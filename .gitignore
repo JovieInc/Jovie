@@ -193,3 +193,6 @@ apps/extension/
 
 # marketing architecture loop state (JOV loop, 2026-07-06)
 .context/marketing-architecture/
+
+# Local fundraising review artifacts may contain source transcripts.
+.artifacts/

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildInvestorNoteReviewArtifact,
+  inputsFromPriorArtifact,
   normalizeSignalText,
   parseAnnotatedTranscript,
 } from '@/lib/investors/note-ingestion';
@@ -97,11 +98,31 @@ OBJECTION | strategy | critical | The buyer is unclear.`)
     expect(artifact.candidates[0]?.sources).toHaveLength(1);
   });
 
-  it('rejects repeated source IDs instead of inflating frequency', () => {
+  it('deduplicates repeated source IDs with identical transcript hashes', () => {
     const input = note({ id: 'conversation-a', signals: [tractionSignal] });
-    expect(() => buildInvestorNoteReviewArtifact([input, input])).toThrow(
-      'Duplicate investor note source ID: conversation-a'
+    expect(buildInvestorNoteReviewArtifact([input, input]).sourceCount).toBe(1);
+  });
+
+  it('makes sequential corpus ingestion equal batch and rejects changed sources', () => {
+    const first = note({ id: 'conversation-a', signals: [tractionSignal] });
+    const second = note({
+      id: 'conversation-b',
+      signals: [{ ...tractionSignal, severity: 'critical' }],
+    });
+    const initial = buildInvestorNoteReviewArtifact([first]);
+    const sequential = buildInvestorNoteReviewArtifact([
+      ...inputsFromPriorArtifact(initial),
+      second,
+    ]);
+    expect(sequential).toEqual(
+      buildInvestorNoteReviewArtifact([first, second])
     );
+    expect(() =>
+      buildInvestorNoteReviewArtifact([
+        first,
+        { ...first, transcript: 'Changed transcript.' },
+      ])
+    ).toThrow('has a changed transcript hash');
   });
 
   it('normalizes Unicode with NFKC while retaining letters and numbers', () => {

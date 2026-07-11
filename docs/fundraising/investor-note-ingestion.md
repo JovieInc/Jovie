@@ -25,7 +25,7 @@ From `apps/web`:
 pnpm exec tsx scripts/ingest-investor-note.ts \
   tests/fixtures/investors/note-a.json \
   tests/fixtures/investors/note-b.json \
-  --out=/tmp/investor-note-review.json
+  --out=../../.artifacts/fundraising/investor-note-review.json
 ```
 
 For plain text, also provide the source date:
@@ -34,25 +34,64 @@ For plain text, also provide the source date:
 pnpm exec tsx scripts/ingest-investor-note.ts exported-note.txt \
   --source-id=conversation-2026-07-11-example \
   --captured-at=2026-07-11 \
-  --out=/tmp/investor-note-review.json
+  --out=../../.artifacts/fundraising/investor-note-review.json
 ```
+
+Outputs are required to be `.json` files under the repository-local
+`.artifacts/fundraising/` directory. That directory is gitignored because the
+artifact retains source transcripts for deterministic incremental ingestion.
+The CLI resolves real paths, rejects symlink inputs and output components, and
+refuses every output outside that root, including with `--overwrite`.
+
+To add notes without losing prior frequency evidence, pass the previous artifact:
+
+```bash
+pnpm exec tsx scripts/ingest-investor-note.ts new-note.json \
+  --prior=../../.artifacts/fundraising/investor-note-review.json \
+  --out=../../.artifacts/fundraising/investor-note-review-next.json
+```
+
+The embedded corpus deduplicates an unchanged `source.id` plus transcript hash.
+Reusing a source ID with a changed transcript hash is rejected. Sequential
+ingestion therefore produces the same artifact as a single batch.
 
 ## Review Contract
 
 The artifact normalizes Unicode with NFKC and merges duplicate questions or objections. It preserves every observed gap classification, chooses canonical text deterministically, keeps the highest observed severity, and sorts and deduplicates provenance. `occurrenceCount` counts mentions; frequency uses distinct conversation IDs so repetition inside one note cannot inflate it.
 
-The CLI refuses `.env*`, `.npmrc`, `.git`, `node_modules`, and the canonical fundraising registry as input or output. Output cannot equal any input. Files are created exclusively by default; `--overwrite` is explicit and never bypasses protected-path or input-collision checks. CLI stdout and stderr are JSON.
+The CLI refuses `.env*`, `.npmrc`, `.git`, `node_modules`, and the canonical fundraising registry as input. Files are created exclusively by default; `--overwrite` is explicit and never bypasses containment, realpath, or symlink checks. CLI stdout and stderr are JSON.
 
 Every artifact is `manual-review-required` and declares `autoPublish: false`. Claims, numbers, the ask, and positioning are protected fields. Candidates include deterministic next actions and proposed review targets for the portal, deck, outreach brief, or registry.
 
-To perform the manual review, create a dedicated branch and draft PR:
+## Guarded Proposal and Draft PR
+
+Create a proposal JSON with `proposalVersion: "1.0.0"`, a stable `slug`, a
+title, and `approvedCandidates`. Each approved item must include an exact
+candidate key, concrete proposed copy, action, allowed target, protected-field
+review flags, and evidence references copied from that candidate's sources.
+Unknown candidates, non-allowed targets, missing evidence, and mismatched
+source IDs, hashes, or line references are rejected.
+
+Preview the deterministic Markdown and git plan without writing or calling a
+remote service (the default):
 
 ```bash
-git switch -c codex/jov-3739-investor-note-review
-# Review the artifact; edit only source-backed risks or communication.
-pnpm --filter @jovie/web exec vitest run tests/unit/investors/fundraising-registry.test.ts
-gh pr create --draft --base codex/jov-3739-investor-note-ingestion \
-  --title "docs(investors): review investor note signals"
+pnpm exec tsx scripts/create-investor-review-draft.ts \
+  --proposal=proposal.json \
+  --artifact=../../.artifacts/fundraising/investor-note-review.json
 ```
 
-The command is deliberately manual. The ingestion script never creates branches, edits the registry, opens PRs, or copies transcript text into investor-facing claims.
+After reviewing the dry-run JSON, explicitly request the external draft stage:
+
+```bash
+pnpm exec tsx scripts/create-investor-review-draft.ts \
+  --proposal=proposal.json \
+  --artifact=../../.artifacts/fundraising/investor-note-review.json \
+  --publish-draft
+```
+
+The opt-in command refuses dirty worktrees and local or remote branch
+collisions. It creates a new `codex/investor-review-*` branch, commits only the
+tracked proposal Markdown under `docs/fundraising/reviews/proposals/`, pushes
+that branch, and opens a GitHub **draft** PR. It never edits registry, portal,
+deck, claims, numbers, ask, or positioning; marks a PR ready; merges; or deploys.

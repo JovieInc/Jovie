@@ -34,12 +34,50 @@ export type InvestorNoteInput = z.infer<typeof investorNoteInputSchema>;
 export type InvestorNoteSignal = z.infer<typeof investorNoteSignalSchema>;
 type GapClassification = InvestorNoteSignal['gapClassification'];
 
+export const investorNotePriorArtifactSchema = z.object({
+  artifactVersion: z.literal('1.2.0'),
+  reviewStatus: z.literal('manual-review-required'),
+  corpus: z.array(
+    z.object({
+      source: investorNoteInputSchema.shape.source,
+      transcriptSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+      transcript: investorNoteInputSchema.shape.transcript,
+      signals: investorNoteInputSchema.shape.signals,
+    })
+  ),
+});
+
+export function inputsFromPriorArtifact(
+  raw: unknown
+): readonly InvestorNoteInput[] {
+  const artifact = investorNotePriorArtifactSchema.parse(raw);
+  return artifact.corpus.map(entry => {
+    if (transcriptHash(entry.transcript) !== entry.transcriptSha256) {
+      throw new Error(
+        `Prior artifact transcript hash mismatch for source ${entry.source.id}.`
+      );
+    }
+    return {
+      source: entry.source,
+      transcript: entry.transcript,
+      signals: entry.signals,
+    };
+  });
+}
+
 interface CandidateSource {
   readonly sourceId: string;
   readonly label: string;
   readonly capturedAt: string;
   readonly transcriptSha256: string;
   readonly line?: number;
+}
+
+export interface InvestorNoteCorpusEntry {
+  readonly source: InvestorNoteInput['source'];
+  readonly transcriptSha256: string;
+  readonly transcript: string;
+  readonly signals: readonly InvestorNoteSignal[];
 }
 
 export interface InvestorNoteCandidate {
@@ -57,11 +95,12 @@ export interface InvestorNoteCandidate {
 }
 
 export interface InvestorNoteReviewArtifact {
-  readonly artifactVersion: '1.1.0';
+  readonly artifactVersion: '1.2.0';
   readonly reviewStatus: 'manual-review-required';
   readonly asOf: string;
   readonly sourceCount: number;
   readonly candidates: readonly InvestorNoteCandidate[];
+  readonly corpus: readonly InvestorNoteCorpusEntry[];
   readonly classificationCounts: Readonly<Record<GapClassification, number>>;
   readonly proposedReviewTargets: readonly string[];
   readonly guardrails: {
@@ -164,16 +203,29 @@ function validateLineProvenance(
 export function buildInvestorNoteReviewArtifact(
   rawInputs: readonly unknown[]
 ): InvestorNoteReviewArtifact {
-  const inputs = rawInputs.map(input => investorNoteInputSchema.parse(input));
+  const parsedInputs = rawInputs.map(input =>
+    investorNoteInputSchema.parse(input)
+  );
+  const inputsById = new Map<string, InvestorNoteInput>();
+  for (const input of parsedInputs) {
+    const existing = inputsById.get(input.source.id);
+    if (existing) {
+      if (
+        transcriptHash(existing.transcript) !== transcriptHash(input.transcript)
+      ) {
+        throw new Error(
+          `Investor note source ID ${input.source.id} has a changed transcript hash.`
+        );
+      }
+      continue;
+    }
+    inputsById.set(input.source.id, input);
+  }
+  const inputs = [...inputsById.values()].sort((left, right) =>
+    compareText(left.source.id, right.source.id)
+  );
   if (inputs.length === 0)
     throw new Error('At least one investor note is required.');
-  const sourceIds = new Set<string>();
-  for (const input of inputs) {
-    if (sourceIds.has(input.source.id)) {
-      throw new Error(`Duplicate investor note source ID: ${input.source.id}`);
-    }
-    sourceIds.add(input.source.id);
-  }
 
   const merged = new Map<
     string,
@@ -268,7 +320,7 @@ export function buildInvestorNoteReviewArtifact(
   ) as Record<GapClassification, number>;
 
   return {
-    artifactVersion: '1.1.0',
+    artifactVersion: '1.2.0',
     reviewStatus: 'manual-review-required',
     asOf: inputs
       .map(input => input.source.capturedAt)
@@ -276,6 +328,12 @@ export function buildInvestorNoteReviewArtifact(
       .at(-1)!,
     sourceCount: inputs.length,
     candidates,
+    corpus: inputs.map(input => ({
+      source: input.source,
+      transcriptSha256: transcriptHash(input.transcript),
+      transcript: input.transcript,
+      signals: input.signals,
+    })),
     classificationCounts,
     proposedReviewTargets: [
       ...new Set(candidates.flatMap(item => item.proposedReviewTargets)),
