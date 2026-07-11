@@ -11,6 +11,10 @@ mode. Do not create Ovie-specific copies of Jovie UI, data contracts, or
 metrics. `/app/admin/ops` remains the canonical Ops surface; Ovie, HUD, and TV
 are presentation modes over the shared implementation.
 
+Before pushing documentation changes, run the local brand-scrub and slopcheck
+guardrails on the changed files; keep these checks passing without weakening
+the scanners.
+
 ## Personal finance boundary
 
 The personal finance module belongs in shared code so its contracts and UI can
