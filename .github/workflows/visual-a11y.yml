@@ -63,7 +63,9 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter web exec playwright install chromium --with-deps
+      # Self-hosted runners already provide the system libraries; --with-deps
+      # invokes sudo and fails on the locked-down OrbStack runner.
+      - run: pnpm --filter web exec playwright install chromium
       - name: Run Storybook A11y Tests
         id: a11y-test
         run: pnpm --filter web test:a11y
@@ -71,15 +73,19 @@ jobs:
         if: always()
         run: |
           if [ "${{ steps.a11y-test.outcome }}" == "failure" ]; then
-            echo "## A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "FAIL: Accessibility violations detected - blocking this PR." >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "To run locally: pnpm --filter web test:a11y" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "## A11y Check Results"
+              echo ""
+              echo "FAIL: Accessibility violations detected - blocking this PR."
+              echo ""
+              echo "To run locally: pnpm --filter web test:a11y"
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "## A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "PASS: All Storybook components passed accessibility checks." >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "## A11y Check Results"
+              echo ""
+              echo "PASS: All Storybook components passed accessibility checks."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
   playwright-visual:
@@ -117,14 +123,18 @@ jobs:
         if: always()
         run: |
           if [ "${{ steps.visual-test.outcome }}" == "failure" ]; then
-            echo "## Visual Regression Results" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "FAIL: Visual differences detected - blocking this PR." >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "If changes are intentional, update snapshots:" >> "$GITHUB_STEP_SUMMARY"
-            echo "pnpm --filter web e2e:visual:update" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "## Visual Regression Results"
+              echo ""
+              echo "FAIL: Visual differences detected - blocking this PR."
+              echo ""
+              echo "If changes are intentional, update snapshots:"
+              echo "pnpm --filter web e2e:visual:update"
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "## Visual Regression Results" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "PASS: All visual tests passed - no unexpected changes detected." >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "## Visual Regression Results"
+              echo ""
+              echo "PASS: All visual tests passed - no unexpected changes detected."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
