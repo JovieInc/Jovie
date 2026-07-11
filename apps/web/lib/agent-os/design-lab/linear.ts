@@ -2,6 +2,7 @@ import 'server-only';
 
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
+import type { DesignProposal } from './types';
 
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 
@@ -16,6 +17,11 @@ interface LinearTeamState {
   readonly id: string;
   readonly type: string;
   readonly name: string;
+}
+
+export interface DesignLabLinearIssueReference {
+  readonly identifier: string;
+  readonly url: string;
 }
 
 async function linearGraphql<T>(
@@ -117,6 +123,61 @@ async function resolveLinearIssue(
   }
 
   return lookupLinearIssueBySearch(issueIdentifier);
+}
+
+export async function createDesignLabLinearIssue(
+  proposal: DesignProposal
+): Promise<DesignLabLinearIssueReference> {
+  const teamData = await linearGraphql<{
+    teams: { nodes: Array<{ id: string }> };
+  }>(
+    `query DesignLabTeam($key: String!) {
+      teams(filter: { key: { eq: $key } }, first: 1) { nodes { id } }
+    }`,
+    { key: 'JOV' }
+  );
+  const teamId = teamData.teams.nodes[0]?.id;
+  if (!teamId) throw new Error('Linear team JOV was not found.');
+
+  const task = proposal.designGap?.registryTask;
+  if (!task)
+    throw new Error('Registry task is required before Linear issue creation.');
+  const description = [
+    proposal.proposalText,
+    '',
+    'Required changes:',
+    ...task.requiredChanges.map(item => `- ${item}`),
+    '',
+    'Exact files:',
+    ...task.exactFiles.map(item => `- ${item}`),
+    '',
+    'Validation:',
+    ...task.validationCommands.map(item => `- \`${item}\``),
+  ].join('\n');
+  const data = await linearGraphql<{
+    issueCreate: {
+      success: boolean;
+      issue: { identifier: string; url: string };
+    };
+  }>(
+    `mutation CreateDesignLabIssue($input: IssueCreateInput!) {
+      issueCreate(input: $input) {
+        success
+        issue { identifier url }
+      }
+    }`,
+    {
+      input: {
+        teamId,
+        title: `[Design Lab] ${proposal.surfaceName}`,
+        description,
+      },
+    }
+  );
+  if (!data.issueCreate.success) {
+    throw new Error('Linear issue creation returned success=false.');
+  }
+  return data.issueCreate.issue;
 }
 
 async function findTeamState(

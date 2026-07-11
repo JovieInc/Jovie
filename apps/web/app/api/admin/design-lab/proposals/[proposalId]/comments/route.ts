@@ -5,8 +5,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   appendDesignProposalComment,
+  mutateDesignProposal,
   parseCompactFeedback,
-  saveDesignProposal,
 } from '@/lib/agent-os/design-lab/proposals';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { getOrMaterializeCatalogProposal } from '../../catalog';
@@ -47,22 +47,29 @@ export async function POST(
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
-    const proposal = await getOrMaterializeCatalogProposal(
+    const materialized = await getOrMaterializeCatalogProposal(
       body.dayBucket,
       params.proposalId
     );
-    if (!proposal) {
+    if (!materialized) {
       return NextResponse.json(
         { error: 'Design proposal not found.' },
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
-    const updated = appendDesignProposalComment(proposal, {
-      author: entitlements.email ?? entitlements.userId ?? 'admin@jovie.local',
-      body: feedback.body,
-      date: new Date().toISOString(),
+    const updated = await mutateDesignProposal({
+      dayBucket: body.dayBucket,
+      proposalId: params.proposalId,
+      mutate: async proposal => {
+        const next = appendDesignProposalComment(proposal, {
+          author:
+            entitlements.email ?? entitlements.userId ?? 'admin@jovie.local',
+          body: feedback.body,
+          date: new Date().toISOString(),
+        });
+        return { proposal: next, result: next };
+      },
     });
-    await saveDesignProposal(updated);
     return NextResponse.json(
       { ok: true, proposal: updated },
       { status: 200, headers: NO_STORE_HEADERS }
