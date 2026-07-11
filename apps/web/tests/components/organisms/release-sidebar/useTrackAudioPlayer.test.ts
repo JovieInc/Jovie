@@ -330,6 +330,65 @@ describe('useTrackAudioPlayer', () => {
     expect(errorCb).toHaveBeenCalledTimes(1);
   });
 
+  it('pauses for interruptions and stays paused by default', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const engine = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('play');
+    });
+
+    act(() => {
+      engine.pausePlaybackForInterruption();
+    });
+    expect(mockAudio.pause).toHaveBeenCalled();
+    act(() => {
+      mockAudio.paused = true;
+      fireAudioEvent('pause');
+    });
+
+    act(() => {
+      engine.resumePlaybackAfterInterruption();
+    });
+    expect(mockAudio.play).toHaveBeenCalledTimes(1);
+    expect(result.current.playbackState.isPlaying).toBe(false);
+  });
+
+  it('switches source onto a single active track', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'First',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+      });
+    });
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-2',
+        title: 'Second',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+      });
+    });
+
+    expect(result.current.playbackState.activeTrackId).toBe('track-2');
+    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
+    expect(mockAudio.pause.mock.calls.length).toBeGreaterThanOrEqual(1);
+  });
+
   it('keeps the latest track active when an earlier play() resolves late', async () => {
     let resolveFirstPlay: (() => void) | undefined;
     let resolveSecondPlay: (() => void) | undefined;

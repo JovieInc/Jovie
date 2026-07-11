@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  pausePlaybackForInterruption,
+  resumePlaybackAfterInterruption,
+} from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
+import {
   createWebSpeechTranscriber,
   type Transcriber,
   type TranscriberErrorCode,
@@ -67,9 +71,12 @@ export function useSpeechRecognition({
         onError: code => {
           setError(code);
           setIsListening(false);
+          // Release interruption hold if capture failed mid-session.
+          resumePlaybackAfterInterruption();
         },
         onEnd: () => {
           setIsListening(false);
+          resumePlaybackAfterInterruption();
         },
       },
       { lang, browserWindow }
@@ -82,6 +89,7 @@ export function useSpeechRecognition({
     return () => {
       transcriber.dispose();
       transcriberRef.current = null;
+      resumePlaybackAfterInterruption();
     };
   }, [browserWindow, desktopDictationStatus.webSpeechFallbackAllowed, lang]);
 
@@ -93,6 +101,9 @@ export function useSpeechRecognition({
     const transcriber = transcriberRef.current;
     if (!transcriber?.isSupported) return;
     setError(null);
+    // Single-active media: pause global playback while capturing voice.
+    // Stay paused after stop (JOV-3683 default — no auto-resume).
+    pausePlaybackForInterruption();
     transcriber.start();
     setIsListening(true);
   }, []);
@@ -100,6 +111,7 @@ export function useSpeechRecognition({
   const stop = useCallback(() => {
     transcriberRef.current?.stop();
     setIsListening(false);
+    resumePlaybackAfterInterruption();
   }, []);
 
   const toggle = useCallback(() => {

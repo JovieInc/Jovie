@@ -51,6 +51,12 @@ let _activeTrackIsrc: string | null = null;
 let _hasRetriedRefresh = false;
 let _queue: readonly AudioTrackSource[] = [];
 let _queueIndex = -1;
+/** Nested audio-focus holds (dictation / local preview). Resume is opt-in. */
+let _interruptionDepth = 0;
+let _wasPlayingBeforeInterruption = false;
+let _mediaSessionBound = false;
+/** ~4 Hz progress notify for cross-surface scrub without rAF thrash. */
+const PROGRESS_NOTIFY_MS = 250;
 
 /** Lazily create the Audio element — safe to call during SSR (returns null server-side). */
 function getAudio(): HTMLAudioElement | null {
@@ -133,8 +139,114 @@ function notify(): void {
 }
 
 function setState(partial: Partial<PlaybackState>): void {
+  const prev = state;
   state = { ...state, ...partial };
   notify();
+
+  if (
+    prev.activeTrackId !== state.activeTrackId ||
+    prev.trackTitle !== state.trackTitle ||
+    prev.artistName !== state.artistName ||
+    prev.releaseTitle !== state.releaseTitle ||
+    prev.artworkUrl !== state.artworkUrl ||
+    prev.isPlaying !== state.isPlaying ||
+    prev.duration !== state.duration
+  ) {
+    syncMediaSession();
+  }
+}
+
+function getMediaSession(): MediaSession | null {
+  if (typeof navigator === 'undefined') return null;
+  if (!('mediaSession' in navigator)) return null;
+  return navigator.mediaSession;
+}
+
+function bindMediaSessionHandlers(): void {
+  if (_mediaSessionBound) return;
+  const session = getMediaSession();
+  if (!session) return;
+
+  try {
+    session.setActionHandler('play', () => {
+      const audio = getAudio();
+      if (!audio || !state.activeTrackId) return;
+      void audio.play().catch(() => {
+        handlePlaybackFailure(audio, 'play_rejected');
+      });
+    });
+    session.setActionHandler('pause', () => {
+      getAudio()?.pause();
+    });
+    session.setActionHandler('previoustrack', () => {
+      if (state.hasPrevious) {
+        void advanceQueueToIndex(_queueIndex - 1);
+      }
+    });
+    session.setActionHandler('nexttrack', () => {
+      if (state.hasNext) {
+        void advanceQueueToIndex(_queueIndex + 1);
+      }
+    });
+    session.setActionHandler('seekto', details => {
+      if (typeof details.seekTime !== 'number') return;
+      seekToTime(details.seekTime);
+    });
+    _mediaSessionBound = true;
+  } catch {
+    // Some browsers reject unsupported action handlers — ignore.
+  }
+}
+
+function syncMediaSession(): void {
+  const session = getMediaSession();
+  if (!session) return;
+
+  bindMediaSessionHandlers();
+
+  if (!state.activeTrackId) {
+    session.metadata = null;
+    session.playbackState = 'none';
+    return;
+  }
+
+  try {
+    session.metadata = new MediaMetadata({
+      title: state.trackTitle ?? 'Unknown track',
+      artist: state.artistName ?? '',
+      album: state.releaseTitle ?? '',
+      artwork: state.artworkUrl
+        ? [{ src: state.artworkUrl, sizes: '512x512' }]
+        : [],
+    });
+  } catch {
+    // MediaMetadata construction can throw on invalid artwork URLs.
+  }
+
+  session.playbackState = state.isPlaying ? 'playing' : 'paused';
+
+  try {
+    if (
+      Number.isFinite(state.duration) &&
+      state.duration > 0 &&
+      typeof session.setPositionState === 'function'
+    ) {
+      session.setPositionState({
+        duration: state.duration,
+        position: Math.min(state.currentTime, state.duration),
+        playbackRate: 1,
+      });
+    }
+  } catch {
+    // setPositionState throws when position > duration during short previews.
+  }
+}
+
+function seekToTime(time: number): void {
+  const audio = getAudio();
+  if (!audio || !Number.isFinite(time)) return;
+  if (!Number.isFinite(audio.duration) || audio.duration === 0) return;
+  audio.currentTime = Math.max(0, Math.min(time, audio.duration));
 }
 
 function notifyPlaybackError(reason: PlaybackState['lastErrorReason']): void {
@@ -221,12 +333,13 @@ async function advanceQueueToIndex(index: number): Promise<void> {
 }
 
 function bindAudioEvents(el: HTMLAudioElement): void {
-  let lastNotifiedSecond = -1;
+  let lastNotifiedAt = 0;
   el.addEventListener('timeupdate', () => {
-    // Throttle to ~1 update/sec to reduce re-renders across all subscribers
-    const sec = Math.floor(el.currentTime);
-    if (sec === lastNotifiedSecond) return;
-    lastNotifiedSecond = sec;
+    // ~4 Hz keeps cross-surface scrub bars smooth without rAF thrash.
+    const now =
+      typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (now - lastNotifiedAt < PROGRESS_NOTIFY_MS) return;
+    lastNotifiedAt = now;
     setState({
       currentTime: el.currentTime,
       duration: Number.isFinite(el.duration) ? el.duration : 0,
@@ -267,7 +380,7 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     });
   });
   el.addEventListener('seeked', () => {
-    lastNotifiedSecond = -1; // invalidate throttle so next timeupdate fires
+    lastNotifiedAt = 0; // invalidate throttle so next timeupdate fires
     setState({
       currentTime: el.currentTime,
       duration: Number.isFinite(el.duration) ? el.duration : 0,
@@ -326,12 +439,46 @@ function bindAudioEvents(el: HTMLAudioElement): void {
   });
 }
 
+/** Nested-safe pause for dictation / local preview. Default: no auto-resume. */
+export function pausePlaybackForInterruption(): void {
+  const audio = getAudio();
+  if (_interruptionDepth === 0) {
+    _wasPlayingBeforeInterruption = Boolean(
+      audio && !audio.paused && state.isPlaying
+    );
+  }
+  _interruptionDepth += 1;
+  if (audio && !audio.paused) {
+    audio.pause();
+  }
+}
+
+/** Release interruption hold. Pass `{ resume: true }` to resume prior track. */
+export function resumePlaybackAfterInterruption(
+  options: { readonly resume?: boolean } = {}
+): void {
+  if (_interruptionDepth === 0) return;
+  _interruptionDepth -= 1;
+  if (_interruptionDepth > 0) return;
+
+  const shouldResume = Boolean(options.resume) && _wasPlayingBeforeInterruption;
+  _wasPlayingBeforeInterruption = false;
+  if (!shouldResume) return;
+
+  const audio = getAudio();
+  if (!audio || !state.activeTrackId) return;
+  void audio.play().catch(() => {
+    handlePlaybackFailure(audio, 'play_rejected');
+  });
+}
+
 export function useTrackAudioPlayer() {
   const [playbackState, setPlaybackState] = useState<PlaybackState>(state);
 
   useEffect(() => {
     const listener = () => setPlaybackState(state);
     listeners.add(listener);
+    setPlaybackState(state);
     return () => {
       listeners.delete(listener);
     };
@@ -341,6 +488,12 @@ export function useTrackAudioPlayer() {
     async (track: AudioTrackSource, options?: ToggleTrackOptions) => {
       const audio = getAudio();
       if (!audio) return;
+
+      // Intentional play clears dictation/local-preview holds.
+      if (_interruptionDepth > 0) {
+        _interruptionDepth = 0;
+        _wasPlayingBeforeInterruption = false;
+      }
 
       // Same track — toggle pause/resume
       if (state.activeTrackId === track.id) {
@@ -379,15 +532,14 @@ export function useTrackAudioPlayer() {
   }, []);
 
   const seek = useCallback((time: number) => {
-    const audio = getAudio();
-    if (!audio || !Number.isFinite(time)) return;
-    if (!Number.isFinite(audio.duration) || audio.duration === 0) return;
-    audio.currentTime = Math.max(0, Math.min(time, audio.duration));
+    seekToTime(time);
   }, []);
 
   const stop = useCallback(() => {
     // Invalidate any in-flight play() from earlier toggleTrack calls
     _playToken += 1;
+    _interruptionDepth = 0;
+    _wasPlayingBeforeInterruption = false;
     const audio = getAudio();
     if (audio) {
       audio.pause();
@@ -428,5 +580,7 @@ export function useTrackAudioPlayer() {
     seek,
     stop,
     onError,
+    pauseForInterruption: pausePlaybackForInterruption,
+    resumeAfterInterruption: resumePlaybackAfterInterruption,
   };
 }

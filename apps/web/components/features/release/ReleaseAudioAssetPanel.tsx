@@ -13,11 +13,13 @@ import {
 import { toast } from '@/components/feedback';
 import {
   AUDIO_ACCEPT,
-  AUDIO_MAX_FILE_SIZE_BYTES,
-  isSupportedAudioFile,
+  type AudioUploadRejection,
+  SUPPORTED_AUDIO_FORMAT_LABELS,
+  validateAudioUpload,
 } from '@/lib/audio/constants';
 import type { AudioSnippet } from '@/lib/audio/snippet';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/utils/logger';
 import { AudioWaveformEditor } from './AudioWaveformEditor';
 
 export interface ReleaseAudioAssetPanelProps {
@@ -58,6 +60,8 @@ export function ReleaseAudioAssetPanel({
   );
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadRejection, setUploadRejection] =
+    useState<AudioUploadRejection | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,22 +96,44 @@ export function ReleaseAudioAssetPanel({
     };
   }, [initialSnippet, localPreviewUrl, releaseId]);
 
+  const openFilePicker = useCallback(() => {
+    inputRef.current?.click();
+  }, []);
+
+  const handleRequestType = useCallback((rejection: AudioUploadRejection) => {
+    logger.info('[audio-upload] request unsupported type', {
+      code: rejection.code,
+      rule: rejection.rule,
+      message: rejection.message,
+    });
+    toast.success('Request noted — we track demand for new formats');
+  }, []);
+
+  const handleRejectionCta = useCallback(
+    (rejection: AudioUploadRejection) => {
+      if (rejection.cta.action === 'request_type') {
+        handleRequestType(rejection);
+        return;
+      }
+      openFilePicker();
+    },
+    [handleRequestType, openFilePicker]
+  );
+
   const uploadFile = useCallback(
     async (file: File) => {
       if (!isEditable) return;
 
-      if (!isSupportedAudioFile(file)) {
-        setUploadError('Use MP3, WAV, FLAC, AIFF, AAC, or M4A audio.');
-        return;
-      }
-
-      if (file.size > AUDIO_MAX_FILE_SIZE_BYTES) {
-        setUploadError('Audio must be 150 MB or smaller.');
+      const validation = validateAudioUpload(file);
+      if (!validation.ok) {
+        setUploadRejection(validation);
+        setUploadError(null);
         return;
       }
 
       setIsUploading(true);
       setUploadError(null);
+      setUploadRejection(null);
 
       try {
         const blob = await upload(file.name, file, {
@@ -145,6 +171,7 @@ export function ReleaseAudioAssetPanel({
         const message =
           error instanceof Error ? error.message : 'Audio upload failed';
         setUploadError(message);
+        setUploadRejection(null);
         toast.error(message);
       } finally {
         setIsUploading(false);
@@ -201,11 +228,12 @@ export function ReleaseAudioAssetPanel({
   );
 
   if (!localPreviewUrl) {
+    const formats = SUPPORTED_AUDIO_FORMAT_LABELS.join(', ');
     return (
       <div data-testid={dropzoneTestId}>
         <button
           type='button'
-          onClick={() => inputRef.current?.click()}
+          onClick={openFilePicker}
           onDragEnter={event => {
             event.preventDefault();
             setIsDragging(true);
@@ -248,7 +276,7 @@ export function ReleaseAudioAssetPanel({
             {isUploading ? 'Uploading audio' : 'Drop audio'}
           </span>
           <span className='mt-1 text-2xs leading-4 text-tertiary-token'>
-            MP3, WAV, FLAC, AIFF, AAC, or M4A. Max 150 MB.
+            {formats}. Max 150 MB.
           </span>
         </button>
         <input
@@ -261,8 +289,53 @@ export function ReleaseAudioAssetPanel({
           className='sr-only'
           aria-label={`Upload audio for ${releaseTitle}`}
         />
-        <output className='min-h-5 pt-1.5 text-2xs'>
-          {uploadError ? <p className='text-error'>{uploadError}</p> : null}
+        <output
+          className='min-h-12 space-y-1.5 pt-1.5 text-2xs'
+          data-testid='release-audio-upload-feedback'
+        >
+          {uploadRejection ? (
+            <div className='rounded-md border border-subtle bg-surface-0 px-2.5 py-2 text-left'>
+              <p className='font-medium text-error' data-testid='upload-rule'>
+                {uploadRejection.rule}
+              </p>
+              <p className='mt-0.5 text-secondary-token'>
+                {uploadRejection.message}
+              </p>
+              <div className='mt-2 flex flex-wrap items-center gap-2'>
+                <button
+                  type='button'
+                  onClick={() => handleRejectionCta(uploadRejection)}
+                  className='focus-ring-themed rounded-md border border-subtle bg-surface-1 px-2 py-1 text-2xs font-medium text-primary-token transition-colors duration-subtle hover:bg-surface-0'
+                  data-testid='upload-rejection-cta'
+                >
+                  {uploadRejection.cta.label}
+                </button>
+                {uploadRejection.code === 'audio.supported_types' ? (
+                  <button
+                    type='button'
+                    onClick={() =>
+                      handleRequestType({
+                        ...uploadRejection,
+                        cta: {
+                          label: 'Request This Type',
+                          action: 'request_type',
+                        },
+                      })
+                    }
+                    className='focus-ring-themed rounded-md px-2 py-1 text-2xs font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token'
+                    data-testid='upload-request-type-cta'
+                  >
+                    Request This Type
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+          {uploadError ? (
+            <p className='text-error' data-testid='upload-generic-error'>
+              {uploadError}
+            </p>
+          ) : null}
         </output>
       </div>
     );
