@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Homepage labels now meet WCAG AA contrast:** the distributor trust-strip and closed-loop labels use the readable tertiary text token instead of the low-contrast quaternary token.
 - [internal] **Desktop renderer recovery (JOV-3595)**: recover from hosted loads that return HTTP 200 but never boot React, and route crashed or unresponsive renderers to the visible recovery shell instead of a permanent black window.
 - [internal] Agent preflight: one-shot JSON bootstrap for /autoplan (JOV-4183)
 - **[internal] Critical auth, activation, and billing identity hardening (JOV-4181)**: Stripe billing updates, trial activation, billing-status reads, and profile ownership checks now resolve Better Auth application users safely across the legacy Clerk-ID transition; deterministic regression tests cover the identity and compare-and-set predicates. CI now classifies onboarding, ingestion, memory, AI/workflow, enrichment, chat, and cron changes as high risk.
