@@ -196,13 +196,6 @@ jobs:
             scripts/lib/detect-systemic-failures.mjs
           sparse-checkout-cone-mode: false
 
-      - name: Enable pnpm
-        if: >-
-          steps.trigger.outputs.should_continue == 'true' &&
-          steps.branch-check.outputs.is_agent_branch == 'true' &&
-          steps.trigger.outputs.trigger_type == 'ci_failure'
-        run: corepack enable
-
       - name: Setup Node
         if: >-
           steps.trigger.outputs.should_continue == 'true' &&
