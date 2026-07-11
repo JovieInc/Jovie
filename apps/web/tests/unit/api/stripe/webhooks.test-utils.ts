@@ -15,6 +15,8 @@ export function setSkipProcessing(value: boolean) {
 // (data race disappear after conflict, unprocessed-retry path for prior failure)
 export let simulateRaceDisappear = false;
 export let simulateUnprocessedRetry = false;
+export let simulateActiveLease = false;
+export let simulateLeaseClaimFailure = false;
 
 export function setSimulateRaceDisappear(value: boolean) {
   simulateRaceDisappear = value;
@@ -22,6 +24,14 @@ export function setSimulateRaceDisappear(value: boolean) {
 
 export function setSimulateUnprocessedRetry(value: boolean) {
   simulateUnprocessedRetry = value;
+}
+
+export function setSimulateActiveLease(value: boolean) {
+  simulateActiveLease = value;
+}
+
+export function setSimulateLeaseClaimFailure(value: boolean) {
+  simulateLeaseClaimFailure = value;
 }
 
 export async function getPost() {
@@ -73,7 +83,20 @@ const hoisted = vi.hoisted(() => {
   // Mock db.update().set().where()
   const dbUpdate = vi.fn(() => ({
     set: vi.fn(() => ({
-      where: vi.fn(() => Promise.resolve()),
+      where: vi.fn(() => ({
+        returning: vi.fn(async () => {
+          const {
+            simulateActiveLease: activeLease,
+            simulateLeaseClaimFailure: claimFailure,
+          } = await import('./webhooks.test-utils');
+          if (claimFailure && dbUpdate.mock.calls.length === 1) {
+            throw new Error('lease claim failed');
+          }
+          return activeLease && dbUpdate.mock.calls.length === 1
+            ? []
+            : [{ id: 'webhook-1' }];
+        }),
+      })),
     })),
   }));
 
@@ -140,6 +163,7 @@ vi.mock('@/lib/db/schema', () => ({
     id: 'id',
     stripeEventId: 'stripe_event_id',
     processedAt: 'processed_at',
+    processingStartedAt: 'processing_started_at',
   },
 }));
 
