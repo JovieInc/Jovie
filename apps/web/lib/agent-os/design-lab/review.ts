@@ -2,11 +2,15 @@ import 'server-only';
 
 import { logger } from '@/lib/utils/logger';
 import { triggerDesignLabDispatch } from './dispatch';
-import { updateDesignLabLinearIssueStatus } from './linear';
+import {
+  createDesignLabLinearIssue,
+  updateDesignLabLinearIssueStatus,
+} from './linear';
 import {
   deriveProposalStatus,
   getDesignProposal,
   saveDesignProposal,
+  withDesignProposalLock,
 } from './proposals';
 import { appendDesignTasteMemoryEntry } from './taste-memory';
 import type {
@@ -41,7 +45,24 @@ async function dispatchApprovedProposal(
   return { proposal: dispatched, triggered: true };
 }
 
-export async function reviewDesignProposal(params: {
+async function ensureImplementationIssue(
+  proposal: DesignProposal,
+  decision: DesignProposalReviewDecision
+): Promise<DesignProposal> {
+  if (!isApproval(decision) || proposal.linearIssueId !== 'UNASSIGNED') {
+    return proposal;
+  }
+  const issue = await createDesignLabLinearIssue(proposal);
+  const assigned = {
+    ...proposal,
+    linearIssueId: issue.identifier,
+    linearIssueUrl: issue.url,
+  };
+  await saveDesignProposal(assigned);
+  return assigned;
+}
+
+async function reviewDesignProposalLocked(params: {
   readonly dayBucket: string;
   readonly proposalId: string;
   readonly decision: DesignProposalReviewDecision;
@@ -107,7 +128,8 @@ export async function reviewDesignProposal(params: {
   await saveDesignProposal(reviewing);
 
   // Approval is durable before any external dispatch. A retry can safely resume it.
-  const decided: DesignProposal = { ...reviewing, status: finalStatus };
+  const assigned = await ensureImplementationIssue(reviewing, params.decision);
+  const decided: DesignProposal = { ...assigned, status: finalStatus };
   await saveDesignProposal(decided);
 
   const dispatch = await dispatchApprovedProposal(
@@ -134,10 +156,13 @@ export async function reviewDesignProposal(params: {
     logger.error('[design-lab/review] Taste memory append failed', { error });
   }
 
-  const linearUpdated = await updateDesignLabLinearIssueStatus(
-    existing.linearIssueId,
-    params.decision === 'no' ? 'canceled' : 'completed'
-  );
+  const linearUpdated =
+    params.decision === 'no' && decided.linearIssueId !== 'UNASSIGNED'
+      ? await updateDesignLabLinearIssueStatus(
+          decided.linearIssueId,
+          'canceled'
+        )
+      : false;
 
   return {
     proposal: dispatch.proposal,
@@ -146,4 +171,16 @@ export async function reviewDesignProposal(params: {
     dispatchTriggered: dispatch.triggered,
     dispatchId: dispatch.proposal.dispatchId,
   };
+}
+
+export async function reviewDesignProposal(params: {
+  readonly dayBucket: string;
+  readonly proposalId: string;
+  readonly decision: DesignProposalReviewDecision;
+  readonly notes: string | null;
+  readonly reviewer: string;
+}): Promise<ReviewDesignProposalResult> {
+  return withDesignProposalLock(params.dayBucket, params.proposalId, () =>
+    reviewDesignProposalLocked(params)
+  );
 }

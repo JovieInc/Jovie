@@ -7,11 +7,17 @@ const getDesignProposal = vi.fn();
 const saveDesignProposal = vi.fn();
 const appendDesignTasteMemoryEntry = vi.fn();
 const updateDesignLabLinearIssueStatus = vi.fn();
+const createDesignLabLinearIssue = vi.fn();
 const triggerDesignLabDispatch = vi.fn();
 
 vi.mock('@/lib/agent-os/design-lab/proposals', () => ({
   getDesignProposal,
   saveDesignProposal,
+  withDesignProposalLock: async (
+    _dayBucket: string,
+    _proposalId: string,
+    action: () => Promise<unknown>
+  ) => action(),
   deriveProposalStatus: (decision: string | null) => {
     if (decision === 'no') return 'rejected';
     if (decision === 'yes' || decision === 'yes-with-notes') return 'approved';
@@ -24,6 +30,7 @@ vi.mock('@/lib/agent-os/design-lab/taste-memory', () => ({
 }));
 
 vi.mock('@/lib/agent-os/design-lab/linear', () => ({
+  createDesignLabLinearIssue,
   updateDesignLabLinearIssueStatus,
 }));
 
@@ -117,13 +124,17 @@ describe('reviewDesignProposal', () => {
     saveDesignProposal.mockResolvedValue(undefined);
     appendDesignTasteMemoryEntry.mockResolvedValue(undefined);
     updateDesignLabLinearIssueStatus.mockResolvedValue(true);
+    createDesignLabLinearIssue.mockResolvedValue({
+      identifier: 'JOV-9999',
+      url: 'https://linear.app/jovie/issue/JOV-9999',
+    });
     triggerDesignLabDispatch.mockResolvedValue({
       triggered: true,
       dispatchId: 'design-lab-test',
     });
   });
 
-  it('approves with yes, dispatches D5, and completes Linear issue', async () => {
+  it('approves with yes, dispatches D5, and leaves implementation issue open', async () => {
     const { reviewDesignProposal } = await import(
       '@/lib/agent-os/design-lab/review'
     );
@@ -151,10 +162,7 @@ describe('reviewDesignProposal', () => {
         reviewer: 'tim@jovie.com',
       })
     );
-    expect(updateDesignLabLinearIssueStatus).toHaveBeenCalledWith(
-      'JOV-1951',
-      'completed'
-    );
+    expect(updateDesignLabLinearIssueStatus).not.toHaveBeenCalled();
     expect(saveDesignProposal).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'approved',
@@ -226,6 +234,35 @@ describe('reviewDesignProposal', () => {
         status: 'approved',
         reviewDecision: 'yes-with-notes',
         reviewNotes: 'Keep the underline but reduce accent saturation.',
+      })
+    );
+  });
+
+  it('creates and persists an implementation issue before dispatch', async () => {
+    getDesignProposal.mockResolvedValue({
+      ...baseProposal,
+      linearIssueId: 'UNASSIGNED',
+      linearIssueUrl: null,
+    });
+    const { reviewDesignProposal } = await import(
+      '@/lib/agent-os/design-lab/review'
+    );
+
+    await reviewDesignProposal({
+      dayBucket: '2026-06-08',
+      proposalId: baseProposal.id,
+      decision: 'yes',
+      notes: null,
+      reviewer: 'tim@jovie.com',
+    });
+
+    expect(createDesignLabLinearIssue).toHaveBeenCalledOnce();
+    expect(triggerDesignLabDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        proposal: expect.objectContaining({
+          linearIssueId: 'JOV-9999',
+          linearIssueUrl: 'https://linear.app/jovie/issue/JOV-9999',
+        }),
       })
     );
   });
