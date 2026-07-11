@@ -80,7 +80,9 @@ const ANNOTATED_LINE =
   /^(QUESTION|OBJECTION)\s*\|\s*(communication|evidence|strategy|investor-fit)\s*\|\s*(medium|high|critical)\s*\|\s*(.+)$/iu;
 const severityRank = { medium: 0, high: 1, critical: 2 } as const;
 const compareText = (left: string, right: string) =>
-  left < right ? -1 : left > right ? 1 : 0;
+  left.localeCompare(right, 'en-US');
+const compareIsoDate = (left: string, right: string) =>
+  Date.parse(left) - Date.parse(right);
 const NEXT_ACTIONS: Readonly<Record<GapClassification, string>> = {
   communication:
     'Review whether the portal and deck explain the existing evidence clearly.',
@@ -231,7 +233,7 @@ export function buildInvestorNoteReviewArtifact(
       );
       const proposedReviewTargets = [
         ...new Set(gapClassifications.flatMap(item => REVIEW_TARGETS[item])),
-      ].sort();
+      ].sort(compareText);
       const conversationCount = value.conversationIds.size;
       return {
         key,
@@ -272,14 +274,14 @@ export function buildInvestorNoteReviewArtifact(
     reviewStatus: 'manual-review-required',
     asOf: inputs
       .map(input => input.source.capturedAt)
-      .sort()
+      .sort(compareIsoDate)
       .at(-1)!,
     sourceCount: inputs.length,
     candidates,
     classificationCounts,
     proposedReviewTargets: [
       ...new Set(candidates.flatMap(item => item.proposedReviewTargets)),
-    ].sort(),
+    ].sort(compareText),
     guardrails: {
       autoPublish: false,
       protectedFields: ['claims', 'numbers', 'ask', 'positioning'],
