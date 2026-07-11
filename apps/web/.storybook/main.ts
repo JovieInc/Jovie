@@ -105,6 +105,14 @@ const config: StorybookConfig = {
           find: /^(.*\/)?test-mode$/,
           replacement: require.resolve('./test-mode-mock.ts'),
         },
+        {
+          find: '@/lib/auth/better-auth',
+          replacement: require.resolve('./better-auth-mock.ts'),
+        },
+        {
+          find: '@/lib/auth/require-auth',
+          replacement: require.resolve('./require-auth-mock.ts'),
+        },
 
         {
           find: '@/app/app/(shell)/dashboard/actions',

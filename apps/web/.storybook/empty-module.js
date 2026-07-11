@@ -35,3 +35,26 @@ export function headers() {
 export function draftMode() {
   return { isEnabled: false, enable: () => {}, disable: () => {} };
 }
+
+export class NextResponse extends Response {
+  static json(body, init) {
+    return Response.json(body, init);
+  }
+
+  static next() {
+    return new NextResponse(null, { status: 200 });
+  }
+
+  static redirect(url, init = 307) {
+    return Response.redirect(
+      url,
+      typeof init === 'number' ? init : init.status
+    );
+  }
+}
+
+export class NextRequest extends Request {}
+
+export function after(callback) {
+  return callback();
+}

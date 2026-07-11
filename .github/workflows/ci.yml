@@ -67,6 +67,7 @@ jobs:
       skip: ${{ steps.graphite.outputs.skip || 'false' }}
       run_build: ${{ steps.detect.outputs.run_build || steps.graphite_skip.outputs.run_build || 'false' }}
       run_test: ${{ steps.detect.outputs.run_test || steps.graphite_skip.outputs.run_test || 'false' }}
+      run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || 'false' }}
       run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse || steps.graphite_skip.outputs.run_public_lighthouse || 'false' }}
       run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse || steps.graphite_skip.outputs.run_dashboard_lighthouse || 'false' }}
       run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse || steps.graphite_skip.outputs.run_onboarding_lighthouse || 'false' }}
@@ -210,6 +211,13 @@ jobs:
           else
             RUN_TEST=false
             echo "run_test=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          STORYBOOK_A11Y_PATTERN='^(apps/web/components/|apps/web/\.storybook/|apps/web/vitest\.config\.storybook\.mts|apps/web/package\.json|packages/ui/|pnpm-lock\.yaml|\.github/workflows/(ci|visual-a11y)\.yml)'
+          if echo "$CHANGED_FILES" | grep -q -E "$STORYBOOK_A11Y_PATTERN"; then
+            echo "run_storybook_a11y=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_storybook_a11y=false" >> "$GITHUB_OUTPUT"
           fi
 
           # Screenshot-only product exports live under public/product-screenshots and
@@ -3814,6 +3822,22 @@ jobs:
   # Original removal was due to 0.5 thresholds being too relaxed. Updated .lighthouserc.pr.json fixes this.
   # Production Lighthouse (in ci-build job) has even stricter thresholds (0.8 perf, 0.95 a11y).
 
+  ci-storybook-a11y:
+    name: Storybook A11y
+    needs: [ci-path-changes]
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && needs.ci-path-changes.outputs.run_storybook_a11y == 'true' }}
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+      - name: Run Storybook accessibility tests
+        run: pnpm --filter @jovie/web test:a11y
+
   ci-pr-ready:
     name: PR Ready
     # THE single aggregate merge gate (docs/PR_FLOW.md, merge-queue-guard.mjs
@@ -3835,6 +3859,7 @@ jobs:
         ci-build-public,
         ci-pr-vercel-preview,
         ci-a11y,
+        ci-storybook-a11y,
         ci-layout-guard,
       ]
     # always() so we still evaluate when a leaf fails. !cancelled() avoids a
@@ -3851,6 +3876,7 @@ jobs:
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
           A11Y_RESULT="${{ needs.ci-a11y.result }}"
+          STORYBOOK_A11Y_RESULT="${{ needs.ci-storybook-a11y.result }}"
           LAYOUT_GUARD_RESULT="${{ needs.ci-layout-guard.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
@@ -3865,6 +3891,7 @@ jobs:
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
           echo "ci-a11y: $A11Y_RESULT"
+          echo "ci-storybook-a11y: $STORYBOOK_A11Y_RESULT"
           echo "ci-layout-guard: $LAYOUT_GUARD_RESULT"
           echo "ci-risk-classifier: $RISK_RESULT ($RISK_LEVEL; rules: ${RISK_RULES:-none})"
           echo "ci-pr-vercel-preview: $PREVIEW_RESULT"
@@ -3879,6 +3906,7 @@ jobs:
             echo "| Unit Tests | $UNIT_RESULT | \`pnpm --filter=@jovie/web run test:fast\` |"
             echo "| Build (public routes) | $BUILD_RESULT | \`pnpm run build:web\` |"
             echo "| A11y (axe) | $A11Y_RESULT | \`pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium\` |"
+            echo "| Storybook A11y | $STORYBOOK_A11Y_RESULT | \`pnpm --filter @jovie/web test:a11y\` |"
             echo "| Layout Guard | $LAYOUT_GUARD_RESULT | \`pnpm exec playwright test tests/e2e/layout-overlap-guard.spec.ts --project=chromium\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo "| Preview Deploy | $PREVIEW_RESULT | \`pnpm run build:web\` |"
@@ -3930,6 +3958,15 @@ jobs:
             exit 1
           fi
 
+          # Storybook A11y is path-gated, but a relevant failure is part of the
+          # aggregate PR Ready contract. Keep the leaf unpinned so irrelevant
+          # PRs never wait for a check that intentionally does not run.
+          if [[ "$STORYBOOK_A11Y_RESULT" != "success" && "$STORYBOOK_A11Y_RESULT" != "skipped" ]]; then
+            echo "❌ Storybook A11y did not pass (result: $STORYBOOK_A11Y_RESULT)"
+            echo "Likely fix: run pnpm --filter @jovie/web test:a11y and fix the first failing story or browser import."
+            exit 1
+          fi
+
           # Layout Guard must succeed when it runs (skipped when the shared build artifact is absent).
           if [[ "$LAYOUT_GUARD_RESULT" != "success" && "$LAYOUT_GUARD_RESULT" != "skipped" ]]; then
             echo "❌ Layout Guard did not pass (result: $LAYOUT_GUARD_RESULT)"
@@ -3957,7 +3994,7 @@ jobs:
             echo "Risk classifier blocks unattended auto-merge for this PR. Human review may still merge after required evidence is present."
           fi
 
-          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, a11y, layout guard, build"
+          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, a11y, Storybook a11y, layout guard, build"
 
   ci-summary:
     name: PR Summary

@@ -65,10 +65,13 @@ export default defineConfig({
       'motion/react',
       'vaul',
       'react-error-boundary',
+      '@jovie/ui > react-hook-form',
+      'dompurify',
       // Radix UI primitives
       '@radix-ui/react-slot',
       '@radix-ui/react-alert-dialog',
       '@radix-ui/react-checkbox',
+      '@jovie/ui > @radix-ui/react-context-menu',
       '@radix-ui/react-dialog',
       '@radix-ui/react-dropdown-menu',
       '@radix-ui/react-label',

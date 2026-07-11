@@ -4,7 +4,7 @@ import {
   type DSPConfig,
   PROVIDER_DOMAINS,
 } from '@/lib/dsp-registry';
-import { Artist, Release } from '@/types/db';
+import type { Artist, Release } from '@/types/db';
 
 export type { DSPConfig } from '@/lib/dsp-registry';
 export { DSP_CONFIGS } from '@/lib/dsp-registry';

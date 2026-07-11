@@ -6,13 +6,7 @@ name: Visual & A11y Tests
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
-    paths:
-      - 'apps/web/components/**'
-      - 'apps/web/.storybook/**'
-      - 'packages/ui/**'
-      - '.github/workflows/visual-a11y.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
