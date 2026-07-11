@@ -4,7 +4,7 @@
 
 ## Current evidence
 
-- Test files inventoried: **2416**
+- Test files inventoried: **2417**
 - Test-related CI lanes inventoried: **43**
 - Trustworthy per-file timing artifacts checked in: **0**
 - Baseline status: **measurement incomplete**
