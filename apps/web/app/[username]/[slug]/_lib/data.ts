@@ -5,7 +5,7 @@
  * Used by both the main smart link page and the /sounds page.
  */
 
-import { and, sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNotNull, isNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { sanitizeCacheTags } from '@/lib/cache/tags';
@@ -653,6 +653,49 @@ function rehydrateContent(
     releaseDate: cached.releaseDate ? new Date(cached.releaseDate) : null,
     revealDate: cached.revealDate ? new Date(cached.revealDate) : null,
   };
+}
+
+/**
+ * Soft presence check for an entity that exists but is not public-eligible yet.
+ * Used to convert 404s into alerts opt-in (JOV-3682). Does not leak draft
+ * status beyond title + existence; deleted rows still resolve to null.
+ */
+export async function getUnpublishedReleasePresence(
+  creatorProfileId: string,
+  slug: string
+): Promise<{ readonly title: string } | null> {
+  try {
+    const [row] = await db
+      .select({
+        title: discogReleases.title,
+        status: discogReleases.status,
+      })
+      .from(discogReleases)
+      .where(
+        and(
+          eq(discogReleases.creatorProfileId, creatorProfileId),
+          eq(discogReleases.slug, slug),
+          isNull(discogReleases.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (!row) return null;
+    return { title: row.title };
+  } catch (error) {
+    logger.error(
+      'Failed unpublished release presence check',
+      {
+        creatorProfileId,
+        error,
+        helper: 'getUnpublishedReleasePresence',
+        route: '/[username]/[slug]',
+        slug,
+      },
+      'public-smart-link'
+    );
+    return null;
+  }
 }
 
 /**

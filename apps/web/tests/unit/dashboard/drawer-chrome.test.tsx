@@ -5,6 +5,16 @@ import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-m
 import { DspPresenceSidebar } from '@/features/dashboard/organisms/dsp-presence/DspPresenceSidebar';
 import type { AudienceMember } from '@/types';
 
+const { mockUseDashboardData, mockUseDspMatchActions } = vi.hoisted(() => ({
+  mockUseDashboardData: vi.fn(() => ({ selectedProfile: null })),
+  mockUseDspMatchActions: vi.fn(() => ({
+    confirmMatch: vi.fn(),
+    rejectMatch: vi.fn(),
+    isConfirming: false,
+    isRejecting: false,
+  })),
+}));
+
 vi.mock('@jovie/ui', async () => {
   const actual = await vi.importActual<object>('@jovie/ui');
   return {
@@ -16,6 +26,14 @@ vi.mock('@jovie/ui', async () => {
     ),
   };
 });
+
+vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
+  useDashboardData: mockUseDashboardData,
+}));
+
+vi.mock('@/features/dashboard/organisms/dsp-matches/hooks', () => ({
+  useDspMatchActions: mockUseDspMatchActions,
+}));
 
 const audienceMember: AudienceMember = {
   id: 'aud-1',
@@ -110,7 +128,7 @@ describe('dashboard drawer chrome', () => {
     expect(screen.queryByText('DSP profile')).not.toBeInTheDocument();
     expect(screen.getByText('Discovered via Spotify')).toBeInTheDocument();
     expect(screen.getByText('Tracks Verified')).toBeInTheDocument();
-    expect(screen.getByLabelText('Profile image missing')).toBeInTheDocument();
+    expect(screen.getByLabelText('Profile Image Missing')).toBeInTheDocument();
     expect(screen.queryByText('Confidence Breakdown')).not.toBeInTheDocument();
   });
 

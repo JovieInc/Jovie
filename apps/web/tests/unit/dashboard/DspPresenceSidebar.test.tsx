@@ -142,7 +142,7 @@ describe('DspPresenceSidebar', () => {
       screen.getByRole('button', { name: 'Confirm Match' })
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
-    expect(screen.getByText('View on Spotify')).toBeInTheDocument();
+    expect(screen.getByText('View On Spotify')).toBeInTheDocument();
   });
 
   it('hides suggested actions for manually linked platforms', () => {
@@ -172,7 +172,7 @@ describe('DspPresenceSidebar', () => {
     expect(
       screen.queryByRole('button', { name: 'Reject' })
     ).not.toBeInTheDocument();
-    expect(screen.getByText('View on Apple Music')).toBeInTheDocument();
+    expect(screen.getByText('View On Apple Music')).toBeInTheDocument();
   });
 
   it('calls confirm and reject match actions', async () => {

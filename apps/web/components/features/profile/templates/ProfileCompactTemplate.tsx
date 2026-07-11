@@ -88,6 +88,9 @@ interface ProfileCompactTemplateProps {
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
   readonly visualVariant?: 'default';
+  /** Desktop spare-space claim footer (JOV-3544). */
+  readonly showClaimFooter?: boolean;
+  readonly claimFooterHref?: string | null;
 }
 
 function resolveDrawerView(
@@ -227,6 +230,8 @@ export function ProfileCompactTemplate({
   hideJovieBranding = false,
   hideMoreMenu = false,
   visualVariant = 'default',
+  showClaimFooter = false,
+  claimFooterHref = null,
 }: ProfileCompactTemplateProps) {
   // alertOptInVariant starts as the ISR-rendered default ('button').
   // AnonCookieBootstrap resolves the per-user Statsig variant on mount and
@@ -720,6 +725,8 @@ export function ProfileCompactTemplate({
         isDesktopLayout={isDesktopLayout}
         shouldRenderHeading={shouldRenderTemplateHeading}
         profileAccentStyle={profileAccentStyle}
+        showClaimFooter={showClaimFooter}
+        claimFooterHref={claimFooterHref}
         compactSurface={
           <div
             className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'

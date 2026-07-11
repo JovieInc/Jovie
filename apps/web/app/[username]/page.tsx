@@ -354,6 +354,8 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
+        showClaimFooter={!profile.is_claimed}
+        claimFooterHref={`/${encodeURIComponent(artist.handle)}/claim?next=auth`}
         profileSettings={{
           showOldReleases: profileSettings.showOldReleases === true,
         }}
