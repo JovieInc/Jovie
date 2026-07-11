@@ -168,7 +168,13 @@ run_trufflehog_git() {
     >"$log" 2>&1 || status=$?
   cat "$log"
   if [[ $status -ne 0 ]] && grep -qiE "$CLONE_CORRUPTION_SIGNATURE" "$log"; then
-    repair_partial_clone
+    echo "::error title=Secret scan checkout corruption::TruffleHog could not read the runner's Git object store; repairing the checkout and retrying once." >&2
+    repair_partial_clone || {
+      status=$?
+      echo "::error title=Secret scan checkout repair failed::Unable to fetch a complete Git object store; secret scanning did not run." >&2
+      rm -f "$log"
+      return "$status"
+    }
     status=0
     # shellcheck disable=SC2046
     "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) \

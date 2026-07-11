@@ -139,6 +139,9 @@ jobs:
             exit 1
           fi
 
+      - name: Test secret scan corruption recovery
+        run: ./scripts/security/scan-secrets.test.sh
+
       - name: Run TruffleHog (full history on main/schedule, PR diff on pull_request)
         shell: bash
         run: |
