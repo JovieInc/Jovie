@@ -305,7 +305,7 @@ export function ReleaseAudioAssetPanel({
                 <button
                   type='button'
                   onClick={() => handleRejectionCta(uploadRejection)}
-                  className='rounded-md border border-subtle bg-surface-1 px-2 py-1 text-2xs font-medium text-primary-token transition-colors duration-subtle hover:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
+                  className='focus-ring-themed rounded-md border border-subtle bg-surface-1 px-2 py-1 text-2xs font-medium text-primary-token transition-colors duration-subtle hover:bg-surface-0'
                   data-testid='upload-rejection-cta'
                 >
                   {uploadRejection.cta.label}
@@ -317,15 +317,15 @@ export function ReleaseAudioAssetPanel({
                       handleRequestType({
                         ...uploadRejection,
                         cta: {
-                          label: 'Request this type',
+                          label: 'Request This Type',
                           action: 'request_type',
                         },
                       })
                     }
-                    className='rounded-md px-2 py-1 text-2xs font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
+                    className='focus-ring-themed rounded-md px-2 py-1 text-2xs font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token'
                     data-testid='upload-request-type-cta'
                   >
-                    Request this type
+                    Request This Type
                   </button>
                 ) : null}
               </div>
