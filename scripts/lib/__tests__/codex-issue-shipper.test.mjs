@@ -13,6 +13,7 @@ import {
   classifyCheckout,
   countRetryReleases,
   describeCheckout,
+  describeIssueScopeMismatch,
   dirtyPathsAreRecoverableDetritus,
   EPIC_LABEL,
   eligibleCodexIssues,
@@ -40,6 +41,7 @@ import {
   selectTaskRoute,
   shellQuote,
   shouldEscalateRetry,
+  validateIssueScopeOverlap,
   worktreeHasWork,
 } from '../../hermes/lib/codex-issue-shipper.ts';
 
@@ -740,13 +742,14 @@ describe('deterministic finisher', () => {
     });
     const cmds = calls.map(c => c.args.slice(0, 2).join(' '));
     expect(cmds).toEqual([
+      'git diff',
       'git status',
       'git add',
       'git -c',
       'git push',
       'gh pr',
     ]);
-    const commit = calls[2].args;
+    const commit = calls[3].args;
     expect(commit).toContain('commit');
     const msg = commit[commit.indexOf('-m') + 1];
     expect(msg).toMatch(
@@ -754,8 +757,8 @@ describe('deterministic finisher', () => {
     );
     expect(msg).toContain('(#12721)');
     // hooks get a long timeout
-    expect(calls[2].opts?.timeoutMs).toBeGreaterThan(60_000);
-    const prCreate = calls[4].args;
+    expect(calls[3].opts?.timeoutMs).toBeGreaterThan(60_000);
+    const prCreate = calls[5].args;
     expect(prCreate).toContain('--head');
     expect(prCreate[prCreate.indexOf('--head') + 1]).toBe('codex/gh-12721-x');
     expect(prCreate[prCreate.indexOf('--body') + 1]).toContain('Fixes #12721');
@@ -785,7 +788,7 @@ describe('deterministic finisher', () => {
       logPath: '/tmp/agent.log',
     });
     const cmds = calls.map(c => c.args.slice(0, 2).join(' '));
-    expect(cmds).toEqual(['git status', 'git push', 'gh pr']);
+    expect(cmds).toEqual(['git diff', 'git status', 'git push', 'gh pr']);
   });
 
   it('finishDispatch propagates a failing step (caller releases the claim)', () => {
@@ -802,6 +805,82 @@ describe('deterministic finisher', () => {
         logPath: '/tmp/agent.log',
       })
     ).toThrow('push rejected');
+  });
+
+  it('rejects a contaminated diff before commit, push, or PR creation', () => {
+    const scopedIssue = {
+      ...issue,
+      number: 13931,
+      title: 'tests/integration/** executes in no CI lane',
+      body: 'Fix `apps/web/tests/integration/rls-access-control.test.ts` and `apps/web/vitest.config.integration.mts`.',
+    };
+    const { run, calls } = fakeRunner({
+      'git diff --name-only':
+        'scripts/hermes/config/model-registry.json\nscripts/hermes/model-router.py\n',
+      'git status --porcelain': ' M scripts/hermes/model-router.py\n',
+    });
+
+    expect(() =>
+      finishDispatch(run, {
+        repo: 'JovieInc/Jovie',
+        branchName: 'gem/prescope-13931',
+        issue: scopedIssue,
+        logPath: '/tmp/agent.log',
+      })
+    ).toThrow('Issue scope contamination');
+    expect(calls.map(call => call.args.slice(0, 2).join(' '))).toEqual([
+      'git diff',
+    ]);
+  });
+});
+
+describe('issue scope overlap gate', () => {
+  const integrationIssue = issue({
+    title: 'tests/integration/** executes in NO CI lane',
+    body: [
+      'Fix `apps/web/tests/integration/rls-access-control.test.ts`.',
+      'Add `vitest.config.integration.mts` and update `scripts/test-truth-guard.mjs`.',
+    ].join('\n'),
+  });
+
+  it('rejects the #13981 model-router contamination', () => {
+    const verdict = validateIssueScopeOverlap(integrationIssue, [
+      'scripts/hermes/config/model-registry.json',
+      'scripts/hermes/model-router.py',
+    ]);
+    expect(verdict.enforce).toBe(true);
+    expect(verdict.matches).toBe(false);
+    expect(describeIssueScopeMismatch(verdict)).toContain(
+      'scripts/hermes/model-router.py'
+    );
+  });
+
+  it('uses an explicit path in the title even when the body has no manifest', () => {
+    const verdict = validateIssueScopeOverlap(
+      issue({
+        title: 'tests/integration/** executes in NO CI lane',
+        body: '',
+      }),
+      ['scripts/hermes/model-router.py']
+    );
+    expect(verdict).toMatchObject({ enforce: true, matches: false });
+    expect(verdict.expectedPaths).toContain('tests/integration');
+  });
+
+  it('accepts the valid #13967 integration implementation', () => {
+    const verdict = validateIssueScopeOverlap(integrationIssue, [
+      'apps/web/tests/integration/rls-access-control.test.ts',
+      'apps/web/vitest.config.integration.mts',
+      'apps/web/scripts/test-truth-guard.mjs',
+    ]);
+    expect(verdict.enforce).toBe(true);
+    expect(verdict.matches).toBe(true);
+  });
+
+  it('does not guess when an issue has no explicit path manifest', () => {
+    expect(
+      validateIssueScopeOverlap(issue(), ['apps/web/components/Foo.tsx'])
+    ).toMatchObject({ enforce: false, matches: true });
   });
 });
 

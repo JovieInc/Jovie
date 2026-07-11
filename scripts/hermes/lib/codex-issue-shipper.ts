@@ -780,6 +780,100 @@ export interface FinisherRunner {
   (args: ReadonlyArray<string>, opts?: { readonly timeoutMs?: number }): string;
 }
 
+export interface IssueScopeVerdict {
+  readonly enforce: boolean;
+  readonly matches: boolean;
+  readonly expectedPaths: ReadonlyArray<string>;
+  readonly changedPaths: ReadonlyArray<string>;
+}
+
+const PATH_TOKEN = /`([^`\n]+)`/g;
+const TITLE_PATH_TOKEN = /[\w.@-]+(?:\/[\w.@*?-]+)+/g;
+const PATHISH_EXTENSION = /\.[a-z0-9]+(?:\.[a-z0-9]+)*$/i;
+
+/**
+ * Extract only explicit, repository-path-shaped scope from an issue. This is
+ * deliberately not a title/keyword classifier: the gate activates only when
+ * the issue author supplied a concrete path manifest in backticks.
+ */
+export function extractIssueScopePaths(issue: GithubIssue): readonly string[] {
+  const text = `${issue.title}\n${issue.body ?? ''}`;
+  const explicitTokens = [
+    ...(issue.title.match(TITLE_PATH_TOKEN) ?? []),
+    ...[...text.matchAll(PATH_TOKEN)].map(match => match[1]?.trim() ?? ''),
+  ];
+  const paths = explicitTokens
+    .filter(token => {
+      if (!token || token.startsWith('-') || /\s/.test(token)) return false;
+      return (
+        token.includes('/') ||
+        token.includes('*') ||
+        PATHISH_EXTENSION.test(token)
+      );
+    })
+    .map(token =>
+      token
+        .replace(/^\.\//, '')
+        .replace(/\/\*\*.*$/, '')
+        .replace(/\/\*$/, '')
+        .replace(/\/+$/, '')
+    )
+    .filter(Boolean);
+  return [...new Set(paths)];
+}
+
+function pathSegmentsOverlap(
+  changedPath: string,
+  expectedPath: string
+): boolean {
+  if (
+    changedPath === expectedPath ||
+    changedPath.startsWith(`${expectedPath}/`) ||
+    expectedPath.startsWith(`${changedPath}/`)
+  ) {
+    return true;
+  }
+
+  // Issues often describe web-package paths relative to apps/web (for
+  // example tests/integration/**). Match complete path segments, never loose
+  // substrings, so `test` cannot accidentally match `contest`.
+  if (expectedPath.includes('/')) {
+    return (
+      changedPath.includes(`/${expectedPath}/`) ||
+      changedPath.endsWith(`/${expectedPath}`)
+    );
+  }
+  return changedPath.split('/').at(-1) === expectedPath;
+}
+
+export function validateIssueScopeOverlap(
+  issue: GithubIssue,
+  changedPaths: ReadonlyArray<string>
+): IssueScopeVerdict {
+  const expectedPaths = extractIssueScopePaths(issue);
+  if (expectedPaths.length === 0) {
+    return { enforce: false, matches: true, expectedPaths, changedPaths };
+  }
+  return {
+    enforce: true,
+    matches: changedPaths.some(changedPath =>
+      expectedPaths.some(expectedPath =>
+        pathSegmentsOverlap(changedPath, expectedPath)
+      )
+    ),
+    expectedPaths,
+    changedPaths,
+  };
+}
+
+export function describeIssueScopeMismatch(verdict: IssueScopeVerdict): string {
+  return [
+    'Issue scope contamination: changed paths do not overlap the explicit issue path manifest.',
+    `Expected: ${verdict.expectedPaths.join(', ') || '(none)'}`,
+    `Changed: ${verdict.changedPaths.join(', ') || '(none)'}`,
+  ].join('\n');
+}
+
 /** Uncommitted changes or unpushed commits count as shippable work. */
 export function worktreeHasWork(runInWorktree: FinisherRunner): boolean {
   const dirty = runInWorktree(['git', 'status', '--porcelain']).trim();
@@ -912,6 +1006,19 @@ export function finishDispatch(
     readonly statePath?: string;
   }
 ): void {
+  const changedPaths = runInWorktree([
+    'git',
+    'diff',
+    '--name-only',
+    'origin/main',
+  ])
+    .trim()
+    .split('\n')
+    .filter(Boolean);
+  const scopeVerdict = validateIssueScopeOverlap(input.issue, changedPaths);
+  if (!scopeVerdict.matches) {
+    throw new Error(describeIssueScopeMismatch(scopeVerdict));
+  }
   const dirty = runInWorktree(['git', 'status', '--porcelain']).trim();
   if (dirty.length > 0) {
     runInWorktree(['git', 'add', '-A']);
