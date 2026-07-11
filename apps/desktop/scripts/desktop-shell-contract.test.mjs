@@ -125,6 +125,19 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     /maybeShowDesktopAuthHandoff\(resolveNavigationUrl\(validatedURL\)\)/
   );
   assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
+  // JOV-3595: blank/crashed-renderer recovery (beyond network did-fail-load).
+  assert.match(mainSource, /APP_BOOTED_CHANNEL/);
+  assert.match(mainSource, /RENDERER_BOOT_WATCHDOG_MS/);
+  assert.match(mainSource, /shouldArmRendererBootWatchdog/);
+  assert.match(mainSource, /armBootWatchdog/);
+  assert.match(mainSource, /Renderer boot watchdog expired/);
+  assert.match(mainSource, /render-process-gone/);
+  assert.match(mainSource, /win\.webContents\.on\('unresponsive'/);
+  assert.match(
+    mainSource,
+    /win\.webContents\.on\('unresponsive'[\s\S]*showDesktopLoadFailure\(win\)/
+  );
+  assert.match(mainSource, /ipcMain\.on\(APP_BOOTED_CHANNEL/);
   assert.match(mainSource, /viewBox="0 0 353\.68 347\.97"/);
   assert.match(mainSource, /START_DESKTOP_AUTH_HANDOFF_CHANNEL/);
   assert.match(mainSource, /OPEN_DESKTOP_AUTH_URL_CHANNEL/);
@@ -333,6 +346,9 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /startDesktopAuthHandoff/);
   assert.match(preloadSource, /openDesktopAuthUrl/);
   assert.match(preloadSource, /closeDesktopAuthWindow/);
+  assert.match(preloadSource, /const APP_BOOTED_CHANNEL = 'app-booted'/);
+  assert.match(preloadSource, /notifyAppBooted:/);
+  assert.match(preloadSource, /ipcRenderer\.send\(APP_BOOTED_CHANNEL\)/);
 });
 
 test('desktop bridge exposes bounded dictation support', async () => {
@@ -560,9 +576,7 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     titlebarSource,
     /data-testid='electron-traffic-light-safe-area'/
   );
-  assert.match(
-    titlebarSource,
-    /w-\[var\(--electron-traffic-light-safe-width\)\]/
-  );
+  // Tailwind v4 CSS-var utility form (not arbitrary w-[var(...)]).
+  assert.match(titlebarSource, /w-\(--electron-traffic-light-safe-width\)/);
   assert.doesNotMatch(titlebarSource, /w-\[72px\]/);
 });

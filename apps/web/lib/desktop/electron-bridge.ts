@@ -67,6 +67,11 @@ export interface ElectronAPI {
    * Returns an unsubscribe function.
    */
   readonly onTrayAction?: (cb: (action: string) => void) => () => void;
+  /**
+   * Signal first successful React paint so the desktop shell can cancel its
+   * boot watchdog (JOV-3595). Optional — older binaries ignore the channel.
+   */
+  readonly notifyAppBooted?: () => void;
 }
 
 export interface DesktopAuthCompletion {
@@ -282,6 +287,41 @@ export function useIsElectronRuntime(): boolean {
   }, []);
 
   return isElectron;
+}
+
+let desktopAppBootedSent = false;
+
+/**
+ * Notify the Electron main process that the hosted web app painted successfully.
+ * Idempotent per full document load. No-ops in the browser and on stale binaries
+ * that predate the app-booted channel (those builds also lack the watchdog).
+ */
+export function notifyDesktopAppBooted(): void {
+  if (desktopAppBootedSent) return;
+  if (!isElectronRuntime()) return;
+
+  const api = getRawElectronAPI();
+  if (!api || typeof api.notifyAppBooted !== 'function') {
+    // Stale binary: no watchdog on that main process either. Do not Sentry-spam.
+    return;
+  }
+
+  try {
+    api.notifyAppBooted();
+    desktopAppBootedSent = true;
+  } catch {
+    // Non-fatal — the watchdog remains armed if send fails.
+  }
+}
+
+/**
+ * Fire the desktop boot heartbeat once React has mounted this tree.
+ * Mount near the top of any client provider that wraps desktop routes.
+ */
+export function useDesktopAppBootSignal(): void {
+  useEffect(() => {
+    notifyDesktopAppBooted();
+  }, []);
 }
 
 // ---------------------------------------------------------------------------
@@ -583,7 +623,10 @@ export function onDesktopTrayAction(cb: (action: string) => void): () => void {
 
 // Exported for tests only — do not call directly from product code.
 export const __testing = {
-  reset: () => reportedMissing.clear(),
+  reset: () => {
+    reportedMissing.clear();
+    desktopAppBootedSent = false;
+  },
   safeInstallUpdateAndRestart,
   safeGetDictationStatus,
   safeOnUpdateAvailable,
@@ -594,5 +637,6 @@ export const __testing = {
   consumeDesktopAuthCompletion,
   setDesktopTrayState,
   onDesktopTrayAction,
+  notifyDesktopAppBooted,
   RELEASE_DOWNLOAD_URL,
 };
