@@ -1,4 +1,13 @@
 export type EvidenceStatus = 'verified' | 'internal' | 'unverified';
+export type ClaimClassification =
+  | 'verified-fact'
+  | 'founder-attested'
+  | 'thesis'
+  | 'plan';
+export type SourceClassification =
+  | 'first-party-artifact'
+  | 'founder-authored'
+  | 'external-context';
 export type OperatingStatus = 'LIVE' | 'DEMO' | 'MANUAL' | 'PLANNED';
 export type RiskSeverity = 'critical' | 'high' | 'medium';
 export type ObjectionFrequency =
@@ -16,6 +25,7 @@ export interface ClaimProvenance {
   readonly label: string;
   readonly href: string;
   readonly accessedAt: string;
+  readonly classification: SourceClassification;
 }
 
 export interface FundraisingClaim {
@@ -24,6 +34,7 @@ export interface FundraisingClaim {
   readonly status: EvidenceStatus;
   readonly provenance: readonly ClaimProvenance[];
   readonly investorFacing: boolean;
+  readonly classification: ClaimClassification;
 }
 
 export interface CoreSlide {
@@ -106,14 +117,17 @@ export const fundraisingRegistry = {
           label: 'Demo video asset',
           href: '/demo/jovie-demo.mp4',
           accessedAt: '2026-07-11',
+          classification: 'first-party-artifact',
         },
         {
           label: 'Caption file',
           href: '/demo/jovie-demo.vtt',
           accessedAt: '2026-07-11',
+          classification: 'first-party-artifact',
         },
       ],
       investorFacing: true,
+      classification: 'verified-fact',
     },
     {
       id: 'release-workflow-focus',
@@ -125,23 +139,88 @@ export const fundraisingRegistry = {
           label: 'Product demonstration',
           href: '/demo/video',
           accessedAt: '2026-07-11',
+          classification: 'first-party-artifact',
         },
       ],
       investorFacing: true,
+      classification: 'verified-fact',
+    },
+    {
+      id: 'slide-thesis',
+      statement:
+        'The next bottleneck in music is not making a song; it is operating the release around it.',
+      status: 'internal',
+      provenance: [],
+      investorFacing: true,
+      classification: 'thesis',
+    },
+    {
+      id: 'slide-problem',
+      statement:
+        'Artists are asked to become a marketing department every time they release.',
+      status: 'internal',
+      provenance: [],
+      investorFacing: true,
+      classification: 'thesis',
+    },
+    {
+      id: 'slide-wedge',
+      statement:
+        'Jovie starts with one bounded job: turn release context into an executable launch plan.',
+      status: 'internal',
+      provenance: [],
+      investorFacing: true,
+      classification: 'plan',
+    },
+    {
+      id: 'slide-product',
+      statement:
+        'The product keeps the release, its opportunities, and the work to ship in one operating surface.',
+      status: 'verified',
+      provenance: [
+        {
+          label: 'Product demonstration',
+          href: '/demo/video',
+          accessedAt: '2026-07-11',
+          classification: 'first-party-artifact',
+        },
+      ],
+      investorFacing: true,
+      classification: 'verified-fact',
+    },
+    {
+      id: 'slide-loop',
+      statement:
+        'The durable loop is context in, approved work out, outcomes back into the next release.',
+      status: 'internal',
+      provenance: [],
+      investorFacing: true,
+      classification: 'plan',
     },
     {
       id: 'founder-artist-operator',
       statement:
-        'Jovie is founder-led by a working music creator building from firsthand release-operations experience.',
+        'Founder-provided account: Jovie is being built by the person who needed this operating system as an artist.',
       status: 'internal',
       provenance: [
         {
-          label: 'Founder narrative and catalog artifacts',
-          href: '/pitch/index.html',
+          label: 'The Friday Problem by Tim White',
+          href: '/blog/the-friday-problem',
           accessedAt: '2026-07-11',
+          classification: 'founder-authored',
         },
       ],
       investorFacing: true,
+      classification: 'founder-attested',
+    },
+    {
+      id: 'slide-round',
+      statement:
+        'This round is for proving that release execution becomes a repeatable, paid creator workflow.',
+      status: 'internal',
+      provenance: [],
+      investorFacing: true,
+      classification: 'plan',
     },
     {
       id: 'closed-loop-category-context',
@@ -153,9 +232,11 @@ export const fundraisingRegistry = {
           label: 'YC Summer 2026 Requests for Startups',
           href: 'https://www.ycombinator.com/rfs',
           accessedAt: '2026-07-11',
+          classification: 'external-context',
         },
       ],
       investorFacing: false,
+      classification: 'verified-fact',
     },
   ],
   coreSlides: [
@@ -166,7 +247,7 @@ export const fundraisingRegistry = {
       support: [
         'Release work is fragmented across planning, creative, links, audience communication, and measurement.',
       ],
-      claimIds: [],
+      claimIds: ['slide-thesis'],
     },
     {
       id: 'problem',
@@ -175,7 +256,7 @@ export const fundraisingRegistry = {
       support: [
         'The work repeats, context is lost between tools, and execution competes with the music itself.',
       ],
-      claimIds: [],
+      claimIds: ['slide-problem'],
     },
     {
       id: 'wedge',
@@ -184,7 +265,7 @@ export const fundraisingRegistry = {
       support: [
         'A narrow release workflow makes inputs, approvals, outputs, and outcomes inspectable.',
       ],
-      claimIds: ['release-workflow-focus'],
+      claimIds: ['slide-wedge'],
     },
     {
       id: 'product',
@@ -193,7 +274,7 @@ export const fundraisingRegistry = {
       support: [
         'The current demo shows the product experience; it is not presented as customer traction.',
       ],
-      claimIds: ['product-demo-exists'],
+      claimIds: ['slide-product'],
     },
     {
       id: 'loop',
@@ -202,12 +283,12 @@ export const fundraisingRegistry = {
       support: [
         'Today that loop spans live product surfaces, demonstration states, manual execution, and planned automation.',
       ],
-      claimIds: [],
+      claimIds: ['slide-loop'],
     },
     {
       id: 'founder',
       dominantSentence:
-        'Jovie is being built by the person who needed this operating system as an artist.',
+        'Founder-provided account: Jovie is being built by the person who needed this operating system as an artist.',
       support: [
         'Founder-market fit is the current advantage; repeatable distribution and retention still need proof.',
       ],
@@ -220,7 +301,7 @@ export const fundraisingRegistry = {
       support: [
         'The next evidence is paid activation, repeated use across releases, and measurable time or revenue impact.',
       ],
-      claimIds: [],
+      claimIds: ['slide-round'],
     },
   ],
   operatingLoop: [
@@ -449,16 +530,14 @@ export const fundraisingRegistry = {
   ],
   appendix: [
     {
-      id: 'legacy-deck',
-      title: 'Legacy Pitch Deck',
-      body: 'The previous presentation is preserved for context. It is not the canonical claim source.',
-      href: '/pitch/index.html',
+      id: 'narrative-boundary',
+      title: 'Narrative Boundary',
+      body: 'The core brief distinguishes verified facts, founder-attested context, thesis, and plans.',
     },
     {
-      id: 'pdf',
-      title: 'Downloadable Deck',
-      body: 'A static PDF of the previous presentation.',
-      href: '/Jovie-Pitch-Deck.pdf',
+      id: 'risk-register',
+      title: 'Risk Register',
+      body: 'The questions above map to explicit evidence, strategy, communication, and investor-fit gaps.',
     },
     {
       id: 'evidence',
@@ -533,11 +612,28 @@ export function validateFundraisingRegistry(
         message: 'Each dominant sentence must be a complete sentence.',
       });
     }
+    if (slide.claimIds.length === 0) {
+      issues.push({
+        path: `coreSlides.${index}.claimIds`,
+        message: 'Each core slide requires a canonical claim.',
+      });
+    }
     for (const claimId of slide.claimIds) {
-      if (!claimIds.has(claimId)) {
+      const claim = registry.claims.find(candidate => candidate.id === claimId);
+      if (!claim) {
         issues.push({
           path: `coreSlides.${index}.claimIds`,
           message: `Unknown claim: ${claimId}`,
+        });
+      } else if (!claim.investorFacing || claim.status === 'unverified') {
+        issues.push({
+          path: `coreSlides.${index}.claimIds`,
+          message: `Claim is not approved for investors: ${claimId}`,
+        });
+      } else if (claim.statement !== slide.dominantSentence) {
+        issues.push({
+          path: `coreSlides.${index}.dominantSentence`,
+          message: `Dominant sentence must exactly match claim: ${claimId}`,
         });
       }
     }
@@ -554,6 +650,21 @@ export function validateFundraisingRegistry(
       issues.push({
         path: `claims.${index}.provenance`,
         message: 'Verified claims require provenance.',
+      });
+    }
+    if (
+      claim.classification === 'founder-attested' &&
+      (claim.provenance.length === 0 ||
+        claim.provenance.some(
+          source =>
+            source.classification !== 'founder-authored' ||
+            source.href.startsWith('/pitch')
+        ))
+    ) {
+      issues.push({
+        path: `claims.${index}.provenance`,
+        message:
+          'Founder-attested claims require a founder-authored source outside the pitch itself.',
       });
     }
     for (const [sourceIndex, source] of claim.provenance.entries()) {

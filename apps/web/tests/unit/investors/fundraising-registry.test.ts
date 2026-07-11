@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type FundraisingRegistry,
   fundraisingRegistry,
   getInvestorFacingClaims,
   validateFundraisingRegistry,
@@ -20,9 +21,11 @@ describe('fundraising registry', () => {
     expect(investorClaims.every(claim => claim.status !== 'unverified')).toBe(
       true
     );
-    expect(investorClaims.every(claim => claim.provenance.length > 0)).toBe(
-      true
-    );
+    expect(
+      investorClaims
+        .filter(claim => claim.status === 'verified')
+        .every(claim => claim.provenance.length > 0)
+    ).toBe(true);
   });
 
   it('labels every step in the operating case', () => {
@@ -76,5 +79,93 @@ describe('fundraising registry', () => {
       expect(risk.recommendedCompanyAction).not.toBe('');
       expect(risk.recommendedCommunicationAction).not.toBe('');
     }
+  });
+
+  it('rejects missing, unsafe, and mismatched core claims', () => {
+    const missing = structuredClone(
+      fundraisingRegistry
+    ) as unknown as FundraisingRegistry;
+    (missing.coreSlides[0] as { claimIds: string[] }).claimIds = [];
+    expect(validateFundraisingRegistry(missing)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining('requires'),
+        }),
+      ])
+    );
+
+    const unknown = structuredClone(
+      fundraisingRegistry
+    ) as unknown as FundraisingRegistry;
+    (unknown.coreSlides[0] as { claimIds: string[] }).claimIds = [
+      'unknown-claim',
+    ];
+    expect(validateFundraisingRegistry(unknown)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ message: 'Unknown claim: unknown-claim' }),
+      ])
+    );
+
+    const unsafe = structuredClone(
+      fundraisingRegistry
+    ) as unknown as FundraisingRegistry;
+    (unsafe.claims[0] as { investorFacing: boolean }).investorFacing = false;
+    (unsafe.coreSlides[0] as { claimIds: string[] }).claimIds = [
+      unsafe.claims[0]?.id ?? '',
+    ];
+    expect(validateFundraisingRegistry(unsafe)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining('not approved'),
+        }),
+      ])
+    );
+
+    const unverified = structuredClone(
+      fundraisingRegistry
+    ) as unknown as FundraisingRegistry;
+    (unverified.claims[0] as { status: string }).status = 'unverified';
+    (unverified.coreSlides[0] as { claimIds: string[] }).claimIds = [
+      unverified.claims[0]?.id ?? '',
+    ];
+    expect(validateFundraisingRegistry(unverified)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining('not approved'),
+        }),
+      ])
+    );
+
+    const mismatch = structuredClone(
+      fundraisingRegistry
+    ) as unknown as FundraisingRegistry;
+    (mismatch.coreSlides[0] as { dominantSentence: string }).dominantSentence =
+      'A different sentence.';
+    expect(validateFundraisingRegistry(mismatch)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining('exactly'),
+        }),
+      ])
+    );
+  });
+
+  it('rejects self-referential founder proof', () => {
+    const registry = structuredClone(
+      fundraisingRegistry
+    ) as unknown as FundraisingRegistry;
+    const founderClaim = registry.claims.find(
+      claim => claim.classification === 'founder-attested'
+    );
+    expect(founderClaim).toBeDefined();
+    (founderClaim?.provenance[0] as { href: string }).href =
+      '/pitch/index.html';
+    expect(validateFundraisingRegistry(registry)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining('outside the pitch'),
+        }),
+      ])
+    );
   });
 });

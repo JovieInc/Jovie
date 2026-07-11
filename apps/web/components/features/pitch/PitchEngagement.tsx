@@ -2,19 +2,33 @@
 
 import { useEffect } from 'react';
 import { track } from '@/lib/analytics';
+import {
+  type InvestorPortalEventName,
+  isInvestorPortalEventName,
+} from '@/lib/investors/portal-events';
+import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 
-const progressedSlides = new Set<string>();
+function trackPitchEvent(event: InvestorPortalEventName, slideId?: string) {
+  const properties = slideId
+    ? { surface: 'pitch', slideId }
+    : { surface: 'pitch' };
+  track(event, properties);
+  if (globalThis.location.pathname.startsWith('/investor-portal')) {
+    postJsonBeacon('/investor-portal/events', { event, slideId });
+  }
+}
 
 export function PitchEngagement() {
   useEffect(() => {
-    track('portal_opened', { surface: 'pitch' });
+    const progressedSlides = new Set<string>();
+    trackPitchEvent('portal_opened');
 
     const onClick = (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
       const action = target.closest<HTMLElement>('[data-pitch-event]');
       const eventName = action?.dataset.pitchEvent;
-      if (eventName) track(eventName, { surface: 'pitch' });
+      if (isInvestorPortalEventName(eventName)) trackPitchEvent(eventName);
     };
 
     const onToggle = (event: Event) => {
@@ -24,7 +38,7 @@ export function PitchEngagement() {
         details.open &&
         details.dataset.pitchSection === 'founder-letter'
       ) {
-        track('founder_letter_opened', { surface: 'pitch' });
+        trackPitchEvent('founder_letter_opened');
       }
     };
 
@@ -35,9 +49,9 @@ export function PitchEngagement() {
     const onPlay = () => {
       if (demoStarted) return;
       demoStarted = true;
-      track('demo_started', { surface: 'pitch' });
+      trackPitchEvent('demo_started');
     };
-    const onEnded = () => track('demo_completed', { surface: 'pitch' });
+    const onEnded = () => trackPitchEvent('demo_completed');
     video?.addEventListener('play', onPlay);
     video?.addEventListener('ended', onEnded);
 
@@ -48,7 +62,7 @@ export function PitchEngagement() {
           const slideId = (entry.target as HTMLElement).dataset.pitchSlide;
           if (!slideId || progressedSlides.has(slideId)) continue;
           progressedSlides.add(slideId);
-          track('deck_progressed', { surface: 'pitch', slideId });
+          trackPitchEvent('deck_progressed', slideId);
         }
       },
       { threshold: 0.6 }

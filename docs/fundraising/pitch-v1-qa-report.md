@@ -1,17 +1,20 @@
 # Investor Brief V1 QA Evidence
 
-**Date:** 2026-07-11  
-**Branch:** `codex/jov-3538-investor-portal-v1`  
+**Date:** 2026-07-11
+
+**Branch:** `codex/jov-3538-investor-portal-v1`
+
 **Implementation commits:** `1ec5dbb4db3d426302ca952149ee7b85054f89f1`, `02ef3aed2eb290dee73b96031323972162c75be8`
 
 ## Verified Behavior
 
 - Public `/pitch` returned 200 and emitted `noindex, nofollow` metadata.
 - The canonical brief rendered all 7 core slides.
-- The legacy HTML deck and downloadable PDF remained reachable.
+- The legacy HTML deck and downloadable PDF remain preserved on disk but are no longer linked from the investor portal because they contain superseded, unsupported claims.
 - The founder letter opened and the appendix opened; the appendix was closed by default.
 - Demo video, poster, and captions were reachable. Video playback and its play event were verified.
-- Anonymous analytics were verified for `founder_letter_opened`, `meeting_cta_clicked`, `demo_started`, and `demo_completed`. The implementation also covers `portal_opened` and `deck_progressed`.
+- Anonymous browser analytics were verified for `founder_letter_opened`, `meeting_cta_clicked`, `demo_started`, and `demo_completed`. The implementation also covers `portal_opened` and `deck_progressed`.
+- Token-attributed event persistence is covered by focused route tests. It has not yet been verified against a live browser and database.
 - The 375px mobile viewport had no horizontal overflow.
 - The browser console had no application errors. Development-only font preload warnings and the development toolbar were excluded from this result.
 - Axe scoped to `main` reported zero accessibility violations.

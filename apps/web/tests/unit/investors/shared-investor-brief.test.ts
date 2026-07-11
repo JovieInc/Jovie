@@ -28,5 +28,18 @@ describe('shared investor brief routing', () => {
     );
 
     expect(engagement).not.toMatch(/investorName|investor_name|token/u);
+    expect(engagement.indexOf('new Set<string>()')).toBeGreaterThan(
+      engagement.indexOf('useEffect(() =>')
+    );
+  });
+
+  it('attributes both sticky investor actions through document delegation', () => {
+    const stickyBar = readFileSync(
+      join(appRoot, 'investor-portal/_components/InvestorStickyBar.tsx'),
+      'utf8'
+    );
+
+    expect(stickyBar).toContain("data-pitch-event='invest_cta_clicked'");
+    expect(stickyBar).toContain("data-pitch-event='meeting_cta_clicked'");
   });
 });

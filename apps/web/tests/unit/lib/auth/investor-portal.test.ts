@@ -109,6 +109,7 @@ describe('investor portal proxy helper', () => {
       'https://jov.ie/investor-portal?utm=x'
     );
     expect(res?.cookies.get('__investor_token')?.value).toBe('token-123');
+    expect(res?.cookies.get('__investor_token')?.path).toBe('/investor-portal');
     expect(mocks.select).toHaveBeenCalledTimes(1);
   });
 });

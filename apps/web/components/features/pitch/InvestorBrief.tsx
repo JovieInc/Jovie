@@ -1,5 +1,5 @@
 import { Button } from '@jovie/ui';
-import { ArrowRight, Download, Mail } from 'lucide-react';
+import { ArrowRight, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/atoms/Logo';
 import { fundraisingRegistry } from '@/lib/investors/fundraising-registry';
@@ -251,19 +251,6 @@ export function InvestorBrief({
                 <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
                   {item.body}
                 </p>
-                {'href' in item ? (
-                  <a
-                    className='mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary-token underline decoration-subtle underline-offset-4 hover:decoration-current'
-                    href={item.href}
-                    target='_blank'
-                    rel='noreferrer'
-                  >
-                    {item.id === 'pdf' ? (
-                      <Download className='size-4' aria-hidden='true' />
-                    ) : null}
-                    Open {item.title}
-                  </a>
-                ) : null}
               </div>
             ))}
           </div>
