@@ -255,7 +255,7 @@ export function CmdKPalette({
         // JOV-2982: full-viewport search takeover (not a centered card).
         // Overrides DialogContent centered defaults via tailwind-merge.
         className={cn(
-          'left-0 top-0 h-dvh w-screen max-w-none [translate:0_0]',
+          'left-0 top-0 h-dvh w-full max-w-none [translate:0_0]',
           'grid gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none',
           'bg-(--linear-app-content-surface)',
           'sm:max-w-none',

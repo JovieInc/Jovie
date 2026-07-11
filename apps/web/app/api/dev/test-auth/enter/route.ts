@@ -8,10 +8,33 @@ import {
   parseDevTestAuthPersona,
   sanitizeDevTestAuthRedirectPath,
 } from '@/lib/auth/dev-test-auth.server';
+import { isTrustedTestBypassRequest } from '@/lib/auth/test-mode';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
-export async function GET(request: NextRequest) {
+/**
+ * Prefer nextUrl.hostname, but fall back to Host / X-Forwarded-Host when the
+ * standalone server URL host is the bind address (0.0.0.0) or the runner
+ * HOSTNAME while the browser still hits loopback. Matches /session.
+ */
+function getRequestDevTestAuthAvailability(request: NextRequest) {
   const availability = getDevTestAuthAvailability(request.nextUrl.hostname);
+  if (
+    availability.trustedHost ||
+    !availability.enabled ||
+    !isTrustedTestBypassRequest(request.headers)
+  ) {
+    return availability;
+  }
+
+  return {
+    enabled: true,
+    trustedHost: true,
+    reason: null,
+  };
+}
+
+export async function GET(request: NextRequest) {
+  const availability = getRequestDevTestAuthAvailability(request);
 
   if (!availability.enabled || !availability.trustedHost) {
     return NextResponse.json(
