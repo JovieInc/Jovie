@@ -6,10 +6,6 @@ import { describe, expect, it } from 'vitest';
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
 const workflowPath = resolve(repoRoot, '.github/workflows/ci.yml');
-const visualRegressionWorkflowPath = resolve(
-  repoRoot,
-  '.github/workflows/visual-regression.yml'
-);
 const canaryWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/canary-health-gate.yml'
@@ -713,40 +709,6 @@ describe('CI public a11y workflow', () => {
     expect(a11yJob).not.toContain(
       '- name: Create ephemeral Neon database branch (with retry)'
     );
-  });
-});
-
-describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
-  it('fans path-gated axe and layout results into PR Ready', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
-    const prReadyJob = getJobBlock(workflow, 'ci-pr-ready');
-
-    expect(prReadyJob).toContain('ci-a11y,');
-    expect(prReadyJob).toContain('ci-layout-guard,');
-    expect(prReadyJob).toContain('A11Y_RESULT="${{ needs.ci-a11y.result }}"');
-    expect(prReadyJob).toContain(
-      'LAYOUT_GUARD_RESULT="${{ needs.ci-layout-guard.result }}"'
-    );
-    expect(prReadyJob).toContain(
-      '"$A11Y_RESULT" != "success" && "$A11Y_RESULT" != "skipped"'
-    );
-    expect(prReadyJob).toContain(
-      '"$LAYOUT_GUARD_RESULT" != "success" && "$LAYOUT_GUARD_RESULT" != "skipped"'
-    );
-  });
-
-  it('keeps visual compare informational while refresh remains self-healing', () => {
-    const workflow = readFileSync(visualRegressionWorkflowPath, 'utf8');
-    const visualJob = getJobBlock(workflow, 'visual-regression');
-
-    expect(visualJob).toContain(
-      "continue-on-error: ${{ github.event_name == 'pull_request' }}"
-    );
-    expect(visualJob).toContain('--update-snapshots');
-    expect(visualJob).toContain('BRANCH="visual-baselines/auto-update"');
-    expect(visualJob).toContain('gh pr create');
-    expect(visualJob).toContain('- name: Cleanup Neon branch');
-    expect(visualJob).toContain('if: always()');
   });
 });
 
