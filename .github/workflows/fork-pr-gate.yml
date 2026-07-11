@@ -92,7 +92,7 @@ jobs:
     if: >-
       (github.event_name == 'pull_request_target' && github.actor != 'copilot-swe-agent[bot]' && github.actor != 'dependabot[bot]') ||
       (github.event_name == 'pull_request_review' && github.event.review.user.type != 'Bot')
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions: {}
     steps:
@@ -121,9 +121,11 @@ jobs:
             HEAD_SHA="${{ github.event.pull_request.head.sha }}"
           fi
 
-          echo "is_fork=$IS_FORK" >> "$GITHUB_OUTPUT"
-          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          {
+            echo "is_fork=$IS_FORK"
+            echo "pr_number=$PR_NUMBER"
+            echo "head_sha=$HEAD_SHA"
+          } >> "$GITHUB_OUTPUT"
           echo "PR #$PR_NUMBER | fork=$IS_FORK | sha=$HEAD_SHA"
 
       - name: Auto-pass for non-fork PRs
