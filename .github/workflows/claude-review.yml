@@ -10,7 +10,7 @@ name: Claude Review (gbrain-aware)
 # REQUIRED SECRETS (Tim to set — workflow runs without gbrain context until then,
 # and just notes gbrain was unavailable):
 #   CLAUDE_CODE_OAUTH_TOKEN  (already set — used by main-autofix)
-#   JOVIE_BOT_PRIVATE_KEY    (already set) + vars.JOVIE_BOT_APP_ID
+#   JOVIE_BOT_PRIVATE_KEY    (already set) + vars.JOVIE_BOT_CLIENT_ID
 #   GBRAIN_CONNECTION        (NEW — the connection string/token your gbrain CLI
 #                             reads to reach your brain backend; confirm the exact
 #                             env var name your `gbrain` build expects)
@@ -44,7 +44,7 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          client-id: ${{ vars.JOVIE_BOT_CLIENT_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
       - name: Checkout
@@ -76,8 +76,34 @@ jobs:
             echo "::warning::gbrain unreachable — review will run WITHOUT collective context."
           fi
 
+      - name: Prepare Claude review context
+        env:
+          GBRAIN_CONNECTION: ${{ secrets.GBRAIN_CONNECTION }}
+        run: |
+          set -euo pipefail
+          canonical_skill='.agents/skills/gstack/office-hours/SKILL.md'
+          test -f "$canonical_skill"
+
+          # Claude discovers repo-local skills under .claude/skills. Rebuild the
+          # compatibility link on every run so persistent runners cannot retain
+          # the old broken ../gstack/office-hours target.
+          rm -rf .claude/skills/office-hours
+          mkdir -p .claude/skills/office-hours
+          ln -s ../../../$canonical_skill .claude/skills/office-hours/SKILL.md
+          test -f .claude/skills/office-hours/SKILL.md
+
+          jq -n --arg connection "$GBRAIN_CONNECTION" '{
+            mcpServers: {
+              gbrain: {
+                type: "stdio",
+                command: "bunx",
+                args: ["gbrain", "serve"],
+                env: { GBRAIN_CONNECTION: $connection }
+              }
+            }
+          }' > "$RUNNER_TEMP/claude-review-mcp.json"
+
       - name: Claude review
-        continue-on-error: true
         uses: anthropics/claude-code-action@a92e7c70a4da9793dc164451d829089dc057a464 # v1
         env:
           GBRAIN_CONNECTION: ${{ secrets.GBRAIN_CONNECTION }}
@@ -85,16 +111,8 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: 'jovie-bot[bot],github-merge-queue[bot]'
-          mcp_config: |
-            {
-              "mcpServers": {
-                "gbrain": {
-                  "command": "bunx",
-                  "args": ["gbrain", "serve"],
-                  "env": { "GBRAIN_CONNECTION": "${{ secrets.GBRAIN_CONNECTION }}" }
-                }
-              }
-            }
+          claude_args: >-
+            --mcp-config ${{ runner.temp }}/claude-review-mcp.json
           prompt: |
             You are reviewing PR #${{ github.event.pull_request.number }} in JovieInc/Jovie. Review as jovie-bot.
 
