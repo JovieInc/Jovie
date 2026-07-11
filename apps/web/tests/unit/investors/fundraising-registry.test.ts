@@ -116,6 +116,88 @@ describe('fundraising registry', () => {
     }
   });
 
+  it('validates narrative, metrics, research, conversations, and FAQ links', () => {
+    const mutations: Array<(registry: FundraisingRegistry) => void> = [
+      registry => {
+        (registry as { currentNarrative: string }).currentNarrative = ' ';
+      },
+      registry => {
+        (registry.metrics[0] as { value: string | null }).value = '10 users';
+      },
+      registry => {
+        (
+          registry.metrics[0] as {
+            provenance: Array<(typeof registry.researchSources)[number]>;
+          }
+        ).provenance = [registry.researchSources[0]!];
+      },
+      registry => {
+        const metric = registry.metrics[0] as {
+          status: string;
+          value: string | null;
+          provenance: unknown[];
+        };
+        metric.status = 'verified';
+        metric.value = '10 users';
+        metric.provenance = [];
+      },
+      registry => {
+        (registry.researchSources[0] as { accessedAt: string }).accessedAt =
+          'not-a-date';
+      },
+      registry => {
+        (
+          registry.investorConversationSummaries as unknown as Array<{
+            sourceId: string;
+            transcriptSha256: string;
+            capturedAt: string;
+            summary: string;
+          }>
+        ).push({
+          sourceId: 'conversation-a',
+          transcriptSha256: 'bad-hash',
+          capturedAt: '2026-07-11',
+          summary: 'Synthetic test summary.',
+        });
+      },
+      registry => {
+        (registry.investorFaq[0] as { answer: string }).answer =
+          'Stale answer.';
+      },
+      registry => {
+        (
+          registry.investorFaq[0] as { riskLastUpdated: string }
+        ).riskLastUpdated = '2026-07-10';
+      },
+    ];
+    for (const mutate of mutations) {
+      const registry = structuredClone(
+        fundraisingRegistry
+      ) as unknown as FundraisingRegistry;
+      mutate(registry);
+      expect(validateFundraisingRegistry(registry).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('covers platform and AI dependency failure categories explicitly', () => {
+    const dependency = fundraisingRegistry.risks.find(
+      risk => risk.id === 'platform-dependency'
+    );
+    const serialized = JSON.stringify(dependency);
+    for (const required of [
+      'music',
+      'social',
+      'AI-provider',
+      'substitution',
+      'outages',
+      'permissions',
+      'data boundaries',
+      'fallbacks',
+    ]) {
+      expect(serialized).toContain(required);
+    }
+  });
+
   it('rejects missing, unsafe, and mismatched core claims', () => {
     const missing = structuredClone(
       fundraisingRegistry

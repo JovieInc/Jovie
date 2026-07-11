@@ -26,7 +26,7 @@ The browser observations below were captured on the browser-evidence origin abov
 | Check | Result |
 | --- | --- |
 | Historical Final Pitch Playwright after safe-appendix review | 3/3 passed |
-| Current fundraising registry tests | 10/10 passed |
+| Current fundraising registry tests | 12/12 passed |
 | Web TypeScript check | Passed |
 
 The responsive and slide screenshots below were refreshed from the reviewed public `/pitch` implementation after the safe-appendix and claim-contract fixes.

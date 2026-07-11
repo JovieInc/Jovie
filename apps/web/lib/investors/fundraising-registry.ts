@@ -71,19 +71,21 @@ export interface FundraisingMetric {
   readonly id: string;
   readonly label: string;
   readonly value: string | null;
-  readonly status: 'evidence-gap';
+  readonly status: EvidenceStatus | 'evidence-gap';
   readonly provenance: readonly ClaimProvenance[];
   readonly lastUpdated: string;
 }
 
 export interface InvestorConversationSummary {
   readonly sourceId: string;
+  readonly transcriptSha256: string;
   readonly capturedAt: string;
   readonly summary: string;
 }
 
 export interface InvestorFaqEntry {
   readonly riskId: string;
+  readonly riskLastUpdated: string;
   readonly question: string;
   readonly answer: string;
 }
@@ -249,7 +251,7 @@ const RISK_DATA = [
   ['market', 'Is the market venture-scale?', 'The thesis is that release operations can expand into recurring creator marketing execution. This version intentionally omits unsupported top-down market arithmetic.', 'high', 'Bottom-up buyer counts, willingness to pay, and expansion sensitivity.', 'evidence', [], ['thesis', 'round'], ['brief', 'questions'], 'Build a bottom-up model from a defined buyer, observed willingness to pay, and reachable distribution.', 'Omit top-down arithmetic until its inputs and sensitivities are reviewable.'],
   ['business-model', 'Who pays, and for what?', 'The working hypothesis is creator-paid software for recurring release operations. Pricing and packaging remain validation questions.', 'critical', 'Paid pilots and willingness-to-pay interviews tied to a specific package.', 'strategy', ['release-workflow-focus'], ['wedge', 'round'], ['brief', 'questions'], 'Test one creator-paid release-operations package through paid pilots.', 'Label pricing and packaging as a working hypothesis until payment evidence exists.'],
   ['moat', 'Why will this not become a feature?', 'The proposed advantage is accumulated release context, approval history, execution reliability, and outcome data. That compounding advantage is not yet proven.', 'high', 'Evidence that repeated use improves execution or creates switching costs.', 'strategy', ['closed-loop-category-context'], ['loop'], ['operating-loop', 'questions'], 'Measure whether retained release context improves repeated execution or creates switching costs.', 'Present the compounding loop as the proposed advantage, not a proven moat.'],
-  ['platform-dependency', 'How exposed is Jovie to music and social platforms?', 'Jovie depends on third-party catalog, audience, commerce, and messaging surfaces. The product must preserve first-party creator context and degrade safely when integrations change.', 'high', 'A dependency matrix with permissions, fallbacks, and owned data boundaries.', 'evidence', [], ['product', 'loop'], ['operating-loop', 'questions'], 'Document platform permissions, failure modes, fallbacks, and first-party data ownership.', 'State the dependency boundary and fallback posture without implying platform guarantees.'],
+  ['platform-dependency', 'How exposed is Jovie to music, social, and AI providers?', 'Jovie depends on third-party music, social, commerce, messaging, and AI-provider APIs. Provider substitution, outages, permissions changes, and model or API changes must degrade safely while preserving first-party creator data boundaries.', 'high', 'A dependency matrix covering each provider category, API substitution, outages, permissions, owned data boundaries, and tested fallbacks.', 'evidence', [], ['product', 'loop'], ['operating-loop', 'questions'], 'Document music, social, commerce, messaging, and AI providers; test substitution and outage paths; record permissions, first-party data boundaries, and fallbacks.', 'State provider dependencies, substitution limits, outage behavior, permissions, data boundaries, and fallbacks without implying guarantees.'],
   ['ai-commoditization', 'What remains valuable as generation gets cheaper?', 'Copy generation is not the moat. The bet is on trustworthy context, approvals, execution, and measured outcomes.', 'high', 'Production proof of execution quality and outcome capture.', 'strategy', ['closed-loop-category-context'], ['wedge', 'loop'], ['operating-loop', 'questions'], 'Prove value in context, approvals, reliable execution, and measured outcomes rather than generation.', 'Keep generative output separate from the proposed operating-system advantage.'],
   ['founder-dependency', 'Can the workflow scale beyond the founder?', 'Founder expertise is currently an advantage and a concentration risk. Manual decisions must become explicit product rules and repeatable operations.', 'high', 'Non-founder operation of the workflow with consistent quality.', 'evidence', ['founder-artist-operator'], ['founder'], ['founder-letter', 'questions'], 'Have a non-founder operate the documented workflow and compare quality and completion.', 'Present founder expertise as both an advantage and a concentration risk.'],
   ['capital', 'What does new capital prove?', 'The intended proof is paid activation, repeated release use, and measurable creator value. Round size and terms are kept out until approved evidence is current.', 'critical', 'Approved raise terms, milestone budget, and runway model.', 'evidence', [], ['round'], ['brief', 'questions'], 'Approve a milestone budget and runway model tied to paid activation and repeated release use.', 'Keep round size and terms out of the portal until the approved model is current.'],
@@ -332,6 +334,7 @@ export const fundraisingRegistry = {
   ),
   investorFaq: RISK_DATA.map(input => ({
     riskId: input[0],
+    riskLastUpdated: AS_OF,
     question: input[1],
     answer: input[2],
   })),
@@ -384,12 +387,131 @@ export function validateFundraisingRegistry(
   const issues: RegistryValidationIssue[] = [];
   const claimIds = new Set(registry.claims.map(claim => claim.id));
   const slideIds = new Set(registry.coreSlides.map(slide => slide.id));
+  const riskIds = new Set(registry.risks.map(risk => risk.id));
   const gapClassifications = new Set<GapClassification>([
     'communication',
     'evidence',
     'strategy',
     'investor-fit',
   ]);
+  const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/u.test(value);
+
+  if (!registry.currentNarrative.trim()) {
+    issues.push({
+      path: 'currentNarrative',
+      message: 'The current narrative must not be empty.',
+    });
+  }
+
+  const metricIds = new Set<string>();
+  for (const [index, metric] of registry.metrics.entries()) {
+    if (!metric.id.trim() || metricIds.has(metric.id)) {
+      issues.push({
+        path: `metrics.${index}.id`,
+        message: 'Metric IDs must be non-empty and unique.',
+      });
+    }
+    metricIds.add(metric.id);
+    if (!metric.label.trim() || !isIsoDate(metric.lastUpdated)) {
+      issues.push({
+        path: `metrics.${index}`,
+        message: 'Metrics require a label and ISO update date.',
+      });
+    }
+    if (
+      metric.status === 'evidence-gap' &&
+      (metric.value !== null || metric.provenance.length > 0)
+    ) {
+      issues.push({
+        path: `metrics.${index}`,
+        message: 'Evidence-gap metrics require a null value and no provenance.',
+      });
+    }
+    if (
+      metric.status !== 'evidence-gap' &&
+      (!metric.value?.trim() ||
+        (metric.status === 'verified' && metric.provenance.length === 0))
+    ) {
+      issues.push({
+        path: `metrics.${index}`,
+        message:
+          'Available metrics require a value, and verified metrics require provenance.',
+      });
+    }
+    for (const [sourceIndex, metricSource] of metric.provenance.entries()) {
+      if (
+        !metricSource.label.trim() ||
+        !metricSource.href.trim() ||
+        !isIsoDate(metricSource.accessedAt)
+      ) {
+        issues.push({
+          path: `metrics.${index}.provenance.${sourceIndex}`,
+          message:
+            'Metric provenance requires label, href, and ISO access date.',
+        });
+      }
+    }
+  }
+
+  for (const [index, researchSource] of registry.researchSources.entries()) {
+    if (
+      !researchSource.label.trim() ||
+      !researchSource.href.trim() ||
+      !isIsoDate(researchSource.accessedAt)
+    ) {
+      issues.push({
+        path: `researchSources.${index}`,
+        message: 'Research sources require label, href, and ISO access date.',
+      });
+    }
+  }
+
+  const conversationIds = new Set<string>();
+  for (const [
+    index,
+    conversation,
+  ] of registry.investorConversationSummaries.entries()) {
+    if (
+      !/^[a-z0-9][a-z0-9._-]{2,127}$/u.test(conversation.sourceId) ||
+      conversationIds.has(conversation.sourceId) ||
+      !/^[a-f0-9]{64}$/u.test(conversation.transcriptSha256) ||
+      !isIsoDate(conversation.capturedAt) ||
+      !conversation.summary.trim()
+    ) {
+      issues.push({
+        path: `investorConversationSummaries.${index}`,
+        message:
+          'Conversation summaries require a unique immutable source ID, transcript hash, ISO date, and content.',
+      });
+    }
+    conversationIds.add(conversation.sourceId);
+  }
+
+  const faqRiskIds = new Set<string>();
+  for (const [index, faq] of registry.investorFaq.entries()) {
+    const linkedRisk = registry.risks.find(risk => risk.id === faq.riskId);
+    if (
+      !linkedRisk ||
+      !riskIds.has(faq.riskId) ||
+      faqRiskIds.has(faq.riskId) ||
+      faq.question !== linkedRisk.question ||
+      faq.answer !== linkedRisk.answer ||
+      faq.riskLastUpdated !== linkedRisk.lastUpdated
+    ) {
+      issues.push({
+        path: `investorFaq.${index}`,
+        message:
+          'FAQ entries must uniquely match the linked risk question, answer, and version date.',
+      });
+    }
+    faqRiskIds.add(faq.riskId);
+  }
+  if (faqRiskIds.size !== riskIds.size) {
+    issues.push({
+      path: 'investorFaq',
+      message: 'Every risk requires exactly one FAQ entry.',
+    });
+  }
 
   if (registry.coreSlides.length < 6 || registry.coreSlides.length > 8) {
     issues.push({
@@ -461,7 +583,7 @@ export function validateFundraisingRegistry(
       });
     }
     for (const [sourceIndex, source] of claim.provenance.entries()) {
-      if (!/^\d{4}-\d{2}-\d{2}$/u.test(source.accessedAt)) {
+      if (!isIsoDate(source.accessedAt)) {
         issues.push({
           path: `claims.${index}.provenance.${sourceIndex}.accessedAt`,
           message: 'Provenance requires an ISO access date.',
@@ -477,7 +599,7 @@ export function validateFundraisingRegistry(
         message: 'Risks require a valid gap classification.',
       });
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/u.test(risk.lastUpdated)) {
+    if (!isIsoDate(risk.lastUpdated)) {
       issues.push({
         path: `risks.${index}.lastUpdated`,
         message: 'Risks require an ISO update date.',

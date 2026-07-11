@@ -76,8 +76,8 @@ These are structured internal simulations designed to surface likely diligence p
 ### Music-Industry Investor
 
 - **Strongest decline reason:** Platform dependencies and heterogeneous artist workflows may make execution brittle and operationally heavy.
-- **Missing evidence:** Integration fallbacks, first-party data boundaries, and reliable execution across multiple release types.
-- **First question:** What still works when a catalog, social, commerce, or messaging integration changes or removes access?
+- **Missing evidence:** Music, social, commerce, messaging, and AI-provider substitution tests; outage fallbacks; permissions; first-party data boundaries; and reliable execution across release types.
+- **First question:** What still works when a catalog, social, commerce, messaging, model, or AI API changes, fails, or removes access?
 
 ### Solo-Founder Skeptic
 
