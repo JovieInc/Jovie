@@ -151,7 +151,12 @@ repair_partial_clone() {
   echo "Partial-clone corruption detected — refetching full objects (#13994)..."
   git config --unset-all remote.origin.promisor || true
   git config --unset-all remote.origin.partialclonefilter || true
-  git fetch --refetch origin '+refs/heads/*:refs/remotes/origin/*'
+  # --refetch needs git >= 2.36; older runner images fall back to a noop
+  # negotiation fetch, which also transfers a complete unfiltered pack.
+  git fetch --refetch origin \
+    '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*' \
+    || git -c fetch.negotiationAlgorithm=noop fetch origin \
+      '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
 }
 
 run_trufflehog_git() {
