@@ -18,6 +18,13 @@ FULL_CHECKOUT_JOBS = (
     ("ci.yml", "ci-summary"),
 )
 
+FLEET_CONTROLLER_JOBS = (
+    ("auto-ready-agent-drafts.yml", "auto-ready"),
+    ("merge-queue-autoenroll.yml", "enroll"),
+    ("merge-queue-autoenroll.yml", "rebase"),
+    ("agent-tick.yml", "auto-ready"),
+)
+
 
 def _job_block(workflow: str, job_name: str) -> str:
     """Return one top-level workflow job using its two-space YAML boundary."""
@@ -72,3 +79,20 @@ def test_merge_gated_secret_scans_use_clean_hosted_runners() -> None:
         block = _job_block("security.yml", job_name)
         assert "runs-on: ubuntu-latest" in block, job_name
         assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block, job_name
+
+
+def test_fleet_controllers_checkout_main_policy_code() -> None:
+    """PR events must not replace fleet scripts with the triggering merge ref."""
+    for workflow, job_name in FLEET_CONTROLLER_JOBS:
+        block = _job_block(workflow, job_name)
+        assert "uses: actions/checkout@" in block, (workflow, job_name)
+        assert "ref: main" in block, (workflow, job_name)
+        assert "persist-credentials: false" in block, (workflow, job_name)
+
+
+def test_gh_fleet_controllers_use_hosted_cli_contract() -> None:
+    """Controller jobs invoking gh must not depend on heterogeneous runners."""
+    for workflow, job_name in FLEET_CONTROLLER_JOBS:
+        block = _job_block(workflow, job_name)
+        assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
+        assert "run: gh --version" in block, (workflow, job_name)

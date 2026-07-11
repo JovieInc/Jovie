@@ -30,9 +30,20 @@ permissions:
 
 jobs:
   auto-ready:
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Fleet controller: use the hosted image contract so `gh` is always
+    # available. Some self-hosted fast runners intentionally lack it.
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Checkout main policy code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # pull_request events otherwise checkout the triggering merge ref,
+          # which may not contain the current fleet scripts or tests.
+          ref: main
+          persist-credentials: false
+
+      - name: Verify GitHub CLI
+        run: gh --version
 
       - name: Auto-ready green agent drafts
         env:

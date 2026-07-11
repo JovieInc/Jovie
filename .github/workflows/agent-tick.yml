@@ -181,7 +181,7 @@ jobs:
   # --------------------------------------------------------------------------
   auto-ready:
     name: Auto-Ready Agent Drafts
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       pull-requests: write
@@ -189,7 +189,14 @@ jobs:
       checks: read
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Checkout main policy code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Verify GitHub CLI
+        run: gh --version
 
       - name: Auto-ready green agent drafts
         env:
