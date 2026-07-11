@@ -5435,7 +5435,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--color-text-quaternary-token);
+  color: var(--color-text-tertiary-token);
 }
 
 .homepage-closed-loop-step-copy {
