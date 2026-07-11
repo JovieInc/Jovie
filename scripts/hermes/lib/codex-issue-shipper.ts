@@ -790,6 +790,7 @@ export interface IssueScopeVerdict {
 const PATH_TOKEN = /`([^`\n]+)`/g;
 const TITLE_PATH_TOKEN = /[\w.@-]+(?:\/[\w.@*?-]+)+/g;
 const PATHISH_EXTENSION = /\.[a-z0-9]+(?:\.[a-z0-9]+)*$/i;
+const URI_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
 
 /**
  * Extract only explicit, repository-path-shaped scope from an issue. This is
@@ -798,13 +799,25 @@ const PATHISH_EXTENSION = /\.[a-z0-9]+(?:\.[a-z0-9]+)*$/i;
  */
 export function extractIssueScopePaths(issue: GithubIssue): readonly string[] {
   const text = `${issue.title}\n${issue.body ?? ''}`;
+  const pathOnlyTitle = issue.title
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, '')
+    .replace(/@[\w.-]+\/[\w.-]+/g, '');
   const explicitTokens = [
-    ...(issue.title.match(TITLE_PATH_TOKEN) ?? []),
+    ...(pathOnlyTitle.match(TITLE_PATH_TOKEN) ?? []),
     ...[...text.matchAll(PATH_TOKEN)].map(match => match[1]?.trim() ?? ''),
   ];
   const paths = explicitTokens
     .filter(token => {
-      if (!token || token.startsWith('-') || /\s/.test(token)) return false;
+      if (
+        !token ||
+        token.startsWith('-') ||
+        token.startsWith('@') ||
+        token.startsWith('$') ||
+        URI_SCHEME.test(token) ||
+        /\s/.test(token)
+      ) {
+        return false;
+      }
       return (
         token.includes('/') ||
         token.includes('*') ||

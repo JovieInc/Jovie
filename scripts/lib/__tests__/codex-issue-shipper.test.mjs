@@ -882,6 +882,27 @@ describe('issue scope overlap gate', () => {
       validateIssueScopeOverlap(issue(), ['apps/web/components/Foo.tsx'])
     ).toMatchObject({ enforce: false, matches: true });
   });
+
+  it('does not treat package specs, URLs, commands, or flags as repo scope', () => {
+    const verdict = validateIssueScopeOverlap(
+      issue({
+        title: 'Update @jovie/web docs from https://example.com/path/to/docs',
+        body: [
+          'Package: `@jovie/web`.',
+          'Reference: `https://example.com/path/to/docs`.',
+          'Run `pnpm --filter @jovie/web test` with `--force`.',
+          'Shell prompt: `$HOME/bin/tool`.',
+        ].join('\n'),
+      }),
+      ['apps/web/package.json']
+    );
+
+    expect(verdict).toMatchObject({
+      enforce: false,
+      matches: true,
+      expectedPaths: [],
+    });
+  });
 });
 
 describe('agent fallback chain', () => {
