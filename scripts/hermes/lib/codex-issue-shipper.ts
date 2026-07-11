@@ -102,6 +102,7 @@ export interface ShipperConfig {
   readonly fallbackModel: string;
   readonly codexSandbox: CodexSandboxMode;
   readonly codexApprovalPolicy: CodexApprovalPolicy;
+  readonly codexBinary: string;
   readonly claudePermissionMode: string;
   readonly grokPermissionMode: string;
   readonly agentTimeoutMs: number;
@@ -257,6 +258,11 @@ export function loadShipperConfig(
       ['untrusted', 'on-failure', 'on-request', 'never'],
       'on-request'
     ),
+    codexBinary:
+      env.HERMES_CODEX_SHIPPER_CODEX_BIN ??
+      (process.platform === 'linux'
+        ? '/home/timwhite/.npm-global/bin/codex'
+        : 'codex'),
     claudePermissionMode:
       env.HERMES_CODEX_SHIPPER_CLAUDE_PERMISSION_MODE ?? 'auto',
     grokPermissionMode: env.HERMES_CODEX_SHIPPER_GROK_PERMISSION_MODE ?? 'auto',
@@ -709,7 +715,7 @@ export function buildAgentCommand(
 ): { readonly command: string; readonly args: ReadonlyArray<string> } {
   if (config.agent === 'codex') {
     return {
-      command: 'codex',
+      command: config.codexBinary ?? 'codex',
       args: [
         '-a',
         config.codexApprovalPolicy,

@@ -42,6 +42,14 @@ import {
   shouldEscalateRetry,
   worktreeHasWork,
 } from '../../hermes/lib/codex-issue-shipper.ts';
+import {
+  buildEscalationArtifact,
+  emptyEscalationState,
+  evaluateEscalation,
+  readEscalationState,
+  recordEscalationAttempt,
+  writeEscalationState,
+} from '../../hermes/lib/model-escalation-policy.ts';
 
 const config = {
   maxIssuesPerRun: 2,
@@ -1077,5 +1085,72 @@ describe('checkout freshness gate', () => {
 
   it('buildRecoveryStashMessage includes the checkout detail', () => {
     expect(buildRecoveryStashMessage("on 'pr1'")).toContain('pr1');
+  });
+});
+
+describe('model escalation policy', () => {
+  it('escalates on measurable triggers and emits machine-readable evidence', () => {
+    const decision = evaluateEscalation(
+      {
+        noDiffAttempts: 2,
+        semanticCiFailures: 1,
+        conflictFiles: 5,
+        conflictHunks: 10,
+        repeatedReviewComments: 2,
+        cheapFailures: 2,
+        text: 'database migration architecture',
+      },
+      new Date('2026-07-10T00:00:00Z')
+    );
+    expect(decision.escalate).toBe(true);
+    expect(decision.route).toBe('codex-semantic-repair');
+    expect(decision.triggers).toEqual(
+      expect.arrayContaining([
+        'repeated_no_diff',
+        'semantic_ci_failure',
+        'conflict_complexity',
+        'repeated_review_comments',
+        'sensitive_architecture_scope',
+        'two_failed_cheap_attempts',
+      ])
+    );
+    expect(
+      JSON.parse(
+        buildEscalationArtifact(42, decision, '/state/escalation.json')
+      ).schema
+    ).toBe('jovie.model-escalation/v1');
+  });
+
+  it('honors cooldowns without losing evidence', () => {
+    const decision = evaluateEscalation(
+      { cheapFailures: 2 },
+      new Date('2026-07-10T00:00:00Z'),
+      '2026-07-10T02:00:00Z'
+    );
+    expect(decision.escalate).toBe(false);
+    expect(decision.triggers).toContain('two_failed_cheap_attempts');
+    expect(decision.cooldownUntil).toBe('2026-07-10T02:00:00Z');
+  });
+
+  it('persists bounded attempt metadata and tolerates missing state', () => {
+    const path = '/tmp/jovie-model-escalation-test.json';
+    const state = recordEscalationAttempt(
+      emptyEscalationState(),
+      42,
+      {
+        at: '2026-07-10T00:00:00Z',
+        route: 'mechanical-cheap',
+        outcome: 'no-diff',
+        artifactPath: '/tmp/a.json',
+      },
+      '2026-07-10T06:00:00Z'
+    );
+    writeEscalationState(path, state);
+    expect(readEscalationState(path).records['42'].attempts[0].outcome).toBe(
+      'no-diff'
+    );
+    expect(
+      readEscalationState('/tmp/does-not-exist-jovie-escalation.json').version
+    ).toBe(1);
   });
 });

@@ -69,6 +69,15 @@ import {
 import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
+import {
+  buildEscalationArtifact,
+  type EscalationDecision,
+  type EscalationObservation,
+  evaluateEscalation,
+  readEscalationState,
+  recordEscalationAttempt,
+  writeEscalationState,
+} from '../lib/model-escalation-policy';
 import { sendOpsAlert } from '../lib/ops-notify';
 import {
   journalEnd,
@@ -185,6 +194,86 @@ function writeAgentAttemptState(
       error: shortError(err),
     });
   }
+}
+
+const ESCALATION_STATE_PATH = join(
+  HERMES_PATHS.stateDir,
+  'model-escalation.json'
+);
+
+function escalationForPlan(plan: DispatchPlan): {
+  decision: EscalationDecision;
+  artifactPath: string;
+} {
+  const state = readEscalationState(ESCALATION_STATE_PATH);
+  const record = state.records[String(plan.issue.number)];
+  const attempts = record?.attempts ?? [];
+  const observation: EscalationObservation = {
+    text: `${plan.issue.title}\n${plan.issue.body ?? ''}`,
+    labels: labelNames(plan.issue),
+    cheapFailures: attempts.filter(
+      attempt =>
+        attempt.route === 'mechanical-cheap' && attempt.outcome !== 'success'
+    ).length,
+    noDiffAttempts: attempts.filter(attempt => attempt.outcome === 'no-diff')
+      .length,
+    semanticCiFailures: attempts.filter(
+      attempt => attempt.outcome === 'ci-failure'
+    ).length,
+    conflictFiles:
+      attempts.filter(attempt => attempt.outcome === 'conflict').length >= 5
+        ? 5
+        : 0,
+    repeatedReviewComments: attempts.filter(
+      attempt => attempt.outcome === 'review-failure'
+    ).length,
+  };
+  const decision = evaluateEscalation(
+    observation,
+    new Date(),
+    record?.cooldownUntil ?? null
+  );
+  const artifactPath = join(
+    agentLogsDir(),
+    `github-${plan.issue.number}-escalation.json`
+  );
+  try {
+    writeFileSync(
+      artifactPath,
+      `${buildEscalationArtifact(plan.issue.number, decision, ESCALATION_STATE_PATH)}\n`
+    );
+    writeEscalationState(
+      ESCALATION_STATE_PATH,
+      recordEscalationAttempt(
+        state,
+        plan.issue.number,
+        {
+          at: new Date().toISOString(),
+          route: decision.route,
+          outcome: decision.escalate ? 'failure' : 'no-diff',
+          artifactPath,
+        },
+        decision.cooldownUntil
+      )
+    );
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'escalation_artifact_write_failed',
+      issue: plan.issue.number,
+      error: shortError(err),
+    });
+  }
+  logJobEvent({
+    job: JOB,
+    event: 'model_route_decided',
+    issue: plan.issue.number,
+    route: decision.route,
+    escalated: decision.escalate,
+    triggers: decision.triggers,
+    artifactPath,
+  });
+  return { decision, artifactPath };
 }
 
 function unquoteEnvValue(value: string): string {
@@ -1233,6 +1322,7 @@ async function dispatchPlan(
   config: ShipperConfig,
   plan: DispatchPlan
 ): Promise<void> {
+  const escalation = escalationForPlan(plan);
   const gbrain = collectGbrainContext(plan);
   const gbrainBlocker = gbrainContextBlocker(gbrain);
   if (gbrainBlocker) {
@@ -1283,7 +1373,14 @@ async function dispatchPlan(
     // Agent fallback chain: an attempt that ends with neither a PR nor work
     // in the worktree (and wasn't killed by the system) hands the same
     // dispatch to the next harness instead of burning a claim-release cycle.
-    const chain = parseAgentChain(process.env, config.agent);
+    const chain = escalation.decision.escalate
+      ? [
+          'codex' as const,
+          ...parseAgentChain(process.env, config.agent).filter(
+            agent => agent !== 'codex'
+          ),
+        ]
+      : parseAgentChain(process.env, config.agent);
     let agentResult!: AgentRunResult;
     let pr: { number: number; url: string } | null = null;
     let isSystemKilled = false;
@@ -1293,15 +1390,20 @@ async function dispatchPlan(
       const attemptRoute = routeForAgent(agent, dispatch.route);
       const attemptConfig = { ...config, agent };
       const attemptDispatch = { ...dispatch, route: attemptRoute };
-      const prompt = buildAgentPrompt({
-        issue: attemptDispatch.issue,
-        branchName: attemptDispatch.branchName,
-        baseBranch: 'main',
-        integrationBranch: attemptDispatch.integrationBranch,
-        route: attemptRoute,
-        gbrain,
-        repoRoot: prepared.repoRoot,
-      });
+      const prompt = [
+        buildAgentPrompt({
+          issue: attemptDispatch.issue,
+          branchName: attemptDispatch.branchName,
+          baseBranch: 'main',
+          integrationBranch: attemptDispatch.integrationBranch,
+          route: attemptRoute,
+          gbrain,
+          repoRoot: prepared.repoRoot,
+        }),
+        escalation.decision.escalate
+          ? `\n## Evidence-based escalation\nThis dispatch crossed measurable triggers: ${escalation.decision.triggers.join(', ')}. Use Codex CLI via \`codex exec\` for semantic repair. Do not merge, deploy, trade, pay, or alter secrets. After repair, request independent verification from Summer, Luna, or Terra and leave exact CI/PR URLs in the artifact.`
+          : '',
+      ].join('');
 
       agentResult = await runAgent(
         attemptConfig,
