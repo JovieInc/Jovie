@@ -3534,7 +3534,8 @@ jobs:
     needs: [ci-path-changes, ci-risk-classifier]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-risk-classifier.outputs.requires_preview == 'true' || contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 20
+    # Build + pull env consume ~5m; Vercel prebuilt upload often needs >20m alone.
+    timeout-minutes: 40
     concurrency:
       # Scope preview concurrency to a single PR/ref so unrelated PRs do not
       # evict each other's pending preview deployments from the queue.
@@ -3595,7 +3596,7 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
-        timeout-minutes: 20
+        timeout-minutes: 30
         run: |
           # For fast preview PRs: use main secrets (no Neon dependency)
           # Fallback hierarchy for maximum compatibility
