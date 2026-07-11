@@ -205,3 +205,112 @@ export function buildEscalationArtifact(
     2
   );
 }
+
+export type RepairWorkKind = 'mechanical' | 'normal' | 'semantic';
+
+export const GEM_MODEL_REGISTRY = Object.freeze({
+  mechanical: Object.freeze({
+    model: 'qwen3:4b-q4_K_M',
+    provider: 'ollama' as const,
+  }),
+  normal: Object.freeze({
+    model: 'deepseek/deepseek-v4-flash',
+    provider: 'openrouter' as const,
+  }),
+  escalation: Object.freeze({ model: 'codex', provider: 'codex-cli' as const }),
+  verification: Object.freeze(['luna', 'terra']),
+  architecture: 'sol',
+});
+
+export interface RepairRoute {
+  readonly route: EscalationRoute;
+  readonly model: string;
+  readonly provider: 'ollama' | 'openrouter' | 'codex-cli';
+  readonly deterministicGate: boolean;
+  readonly codexAllowed: boolean;
+  readonly costCapUsd: number;
+}
+
+/** Main/PR/new-issue work ordering. Red main is always the first lane. */
+export function rankRepairWork(input: {
+  readonly mainRed: boolean;
+  readonly blockedPrs: number;
+  readonly newIssues: number;
+}): readonly string[] {
+  return [
+    ...(input.mainRed ? ['main-red'] : []),
+    ...(input.blockedPrs > 0 ? ['pr-remediation'] : []),
+    ...(input.newIssues > 0 ? ['new-pr'] : []),
+  ];
+}
+
+/** Shared Gem model registry/router; Codex is exception-only after evidence. */
+export function routeRepairWork(input: {
+  readonly workKind: RepairWorkKind;
+  readonly mainRed?: boolean;
+  readonly cheapFailures?: number;
+  readonly changedFiles?: readonly string[];
+}): RepairRoute {
+  const semantic =
+    input.workKind === 'semantic' ||
+    (input.cheapFailures ?? 0) >= TWO_FAILED_CHEAP_ATTEMPTS;
+  if (semantic) {
+    return {
+      route: 'codex-semantic-repair',
+      model: GEM_MODEL_REGISTRY.escalation.model,
+      provider: GEM_MODEL_REGISTRY.escalation.provider,
+      deterministicGate: true,
+      codexAllowed: true,
+      costCapUsd: 0,
+    };
+  }
+  if (input.workKind === 'mechanical') {
+    return {
+      route: 'mechanical-cheap',
+      model: GEM_MODEL_REGISTRY.mechanical.model,
+      provider: GEM_MODEL_REGISTRY.mechanical.provider,
+      deterministicGate: true,
+      codexAllowed: false,
+      costCapUsd: 0,
+    };
+  }
+  return {
+    route: 'mechanical-cheap',
+    model: GEM_MODEL_REGISTRY.normal.model,
+    provider: GEM_MODEL_REGISTRY.normal.provider,
+    deterministicGate: true,
+    codexAllowed: false,
+    costCapUsd: 0,
+  };
+}
+
+export function buildRepairArtifact(input: {
+  readonly workId: string;
+  readonly priority: 'main-red' | 'pr-remediation' | 'new-pr';
+  readonly route: RepairRoute;
+  readonly attempt: number;
+  readonly cooldownUntil: string | null;
+}): string {
+  return JSON.stringify(
+    {
+      schema: 'jovie.repair/v1',
+      workId: input.workId,
+      priority: input.priority,
+      route: input.route,
+      attempt: input.attempt,
+      cooldownUntil: input.cooldownUntil,
+      registry: {
+        verification: GEM_MODEL_REGISTRY.verification,
+        architecture: GEM_MODEL_REGISTRY.architecture,
+      },
+      safety: {
+        merge: false,
+        admin: false,
+        tasteGateMutation: false,
+        secrets: false,
+      },
+    },
+    null,
+    2
+  );
+}

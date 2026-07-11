@@ -1,8 +1,8 @@
 name: Main Autofix
 
 # Auto-triage red main. Dispatched after the health monitor's one-shot rerun fails
-# (or is skipped). Fetches the failing run's logs + diff since last green, invokes
-# Claude Code to propose a fix, opens a PR with auto-merge enabled.
+# (or is skipped). Fetches the failing run's logs + diff since last green, applies
+# the shared Gem deterministic-first repair route, and opens a verification PR.
 #
 # Guardrails (enforced in eval-main-health composite action):
 #  - Canary/Sentry gate failures do NOT trigger autofix (rollback path owns those).
@@ -128,7 +128,7 @@ jobs:
           curl -sS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
 
   autofix:
-    name: Dispatch Claude Code fix
+    name: Dispatch shared Gem repair route
     needs: evaluate
     if: needs.evaluate.outputs.needs_autofix == 'true'
     runs-on: ${{ vars.CI_FAST_RUNNER }}
@@ -267,11 +267,24 @@ jobs:
           ls -la /tmp/autofix-context/
           wc -l /tmp/autofix-context/*.txt /tmp/autofix-context/*.patch 2>/dev/null || true
 
-      - name: OpenRouter fix attempt (cheap first, stronger fallback)
+      - name: Select shared Gem repair route
         if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == ''
-        id: openrouter
+        id: route
+        env:
+          FAILED_JOB_NAMES: ${{ needs.evaluate.outputs.failed_job_names }}
+          FAILING_SHORT_SHA: ${{ needs.evaluate.outputs.failing_short_sha }}
+          ATTEMPT: ${{ steps.dedup.outputs.attempt }}
+        run: |
+          SUSPECT_FILES="$(cat /tmp/autofix-context/suspect-files.txt 2>/dev/null || true)" \
+            pnpm exec tsx scripts/hermes/jobs/main-repair-route.ts
+
+      - name: Shared Gem repair route (deterministic gate first)
+        if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == ''
+        id: repair
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          REPAIR_MODEL: ${{ steps.route.outputs.model }}
+          REPAIR_PROVIDER: ${{ steps.route.outputs.provider }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
           FAILING_SHA: ${{ needs.evaluate.outputs.failing_sha }}
@@ -281,13 +294,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "did_fix=false" >> "$GITHUB_OUTPUT"
-          echo "fallback=true" >> "$GITHUB_OUTPUT"
-          echo "reason=" >> "$GITHUB_OUTPUT"
-          echo "model_used=" >> "$GITHUB_OUTPUT"
-          echo "status=" >> "$GITHUB_OUTPUT"
+          {
+            echo "did_fix=false"
+            echo "fallback=true"
+            echo "reason="
+            echo "model_used="
+            echo "status="
+          } >> "$GITHUB_OUTPUT"
 
-          if [ -z "${OPENROUTER_API_KEY:-}" ]; then
+          if [ "$REPAIR_PROVIDER" = "openrouter" ] && [ -z "${OPENROUTER_API_KEY:-}" ]; then
             echo "reason=no_openrouter_key" >> "$GITHUB_OUTPUT"
             echo "status=skipped" >> "$GITHUB_OUTPUT"
             exit 0
@@ -345,14 +360,27 @@ jobs:
               '{model: $model, messages: [{role: "system", content: $system}, {role: "user", content: $user}], temperature: 0.2, max_tokens: 6000}'
             )
 
-            RESPONSE=$(curl -sS --max-time 90 --retry 2 --retry-delay 1 \
-              --retry-connrefused --retry-all-errors \
-              https://openrouter.ai/api/v1/chat/completions \
-              -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -H "HTTP-Referer: https://github.com/${GH_REPO}" \
-              -H "X-Title: jovie-main-autofix" \
-              -d "$REQUEST_BODY")
+            if [ "$REPAIR_PROVIDER" = "ollama" ]; then
+              API_URL="${OLLAMA_BASE_URL:-http://localhost:11434/v1}/chat/completions"
+              AUTH_ARGS=()
+            elif [ "$REPAIR_PROVIDER" = "codex-cli" ]; then
+              CONTENT=$(codex exec --sandbox workspace-write --ask-for-approval never "$USER_PROMPT" 2>/tmp/autofix-context/codex.stderr || true)
+              RESPONSE=$(jq -n --arg content "$CONTENT" '{choices: [{message: {content: $content}}]}')
+            else
+              API_URL="https://openrouter.ai/api/v1/chat/completions"
+              AUTH_ARGS=(-H "Authorization: Bearer ${OPENROUTER_API_KEY}")
+            fi
+
+            if [ "$REPAIR_PROVIDER" != "codex-cli" ]; then
+              RESPONSE=$(curl -sS --max-time 90 --retry 2 --retry-delay 1 \
+                --retry-connrefused --retry-all-errors \
+                "$API_URL" \
+                "${AUTH_ARGS[@]}" \
+                -H "Content-Type: application/json" \
+                -H "HTTP-Referer: https://github.com/${GH_REPO}" \
+                -H "X-Title: jovie-gem-repair" \
+                -d "$REQUEST_BODY")
+            fi
 
             ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // empty')
             if [ -n "$ERROR_MSG" ]; then
@@ -376,13 +404,15 @@ jobs:
             PATCH=$(echo "$CONTENT" | jq -r '.patch // ""')
             REASON=$(echo "$CONTENT" | jq -r '.reason // ""')
 
-            echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-            echo "reason=$REASON" >> "$GITHUB_OUTPUT"
-            echo "model_used=$model" >> "$GITHUB_OUTPUT"
-            echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT"
+            {
+              echo "status=$STATUS"
+              echo "reason=$REASON"
+              echo "model_used=$model"
+              echo "summary=$SUMMARY"
+            } >> "$GITHUB_OUTPUT"
 
             if [ "$STATUS" = "abort" ]; then
-              echo "OpenRouter says this is not an autofixable code issue." > /tmp/autofix-context/ABORT.txt
+              echo "Shared Gem route says this is not an autofixable code issue." > /tmp/autofix-context/ABORT.txt
               echo "$REASON" >> /tmp/autofix-context/ABORT.txt
               echo "did_fix=false" >> "$GITHUB_OUTPUT"
               echo "fallback=false" >> "$GITHUB_OUTPUT"
@@ -390,7 +420,7 @@ jobs:
             fi
 
             if [ "$STATUS" = "skip" ]; then
-              echo "OpenRouter skipped fix: $REASON"
+              echo "Shared Gem route skipped fix: $REASON"
               echo "did_fix=false" >> "$GITHUB_OUTPUT"
               echo "fallback=false" >> "$GITHUB_OUTPUT"
               return 0
@@ -406,7 +436,7 @@ jobs:
               return 1
             fi
 
-            PATCH_FILE="/tmp/openrouter-autofix.patch"
+            PATCH_FILE="/tmp/gem-repair.patch"
             printf '%s\n' "$PATCH" > "$PATCH_FILE"
 
             if ! git apply --check "$PATCH_FILE"; then
@@ -420,97 +450,43 @@ jobs:
               return 1
             fi
 
-            echo "did_fix=true" >> "$GITHUB_OUTPUT"
-            echo "fallback=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "did_fix=true"
+              echo "fallback=false"
+            } >> "$GITHUB_OUTPUT"
             return 0
           }
 
-          PRIMARY_MODEL="google/gemini-flash-1.5:free"
-          FALLBACK_MODEL="openai/gpt-4o-mini"
-
-          if ! run_model "$PRIMARY_MODEL"; then
-            if ! run_model "$FALLBACK_MODEL"; then
-              echo "status=failed" >> "$GITHUB_OUTPUT"
-              echo "reason=openrouter_all_models_failed" >> "$GITHUB_OUTPUT"
-              echo "model_used=${PRIMARY_MODEL},${FALLBACK_MODEL}" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
+          if ! run_model "$REPAIR_MODEL"; then
+            {
+              echo "status=failed"
+              echo "reason=shared_gem_route_failed"
+              echo "model_used=$REPAIR_MODEL"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-      - name: Run Claude Code fallback
-        if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == '' && steps.openrouter.outputs.fallback == 'true'
-        id: claude
-        uses: anthropics/claude-code-action@a92e7c70a4da9793dc164451d829089dc057a464 # v1
-        with:
-          allowed_bots: 'github-merge-queue[bot],jovie-bot[bot]'
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            Main branch CI is red. Your job is to diagnose and fix the root cause.
-
-            **Failing run:** https://github.com/${{ github.repository }}/actions/runs/${{ needs.evaluate.outputs.failing_run_id }}
-            **Failing SHA:** ${{ needs.evaluate.outputs.failing_sha }}
-            **Last green SHA:** ${{ needs.evaluate.outputs.last_green_sha }}
-            **Failed jobs:** ${{ needs.evaluate.outputs.failed_job_names }}
-
-            ## Context bundle (read these first)
-
-            1. `/tmp/autofix-context/failed-logs.txt` — failed job output from CI
-            2. `/tmp/autofix-context/commits-since-green.txt` — commits merged since last green
-            3. `/tmp/autofix-context/diff-since-green.patch` — full diff since last green
-            4. `/tmp/autofix-context/suspect-files.txt` — files touched since last green (most likely cause)
-
-            ## Rules (from /drain Phase 1)
-
-            - Fix the **root cause**, not the symptom. Do not add try/catches to hide errors. Do not comment out failing tests.
-            - Do not skip tests. Do not add `[skip ci]`. Do not use `--no-verify`.
-            - Keep changes minimal — fix only what broke CI. Do not refactor.
-            - Skip security-sensitive paths unless the failure is IN them: auth, billing, drizzle/migrations, .github/ (other than this workflow).
-            - If the failure is an env/secret issue (not a code bug), STOP. Write a file `/tmp/autofix-context/ABORT.txt` explaining why and exit. Do not guess at secrets.
-
-            ## Required steps
-
-            1. Read the failed logs and identify the failing job's root cause.
-            2. Cross-reference the suspect files — the bug is almost certainly in one of them.
-            3. Make the minimal fix.
-            4. Run `pnpm biome check . --write` to auto-fix formatting.
-            5. Run `pnpm turbo typecheck --filter=@jovie/web` to verify types pass.
-            6. If the failure was a test, run the relevant test to confirm it now passes.
-            7. If validation fails, iterate up to 2 more times. After that, stop.
-
-            Keep the diff small and targeted. This will be auto-merged, so be conservative.
-
-      - name: Check for Claude ABORT signal
+      - name: Check repair abort signal
         id: abort-check
         if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == ''
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SHORT_SHA: ${{ needs.evaluate.outputs.failing_short_sha }}
-          FAILING_RUN_ID: ${{ needs.evaluate.outputs.failing_run_id }}
-          GH_REPO: ${{ github.repository }}
         run: |
           if [ -f /tmp/autofix-context/ABORT.txt ]; then
             REASON=$(cat /tmp/autofix-context/ABORT.txt)
             echo "aborted=true" >> "$GITHUB_OUTPUT"
-            echo "::warning::Claude aborted — not a code bug."
+            echo "::warning::Shared Gem repair route aborted — human triage required."
             echo "$REASON"
-
-            if [ -n "$SLACK_WEBHOOK_URL" ]; then
-              PAYLOAD=$(jq -n --arg sha "$SHORT_SHA" --arg reason "$REASON" --arg url "https://github.com/${GH_REPO}/actions/runs/${FAILING_RUN_ID}" '{
-                text: "🚨 Main autofix declined to open a PR — human triage required",
-                attachments: [{
-                  color: "danger",
-                  fields: [
-                    { title: "Failing SHA", value: $sha, short: true },
-                    { title: "Reason (from Claude)", value: $reason, short: false },
-                    { title: "Failing run", value: ("<" + $url + "|View>"), short: false }
-                  ]
-                }]
-              }')
-              curl -sS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
-            fi
           else
             echo "aborted=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Upload shared repair artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jovie-repair-${{ needs.evaluate.outputs.failing_short_sha }}-${{ github.run_attempt }}
+          path: /tmp/autofix-context/repair-artifact.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Run automation verify bundle
         if: steps.drift.outputs.drifted != 'true' && steps.dedup.outputs.skip_reason == '' && steps.abort-check.outputs.aborted != 'true'
@@ -544,14 +520,14 @@ jobs:
           BRANCH="autofix/main-${SHORT_SHA}-${ATTEMPT}"
 
           if [ -f /tmp/autofix-context/ABORT.txt ]; then
-            echo "Claude reported it cannot fix this (not a code bug). Skipping PR."
+            echo "Shared Gem route reported it cannot fix this (not a code bug). Skipping PR."
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
             cat /tmp/autofix-context/ABORT.txt
             exit 0
           fi
 
           if git diff --quiet && git diff --staged --quiet && [ -z "$(git status --porcelain)" ]; then
-            echo "No changes made — Claude could not fix this."
+            echo "No changes made — shared Gem route could not fix this."
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -569,7 +545,6 @@ jobs:
 
           Failed jobs: ${FAILED_JOB_NAMES}
 
-          Co-authored-by: Claude <claude@anthropic.com>
           EOF
           )"
 
@@ -594,9 +569,9 @@ jobs:
           ## Test plan
 
           - [ ] CI passes (Biome + TypeScript + tests)
-          - [ ] Review the diff — this was auto-generated and will auto-merge on green CI
+          - [ ] Review the diff — this was auto-generated and requires independent verification
 
-          🤖 Generated with [Claude Code](https://claude.com/claude-code) via Main Autofix
+          🤖 Generated by the shared Gem repair route (deterministic gate first)
           EOF
           )")
 
@@ -629,7 +604,7 @@ jobs:
                 { title: "Failing SHA", value: $sha, short: true },
                 { title: "Attempt", value: ($attempt + " of 3"), short: true },
                 { title: "PR", value: ("<" + $url + "|View PR>"), short: false },
-                { title: "Action", value: "Auto-merge enabled on green CI. No action needed unless diff looks wrong.", short: false }
+                { title: "Action", value: "Opened for independent verification; Graphite enrollment remains label-only. No merge or admin bypass is performed.", short: false }
               ]
             }]
           }')
