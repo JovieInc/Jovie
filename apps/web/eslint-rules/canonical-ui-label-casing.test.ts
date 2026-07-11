@@ -50,6 +50,14 @@ ruleTester.run('canonical-ui-label-casing', rule, {
       code: `<span aria-label="Copy Profile Link" />`,
     },
     {
+      // Hyphenated compounds: canonical Title Case keeps post-hyphen segments
+      // lowercase ("Follow-up"). Regression — this exact form used to be
+      // unsatisfiable (the word regex rejected every hyphenated word while
+      // toCanonicalTitleCase produced this same string as the expected fix).
+      filename,
+      code: `const items = [{ label: 'Follow-up Delay (Hours)' }];`,
+    },
+    {
       filename,
       code: `const items = [{ label: 'Last Action' }];`,
     },

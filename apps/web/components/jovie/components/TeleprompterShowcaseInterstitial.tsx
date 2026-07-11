@@ -106,7 +106,7 @@ export function TeleprompterShowcaseInterstitial({
             </p>
             <h2
               id='teleprompter-showcase-title'
-              className='mt-2 text-xl font-semibold tracking-[-0.02em] text-white dark:text-white'
+              className='mt-2 text-xl font-semibold tracking-tighter text-white dark:text-white'
             >
               {'Record With A Voice Following Teleprompter'}
             </h2>
