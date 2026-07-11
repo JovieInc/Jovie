@@ -50,7 +50,7 @@ export function AuthUnavailableCard({
       />
 
       <div className='mt-5 space-y-2'>
-        <h1 className='text-[1.5rem] font-[650] leading-[1.16] tracking-[-0.02em] text-white dark:text-white text-balance'>
+        <h1 className='text-[1.5rem] font-[650] leading-[1.16] tracking-tighter text-white dark:text-white text-balance'>
           {headline}
         </h1>
         <p className='mx-auto max-w-[20rem] text-[0.875rem] leading-[1.55] tracking-[-0.011em] text-white/60 text-pretty'>
@@ -77,7 +77,7 @@ export function AuthUnavailableCard({
       )}
 
       {showSignupLegal ? (
-        <p className='mt-4 text-xs leading-[1.6] tracking-[-0.01em] text-white/50'>
+        <p className='mt-4 text-xs leading-[1.6] tracking-tight text-white/50'>
           By signing up, you agree to our{' '}
           <Link
             href={APP_ROUTES.LEGAL_TERMS}

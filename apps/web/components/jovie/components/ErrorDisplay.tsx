@@ -81,7 +81,7 @@ export function ErrorDisplay({
 
           {supportCode && (
             <div className='mt-1 flex flex-wrap items-center gap-2 text-xs text-tertiary-token'>
-              <span className='text-2xs font-medium tracking-[-0.01em] text-secondary-token'>
+              <span className='text-2xs font-medium tracking-tight text-secondary-token'>
                 Reference
               </span>
               <span className='font-mono text-primary-token'>
@@ -92,7 +92,7 @@ export function ErrorDisplay({
                 variant='ghost'
                 size='sm'
                 onClick={handleCopySupportCode}
-                className='h-7 gap-1 rounded-lg px-2 text-2xs font-medium tracking-[-0.01em]'
+                className='h-7 gap-1 rounded-lg px-2 text-2xs font-medium tracking-tight'
                 aria-label='Copy Support Reference'
               >
                 <Copy className='size-3' />
@@ -110,7 +110,7 @@ export function ErrorDisplay({
                 size='sm'
                 onClick={onRetry}
                 disabled={isLoading || isSubmitting}
-                className='mt-2 h-7 gap-1.5 rounded-lg px-2 text-2xs font-medium tracking-[-0.01em] text-error hover:bg-error/10 hover:text-error'
+                className='mt-2 h-7 gap-1.5 rounded-lg px-2 text-2xs font-medium tracking-tight text-error hover:bg-error/10 hover:text-error'
               >
                 <RefreshCw className='size-3.5' />
                 Retry Message

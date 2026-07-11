@@ -90,7 +90,7 @@ export function ProfileDrawerShell({
                 {subtitle ? (
                   <p
                     id={subtitleId}
-                    className='truncate text-3xs font-[440] leading-[1.1] tracking-[-0.01em] text-tertiary-token'
+                    className='truncate text-3xs font-[440] leading-[1.1] tracking-tight text-tertiary-token'
                   >
                     {subtitle}
                   </p>
@@ -129,7 +129,7 @@ export function ProfileDrawerShell({
               {subtitle ? (
                 <p
                   id={subtitleId}
-                  className='mt-1 truncate text-3xs font-[440] leading-[1.1] tracking-[-0.01em] text-tertiary-token'
+                  className='mt-1 truncate text-3xs font-[440] leading-[1.1] tracking-tight text-tertiary-token'
                 >
                   {subtitle}
                 </p>
