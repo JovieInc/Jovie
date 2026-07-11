@@ -43,6 +43,7 @@ import {
   CODEX_TRUSTED_LABEL,
   countRetryReleases,
   type DispatchPlan,
+  describeIssueScopeMismatch,
   EPIC_LABEL,
   type FinisherRunner,
   finishDispatch,
@@ -64,6 +65,7 @@ import {
   type ShipperConfig,
   SpawnEagainError,
   shouldEscalateRetry,
+  validateIssueScopeOverlap,
   worktreeHasWork,
 } from '../lib/codex-issue-shipper';
 import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
@@ -1450,6 +1452,56 @@ async function dispatchPlan(
         event: 'missing_pr_release_claim',
         issue: plan.issue.number,
         branch: dispatch.branchName,
+      });
+      return;
+    }
+
+    const changedPaths = runInWorktree([
+      'git',
+      'diff',
+      '--name-only',
+      'origin/main...HEAD',
+    ])
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    const scopeVerdict = validateIssueScopeOverlap(
+      dispatch.issue,
+      changedPaths
+    );
+    if (!scopeVerdict.matches) {
+      const reason = describeIssueScopeMismatch(scopeVerdict);
+      try {
+        run(
+          [
+            'gh',
+            'pr',
+            'close',
+            String(pr.number),
+            '--repo',
+            config.repo,
+            '--comment',
+            reason,
+          ],
+          config
+        );
+      } catch (err) {
+        logJobEvent({
+          job: JOB,
+          event: 'scope_mismatch_pr_close_failed',
+          issue: dispatch.issue.number,
+          pr: pr.number,
+          error: shortError(err),
+        });
+      }
+      markBlocked(config, dispatch, reason);
+      logJobEvent({
+        job: JOB,
+        event: 'scope_mismatch_blocked',
+        issue: dispatch.issue.number,
+        pr: pr.number,
+        expectedPaths: scopeVerdict.expectedPaths,
+        changedPaths,
       });
       return;
     }
