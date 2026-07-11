@@ -1,0 +1,56 @@
+name: 'Ensure full repository checkout'
+description: >-
+  Reset stale sparse-checkout / partial-clone state on reused self-hosted
+  workspaces, checkout the full tree, and materialize all tracked files.
+
+inputs:
+  fetch-depth:
+    description: 'fetch-depth forwarded to actions/checkout'
+    required: false
+    default: '0'
+  sentinel:
+    description: 'Path that must exist after checkout (fail-fast guard)'
+    required: false
+    default: '.github/actions/setup-node-pnpm/action.yml'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Reset workspace git state (self-hosted)
+      if: runner.environment != 'github-hosted'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ ! -d .git ]]; then
+          exit 0
+        fi
+        git sparse-checkout disable 2>/dev/null || true
+        git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+        git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+        rm -f .git/info/sparse-checkout
+        git config --local --unset-all extensions.partialClone 2>/dev/null || true
+        git config --local --unset-all remote.origin.promisorRemote 2>/dev/null || true
+
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        fetch-depth: ${{ inputs.fetch-depth }}
+        clean: true
+
+    - name: Materialize full tree (self-hosted)
+      if: runner.environment != 'github-hosted'
+      shell: bash
+      run: |
+        set -euo pipefail
+        git sparse-checkout disable 2>/dev/null || true
+        git reset --hard HEAD
+        git checkout-index -a -f
+
+    - name: Verify checkout sentinel
+      shell: bash
+      run: |
+        set -euo pipefail
+        sentinel="${{ inputs.sentinel }}"
+        if [[ ! -f "$sentinel" ]]; then
+          echo "::error::Incomplete checkout — missing ${sentinel}. Self-hosted workspace may be contaminated."
+          exit 1
+        fi

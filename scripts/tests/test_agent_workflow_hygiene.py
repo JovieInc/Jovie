@@ -4,6 +4,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
+ACTIONS = REPO_ROOT / ".github" / "actions"
 
 
 HOT_PATH_WORKFLOWS = (
@@ -12,6 +13,13 @@ HOT_PATH_WORKFLOWS = (
     "auto-fix-lint-agent-drafts.yml",
     "stuck-draft-autoclose.yml",
     "merge-queue-autoenroll.yml",
+)
+
+FULL_CHECKOUT_JOBS = (
+    ("security.yml", "gitleaks"),
+    ("security.yml", "trufflehog"),
+    ("ci.yml", "ci-build-public"),
+    ("ci.yml", "ci-summary"),
 )
 
 
@@ -31,3 +39,19 @@ def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
     ):
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "run: corepack enable" not in content, workflow_name
+
+
+def test_self_hosted_gate_jobs_use_ensure_full_checkout() -> None:
+    """Jobs that need repo scripts/actions must recover from sparse workspaces."""
+    action_path = ACTIONS / "ensure-full-checkout" / "action.yml"
+    assert action_path.is_file(), "ensure-full-checkout composite action must exist"
+    for workflow_name, _job_hint in FULL_CHECKOUT_JOBS:
+        content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
+        assert "ensure-full-checkout" in content, workflow_name
+
+
+def test_trufflehog_job_does_not_require_docker() -> None:
+    """Self-hosted runners do not expose a Docker socket for trufflehog action."""
+    content = (WORKFLOWS / "security.yml").read_text(encoding="utf-8")
+    assert "trufflesecurity/trufflehog@" not in content
+    assert "ci-pr-trufflehog" in content

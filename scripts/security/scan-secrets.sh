@@ -162,7 +162,7 @@ run_trufflehog_full() {
 }
 
 usage() {
-  echo "Usage: $0 {pre-commit|ci-pr|full} [base-ref]" >&2
+  echo "Usage: $0 {pre-commit|ci-pr|ci-pr-trufflehog|full|full-trufflehog} [base-ref]" >&2
   exit 1
 }
 
@@ -178,8 +178,14 @@ case "$MODE" in
     run_gitleaks_ci_pr
     run_trufflehog_ci_pr
     ;;
+  ci-pr-trufflehog)
+    run_trufflehog_ci_pr
+    ;;
   full)
     run_gitleaks_full
+    run_trufflehog_full
+    ;;
+  full-trufflehog)
     run_trufflehog_full
     ;;
   *)
