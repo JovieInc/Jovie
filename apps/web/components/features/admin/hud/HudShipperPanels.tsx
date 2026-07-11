@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -336,14 +337,16 @@ function TasteInboxPanel({
             Human decisions stay in the loop.
           </p>
         </div>
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='icon'
           onClick={onRefresh}
-          className='rounded-md p-1.5 text-tertiary-token hover:bg-surface-0 hover:text-primary-token'
+          className='h-7 w-7 text-tertiary-token hover:bg-surface-0 hover:text-primary-token'
           aria-label='Refresh Taste Inbox'
         >
           <RefreshCw className='h-3.5 w-3.5' aria-hidden='true' />
-        </button>
+        </Button>
       </div>
       {!payload.available ? (
         <p className='text-app text-secondary-token'>
@@ -384,35 +387,41 @@ function TasteInboxPanel({
               </Link>
             </div>
             <div className='mt-2 flex flex-wrap items-center gap-1.5'>
-              <button
+              <Button
                 type='button'
+                variant='secondary'
+                size='sm'
                 disabled={busyId === issue.id}
                 onClick={() => void act(issue.id, 'approve')}
-                className='inline-flex items-center gap-1 rounded-md border border-subtle px-2 py-1 text-2xs text-secondary-token hover:bg-surface-1 disabled:opacity-50'
+                className='h-auto gap-1 rounded-md px-2 py-1 text-2xs'
               >
                 <Check className='h-3 w-3' aria-hidden='true' />
                 Approve
-              </button>
-              <button
+              </Button>
+              <Button
                 type='button'
+                variant='secondary'
+                size='sm'
                 disabled={busyId === issue.id}
                 onClick={() => void act(issue.id, 'reject')}
-                className='inline-flex items-center gap-1 rounded-md border border-subtle px-2 py-1 text-2xs text-secondary-token hover:bg-surface-1 disabled:opacity-50'
+                className='h-auto gap-1 rounded-md px-2 py-1 text-2xs'
               >
                 <X className='h-3 w-3' aria-hidden='true' />
                 Reject
-              </button>
-              <button
+              </Button>
+              <Button
                 type='button'
+                variant='secondary'
+                size='sm'
                 disabled={busyId === issue.id}
                 onClick={() =>
                   setCommentId(commentId === issue.id ? null : issue.id)
                 }
-                className='inline-flex items-center gap-1 rounded-md border border-subtle px-2 py-1 text-2xs text-secondary-token hover:bg-surface-1 disabled:opacity-50'
+                className='h-auto gap-1 rounded-md px-2 py-1 text-2xs'
               >
                 <MessageSquare className='h-3 w-3' aria-hidden='true' />
                 Comment
-              </button>
+              </Button>
             </div>
             {commentId === issue.id ? (
               <div className='mt-2 flex gap-2'>
@@ -422,14 +431,16 @@ function TasteInboxPanel({
                   placeholder='Add a decision note'
                   className='min-w-0 flex-1 rounded-md border border-subtle bg-surface-1 px-2 py-1.5 text-app text-primary-token outline-none focus:border-accent'
                 />
-                <button
+                <Button
                   type='button'
+                  variant='primary'
+                  size='sm'
                   disabled={!comment.trim() || busyId === issue.id}
                   onClick={() => void act(issue.id, 'comment')}
-                  className='rounded-md bg-primary-token px-2 py-1 text-2xs text-surface-0 disabled:opacity-50'
+                  className='h-auto rounded-md px-2 py-1 text-2xs'
                 >
                   Save
-                </button>
+                </Button>
               </div>
             ) : null}
           </div>
@@ -499,14 +510,16 @@ function CliAuthPanel() {
             <span className='text-app capitalize text-primary-token'>
               {item.provider}
             </span>
-            <button
+            <Button
               type='button'
+              variant='link'
+              size='sm'
               onClick={() => void reauthenticate(item.provider)}
               disabled={busy === item.provider}
-              className='text-2xs text-secondary-token underline-offset-2 hover:underline disabled:opacity-50'
+              className='h-auto p-0 text-2xs text-secondary-token'
             >
               {item.available ? 'Reauthenticate' : 'Sign in'}
-            </button>
+            </Button>
           </div>
         ))}
       </div>
