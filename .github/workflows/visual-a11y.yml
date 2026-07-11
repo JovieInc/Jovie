@@ -63,9 +63,7 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      # Self-hosted runners already provide the system libraries; --with-deps
-      # invokes sudo and fails on the locked-down OrbStack runner.
-      - run: pnpm --filter web exec playwright install chromium
+      - uses: ./.github/actions/setup-playwright
       - name: Run Storybook A11y Tests
         id: a11y-test
         run: pnpm --filter web test:a11y
