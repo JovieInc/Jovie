@@ -4,7 +4,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
-ACTIONS = REPO_ROOT / ".github" / "actions"
 
 
 HOT_PATH_WORKFLOWS = (
@@ -41,13 +40,12 @@ def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
         assert "run: corepack enable" not in content, workflow_name
 
 
-def test_self_hosted_gate_jobs_use_ensure_full_checkout() -> None:
+def test_self_hosted_gate_jobs_materialize_full_checkout() -> None:
     """Jobs that need repo scripts/actions must recover from sparse workspaces."""
-    action_path = ACTIONS / "ensure-full-checkout" / "action.yml"
-    assert action_path.is_file(), "ensure-full-checkout composite action must exist"
     for workflow_name, _job_hint in FULL_CHECKOUT_JOBS:
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
-        assert "ensure-full-checkout" in content, workflow_name
+        assert "git checkout-index -a -f" in content, workflow_name
+        assert "Verify checkout sentinel" in content, workflow_name
 
 
 def test_trufflehog_job_does_not_require_docker() -> None:
