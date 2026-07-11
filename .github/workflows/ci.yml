@@ -3026,6 +3026,10 @@ jobs:
           export SENTRY_ENVIRONMENT=ci-pr-e2e
           export SENTRY_RELEASE="${{ github.sha }}"
           export E2E_USE_TEST_AUTH_BYPASS=1
+          # golden-path.spec.ts is part of the smoke manifest. Its visible
+          # Better Auth signup requires the deterministic OTP contract, which
+          # is production-blocked and restricted to canonical +e2e addresses.
+          export E2E_TEST_MODE=1
           export VERCEL_ENV=development
           export E2E_TEST_AUTH_PERSONA=creator-ready
           export NEXT_PUBLIC_CLERK_MOCK=1
@@ -3226,6 +3230,9 @@ jobs:
           # Enables Better Auth's deterministic OTP only for the golden path's
           # canonical +e2e test address; production hard-blocks this switch.
           export E2E_TEST_MODE=1
+          # Makes the anonymous /start turn deterministic while preserving the
+          # real session cookie, persistence, signup, claim, and activation path.
+          export CHAT_LLM_FAILURE_INJECTION=1
           export NEXT_PUBLIC_APP_URL=http://localhost:3100
           export BETTER_AUTH_URL=http://localhost:3100
           export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100
