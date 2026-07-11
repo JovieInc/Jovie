@@ -1,9 +1,6 @@
 """Regression tests for self-hosted agent workflow hygiene."""
 from pathlib import Path
 
-import yaml
-
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 
@@ -20,6 +17,20 @@ FULL_CHECKOUT_JOBS = (
     ("ci.yml", "ci-build-public"),
     ("ci.yml", "ci-summary"),
 )
+
+
+def _job_block(workflow: str, job_name: str) -> str:
+    """Return one top-level workflow job using its two-space YAML boundary."""
+    content = (WORKFLOWS / workflow).read_text(encoding="utf-8")
+    marker = f"  {job_name}:\n"
+    assert marker in content, f"{workflow}: missing jobs.{job_name}"
+    remainder = content.split(marker, 1)[1]
+    lines: list[str] = []
+    for line in remainder.splitlines():
+        if line.startswith("  ") and not line.startswith("    "):
+            break
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def test_agent_hot_paths_do_not_run_repo_tests() -> None:
@@ -57,10 +68,7 @@ def test_trufflehog_job_does_not_require_docker() -> None:
 
 def test_merge_gated_secret_scans_use_clean_hosted_runners() -> None:
     """Secret scanners need a fresh, authoritative Git object store."""
-    workflow = yaml.safe_load(
-        (WORKFLOWS / "security.yml").read_text(encoding="utf-8")
-    )
-    jobs = workflow["jobs"]
-
-    assert jobs["gitleaks"]["runs-on"] == "ubuntu-latest"
-    assert jobs["trufflehog"]["runs-on"] == "ubuntu-latest"
+    for job_name in ("gitleaks", "trufflehog"):
+        block = _job_block("security.yml", job_name)
+        assert "runs-on: ubuntu-latest" in block, job_name
+        assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block, job_name
