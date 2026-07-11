@@ -5,6 +5,7 @@ const FIXTURE_CREATED_AT = '2026-06-08T12:00:00.000Z';
 export const DESIGN_LAB_DEV_FIXTURE_PROPOSALS: readonly DesignProposal[] = [
   {
     id: 'profile-page-quiet-hero',
+    kind: 'surface',
     surfaceId: 'profile-page',
     surfaceName: 'Public profile page',
     proposalText:
@@ -14,7 +15,8 @@ export const DESIGN_LAB_DEV_FIXTURE_PROPOSALS: readonly DesignProposal[] = [
     linearIssueId: 'JOV-1951',
     linearIssueUrl:
       'https://linear.app/jovie/issue/JOV-1951/profile-redesign-proposal-loop',
-    status: 'pending',
+    status: 'proposed',
+    designGap: null,
     createdAt: FIXTURE_CREATED_AT,
     reviewedAt: null,
     reviewer: null,
@@ -25,6 +27,7 @@ export const DESIGN_LAB_DEV_FIXTURE_PROPOSALS: readonly DesignProposal[] = [
   },
   {
     id: 'sidebar-density-pass',
+    kind: 'surface',
     surfaceId: 'dashboard-sidebar',
     surfaceName: 'Dashboard sidebar',
     proposalText:
@@ -34,7 +37,8 @@ export const DESIGN_LAB_DEV_FIXTURE_PROPOSALS: readonly DesignProposal[] = [
     linearIssueId: 'JOV-2098',
     linearIssueUrl:
       'https://linear.app/jovie/issue/JOV-2098/designadmin-consolidate-overlapping-ia-across-overview-ops-growth',
-    status: 'pending',
+    status: 'proposed',
+    designGap: null,
     createdAt: FIXTURE_CREATED_AT,
     reviewedAt: null,
     reviewer: null,
