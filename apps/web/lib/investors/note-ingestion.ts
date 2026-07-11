@@ -151,6 +151,12 @@ function transcriptHash(transcript: string): string {
   return createHash('sha256').update(transcript, 'utf8').digest('hex');
 }
 
+function sourceRecordHash(input: InvestorNoteInput): string {
+  return createHash('sha256')
+    .update(JSON.stringify(input), 'utf8')
+    .digest('hex');
+}
+
 function frequencyFor(count: number): InvestorNoteCandidate['frequency'] {
   if (count >= 4) return 'frequent';
   if (count >= 2) return 'common';
@@ -210,11 +216,9 @@ export function buildInvestorNoteReviewArtifact(
   for (const input of parsedInputs) {
     const existing = inputsById.get(input.source.id);
     if (existing) {
-      if (
-        transcriptHash(existing.transcript) !== transcriptHash(input.transcript)
-      ) {
+      if (sourceRecordHash(existing) !== sourceRecordHash(input)) {
         throw new Error(
-          `Investor note source ID ${input.source.id} has a changed transcript hash.`
+          `Investor note source ID ${input.source.id} has a changed source record.`
         );
       }
       continue;

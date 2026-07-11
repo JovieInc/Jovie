@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { investorNotePriorArtifactSchema } from '@/lib/investors/note-ingestion';
+import {
+  buildInvestorNoteReviewArtifact,
+  inputsFromPriorArtifact,
+  investorNotePriorArtifactSchema,
+} from '@/lib/investors/note-ingestion';
 
 const protectedFieldSchema = z.enum([
   'claims',
@@ -54,25 +58,19 @@ export function renderInvestorReviewProposal(
   readonly markdown: string;
 } {
   const proposal = investorReviewProposalSchema.parse(rawProposal);
-  const artifact = investorNotePriorArtifactSchema
-    .and(
-      z.object({
-        candidates: z.array(
-          z.object({
-            key: z.string(),
-            proposedReviewTargets: z.array(z.string()),
-            sources: z.array(
-              z.object({
-                sourceId: z.string(),
-                transcriptSha256: z.string(),
-                line: z.number().int().positive().optional(),
-              })
-            ),
-          })
-        ),
-      })
-    )
+  const supplied = investorNotePriorArtifactSchema
+    .and(z.object({ candidates: z.array(z.unknown()) }))
     .parse(rawArtifact);
+  const artifact = buildInvestorNoteReviewArtifact(
+    inputsFromPriorArtifact(supplied)
+  );
+  if (
+    JSON.stringify(supplied.candidates) !== JSON.stringify(artifact.candidates)
+  ) {
+    throw new Error(
+      'Supplied derived candidates do not match the canonical corpus.'
+    );
+  }
   const candidates = new Map(
     artifact.candidates.map(candidate => [candidate.key, candidate])
   );

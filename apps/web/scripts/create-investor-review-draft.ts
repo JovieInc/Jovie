@@ -1,16 +1,26 @@
 import { spawnSync } from 'node:child_process';
-import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { renderInvestorReviewProposal } from '@/lib/investors/investor-review-proposal';
+import { publishInvestorReviewDraft } from '@/lib/investors/investor-review-publisher';
 
 const webRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '..'
 );
 const repoRoot = path.resolve(webRoot, '../..');
-const reviewRoot = path.join(repoRoot, 'docs/fundraising/reviews');
+const relativeReviewRoot = 'docs/fundraising/reviews/proposals';
 
 function argument(name: string): string {
   const value = process.argv
@@ -20,12 +30,13 @@ function argument(name: string): string {
   return value.slice(name.length + 3);
 }
 
-function git(args: readonly string[]): string {
-  const result = spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8' });
-  if (result.status !== 0) {
-    throw new Error(result.stderr.trim() || `git ${args.join(' ')} failed.`);
-  }
-  return result.stdout.trim();
+function run(command: 'git' | 'gh', args: readonly string[], cwd = repoRoot) {
+  const result = spawnSync(command, args, { cwd, encoding: 'utf8' });
+  return {
+    status: result.status ?? 1,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
 }
 
 async function regularRealPath(filePath: string): Promise<string> {
@@ -45,9 +56,16 @@ async function main() {
     JSON.parse(await readFile(proposalPath, 'utf8')),
     JSON.parse(await readFile(artifactPath, 'utf8'))
   );
-  const output = path.join(reviewRoot, 'proposals', `${rendered.slug}.md`);
+  const relativeOutput = path.join(relativeReviewRoot, `${rendered.slug}.md`);
+  const output = path.join(repoRoot, relativeOutput);
   const branch = `codex/investor-review-${rendered.slug}`;
-  const base = git(['branch', '--show-current']);
+  const currentBranch = run('git', ['branch', '--show-current']);
+  if (currentBranch.status !== 0 || !currentBranch.stdout.trim()) {
+    throw new Error(
+      currentBranch.stderr.trim() || 'Current branch is required.'
+    );
+  }
+  const base = currentBranch.stdout.trim();
   const plan = {
     mode: publish ? 'publish-draft' : 'dry-run',
     branch,
@@ -60,59 +78,28 @@ async function main() {
     );
     return;
   }
-  if (git(['status', '--porcelain']))
-    throw new Error('Refusing a dirty worktree.');
-  const localBranch = spawnSync(
-    'git',
-    ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`],
-    { cwd: repoRoot }
-  );
-  if (localBranch.status === 0) {
-    throw new Error(`Branch already exists: ${branch}`);
-  }
-  const remote = spawnSync(
-    'git',
-    ['ls-remote', '--exit-code', '--heads', 'origin', branch],
-    { cwd: repoRoot }
-  );
-  if (remote.status === 0)
-    throw new Error(`Remote branch already exists: ${branch}`);
-  if (remote.status !== 2) {
-    throw new Error(
-      remote.stderr?.toString().trim() ||
-        'Could not verify remote branch availability.'
-    );
-  }
-  await mkdir(path.dirname(output), { recursive: true });
-  await writeFile(output, rendered.markdown, { encoding: 'utf8', flag: 'wx' });
-  git(['switch', '-c', branch]);
-  git(['add', '--', path.relative(repoRoot, output)]);
-  git([
-    'commit',
-    '-m',
-    `docs(investors): add ${rendered.slug} review proposal`,
-  ]);
-  git(['push', '-u', 'origin', branch]);
-  const pr = spawnSync(
-    'gh',
-    [
-      'pr',
-      'create',
-      '--draft',
-      '--base',
+  const draftPr = await publishInvestorReviewDraft(
+    {
+      repoRoot,
+      branch,
       base,
-      '--title',
-      rendered.title,
-      '--body',
-      'Manual investor-note review proposal only. No investor-facing content is changed.',
-    ],
-    { cwd: repoRoot, encoding: 'utf8' }
+      title: rendered.title,
+      relativeOutput,
+      markdown: rendered.markdown,
+    },
+    {
+      run,
+      createTempDirectory: () =>
+        mkdtemp(path.join(tmpdir(), 'jovie-investor-review-')),
+      removeTempDirectory: directory =>
+        rm(directory, { recursive: true, force: true }),
+      writeArtifact: async (filePath, content) => {
+        await mkdir(path.dirname(filePath), { recursive: true });
+        await writeFile(filePath, content, { encoding: 'utf8', flag: 'wx' });
+      },
+    }
   );
-  if (pr.status !== 0)
-    throw new Error(pr.stderr.trim() || 'Draft PR creation failed.');
-  process.stdout.write(
-    `${JSON.stringify({ ...plan, draftPr: pr.stdout.trim() })}\n`
-  );
+  process.stdout.write(`${JSON.stringify({ ...plan, draftPr })}\n`);
 }
 
 main().catch(error => {

@@ -103,7 +103,7 @@ OBJECTION | strategy | critical | The buyer is unclear.`)
     expect(buildInvestorNoteReviewArtifact([input, input]).sourceCount).toBe(1);
   });
 
-  it('makes sequential corpus ingestion equal batch and rejects changed sources', () => {
+  it('makes sequential corpus ingestion equal batch and rejects any changed source record', () => {
     const first = note({ id: 'conversation-a', signals: [tractionSignal] });
     const second = note({
       id: 'conversation-b',
@@ -117,12 +117,25 @@ OBJECTION | strategy | critical | The buyer is unclear.`)
     expect(sequential).toEqual(
       buildInvestorNoteReviewArtifact([first, second])
     );
-    expect(() =>
-      buildInvestorNoteReviewArtifact([
-        first,
-        { ...first, transcript: 'Changed transcript.' },
-      ])
-    ).toThrow('has a changed transcript hash');
+    const mutations = [
+      { ...first, transcript: 'Changed transcript.' },
+      { ...first, source: { ...first.source, label: 'Changed label' } },
+      {
+        ...first,
+        source: { ...first.source, capturedAt: '2026-07-10' },
+      },
+      { ...first, signals: [{ ...tractionSignal, severity: 'critical' }] },
+      {
+        ...first,
+        signals: [{ ...tractionSignal, gapClassification: 'communication' }],
+      },
+      { ...first, signals: [{ ...tractionSignal, line: 1 }] },
+    ];
+    for (const mutation of mutations) {
+      expect(() => buildInvestorNoteReviewArtifact([first, mutation])).toThrow(
+        'has a changed source record'
+      );
+    }
   });
 
   it('normalizes Unicode with NFKC while retaining letters and numbers', () => {

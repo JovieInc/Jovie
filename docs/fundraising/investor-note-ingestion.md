@@ -91,7 +91,13 @@ pnpm exec tsx scripts/create-investor-review-draft.ts \
 ```
 
 The opt-in command refuses dirty worktrees and local or remote branch
-collisions. It creates a new `codex/investor-review-*` branch, commits only the
-tracked proposal Markdown under `docs/fundraising/reviews/proposals/`, pushes
-that branch, and opens a GitHub **draft** PR. It never edits registry, portal,
-deck, claims, numbers, ask, or positioning; marks a PR ready; merges; or deploys.
+collisions. It creates the `codex/investor-review-*` branch in an isolated
+temporary git worktree, leaving the caller's checkout and branch untouched. It
+commits only the tracked proposal Markdown under
+`docs/fundraising/reviews/proposals/`, pushes that branch, and opens a GitHub
+**draft** PR. Pre-push failures remove the temporary worktree, artifact, and
+new local branch. If draft-PR creation fails after push, the newly-created
+remote branch is deleted; a failed deletion reports the exact recoverable
+remote state. The command never deletes a preexisting branch, edits registry,
+portal, deck, claims, numbers, ask, or positioning; marks a PR ready; merges;
+or deploys.

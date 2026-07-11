@@ -25,6 +25,15 @@ function setup() {
   return { artifact, candidate: artifact.candidates[0]! };
 }
 
+interface MutableArtifact {
+  candidates: Array<{
+    key: string;
+    text: string;
+    proposedReviewTargets: string[];
+    sources: Array<{ transcriptSha256: string }>;
+  }>;
+}
+
 describe('investor review proposal', () => {
   it('renders approved copy with matching evidence and protected-field flags', () => {
     const { artifact, candidate } = setup();
@@ -74,5 +83,56 @@ describe('investor review proposal', () => {
         artifact
       )
     ).toThrow('not allowed');
+  });
+
+  it.each([
+    [
+      'source hash',
+      (artifact: MutableArtifact) => {
+        artifact.candidates[0]!.sources[0]!.transcriptSha256 = '0'.repeat(64);
+      },
+    ],
+    [
+      'target',
+      (artifact: MutableArtifact) => {
+        artifact.candidates[0]!.proposedReviewTargets = ['outreach-brief'];
+      },
+    ],
+    [
+      'key',
+      (artifact: MutableArtifact) => {
+        artifact.candidates[0]!.key = 'question:forged';
+      },
+    ],
+    [
+      'text',
+      (artifact: MutableArtifact) => {
+        artifact.candidates[0]!.text = 'Forged derived text';
+      },
+    ],
+  ])('rejects a mutated derived candidate %s', (_label, mutate) => {
+    const { artifact, candidate } = setup();
+    const rawArtifact = structuredClone(artifact);
+    mutate(rawArtifact as unknown as MutableArtifact);
+    expect(() =>
+      renderInvestorReviewProposal(
+        {
+          proposalVersion: '1.0.0',
+          slug: 'traction-proof',
+          title: 'Review traction proof',
+          approvedCandidates: [
+            {
+              key: candidate.key,
+              proposedCopy: 'Copy',
+              action: 'Review',
+              target: 'fundraisingRegistry.claims',
+              protectedFields: ['claims'],
+              evidence: [candidate.sources[0]],
+            },
+          ],
+        },
+        rawArtifact
+      )
+    ).toThrow('do not match the canonical corpus');
   });
 });
