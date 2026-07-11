@@ -304,6 +304,7 @@
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
+| `/investor-portal/events` | POST | `investor cookie` | Persist allowlisted investor engagement to investor activity without exposing the token |
 | `/api/investors/track` | POST | `public` | Record investor page view heartbeat |
 
 ### Link
