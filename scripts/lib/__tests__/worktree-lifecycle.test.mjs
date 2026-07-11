@@ -1,6 +1,6 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateCandidate, effectiveTtlDays } from '../worktree-lifecycle.mjs';
+import test from 'node:test';
+import { effectiveTtlDays, evaluateCandidate } from '../worktree-lifecycle.mjs';
 
 const base = {
   path: '/tmp/jovie-wt',
@@ -21,10 +21,14 @@ const base = {
 const policy = { ttlDays: 7, emergencyTtlDays: 2, criticalTtlDays: 1 };
 
 function candidate(overrides = {}, now = '2026-06-10T00:00:00Z') {
-  const metadata = Object.hasOwn(overrides, 'metadata') && overrides.metadata === null
-    ? null
-    : { ...base.metadata, ...(overrides.metadata ?? {}) };
-  return evaluateCandidate({ ...base, ...overrides, metadata }, { now, policy });
+  const metadata =
+    Object.hasOwn(overrides, 'metadata') && overrides.metadata === null
+      ? null
+      : { ...base.metadata, ...(overrides.metadata ?? {}) };
+  return evaluateCandidate(
+    { ...base, ...overrides, metadata },
+    { now, policy }
+  );
 }
 
 test('dirty worktrees are never eligible', () => {
@@ -57,17 +61,30 @@ test('unclaimed worktree is eligible only after normal TTL', () => {
 
 test('missing or non-unclaimed metadata fails closed', () => {
   assert.equal(candidate({ metadata: null }).reason, 'missing_metadata');
-  assert.equal(candidate({ metadata: { owner: 'summer', run_id: 'run-2', created_at: '2026-06-01T00:00:00Z' } }).reason, 'claimed');
+  assert.equal(
+    candidate({
+      metadata: {
+        owner: 'summer',
+        run_id: 'run-2',
+        created_at: '2026-06-01T00:00:00Z',
+      },
+    }).reason,
+    'claimed'
+  );
 });
 
 test('emergency disk pressure tightens TTL and reports alert', () => {
   assert.equal(effectiveTtlDays(policy, 50), 7);
   assert.equal(effectiveTtlDays(policy, 15), 2);
   assert.equal(effectiveTtlDays(policy, 5), 1);
-  const result = candidate({}, '2026-06-02T00:00:00Z');
-  const emergency = evaluateCandidate({ ...base, metadata: { ...base.metadata } }, {
-    now: '2026-06-04T00:00:00Z', policy, freeGb: 15,
-  });
+  const emergency = evaluateCandidate(
+    { ...base, metadata: { ...base.metadata } },
+    {
+      now: '2026-06-04T00:00:00Z',
+      policy,
+      freeGb: 15,
+    }
+  );
   assert.equal(emergency.eligible, true);
   assert.equal(emergency.ttlDays, 2);
   assert.equal(emergency.alert, 'summer_disk_pressure');

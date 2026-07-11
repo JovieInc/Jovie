@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import process from 'node:process';
-import { inventory, reap, registerWorktree } from './lib/worktree-lifecycle.mjs';
+import {
+  inventory,
+  reap,
+  registerWorktree,
+} from './lib/worktree-lifecycle.mjs';
 
 function args(argv) {
   const result = { command: argv[0] ?? 'inventory' };
@@ -15,10 +19,14 @@ function args(argv) {
     else if (arg === '--created-at') result.createdAt = argv[++i];
     else if (arg === '--named-user') result.namedUser = true;
     else if (arg === '--ttl-days') result.ttlDays = Number(argv[++i]);
-    else if (arg === '--emergency-ttl-days') result.emergencyTtlDays = Number(argv[++i]);
-    else if (arg === '--critical-ttl-days') result.criticalTtlDays = Number(argv[++i]);
-    else if (arg === '--emergency-free-gb') result.emergencyFreeGb = Number(argv[++i]);
-    else if (arg === '--critical-free-gb') result.criticalFreeGb = Number(argv[++i]);
+    else if (arg === '--emergency-ttl-days')
+      result.emergencyTtlDays = Number(argv[++i]);
+    else if (arg === '--critical-ttl-days')
+      result.criticalTtlDays = Number(argv[++i]);
+    else if (arg === '--emergency-free-gb')
+      result.emergencyFreeGb = Number(argv[++i]);
+    else if (arg === '--critical-free-gb')
+      result.criticalFreeGb = Number(argv[++i]);
     else if (arg === '--config') result.config = argv[++i];
     else if (!result.path) result.path = arg;
     else throw new Error(`unknown argument: ${arg}`);
@@ -27,9 +35,15 @@ function args(argv) {
 }
 
 const options = args(process.argv.slice(2));
-const configPath = options.config ?? `${options.root ?? process.cwd()}/config/worktree-lifecycle.json`;
+const configPath =
+  options.config ??
+  `${options.root ?? process.cwd()}/config/worktree-lifecycle.json`;
 let fileConfig = {};
-try { fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch { /* optional config */ }
+try {
+  fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+} catch {
+  /* optional config */
+}
 const configPolicy = {
   ttlDays: fileConfig.ttl_days,
   emergencyTtlDays: fileConfig.emergency_ttl_days,
@@ -37,14 +51,16 @@ const configPolicy = {
   emergencyFreeGb: fileConfig.emergency_free_gb,
   criticalFreeGb: fileConfig.critical_free_gb,
 };
-const policy = Object.fromEntries(Object.entries({
-  ...configPolicy,
-  ttlDays: options.ttlDays ?? configPolicy.ttlDays,
-  emergencyTtlDays: options.emergencyTtlDays ?? configPolicy.emergencyTtlDays,
-  criticalTtlDays: options.criticalTtlDays ?? configPolicy.criticalTtlDays,
-  emergencyFreeGb: options.emergencyFreeGb ?? configPolicy.emergencyFreeGb,
-  criticalFreeGb: options.criticalFreeGb ?? configPolicy.criticalFreeGb,
-}).filter(([, value]) => Number.isFinite(value)));
+const policy = Object.fromEntries(
+  Object.entries({
+    ...configPolicy,
+    ttlDays: options.ttlDays ?? configPolicy.ttlDays,
+    emergencyTtlDays: options.emergencyTtlDays ?? configPolicy.emergencyTtlDays,
+    criticalTtlDays: options.criticalTtlDays ?? configPolicy.criticalTtlDays,
+    emergencyFreeGb: options.emergencyFreeGb ?? configPolicy.emergencyFreeGb,
+    criticalFreeGb: options.criticalFreeGb ?? configPolicy.criticalFreeGb,
+  }).filter(([, value]) => Number.isFinite(value))
+);
 
 let report;
 if (options.command === 'register') {
@@ -60,10 +76,15 @@ if (options.command === 'register') {
 } else if (options.command === 'inventory') {
   report = inventory(options.root ?? process.cwd(), { ...options, policy });
 } else {
-  throw new Error(`command must be inventory, reap, or register; got ${options.command}`);
+  throw new Error(
+    `command must be inventory, reap, or register; got ${options.command}`
+  );
 }
 
 const json = `${JSON.stringify(report, null, 2)}\n`;
 if (options.report) fs.writeFileSync(options.report, json, { mode: 0o600 });
 process.stdout.write(json);
-if (report.alert) process.stderr.write(`ALERT_SUMMER ${report.alert}: disk pressure tightened worktree TTL\n`);
+if (report.alert)
+  process.stderr.write(
+    `ALERT_SUMMER ${report.alert}: disk pressure tightened worktree TTL\n`
+  );
