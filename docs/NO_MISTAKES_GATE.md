@@ -67,6 +67,16 @@ After push, monitor with `no-mistakes` (TUI) or `no-mistakes axi status`.
 
 The husky hook intentionally runs **lint only** (no tests) to keep local pushes fast. The no-mistakes pipeline adds tests, review, docs, and CI babysitting in the disposable worktree.
 
+## Agent-local verification receipt
+
+Before opening or updating a draft PR, autonomous shippers should run:
+
+```bash
+pnpm ship:verify -- --base origin/main
+```
+
+It classifies the diff with the checked-in CI harness, runs affected local checks plus the risk-required smoke/build commands, and writes a machine-readable receipt to `artifacts/verification/result.json` (ignored by Git). Add `--with-performance` for route-budget verification on performance-sensitive work. This is a fast feedback loop, not a CI replacement: the PR and merge paths still run independently in clean runners.
+
 ## Evidence artifacts
 
 When `test.evidence.store_in_repo: true` in `.no-mistakes.yaml`, the test step may commit screenshots/logs under `.no-mistakes/evidence/<branch-slug>/` so reviewers see proof on the PR. Transient build caches are never committed.

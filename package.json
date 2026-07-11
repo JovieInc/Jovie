@@ -180,6 +180,7 @@
     "pre-push:gate:test": "bash scripts/hooks/pre-push-gate.sh test",
     "pre-push:gate:format": "bash scripts/hooks/pre-push-gate.sh format",
     "pre-push:gate:all": "bash scripts/hooks/pre-push-gate.sh all",
+    "ship:verify": "node scripts/ship-verify.mjs",
     "tailwind:check": "pnpm --filter=@jovie/web run tailwind:check",
     "db:web:migrate": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run drizzle:migrate",
     "db:web:studio": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run drizzle:studio",
