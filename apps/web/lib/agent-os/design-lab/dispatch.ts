@@ -28,6 +28,10 @@ function buildDispatchPrompt(payload: DesignLabDispatchPayload): string {
     `Surface: ${payload.surfaceName} (${payload.surfaceId})`,
     `Linear issue: ${payload.linearIssueId}`,
     `Proposal:\n${payload.proposalText.trim()}`,
+    `Exact files:\n${payload.registryTask.exactFiles.join('\n')}`,
+    `Forbidden patterns:\n${payload.registryTask.forbiddenPatterns.join('\n')}`,
+    `Acceptance criteria:\n${payload.registryTask.acceptanceCriteria.join('\n')}`,
+    `Required evidence:\n${payload.registryTask.evidenceRequired.join('\n')}`,
     notesBlock,
     tasteBlock,
     'Store the resulting HTML artifact under agentos/runs/design-lab/ and link it back to the Linear issue.',
@@ -41,6 +45,17 @@ export async function triggerDesignLabDispatch(params: {
   readonly amendmentNotes: string | null;
   readonly requestedBy: string;
 }): Promise<{ triggered: boolean; dispatchId: string | null }> {
+  const registryTask = params.proposal.designGap?.registryTask;
+  if (!registryTask) {
+    logger.info(
+      '[design-lab/dispatch] Registry task missing; dispatch skipped',
+      {
+        proposalId: params.proposal.id,
+      }
+    );
+    return { triggered: false, dispatchId: null };
+  }
+
   const dispatchId = `design-lab-${crypto.randomUUID()}`;
   const tasteMemoryExcerpt = await readDesignTasteMemoryExcerpt();
 
@@ -56,6 +71,7 @@ export async function triggerDesignLabDispatch(params: {
     tasteMemoryExcerpt,
     requestedAt: new Date().toISOString(),
     requestedBy: params.requestedBy,
+    registryTask,
   };
 
   const dispatchDirectory = getDesignLabDispatchDirectory();
@@ -75,7 +91,7 @@ export async function triggerDesignLabDispatch(params: {
         reason: availability.unavailableReason,
       }
     );
-    return { triggered: true, dispatchId };
+    return { triggered: false, dispatchId: null };
   }
 
   try {
@@ -87,10 +103,8 @@ export async function triggerDesignLabDispatch(params: {
       runtime: 'codex-cli',
       priority: 70,
       skills: ['design-html', 'autoplan'],
-      allowedPaths: ['agentos', 'apps/web/components', 'apps/web/styles'],
-      verification: [
-        'pnpm --filter @jovie/web run typecheck -- --pretty false',
-      ],
+      allowedPaths: registryTask.exactFiles,
+      verification: registryTask.validationCommands,
       dryRun: false,
       prompt: buildDispatchPrompt(payload),
       owner: params.requestedBy,
@@ -104,7 +118,7 @@ export async function triggerDesignLabDispatch(params: {
           error: error.message,
         }
       );
-      return { triggered: true, dispatchId };
+      return { triggered: false, dispatchId: null };
     }
 
     logger.error(
@@ -114,7 +128,7 @@ export async function triggerDesignLabDispatch(params: {
         error,
       }
     );
-    return { triggered: true, dispatchId };
+    return { triggered: false, dispatchId: null };
   }
 
   return { triggered: true, dispatchId };
