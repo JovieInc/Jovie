@@ -28,7 +28,9 @@ permissions:
 jobs:
   brand-scrub:
     name: Brand Scrub (blocking)
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Hosted runner: lightweight pure-Python scan. Self-hosted jovie-runner
+    # saturation / disconnects have blocked PR Ready without content violations.
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -71,7 +73,7 @@ jobs:
 
   brand-scrub-unit-tests:
     name: brand-scrub.py unit tests
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
