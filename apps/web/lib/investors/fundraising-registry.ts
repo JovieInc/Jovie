@@ -90,6 +90,16 @@ export interface InvestorFaqEntry {
   readonly answer: string;
 }
 
+export interface CompanyOperatingMetric {
+  readonly id: string;
+  readonly label: string;
+  readonly value: null;
+  readonly status: 'evidence-gap';
+  readonly evidenceGap: string;
+  readonly instrumentationPlan: string;
+  readonly lastUpdated: string;
+}
+
 export interface FundraisingRegistry {
   readonly version: string;
   readonly asOf: string;
@@ -100,6 +110,7 @@ export interface FundraisingRegistry {
   readonly researchSources: readonly ClaimProvenance[];
   readonly investorConversationSummaries: readonly InvestorConversationSummary[];
   readonly investorFaq: readonly InvestorFaqEntry[];
+  readonly companyOperatingMetrics: readonly CompanyOperatingMetric[];
   readonly claims: readonly FundraisingClaim[];
   readonly coreSlides: readonly CoreSlide[];
   readonly operatingLoop: readonly OperatingStep[];
@@ -260,6 +271,7 @@ const RISK_DATA = [
   ['willingness-to-pay', 'Will creators both want and be able to pay for this workflow?', 'No approved willingness-to-pay, budget, or paid-pilot evidence is currently available. Creator-paid software is a working hypothesis.', 'critical', 'Segmented price discovery, budget evidence, and completed paid pilots.', 'evidence', ['release-workflow-focus'], ['wedge', 'round'], ['brief', 'questions'], 'Run priced offers with a defined creator segment and record acceptance, refusal, and budget constraints.', 'Do not infer willingness or ability to pay from product interest.'],
   ['small-team-support', 'Can a small team support creator customers without becoming an agency?', 'Execution still includes manual work, so service load and support economics are not yet known. The product must make approvals and operations repeatable without hiding founder labor.', 'critical', 'Time-per-customer, support volume, exception rate, and gross-margin evidence from repeated release cohorts.', 'strategy', ['release-workflow-focus'], ['product', 'loop', 'round'], ['operating-loop', 'questions'], 'Instrument human time, exceptions, and support work per active release and set a service-load ceiling.', 'Label manual work and avoid presenting founder-operated service as software scalability.'],
   ['closed-loop-credibility', 'Why should investors believe the closed-loop model will work?', 'The current registry distinguishes live context surfaces, a demonstrated opportunity flow, manual execution, and planned outcome learning. The complete loop has not been verified in production.', 'critical', 'End-to-end records showing approved work, shipped execution, measured outcomes, and improved next-release recommendations.', 'evidence', ['slide-loop', 'closed-loop-category-context'], ['loop'], ['operating-loop', 'questions'], 'Complete and audit repeated end-to-end release loops before claiming learning effects.', 'Keep each loop stage labeled LIVE, DEMO, MANUAL, or PLANNED and describe compounding as proposed.'],
+  ['closed-loop-company-credibility', 'Can Jovie prove that its own company operating loop is credible?', 'No approved measurements yet show how much autonomous work completes, how often humans intervene, whether verification succeeds, how quickly issues become fixes, or whether changes ship reliably and roll back safely.', 'critical', 'Dated company-operating measurements for autonomy, intervention, verification, latency, cost, reliability, rollback, feedback ingestion, and throughput.', 'evidence', [], ['loop', 'round'], ['operating-loop', 'questions'], 'Instrument the company operating metrics registry and review dated results before making autonomy or execution-efficiency claims.', 'State that company-loop credibility is an instrumentation plan until reviewed measurements exist.'],
 ] as const satisfies readonly RiskInput[];
 
 // biome-ignore format: One content record per line prevents structural duplication while keeping review diffs readable.
@@ -338,6 +350,61 @@ export const fundraisingRegistry = {
     question: input[1],
     answer: input[2],
   })),
+  companyOperatingMetrics: [
+    [
+      'autonomous-work-completed',
+      'Autonomous work completed',
+      'Define a completed autonomous work unit and record completion events.',
+    ],
+    [
+      'intervention-rate',
+      'Human intervention rate',
+      'Record interventions and divide by attempted autonomous work units.',
+    ],
+    [
+      'verification-success',
+      'Verification success rate',
+      'Record deterministic verification outcomes for every attempted change.',
+    ],
+    [
+      'issue-to-fix-latency',
+      'Issue-to-fix latency',
+      'Timestamp issue detection and verified fix completion.',
+    ],
+    [
+      'cost-per-shipped-change',
+      'Cost per shipped change',
+      'Attribute model, compute, and service cost to each verified shipped change.',
+    ],
+    [
+      'feedback-ingestion-latency',
+      'Feedback ingestion latency',
+      'Timestamp feedback receipt and durable incorporation into the work queue.',
+    ],
+    [
+      'reliability',
+      'Operating-loop reliability',
+      'Define successful end-to-end runs and record failures by stage.',
+    ],
+    [
+      'rollback-rate',
+      'Rollback rate',
+      'Record shipped changes and subsequent rollback events.',
+    ],
+    [
+      'throughput',
+      'Verified change throughput',
+      'Count verified shipped changes per defined time window.',
+    ],
+  ].map(([id, label, instrumentationPlan]) => ({
+    id,
+    label,
+    value: null,
+    status: 'evidence-gap' as const,
+    evidenceGap: `No approved ${label.toLocaleLowerCase('en-US')} measurement is available.`,
+    instrumentationPlan,
+    lastUpdated: AS_OF,
+  })),
   appendix: APPENDIX_DATA.map(input =>
     appendixItem(input[0], input[1], input[2])
   ),
@@ -395,6 +462,23 @@ export function validateFundraisingRegistry(
     'investor-fit',
   ]);
   const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/u.test(value);
+
+  for (const [collection, records] of [
+    ['claims', registry.claims],
+    ['coreSlides', registry.coreSlides],
+    ['risks', registry.risks],
+  ] as const) {
+    const ids = new Set<string>();
+    for (const [index, record] of records.entries()) {
+      if (!record.id.trim() || ids.has(record.id)) {
+        issues.push({
+          path: `${collection}.${index}.id`,
+          message: `${collection} IDs must be non-empty and unique.`,
+        });
+      }
+      ids.add(record.id);
+    }
+  }
 
   if (!registry.currentNarrative.trim()) {
     issues.push({
@@ -593,6 +677,19 @@ export function validateFundraisingRegistry(
   }
 
   for (const [index, risk] of registry.risks.entries()) {
+    if (
+      !risk.question.trim() ||
+      !risk.answer.trim() ||
+      !risk.evidenceGap?.trim() ||
+      !risk.recommendedCompanyAction.trim() ||
+      !risk.recommendedCommunicationAction.trim()
+    ) {
+      issues.push({
+        path: `risks.${index}`,
+        message:
+          'Risks require question, answer, evidence gap, and company and communication actions.',
+      });
+    }
     if (!gapClassifications.has(risk.gapClassification)) {
       issues.push({
         path: `risks.${index}.gapClassification`,
@@ -627,6 +724,27 @@ export function validateFundraisingRegistry(
         message: 'Risks require at least one affected portal section.',
       });
     }
+  }
+
+  const operatingMetricIds = new Set<string>();
+  for (const [index, metric] of registry.companyOperatingMetrics.entries()) {
+    if (
+      !metric.id.trim() ||
+      operatingMetricIds.has(metric.id) ||
+      !metric.label.trim() ||
+      metric.value !== null ||
+      metric.status !== 'evidence-gap' ||
+      !metric.evidenceGap.trim() ||
+      !metric.instrumentationPlan.trim() ||
+      !isIsoDate(metric.lastUpdated)
+    ) {
+      issues.push({
+        path: `companyOperatingMetrics.${index}`,
+        message:
+          'Company operating metrics require unique IDs, explicit evidence gaps, null values, instrumentation plans, and ISO dates.',
+      });
+    }
+    operatingMetricIds.add(metric.id);
   }
 
   return issues;

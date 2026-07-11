@@ -188,6 +188,22 @@ function resolveComparePath(): string {
 
 const MARKETING_SURFACES = [
   {
+    id: 'investor-pitch',
+    family: 'marketing',
+    expectedState: 'ok',
+    path: APP_ROUTES.PITCH,
+    readySelectors: [
+      'h1',
+      '[data-pitch-slide]',
+      '[data-testid="pitch-appendix"]',
+    ],
+    mainSelector: 'main',
+    minMainTextLength: 500,
+    lighthouse: false,
+    perfGroups: ['marketing-public'],
+    interactions: MARKETING_CONVERSION_INTERACTIONS,
+  },
+  {
     id: 'home',
     family: 'marketing',
     expectedState: 'ok',

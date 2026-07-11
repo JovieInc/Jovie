@@ -56,6 +56,7 @@ const UNAVAILABLE_SURFACE_TEXT =
 
 const PUBLIC_SURFACE_IDS = [
   'home',
+  'investor-pitch',
   'marketing-pricing',
   'marketing-artist-profiles',
   'marketing-artist-notifications',

@@ -26,8 +26,13 @@ The browser observations below were captured on the browser-evidence origin abov
 | Check | Result |
 | --- | --- |
 | Historical Final Pitch Playwright after safe-appendix review | 3/3 passed |
-| Current fundraising registry tests | 12/12 passed |
+| Current fundraising registry tests | 14/14 passed |
+| Public pitch manifest unit contract | 1/1 passed |
 | Web TypeScript check | Passed |
+
+## Current Narrow Browser Attempt
+
+The filtered Chromium run for the pitch spec, canonical public axe audit, and public exhaustive gate completed with 3 passed, 3 failed, and 8 unrelated authenticated axe cases skipped. The local test server returned the legacy static “Jovie Pitch Deck” surface at `/pitch` rather than the current `InvestorBrief`: the pitch assertion received that legacy H1 instead of “operating layer,” while axe and exhaustive checks could not find the current page’s `main` element. This is an exact environment/result report, not evidence that the current component passed browser validation. The manifest and unit gates are committed so CI can exercise the current route in its authoritative environment.
 
 The responsive and slide screenshots below were refreshed from the reviewed public `/pitch` implementation after the safe-appendix and claim-contract fixes.
 

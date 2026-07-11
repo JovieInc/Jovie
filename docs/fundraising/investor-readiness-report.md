@@ -3,6 +3,8 @@
 **As of:** 2026-07-11  
 **Evidence boundary:** This report summarizes the typed fundraising registry and five synthesized adversarial reviews. The critic readouts are not investor conversations. No production database or browser verification was performed for this report.
 
+Related reviews: [Narrative structure review](./narrative-structure-review.md). The registry also contains the typed company-operating instrumentation plan; all nine operating measurements remain explicit evidence gaps.
+
 ## Resulting Narrative
 
 Jovie begins with a bounded release-operations workflow: preserve creator and release context, surface executable marketing work, keep approval human-visible, and eventually learn from measured outcomes. The current proof is a product demonstration and founder-attested problem history. Paid demand, scalable service economics, and a production closed loop remain evidence gaps.
@@ -50,6 +52,7 @@ Jovie begins with a bounded release-operations workflow: preserve creator and re
 4. Publish a deployed capability matrix using `LIVE`, `DEMO`, `MANUAL`, and `PLANNED` labels.
 5. Have a non-founder operate the documented workflow and compare time, quality, exceptions, and customer outcome.
 6. Build the bottom-up market model only after buyer definition, price evidence, and reachable distribution are observed.
+7. Instrument autonomous completion, intervention, verification, issue-to-fix latency, cost per shipped change, feedback ingestion latency, reliability, rollback rate, and throughput before making company-loop credibility claims.
 
 ## Synthesized Adversarial Critic Readouts
 

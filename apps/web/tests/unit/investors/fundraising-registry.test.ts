@@ -60,7 +60,7 @@ describe('fundraising registry', () => {
       fundraisingRegistry.coreSlides.map(slide => slide.id)
     );
 
-    expect(fundraisingRegistry.risks).toHaveLength(15);
+    expect(fundraisingRegistry.risks).toHaveLength(16);
     for (const risk of fundraisingRegistry.risks) {
       expect([
         'communication',
@@ -103,6 +103,7 @@ describe('fundraising registry', () => {
       'willingness-to-pay',
       'small-team-support',
       'closed-loop-credibility',
+      'closed-loop-company-credibility',
     ];
     for (const id of required) {
       const objection = fundraisingRegistry.risks.find(risk => risk.id === id);
@@ -113,6 +114,70 @@ describe('fundraising registry', () => {
       expect(objection?.evidenceGap).not.toBe('');
       expect(objection?.recommendedCompanyAction).not.toBe('');
       expect(objection?.recommendedCommunicationAction).not.toBe('');
+    }
+  });
+
+  it('keeps company operating measurements explicitly unavailable and instrumented', () => {
+    expect(
+      fundraisingRegistry.companyOperatingMetrics.map(metric => metric.id)
+    ).toEqual([
+      'autonomous-work-completed',
+      'intervention-rate',
+      'verification-success',
+      'issue-to-fix-latency',
+      'cost-per-shipped-change',
+      'feedback-ingestion-latency',
+      'reliability',
+      'rollback-rate',
+      'throughput',
+    ]);
+    expect(
+      fundraisingRegistry.companyOperatingMetrics.every(
+        metric =>
+          metric.value === null &&
+          metric.status === 'evidence-gap' &&
+          metric.instrumentationPlan.length > 0
+      )
+    ).toBe(true);
+  });
+
+  it('rejects duplicate IDs, blank risks, and misleading operating metrics', () => {
+    const mutations: Array<(registry: FundraisingRegistry) => void> = [
+      registry => {
+        (registry.claims[1] as { id: string }).id = registry.claims[0]!.id;
+      },
+      registry => {
+        (registry.coreSlides[1] as { id: string }).id =
+          registry.coreSlides[0]!.id;
+      },
+      registry => {
+        (registry.risks[1] as { id: string }).id = registry.risks[0]!.id;
+      },
+      registry => {
+        (registry.risks[0] as { question: string }).question = ' ';
+      },
+      registry => {
+        (registry.risks[0] as { evidenceGap: string | null }).evidenceGap = '';
+      },
+      registry => {
+        (
+          registry.companyOperatingMetrics[0] as { value: string | null }
+        ).value = '99%';
+      },
+      registry => {
+        (
+          registry.companyOperatingMetrics[0] as {
+            instrumentationPlan: string;
+          }
+        ).instrumentationPlan = '';
+      },
+    ];
+    for (const mutate of mutations) {
+      const registry = structuredClone(
+        fundraisingRegistry
+      ) as unknown as FundraisingRegistry;
+      mutate(registry);
+      expect(validateFundraisingRegistry(registry).length).toBeGreaterThan(0);
     }
   });
 
