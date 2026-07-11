@@ -39,6 +39,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/db/schema/auth', () => ({
   users: {
     id: 'users.id',
+    isPro: 'users.isPro',
     plan: 'users.plan',
     trialStartedAt: 'users.trialStartedAt',
     trialEndsAt: 'users.trialEndsAt',
@@ -50,6 +51,7 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => ({ _type: 'and', args })),
   eq: vi.fn((a: unknown, b: unknown) => ({ _type: 'eq', a, b })),
   isNull: vi.fn((a: unknown) => ({ _type: 'isNull', a })),
+  or: vi.fn((...args: unknown[]) => ({ _type: 'or', args })),
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
@@ -67,11 +69,37 @@ const EXPECTED_WHERE = {
   _type: 'and',
   args: [
     { _type: 'eq', a: 'users.id', b: 'app-user-uuid' },
-    { _type: 'eq', a: 'users.plan', b: 'free' },
+    {
+      _type: 'or',
+      args: [
+        { _type: 'eq', a: 'users.plan', b: 'free' },
+        { _type: 'isNull', a: 'users.plan' },
+      ],
+    },
+    {
+      _type: 'or',
+      args: [
+        { _type: 'eq', a: 'users.isPro', b: false },
+        { _type: 'isNull', a: 'users.isPro' },
+      ],
+    },
     { _type: 'isNull', a: 'users.trialStartedAt' },
     { _type: 'isNull', a: 'users.trialEndsAt' },
   ],
 };
+
+type GuardNode =
+  | { _type: 'and' | 'or'; args: GuardNode[] }
+  | { _type: 'eq'; a: string; b: unknown }
+  | { _type: 'isNull'; a: string };
+
+function matchesGuard(node: GuardNode, row: Record<string, unknown>): boolean {
+  if (node._type === 'and')
+    return node.args.every(arg => matchesGuard(arg, row));
+  if (node._type === 'or') return node.args.some(arg => matchesGuard(arg, row));
+  if (node._type === 'isNull') return row[node.a] == null;
+  return row[node.a] === node.b;
+}
 
 function updateChain(returned: unknown[]) {
   const returning = vi.fn().mockResolvedValue(returned);
@@ -115,6 +143,41 @@ describe('activateTrial', () => {
     expect(mockLoggerWarn).not.toHaveBeenCalled();
   });
 
+  it('activates for a legacy user with a null plan and no paid flag', async () => {
+    const { where } = updateChain([{ id: 'u1', plan: 'trial' }]);
+
+    await expect(activateTrial('app-user-uuid')).resolves.toBe(true);
+
+    const [condition] = where.mock.calls[0] as [GuardNode];
+    expect(
+      matchesGuard(condition, {
+        'users.id': 'app-user-uuid',
+        'users.plan': null,
+        'users.isPro': null,
+        'users.trialStartedAt': null,
+        'users.trialEndsAt': null,
+      })
+    ).toBe(true);
+  });
+
+  it('denies a legacy paid user when the plan is null', async () => {
+    const { where } = updateChain([]);
+    selectChain([{ id: 'u1' }]);
+
+    await expect(activateTrial('app-user-uuid')).resolves.toBe(false);
+
+    const [condition] = where.mock.calls[0] as [GuardNode];
+    expect(
+      matchesGuard(condition, {
+        'users.id': 'app-user-uuid',
+        'users.plan': null,
+        'users.isPro': true,
+        'users.trialStartedAt': null,
+        'users.trialEndsAt': null,
+      })
+    ).toBe(false);
+  });
+
   it('guards the WHERE clause against paid plans and prior trials', async () => {
     const { where } = updateChain([{ id: 'u1', plan: 'trial' }]);
 
@@ -128,11 +191,8 @@ describe('activateTrial', () => {
       a: 'users.id',
       b: 'app-user-uuid',
     });
-    expect(condition.args).toContainEqual({
-      _type: 'eq',
-      a: 'users.plan',
-      b: 'free',
-    });
+    expect(condition.args).toContainEqual(EXPECTED_WHERE.args[1]);
+    expect(condition.args).toContainEqual(EXPECTED_WHERE.args[2]);
     expect(condition.args).toContainEqual({
       _type: 'isNull',
       a: 'users.trialStartedAt',
