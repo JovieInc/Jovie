@@ -1,20 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildInvestorNoteReviewArtifact,
+  normalizeSignalText,
   parseAnnotatedTranscript,
 } from '@/lib/investors/note-ingestion';
 
-function note(
-  label: string,
-  capturedAt: string,
-  signals: readonly Record<string, unknown>[]
-) {
+function note({
+  id,
+  capturedAt = '2026-07-11',
+  transcript = 'Synthetic test transcript.',
+  signals,
+}: {
+  id: string;
+  capturedAt?: string;
+  transcript?: string;
+  signals: readonly Record<string, unknown>[];
+}) {
   return {
-    source: { kind: 'local-note', label, capturedAt },
-    transcript: 'Synthetic test transcript.',
+    source: { id, kind: 'local-note', label: id, capturedAt },
+    transcript,
     signals,
   };
 }
+
+const tractionSignal = {
+  kind: 'question',
+  text: 'What traction is proven?',
+  gapClassification: 'evidence',
+  severity: 'high',
+};
 
 describe('investor note ingestion', () => {
   it('extracts only explicitly annotated text lines', () => {
@@ -23,13 +37,7 @@ describe('investor note ingestion', () => {
 QUESTION | evidence | high | What traction is proven?
 OBJECTION | strategy | critical | The buyer is unclear.`)
     ).toEqual([
-      {
-        kind: 'question',
-        text: 'What traction is proven?',
-        gapClassification: 'evidence',
-        severity: 'high',
-        line: 2,
-      },
+      { ...tractionSignal, line: 2 },
       {
         kind: 'objection',
         text: 'The buyer is unclear.',
@@ -40,56 +48,124 @@ OBJECTION | strategy | critical | The buyer is unclear.`)
     ]);
   });
 
-  it('merges duplicates and keeps the highest observed severity', () => {
-    const artifact = buildInvestorNoteReviewArtifact([
-      note('A', '2026-07-10', [
+  it('is input-order independent and preserves classification conflicts', () => {
+    const first = note({
+      id: 'conversation-a',
+      capturedAt: '2026-07-10',
+      signals: [tractionSignal],
+    });
+    const second = note({
+      id: 'conversation-b',
+      signals: [
         {
-          kind: 'question',
-          text: 'What traction is proven?',
-          gapClassification: 'evidence',
-          severity: 'medium',
-        },
-      ]),
-      note('B', '2026-07-11', [
-        {
-          kind: 'question',
+          ...tractionSignal,
           text: 'What traction is proven!',
-          gapClassification: 'evidence',
+          gapClassification: 'communication',
           severity: 'critical',
         },
-      ]),
-    ]);
+      ],
+    });
 
-    expect(artifact.asOf).toBe('2026-07-11');
-    expect(artifact.candidates).toHaveLength(1);
-    expect(artifact.candidates[0]).toMatchObject({
+    const forward = buildInvestorNoteReviewArtifact([first, second]);
+    const reverse = buildInvestorNoteReviewArtifact([second, first]);
+    expect(reverse).toEqual(forward);
+    expect(forward.candidates[0]).toMatchObject({
+      text: 'What traction is proven!',
+      gapClassifications: ['communication', 'evidence'],
       severity: 'critical',
       occurrenceCount: 2,
+      conversationCount: 2,
       frequency: 'common',
-      gapClassification: 'evidence',
     });
-    expect(artifact.candidates[0]?.sources).toHaveLength(2);
+    expect(
+      forward.candidates[0]?.sources.map(source => source.sourceId)
+    ).toEqual(['conversation-a', 'conversation-b']);
   });
 
-  it('classifies gaps and forbids automatic publishing', () => {
+  it('scores frequency from distinct conversations, not repeated mentions', () => {
     const artifact = buildInvestorNoteReviewArtifact([
-      note('A', '2026-07-11', [
-        {
-          kind: 'objection',
-          text: 'The investor fit is unclear.',
-          gapClassification: 'investor-fit',
-          severity: 'high',
-        },
-      ]),
+      note({
+        id: 'conversation-a',
+        signals: [tractionSignal, tractionSignal, tractionSignal],
+      }),
     ]);
-
-    expect(artifact.classificationCounts['investor-fit']).toBe(1);
-    expect(artifact.reviewStatus).toBe('manual-review-required');
-    expect(artifact.guardrails).toEqual({
-      autoPublish: false,
-      protectedFields: ['claims', 'numbers', 'ask', 'positioning'],
+    expect(artifact.candidates[0]).toMatchObject({
+      occurrenceCount: 3,
+      conversationCount: 1,
+      frequency: 'occasional',
     });
-    expect(artifact.recommendedReviewPath).toContain('dedicated PR');
+    expect(artifact.candidates[0]?.sources).toHaveLength(1);
+  });
+
+  it('rejects repeated source IDs instead of inflating frequency', () => {
+    const input = note({ id: 'conversation-a', signals: [tractionSignal] });
+    expect(() => buildInvestorNoteReviewArtifact([input, input])).toThrow(
+      'Duplicate investor note source ID: conversation-a'
+    );
+  });
+
+  it('normalizes Unicode with NFKC while retaining letters and numbers', () => {
+    expect(normalizeSignalText('Ｃafé № １２')).toBe('café no 12');
+    expect(normalizeSignalText('市場 规模 2026')).toBe('市場 规模 2026');
+    expect(() => normalizeSignalText('?! —')).toThrow(
+      'Signal text has no letters or numbers.'
+    );
+  });
+
+  it('validates annotated line provenance and emits transcript hashes', () => {
+    const transcript =
+      'Context\nQUESTION | evidence | high | What traction is proven?';
+    const artifact = buildInvestorNoteReviewArtifact([
+      note({
+        id: 'conversation-a',
+        transcript,
+        signals: [{ ...tractionSignal, line: 2 }],
+      }),
+    ]);
+    expect(artifact.candidates[0]?.sources[0]).toMatchObject({
+      sourceId: 'conversation-a',
+      line: 2,
+    });
+    expect(artifact.candidates[0]?.sources[0]?.transcriptSha256).toMatch(
+      /^[a-f0-9]{64}$/u
+    );
+
+    expect(() =>
+      buildInvestorNoteReviewArtifact([
+        note({
+          id: 'conversation-b',
+          transcript,
+          signals: [{ ...tractionSignal, line: 1 }],
+        }),
+      ])
+    ).toThrow('does not match annotated transcript content');
+  });
+
+  it('proposes bounded actions and review targets without publishing', () => {
+    const artifact = buildInvestorNoteReviewArtifact([
+      note({
+        id: 'conversation-a',
+        signals: [
+          {
+            kind: 'objection',
+            text: 'The investor fit is unclear.',
+            gapClassification: 'investor-fit',
+            severity: 'high',
+          },
+        ],
+      }),
+    ]);
+    expect(artifact.proposedReviewTargets).toEqual([
+      'outreach-brief',
+      'portal',
+    ]);
+    expect(artifact.candidates[0]?.proposedNextActions[0]).toContain(
+      'targeting'
+    );
+    expect(artifact.guardrails.autoPublish).toBe(false);
+    expect(artifact.recommendedReviewPath).toContain(
+      'codex/jov-3739-investor-note-review'
+    );
   });
 
   it('rejects invalid classifications and empty input sets', () => {
@@ -98,14 +174,15 @@ OBJECTION | strategy | critical | The buyer is unclear.`)
     );
     expect(() =>
       buildInvestorNoteReviewArtifact([
-        note('A', '2026-07-11', [
-          {
-            kind: 'question',
-            text: 'Is this valid?',
-            gapClassification: 'made-up',
-            severity: 'high',
-          },
-        ]),
+        note({
+          id: 'conversation-a',
+          signals: [
+            {
+              ...tractionSignal,
+              gapClassification: 'made-up',
+            },
+          ],
+        }),
       ])
     ).toThrow();
   });

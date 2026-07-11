@@ -1,5 +1,6 @@
 {
   "source": {
+    "id": "sample-conversation-a",
     "kind": "granola-export",
     "label": "Sample investor conversation A",
     "capturedAt": "2026-07-10"
