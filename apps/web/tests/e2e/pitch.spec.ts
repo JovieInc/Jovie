@@ -28,7 +28,12 @@ test.describe('public investor brief', () => {
 
     const appendix = page.getByTestId('pitch-appendix');
     await expect(appendix).not.toHaveAttribute('open', '');
-    await expect(appendix).toContainText('Legacy Pitch Deck');
+    await expect(appendix).toContainText('Narrative Boundary');
+    await expect(appendix).toContainText('Risk Register');
+    await expect(appendix).toContainText('Evidence Boundary');
+    await expect(appendix).not.toContainText('Legacy Pitch Deck');
+    await expect(appendix).not.toContainText('Downloadable Deck');
+    await expect(appendix.locator('a')).toHaveCount(0);
   });
 
   test('preserves the legacy deck and PDF as appendix assets', async ({

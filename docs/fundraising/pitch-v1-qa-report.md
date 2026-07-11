@@ -23,10 +23,12 @@
 
 | Check | Result |
 | --- | --- |
-| Pitch Playwright after shared-brief refactor | 3/3 passed |
+| Final Pitch Playwright after safe-appendix review | 3/3 passed |
 | Focused Vitest run | 19/19 passed |
 | Fundraising registry tests | 6/6 passed |
 | Web TypeScript check | Passed |
+
+The responsive and slide screenshots below were refreshed from the reviewed public `/pitch` implementation after the safe-appendix and claim-contract fixes.
 
 ## Development Timing
 
