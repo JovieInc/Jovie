@@ -114,7 +114,17 @@ Agent commit signing (each identity that authors merges):
 - **Stale Graphite draft after a downstack MQ draft closes:** resubmit the
   source PR with `gt submit --always --update-only --no-edit --no-interactive
   --no-verify`. If the stale `gtmq_*` draft remains, cancel/retry the queue
-  entry from the Graphite dashboard. Do not close `gtmq_*` PRs from GitHub.
+  entry from the Graphite dashboard. Do not close `gtmq_*` PRs manually from
+  GitHub.
+  - The only automated exception is the fail-closed orphan reaper in
+    `scripts/drain-pr-queue.sh`. It may close a `gtmq_*` PR only when the PR is
+    still a draft, its generated body contains explicit Graphite or GitHub
+    source-PR URLs, and every referenced source PR is confirmed `CLOSED` or
+    `MERGED`.
+  - Missing or malformed source metadata, an `OPEN` source, an unknown/failed
+    source lookup, or a failure to post the root-cause comment always preserves
+    the synthetic draft. The reaper records that comment before attempting to
+    close the draft.
 - **Batch failure stalled siblings:** confirm Graphite **bisect on batch failure** is enabled in the dashboard. Repo guardrails only allow aggregate required checks — pinned leaf jobs break bisection.
 - **Want to bypass for an emergency:** use Graphite's "merge now" in the dashboard; there is no GitHub-side bypass actor for humans.
 

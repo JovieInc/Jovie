@@ -584,6 +584,20 @@ JSON
         assert comment_index < close_index
         assert "Root cause: this Graphite merge-queue synthetic draft is orphaned" in calls[comment_index]
 
+    def test_gtmq_orphan_policy_documents_fail_closed_contract(self) -> None:
+        policy = (_REPO_ROOT / ".github" / "MERGE_QUEUE.md").read_text(
+            encoding="utf-8"
+        )
+
+        assert "only automated exception is the fail-closed orphan reaper" in policy
+        assert "still a draft" in policy
+        assert "explicit Graphite or GitHub" in policy
+        assert "confirmed `CLOSED` or" in policy
+        assert "`MERGED`" in policy
+        assert "unknown/failed" in policy
+        assert "root-cause comment always preserves" in policy
+        assert "comment before attempting to" in policy
+
 
 class TestMergeQueueWatchdog:
     """
