@@ -256,7 +256,7 @@ export interface MarketingSection {
    * as hard legality failures.
    */
   readonly neverUse: readonly string[];
-  readonly status: 'active' | 'deprecated' | 'removed';
+  readonly status: 'approved' | 'deprecated' | 'removed';
   readonly deprecatedSince?: string;
   readonly replacedBy?: MarketingSectionId;
 }
@@ -523,7 +523,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'As anything other than the first section (composition rule)',
       'With fabricated metrics in the logos/media slot (zero-proof law)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── logo-cloud ──────────────────────────────────────────────────────────────
@@ -602,7 +602,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'As the closing beat (illegalAfter pricing/cta)',
       'On artist-recipes with customer-company logos (use platform-reach-row variant instead)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── feature-grid ────────────────────────────────────────────────────────────
@@ -713,7 +713,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     neverUse: [
       'With fabricated feature claims (copy must describe real capability)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── feature-split ───────────────────────────────────────────────────────────
@@ -812,7 +812,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     neverUse: [
       'As a problem-agitation section for audience=artist (creator R9: no problem beat in artist arc)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── how-it-works ────────────────────────────────────────────────────────────
@@ -891,7 +891,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     neverUse: [
       'After pricing/cta/faq (terminal-section proximity illegalAfter)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── social-proof ────────────────────────────────────────────────────────────
@@ -998,7 +998,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'Immediately after hero (illegalAfter hero — proof is a gradient)',
       'For audience=artist with quotes from famous artists (creator R5: famous=profiles, quotes=small/relatable)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── stats ───────────────────────────────────────────────────────────────────
@@ -1078,7 +1078,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'Immediately after hero (illegalAfter)',
       'With more than 4 stats (cognitive overload)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── pricing ──────────────────────────────────────────────────────────────────
@@ -1178,7 +1178,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'Immediately after hero (illegalAfter hero; requires feature-grid first)',
       'On artist LP as a full table (use one-liner-link variant; cost-objection in CTA string)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── comparison ──────────────────────────────────────────────────────────────
@@ -1256,7 +1256,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'Above the fold when audience=artist (audienceLegality)',
       'Immediately after hero or cta (illegalAfter)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── faq ────────────────────────────────────────────────────────────────────
@@ -1326,7 +1326,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'Immediately after hero (illegalAfter)',
       'Without real question sourcing (zero-proof law)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── cta ────────────────────────────────────────────────────────────────────
@@ -1412,7 +1412,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'Before any proof beat (mid-page CTAs only after proof — B2B C6)',
       'With multiple distinct primary CTA verbs on one page (one primary label repeated — B2B C6 invariant)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── spec-wall (Jovie delta) ────────────────────────────────────────────────
@@ -1484,7 +1484,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'Immediately after hero or cta (illegalAfter)',
       'Without a screenshot or icon per tile (use feature-grid instead)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── capture (Jovie delta) ───────────────────────────────────────────────────
@@ -1562,7 +1562,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'As a demo-gate on audience=artist (creator R10 — self-serve only on creator paths)',
       'Without interaction states (submitting/success/error/already-subscribed — Design F2)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── monetization (Jovie delta) ─────────────────────────────────────────────
@@ -1646,7 +1646,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'Without a real take-rate (zero-proof law; omit the section instead)',
       'With projected personal earnings calculators (creator R3 — banned)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── ownership (Jovie delta) ─────────────────────────────────────────────────
@@ -1711,7 +1711,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'For audience=fan (audienceLegality)',
       'Without the music object (use music-native nouns: releases, drops, shows, payouts — creator R5)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── content-prose ───────────────────────────────────────────────────────────
@@ -1778,7 +1778,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     neverUse: [
       'On a conversion-page recipe as the primary body (conversion pages use feature-grid/feature-split, not prose)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 
   // ── blog-feed ───────────────────────────────────────────────────────────────
@@ -1849,7 +1849,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       'Immediately after hero (illegalAfter — hero is for the page promise, not the feed)',
       'With <3 posts (omit the section)',
     ],
-    status: 'active',
+    status: 'approved',
   },
 ] as const;
 

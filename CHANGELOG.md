@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Governed marketing section proposals:** the marketing registry now records route-recipe evidence and explicit design gaps, while the admin Design Lab provides desktop/mobile proposal review, comments, approval states, implementation evidence, and auditable model-usage metadata.
 - **Homepage labels now meet WCAG AA contrast:** the distributor trust-strip and closed-loop labels use the readable tertiary text token instead of the low-contrast quaternary token.
 - [internal] **Desktop renderer recovery (JOV-3595)**: recover from hosted loads that return HTTP 200 but never boot React, and route crashed or unresponsive renderers to the visible recovery shell instead of a permanent black window.
 - [internal] Agent preflight: one-shot JSON bootstrap for /autoplan (JOV-4183)
