@@ -67,11 +67,37 @@ export interface OperatingStep {
   readonly description: string;
 }
 
+export interface FundraisingMetric {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string | null;
+  readonly status: 'evidence-gap';
+  readonly provenance: readonly ClaimProvenance[];
+  readonly lastUpdated: string;
+}
+
+export interface InvestorConversationSummary {
+  readonly sourceId: string;
+  readonly capturedAt: string;
+  readonly summary: string;
+}
+
+export interface InvestorFaqEntry {
+  readonly riskId: string;
+  readonly question: string;
+  readonly answer: string;
+}
+
 export interface FundraisingRegistry {
   readonly version: string;
   readonly asOf: string;
   readonly thesis: string;
   readonly companyDefinition: string;
+  readonly currentNarrative: string;
+  readonly metrics: readonly FundraisingMetric[];
+  readonly researchSources: readonly ClaimProvenance[];
+  readonly investorConversationSummaries: readonly InvestorConversationSummary[];
+  readonly investorFaq: readonly InvestorFaqEntry[];
   readonly claims: readonly FundraisingClaim[];
   readonly coreSlides: readonly CoreSlide[];
   readonly operatingLoop: readonly OperatingStep[];
@@ -227,6 +253,11 @@ const RISK_DATA = [
   ['ai-commoditization', 'What remains valuable as generation gets cheaper?', 'Copy generation is not the moat. The bet is on trustworthy context, approvals, execution, and measured outcomes.', 'high', 'Production proof of execution quality and outcome capture.', 'strategy', ['closed-loop-category-context'], ['wedge', 'loop'], ['operating-loop', 'questions'], 'Prove value in context, approvals, reliable execution, and measured outcomes rather than generation.', 'Keep generative output separate from the proposed operating-system advantage.'],
   ['founder-dependency', 'Can the workflow scale beyond the founder?', 'Founder expertise is currently an advantage and a concentration risk. Manual decisions must become explicit product rules and repeatable operations.', 'high', 'Non-founder operation of the workflow with consistent quality.', 'evidence', ['founder-artist-operator'], ['founder'], ['founder-letter', 'questions'], 'Have a non-founder operate the documented workflow and compare quality and completion.', 'Present founder expertise as both an advantage and a concentration risk.'],
   ['capital', 'What does new capital prove?', 'The intended proof is paid activation, repeated release use, and measurable creator value. Round size and terms are kept out until approved evidence is current.', 'critical', 'Approved raise terms, milestone budget, and runway model.', 'evidence', [], ['round'], ['brief', 'questions'], 'Approve a milestone budget and runway model tied to paid activation and repeated release use.', 'Keep round size and terms out of the portal until the approved model is current.'],
+  ['why-now', 'Why is now the right time to build Jovie?', 'The timing thesis is that cheaper AI generation increases the volume of possible marketing work while creator release operations remain fragmented. Jovie has not yet proven that this timing produces urgent paid demand.', 'high', 'Dated buyer evidence that AI-driven content volume increases release-operations pain or purchase urgency.', 'evidence', ['slide-problem', 'closed-loop-category-context'], ['thesis', 'problem'], ['brief', 'questions'], 'Test timing and urgency explicitly in paid-pilot and buyer interviews.', 'Present why-now as a testable timing thesis, not a market fact.'],
+  ['why-founder', 'Why is this founder uniquely positioned to win?', 'The founder has an attested artist-operator problem history and built the current product. Unique distribution, execution velocity, and repeatable company-building advantage remain unproven.', 'high', 'Dated evidence of founder-led distribution, shipping velocity, or outcomes that competitors cannot readily reproduce.', 'evidence', ['founder-artist-operator', 'product-demo-exists'], ['founder'], ['founder-letter', 'questions'], 'Document dated founder execution and distribution evidence outside the pitch.', 'Separate the sourced artist-operator history from still-unproven founder advantage.'],
+  ['willingness-to-pay', 'Will creators both want and be able to pay for this workflow?', 'No approved willingness-to-pay, budget, or paid-pilot evidence is currently available. Creator-paid software is a working hypothesis.', 'critical', 'Segmented price discovery, budget evidence, and completed paid pilots.', 'evidence', ['release-workflow-focus'], ['wedge', 'round'], ['brief', 'questions'], 'Run priced offers with a defined creator segment and record acceptance, refusal, and budget constraints.', 'Do not infer willingness or ability to pay from product interest.'],
+  ['small-team-support', 'Can a small team support creator customers without becoming an agency?', 'Execution still includes manual work, so service load and support economics are not yet known. The product must make approvals and operations repeatable without hiding founder labor.', 'critical', 'Time-per-customer, support volume, exception rate, and gross-margin evidence from repeated release cohorts.', 'strategy', ['release-workflow-focus'], ['product', 'loop', 'round'], ['operating-loop', 'questions'], 'Instrument human time, exceptions, and support work per active release and set a service-load ceiling.', 'Label manual work and avoid presenting founder-operated service as software scalability.'],
+  ['closed-loop-credibility', 'Why should investors believe the closed-loop model will work?', 'The current registry distinguishes live context surfaces, a demonstrated opportunity flow, manual execution, and planned outcome learning. The complete loop has not been verified in production.', 'critical', 'End-to-end records showing approved work, shipped execution, measured outcomes, and improved next-release recommendations.', 'evidence', ['slide-loop', 'closed-loop-category-context'], ['loop'], ['operating-loop', 'questions'], 'Complete and audit repeated end-to-end release loops before claiming learning effects.', 'Keep each loop stage labeled LIVE, DEMO, MANUAL, or PLANNED and describe compounding as proposed.'],
 ] as const satisfies readonly RiskInput[];
 
 // biome-ignore format: One content record per line prevents structural duplication while keeping review diffs readable.
@@ -243,6 +274,33 @@ export const fundraisingRegistry = {
     'Jovie is building the operating layer that turns a music release into coordinated, measurable marketing work.',
   companyDefinition:
     'An AI marketing operator for music creators, beginning with release workflows.',
+  currentNarrative:
+    'Jovie begins with a bounded release-operations workflow: preserve creator and release context, surface executable marketing work, keep approval human-visible, and eventually learn from measured outcomes. The current proof is a product demonstration and founder-attested problem history; paid demand, scalable service economics, and a production closed loop remain evidence gaps.',
+  metrics: [
+    {
+      id: 'customer-revenue-retention',
+      label: 'Customer, revenue, activation, and retention metrics',
+      value: null,
+      status: 'evidence-gap',
+      provenance: [],
+      lastUpdated: AS_OF,
+    },
+  ],
+  researchSources: [
+    source('Demo video asset', '/demo/jovie-demo.mp4', 'first-party-artifact'),
+    source('Caption file', '/demo/jovie-demo.vtt', 'first-party-artifact'),
+    source(
+      'The Friday Problem by Tim White',
+      '/blog/the-friday-problem',
+      'founder-authored'
+    ),
+    source(
+      'YC Summer 2026 Requests for Startups',
+      'https://www.ycombinator.com/rfs',
+      'external-context'
+    ),
+  ],
+  investorConversationSummaries: [],
   claims: CLAIM_DATA.map(input =>
     claim(input[0], input[1], input[2], input[3], input[4], input[5])
   ),
@@ -272,6 +330,11 @@ export const fundraisingRegistry = {
       input[10]
     )
   ),
+  investorFaq: RISK_DATA.map(input => ({
+    riskId: input[0],
+    question: input[1],
+    answer: input[2],
+  })),
   appendix: APPENDIX_DATA.map(input =>
     appendixItem(input[0], input[1], input[2])
   ),

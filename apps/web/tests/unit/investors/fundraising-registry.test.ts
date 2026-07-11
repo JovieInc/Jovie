@@ -60,7 +60,7 @@ describe('fundraising registry', () => {
       fundraisingRegistry.coreSlides.map(slide => slide.id)
     );
 
-    expect(fundraisingRegistry.risks).toHaveLength(10);
+    expect(fundraisingRegistry.risks).toHaveLength(15);
     for (const risk of fundraisingRegistry.risks) {
       expect([
         'communication',
@@ -78,6 +78,41 @@ describe('fundraising registry', () => {
       ).toBe(true);
       expect(risk.recommendedCompanyAction).not.toBe('');
       expect(risk.recommendedCommunicationAction).not.toBe('');
+    }
+  });
+
+  it('exposes explicit readiness sections without inventing evidence', () => {
+    expect(fundraisingRegistry.currentNarrative).not.toBe('');
+    expect(fundraisingRegistry.metrics).toEqual([
+      expect.objectContaining({ value: null, status: 'evidence-gap' }),
+    ]);
+    expect(fundraisingRegistry.researchSources.length).toBeGreaterThan(0);
+    expect(fundraisingRegistry.investorConversationSummaries).toEqual([]);
+    expect(fundraisingRegistry.investorFaq).toHaveLength(
+      fundraisingRegistry.risks.length
+    );
+    expect(fundraisingRegistry.investorFaq.map(item => item.riskId)).toEqual(
+      fundraisingRegistry.risks.map(item => item.id)
+    );
+  });
+
+  it('tracks the completion-audit objections with unknown frequency', () => {
+    const required = [
+      'why-now',
+      'why-founder',
+      'willingness-to-pay',
+      'small-team-support',
+      'closed-loop-credibility',
+    ];
+    for (const id of required) {
+      const objection = fundraisingRegistry.risks.find(risk => risk.id === id);
+      expect(objection).toMatchObject({
+        frequency: 'unknown',
+        lastUpdated: '2026-07-11',
+      });
+      expect(objection?.evidenceGap).not.toBe('');
+      expect(objection?.recommendedCompanyAction).not.toBe('');
+      expect(objection?.recommendedCommunicationAction).not.toBe('');
     }
   });
 

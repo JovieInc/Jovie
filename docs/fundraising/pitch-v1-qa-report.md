@@ -2,11 +2,13 @@
 
 **Date:** 2026-07-11
 
-**Branch:** `codex/jov-3538-investor-portal-v1`
+**Current registry/report branch:** `codex/jov-3739-investor-readiness-report`
 
-**Implementation commits:** `1ec5dbb4db3d426302ca952149ee7b85054f89f1`, `02ef3aed2eb290dee73b96031323972162c75be8`
+**Browser evidence origin:** `codex/jov-3538-investor-portal-v1` at implementation commits `1ec5dbb4db3d426302ca952149ee7b85054f89f1`, `02ef3aed2eb290dee73b96031323972162c75be8`
 
 ## Verified Behavior
+
+The browser observations below were captured on the browser-evidence origin above. The current registry/report branch has not been re-verified against a production database or browser; its authoritative checks are the registry unit tests and TypeScript validation listed below.
 
 - Public `/pitch` returned 200 and emitted `noindex, nofollow` metadata.
 - The canonical brief rendered all 7 core slides.
@@ -23,9 +25,8 @@
 
 | Check | Result |
 | --- | --- |
-| Final Pitch Playwright after safe-appendix review | 3/3 passed |
-| Focused Vitest run | 19/19 passed |
-| Fundraising registry tests | 6/6 passed |
+| Historical Final Pitch Playwright after safe-appendix review | 3/3 passed |
+| Current fundraising registry tests | 10/10 passed |
 | Web TypeScript check | Passed |
 
 The responsive and slide screenshots below were refreshed from the reviewed public `/pitch` implementation after the safe-appendix and claim-contract fixes.
