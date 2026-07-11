@@ -245,6 +245,7 @@ const adminIconById: Record<AdminWorkspaceId, LucideIcon> = {
   activity: Activity,
   investors: Briefcase,
   screenshots: ImageIcon,
+  design_lab: SquarePen,
   costs: Banknote,
   revenue_lift: TrendingUp,
   share_studio: Share2,

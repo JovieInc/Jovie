@@ -37,6 +37,7 @@ export type AdminWorkspaceId =
   | 'activity'
   | 'investors'
   | 'screenshots'
+  | 'design_lab'
   | 'costs'
   | 'revenue_lift'
   | 'share_studio'
@@ -65,6 +66,7 @@ export const ADMIN_PRIMARY_WORKSPACE_IDS = [
 export const ADMIN_SETTINGS_TOOL_IDS = [
   'investors',
   'screenshots',
+  'design_lab',
   'share_studio',
   'costs',
   'revenue_lift',
@@ -127,6 +129,13 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Screenshots',
     href: APP_ROUTES.ADMIN_SCREENSHOTS,
     description: 'Generated docs and QA screenshots',
+    section: 'utilities',
+  },
+  {
+    id: 'design_lab',
+    label: 'Design Lab',
+    href: APP_ROUTES.ADMIN_DESIGN_LAB,
+    description: 'Review proposed sections and registry conversion evidence',
     section: 'utilities',
   },
   {
