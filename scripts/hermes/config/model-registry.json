@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-07-11",
+  "deterministic_first": true,
+  "state_file_env": "GEM_MODEL_ROUTER_STATE",
+  "models": [
+    {
+      "id": "qwen-coder-local",
+      "provider": "ollama",
+      "model": "qwen3-coder:30b",
+      "capabilities": ["mechanical", "code", "tests"],
+      "cost_tier": "free-local",
+      "executable_env": "GEM_PR_DRAIN_QWEN",
+      "executable_default": "/usr/local/bin/ollama",
+      "probe_argv": ["{executable}", "list"],
+      "cooldown_seconds": 900
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-flash",
+      "capabilities": ["mechanical", "code", "review", "semantic"],
+      "cost_tier": "cheap-paid",
+      "executable_env": "GEM_DEEPSEEK_EXECUTABLE",
+      "executable_default": "hermes",
+      "probe_argv": ["{executable}", "--help"],
+      "cooldown_seconds": 1800
+    },
+    {
+      "id": "grok-composer-2.5-fast",
+      "provider": "grok",
+      "model": "grok-composer-2.5-fast",
+      "capabilities": ["mechanical", "code", "review", "semantic"],
+      "cost_tier": "subscription",
+      "executable_env": "GEM_GROK_EXECUTABLE",
+      "executable_default": "grok",
+      "probe_argv": ["{executable}", "models"],
+      "cooldown_seconds": 1800
+    },
+    {
+      "id": "claude",
+      "provider": "claude",
+      "model": "sonnet",
+      "capabilities": ["code", "review", "semantic", "architecture"],
+      "cost_tier": "subscription",
+      "executable_env": "GEM_CLAUDE_EXECUTABLE",
+      "executable_default": "claude",
+      "probe_argv": ["{executable}", "--version"],
+      "cooldown_seconds": 3600
+    },
+    {
+      "id": "codex-luna",
+      "provider": "codex",
+      "model": "gpt-5.6-luna",
+      "capabilities": ["code", "review"],
+      "cost_tier": "subscription-exception",
+      "exception_only": true,
+      "executable_env": "GEM_PR_DRAIN_CODEX",
+      "executable_default": "/home/timwhite/.npm-global/bin/codex",
+      "probe_argv": ["{executable}", "exec", "--model", "{model}", "--sandbox", "read-only", "--skip-git-repo-check", "Reply with exactly: GEM_MODEL_READY"],
+      "cooldown_seconds": 21600
+    },
+    {
+      "id": "codex-terra",
+      "provider": "codex",
+      "model": "gpt-5.6-terra",
+      "capabilities": ["code", "review", "architecture"],
+      "cost_tier": "subscription-exception",
+      "exception_only": true,
+      "executable_env": "GEM_PR_DRAIN_CODEX",
+      "executable_default": "/home/timwhite/.npm-global/bin/codex",
+      "probe_argv": ["{executable}", "exec", "--model", "{model}", "--sandbox", "read-only", "--skip-git-repo-check", "Reply with exactly: GEM_MODEL_READY"],
+      "cooldown_seconds": 21600
+    },
+    {
+      "id": "codex-sol",
+      "provider": "codex",
+      "model": "gpt-5.6-sol",
+      "capabilities": ["architecture", "root-cause"],
+      "cost_tier": "subscription-exception",
+      "exception_only": true,
+      "executable_env": "GEM_PR_DRAIN_CODEX",
+      "executable_default": "/home/timwhite/.npm-global/bin/codex",
+      "probe_argv": ["{executable}", "exec", "--model", "{model}", "--sandbox", "read-only", "--skip-git-repo-check", "Reply with exactly: GEM_MODEL_READY"],
+      "cooldown_seconds": 21600
+    }
+  ],
+  "route_chains": {
+    "remediation": ["qwen-coder-local", "deepseek-v4-flash", "grok-composer-2.5-fast", "claude", "codex-terra", "codex-sol"],
+    "new_pr": ["qwen-coder-local", "deepseek-v4-flash", "grok-composer-2.5-fast", "claude", "codex-luna", "codex-terra", "codex-sol"]
+  },
+  "deterministic_gates": ["github-auth", "mergeability-refresh", "focused-tests", "main-green", "graphite-label-only"],
+  "forbidden_actions": ["merge", "auto-merge", "admin", "gtmq-drafts", "taste-gates", "codex-for-ordinary-remediation"]
+}
