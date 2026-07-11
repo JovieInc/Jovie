@@ -148,15 +148,31 @@ run_trufflehog_pre_commit() {
 CLONE_CORRUPTION_SIGNATURE='promisor remote|repository corruption on the remote side|failed to clone file Git repo'
 
 repair_partial_clone() {
-  echo "Partial-clone corruption detected — refetching full objects (#13994)..."
+  echo "Partial-clone corruption detected — repairing workdir (#13994)..."
   git config --unset-all remote.origin.promisor || true
   git config --unset-all remote.origin.partialclonefilter || true
+  # trufflehog's internal `git clone file://…` makes upload-pack serve every
+  # advertised ref, and persistent runner workdirs accumulate stale refs whose
+  # objects were promisor-elided long ago. Drop every ref the diff scan does
+  # not need (detached HEAD survives — its objects arrived with this job's own
+  # checkout fetch), then transfer a complete pack for the scan base.
+  local base_branch keep_ref ref
+  base_branch="${BASE_REF#origin/}"
+  keep_ref="refs/remotes/origin/${base_branch}"
+  # Ref pruning is CI-only (persistent runner workdirs); never touch a
+  # developer clone's refs. refs/heads is left alone everywhere.
+  if [[ -n "${CI:-}" ]]; then
+    while IFS= read -r ref; do
+      [[ "$ref" == "$keep_ref" ]] && continue
+      git update-ref -d "$ref" 2>/dev/null || true
+    done < <(git for-each-ref --format='%(refname)' refs/remotes refs/tags refs/replace refs/prefetch)
+  fi
   # --refetch needs git >= 2.36; older runner images fall back to a noop
   # negotiation fetch, which also transfers a complete unfiltered pack.
   git fetch --refetch origin \
-    '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*' \
+    "+refs/heads/${base_branch}:${keep_ref}" \
     || git -c fetch.negotiationAlgorithm=noop fetch origin \
-      '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
+      "+refs/heads/${base_branch}:${keep_ref}"
 }
 
 run_trufflehog_git() {
