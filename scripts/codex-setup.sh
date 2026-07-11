@@ -4,8 +4,7 @@
 #
 # Keep this as a thin wrapper. The canonical bootstrap lives in scripts/setup.sh
 # so Codex, Conductor, Claude, and humans all exercise the same setup path.
-# Codex hook mode must be resilient: setup failures don't block agent sessions.
-set -uo pipefail
+set -euo pipefail
 
 CODEX_HOOK=0
 if [[ "${1:-}" == "--codex-hook" ]]; then
