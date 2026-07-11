@@ -22,7 +22,7 @@ If a GitHub Team plan (unlimited private CI minutes) becomes cost-effective, bot
 - **ceo-plans** — kept in `~/.gstack/projects/…/ceo-plans/` (local machine) or a private repo
 - **Secrets or credentials** — even expired; use Doppler + `gitleaks` gate (see `JovieInc/Jovie#10940`)
 - **Agent configs with private topology** — Hermes service config, Tailscale IPs, orchestration scripts
-- **Investor/legal documents** — keep in Google Drive or a dedicated private repo
+- **Investor and legal material** — approved public investor-portal or deck copy required to serve the product may live with the code; private investor notes, legal documents, deal terms, diligence material, and investor-specific strategy must stay in Google Drive or a dedicated private repo
 
 ## License signaling
 
