@@ -90,6 +90,8 @@ export async function publishInvestorReviewDraft(
   let remoteOwned = false;
   let prCreateFailed = false;
   let primaryError: Error | null = null;
+  let draftPrUrl: string | null = null;
+  const cleanupErrors: string[] = [];
   try {
     const add = run('git', [
       'worktree',
@@ -188,7 +190,7 @@ export async function publishInvestorReviewDraft(
       prCreateFailed = true;
       throw failure(pr, 'Draft PR creation failed.');
     }
-    return pr.stdout.trim();
+    draftPrUrl = pr.stdout.trim();
   } catch (error) {
     primaryError = error instanceof Error ? error : new Error(String(error));
     if (remoteOwned && prCreateFailed) {
@@ -246,9 +248,7 @@ export async function publishInvestorReviewDraft(
         );
       }
     }
-    throw primaryError;
   } finally {
-    const cleanupErrors: string[] = [];
     const remove = run('git', [
       'worktree',
       'remove',
@@ -274,11 +274,14 @@ export async function publishInvestorReviewDraft(
       if (deleteBranch.status !== 0)
         cleanupErrors.push(deleteBranch.stderr.trim());
     }
-    if (cleanupErrors.length > 0) {
-      const prefix = primaryError
-        ? `${primaryError.message} Recoverable state: local cleanup failed:`
-        : 'Draft created but local cleanup failed:';
-      throw new Error(`${prefix} ${cleanupErrors.join(' ')}`);
-    }
   }
+  if (cleanupErrors.length > 0) {
+    const prefix = primaryError
+      ? `${primaryError.message} Recoverable state: local cleanup failed:`
+      : 'Draft created but local cleanup failed:';
+    throw new Error(`${prefix} ${cleanupErrors.join(' ')}`);
+  }
+  if (primaryError) throw primaryError;
+  if (!draftPrUrl) throw new Error('Draft PR URL was not returned.');
+  return draftPrUrl;
 }
