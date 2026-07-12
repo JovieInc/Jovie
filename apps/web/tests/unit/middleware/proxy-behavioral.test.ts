@@ -197,6 +197,11 @@ function resetMocks() {
     status: 'ok',
   });
   mocks.resolveTestBypassUserId.mockReturnValue(null);
+  // Some tests flip this to `false` to exercise the real (non-bypass)
+  // getSessionCookie detection path; restore the suite default here so
+  // that override never leaks into later tests via mockClear() (which
+  // clears call history but not a previously assigned return value).
+  mocks.isTestAuthBypassEnabled.mockReturnValue(true);
   mocks.isCookieBannerRequired.mockReturnValue(false);
   mocks.getUserState.mockResolvedValue(null);
   mocks.isKnownActiveUser.mockReturnValue(false);
@@ -1145,6 +1150,69 @@ describe('proxy.ts middleware', () => {
       // The isNavigationMethod gate must short-circuit before the cache is
       // even consulted.
       expect(mocks.getCookieCache).not.toHaveBeenCalled();
+    });
+  });
+
+  // ==========================================================================
+  // Real (non-bypass) session-cookie detection (audit row 16 follow-up)
+  //
+  // `detectBetterAuthSession` (apps/web/proxy.ts ~line 39) calls
+  // `getSessionCookie` from 'better-auth/cookies' to derive the truthy
+  // signed-in marker that flows into `handleProxyRequest` on every request
+  // that is NOT using the E2E test-bypass. Every other "authenticated" test
+  // in this suite goes through `resolveTestBypassUserId` instead, so this is
+  // the only place `getSessionCookie`'s actual return value (not just the
+  // test-bypass user id) drives auth-gated behavior. `isTestAuthBypassEnabled`
+  // is forced to `false` in each test here so there is no ambiguity about
+  // which path produced the observed behavior.
+  // ==========================================================================
+  describe('real session-cookie detection (getSessionCookie, non-bypass path)', () => {
+    it('treats a truthy Better Auth session cookie as signed-in and lets a protected path through', async () => {
+      mocks.isTestAuthBypassEnabled.mockReturnValue(false);
+      mocks.getSessionCookie.mockReturnValue('valid_session_cookie_value');
+
+      const req = createTestRequest({ pathname: '/app' });
+      const res = await callMiddleware(req);
+
+      expect(mocks.getSessionCookie).toHaveBeenCalledWith(req);
+      // Confirms this went through the real detection path, not the bypass.
+      expect(mocks.resolveTestBypassUserId).not.toHaveBeenCalled();
+      expect(res.status).toBeLessThan(300);
+      expect(isRedirectTo(res, '/signin')).toBe(false);
+    });
+
+    it('treats a thrown/malformed session cookie as signed-out (fails closed)', async () => {
+      mocks.isTestAuthBypassEnabled.mockReturnValue(false);
+      mocks.getSessionCookie.mockImplementation(() => {
+        throw new Error('malformed session cookie');
+      });
+
+      const req = createTestRequest({ pathname: '/app' });
+      const res = await callMiddleware(req);
+
+      expect(mocks.getSessionCookie).toHaveBeenCalledWith(req);
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      expect(isRedirectTo(res, '/signin')).toBe(true);
+    });
+
+    it('does not redirect a signed-in Electron app-shell request to signin', async () => {
+      mocks.isTestAuthBypassEnabled.mockReturnValue(false);
+      mocks.getSessionCookie.mockReturnValue('valid_session_cookie_value');
+
+      const req = createTestRequest({
+        hostname: 'localhost:3112',
+        pathname: '/app/chat',
+        searchParams: { runtime: 'electron' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(mocks.getSessionCookie).toHaveBeenCalledWith(req);
+      expect(res.status).toBeLessThan(300);
+      expect(isRedirectTo(res, '/signin')).toBe(false);
+      // The signed-out Electron redirect helper must not fire when a
+      // session cookie is present.
+      expect(mocks.buildProtectedAuthRedirectUrl).not.toHaveBeenCalled();
     });
   });
 
