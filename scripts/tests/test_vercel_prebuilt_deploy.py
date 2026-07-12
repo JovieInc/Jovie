@@ -155,3 +155,29 @@ def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
     )
     preview_wait_index = workflow.index("- name: Wait for PR preview readiness")
     assert preview_deploy_index < preview_wait_index < deploy_index
+
+
+def test_staging_job_budget_contains_deploy_and_readiness_steps() -> None:
+    workflow = CI_WORKFLOW.read_text()
+    staging_block = workflow[
+        workflow.index("  deploy-staging:") : workflow.index(
+            "  canary-health-gate:"
+        )
+    ]
+
+    job_timeout = re.search(r"^    timeout-minutes: ([0-9]+)$", staging_block, re.M)
+    deploy_timeout = re.search(
+        r"- name: Deploy \(staging preview, prebuilt\)\n        timeout-minutes: ([0-9]+)",
+        staging_block,
+    )
+    readiness_timeout = re.search(
+        r"- name: Wait for staging deployment readiness\n        timeout-minutes: ([0-9]+)",
+        staging_block,
+    )
+
+    assert job_timeout is not None
+    assert deploy_timeout is not None
+    assert readiness_timeout is not None
+    assert int(job_timeout.group(1)) >= (
+        int(deploy_timeout.group(1)) + int(readiness_timeout.group(1)) + 5
+    )

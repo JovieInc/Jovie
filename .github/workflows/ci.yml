@@ -479,6 +479,8 @@ jobs:
     # (build / Lighthouse / e2e / preview) stay separate.
     needs: [ci-path-changes]
     runs-on: ubuntu-latest
+    # Setup/DB work (~2m) + accepted source deploy (up to 10m) + readiness
+    # verification (up to 9m) must fit without the job canceling a healthy build.
     timeout-minutes: 25
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     env:
@@ -2546,7 +2548,7 @@ jobs:
     needs: [ci-build-public, ci-path-changes, neon-db]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true')) && needs.ci-build-public.outputs.has_artifact == 'true') }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -4585,7 +4587,7 @@ jobs:
     # saturate the production-deploy concurrency slot.
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() && needs.deploy-gate.outputs.is_head == 'true' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     # Deploy concurrency: serialize main deploys instead of cancelling them.
     # Cancelling in-progress main deploys during merge bursts can starve
     # production promotion and leave main without a completed deploy run.
