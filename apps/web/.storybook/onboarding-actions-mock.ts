@@ -52,3 +52,26 @@ export async function connectOnboardingSpotifyArtist(
     success: true,
   };
 }
+
+export async function verifyProfileHasAvatar(): Promise<{
+  avatarUrl: string;
+}> {
+  console.log('[Storybook Mock] verifyProfileHasAvatar called');
+  return { avatarUrl: 'https://placehold.co/256x256' };
+}
+
+export async function getProfileAvatarUrl(): Promise<{
+  avatarUrl: string | null;
+}> {
+  console.log('[Storybook Mock] getProfileAvatarUrl called');
+  return { avatarUrl: null };
+}
+
+export async function updateOnboardingProfile(_updates: {
+  displayName?: string;
+  bio?: string;
+  avatarUrl?: string;
+}): Promise<{ success: boolean }> {
+  console.log('[Storybook Mock] updateOnboardingProfile called');
+  return { success: true };
+}
