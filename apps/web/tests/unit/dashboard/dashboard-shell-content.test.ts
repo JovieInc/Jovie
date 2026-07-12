@@ -163,11 +163,12 @@ describe('@critical DashboardShellContent behavior contracts', () => {
       // Critical for shell frame persistence: DashboardShellContent always returns
       // <HydrateClient> <AppFlagProvider> ... <AuthShellWrapper> <AppShellFrame> ...
       // regardless of useEssentialShell. This prevents remount of the chrome on
-      // transitions between lightweight routes (chat/library/releases/...) and
-      // full-data routes (earnings, etc.). Sidebar state, audio, and shell UI
-      // survive client-side /app/* navigation with no blank/dark frames.
+      // transitions between routes. Sidebar state, audio, and shell UI survive
+      // client-side /app/* navigation with no blank/dark frames — whether the
+      // route uses essential or full dashboard data (see the "remaining
+      // full-data routes" note in shell-route-matches.test.ts for what's left
+      // on the full path today).
       expect(shouldUseEssentialShellData('/app/chat')).toBe(true);
-      expect(shouldUseEssentialShellData(APP_ROUTES.EARNINGS)).toBe(false);
       expect(isChatShellRoute('/app/chat')).toBe(true);
     });
 
