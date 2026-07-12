@@ -7,6 +7,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_SCRIPT = REPO_ROOT / ".github/scripts/vercel-prebuilt-deploy.sh"
 CI_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
+CANARY_WORKFLOW = REPO_ROOT / ".github/workflows/canary-health-gate.yml"
 
 
 def test_timed_out_prebuilt_uploads_fall_back_to_source(tmp_path: Path) -> None:
@@ -181,3 +182,83 @@ def test_staging_job_budget_contains_deploy_and_readiness_steps() -> None:
     assert int(job_timeout.group(1)) >= (
         int(deploy_timeout.group(1)) + int(readiness_timeout.group(1)) + 5
     )
+
+
+def test_reusable_vercel_artifact_contains_traced_runtime_dependencies() -> None:
+    workflow = CI_WORKFLOW.read_text()
+    producer = workflow[
+        workflow.index("- name: Vercel build (deploy artifact)") : workflow.index(
+            "- name: Upload vercel build artifact"
+        )
+    ]
+
+    assert "apps/web/.next/standalone/apps/web/.next/node_modules" in producer
+    assert "cp -a" in producer
+    assert "apps/web/.next/node_modules" in producer
+    assert "import-in-the-middle-*" in producer
+
+    fallback = workflow[
+        workflow.index("- name: Build (preview target for staging verification)") : workflow.index(
+            "- name: Package build output for provenance attestation"
+        )
+    ]
+    assert "- name: Materialize traced runtime dependencies" in fallback
+    assert "apps/web/.next/standalone/apps/web/.next/node_modules" in fallback
+
+
+def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
+    workflow = CI_WORKFLOW.read_text()
+    expected_publishable = (
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "
+        "${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}"
+    )
+    expected_secret = "CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}"
+
+    producer = workflow[
+        workflow.index("- name: Vercel build (deploy artifact)") : workflow.index(
+            "- name: Upload vercel build artifact"
+        )
+    ]
+    staging = workflow[
+        workflow.index("  deploy-staging:") : workflow.index(
+            "  canary-health-gate:"
+        )
+    ]
+    assert expected_publishable in producer
+    assert expected_secret in producer
+    assert staging.count(expected_publishable) >= 2
+    assert staging.count(expected_secret) >= 2
+
+
+def test_masked_deployment_url_is_encoded_across_job_boundary() -> None:
+    workflow = CI_WORKFLOW.read_text()
+    canary_workflow = CANARY_WORKFLOW.read_text()
+    staging_block = workflow[
+        workflow.index("  deploy-staging:") : workflow.index(
+            "  canary-health-gate:"
+        )
+    ]
+    downstream = workflow[
+        workflow.index("  canary-health-gate:") : workflow.index(
+            "  promote-production:"
+        )
+    ]
+
+    assert "deploy_url_b64: ${{ steps.encode_deploy_url.outputs.deploy_url_b64 }}" in staging_block
+    assert "deployment_url_b64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}" in downstream
+    assert "base64 --decode" in downstream
+    assert "DEPLOYMENT_URL_B64: ${{ inputs.deployment_url_b64 }}" in canary_workflow
+    assert "base64 --decode" in canary_workflow
+
+
+def test_readiness_gate_checks_ready_state_after_vercel_wait() -> None:
+    workflow = CI_WORKFLOW.read_text()
+    readiness = workflow[
+        workflow.index("- name: Wait for staging deployment readiness") : workflow.index(
+            "- name: Encode deployment URL for downstream jobs"
+        )
+    ]
+
+    assert "--wait" in readiness
+    assert "--format=json" in readiness
+    assert 'ascii_upcase) == "READY"' in readiness

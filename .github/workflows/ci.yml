@@ -1049,15 +1049,30 @@ jobs:
           # targets with the reusable output so a later runner can deploy the
           # prebuilt artifact without the full ~384 MB .next archive.
           test -d apps/web/.next/server/edge
+          # Vercel function traces point at this standalone runtime tree through
+          # apps/web/.next/node_modules. Materialize that path so the prebuilt
+          # upload is closed over every traced dependency on the deploy runner.
+          test -d apps/web/.next/standalone/apps/web/.next/node_modules
+          rm -rf apps/web/.next/node_modules
+          mkdir -p apps/web/.next/node_modules
+          cp -a apps/web/.next/standalone/apps/web/.next/node_modules/. \
+            apps/web/.next/node_modules/
+          find apps/web/.next/node_modules -maxdepth 1 -type d \
+            -name 'import-in-the-middle-*' -print -quit | grep -q .
           tar -czf /tmp/vercel-build-output.tar.gz -C . \
             .vercel/output \
-            apps/web/.next/server/edge
+            apps/web/.next/server/edge \
+            apps/web/.next/node_modules
           tar -tzf /tmp/vercel-build-output.tar.gz \
             apps/web/.next/server/edge >/dev/null
+          tar -tzf /tmp/vercel-build-output.tar.gz \
+            apps/web/.next/node_modules >/dev/null
           echo "vercel_artifact=true" >> "$GITHUB_OUTPUT"
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -4607,6 +4622,7 @@ jobs:
       # so no drift warning fires. This is acceptable — the cancelled deploy didn't ship.
       schema_drift: ${{ steps.verify.outcome == 'failure' }}
       deploy_url: ${{ steps.deploy.outputs.deploy_url }}
+      deploy_url_b64: ${{ steps.encode_deploy_url.outputs.deploy_url_b64 }}
     environment:
       name: Staging – jovie
       url: https://staging.jov.ie
@@ -4744,6 +4760,19 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
+      - name: Materialize traced runtime dependencies
+        if: steps.restore_vercel_build.outputs.restored != 'true'
+        run: |
+          set -euo pipefail
+          test -d apps/web/.next/standalone/apps/web/.next/node_modules
+          rm -rf apps/web/.next/node_modules
+          mkdir -p apps/web/.next/node_modules
+          cp -a apps/web/.next/standalone/apps/web/.next/node_modules/. \
+            apps/web/.next/node_modules/
+          find apps/web/.next/node_modules -maxdepth 1 -type d \
+            -name 'import-in-the-middle-*' -print -quit | grep -q .
       - name: Package build output for provenance attestation
         run: |
           set -euo pipefail
@@ -4807,19 +4836,38 @@ jobs:
           done
         env:
           VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
-          CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
 
       - name: Wait for staging deployment readiness
         timeout-minutes: 9
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
         run: |
-          ./node_modules/.bin/vercel inspect "${{ steps.deploy.outputs.deploy_url }}" \
+          ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
             --wait \
             --timeout 8m \
             --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID"
+          deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
+            --format=json \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID")"
+          if ! jq -e '((.readyState // .state // .status // "") | ascii_upcase) == "READY"' \
+            <<<"$deployment_json" >/dev/null; then
+            echo "::error::Vercel inspect returned before the staging deployment reached READY."
+            jq -r '"Current deployment state: \(.readyState // .state // .status // "unknown")"' \
+              <<<"$deployment_json"
+            exit 1
+          fi
+
+      - name: Encode deployment URL for downstream jobs
+        id: encode_deploy_url
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
+        run: |
+          printf 'deploy_url_b64=%s\n' "$(printf '%s' "$DEPLOYMENT_URL" | base64 | tr -d '\n')" \
+            >> "$GITHUB_OUTPUT"
 
   canary-health-gate:
     name: Canary Health Gate (staging)
@@ -4834,7 +4882,7 @@ jobs:
       # shared staging alias. Merge-queue traffic can retarget staging.jov.ie
       # while this gate is still retrying, which produces false negatives even
       # when the freshly deployed preview is healthy.
-      deployment_url: ${{ needs.deploy-staging.outputs.deploy_url }}
+      deployment_url_b64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
       commit_sha: ${{ github.sha }}
       fallback_health_url: /api/health
     secrets:
@@ -4856,14 +4904,17 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
       - name: Alias verified deployment
-        run: |
-          ./node_modules/.bin/vercel alias set "${{ needs.deploy-staging.outputs.deploy_url }}" staging.jov.ie \
-            --token "$VERCEL_TOKEN" \
-            --scope "$VERCEL_ORG_ID"
         env:
+          DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
+          test -n "$deployment_url"
+          ./node_modules/.bin/vercel alias set "$deployment_url" staging.jov.ie \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID"
 
   promote-production:
     name: Promote to Production

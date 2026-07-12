@@ -8,7 +8,11 @@ on:
     inputs:
       deployment_url:
         description: Base URL for the deployment to verify.
-        required: true
+        required: false
+        type: string
+      deployment_url_b64:
+        description: Base64-encoded deployment URL for masked cross-job handoff.
+        required: false
         type: string
       commit_sha:
         description: Git commit SHA for the deployment.
@@ -54,6 +58,7 @@ jobs:
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           DEPLOYMENT_URL: ${{ inputs.deployment_url }}
+          DEPLOYMENT_URL_B64: ${{ inputs.deployment_url_b64 }}
           COMMIT_SHA: ${{ inputs.commit_sha }}
           FALLBACK_HEALTH_URL: ${{ inputs.fallback_health_url }}
           WAIT_SECONDS: ${{ inputs.wait_seconds }}
@@ -63,6 +68,9 @@ jobs:
         run: |
           echo "Running canary health check..."
           deployment_url="${DEPLOYMENT_URL}"
+          if [ -z "$deployment_url" ] && [ -n "${DEPLOYMENT_URL_B64:-}" ]; then
+            deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
+          fi
           health_url_fallback="${FALLBACK_HEALTH_URL}"
           resolved_commit_deployment_url="$(python3 - <<'PY'
           import json
