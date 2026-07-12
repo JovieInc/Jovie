@@ -3,6 +3,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
+ACTIONS = REPO_ROOT / ".github" / "actions"
 
 
 HOT_PATH_WORKFLOWS = (
@@ -65,6 +66,19 @@ def test_self_hosted_gate_jobs_materialize_full_checkout() -> None:
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "git checkout-index -a -f" in content, workflow_name
         assert "Verify checkout sentinel" in content, workflow_name
+
+
+def test_shared_node_setup_never_uploads_the_self_hosted_pnpm_store() -> None:
+    """Self-hosted stores persist locally; actions/cache post-job uploads stall."""
+    content = (ACTIONS / "setup-node-pnpm" / "action.yml").read_text(
+        encoding="utf-8"
+    )
+    assert (
+        "cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}"
+        in content
+    )
+    assert "uses: actions/cache@" not in content
+    assert "Setup pnpm cache" not in content
 
 
 def test_trufflehog_job_does_not_require_docker() -> None:
