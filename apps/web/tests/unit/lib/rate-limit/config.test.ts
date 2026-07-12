@@ -148,6 +148,17 @@ describe('Rate Limit Config', () => {
         expect(RATE_LIMITERS.spotifyClaim.limit).toBeLessThanOrEqual(10);
         expect(RATE_LIMITERS.spotifyClaim.window).toContain('h');
       });
+
+      it('should throttle the public claim-token entry route per IP', () => {
+        // The unauthenticated /claim/[token] route runs several DB reads plus
+        // lead/cookie writes per hit — the throttle must not be silently dropped.
+        expect(RATE_LIMITERS.claimTokenAccess).toBeDefined();
+        expect(RATE_LIMITERS.claimTokenAccess.limit).toBe(20);
+        expect(RATE_LIMITERS.claimTokenAccess.window).toBe('1 m');
+        expect(RATE_LIMITERS.claimTokenAccess.prefix).toBe(
+          'public:claim-token'
+        );
+      });
     });
 
     describe('analytics configuration', () => {
