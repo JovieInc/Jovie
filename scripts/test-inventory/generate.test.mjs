@@ -171,4 +171,10 @@ test('maps known file families and exposes current coverage gaps', () => {
   assert.deepEqual(liveEval.ci.suiteCandidates, ['pnpm test:evals:live']);
   assert.equal(liveEval.classification, 'live eval');
   assert.equal(liveEval.ci.mappingConfidence, 'high');
+
+  const nodeLane = byPath('apps/web/lib/utils/clamp.test.ts');
+  assert.deepEqual(nodeLane.ci.suiteCandidates, ['pnpm test:unit:node']);
+  assert.equal(nodeLane.classification, 'pure unit');
+  assert.equal(nodeLane.confidence, 'high');
+  assert.match(nodeLane.ci.mappingProvenance, /node-test-files\.manifest/);
 });

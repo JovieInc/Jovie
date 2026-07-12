@@ -21,6 +21,13 @@ Classification follows the strongest real boundary crossed, never the filename o
 | iOS unit | No numeric target in brief |
 | iOS integration/UI | No numeric target in brief |
 
+## Canonical web unit lanes
+
+- `pnpm test:unit:node` runs the explicit pure-Node manifest without jsdom or browser setup.
+- `pnpm test:unit:dom` runs the complementary jsdom partition.
+- `pnpm test:unit:partition` fails closed unless both selections are non-empty, disjoint, and their union exactly matches the unchanged `test:fast` fallback.
+- `apps/web/tests/node-test-files.manifest` is the reviewed Node membership source of truth. `pnpm test:fast` remains the compatibility/full-suite fallback until CI ownership approves lane wiring.
+
 ## Canonical eval lanes
 
 - `pnpm test:evals:deterministic` runs deterministic Promptfoo validation/evaluation, the mocked golden gate, and manifest-listed fixture/scorer/calibration/leak/promote Vitest coverage. It rejects enabled live flags and strips provider credentials.

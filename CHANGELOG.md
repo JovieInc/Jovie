@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] Split the web unit suite into explicit Node and DOM lanes with fail-closed partition validation while retaining the full-suite fallback.
 - [internal] **Canonical desktop test lane:** recursively runs every desktop script test plus root desktop guards, including previously orphaned auth-security and tray-contract coverage, with desktop-only test asset preparation.
 - [internal] **Governed marketing section proposals:** the marketing registry now records route-recipe evidence and explicit design gaps, while the admin Design Lab provides desktop/mobile proposal review, comments, approval states, implementation evidence, and auditable model-usage metadata.
 - **Homepage labels now meet WCAG AA contrast:** the distributor trust-strip and closed-loop labels use the readable tertiary text token instead of the low-contrast quaternary token.
