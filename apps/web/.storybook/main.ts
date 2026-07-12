@@ -90,6 +90,21 @@ const config: StorybookConfig = {
           find: '@/app/onboarding/actions/enrich-profile',
           replacement: require.resolve('./enrich-profile-mock.ts'),
         },
+        {
+          // lib/auth/better-auth.ts imports this RELATIVELY
+          // ('./apple-client-secret'), so a plain '@/…' find never matches.
+          // Full-specifier regex: .replace() swaps the entire id for the
+          // mock's absolute path, for both aliased and relative forms.
+          find: /^(.*\/)?apple-client-secret$/,
+          replacement: require.resolve('./apple-client-secret-mock.ts'),
+        },
+        {
+          // lib/auth/test-mode.ts imports node:net at module scope; matched
+          // by full-specifier regex for both '@/…' and relative imports
+          // ('test-mode-constants' does not match the $-anchored pattern).
+          find: /^(.*\/)?test-mode$/,
+          replacement: require.resolve('./test-mode-mock.ts'),
+        },
 
         {
           find: '@/app/app/(shell)/dashboard/actions',
@@ -140,6 +155,13 @@ const config: StorybookConfig = {
         {
           find: 'next/headers',
           replacement: require.resolve('./empty-module.js'),
+        },
+        {
+          // lib/auth server modules import NextRequest/NextResponse; the
+          // real next/server entry drags in compiled ua-parser-js, which
+          // needs __dirname and crashes the browser story build.
+          find: 'next/server',
+          replacement: require.resolve('./next-server-mock.js'),
         },
         // Mock Next.js navigation for Storybook
         {
