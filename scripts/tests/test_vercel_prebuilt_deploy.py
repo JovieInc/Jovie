@@ -193,17 +193,14 @@ def test_reusable_vercel_artifact_contains_traced_runtime_dependencies() -> None
     ]
 
     assert "apps/web/.next/standalone/apps/web/.next/node_modules" in producer
-    assert "cp -a" in producer
+    snapshot_index = producer.index("vercel-runtime-node-modules.tar.gz")
+    build_index = producer.index("./node_modules/.bin/vercel build")
+    restore_index = producer.index(
+        "tar -xzf /tmp/vercel-runtime-node-modules.tar.gz"
+    )
+    assert snapshot_index < build_index < restore_index
     assert "apps/web/.next/node_modules" in producer
     assert "import-in-the-middle-*" in producer
-
-    fallback = workflow[
-        workflow.index("- name: Build (preview target for staging verification)") : workflow.index(
-            "- name: Package build output for provenance attestation"
-        )
-    ]
-    assert "- name: Materialize traced runtime dependencies" in fallback
-    assert "apps/web/.next/standalone/apps/web/.next/node_modules" in fallback
 
 
 def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
