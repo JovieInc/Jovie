@@ -131,4 +131,30 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
     expect(workflow).toContain('node scripts/pr-size-guard-label-override.mjs');
     expect(workflow).toContain('JOV-3580');
   });
+
+  it('does not skip the job before supported-label step conditions can run', () => {
+    const workflow = readFileSync(OVERRIDE_WORKFLOW, 'utf8');
+    const jobHeader = workflow.slice(
+      workflow.indexOf('  override:'),
+      workflow.indexOf('    steps:')
+    );
+    const privilegedSteps = workflow.slice(workflow.indexOf('    steps:'));
+
+    // GitHub skipped the entire job for an integration-train labeled event in
+    // runs 29210018465 and 29210083985. Keep the job schedulable, then gate
+    // every privileged step on the exact supported labels instead.
+    expect(jobHeader).not.toMatch(/^\s+if:/m);
+    expect(
+      privilegedSteps.match(/github\.event\.label\.name == 'big-pr'/g)
+    ).toHaveLength(2);
+    expect(
+      privilegedSteps.match(/github\.event\.label\.name == 'codemod'/g)
+    ).toHaveLength(2);
+    expect(
+      privilegedSteps.match(
+        /github\.event\.label\.name == 'integration-train'/g
+      )
+    ).toHaveLength(4);
+    expect(privilegedSteps.match(/^\s+if:/gm)).toHaveLength(3);
+  });
 });
