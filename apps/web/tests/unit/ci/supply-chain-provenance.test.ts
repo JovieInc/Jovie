@@ -97,8 +97,10 @@ describe('supply chain provenance guardrails', () => {
     expect(deployIndex).toBeGreaterThan(attestIndex);
 
     expect(buildStep).toContain('vercel build');
-    expect(packageStep).toContain('tar -czf /tmp/vercel-build-output.tar.gz');
-    expect(packageStep).toContain('.vercel/output');
+    expect(workflow).toContain(
+      'bash .github/scripts/package-vercel-build-output.sh'
+    );
+    expect(packageStep).toContain('/tmp/vercel-build-output.tar.gz');
     // Assert the action is pinned to a full 40-char commit SHA (the security
     // property this guardrail protects) without hardcoding a specific SHA, so
     // dependabot pin bumps don't deterministically redden the merge gate (#12425).

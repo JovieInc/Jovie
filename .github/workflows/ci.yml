@@ -1044,16 +1044,7 @@ jobs:
             sleep 10
             if [ $i -eq 3 ]; then exit 1; fi
           done
-          # Next/Vercel edge functions keep file-trace references to generated
-          # WASM/font chunks under .next/server/edge. Preserve those 16 MB of
-          # targets with the reusable output so a later runner can deploy the
-          # prebuilt artifact without the full ~384 MB .next archive.
-          test -d apps/web/.next/server/edge
-          tar -czf /tmp/vercel-build-output.tar.gz -C . \
-            .vercel/output \
-            apps/web/.next/server/edge
-          tar -tzf /tmp/vercel-build-output.tar.gz \
-            apps/web/.next/server/edge >/dev/null
+          bash .github/scripts/package-vercel-build-output.sh
           echo "vercel_artifact=true" >> "$GITHUB_OUTPUT"
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
@@ -4686,6 +4677,7 @@ jobs:
             mkdir -p .vercel
             tar -xzf /tmp/vercel-build-output.tar.gz -C .
             if [ -d .vercel/output ]; then
+              node .github/scripts/vercel-artifact-closure.mjs verify
               echo "restored=true" >> "$GITHUB_OUTPUT"
               echo "Restored .vercel/output from ci-build-public artifact (JOV-4087)"
             else

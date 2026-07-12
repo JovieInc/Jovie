@@ -134,6 +134,15 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(deployScript).toContain('"${VERCEL_SCOPE_ARGS[@]}"');
   });
 
+  it('fails before upload when the restored Vercel artifact closure is incomplete', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const restoreStep = getStepBlock(
+      workflow,
+      'Restore vercel build output from artifact'
+    );
+    expect(restoreStep).toContain('vercel-artifact-closure.mjs verify');
+  });
+
   it('passes signup readiness keys into the staging preview runtime', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const deployStep = getStepBlock(
