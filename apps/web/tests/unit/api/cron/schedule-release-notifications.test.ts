@@ -1,11 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockDbSelect, mockGetBatchCreatorEntitlements, mockLoggerWarn } =
-  vi.hoisted(() => ({
-    mockDbSelect: vi.fn(),
-    mockGetBatchCreatorEntitlements: vi.fn(),
-    mockLoggerWarn: vi.fn(),
-  }));
+const {
+  mockDbSelect,
+  mockGetBatchCreatorEntitlements,
+  mockLoggerInfo,
+  mockLoggerWarn,
+} = vi.hoisted(() => ({
+  mockDbSelect: vi.fn(),
+  mockGetBatchCreatorEntitlements: vi.fn(),
+  mockLoggerInfo: vi.fn(),
+  mockLoggerWarn: vi.fn(),
+}));
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -58,7 +63,7 @@ vi.mock('@/lib/error-tracking', () => ({
 
 vi.mock('@/lib/utils/logger', () => ({
   logger: {
-    info: vi.fn(),
+    info: mockLoggerInfo,
     warn: mockLoggerWarn,
     error: vi.fn(),
   },
@@ -107,6 +112,32 @@ describe('scheduleReleaseNotifications', () => {
         error: 'temporary entitlements outage',
         creatorCount: 1,
       })
+    );
+  });
+
+  it('short-circuits with a zero-count result when no releases fall in the scheduling window', async () => {
+    // Overrides the shared beforeEach fixture (one release in-window) so the
+    // upcomingReleases query resolves empty instead.
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([]),
+      }),
+    });
+
+    const { scheduleReleaseNotifications } = await import(
+      '@/app/api/cron/schedule-release-notifications/route'
+    );
+
+    const result = await scheduleReleaseNotifications();
+
+    expect(result).toEqual({ scheduled: 0, releasesFound: 0 });
+    // Proves the early return happens before the entitlements lookup and
+    // before any further db.select call — not just that the counts happen
+    // to end up at zero via some other path.
+    expect(mockGetBatchCreatorEntitlements).not.toHaveBeenCalled();
+    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      '[schedule-release-notifications] No upcoming releases found'
     );
   });
 });
