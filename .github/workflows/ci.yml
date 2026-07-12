@@ -3828,9 +3828,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ALLOW_SOURCE_FALLBACK: '1'
-          # The closed staging artifact contains more than Vercel's 15k plain
-          # upload limit. Give the archive path the full prebuilt budget.
-          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'false'
+          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
           # Use main secrets - no Neon dependency for fast deployments
           DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -4833,7 +4831,9 @@ jobs:
             if [ $i -eq 3 ]; then exit 1; fi
           done
         env:
-          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
+          # The closed staging artifact contains more than Vercel's 15k plain
+          # upload limit. Give the archive path the full prebuilt budget.
+          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'false'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
 
