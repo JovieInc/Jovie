@@ -48,6 +48,7 @@ interface ProfileRowOverrides {
   usernameNormalized?: string;
   displayName?: string | null;
   isClaimed?: boolean | null;
+  claimedAt?: Date | null;
   onboardingCompletedAt?: Date | null;
 }
 
@@ -58,6 +59,7 @@ function profileRow(overrides: ProfileRowOverrides = {}) {
     usernameNormalized: 'artistname',
     displayName: 'Old Name',
     isClaimed: false,
+    claimedAt: null,
     onboardingCompletedAt: null,
     ...overrides,
   };
@@ -343,30 +345,51 @@ describe('claimPrebuiltProfileForUser', () => {
     ).toHaveLength(2);
   });
 
-  it.skip(
-    'BUG: re-claiming a profile the user already owns overwrites the original claimedAt with "now" every call. ' +
-      'Expected: creatorProfiles.claimedAt should be preserved from the first claim (mirroring the ' +
-      'onboardingCompletedAt ?? now preservation pattern used two lines below it). ' +
-      'Actual: getClaimTargetProfile does not even select claimedAt, and the update unconditionally sets ' +
-      '`claimedAt: now`, so every idempotent re-run of claimPrebuiltProfileForUser for an already-claimed ' +
-      'profile silently rewrites the audit-significant original claim timestamp.',
+  it(
+    'preserves the original claimedAt when re-claiming a profile the user already owns (idempotent retry), ' +
+      'mirroring the onboardingCompletedAt ?? now preservation pattern used two lines below it',
     async () => {
       const originalClaimedAt = new Date('2024-01-01T00:00:00.000Z');
       const mocks = createTxMock([
         // Same user already owns and has already claimed this exact profile.
-        [profileRow({ userId: 'user-1', isClaimed: true })],
+        [
+          profileRow({
+            userId: 'user-1',
+            isClaimed: true,
+            claimedAt: originalClaimedAt,
+          }),
+        ],
         [],
       ]);
 
       await claimPrebuiltProfileForUser(mocks.tx, baseParams);
 
-      // Expected (desired) behavior — fails today because claimedAt is not
-      // even fetched by getClaimTargetProfile, let alone preserved.
+      // getClaimTargetProfile now selects claimedAt, and the update preserves
+      // it via `profile.claimedAt ?? now` instead of unconditionally
+      // overwriting the audit-significant original claim timestamp.
       expect(mocks.updateSetMock.mock.calls[1]?.[0]).toMatchObject({
         claimedAt: originalClaimedAt,
       });
+      // The tx mock is projection-blind (limitMock returns the full fixture
+      // regardless of selected columns), so also pin that the select actually
+      // requests claimedAt — without this, dropping the select line would be
+      // caught only by typecheck, not by this suite.
+      expect(mocks.selectMock.mock.calls[0]?.[0]).toHaveProperty('claimedAt');
     }
   );
+
+  it('sets claimedAt to now on a first-time claim (profile.claimedAt is null)', async () => {
+    const mocks = createTxMock([
+      [profileRow({ onboardingCompletedAt: null })],
+      [],
+    ]);
+
+    await claimPrebuiltProfileForUser(mocks.tx, baseParams);
+
+    expect(mocks.updateSetMock.mock.calls[1]?.[0]).toMatchObject({
+      claimedAt: FIXED_NOW,
+    });
+  });
 });
 
 describe('reservePrebuiltProfileForUser', () => {
