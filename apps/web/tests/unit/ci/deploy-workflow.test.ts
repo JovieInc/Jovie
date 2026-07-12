@@ -668,16 +668,16 @@ describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
     );
   });
 
-  it('recognizes lighthouse and smoke ephemeral branch name patterns', () => {
+  it('recognizes only exact creator prefixes for ephemeral branches', () => {
     const cleanupAction = readFileSync(
       resolve(repoRoot, '.github/actions/neon-branch-cleanup/action.yml'),
       'utf8'
     );
 
-    expect(cleanupAction).toContain(
-      'dashboard|onboarding|admin|chat)-lighthouse-'
-    );
+    expect(cleanupAction).toContain('dashboard-lighthouse-[0-9]+-[0-9]+');
     expect(cleanupAction).toContain('admin-smoke-[0-9]+-[0-9]+');
+    expect(cleanupAction).toContain('ci-neon-run-[0-9]+-[0-9]+');
+    expect(cleanupAction).not.toContain('[a-z0-9._-]+-[0-9]+-[0-9]+)$');
   });
 });
 

@@ -31,9 +31,12 @@ if [ -n "${EXPIRES_AT:-}" ]; then
 fi
 
 set +e
-CREATE_JSON="$(npx neonctl "${args[@]}" 2>&1)"
+CREATE_STDERR="$(mktemp)"
+trap 'rm -f "$CREATE_STDERR"' EXIT
+CREATE_JSON="$(npx --yes neonctl "${args[@]}" 2>"$CREATE_STDERR")"
 CREATE_EXIT=$?
 set -e
+CREATE_ERROR="$(cat "$CREATE_STDERR")"
 
 BRANCH_ID=""
 RESOLVED_BRANCH_NAME=""
@@ -42,10 +45,10 @@ if [ "$CREATE_EXIT" -eq 0 ]; then
   BRANCH_ID="$(echo "$CREATE_JSON" | jq -r '.branch.id // empty')"
   RESOLVED_BRANCH_NAME="$(echo "$CREATE_JSON" | jq -r '.branch.name // empty')"
 else
-  if echo "$CREATE_JSON" | grep -q 'branch already exists'; then
+  if printf '%s\n%s' "$CREATE_JSON" "$CREATE_ERROR" | grep -q 'branch already exists'; then
     echo "Reusing existing Neon branch: $BRANCH_NAME"
     RESOLVED_BRANCH_NAME="$BRANCH_NAME"
-    BRANCHES_JSON="$(npx neonctl branches list \
+    BRANCHES_JSON="$(npx --yes neonctl branches list \
       --project-id "$NEON_PROJECT_ID" \
       --api-key "$NEON_API_KEY" \
       --output json \
@@ -61,7 +64,7 @@ else
       | .id
     ' | head -1)"
   else
-    echo "$CREATE_JSON"
+    printf '%s\n%s\n' "$CREATE_JSON" "$CREATE_ERROR"
     exit 1
   fi
 fi
@@ -76,7 +79,7 @@ if [ -z "$BRANCH_ID" ]; then
   echo "Warning: branch_id unavailable for $RESOLVED_BRANCH_NAME; continuing with connection strings."
 fi
 
-DB_URL="$(npx neonctl connection-string "$RESOLVED_BRANCH_NAME" \
+DB_URL="$(npx --yes neonctl connection-string "$RESOLVED_BRANCH_NAME" \
   --project-id "$NEON_PROJECT_ID" \
   --api-key "$NEON_API_KEY" \
   --role-name "$ROLE_NAME" \
@@ -84,7 +87,7 @@ DB_URL="$(npx neonctl connection-string "$RESOLVED_BRANCH_NAME" \
   --no-analytics \
   --no-color | tr -d '\n')"
 
-DB_URL_POOLED="$(npx neonctl connection-string "$RESOLVED_BRANCH_NAME" \
+DB_URL_POOLED="$(npx --yes neonctl connection-string "$RESOLVED_BRANCH_NAME" \
   --project-id "$NEON_PROJECT_ID" \
   --api-key "$NEON_API_KEY" \
   --role-name "$ROLE_NAME" \

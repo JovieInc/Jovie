@@ -649,30 +649,16 @@ jobs:
           protected_branches: 'main,development,preview,br-main,br-production'
           cleanup_threshold: '7'
 
-      - name: Determine sanitized branch name
+      - name: Determine owned ephemeral branch name
         id: sanitize-branch
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
         env:
-          RAW_REF: ${{ github.head_ref || github.ref_name }}
-          EVENT_NAME: ${{ github.event_name }}
-          REF_NAME: ${{ github.ref_name }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          RAW="$RAW_REF"
-
-          # Avoid collisions with protected long-lived branches in Neon.
-          # For push to main we reuse the long-lived Neon branch.
-          if [[ "$EVENT_NAME" == "push" && "$REF_NAME" == "main" ]]; then
-            RAW="$REF_NAME"
-          fi
-
-          # sanitize: lowercase, replace slashes with dashes, remove invalid chars, collapse repeats
-          SANITIZED=$(printf '%s' "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          BASE=$(printf '%s' "$SANITIZED" | cut -c1-40)
           SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"
-          FINAL="${BASE}-${SUFFIX}"
-          echo "Using sanitized branch name: $FINAL"
+          FINAL="ci-neon-run-${SUFFIX}"
+          echo "Using owned ephemeral branch name: $FINAL"
           echo "name=$FINAL" >> "$GITHUB_OUTPUT"
       - name: Create or reuse Neon branch (with retry)
         id: create-branch
