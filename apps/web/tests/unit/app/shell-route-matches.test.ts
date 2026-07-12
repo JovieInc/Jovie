@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isAdminShellRoute,
   isAudienceShellRoute,
   isCalendarShellRoute,
   isChatShellRoute,
@@ -8,6 +9,7 @@ import {
   isLyricsShellRoute,
   isPresenceShellRoute,
   isReleasesShellRoute,
+  isSettingsShellRoute,
   isTasksShellRoute,
   isThreadsShellRoute,
   resolveAppShellRequestPath,
@@ -191,6 +193,30 @@ describe('isCalendarShellRoute', () => {
     expect(isCalendarShellRoute(`${APP_ROUTES.CALENDAR}/week/2026-05-15`)).toBe(
       true
     );
+  });
+});
+
+describe('isSettingsShellRoute', () => {
+  it('matches the settings root and nested settings subroutes', () => {
+    expect(isSettingsShellRoute(APP_ROUTES.SETTINGS)).toBe(true);
+    expect(isSettingsShellRoute(APP_ROUTES.SETTINGS_ACCOUNT)).toBe(true);
+  });
+
+  it('returns false for non-settings routes', () => {
+    expect(isSettingsShellRoute(APP_ROUTES.AUDIENCE)).toBe(false);
+    expect(isSettingsShellRoute(null)).toBe(false);
+  });
+});
+
+describe('isAdminShellRoute', () => {
+  it('matches the admin root and nested admin subroutes', () => {
+    expect(isAdminShellRoute(APP_ROUTES.ADMIN)).toBe(true);
+    expect(isAdminShellRoute(`${APP_ROUTES.ADMIN}/activity`)).toBe(true);
+  });
+
+  it('returns false for non-admin routes', () => {
+    expect(isAdminShellRoute(APP_ROUTES.SETTINGS)).toBe(false);
+    expect(isAdminShellRoute(null)).toBe(false);
   });
 });
 

@@ -55,21 +55,12 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
   const visible = expanded ? sorted : sorted.slice(0, MAX_VISIBLE);
   const hiddenCount = sorted.length - MAX_VISIBLE;
 
+  // Zero matches is the common resolution for this query, so a skeleton
+  // that renders during `isLoading` and then collapses to `null` produces a
+  // visible flash-then-shift for most users (#13821). Stay collapsed while
+  // loading and only occupy space once we know there is something to show.
   if (isLoading) {
-    return (
-      <div className='mt-3 space-y-1.5'>
-        <SectionHeading count={0} />
-        {[1, 2, 3].map(i => (
-          <div
-            key={i}
-            className='flex items-center gap-2.5 rounded-md px-2 py-1'
-          >
-            <div className='h-4 w-4 rounded skeleton' />
-            <div className='h-3.5 flex-1 rounded skeleton' />
-          </div>
-        ))}
-      </div>
-    );
+    return null;
   }
 
   if (error) {
