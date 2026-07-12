@@ -14,10 +14,17 @@ import { main, syncSkillsCatalog } from './sync-skills-catalog';
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockInsert, mockOnConflictDoUpdate, mockValues } = vi.hoisted(() => {
+const {
+  mockInsert,
+  mockOnConflictDoUpdate,
+  mockOnConflictDoNothing,
+  mockValues,
+} = vi.hoisted(() => {
   const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+  const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
   const values = vi.fn().mockReturnValue({
     onConflictDoUpdate,
+    onConflictDoNothing,
   });
   const insert = vi.fn().mockReturnValue({
     values,
@@ -26,6 +33,7 @@ const { mockInsert, mockOnConflictDoUpdate, mockValues } = vi.hoisted(() => {
   return {
     mockInsert: insert,
     mockOnConflictDoUpdate: onConflictDoUpdate,
+    mockOnConflictDoNothing: onConflictDoNothing,
     mockValues: values,
   };
 });
@@ -105,14 +113,40 @@ describe('sync-skills-catalog', () => {
           id: 'retouch',
           kind: 'vertical_agent',
           entitlementRequired: 'canAccessAiRetouching',
+          lifecycle: 'ga',
+          activeVersion: '1.0.0',
+          version: '1.0.0',
         }),
       ])
     );
     expect(mockOnConflictDoUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         setWhere: expect.anything(),
+        set: expect.objectContaining({
+          lifecycle: expect.anything(),
+          activeVersion: expect.anything(),
+        }),
       })
     );
+  });
+
+  it('writes version history rows with onConflictDoNothing semantics', async () => {
+    await syncSkillsCatalog(mockDb);
+
+    // non-tool skills catalog insert + versions insert + tools insert
+    expect(mockInsert.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const versionRowsCall = mockValues.mock.calls.find(([rows]) => {
+      return (
+        Array.isArray(rows) &&
+        rows.some(
+          row =>
+            (row as { skillId?: string }).skillId === 'retouch' &&
+            (row as { version?: string }).version === '1.0.0'
+        )
+      );
+    });
+    expect(versionRowsCall).toBeDefined();
+    expect(mockOnConflictDoNothing).toHaveBeenCalled();
   });
 
   it('upserts tool schema paths with conflict guards', async () => {
@@ -153,7 +187,9 @@ describe('sync-skills-catalog', () => {
         }),
       ])
     );
-    expect(mockOnConflictDoUpdate.mock.calls[toolCallIndex]?.[0]).toEqual(
+    // Version history insert uses onConflictDoNothing, so values-call index
+    // no longer lines up with onConflictDoUpdate calls — match by payload.
+    expect(mockOnConflictDoUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         set: expect.objectContaining({
           inputSchemaZodPath: expect.anything(),

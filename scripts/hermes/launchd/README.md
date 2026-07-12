@@ -26,6 +26,7 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 | `co.jovie.hermes.cron-daily-briefing.plist.template` | 07:00 daily | Morning briefing to Telegram |
 | `co.jovie.hermes.cron-deterministic-tracker.plist.template` | 03:00 daily | Self-improvement clustering |
 | `co.jovie.hermes.cron-free-model-health.plist.template` | 02:00 daily | Free-model rankings refresh |
+| `co.jovie.hermes.cron-gstack-upgrade.plist.template` | 03:30 daily | Out-of-band gstack upgrade (backup/restore); agent runs stay pinned (JOV-4184) |
 
 ## Houston (MacBook Pro) units
 

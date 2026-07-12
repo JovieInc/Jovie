@@ -334,7 +334,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
         {canonicalSections.length > 0 ? (
           <ContentSurfaceCard as='section' className='overflow-hidden'>
             <div className='border-b border-subtle px-4 py-3'>
-              <h2 className='text-app font-semibold tracking-[-0.01em] text-primary-token'>
+              <h2 className='text-app font-semibold tracking-tight text-primary-token'>
                 Canonical Surfaces
               </h2>
               <p className='mt-1 text-xs text-secondary-token'>
@@ -351,7 +351,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   <div className='border-b border-subtle px-4 py-3'>
                     <div className='flex items-start justify-between gap-3'>
                       <div className='min-w-0'>
-                        <h3 className='text-app font-semibold tracking-[-0.01em] text-primary-token'>
+                        <h3 className='text-app font-semibold tracking-tight text-primary-token'>
                           {surface.label}
                         </h3>
                         <p className='mt-1 text-xs text-secondary-token'>
@@ -381,7 +381,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
         {otherGroups.size > 0 ? (
           <ContentSurfaceCard as='section' className='overflow-hidden'>
             <div className='border-b border-subtle px-4 py-3'>
-              <h2 className='text-app font-semibold tracking-[-0.01em] text-primary-token'>
+              <h2 className='text-app font-semibold tracking-tight text-primary-token'>
                 Other Captures
               </h2>
               <p className='mt-1 text-xs text-secondary-token'>
@@ -397,7 +397,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   className='overflow-hidden bg-surface-0'
                 >
                   <div className='flex items-center justify-between gap-3 border-b border-subtle px-4 py-3'>
-                    <h3 className='truncate text-app font-semibold tracking-[-0.01em] text-primary-token'>
+                    <h3 className='truncate text-app font-semibold tracking-tight text-primary-token'>
                       {sourceLabel}
                     </h3>
                     <span className='shrink-0 text-xs text-secondary-token'>
@@ -442,7 +442,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                 )
               }
               disabled={selectedIndex === 0}
-              aria-label='Previous screenshot'
+              aria-label='Previous Screenshot'
             >
               <ChevronLeft className='size-4' />
             </DrawerButton>
@@ -461,7 +461,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                 )
               }
               disabled={selectedIndex === filteredScreenshotsCount - 1}
-              aria-label='Next screenshot'
+              aria-label='Next Screenshot'
             >
               <ChevronRight className='size-4' />
             </DrawerButton>

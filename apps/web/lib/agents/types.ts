@@ -7,9 +7,12 @@
  */
 
 import type { BooleanEntitlement } from '@/lib/entitlements/registry';
+import type { SkillLifecycle } from './lifecycle';
 
 // Matches the skillKindEnum values in enums.ts
 export type SkillKind = 'vertical_agent' | 'tool' | 'style';
+
+export type { SkillLifecycle };
 
 /**
  * A skill definition as it exists in code.
@@ -26,6 +29,16 @@ export interface SkillDefinition {
   readonly kind: SkillKind;
   /** Semver string — stored on retouch_jobs.style_version for correlating prompt revisions. */
   readonly version: string;
+  /**
+   * Lifecycle stage for staged rollout (JOV-3944).
+   * Defaults to `ga` for registry skills; compiled playbooks start as `draft`.
+   */
+  readonly lifecycle?: SkillLifecycle;
+  /**
+   * Version pointer served at invocation time. Rollback = flip this field
+   * without deleting historical version rows.
+   */
+  readonly activeVersion?: string;
   /** Entitlement key that gates access. */
   readonly entitlement: BooleanEntitlement;
   /** Model identifier used for inference (e.g. 'google/gemini-2.5-flash-image'). */

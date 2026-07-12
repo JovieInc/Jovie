@@ -337,6 +337,7 @@ describe('limiters.ts', () => {
         'trackingIpClicks',
         'trackingIpVisits',
         'publicProfile',
+        'claimTokenAccess',
         'publicClick',
         'publicVisit',
         'health',

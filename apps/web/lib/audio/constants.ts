@@ -23,6 +23,16 @@ export const SUPPORTED_AUDIO_MIME_TYPES_SET = new Set<string>(
 
 export const AUDIO_FILE_ACCEPT = SUPPORTED_AUDIO_MIME_TYPES.join(',');
 
+/** Human labels for supported container formats (UI copy). */
+export const SUPPORTED_AUDIO_FORMAT_LABELS = [
+  'MP3',
+  'WAV',
+  'FLAC',
+  'AIFF',
+  'AAC',
+  'M4A',
+] as const;
+
 /** @deprecated Prefer AUDIO_FILE_ACCEPT */
 export const AUDIO_ACCEPT = AUDIO_FILE_ACCEPT;
 
@@ -30,6 +40,31 @@ export const AUDIO_ACCEPT = AUDIO_FILE_ACCEPT;
 export const ALLOWED_AUDIO_MIME_TYPES = SUPPORTED_AUDIO_MIME_TYPES_SET;
 
 const AUDIO_EXTENSION_PATTERN = /\.(aac|aiff?|flac|m4a|mp3|wav)$/i;
+
+/** Named-rule codes for rejected audio uploads (JOV-3688). */
+export type AudioUploadRuleCode =
+  | 'audio.supported_types'
+  | 'audio.max_file_size_bytes';
+
+export type AudioUploadCtaAction = 'pick_another' | 'request_type' | 'compress';
+
+export interface AudioUploadRejection {
+  readonly ok: false;
+  /** Stable machine id for telemetry + tests */
+  readonly code: AudioUploadRuleCode;
+  /** Named rule shown inline (plain language) */
+  readonly rule: string;
+  /** Full user-facing sentence */
+  readonly message: string;
+  readonly cta: {
+    readonly label: string;
+    readonly action: AudioUploadCtaAction;
+  };
+}
+
+export type AudioUploadValidationResult =
+  | { readonly ok: true }
+  | AudioUploadRejection;
 
 export function isSupportedAudioFile(
   file: Pick<File, 'name' | 'type'>
@@ -41,19 +76,63 @@ export function isSupportedAudioFile(
   return AUDIO_EXTENSION_PATTERN.test(file.name);
 }
 
+function formatMaxSizeMb(maxSizeBytes: number): number {
+  return Math.round(maxSizeBytes / (1024 * 1024));
+}
+
+function describeRejectedType(file: Pick<File, 'name' | 'type'>): string {
+  if (file.type && file.type.length > 0) {
+    return file.type;
+  }
+  const match = file.name.match(/\.([^.]+)$/);
+  return match?.[1] ? `.${match[1].toLowerCase()}` : 'unknown type';
+}
+
+/** Structured upload validation with named failing rule + CTA (JOV-3688). */
+export function validateAudioUpload(
+  file: Pick<File, 'name' | 'type' | 'size'>,
+  maxSizeBytes = AUDIO_MAX_FILE_SIZE_BYTES
+): AudioUploadValidationResult {
+  if (!isSupportedAudioFile(file)) {
+    const rejected = describeRejectedType(file);
+    const formats = SUPPORTED_AUDIO_FORMAT_LABELS.join(', ');
+    return {
+      ok: false,
+      code: 'audio.supported_types',
+      rule: `Supported types: ${formats}`,
+      message: `${rejected} is not supported. Use ${formats}.`,
+      cta: {
+        label: 'Choose another file',
+        action: 'pick_another',
+      },
+    };
+  }
+
+  if (file.size > maxSizeBytes) {
+    const maxMb = formatMaxSizeMb(maxSizeBytes);
+    const fileMb = (file.size / (1024 * 1024)).toFixed(1);
+    return {
+      ok: false,
+      code: 'audio.max_file_size_bytes',
+      rule: `Max file size: ${maxMb} MB`,
+      message: `This file is ${fileMb} MB. Audio must be ${maxMb} MB or smaller.`,
+      cta: {
+        label: 'Choose a smaller file',
+        action: 'compress',
+      },
+    };
+  }
+
+  return { ok: true };
+}
+
+/** Legacy string validator; prefer `validateAudioUpload` for UI. */
 export function validateAudioFile(
   file: Pick<File, 'name' | 'type' | 'size'>,
   maxSizeBytes = AUDIO_MAX_FILE_SIZE_BYTES
 ): string | null {
-  if (!isSupportedAudioFile(file)) {
-    return 'Use MP3, WAV, FLAC, AIFF, AAC, or M4A audio.';
-  }
-
-  if (file.size > maxSizeBytes) {
-    return 'Audio must be 150 MB or smaller.';
-  }
-
-  return null;
+  const result = validateAudioUpload(file, maxSizeBytes);
+  return result.ok ? null : result.message;
 }
 
 export function parseAudioTitleFromFileName(fileName: string): string {

@@ -83,6 +83,7 @@ export {
   checkTrackingRateLimit,
   checkVerificationRequestRateLimit,
   checkWrapLinkRateLimit,
+  claimTokenAccessLimiter,
   dashboardLinksLimiter,
   deployPromoteLimiter,
   dspDiscoveryLimiter,

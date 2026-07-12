@@ -107,6 +107,16 @@ function collectWorktree() {
   });
 }
 
+// Ownership lookup budget (JOV-4185): p95 target < 5s, hard ceiling 10s.
+// A semantic/hybrid query must NEVER hang the run — every step is capped and
+// the whole gate auto-falls-back when the budget is spent.
+const OWNERSHIP_BUDGET_MS = Math.max(
+  1_000,
+  Number(process.env.AGENT_PREFLIGHT_OWNERSHIP_BUDGET_MS) || 10_000
+);
+const OWNERSHIP_LEDGER_PAGE =
+  process.env.AGENT_PREFLIGHT_LEDGER_PAGE || 'agent-job-ledger';
+
 function collectOwnership(task) {
   const start = nowMs();
   const gbrain = which('gbrain');
@@ -121,34 +131,46 @@ function collectOwnership(task) {
     });
   }
 
-  // Cap wait — bootstrap must stay cheap.
-  const timeout = 5_000;
-  let out = '';
-  if (task) {
-    const r = run(
-      gbrain,
-      ['query', `agent ownership and current priorities for: ${task}`],
-      { timeout }
-    );
-    out = r.stdout;
-  } else {
-    let r = run(gbrain, ['get', 'agent-org-chart'], { timeout });
-    out = r.stdout;
-    if (!out.trim()) {
-      r = run(gbrain, ['query', 'agent org chart ownership coordination'], {
-        timeout,
-      });
-      out = r.stdout;
-    }
-  }
+  const deadline = start + OWNERSHIP_BUDGET_MS;
+  const remaining = () => Math.max(0, deadline - nowMs());
+  const finish = (out, source, timedOut = false) =>
+    evaluateOwnership({
+      gbrainOnPath: true,
+      gbrainOutput: out,
+      source,
+      timedOut,
+      requireGbrain,
+      task,
+      ms: nowMs() - start,
+    });
 
-  return evaluateOwnership({
-    gbrainOnPath: true,
-    gbrainOutput: out,
-    requireGbrain,
-    task,
-    ms: nowMs() - start,
-  });
+  let timedOut = false;
+  const step = (args, cap) => {
+    const budget = Math.min(cap, remaining());
+    if (budget <= 0) return '';
+    const r = run(gbrain, args, { timeout: budget });
+    if (r.error) timedOut = true;
+    return (r.stdout || '').trim();
+  };
+
+  // 1. FAST PATH — the agent-job-ledger page is the canonical ownership
+  //    surface: one deterministic read, no ranking, no embedding.
+  const ledger = step(['get', OWNERSHIP_LEDGER_PAGE], 3_000);
+  if (ledger) return finish(ledger, 'ledger');
+
+  // 2. Keyword index — deterministic search over current claims/priorities.
+  const queryText = task
+    ? `agent ownership current claims priorities: ${task}`
+    : 'agent org chart ownership coordination';
+  const keyword = step(['search', queryText, '--limit', '5'], 5_000);
+  if (keyword) return finish(keyword, 'keyword');
+
+  // 3. Semantic/hybrid query — ONLY when keyword came back empty, and only
+  //    inside whatever budget is left (never past the 10s hard ceiling).
+  const semantic = step(['query', queryText], remaining());
+  if (semantic) return finish(semantic, 'semantic');
+
+  return finish('', null, timedOut);
 }
 
 function findGstackBin(repoRoot) {
@@ -190,6 +212,9 @@ function collectGstack(repoRoot) {
     }
   }
 
+  // Upgrade policy is PINNED by default (JOV-4184): runs consume the installed
+  // version as-is; upgrades happen out-of-band (nightly Hermes cron), never
+  // mid-run. The config read only surfaces an explicit override.
   let policy = null;
   const pol = run(join(binPath, 'gstack-config'), ['get', 'upgrade_policy'], {
     timeout: 3000,
@@ -206,17 +231,23 @@ function collectGstack(repoRoot) {
       policy = pol2.stdout.trim();
     }
   }
+  if (!policy) policy = 'pinned';
 
+  // Read-only freshness peek: parse the cached update-check state file written
+  // by the out-of-band checker. Never invoke `gstack-update-check` in-run — it
+  // hits the network and performs one-time migrations (mutations), which are
+  // exactly the per-run upgrade tax JOV-4184 removes from the job hot path.
   let latest = null;
-  const check = join(binPath, 'gstack-update-check');
-  if (existsSync(check)) {
-    const upd = run(check, [], { timeout: 5000 });
-    const line = (upd.stdout || '').trim();
-    if (
-      line.startsWith('UPGRADE_AVAILABLE') ||
-      line.startsWith('JUST_UPGRADED')
-    ) {
-      latest = line.split(/\s+/)[2] || null;
+  const stateDir = process.env.GSTACK_STATE_DIR || join(homedir(), '.gstack');
+  const cacheFile = join(stateDir, 'last-update-check');
+  if (existsSync(cacheFile)) {
+    try {
+      const line = readFileSync(cacheFile, 'utf8').trim();
+      if (line.startsWith('UPGRADE_AVAILABLE')) {
+        latest = line.split(/\s+/)[2] || null;
+      }
+    } catch {
+      latest = null;
     }
   }
 

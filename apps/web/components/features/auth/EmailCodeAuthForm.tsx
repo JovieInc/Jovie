@@ -66,13 +66,21 @@ const VERIFY_ERROR_COPY: Record<string, string> = {
   otp_expired: 'That code has expired. Send a new one and try again.',
   max_attempts_reached:
     'Too many incorrect attempts. Request a new code to try again.',
+  too_many_attempts:
+    'Too many incorrect attempts. Request a new code to try again.',
   rate_limit_exceeded: 'Too many attempts. Please wait a moment and try again.',
 };
 
 function readErrorCode(error: unknown): string | undefined {
   if (!error || typeof error !== 'object') return undefined;
-  const candidate = error as { code?: unknown; message?: unknown };
-  if (typeof candidate.code === 'string') return candidate.code;
+  const candidate = error as {
+    code?: unknown;
+    message?: unknown;
+    status?: unknown;
+  };
+  // Better Auth rate-limit rejections are bare 429s with no error code.
+  if (candidate.status === 429) return 'rate_limit_exceeded';
+  if (typeof candidate.code === 'string') return candidate.code.toLowerCase();
   if (typeof candidate.message === 'string') {
     // Better Auth errors sometimes carry the code in `message` as
     // `"code: ..."` — fall through to that.
@@ -95,7 +103,8 @@ function getVerifyErrorMessage(error: unknown): string {
 }
 
 function isMaxAttemptsError(error: unknown): boolean {
-  return readErrorCode(error) === 'max_attempts_reached';
+  const code = readErrorCode(error);
+  return code === 'max_attempts_reached' || code === 'too_many_attempts';
 }
 
 // ============================================================================
@@ -176,10 +185,15 @@ export function EmailCodeAuthForm({
       // code via Resend. In E2E test mode (`E2E_TEST_MODE=1`, test-email
       // pattern only) the server returns the deterministic `424242` and
       // nothing is sent.
-      await authClient.emailOtp.sendVerificationOtp({
-        email: trimmedEmail,
-        type: 'sign-in',
-      });
+      // Better Auth client calls resolve with `{ data, error }` instead of
+      // throwing — an unchecked error here silently advances to the code
+      // step with no OTP in flight.
+      const { error: sendError } =
+        await authClient.emailOtp.sendVerificationOtp({
+          email: trimmedEmail,
+          type: 'sign-in',
+        });
+      if (sendError) throw sendError;
 
       setCode('');
       setStep('code');
@@ -218,10 +232,14 @@ export function EmailCodeAuthForm({
         // the session. Auto-creates the user if not existing (plan design
         // row 17 — waitlist gates downstream). On success the session cookie
         // is set and we hard-navigate to `redirectUrl`.
-        await authClient.signIn.emailOtp({
+        // Better Auth client calls resolve with `{ data, error }` instead of
+        // throwing — an unchecked error here navigates away signed-out, so a
+        // wrong or rate-limited code looks like a successful signup.
+        const { error: verifyError } = await authClient.signIn.emailOtp({
           email: emailAddress.trim(),
           otp: submittedCode,
         });
+        if (verifyError) throw verifyError;
 
         globalThis.location?.assign(redirectUrl);
       } catch (error) {
@@ -286,7 +304,12 @@ export function EmailCodeAuthForm({
 
   if (step === 'locked') {
     return (
-      <div data-auth-email-code-step='locked' className='flex flex-col gap-3'>
+      <div
+        data-auth-email-code-step='locked'
+        className='flex flex-col gap-3'
+        role='alert'
+        aria-live='assertive'
+      >
         <p className='text-center text-app text-primary-token'>
           Too many incorrect attempts.
         </p>
@@ -314,7 +337,7 @@ export function EmailCodeAuthForm({
       >
         <p className='text-center text-app text-secondary-token'>
           Enter the code sent to{' '}
-          <span className='font-medium text-primary-token'>
+          <span className='break-all font-medium text-primary-token'>
             {emailAddress.trim()}
           </span>
         </p>
@@ -335,16 +358,19 @@ export function EmailCodeAuthForm({
         >
           {isPending ? 'Verifying…' : 'Verify Code'}
         </Button>
-        <div className='flex items-center justify-center gap-3'>
+        <div className='flex flex-wrap items-center justify-center gap-x-3 gap-y-1'>
           <button
             type='button'
             onClick={handleBackToEmail}
-            className='focus-ring-themed rounded-md text-app text-secondary-token underline underline-offset-2'
+            className='focus-ring-themed max-w-full rounded-md text-app text-secondary-token underline underline-offset-2'
           >
             Use a different email
           </button>
           {resendCooldown > 0 ? (
-            <span className='text-app text-tertiary-token' aria-live='polite'>
+            <span
+              className='shrink-0 text-app text-tertiary-token'
+              aria-live='polite'
+            >
               Resend in {resendCooldown}s
             </span>
           ) : (
@@ -352,7 +378,8 @@ export function EmailCodeAuthForm({
               type='button'
               onClick={handleResendCode}
               disabled={isPending}
-              className='focus-ring-themed rounded-md text-app text-secondary-token underline underline-offset-2 disabled:opacity-50'
+              aria-label='Resend verification code'
+              className='focus-ring-themed max-w-full rounded-md text-app text-secondary-token underline underline-offset-2 disabled:opacity-50'
             >
               Resend code
             </button>
@@ -375,12 +402,13 @@ export function EmailCodeAuthForm({
         inputMode='email'
         placeholder='Email address'
         aria-label='Email Address'
+        aria-describedby={errorMessage ? 'auth-email-error' : undefined}
         value={emailAddress}
         error={Boolean(errorMessage)}
         disabled={isPending}
         onChange={event => setEmailAddress(event.target.value)}
       />
-      <FormError message={errorMessage} />
+      <FormError id='auth-email-error' message={errorMessage} />
       <Button
         type='submit'
         className={AUTH_CLASSES.authCta}

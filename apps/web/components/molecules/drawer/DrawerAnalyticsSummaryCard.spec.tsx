@@ -65,7 +65,7 @@ describe('DrawerAnalyticsSummaryCard', () => {
       'true'
     );
     expect(
-      screen.getByRole('status', { name: 'Loading analytics' })
+      screen.getByRole('status', { name: 'Loading Analytics' })
     ).toBeInTheDocument();
   });
 

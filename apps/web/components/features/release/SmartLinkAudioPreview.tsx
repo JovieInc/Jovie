@@ -1,6 +1,6 @@
 'use client';
 
-import { Pause, Play } from 'lucide-react';
+import { Loader2, Pause, Play } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { toast } from '@/components/feedback';
@@ -35,18 +35,21 @@ export function SmartLinkAudioPreview({
   const { playbackState, toggleTrack, seek, onError } = useTrackAudioPlayer();
 
   const isThisTrack = playbackState.activeTrackId === contentId;
+  const isLoading = isThisTrack && playbackState.playbackStatus === 'loading';
   const isPlaying = isThisTrack && playbackState.isPlaying;
   const currentTime = isThisTrack ? playbackState.currentTime : 0;
   const duration = isThisTrack ? playbackState.duration : 0;
+  const canScrub = isThisTrack && duration > 0 && !isLoading;
 
   useEffect(() => {
-    return onError(() => {
+    return onError(reason => {
+      if (reason === 'missing_source') return;
       toast.error('Preview unavailable');
     });
   }, [onError]);
 
   const handleToggle = useCallback(() => {
-    if (!previewUrl) return;
+    if (!previewUrl || isLoading) return;
     toggleTrack({
       id: contentId,
       title,
@@ -56,14 +59,23 @@ export function SmartLinkAudioPreview({
       artistName,
       artworkUrl,
     }).catch(() => {});
-  }, [contentId, title, artistName, artworkUrl, previewUrl, isrc, toggleTrack]);
+  }, [
+    contentId,
+    title,
+    artistName,
+    artworkUrl,
+    previewUrl,
+    isrc,
+    isLoading,
+    toggleTrack,
+  ]);
 
   // Hide entirely when no preview is available
   if (!previewUrl) return null;
 
   const currentTimeFormatted = formatDuration(Math.round(currentTime) * 1000);
   const durationFormatted =
-    duration > 0 ? formatDuration(Math.round(duration) * 1000) : null;
+    duration > 0 ? formatDuration(Math.round(duration) * 1000) : '–:––';
   let fallbackSourceLabel: string | null = null;
   if (previewVerification === 'fallback') {
     const sourceLabels: Record<string, string> = {
@@ -77,43 +89,56 @@ export function SmartLinkAudioPreview({
       (previewSource && sourceLabels[previewSource]) ?? 'Fallback preview';
   }
 
+  let statusLabel = isPlaying ? 'Pause preview' : 'Play preview';
+  if (isLoading) statusLabel = 'Loading preview';
+
   return (
-    <div className='space-y-1.5'>
-      <div className='flex items-center gap-2.5'>
+    <div className='space-y-1.5' data-testid='smart-link-audio-preview'>
+      <div className='flex min-h-10 items-center gap-2.5'>
         <button
           type='button'
           onClick={handleToggle}
-          aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
+          aria-label={statusLabel}
           aria-pressed={isPlaying}
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/90 text-black dark:text-white transition-colors duration-fast hover:bg-white active:bg-white/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70'
+          aria-busy={isLoading || undefined}
+          disabled={isLoading}
+          className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/90 text-black transition-colors duration-fast hover:bg-white active:scale-[var(--scale-press)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 disabled:opacity-70 motion-reduce:active:scale-100'
         >
-          {isPlaying ? (
-            <Pause className='h-3 w-3' />
+          {isLoading ? (
+            <Loader2
+              className='h-3.5 w-3.5 animate-spin motion-reduce:animate-none'
+              aria-hidden='true'
+              strokeWidth={2.25}
+            />
+          ) : isPlaying ? (
+            <Pause className='h-3.5 w-3.5' aria-hidden='true' />
           ) : (
-            <Play className='h-3 w-3 translate-x-px' />
+            <Play className='h-3.5 w-3.5 translate-x-px' aria-hidden='true' />
           )}
         </button>
 
-        <div className='min-w-0 flex-1 space-y-0.5'>
-          <SeekBar
-            currentTime={currentTime}
-            duration={duration}
-            onSeek={seek}
-            disabled={false}
-            className='h-1 w-full'
-          />
-          <div className='flex items-center justify-between text-3xs tabular-nums text-white/35'>
-            <span>{currentTimeFormatted}</span>
-            <span>
+        <div className='min-w-0 flex-1 space-y-1'>
+          <div className='flex h-4 items-center'>
+            <SeekBar
+              currentTime={currentTime}
+              duration={duration}
+              onSeek={seek}
+              disabled={!canScrub}
+              className='h-1.5 w-full'
+            />
+          </div>
+          <div className='flex h-3.5 items-center justify-between text-3xs tabular-nums text-white/35'>
+            <span className='min-w-8'>{currentTimeFormatted}</span>
+            <span className='min-w-12 text-right'>
               {durationFormatted}
               {duration > 0 && duration < 45 ? ' · Preview' : ''}
             </span>
           </div>
         </div>
       </div>
-      {fallbackSourceLabel ? (
-        <p className='text-3xs text-white/45'>{fallbackSourceLabel}</p>
-      ) : null}
+      <p className='min-h-3.5 text-3xs text-white/45'>
+        {fallbackSourceLabel ?? '\u00a0'}
+      </p>
     </div>
   );
 }

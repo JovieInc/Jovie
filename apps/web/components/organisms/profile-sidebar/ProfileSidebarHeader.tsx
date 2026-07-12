@@ -104,7 +104,7 @@ export function useProfileHeaderParts({
   const overflowActions: DrawerHeaderAction[] = [
     {
       id: 'open',
-      label: 'Open profile',
+      label: 'Open Profile',
       icon: ExternalLink,
       onClick: handleOpenProfile,
     },
@@ -116,7 +116,7 @@ export function useProfileHeaderParts({
     },
     {
       id: 'qr',
-      label: 'Download QR code',
+      label: 'Download QR Code',
       icon: QrCode,
       onClick: () => {
         void handleDownloadQRCode();
@@ -127,7 +127,7 @@ export function useProfileHeaderParts({
   if (appleWalletEnabled && supportsAppleWallet) {
     overflowActions.push({
       id: 'apple-wallet-profile-pass',
-      label: 'Add to Apple Wallet',
+      label: 'Add To Apple Wallet',
       icon: Wallet,
       onClick: openAppleWalletProfilePass,
     });
@@ -145,7 +145,7 @@ export function useProfileHeaderParts({
 
   const title: ReactNode = (
     <div className='flex min-w-0 items-center gap-1.5'>
-      <span className='truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
+      <span className='truncate text-xs font-semibold tracking-tight text-primary-token'>
         {primaryLabel}
       </span>
       {secondaryLabel ? (

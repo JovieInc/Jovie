@@ -256,6 +256,20 @@ export const publicProfileLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for the public claim-token entry route (`/claim/[token]`)
+ * Limit: 20 requests per minute per IP. Durable (Redis) so the throttle holds
+ * across serverless instances; callers treat a degraded backend as advisory
+ * (see allowIfRateLimitBackendDegraded) so a Redis outage never blocks a
+ * legitimate creator following their claim link.
+ */
+export const claimTokenAccessLimiter = createRateLimiter(
+  RATE_LIMITERS.claimTokenAccess,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
  * Rate limiter for public click endpoint
  * Limit: 50 requests per minute per IP
  */
@@ -1065,6 +1079,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     trackingIpClicks: trackingIpClicksLimiter,
     trackingIpVisits: trackingIpVisitsLimiter,
     publicProfile: publicProfileLimiter,
+    claimTokenAccess: claimTokenAccessLimiter,
     publicClick: publicClickLimiter,
     publicVisit: publicVisitLimiter,
     health: healthLimiter,
