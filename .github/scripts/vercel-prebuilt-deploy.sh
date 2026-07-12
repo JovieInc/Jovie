@@ -65,7 +65,9 @@ run_deploy() {
   local mode="$1"
   shift
 
-  local timeout_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-45}"
+  # Three bounded prebuilt attempts plus the source fallback must stay within
+  # the workflow step's 10-minute ceiling, including each 15-second kill grace.
+  local timeout_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-35}"
   if [ "$mode" = "source" ]; then
     timeout_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-420}"
   fi
