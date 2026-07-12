@@ -1050,21 +1050,20 @@ jobs:
             sleep 10
             if [ $i -eq 3 ]; then exit 1; fi
           done
-          # Next/Vercel edge functions keep file-trace references to generated
-          # WASM/font chunks under .next/server/edge. Preserve those 16 MB of
-          # targets with the reusable output so a later runner can deploy the
-          # prebuilt artifact without the full ~384 MB .next archive.
-          test -d apps/web/.next/server/edge
+          # Generated function configs reference chunks across the complete
+          # Next server tree, not only edge assets. Preserve that trace root so
+          # the prebuilt upload is closed over every generated server file.
+          test -d apps/web/.next/server/chunks
           rm -rf apps/web/.next/node_modules
           tar -xzf /tmp/vercel-runtime-node-modules.tar.gz -C apps/web/.next
           find apps/web/.next/node_modules -maxdepth 1 -type d \
             -name 'import-in-the-middle-*' -print -quit | grep -q .
           tar -czf /tmp/vercel-build-output.tar.gz -C . \
             .vercel/output \
-            apps/web/.next/server/edge \
+            apps/web/.next/server \
             apps/web/.next/node_modules
           tar -tzf /tmp/vercel-build-output.tar.gz \
-            apps/web/.next/server/edge >/dev/null
+            apps/web/.next/server/chunks >/dev/null
           tar -tzf /tmp/vercel-build-output.tar.gz \
             apps/web/.next/node_modules >/dev/null
           echo "vercel_artifact=true" >> "$GITHUB_OUTPUT"
