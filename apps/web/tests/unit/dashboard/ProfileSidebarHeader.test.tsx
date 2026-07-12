@@ -64,7 +64,7 @@ describe('ProfileSidebarHeader QR download', () => {
       .mockImplementation(() => null as unknown as Window);
 
     render(<HeaderHarness />);
-    await user.click(screen.getByRole('button', { name: 'Download QR code' }));
+    await user.click(screen.getByRole('button', { name: 'Download QR Code' }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -90,7 +90,7 @@ describe('ProfileSidebarHeader QR download', () => {
     );
 
     render(<HeaderHarness />);
-    await user.click(screen.getByRole('button', { name: 'Download QR code' }));
+    await user.click(screen.getByRole('button', { name: 'Download QR Code' }));
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Unable to download QR code');

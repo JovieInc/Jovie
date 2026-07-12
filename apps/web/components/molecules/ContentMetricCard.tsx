@@ -75,7 +75,7 @@ export function ContentMetricCard({
         {subtitle ? (
           <div
             className={cn(
-              'text-xs leading-[16px] text-secondary-token',
+              'text-xs leading-4 text-secondary-token',
               subtitleClassName
             )}
           >
