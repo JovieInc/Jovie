@@ -119,6 +119,20 @@ describe('AppShellFrame', () => {
     expect(screen.getByTestId('app-shell-right-rail')).toBeInTheDocument();
   });
 
+  it('fills sidebar mount height so footer mt-auto can pin Settings (JOV-3960)', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside data-testid='fixture-sidebar'>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+      />
+    );
+
+    const mount = screen.getByTestId('app-shell-sidebar-mount');
+    expect(mount).toHaveClass('h-full', 'min-h-0', 'flex', 'flex-col');
+    expect(mount).toContainElement(screen.getByTestId('fixture-sidebar'));
+  });
+
   it('renders the chat ambient gradient full-bleed behind the header on chat routes', () => {
     render(
       <AppShellFrame
