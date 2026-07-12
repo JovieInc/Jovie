@@ -30,7 +30,9 @@ concurrency:
 jobs:
   review:
     name: Claude Review
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # setup-bun requires archive tooling (including unzip). The heterogeneous
+    # self-hosted fast pool does not guarantee those image prerequisites.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     # Real PRs only: skip drafts, dependabot, and mechanical codemods.
     if: >-

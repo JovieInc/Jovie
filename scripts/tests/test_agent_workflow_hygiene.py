@@ -105,3 +105,11 @@ def test_auto_pr_compares_trigger_branch_without_executing_its_checkout() -> Non
     assert 'git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"' in block
     assert 'git diff --name-only "origin/main...origin/$BRANCH"' in block
     assert "origin/main...HEAD" not in block
+
+
+def test_claude_review_uses_hosted_bun_prerequisites() -> None:
+    """setup-bun must not land on self-hosted images missing unzip."""
+    block = _job_block("claude-review.yml", "review")
+    assert "runs-on: ubuntu-latest" in block
+    assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block
+    assert "uses: oven-sh/setup-bun@" in block
