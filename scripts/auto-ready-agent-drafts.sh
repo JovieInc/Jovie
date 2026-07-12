@@ -17,7 +17,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 
 REPO="${REPO:-JovieInc/Jovie}"
 DRY_RUN="${DRY_RUN:-0}"
-AGENT_RE='^(tim/|codex/|agent/|claude/|linear/|dependabot/)'
 # Idempotency guard (#13342): one marker comment per PR, edited in place, and a
 # hard cap of one flip attempt per PR per ATTEMPT_COOLDOWN_HOURS. Without this,
 # a PR the token cannot actually flip (see #13122) gets an identical
@@ -70,33 +69,28 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
   local base_delay="${GH_RETRY_BASE_DELAY:-2}"
   local max_delay="${GH_RETRY_MAX_DELAY:-30}"
   local attempt=1
-  local out_file err_file err delay
+  local raw_file out_file err_file err delay
+  raw_file="$(mktemp)"
   out_file="$(mktemp)"
   err_file="$(mktemp)"
 
-  # TERMINAL failures only. Same filter as drain-pr-queue.sh.
-  local jq_filter='[
-    .[]
-    | select(
-        ((.bucket // "") | test("^fail$"; "i"))
-        or ((.state // "") | test("^(FAILURE|ERROR|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE)$"; "i"))
-      )
-    | select(((.name // "") | test("advisory|Preview Deploy|Slop Gate|Open PR|Secret Scanning|Verify Draft|E2E Smoke"; "i")) | not)
-    | (.name // .workflow // .description // "unnamed check")
-  ]'
-
   while [[ "$attempt" -le "$attempts" ]]; do
+    : >"$raw_file"
     : >"$out_file"
     : >"$err_file"
-    if gh pr checks "$n" -R "$REPO" --required --json name,bucket,state,workflow,description --jq "$jq_filter" >"$out_file" 2>"$err_file"; then
-      if jq -e 'type == "array"' "$out_file" >/dev/null 2>&1; then
+    if gh pr checks "$n" -R "$REPO" --json name,bucket,state,workflow,description,startedAt,completedAt >"$raw_file" 2>"$err_file"; then
+      if jq -e 'type == "array"' "$raw_file" >/dev/null 2>&1 \
+        && node "$(dirname "${BASH_SOURCE[0]}")/lib/pr-check-failures.mjs" \
+          --classify-auto-ready <"$raw_file" >"$out_file"; then
         cat "$out_file"
-        rm -f "$out_file" "$err_file"
+        rm -f "$raw_file" "$out_file" "$err_file"
         return 0
       fi
-    elif jq -e 'type == "array"' "$out_file" >/dev/null 2>&1; then
+    elif jq -e 'type == "array"' "$raw_file" >/dev/null 2>&1 \
+      && node "$(dirname "${BASH_SOURCE[0]}")/lib/pr-check-failures.mjs" \
+        --classify-auto-ready <"$raw_file" >"$out_file"; then
       cat "$out_file"
-      rm -f "$out_file" "$err_file"
+      rm -f "$raw_file" "$out_file" "$err_file"
       return 0
     fi
 
@@ -104,7 +98,7 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
     if [[ "$attempt" -eq "$attempts" ]] || ! gh_retry_is_transient_error "$err"; then
       [[ -n "$err" ]] && echo "  !! could not read required checks for #$n: $err" >&2
       jq -cn --arg reason "required check status unavailable" '[$reason]'
-      rm -f "$out_file" "$err_file"
+      rm -f "$raw_file" "$out_file" "$err_file"
       return 0
     fi
 
@@ -115,7 +109,7 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
     attempt=$((attempt + 1))
   done
 
-  rm -f "$out_file" "$err_file"
+  rm -f "$raw_file" "$out_file" "$err_file"
   jq -cn --arg reason "required check status unavailable" '[$reason]'
 }
 
@@ -142,7 +136,7 @@ while IFS= read -r pr; do
   if jq -e '
     .draft
     and (.m == "MERGEABLE")
-    and ((.head | test("^(tim/|codex/|agent/|claude/|linear/|dependabot/)")))
+    and ((.head | test("^(tim/|codex/|agent/|claude/|linear/|codegen-bot/)")))
     and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
   ' <<<"$pr" >/dev/null; then
     fail="$(check_failures_for_pr "$n")"
@@ -156,7 +150,7 @@ echo "=== FLIP: draft + agent + mergeable + 0 failing checks → ready ==="
 echo "$SNAP" | jq -c '.[]
   | select(.draft)
   | select(.m == "MERGEABLE")
-  | select((.head | test("^(tim/|codex/|agent/|claude/|linear/|dependabot/)")))
+  | select((.head | test("^(tim/|codex/|agent/|claude/|linear/|codegen-bot/)")))
   | select(.fail | length == 0)
   | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast") | not)' \
   | while read -r pr; do
