@@ -41,9 +41,17 @@ jobs:
           ref: main
           persist-credentials: false
 
+      - name: Mint Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Query runner status
         id: runners
         env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           .github/scripts/query-runner-heartbeat.sh
@@ -51,6 +59,7 @@ jobs:
       - name: Flip to GitHub-hosted fallback if runners are down
         if: steps.runners.outputs.health == 'down'
         env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
           RUNNER_HEALTH: down
         run: |
@@ -59,6 +68,7 @@ jobs:
       - name: Restore self-hosted runners when they come back
         if: steps.runners.outputs.health == 'up'
         env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
           RUNNER_HEALTH: up
         run: |

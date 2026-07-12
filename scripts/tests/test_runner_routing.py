@@ -8,6 +8,7 @@ import subprocess
 import textwrap
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPT = _REPO_ROOT / ".github" / "scripts" / "update-runner-routing.sh"
@@ -126,10 +127,16 @@ def test_opposite_observation_resets_consecutive_count(tmp_path: Path) -> None:
     assert _state(tmp_path)["CI_FAST_RUNNER_HEALTH_STATE"] == "down:1"
 
 
-def _run_heartbeat_query(tmp_path: Path, latest: str) -> tuple[subprocess.CompletedProcess[str], str]:
+def _run_heartbeat_query(
+    tmp_path: Path, latest: str, *, api_error: Optional[str] = None
+) -> tuple[subprocess.CompletedProcess[str], str]:
     fake = tmp_path / "gh"
     fake.write_text(
-        f"#!/usr/bin/env bash\nprintf '%s\\n' '{latest}'\n",
+        (
+            f"#!/usr/bin/env bash\necho '{api_error}' >&2\nexit 1\n"
+            if api_error
+            else f"#!/usr/bin/env bash\nprintf '%s\\n' '{latest}'\n"
+        ),
         encoding="utf-8",
     )
     fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
@@ -151,7 +158,7 @@ def _run_heartbeat_query(tmp_path: Path, latest: str) -> tuple[subprocess.Comple
         capture_output=True,
         check=False,
     )
-    return result, output.read_text(encoding="utf-8")
+    return result, output.read_text(encoding="utf-8") if output.exists() else ""
 
 
 def test_fresh_successful_heartbeat_is_up(tmp_path: Path) -> None:
@@ -189,3 +196,27 @@ def test_queued_heartbeat_is_down_for_routing_debounce(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert "health=down" in output
     assert "status=queued" in output
+
+
+def test_heartbeat_api_auth_failure_is_not_reported_as_runner_down(tmp_path: Path) -> None:
+    result, output = _run_heartbeat_query(
+        tmp_path,
+        "",
+        api_error="HTTP 403: Resource not accessible by integration",
+    )
+
+    assert result.returncode == 3
+    assert "authentication/API failure, not runner health" in result.stderr
+    assert "health=down" not in output
+
+
+def test_health_workflows_use_jovie_bot_token_for_api_calls() -> None:
+    for relative in (
+        ".github/workflows/agent-tick.yml",
+        ".github/workflows/runner-health-monitor.yml",
+    ):
+        workflow = (_REPO_ROOT / relative).read_text(encoding="utf-8")
+        assert "actions/create-github-app-token@" in workflow
+        assert "app-id: ${{ vars.JOVIE_BOT_APP_ID }}" in workflow
+        assert "private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}" in workflow
+        assert "GH_TOKEN: ${{ steps.app-token.outputs.token }}" in workflow

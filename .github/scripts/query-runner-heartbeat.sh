@@ -10,10 +10,17 @@ if ! [[ "$HEARTBEAT_MAX_AGE_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   exit 2
 fi
 
-LATEST=$(gh api \
+api_error="$(mktemp)"
+if ! LATEST=$(gh api \
   "repos/$GH_REPO/actions/workflows/$HEARTBEAT_WORKFLOW/runs?per_page=1" \
   --jq '.workflow_runs[0] | [.status, (.conclusion // ""), .created_at, .html_url] | @tsv' \
-  2>/dev/null || true)
+  2>"$api_error"); then
+  echo "Runner heartbeat query failed; this is an authentication/API failure, not runner health." >&2
+  cat "$api_error" >&2
+  rm -f "$api_error"
+  exit 3
+fi
+rm -f "$api_error"
 
 if [[ -z "$LATEST" || "$LATEST" == "null\t\t\t" ]]; then
   HEALTH=down
