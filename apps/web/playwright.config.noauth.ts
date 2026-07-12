@@ -36,10 +36,9 @@ export default defineConfig({
     baseURL,
     trace: 'on-first-retry',
     video: 'retain-on-failure',
-    // Add custom headers to bypass Clerk in test mode
-    extraHTTPHeaders: {
-      'x-test-mode': 'bypass-auth',
-    },
+    // Public tests must remain anonymous. Authenticated specs mint a persisted
+    // persona session explicitly through setTestAuthBypassSession instead of
+    // applying an identity-bearing header to every page in this config.
   },
   projects: [
     {

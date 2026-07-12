@@ -1,9 +1,41 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildPublicReleaseApprovalSeedRow,
+  buildTourDateSeedRow,
   isMissingPromoDownloadsRelationError,
   isRetryableSeedDatabaseError,
 } from '../../seed-test-data';
+
+const tourDate = {
+  externalId: 'event-1',
+  title: null,
+  venueName: 'Venue',
+  city: 'City',
+  region: null,
+  country: 'USA',
+  provider: 'manual' as const,
+  ticketStatus: 'available' as const,
+  ticketUrl: null,
+  latitude: null,
+  longitude: null,
+  timezone: 'America/Los_Angeles',
+  monthsFromNow: 1,
+  startTime: '8:00 PM',
+};
+
+describe('buildTourDateSeedRow', () => {
+  it('confirms manual events and leaves provider imports pending', () => {
+    expect(buildTourDateSeedRow('profile-123', tourDate)).toMatchObject({
+      confirmationStatus: 'confirmed',
+    });
+    expect(
+      buildTourDateSeedRow('profile-123', {
+        ...tourDate,
+        provider: 'bandsintown',
+      })
+    ).toMatchObject({ confirmationStatus: 'pending' });
+  });
+});
 
 describe('buildPublicReleaseApprovalSeedRow', () => {
   it('marks seeded releases approved so public-profile fixtures stay visible', () => {

@@ -227,8 +227,9 @@ function getFallbackActorFromPersona(
 
 async function findDevTestAuthSession(
   betterAuthUserId: string,
-  requestedPersona: DevTestAuthPersona | null
-): Promise<DevTestAuthSession> {
+  requestedPersona: DevTestAuthPersona | null,
+  allowSyntheticFallback = true
+): Promise<DevTestAuthSession | null> {
   let matchedUser:
     | {
         dbUserId: string;
@@ -259,6 +260,13 @@ async function findDevTestAuthSession(
       .where(eq(users.betterAuthUserId, betterAuthUserId))
       .limit(1);
   } catch (error) {
+    if (!allowSyntheticFallback) {
+      logger.warn('Failed to validate persisted dev test auth actor', {
+        betterAuthUserId,
+        error,
+      });
+      return null;
+    }
     logger.warn('Falling back to synthetic dev test auth actor', {
       betterAuthUserId,
       error,
@@ -270,6 +278,7 @@ async function findDevTestAuthSession(
   }
 
   if (!matchedUser) {
+    if (!allowSyntheticFallback) return null;
     return getFallbackActorFromPersona(
       betterAuthUserId,
       requestedPersona ?? 'creator'
@@ -293,6 +302,26 @@ async function findDevTestAuthSession(
     isAdmin: matchedUser.isAdmin,
     profilePath: username ? `/${username}` : null,
   };
+}
+
+export async function ensureExistingDevTestAuthActor(
+  betterAuthUserId: string,
+  requestedPersona: DevTestAuthPersona | null
+): Promise<DevTestAuthActor | null> {
+  const actor = await findDevTestAuthSession(
+    betterAuthUserId,
+    requestedPersona,
+    false
+  );
+  if (!actor) return null;
+
+  await mintBetterAuthSessionForDevTestActor({
+    dbUserId: actor.dbUserId,
+    betterAuthUserId: actor.clerkUserId,
+    email: actor.email,
+    fullName: actor.fullName,
+  });
+  return actor;
 }
 
 async function ensurePersonaProfile(

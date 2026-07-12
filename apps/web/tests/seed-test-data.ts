@@ -16,6 +16,7 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import {
+  E2E_PREBUILT_CLAIM_SPOTIFY_ID,
   E2E_PREBUILT_CLAIM_TOKEN,
   E2E_PREBUILT_CLAIM_USERNAME,
 } from '@/lib/testing/e2e-prebuilt-claim';
@@ -63,6 +64,7 @@ interface TestProfile {
   displayName: string;
   bio: string;
   spotifyUrl?: string;
+  spotifyId?: string;
   avatarUrl?: string;
 }
 
@@ -294,7 +296,8 @@ const TEST_PROFILES: TestProfile[] = [
     username: 'testartist',
     displayName: 'Test Artist',
     bio: 'Test artist for E2E tipping tests',
-    spotifyUrl: 'https://open.spotify.com/artist/test',
+    spotifyUrl: `https://open.spotify.com/artist/${E2E_PREBUILT_CLAIM_SPOTIFY_ID}`,
+    spotifyId: E2E_PREBUILT_CLAIM_SPOTIFY_ID,
     avatarUrl: DEFAULT_TEST_AVATAR_URL,
   },
 ];
@@ -720,6 +723,30 @@ const TEST_TOUR_DATES: TestTourDate[] = [
   },
 ];
 
+export function buildTourDateSeedRow(
+  profileId: string,
+  td: TestTourDate
+): typeof tourDates.$inferInsert {
+  return {
+    profileId,
+    externalId: td.externalId,
+    title: td.title,
+    venueName: td.venueName,
+    city: td.city,
+    region: td.region,
+    country: td.country,
+    provider: td.provider,
+    confirmationStatus: td.provider === 'manual' ? 'confirmed' : 'pending',
+    ticketStatus: td.ticketStatus,
+    ticketUrl: td.ticketUrl,
+    latitude: td.latitude,
+    longitude: td.longitude,
+    timezone: td.timezone,
+    startDate: dateMonthsFromNow(td.monthsFromNow),
+    startTime: td.startTime,
+  };
+}
+
 /**
  * Seeds tour dates for a creator profile.
  * Idempotent — uses onConflictDoNothing to safely backfill.
@@ -730,23 +757,7 @@ async function seedTourDatesForProfile(
 ) {
   console.log('    Seeding tour dates...');
 
-  const values = TEST_TOUR_DATES.map(td => ({
-    profileId,
-    externalId: td.externalId,
-    title: td.title,
-    venueName: td.venueName,
-    city: td.city,
-    region: td.region,
-    country: td.country,
-    provider: td.provider,
-    ticketStatus: td.ticketStatus,
-    ticketUrl: td.ticketUrl,
-    latitude: td.latitude,
-    longitude: td.longitude,
-    timezone: td.timezone,
-    startDate: dateMonthsFromNow(td.monthsFromNow),
-    startTime: td.startTime,
-  }));
+  const values = TEST_TOUR_DATES.map(td => buildTourDateSeedRow(profileId, td));
 
   try {
     await withSeedOperationTimeout(
@@ -1383,6 +1394,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           displayName: profile.displayName,
           bio: profile.bio,
           spotifyUrl: profile.spotifyUrl || null,
+          spotifyId: profile.spotifyId || null,
           avatarUrl: profile.avatarUrl || null,
           creatorType: 'artist',
           isPublic: true,

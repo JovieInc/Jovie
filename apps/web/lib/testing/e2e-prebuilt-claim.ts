@@ -8,3 +8,4 @@
  */
 export const E2E_PREBUILT_CLAIM_USERNAME = 'testartist';
 export const E2E_PREBUILT_CLAIM_TOKEN = 'e2e-prebuilt-claim-token';
+export const E2E_PREBUILT_CLAIM_SPOTIFY_ID = '3WrFJ7ztbogyGnTHbHJFl2';

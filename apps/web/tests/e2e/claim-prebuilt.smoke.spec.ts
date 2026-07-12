@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  E2E_PREBUILT_CLAIM_SPOTIFY_ID,
   E2E_PREBUILT_CLAIM_TOKEN,
   E2E_PREBUILT_CLAIM_USERNAME,
 } from '@/lib/testing/e2e-prebuilt-claim';
@@ -40,6 +41,7 @@ async function assertPrebuiltClaimFixture(): Promise<boolean> {
       is_claimed: boolean | null;
       user_id: string | null;
       claim_token: string | null;
+      spotify_id: string | null;
       release_count: number | string | null;
     }>
   >`
@@ -47,6 +49,7 @@ async function assertPrebuiltClaimFixture(): Promise<boolean> {
       cp.is_claimed,
       cp.user_id,
       cp.claim_token,
+      cp.spotify_id,
       (
         select count(*)::int
         from discog_releases dr
@@ -61,6 +64,7 @@ async function assertPrebuiltClaimFixture(): Promise<boolean> {
   if (!profile) return false;
   if (profile.is_claimed || profile.user_id) return false;
   if (!profile.claim_token) return false;
+  if (profile.spotify_id !== E2E_PREBUILT_CLAIM_SPOTIFY_ID) return false;
 
   const releaseCount = Number(profile.release_count ?? 0);
   return releaseCount > 0;
