@@ -68,7 +68,28 @@ jobs:
 
           # Exclude generated / lock / snapshot / vendored noise from the count.
           EXCLUDE='pnpm-lock\.yaml|package-lock\.json|yarn\.lock|\.lock$|/generated/|\.gen\.|__snapshots__/|\.snap$|\.svg$|\.po$|/dist/|/build/|\.min\.|drizzle/migrations/meta/'
-          rows=$(gh pr view "$PR" -R "$REPO" --json files -q '.files[] | "\(.additions+.deletions)\t\(.path)"')
+          # The GraphQL-backed `gh pr view --json files` shares an installation
+          # quota with the rest of the fleet and can fail before counting a
+          # two-file PR. Use the paginated REST endpoint and retry only
+          # transient quota/server failures; every other error fails closed.
+          api_error="$RUNNER_TEMP/pr-size-guard-api.err"
+          rows=''
+          for attempt in 1 2 3; do
+            if rows=$(gh api --paginate \
+              "repos/$REPO/pulls/$PR/files?per_page=100" \
+              --jq '.[] | "\(.additions+.deletions)\t\(.filename)"' \
+              2>"$api_error"); then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]] || ! grep -qiE \
+              'rate limit|HTTP 403|HTTP 429|HTTP 5[0-9][0-9]' "$api_error"; then
+              cat "$api_error" >&2
+              exit 1
+            fi
+            delay=$((attempt * 5))
+            echo "Transient GitHub REST failure (attempt $attempt/3); retrying in ${delay}s"
+            sleep "$delay"
+          done
           counted=$(printf '%s\n' "$rows" | grep -vE "$EXCLUDE" || true)
           lines=$(printf '%s\n' "$counted" | awk -F'\t' '{s+=$1} END{print s+0}')
           files=$(printf '%s\n' "$counted" | grep -c . || true)
