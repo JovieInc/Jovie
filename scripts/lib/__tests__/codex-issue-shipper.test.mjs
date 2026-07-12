@@ -872,6 +872,26 @@ describe('contaminated PR containment', () => {
     reason: 'Issue scope contamination',
   };
 
+  it('verifies a successful close before reporting containment', () => {
+    const calls = [];
+    const result = containContaminatedPr(args => {
+      calls.push(args);
+      if (args[2] === 'view')
+        return JSON.stringify({
+          state: 'CLOSED',
+          isDraft: false,
+          labels: [],
+          autoMergeRequest: null,
+        });
+      return '';
+    }, input);
+    expect(result).toEqual({ containedBy: 'closed' });
+    expect(calls.map(args => `${args[1]} ${args[2]}`)).toEqual([
+      'pr close',
+      'pr view',
+    ]);
+  });
+
   it('drafts and removes every merge path when closing fails', () => {
     const calls = [];
     const result = containContaminatedPr(args => {
@@ -879,6 +899,7 @@ describe('contaminated PR containment', () => {
       if (args[2] === 'close') throw new Error('close failed');
       if (args[2] === 'view')
         return JSON.stringify({
+          state: 'OPEN',
           isDraft: true,
           labels: [],
           autoMergeRequest: null,
@@ -888,6 +909,7 @@ describe('contaminated PR containment', () => {
     expect(result).toEqual({ containedBy: 'drafted' });
     expect(calls.map(args => `${args[1]} ${args[2]}`)).toEqual([
       'pr close',
+      'pr view',
       'pr ready',
       'pr edit',
       'pr edit',
@@ -904,6 +926,7 @@ describe('contaminated PR containment', () => {
         throw new Error('label was already absent');
       if (args[2] === 'view')
         return JSON.stringify({
+          state: 'OPEN',
           isDraft: false,
           labels: [],
           autoMergeRequest: null,
@@ -911,6 +934,22 @@ describe('contaminated PR containment', () => {
       return '';
     }, input);
     expect(result).toEqual({ containedBy: 'merge-eligibility-removed' });
+  });
+
+  it('rejects draft state while a merge path remains active', () => {
+    expect(() =>
+      containContaminatedPr(args => {
+        if (args[2] === 'close') throw new Error('close failed');
+        if (args[2] === 'view')
+          return JSON.stringify({
+            state: 'OPEN',
+            isDraft: true,
+            labels: [{ name: 'merge-queue' }],
+            autoMergeRequest: null,
+          });
+        return '';
+      }, input)
+    ).toThrow('close failed');
   });
 
   it('escalates when close and both containment fallbacks fail', () => {

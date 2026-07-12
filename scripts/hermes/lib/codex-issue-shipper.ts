@@ -904,6 +904,7 @@ export function containContaminatedPr(
     readonly reason: string;
   }
 ): ContaminatedPrContainment {
+  let closeError: unknown;
   try {
     run([
       'gh',
@@ -915,8 +916,36 @@ export function containContaminatedPr(
       '--comment',
       input.reason,
     ]);
-    return { containedBy: 'closed' };
-  } catch (closeError) {
+  } catch (error) {
+    closeError = error;
+  }
+
+  const readState = () =>
+    JSON.parse(
+      run([
+        'gh',
+        'pr',
+        'view',
+        String(input.prNumber),
+        '--repo',
+        input.repo,
+        '--json',
+        'state,isDraft,labels,autoMergeRequest',
+      ])
+    ) as {
+      state?: string;
+      isDraft?: boolean;
+      labels?: ReadonlyArray<{ name?: string }>;
+      autoMergeRequest?: unknown;
+    };
+
+  try {
+    if (readState().state === 'CLOSED') return { containedBy: 'closed' };
+  } catch {
+    // A successful mutation without observable closed state is not containment.
+  }
+
+  try {
     try {
       run([
         'gh',
@@ -960,35 +989,25 @@ export function containContaminatedPr(
       // Auto-merge may already be disabled; final state is verified below.
     }
     try {
-      const state = JSON.parse(
-        run([
-          'gh',
-          'pr',
-          'view',
-          String(input.prNumber),
-          '--repo',
-          input.repo,
-          '--json',
-          'isDraft,labels,autoMergeRequest',
-        ])
-      ) as {
-        isDraft?: boolean;
-        labels?: ReadonlyArray<{ name?: string }>;
-        autoMergeRequest?: unknown;
-      };
-      if (state.isDraft === true) return { containedBy: 'drafted' };
+      const state = readState();
+      if (state.state === 'CLOSED') return { containedBy: 'closed' };
       const labels = new Set((state.labels ?? []).map(label => label.name));
       if (
         !labels.has('merge-queue') &&
         !labels.has('fast') &&
         state.autoMergeRequest == null
       ) {
-        return { containedBy: 'merge-eligibility-removed' };
+        return {
+          containedBy:
+            state.isDraft === true ? 'drafted' : 'merge-eligibility-removed',
+        };
       }
     } catch {
       // Unverifiable state is not containment.
     }
-    throw closeError;
+    throw closeError ?? new Error('Contaminated PR did not close');
+  } catch (containmentError) {
+    throw closeError ?? containmentError;
   }
 }
 
