@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildSizeGuardOverrideCheckRun,
+  buildValidatedSizeGuardCheckRun,
   isSizeGuardOptOutLabel,
   PR_SIZE_GUARD_CHECK_NAME,
   SIZE_GUARD_OPT_OUT_LABELS,
@@ -60,6 +61,23 @@ describe('pr-size-guard label override helpers', () => {
       })
     ).toThrow(/headSha is required/);
   });
+
+  it('builds a success check only for a recomputed integration-train policy', () => {
+    const payload = buildValidatedSizeGuardCheckRun({
+      headSha: 'abc123def456',
+      policy: 'integration-train',
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/2',
+    });
+    expect(payload.conclusion).toBe('success');
+    expect(payload.output.title).toContain('integration train');
+    expect(() =>
+      buildValidatedSizeGuardCheckRun({
+        headSha: 'abc',
+        policy: 'big-pr',
+        runUrl: '',
+      })
+    ).toThrow(/unsupported validated policy/);
+  });
 });
 
 describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => {
@@ -91,7 +109,18 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
     expect(workflow).toContain('types: [labeled]');
     expect(workflow).toContain("github.event.label.name == 'big-pr'");
     expect(workflow).toContain("github.event.label.name == 'codemod'");
+    expect(workflow).toContain(
+      "github.event.label.name == 'integration-train'"
+    );
+    expect(workflow).toContain('node scripts/lib/pr-size-guard-policy.mjs');
     expect(workflow).toContain('checks: write');
+    expect(workflow).toContain(
+      'ref: ${{ github.event.pull_request.base.sha }}'
+    );
+    expect(workflow).toContain('persist-credentials: false');
+    expect(workflow).not.toContain(
+      'ref: ${{ github.event.pull_request.head.sha }}'
+    );
     expect(workflow).toContain(
       'group: pr-size-label-override-${{ github.event.pull_request.number }}'
     );

@@ -19,7 +19,7 @@ gh api repos/JovieInc/Jovie/rulesets/10512119 \
 1. **PR Ready** - The single aggregate merge gate (`ci-pr-ready` job in `ci.yml`): fans in typecheck, biome, guardrails, structural contract, unit tests, risk classifier + risk-triggered preview evidence (build is advisory)
 2. **Migration Guard** - Database migration validation (path-gated to DB/schema changes)
 3. **Fork PR Gate** - Blocks unreviewed external fork PRs; auto-passes for agents + team
-4. **PR Size Guard** - Caps PR size (800 lines / 40 files) to force small, reviewable PRs; `big-pr` label opts out
+4. **PR Size Guard** - Caps PR size (800 lines / 40 files) to force small, reviewable PRs; `big-pr` remains mechanical-only. A labeled `integration-train` with a machine-readable body block linking at least two component PRs has a fail-closed 2500-line / 60-file cap.
 
 ### Configuration Details
 
