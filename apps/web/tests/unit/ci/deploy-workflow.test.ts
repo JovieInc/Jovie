@@ -10,6 +10,10 @@ const canaryWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/canary-health-gate.yml'
 );
+const agentTickWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/agent-tick.yml'
+);
 
 function getStepBlock(workflow: string, stepName: string): string {
   const lines = workflow.split('\n');
@@ -62,14 +66,6 @@ describe('deploy workflow Vercel env resolution', () => {
         command: 'vercel build',
         name: 'Build (PR preview)',
       },
-      {
-        command: 'vercel pull',
-        name: 'Pull env (production)',
-      },
-      {
-        command: 'vercel build',
-        name: 'Build (preview target for staging verification)',
-      },
     ];
 
     for (const { command, name } of steps) {
@@ -86,6 +82,41 @@ describe('deploy workflow Vercel env resolution', () => {
       expect(step).toContain('scope_args=(--scope "$VERCEL_ORG_ID")');
       expect(step).toContain('"${scope_args[@]}"');
       expect(step).not.toContain('--scope ${{ secrets.VERCEL_ORG_ID }}');
+    }
+
+    const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const configureStep = getStepBlock(
+      stagingJob,
+      'Configure staging deployment credentials'
+    );
+    const stagingSteps = [
+      {
+        command: 'vercel pull',
+        name: 'Pull env (staging preview)',
+      },
+      {
+        command: 'vercel build',
+        name: 'Build (preview target for staging verification)',
+      },
+    ];
+
+    expect(configureStep).toContain(
+      'VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}'
+    );
+    expect(configureStep).toContain(
+      'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
+    );
+    expect(configureStep).toContain(
+      'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}'
+    );
+    expect(configureStep).toContain('>> "$GITHUB_ENV"');
+
+    for (const { command, name } of stagingSteps) {
+      const step = getStepBlock(stagingJob, name);
+      expect(step).toContain(command);
+      expect(step).toContain('scope_args=()');
+      expect(step).toContain('scope_args=(--scope "$VERCEL_ORG_ID")');
+      expect(step).toContain('"${scope_args[@]}"');
     }
   });
 
@@ -129,62 +160,29 @@ describe('deploy workflow Vercel env resolution', () => {
     }
   });
 
-  it('syncs required signup readiness keys into the configured production Vercel project before pulling env', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
-    const syncStep = getStepBlock(
-      workflow,
-      'Sync required production env to Vercel project'
-    );
-    const pullStep = getStepBlock(workflow, 'Pull env (production)');
-    const syncIndex = workflow.indexOf(
-      '- name: Sync required production env to Vercel project'
-    );
-    const pullIndex = workflow.indexOf('- name: Pull env (production)');
-    const requiredKeys = [
-      'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
-      'CLERK_SECRET_KEY',
-      'CLERK_PUBLISHABLE_KEY_STAGING',
-      'CLERK_SECRET_KEY_STAGING',
-      'DATABASE_URL',
-      'SESSION_SECRET',
-      'AI_GATEWAY_API_KEY',
-      'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
-      'TURNSTILE_SECRET_KEY',
-    ];
-
-    expect(syncIndex).toBeGreaterThanOrEqual(0);
-    expect(pullIndex).toBeGreaterThan(syncIndex);
-    expect(syncStep).toContain('required_vercel_env=(');
-    expect(syncStep).toContain('vercel env rm "$key" production');
-    expect(syncStep).toContain('vercel env add "$key" production');
-    expect(syncStep).toContain('--value "${!key}"');
-    expect(syncStep).toContain('>/dev/null');
-    expect(syncStep).toContain('>/dev/null 2>&1 || true');
-    expect(syncStep).toContain('set +x');
-    expect(syncStep).toContain(
-      'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
-    );
-    expect(pullStep).toContain(
-      'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
-    );
-
-    for (const key of requiredKeys) {
-      expect(syncStep).toContain(key);
-      expect(syncStep).toContain(`${key}: \${{ secrets.${key} }}`);
-    }
-  });
-
-  it('checks production signup readiness against the deploy env instead of the pulled Vercel file', () => {
+  it('checks staging signup readiness against the deploy env before building the promotion artifact', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const readinessStep = getStepBlock(
       workflow,
-      'Check signup readiness (production deploy env)'
+      'Check signup readiness (staging deploy env)'
+    );
+    const buildStep = getStepBlock(
+      workflow,
+      'Build (preview target for staging verification)'
+    );
+    const readinessIndex = workflow.indexOf(
+      '- name: Check signup readiness (staging deploy env)'
+    );
+    const buildIndex = workflow.indexOf(
+      '- name: Build (preview target for staging verification)'
     );
 
-    expect(readinessStep).toContain('--target=prd');
+    expect(readinessIndex).toBeGreaterThanOrEqual(0);
+    expect(buildIndex).toBeGreaterThan(readinessIndex);
+    expect(readinessStep).toContain('--target=stg');
     expect(readinessStep).toContain('--source=env');
     expect(readinessStep).not.toContain('--source=vercel-file');
-    expect(readinessStep).not.toContain('.vercel/.env.production.local');
+    expect(buildStep).toContain('vercel build');
   });
 
   it('verifies production promotion through the canonical public alias', () => {
@@ -223,7 +221,8 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(promoteStep).toContain('"https://jov.ie/api/health/build-info"');
     expect(promoteStep).toContain('probe_labels=(');
     expect(promoteStep).toContain('"production-alias"');
-    expect(promoteStep).toContain('max_attempts=30');
+    const attempts = promoteStep.match(/max_attempts=(\d+)/);
+    expect(Number(attempts?.[1])).toBe(15);
     expect(promoteStep).toContain('URLs can return 401');
   });
 
@@ -291,7 +290,8 @@ describe('canary health gate workflow', () => {
       'value: ${{ jobs.canary-health-gate.outputs.verified_deployment_url }}'
     );
     expect(canaryStep).toContain('/api/health/build-info');
-    expect(canaryStep).toContain('local max_attempts=30');
+    const attempts = canaryStep.match(/local max_attempts=(\d+)/);
+    expect(Number(attempts?.[1])).toBe(15);
     expect(canaryStep).toContain(
       'CURL_TIMEOUT_ARGS=(--connect-timeout 5 --max-time 15)'
     );
@@ -364,7 +364,13 @@ describe('CI E2E smoke workflow', () => {
     expect(seedStep).toContain(
       "if: steps.check_changes.outputs.run_full_ci == 'true'"
     );
-    expect(seedStep).toContain('tests/seed-test-data.ts');
+    expect(seedStep).toContain('run seed:test-data');
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repoRoot, 'apps/web/package.json'), 'utf8')
+    ) as { scripts: Record<string, string> };
+    expect(packageJson.scripts['seed:test-data']).toContain(
+      'tests/seed-test-data.ts'
+    );
     expect(smokeJob).not.toContain('Export DATABASE_URL (main');
   });
 });
@@ -421,7 +427,7 @@ describe('CI public lighthouse workflow', () => {
     expect(seedStep).toContain('matrix.shard == 0');
     expect(waitStep).toContain('matrix.shard != 0');
     expect(waitStep).toContain('tests/wait-for-public-qa-seed.ts');
-    expect(seedStep).toContain('tests/seed-test-data.ts');
+    expect(seedStep).toContain('run seed:test-data');
     expect(exportStep).toContain(
       'steps.resolve-lighthouse-neon-db-url.outputs.database_url'
     );
@@ -443,26 +449,18 @@ describe('CI public lighthouse workflow', () => {
     const config = JSON.parse(readFileSync(configPath, 'utf8')) as {
       ci: {
         collect: {
-          puppeteerLaunchOptions?: {
-            args?: string[];
-            protocolTimeout?: number;
-          };
           settings?: {
+            chromeFlags?: string;
             skipAudits?: string[];
           };
         };
       };
     };
 
-    const launchOptions = config.ci.collect.puppeteerLaunchOptions;
-    expect(launchOptions?.args).toEqual(
-      expect.arrayContaining([
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-      ])
-    );
-    expect(launchOptions?.protocolTimeout).toBeGreaterThanOrEqual(120_000);
+    const chromeFlags = config.ci.collect.settings?.chromeFlags ?? '';
+    expect(chromeFlags).toContain('--no-sandbox');
+    expect(chromeFlags).toContain('--disable-setuid-sandbox');
+    expect(chromeFlags).toContain('--disable-dev-shm-usage');
     expect(config.ci.collect.settings?.skipAudits).toContain('font-size');
   });
 });
@@ -519,7 +517,7 @@ describe('CI mobile overflow workflow', () => {
     expect(seedStep).toContain('matrix.width == 320');
     expect(waitStep).toContain('matrix.width != 320');
     expect(waitStep).toContain('tests/wait-for-public-qa-seed.ts');
-    expect(seedStep).toContain('tests/seed-test-data.ts');
+    expect(seedStep).toContain('run seed:test-data');
     expect(exportStep).toContain(
       'steps.resolve-mobile-overflow-neon-db-url.outputs.database_url'
     );
@@ -626,15 +624,15 @@ describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
     expect(cleanupWorkflow).toContain('startswith($base + "-")');
   });
 
-  it('runs scheduled branch cleanup every 30 minutes', () => {
-    const scheduledWorkflow = readFileSync(
-      resolve(repoRoot, '.github/workflows/neon-scheduled-cleanup.yml'),
-      'utf8'
-    );
+  it('runs Neon branch cleanup from the consolidated ten-minute agent tick', () => {
+    const agentTickWorkflow = readFileSync(agentTickWorkflowPath, 'utf8');
+    const cleanupJob = getJobBlock(agentTickWorkflow, 'neon-cleanup');
 
-    expect(scheduledWorkflow).toContain("cron: '*/30 * * * *'");
-    expect(scheduledWorkflow).toContain(
-      "minimum_branch_age_minutes: ${{ github.event.inputs.minimum_branch_age_minutes || '45' }}"
+    expect(agentTickWorkflow).toContain("cron: '*/10 * * * *'");
+    expect(cleanupJob).toContain('uses: ./.github/actions/neon-branch-cleanup');
+    expect(cleanupJob).toContain("minimum_branch_age_minutes: '45'");
+    expect(cleanupJob).toContain(
+      "protected_branches: 'main,development,preview,br-main,br-production'"
     );
   });
 
