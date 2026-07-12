@@ -26,6 +26,13 @@ run_test() {
   pnpm --filter=@jovie/web run test:fast
 }
 
+run_affected() {
+  # Keep pushes independent of the full repository suite while catching the
+  # changed surface before CI has to spend a runner on it.
+  run_lint
+  bash scripts/automation-verify.sh affected
+}
+
 run_format() {
   pnpm biome check --write .
 }
@@ -37,6 +44,9 @@ case "$MODE" in
   test)
     run_test
     ;;
+  affected)
+    run_affected
+    ;;
   format)
     run_format
     ;;
@@ -45,7 +55,7 @@ case "$MODE" in
     run_test
     ;;
   *)
-    echo "usage: scripts/hooks/pre-push-gate.sh [lint|test|format|all]" >&2
+    echo "usage: scripts/hooks/pre-push-gate.sh [lint|test|affected|format|all]" >&2
     exit 2
     ;;
 esac
