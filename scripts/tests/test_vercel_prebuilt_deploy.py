@@ -204,6 +204,15 @@ def test_reusable_vercel_artifact_contains_traced_runtime_dependencies() -> None
     assert "apps/web/.next/server/chunks" in producer
     assert "apps/web/.next/server \\" in producer
     assert "apps/web/.next/server/edge \\" not in producer
+    for metadata_file in (
+        "BUILD_ID",
+        "app-path-routes-manifest.json",
+        "build-manifest.json",
+        "package.json",
+        "prerender-manifest.json",
+        "required-server-files.json",
+    ):
+        assert f"apps/web/.next/{metadata_file}" in producer
 
 
 def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
