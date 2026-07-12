@@ -67,11 +67,11 @@ run_deploy() {
 
   # Three bounded prebuilt attempts plus the source fallback must leave a full
   # minute beneath the workflow step's 10-minute ceiling, including kill grace.
-  local timeout_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-25}"
+  local timeout_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-15}"
   if [ "$mode" = "source" ]; then
-    timeout_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-405}"
+    timeout_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-475}"
   fi
-  local kill_grace_seconds="${VERCEL_DEPLOY_KILL_GRACE_SECONDS:-15}"
+  local kill_grace_seconds="${VERCEL_DEPLOY_KILL_GRACE_SECONDS:-5}"
 
   local deploy_cmd=(timeout --signal=TERM --kill-after="${kill_grace_seconds}s" "$timeout_seconds")
 
