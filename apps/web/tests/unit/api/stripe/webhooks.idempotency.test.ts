@@ -57,6 +57,18 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
 
     mockConstructEvent.mockReturnValue(event);
 
+    // Register a REAL handler so the "handler not called" assertion below is
+    // meaningful. Without this, mockGetHandler stays null (per beforeEach)
+    // and the handler could never be invoked regardless of whether the
+    // processedAt skip-check exists — the assertion would pass trivially
+    // even if that skip-check were deleted from the route.
+    const mockHandler = {
+      eventTypes: ['checkout.session.completed'] as const,
+      handle: mockHandlerHandle,
+    };
+    mockGetHandler.mockReturnValue(mockHandler);
+    mockHandlerHandle.mockResolvedValue({ success: true });
+
     // Set up to return an already-processed event
     setSkipProcessing(true);
 
@@ -79,8 +91,51 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
     expect(mockDbInsert).toHaveBeenCalled();
     // Select was called to check existing record
     expect(mockDbSelect).toHaveBeenCalled();
-    // Should not call handler for duplicate events
+    // Should not call the handler for an already-processed duplicate, even
+    // though a real handler IS registered and would run if the processedAt
+    // skip-check were removed from the route.
     expect(mockHandlerHandle).not.toHaveBeenCalled();
+  });
+
+  it('invokes the handler at most once when the same event is delivered twice (unprocessed then duplicate)', async () => {
+    const event = {
+      id: 'evt_dedup_once',
+      type: 'checkout.session.completed',
+      created: Math.floor(Date.now() / 1000),
+      data: { object: { id: 'cs_dedup_once' } },
+    } as any;
+
+    mockConstructEvent.mockReturnValue(event);
+
+    const mockHandler = {
+      eventTypes: ['checkout.session.completed'] as const,
+      handle: mockHandlerHandle,
+    };
+    mockGetHandler.mockReturnValue(mockHandler);
+    mockHandlerHandle.mockResolvedValue({ success: true });
+
+    const makeRequest = () =>
+      new NextRequest('http://localhost:3000/api/stripe/webhooks', {
+        method: 'POST',
+        body: 'test-body',
+        headers: { 'stripe-signature': 'sig_test' },
+      });
+
+    // First delivery: brand-new event — insert succeeds, handler runs once.
+    setSkipProcessing(false);
+    const firstResponse = await POST(makeRequest());
+    expect(firstResponse.status).toBe(200);
+    expect((await firstResponse.json()).received).toBe(true);
+    expect(mockHandlerHandle).toHaveBeenCalledTimes(1);
+
+    // Second delivery of the SAME event: now a duplicate with processedAt
+    // set — the handler must not be invoked again (at-most-once guarantee).
+    setSkipProcessing(true);
+    const secondResponse = await POST(makeRequest());
+    expect(secondResponse.status).toBe(200);
+    expect((await secondResponse.json()).received).toBe(true);
+
+    expect(mockHandlerHandle).toHaveBeenCalledTimes(1);
   });
 
   it('retries processing for existing unprocessed event (prior handler failure path)', async () => {
