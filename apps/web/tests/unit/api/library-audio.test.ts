@@ -195,4 +195,60 @@ describe('library audio upload API', () => {
     expect(response.status).toBe(409);
     expect(hoisted.updateMock).not.toHaveBeenCalled();
   });
+
+  it('returns 403 without resolving or mutating a recording when the caller has no creator profile', async () => {
+    hoisted.getSessionContextMock.mockResolvedValue({ profile: null });
+
+    const { POST } = await import('@/app/api/library/audio/confirm/route');
+    const response = await POST(
+      new Request('http://localhost/api/library/audio/confirm', {
+        method: 'POST',
+        body: JSON.stringify({
+          releaseId: '00000000-0000-4000-8000-000000000001',
+          blobUrl: 'https://cdn.example.com/take-me-over.mp3',
+          blobPathname: 'library/audio/take-me-over.mp3',
+          fileName: 'take-me-over.mp3',
+          fileMimeType: 'audio/mpeg',
+          fileSizeBytes: 1024,
+        }),
+      }) as never
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Creator profile not found',
+    });
+    expect(
+      hoisted.resolvePrimaryRecordingForReleaseMock
+    ).not.toHaveBeenCalled();
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 without mutating when the release is not owned by the requesting profile', async () => {
+    // resolvePrimaryRecordingForRelease scopes its join by creatorProfileId, so a
+    // release owned by someone else resolves to no row — same as "not found".
+    hoisted.resolvePrimaryRecordingForReleaseMock.mockResolvedValue(null);
+
+    const { POST } = await import('@/app/api/library/audio/confirm/route');
+    const response = await POST(
+      new Request('http://localhost/api/library/audio/confirm', {
+        method: 'POST',
+        body: JSON.stringify({
+          releaseId: '00000000-0000-4000-8000-000000000002',
+          blobUrl: 'https://cdn.example.com/take-me-over.mp3',
+          blobPathname: 'library/audio/take-me-over.mp3',
+          fileName: 'take-me-over.mp3',
+          fileMimeType: 'audio/mpeg',
+          fileSizeBytes: 1024,
+        }),
+      }) as never
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Release recording not found',
+    });
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
+    expect(hoisted.revalidateTagMock).not.toHaveBeenCalled();
+  });
 });

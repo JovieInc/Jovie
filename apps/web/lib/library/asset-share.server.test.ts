@@ -14,6 +14,7 @@ const eqValues: unknown[] = [];
 function makeSelectChain() {
   const chain = {
     from: () => chain,
+    innerJoin: () => chain,
     where: () => chain,
     // ensure() awaits `.limit(1)` for the read; pop the next queued result set.
     limit: () => Promise.resolve(selectRows.shift() ?? []),
@@ -78,6 +79,7 @@ vi.mock('@/lib/library/asset-share/token', () => ({
 
 import {
   ensureLibraryAssetShareSettings,
+  resolveLibraryAssetShareByToken,
   revokeLibraryAssetShareToken,
   updateLibraryAssetShareVisibility,
 } from './asset-share.server';
@@ -234,5 +236,54 @@ describe('updateLibraryAssetShareVisibility with a slug-collided assetId', () =>
 
     expect(result.assetId).toBe('release-OLD');
     expect(result.accessToken).toBe('fixed-token-000000000000');
+  });
+});
+
+describe('resolveLibraryAssetShareByToken (private share access)', () => {
+  beforeEach(() => {
+    selectRows.length = 0;
+    insertResult.value = [];
+    insertSpy.mockClear();
+    updatableRowsByAssetId.clear();
+    eqValues.length = 0;
+  });
+
+  it('resolves the settings and artist handle for a valid, non-revoked token', async () => {
+    // The real query filters with `isNull(tokenRevokedAt)` in the WHERE clause —
+    // a matching row here models a token that passed that predicate.
+    selectRows.push([
+      {
+        settings: shareRow({ accessToken: 'valid-token' }),
+        artistHandle: 'tim',
+      },
+    ]);
+
+    const result = await resolveLibraryAssetShareByToken('valid-token');
+
+    expect(result).toEqual({
+      settings: shareRow({ accessToken: 'valid-token' }),
+      artistHandle: 'tim',
+    });
+  });
+
+  it('returns null (no leaked settings) for a token that does not match any non-revoked row', async () => {
+    // Models a revoked or unknown token: the DB predicate excludes the row, so
+    // the query returns no rows at all — the caller cannot distinguish "revoked"
+    // from "never existed", which is the point (no information leak).
+    selectRows.push([]);
+
+    const result = await resolveLibraryAssetShareByToken(
+      'revoked-or-unknown-token'
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when the joined artist handle is missing even though a settings row matched', async () => {
+    selectRows.push([{ settings: shareRow(), artistHandle: null }]);
+
+    const result = await resolveLibraryAssetShareByToken('valid-token');
+
+    expect(result).toBeNull();
   });
 });
