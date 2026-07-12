@@ -147,6 +147,9 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './atoms/dropdown-menu';
+// Empty State
+export type { EmptyStateProps } from './atoms/empty-state';
+export { EmptyState } from './atoms/empty-state';
 // Field
 export type { FieldProps } from './atoms/field';
 export { Field } from './atoms/field';

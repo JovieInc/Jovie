@@ -6,6 +6,7 @@
  * Renders source history from structured actions, UTM, and referrers.
  */
 
+import { EmptyState } from '@jovie/ui';
 import {
   Copy,
   Download,
@@ -16,7 +17,6 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { toast } from '@/components/feedback';
-import { DrawerEmptyState } from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { formatTimeAgo } from '@/lib/utils/audience';
@@ -115,9 +115,7 @@ export function AudienceMemberReferrers({
   const sources = [...actionSources, ...utmSource, ...referrers];
 
   if (sources.length === 0) {
-    return (
-      <DrawerEmptyState className='min-h-22' message='No source data yet.' />
-    );
+    return <EmptyState heading='No source data yet.' />;
   }
 
   return (
