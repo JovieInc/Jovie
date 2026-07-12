@@ -49,7 +49,7 @@ Graphite and branch protection must wait on **aggregate** contexts only — neve
 | `CI / PR Ready` | Single merge gate — fans in typecheck, biome, guardrails, structural contract, unit tests, risk classifier, and risk-triggered preview evidence (build is advisory) |
 | `CI / Migration Guard` | Path-gated schema/migration safety (independent aggregate) |
 | `Fork PR Gate` | Blocks unreviewed fork PRs (auto-passes for agents + team) |
-| `PR Size Guard` | Caps PR size (800 lines / 40 files); `big-pr` label opts out |
+| `PR Size Guard` | Caps PR size (800 lines / 40 files); `big-pr` is mechanical-only. A documented `integration-train` may use the bounded 2500-line / 60-file policy. |
 
 **Queue CI is the PR's own CI.** Graphite runs on every PR directly (not draft-batch mode), so `gtmq_*` batch branches are never created and the former slim-lane `if:` conditions were removed from `ci.yml` (#13610). Graphite does not use GitHub `merge_group` events. If batching mode is ever re-enabled, the slim-lane conditions must be restored with it — see `docs/PR_FLOW.md` §2 and the 2026-06-22 post-mortem.
 
