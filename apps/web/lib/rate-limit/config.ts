@@ -322,6 +322,20 @@ export const RATE_LIMITERS = {
     analytics: false,
   } satisfies RateLimitConfig,
 
+  /**
+   * Claim-token link follow: 20 requests per minute per IP.
+   * Unauthenticated public entry (`/claim/[token]`) that runs several DB reads
+   * plus lead/cookie writes per hit — throttle abuse/DoS while staying generous
+   * for real humans (multi-tab / refresh).
+   */
+  claimTokenAccess: {
+    name: 'Claim Token Access',
+    limit: 20,
+    window: '1 m',
+    prefix: 'public:claim-token',
+    analytics: false,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // Health & Monitoring
   // ---------------------------------------------------------------------------

@@ -11,6 +11,8 @@ const {
   mockMarkLeadClaimPageViewedFromToken,
   mockSetLeadAttributionCookieFromToken,
   mockWritePendingClaimContext,
+  mockClaimLimit,
+  mockGetClientIP,
 } = vi.hoisted(() => ({
   mockClearLeadAttributionCookie: vi.fn(),
   mockGetProfileByUsername: vi.fn(),
@@ -21,6 +23,26 @@ const {
   mockMarkLeadClaimPageViewedFromToken: vi.fn(),
   mockSetLeadAttributionCookieFromToken: vi.fn(),
   mockWritePendingClaimContext: vi.fn(),
+  mockClaimLimit: vi.fn(),
+  mockGetClientIP: vi.fn(),
+}));
+
+vi.mock('@/lib/rate-limit', () => ({
+  claimTokenAccessLimiter: { limit: mockClaimLimit },
+  getClientIP: mockGetClientIP,
+  createRateLimitHeaders: (result: { readonly reset?: number }) => ({
+    'retry-after': String(result.reset ?? 60),
+  }),
+  // Faithful mirror of the real helper's contract: a degraded/unavailable
+  // backend downgrades a hard block to an advisory allow (fail-open).
+  allowIfRateLimitBackendDegraded: (result: {
+    readonly success: boolean;
+    readonly degraded?: boolean;
+    readonly unavailable?: boolean;
+  }) =>
+    !result.success && (result.degraded === true || result.unavailable === true)
+      ? { ...result, success: true }
+      : result,
 }));
 
 vi.mock('@/lib/claim/context', () => ({
@@ -52,6 +74,13 @@ import { GET } from '../../../app/claim/[token]/route';
 describe('Claim token route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetClientIP.mockReturnValue('203.0.113.7');
+    mockClaimLimit.mockResolvedValue({
+      success: true,
+      limit: 20,
+      remaining: 19,
+      reset: 60,
+    });
     mockLookupLeadByClaimToken.mockResolvedValue(null);
     mockHashClaimToken.mockResolvedValue('hashed-token');
     mockGetProfileByUsername.mockResolvedValue({
@@ -155,5 +184,67 @@ describe('Claim token route', () => {
     expect(response.headers.get('location')).toBe('http://localhost/');
     expect(mockClearLeadAttributionCookie).toHaveBeenCalledTimes(1);
     expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 without touching the database when the IP is over the limit', async () => {
+    mockClaimLimit.mockResolvedValue({
+      success: false,
+      limit: 20,
+      remaining: 0,
+      reset: 60,
+    });
+
+    const response = await GET(
+      new NextRequest('http://localhost/claim/valid-token'),
+      {
+        params: Promise.resolve({ token: 'valid-token' }),
+      }
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('60');
+    // Throttle short-circuits before any DB/lead/cookie work.
+    expect(mockLookupUsernameByClaimToken).not.toHaveBeenCalled();
+    expect(mockIsClaimTokenValid).not.toHaveBeenCalled();
+    expect(mockGetProfileByUsername).not.toHaveBeenCalled();
+    expect(mockLookupLeadByClaimToken).not.toHaveBeenCalled();
+    expect(mockSetLeadAttributionCookieFromToken).not.toHaveBeenCalled();
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+  });
+
+  it('keys the limiter by the client IP', async () => {
+    mockLookupUsernameByClaimToken.mockResolvedValue('testartist');
+    mockIsClaimTokenValid.mockResolvedValue(true);
+
+    await GET(new NextRequest('http://localhost/claim/valid-token'), {
+      params: Promise.resolve({ token: 'valid-token' }),
+    });
+
+    expect(mockClaimLimit).toHaveBeenCalledWith('203.0.113.7');
+  });
+
+  it('fails open (proceeds) when the rate-limit backend is degraded', async () => {
+    mockClaimLimit.mockResolvedValue({
+      success: false,
+      degraded: true,
+      limit: 20,
+      remaining: 0,
+      reset: 60,
+    });
+    mockLookupUsernameByClaimToken.mockResolvedValue('testartist');
+    mockIsClaimTokenValid.mockResolvedValue(true);
+
+    const response = await GET(
+      new NextRequest('http://localhost/claim/valid-token'),
+      {
+        params: Promise.resolve({ token: 'valid-token' }),
+      }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/testartist?claim=1'
+    );
+    expect(mockWritePendingClaimContext).toHaveBeenCalledTimes(1);
   });
 });
