@@ -16,6 +16,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ## [Unreleased]
 
 - [internal] **Governed marketing section proposals:** the marketing registry now records route-recipe evidence and explicit design gaps, while the admin Design Lab provides desktop/mobile proposal review, comments, approval states, implementation evidence, and auditable model-usage metadata.
+- [internal] Mutation-verified guard tests for `POST /api/chat` — 401 unauthenticated, 400 missing profile context, 429 plan-aware rate limit with `Retry-After`, 503 kill switch (JOV-4220)
 - **Homepage labels now meet WCAG AA contrast:** the distributor trust-strip and closed-loop labels use the readable tertiary text token instead of the low-contrast quaternary token.
 - [internal] **Design-system drift ratchet tightened 3044→2609 (JOV-4211)**: converted 29 exact-match typography arbitraries to tokens across 18 dashboard/admin/organism/molecule files (`leading-[16px]`→`leading-4`, `tracking-[-0.01em]`→`tracking-tight`, `tracking-[-0.02em]`→`tracking-tighter`, `tracking-[0.01em]`→`tracking-wide`) and re-measured the baseline to the true count, removing ~406 counts of stale regression headroom.
 - [internal] **Desktop renderer recovery (JOV-3595)**: recover from hosted loads that return HTTP 200 but never boot React, and route crashed or unresponsive renderers to the visible recovery shell instead of a permanent black window.
