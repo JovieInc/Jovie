@@ -81,7 +81,7 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
         ((.bucket // "") | test("^fail$"; "i"))
         or ((.state // "") | test("^(FAILURE|ERROR|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE)$"; "i"))
       )
-    | select(((.name // "") | test("advisory|Preview Deploy|Slop Gate"; "i")) | not)
+    | select(((.name // "") | test("advisory|Preview Deploy|Slop Gate|Open PR|Secret Scanning|Verify Draft|E2E Smoke"; "i")) | not)
     | (.name // .workflow // .description // "unnamed check")
   ]'
 
