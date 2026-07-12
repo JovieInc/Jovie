@@ -479,6 +479,8 @@ jobs:
     # (build / Lighthouse / e2e / preview) stay separate.
     needs: [ci-path-changes]
     runs-on: ubuntu-latest
+    # Setup/DB work (~2m) + accepted source deploy (up to 10m) + readiness
+    # verification (up to 9m) must fit without the job canceling a healthy build.
     timeout-minutes: 25
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     env:
