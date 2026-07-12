@@ -41,6 +41,7 @@ import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
+import { useRouteTransitionTelemetry } from '@/lib/perf/route-transition';
 import { AuthShell } from './AuthShell';
 import { CommandPalette } from './CommandPalette';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
@@ -85,6 +86,7 @@ function AuthShellWrapperInner({
 }>) {
   const config = useAuthRouteConfig();
   const pathname = usePathname();
+  useRouteTransitionTelemetry();
   const headerActions = useHeaderActions();
   const isElectron = useIsElectronRuntime();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
