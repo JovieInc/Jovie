@@ -220,13 +220,17 @@ JSON
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
                   cat <<'JSON'
-                [{"n":456,"t":"Taste approved PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-taste","L":["needs-human","approved:taste"],"fail":[]},{"n":789,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-789-human","L":["needs-human","merge-queue"],"fail":[]},{"n":101,"t":"Clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-101-clean","L":[],"fail":[]}]
+                [{"n":456,"t":"Taste approved PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-taste","L":["needs-human","approved:taste"],"fail":[]},{"n":789,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-789-human","L":["needs-human","merge-queue"],"fail":[]},{"n":102,"t":"Deferred PR","draft":false,"m":"MERGEABLE","head":"codex/jov-102-deferred","L":["queue-deferred","merge-queue"],"fail":[]},{"n":103,"t":"Draft PR","draft":true,"m":"MERGEABLE","head":"codex/jov-103-draft","L":["merge-queue"],"fail":[]},{"n":101,"t":"Clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-101-clean","L":[],"fail":[]}]
 JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
                   [[ "$3" == "101" ]]
                   echo '[]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[]}'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -244,9 +248,13 @@ JSON
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "=== DEQUEUE (hard gates" in result.stdout
         assert "[dry-run] would -merge-queue on #789" in result.stdout
+        assert "[dry-run] would -merge-queue on #102" in result.stdout
+        assert "[dry-run] would -merge-queue on #103" in result.stdout
         assert "[dry-run] would +merge-queue on #101" in result.stdout
         assert "[dry-run] would +merge-queue on #456" not in result.stdout
         assert "[dry-run] would +merge-queue on #789" not in result.stdout
+        assert "[dry-run] would +merge-queue on #102" not in result.stdout
+        assert "[dry-run] would +merge-queue on #103" not in result.stdout
         assert "=== SURFACE (human decision; not touched) ===" in result.stdout
         assert "#456" in result.stdout
         assert "#789" in result.stdout
@@ -267,6 +275,10 @@ JSON
                 if [[ "$1 $2" == "pr checks" ]]; then
                   echo '[]'
                   exit 8
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[]}'
+                  exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
                 exit 2
@@ -310,6 +322,10 @@ JSON
                   echo '[]'
                   exit 0
                 fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[]}'
+                  exit 0
+                fi
                 echo "unexpected gh args: $*" >&2
                 exit 2
                 """
@@ -326,6 +342,205 @@ JSON
         assert "[dry-run] would +merge-queue on #654" in result.stdout
         assert "gh-retry" in result.stderr
         assert counter.read_text(encoding="utf-8").strip() == "2"
+
+    @pytest.mark.parametrize(
+        "refreshed_state",
+        [
+            '{"state":"OPEN","isDraft":true,"mergeable":"MERGEABLE","labels":[]}',
+            '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[{"name":"queue-deferred"}]}',
+        ],
+    )
+    def test_enroll_refuses_draft_or_deferred_state_from_fresh_read(
+        self, tmp_path: Path, refreshed_state: str
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":655,"t":"Held after snapshot","draft":false,"m":"MERGEABLE","head":"codex/jov-655-held","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{refreshed_state}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  echo "unexpected enrollment mutation: $*" >&2
+                  exit 9
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "eligibility changed; refusing enrollment for #655" in result.stdout
+        assert "[dry-run] would +merge-queue on #655" not in result.stdout
+
+    @pytest.mark.parametrize("edit_exit", [0, 1])
+    def test_held_dequeue_fails_when_removal_is_not_proven(
+        self, tmp_path: Path, edit_exit: int
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":656,"t":"Held and queued","draft":true,"m":"MERGEABLE","head":"codex/jov-656-held","L":["merge-queue"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  exit {edit_exit}
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"labels":[{{"name":"merge-queue"}}]}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(f'PATH="{tmp_path}:$PATH" bash "{_DRAIN_SCRIPT}"')
+
+        assert result.returncode != 0
+        assert "Failed to prove held PR #656 is outside merge queue" in result.stderr
+
+    def test_enrollment_mutation_failure_is_terminal(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{"n":657,"t":"Clean candidate","draft":false,"m":"MERGEABLE","head":"codex/jov-657-clean","L":[],"fail":[]}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[]}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(f'PATH="{tmp_path}:$PATH" bash "{_DRAIN_SCRIPT}"')
+
+        assert result.returncode != 0
+        assert "Failed to prove enrollment for #657" in result.stderr
+
+    @pytest.mark.parametrize(
+        ("second_read", "removal_exit", "expected_message"),
+        [
+            (
+                '{"state":"OPEN","isDraft":true,"mergeable":"MERGEABLE","labels":[{"name":"merge-queue"}]}',
+                0,
+                "enrollment verification failed",
+            ),
+            (
+                '{"state":"OPEN","isDraft":false,"mergeable":"CONFLICTING","labels":[{"name":"merge-queue"},{"name":"needs-conflict-resolution"}]}',
+                0,
+                "enrollment verification failed",
+            ),
+            ("READ_FAILURE", 0, "could not verify"),
+            (
+                "READ_FAILURE",
+                1,
+                "CRITICAL: could not prove failed enrollment was compensated",
+            ),
+        ],
+    )
+    def test_post_enrollment_failure_compensates_and_proves_absence(
+        self,
+        tmp_path: Path,
+        second_read: str,
+        removal_exit: int,
+        expected_message: str,
+    ) -> None:
+        read_count = tmp_path / "read-count"
+        edit_count = tmp_path / "edit-count"
+        read_count.write_text("0", encoding="utf-8")
+        edit_count.write_text("0", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":658,"t":"Racing candidate","draft":false,"m":"MERGEABLE","head":"codex/jov-658-race","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  count=$(cat '{read_count}')
+                  count=$((count + 1))
+                  echo "$count" > '{read_count}'
+                  if [[ "$count" -eq 1 ]]; then
+                    echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[]}}'
+                  elif [[ "$count" -eq 2 && '{second_read}' == 'READ_FAILURE' ]]; then
+                    exit 1
+                  elif [[ "$count" -eq 2 ]]; then
+                    echo '{second_read}'
+                  else
+                    echo '{{"labels":[]}}'
+                  fi
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  count=$(cat '{edit_count}')
+                  count=$((count + 1))
+                  echo "$count" > '{edit_count}'
+                  if [[ "$count" -eq 2 ]]; then exit {removal_exit}; fi
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(f'PATH="{tmp_path}:$PATH" bash "{_DRAIN_SCRIPT}"')
+
+        assert result.returncode != 0
+        assert expected_message in result.stderr
+        assert edit_count.read_text(encoding="utf-8").strip() == "2"
 
     def test_queued_conflict_is_dequeued_and_labeled_for_resolution(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
