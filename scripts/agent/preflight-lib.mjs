@@ -71,9 +71,17 @@ export function evaluateWorktree(input) {
 }
 
 /**
+ * Ownership lookup sources, in preference order (JOV-4185):
+ *   'ledger'   — direct read of the gbrain agent-job-ledger page (deterministic)
+ *   'keyword'  — keyword index search (fast, deterministic ranking)
+ *   'semantic' — hybrid/semantic query (only when keyword was empty; hard-capped)
+ * Legacy 'gbrain' is retained as the default label for untagged output.
+ *
  * @param {{
  *   gbrainOnPath: boolean,
  *   gbrainOutput: string | null,
+ *   source?: 'ledger' | 'keyword' | 'semantic' | 'gbrain' | null,
+ *   timedOut?: boolean,
  *   requireGbrain?: boolean,
  *   task?: string | null,
  *   ms?: number,
@@ -106,18 +114,20 @@ export function evaluateOwnership(input) {
 
   const out = (input.gbrainOutput ?? '').trim();
   if (!out) {
+    const timedOut = Boolean(input.timedOut);
     if (requireGbrain) {
       blockers.push({
         code: 'gbrain_unreachable',
-        message:
-          'gbrain returned empty ownership context (AGENT_PREFLIGHT_REQUIRE_GBRAIN=1).',
+        message: timedOut
+          ? 'gbrain ownership lookup exceeded the hard time budget (AGENT_PREFLIGHT_REQUIRE_GBRAIN=1).'
+          : 'gbrain returned empty ownership context (AGENT_PREFLIGHT_REQUIRE_GBRAIN=1).',
       });
     }
     return {
       ownership: {
         owner: null,
         scope: task || null,
-        source: 'gbrain-empty',
+        source: timedOut ? 'gbrain-timeout' : 'gbrain-empty',
         reachable: false,
         ms: input.ms ?? 0,
       },
@@ -130,7 +140,7 @@ export function evaluateOwnership(input) {
     ownership: {
       owner: 'available',
       scope: task || 'repo',
-      source: 'gbrain',
+      source: input.source || 'gbrain',
       reachable: true,
       ms: input.ms ?? 0,
     },
