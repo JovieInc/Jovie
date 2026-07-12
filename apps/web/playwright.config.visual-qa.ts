@@ -29,7 +29,7 @@ const managedWebServerPort = managedWebServerUrl.port;
 
 export default defineConfig({
   testDir: './tests/visual-qa',
-  testMatch: '**/capture.spec.ts',
+  testMatch: ['**/capture.spec.ts', '**/breakpoint-check.spec.ts'],
   fullyParallel: false,
   forbidOnly: true,
   retries: 1,

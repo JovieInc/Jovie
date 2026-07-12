@@ -1,5 +1,4 @@
 import path from 'node:path';
-import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 import { validatePathTraversal } from '@/lib/security/path-traversal';
 import type { VisualQaColorScheme } from '@/lib/visual-qa/themes';
 import type { VisualQaPhase } from '@/lib/visual-qa/types';
@@ -10,11 +9,20 @@ export const VISUAL_QA_ROOT_SEGMENTS = [
   'visual-qa',
 ] as const;
 
+function resolveVisualQaMonorepoPath(...segments: string[]): string {
+  const cwd = process.cwd();
+  const monorepoRoot =
+    path.basename(cwd) === 'web' && path.basename(path.dirname(cwd)) === 'apps'
+      ? path.resolve(cwd, '..', '..')
+      : cwd;
+  return path.join(monorepoRoot, ...segments);
+}
+
 const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const SURFACE_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 
 export function getVisualQaRootDirectory(): string {
-  return resolveMonorepoPath(...VISUAL_QA_ROOT_SEGMENTS);
+  return resolveVisualQaMonorepoPath(...VISUAL_QA_ROOT_SEGMENTS);
 }
 
 export function assertValidVisualQaRunId(runId: string): string {

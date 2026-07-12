@@ -63,6 +63,14 @@ function classify(path, content) {
     return true;
   };
 
+  if (path === 'apps/web/scripts/visual-qa-lane.test.mjs') {
+    return [
+      'contract/structural',
+      ['Playwright collection and nonzero-selection contract'],
+      'high',
+    ];
+  }
+
   if (
     /\/(?:UITests)\//.test(path) ||
     /XCUITest|XCUIApplication/.test(content)
@@ -296,6 +304,21 @@ function fileCiMapping(record, lanes) {
     confidence = 'high';
     provenance =
       'eval-lanes.json explicitly assigns this file to the locally isolated deterministic lane.';
+  } else if (record.path === 'apps/web/scripts/visual-qa-lane.test.mjs') {
+    suiteCandidates = [
+      'pnpm --filter @jovie/web run test:visual:breakpoints:selection',
+    ];
+    confidence = 'high';
+    provenance =
+      'Dedicated Node contract invokes Playwright list mode and fails unless the breakpoint lane selects exactly one executable test.';
+  } else if (record.path.startsWith('apps/web/tests/visual-qa/')) {
+    suiteCandidates =
+      record.path === 'apps/web/tests/visual-qa/breakpoint-check.spec.ts'
+        ? ['pnpm test:visual:breakpoints']
+        : ['pnpm --filter @jovie/web run visual-qa:capture'];
+    confidence = 'high';
+    provenance =
+      'playwright.config.visual-qa.ts explicitly selects this Visual QA browser spec; no checked-in CI workflow invokes the package lane.';
   } else if (record.path.startsWith('apps/web/tests/e2e/')) {
     if (record.classification === 'E2E smoke') {
       candidates = lanes.filter(lane =>

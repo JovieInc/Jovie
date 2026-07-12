@@ -134,6 +134,7 @@
     "test:desktop": "pnpm --filter @jovie/desktop test",
     "test:evals:deterministic": "pnpm --filter @jovie/web run test:evals:deterministic",
     "test:evals:live": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:evals:live",
+    "test:visual:breakpoints": "pnpm --filter @jovie/web run test:visual:breakpoints",
     "test:inventory": "node scripts/test-inventory/generate.mjs --check && node --test scripts/test-inventory/generate.test.mjs",
     "test:quarantine-ledger": "pnpm --filter @jovie/web run test:quarantine-ledger",
     "test:reliability-detectors": "pnpm --filter @jovie/web run test:reliability-detectors",

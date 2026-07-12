@@ -171,4 +171,24 @@ test('maps known file families and exposes current coverage gaps', () => {
   assert.deepEqual(liveEval.ci.suiteCandidates, ['pnpm test:evals:live']);
   assert.equal(liveEval.classification, 'live eval');
   assert.equal(liveEval.ci.mappingConfidence, 'high');
+
+  const visualBreakpoint = byPath(
+    'apps/web/tests/visual-qa/breakpoint-check.spec.ts'
+  );
+  assert.deepEqual(visualBreakpoint.ci.jobs, []);
+  assert.deepEqual(visualBreakpoint.ci.suiteCandidates, [
+    'pnpm test:visual:breakpoints',
+  ]);
+  assert.equal(visualBreakpoint.classification, 'full/visual/a11y E2E');
+  assert.equal(visualBreakpoint.ci.mappingConfidence, 'high');
+
+  const visualSelectionContract = byPath(
+    'apps/web/scripts/visual-qa-lane.test.mjs'
+  );
+  assert.deepEqual(visualSelectionContract.ci.jobs, []);
+  assert.deepEqual(visualSelectionContract.ci.suiteCandidates, [
+    'pnpm --filter @jovie/web run test:visual:breakpoints:selection',
+  ]);
+  assert.equal(visualSelectionContract.classification, 'contract/structural');
+  assert.equal(visualSelectionContract.ci.mappingConfidence, 'high');
 });
