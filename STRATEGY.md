@@ -31,6 +31,23 @@ This replaces traditional ship cycles. The loop runs faster and more autonomousl
 
 ## Repository Structure
 
+### One Codebase, Two Shells
+
+Jovie and Ovie are two configured shells over the same implementation, not
+forked applications. Jovie is the external/consumer shell. Ovie is the
+internal/personal/ops shell. Shared packages, components, design-system
+primitives, data contracts, API clients, auth primitives, ledger models,
+interaction patterns, and metrics are canonical.
+
+Shell, route, entitlement, and presentation configuration may differ; UI
+components, business contracts, and metric definitions must not be duplicated.
+`/app/admin/ops` is the canonical Ops surface. HUD, Ovie, and TV are
+presentation modes over that shared surface.
+
+Personal finance is a shared module with a private capability boundary: raw
+Gmail/Amazon receipts remain local and encrypted, normalized facts may be
+stored in gbrain, and no account connections or money movement are enabled.
+
 ### Key Directories
 - `apps/web/`: Next.js web application (HUD, marketing, admin)
 - `apps/desktop/`: Electron desktop app
