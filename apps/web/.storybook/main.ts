@@ -98,6 +98,13 @@ const config: StorybookConfig = {
           find: /^(.*\/)?apple-client-secret$/,
           replacement: require.resolve('./apple-client-secret-mock.ts'),
         },
+        {
+          // lib/auth/test-mode.ts imports node:net at module scope; matched
+          // by full-specifier regex for both '@/…' and relative imports
+          // ('test-mode-constants' does not match the $-anchored pattern).
+          find: /^(.*\/)?test-mode$/,
+          replacement: require.resolve('./test-mode-mock.ts'),
+        },
 
         {
           find: '@/app/app/(shell)/dashboard/actions',
