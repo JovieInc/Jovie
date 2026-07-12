@@ -84,8 +84,50 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
-      - name: Mark PR ready
+      - name: Mark PR ready if the live state is still eligible
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: gh pr ready "$PR_NUMBER"
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          HOLD_LABEL_RE='^(needs-human|hold|gated|queue-deferred|fast)$'
+
+          read_state() {
+            gh pr view "$PR_NUMBER" --json isDraft,headRefOid,labels
+          }
+
+          before="$(read_state)"
+          live_head="$(jq -r '.headRefOid' <<<"$before")"
+          if [[ "$live_head" != "$EXPECTED_HEAD_SHA" ]]; then
+            echo "::error::PR head changed during verification ($live_head != $EXPECTED_HEAD_SHA)"
+            exit 1
+          fi
+          if [[ "$(jq -r '.isDraft' <<<"$before")" != "true" ]]; then
+            echo "PR is no longer draft; nothing to promote."
+            exit 0
+          fi
+          if jq -e --arg re "$HOLD_LABEL_RE" \
+            '[.labels[].name] | any(test($re))' <<<"$before" >/dev/null; then
+            echo "PR gained a hold label during verification; leaving it draft."
+            exit 0
+          fi
+
+          gh pr ready "$PR_NUMBER"
+
+          after="$(read_state)"
+          after_head="$(jq -r '.headRefOid' <<<"$after")"
+          held_after=false
+          if jq -e --arg re "$HOLD_LABEL_RE" \
+            '[.labels[].name] | any(test($re))' <<<"$after" >/dev/null; then
+            held_after=true
+          fi
+          if [[ "$after_head" != "$EXPECTED_HEAD_SHA" || "$held_after" == "true" ]]; then
+            gh pr ready "$PR_NUMBER" --undo
+            echo "::error::PR eligibility changed during promotion; restored draft state"
+            exit 1
+          fi
+          if [[ "$(jq -r '.isDraft' <<<"$after")" != "false" ]]; then
+            echo "::error::gh pr ready returned without promoting the PR"
+            exit 1
+          fi
