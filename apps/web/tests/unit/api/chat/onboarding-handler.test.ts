@@ -297,6 +297,69 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
   });
 
+  it('bypasses shared-IP rate limits only for the explicit local E2E injection handshake', async () => {
+    vi.resetModules();
+    stubRuntimeEnv({ nodeEnv: 'test' });
+    vi.stubEnv('E2E_TEST_MODE', '1');
+    vi.stubEnv('CHAT_LLM_FAILURE_INJECTION', '1');
+    hoisted.checkAnonymousChatRateLimitMock.mockResolvedValue({
+      success: false,
+      reason: 'ip_limit',
+    });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest(
+      { mode: 'onboarding', messages: [userMessage('hi')] },
+      '',
+      { 'x-jovie-e2e-llm-failure': '1' }
+    );
+
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-e2e-rate');
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-fallback-reason')).toBe('injected');
+    expect(hoisted.checkAnonymousChatRateLimitMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps rate limits enabled on production despite E2E injection settings', async () => {
+    vi.resetModules();
+    stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'production' });
+    vi.stubEnv('E2E_TEST_MODE', '1');
+    vi.stubEnv('CHAT_LLM_FAILURE_INJECTION', '1');
+    hoisted.checkGateForUserMock.mockResolvedValue(false);
+    hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+    hoisted.verifyTurnstileTokenMock.mockResolvedValue({ success: true });
+    hoisted.checkAnonymousChatRateLimitMock.mockResolvedValue({
+      success: false,
+      reason: 'ip_limit',
+    });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest(
+      {
+        mode: 'onboarding',
+        turnstileToken: 'tok',
+        messages: [userMessage('hi')],
+      },
+      '',
+      { 'x-jovie-e2e-llm-failure': '1' }
+    );
+
+    const result = await tryHandleAnonymousOnboardingChat(
+      req,
+      'req-prod-e2e-rate'
+    );
+
+    expect(result?.status).toBe(429);
+    expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalledWith({
+      ip: '203.0.113.5',
+      sessionId: expect.any(String),
+      asn: null,
+    });
+  });
+
   it('ignores the injection header when the env flag is not set', async () => {
     vi.resetModules();
     stubRuntimeEnv();

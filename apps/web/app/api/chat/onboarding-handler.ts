@@ -316,7 +316,16 @@ export async function tryHandleAnonymousOnboardingChat(
   }
 
   // --- Rate limits: IP + ASN + session ---
-  const rate = await checkAnonymousChatRateLimit({ ip, sessionId, asn });
+  // The deterministic Golden Path turn runs concurrently with other anonymous
+  // smoke traffic behind one CI egress IP. Bypass only for the existing
+  // request-scoped failure-injection handshake, with the additional explicit
+  // E2E server gate. `isLlmFailureInjected` is already hard-disabled on secure
+  // preview/production deployments.
+  const shouldBypassRateLimit =
+    env.E2E_TEST_MODE === '1' && isLlmFailureInjected(req);
+  const rate = shouldBypassRateLimit
+    ? { success: true as const }
+    : await checkAnonymousChatRateLimit({ ip, sessionId, asn });
   if (!rate.success) {
     return NextResponse.json(
       {
