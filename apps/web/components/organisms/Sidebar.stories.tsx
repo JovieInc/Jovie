@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
   Sidebar,
   SidebarContent,
@@ -38,7 +39,9 @@ const meta: Meta<typeof Sidebar> = {
   decorators: [
     Story => (
       <DashboardDataProvider value={mockDashboardData}>
-        <Story />
+        <PreviewPanelProvider enabled={false}>
+          <Story />
+        </PreviewPanelProvider>
       </DashboardDataProvider>
     ),
   ],
