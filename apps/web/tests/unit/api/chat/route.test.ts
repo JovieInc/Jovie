@@ -1,5 +1,13 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getEntitlements } from '@/lib/entitlements/registry';
+// Imported (not re-declared) so the happy-path test can assert on the same
+// mock instances installed by the `vi.mock('@/lib/intent-detection', ...)`
+// factory below — proves intent routing actually ran and declined.
+import {
+  classifyIntent,
+  isDeterministicIntent,
+  routeIntent,
+} from '@/lib/intent-detection';
 
 const hoisted = vi.hoisted(() => ({
   tryHandleAnonymousOnboardingChatMock: vi.fn(),
@@ -289,6 +297,42 @@ function validBody(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// Satisfies `artistContextSchema` exactly (apps/web/lib/chat/types.ts). Used
+// by the happy-path test via the client-provided `artistContext` backward-
+// compat branch of `resolveArtistContext`, which never touches `db` (mocked
+// to `{}` above) — the `profileId`-driven branch calls the real
+// `fetchArtistContext` DB query and is out of scope for this guard-wiring
+// suite.
+const VALID_ARTIST_CONTEXT = {
+  displayName: 'Test Artist',
+  username: 'testartist',
+  bio: null,
+  genres: [] as string[],
+  spotifyFollowers: null,
+  spotifyPopularity: null,
+  spotifyUrl: null,
+  appleMusicUrl: null,
+  profileViews: 0,
+  hasSocialLinks: false,
+  hasMusicLinks: false,
+  tippingStats: {
+    tipClicks: 0,
+    tipsSubmitted: 0,
+    totalReceivedCents: 0,
+    monthReceivedCents: 0,
+  },
+};
+
+function happyPathBody(overrides: Record<string, unknown> = {}) {
+  return {
+    messages: [
+      { id: 'm1', role: 'user', parts: [{ type: 'text', text: 'hello' }] },
+    ],
+    artistContext: VALID_ARTIST_CONTEXT,
+    ...overrides,
+  };
+}
+
 describe('POST /api/chat guard wiring', () => {
   let POST: typeof import('@/app/api/chat/route')['POST'];
 
@@ -415,5 +459,138 @@ describe('POST /api/chat guard wiring', () => {
 
     expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
+
+  describe('happy-path 200 wiring', () => {
+    function mockSuccessfulTurn() {
+      const fakeResponse = new Response('mock-stream-body', {
+        status: 200,
+        headers: { 'x-mock-stream': 'true' },
+      });
+      const toUIMessageStreamResponseMock = vi
+        .fn()
+        .mockReturnValue(fakeResponse);
+      hoisted.executeChatTurnMock.mockResolvedValue({
+        streamResult: {
+          toUIMessageStreamResponse: toUIMessageStreamResponseMock,
+        },
+        selectedModel: 'anthropic/claude-happy-path-test',
+        systemPrompt: 'test system prompt',
+        toolNames: ['proposeAvatarUpload'],
+        modelMessages: [],
+        turnSignals: { toolStepCapExhausted: false },
+      });
+      return { fakeResponse, toUIMessageStreamResponseMock };
+    }
+
+    it('wires guards in order — resolveChatAccountContext -> checkAiChatRateLimitForPlan -> intent routing (declines) -> executeChatTurn — and dispatches with resolved-context/plan-derived args, never request-body values', async () => {
+      const accountContext = makeAccountContext();
+      hoisted.resolveChatAccountContextMock.mockResolvedValue(accountContext);
+      const { fakeResponse, toUIMessageStreamResponseMock } =
+        mockSuccessfulTurn();
+
+      const response = await POST(chatRequest(happyPathBody()));
+
+      // 200 + the exact Response produced by the mocked executeChatTurn's
+      // streamResult — proves the route returns it directly, unwrapped.
+      expect(response).toBe(fakeResponse);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('x-mock-stream')).toBe('true');
+
+      // --- Call order: resolveChatAccountContext -> checkAiChatRateLimitForPlan
+      //     -> classifyIntent/isDeterministicIntent (intent routing declines,
+      //     routeIntent never called) -> executeChatTurn.
+      const accountContextOrder =
+        hoisted.resolveChatAccountContextMock.mock.invocationCallOrder[0];
+      const rateLimitOrder =
+        hoisted.checkAiChatRateLimitForPlanMock.mock.invocationCallOrder[0];
+      const classifyIntentOrder =
+        vi.mocked(classifyIntent).mock.invocationCallOrder[0];
+      const isDeterministicIntentOrder = vi.mocked(isDeterministicIntent).mock
+        .invocationCallOrder[0];
+      const executeChatTurnOrder =
+        hoisted.executeChatTurnMock.mock.invocationCallOrder[0];
+
+      expect(accountContextOrder).toBeLessThan(rateLimitOrder);
+      expect(rateLimitOrder).toBeLessThan(classifyIntentOrder);
+      expect(classifyIntentOrder).toBeLessThan(isDeterministicIntentOrder);
+      expect(isDeterministicIntentOrder).toBeLessThan(executeChatTurnOrder);
+
+      // Intent routing ran and declined — routeIntent (the actual dispatch)
+      // must never be called, proving the LLM path (not deterministic CRUD)
+      // handled this turn.
+      expect(vi.mocked(classifyIntent)).toHaveBeenCalledWith('hello');
+      expect(vi.mocked(isDeterministicIntent)).toHaveBeenCalledWith({
+        category: 'unknown',
+      });
+      expect(vi.mocked(routeIntent)).not.toHaveBeenCalled();
+
+      // Rate limiter consulted with the canonical userId + plan (not request
+      // body values — the request body carries no userId/plan at all here).
+      expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
+        'user_123',
+        'pro'
+      );
+
+      // --- executeChatTurn receives the resolved account context and
+      //     plan-derived state, not raw request-body values.
+      expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
+      const turnArgs = hoisted.executeChatTurnMock.mock.calls[0][0];
+      expect(turnArgs.userId).toBe('user_123');
+      expect(turnArgs.userPlan).toBe('pro');
+      expect(turnArgs.accountContext).toBe(accountContext);
+      expect(turnArgs.planLimits).toBe(accountContext.planLimits);
+      expect(turnArgs.artistContext).toEqual(VALID_ARTIST_CONTEXT);
+      expect(turnArgs.releases).toEqual([]);
+      // No profileId in the request body — the client-provided artistContext
+      // backward-compat branch resolves a null internal profile id.
+      expect(turnArgs.resolvedProfileId).toBeNull();
+      expect(turnArgs.resolvedConversationId).toBeNull();
+      expect(turnArgs.lastUserText).toBe('hello');
+      expect(turnArgs.forceLightModel).toBe(false);
+      expect(turnArgs.modelRotationStep).toBe(0);
+      expect(turnArgs.pinnedOpportunity).toBeNull();
+      expect(turnArgs.requestId).toBeTruthy();
+      expect(typeof turnArgs.signal).toBe('object');
+
+      // Tool set is derived from the resolved plan/account context, not the
+      // request body (`ChatRequestBody` has no `tools` field at all — see
+      // apps/web/lib/chat/request-validation.ts). Pro plan + verified billing
+      // => paid tools merged with the always-on free tools.
+      const toolNames = Object.keys(turnArgs.tools).sort();
+      expect(toolNames).toEqual(
+        expect.arrayContaining([
+          // Free tools (present on every plan)
+          'proposeAvatarUpload',
+          'proposeSocialLink',
+          'proposeSocialLinkRemoval',
+          'submitFeedback',
+          // Paid-plan-only tools — presence proves the set was expanded
+          // server-side from the resolved plan, not from the request.
+          'proposeProfileEdit',
+          'showTopInsights',
+          'createMerch',
+        ])
+      );
+      // Gated off given default flags/state in this scenario: no profileId
+      // (createRelease/generateReleasePitch need one), album art + teleprompter
+      // feature flags default false via getAppFlagValueMock.
+      expect(toolNames).not.toContain('createRelease');
+      expect(toolNames).not.toContain('generateReleasePitch');
+      expect(toolNames).not.toContain('generateAlbumArt');
+      expect(toolNames).not.toContain('proposeVideoRecording');
+
+      // --- Response wiring: headers passed to toUIMessageStreamResponse
+      //     reflect requestId + CORS, and (with no reserved turn) omit
+      //     conversation/turn headers and messageMetadata.
+      expect(toUIMessageStreamResponseMock).toHaveBeenCalledTimes(1);
+      const streamCallArgs = toUIMessageStreamResponseMock.mock.calls[0][0];
+      expect(streamCallArgs.headers['x-request-id']).toBe(turnArgs.requestId);
+      expect(streamCallArgs.headers['x-conversation-id']).toBeUndefined();
+      expect(streamCallArgs.headers['x-chat-turn-id']).toBeUndefined();
+      expect(streamCallArgs.messageMetadata()).toBeUndefined();
+
+      expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
+    });
   });
 });
