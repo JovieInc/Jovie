@@ -22,3 +22,33 @@ export async function validateDisplayName(
   console.log('[Storybook Mock] validateDisplayName called');
   return { valid: true };
 }
+
+export interface ConnectOnboardingSpotifyArtistParams {
+  artistName: string;
+  includeTracks?: boolean;
+  profileId: string;
+  skipMusicFetchEnrichment?: boolean;
+  spotifyArtistId: string;
+  spotifyArtistUrl: string;
+}
+
+export interface ConnectOnboardingSpotifyArtistResult {
+  artistName: string;
+  imported: number;
+  importing: boolean;
+  message: string;
+  success: boolean;
+}
+
+export async function connectOnboardingSpotifyArtist(
+  params: ConnectOnboardingSpotifyArtistParams
+): Promise<ConnectOnboardingSpotifyArtistResult> {
+  console.log('[Storybook Mock] connectOnboardingSpotifyArtist called');
+  return {
+    artistName: params.artistName,
+    imported: 0,
+    importing: false,
+    message: 'Storybook mock: Spotify connect skipped',
+    success: true,
+  };
+}
