@@ -2546,7 +2546,7 @@ jobs:
     needs: [ci-build-public, ci-path-changes, neon-db]
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true')) && needs.ci-build-public.outputs.has_artifact == 'true') }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -3810,6 +3810,19 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
 
+      - name: Wait for PR preview readiness
+        timeout-minutes: 9
+        run: |
+          ./node_modules/.bin/vercel inspect "${{ steps.pr_deploy.outputs.deployment_url }}" \
+            --wait \
+            --timeout 8m \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
   # PR Lighthouse runs as a path-gated preview-evidence lane with stricter thresholds (0.75 perf, 0.85 a11y).
   # Original removal was due to 0.5 thresholds being too relaxed. Updated .lighthouserc.pr.json fixes this.
   # Production Lighthouse (in ci-build job) has even stricter thresholds (0.8 perf, 0.95 a11y).
@@ -4797,10 +4810,14 @@ jobs:
           CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
 
-      - name: Alias preview to staging.jov.ie
-        timeout-minutes: 3
+      - name: Wait for staging deployment readiness
+        timeout-minutes: 9
         run: |
-          ./node_modules/.bin/vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"
+          ./node_modules/.bin/vercel inspect "${{ steps.deploy.outputs.deploy_url }}" \
+            --wait \
+            --timeout 8m \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID"
 
   canary-health-gate:
     name: Canary Health Gate (staging)
@@ -4824,10 +4841,32 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-  promote-production:
-    name: Promote to Production
+  alias-staging:
+    name: Alias verified preview to staging.jov.ie
     needs: [deploy-staging, canary-health-gate]
     if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' }}
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Alias verified deployment
+        run: |
+          ./node_modules/.bin/vercel alias set "${{ needs.deploy-staging.outputs.deploy_url }}" staging.jov.ie \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  promote-production:
+    name: Promote to Production
+    needs: [deploy-staging, canary-health-gate, alias-staging]
+    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     concurrency:

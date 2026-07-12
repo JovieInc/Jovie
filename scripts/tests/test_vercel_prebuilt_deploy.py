@@ -6,6 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_SCRIPT = REPO_ROOT / ".github/scripts/vercel-prebuilt-deploy.sh"
+CI_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
 
 
 def test_timed_out_prebuilt_uploads_fall_back_to_source(tmp_path: Path) -> None:
@@ -131,3 +132,26 @@ sleep 5
     assert output_file.read_text().strip() == (
         "deploy_url=https://jovie-accepted-test.vercel.app"
     )
+
+
+def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
+    workflow = CI_WORKFLOW.read_text()
+
+    deploy_index = workflow.index("- name: Deploy (staging preview, prebuilt)")
+    wait_index = workflow.index("- name: Wait for staging deployment readiness")
+    canary_index = workflow.index("  canary-health-gate:")
+    alias_job_index = workflow.index("  alias-staging:")
+    promote_index = workflow.index("  promote-production:")
+
+    assert deploy_index < wait_index < canary_index < alias_job_index < promote_index
+    assert "vercel inspect" in workflow[wait_index:canary_index]
+    assert "--wait" in workflow[wait_index:canary_index]
+    assert "needs: [deploy-staging, canary-health-gate, alias-staging]" in workflow[
+        promote_index:
+    ]
+
+    preview_deploy_index = workflow.index(
+        "- name: Deploy (PR preview, fast deployment for UI-only changes)"
+    )
+    preview_wait_index = workflow.index("- name: Wait for PR preview readiness")
+    assert preview_deploy_index < preview_wait_index < deploy_index
