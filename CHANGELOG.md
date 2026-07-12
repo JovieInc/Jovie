@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] Mutation-verified guard tests for `POST /api/chat` — 401 unauthenticated, 400 missing profile context, 429 plan-aware rate limit with `Retry-After`, 503 kill switch (JOV-4220)
 - **Homepage labels now meet WCAG AA contrast:** the distributor trust-strip and closed-loop labels use the readable tertiary text token instead of the low-contrast quaternary token.
 - [internal] **Desktop renderer recovery (JOV-3595)**: recover from hosted loads that return HTTP 200 but never boot React, and route crashed or unresponsive renderers to the visible recovery shell instead of a permanent black window.
 - [internal] Agent preflight: one-shot JSON bootstrap for /autoplan (JOV-4183)
