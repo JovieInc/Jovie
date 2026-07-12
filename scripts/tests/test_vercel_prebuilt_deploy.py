@@ -201,6 +201,9 @@ def test_reusable_vercel_artifact_contains_traced_runtime_dependencies() -> None
     assert snapshot_index < build_index < restore_index
     assert "apps/web/.next/node_modules" in producer
     assert "import-in-the-middle-*" in producer
+    assert "apps/web/.next/server/chunks" in producer
+    assert "apps/web/.next/server \\" in producer
+    assert "apps/web/.next/server/edge \\" not in producer
 
 
 def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
