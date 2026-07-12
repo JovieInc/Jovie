@@ -255,7 +255,9 @@ export interface DesignLabDispatchPayload {
   readonly tasteMemoryExcerpt: string;
   readonly requestedAt: string;
   readonly requestedBy: string;
-  readonly registryTask: DesignRegistryTask;
+  // Older surface proposals do not carry a governed registry task. The review
+  // workflow makes this required before dispatching section-gap proposals.
+  readonly registryTask?: DesignRegistryTask;
 }
 
 export interface ReviewDesignProposalResult {

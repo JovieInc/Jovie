@@ -37,7 +37,10 @@ export async function reviewDesignProposal(params: {
     throw new Error('Design proposal not found.');
   }
 
-  if (existing.status !== 'pending') {
+  // Persisted legacy records and test fixtures may still expose `pending`,
+  // while the expanded schema normalizes that state to `proposed`.
+  const existingStatus: string = existing.status;
+  if (existingStatus !== 'pending' && existingStatus !== 'proposed') {
     throw new Error('Design proposal has already been reviewed.');
   }
 
