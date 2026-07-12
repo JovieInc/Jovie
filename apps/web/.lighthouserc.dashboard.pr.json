@@ -60,6 +60,12 @@
               {
                 "maxNumericValue": 850
               }
+            ],
+            "interaction-to-next-paint": [
+              "warn",
+              {
+                "maxNumericValue": 200
+              }
             ]
           }
         }
