@@ -1060,8 +1060,16 @@ jobs:
             -name 'import-in-the-middle-*' -print -quit | grep -q .
           tar -czf /tmp/vercel-build-output.tar.gz -C . \
             .vercel/output \
+            apps/web/.next/BUILD_ID \
+            apps/web/.next/app-path-routes-manifest.json \
+            apps/web/.next/build-manifest.json \
+            apps/web/.next/package.json \
+            apps/web/.next/prerender-manifest.json \
+            apps/web/.next/required-server-files.json \
             apps/web/.next/server \
             apps/web/.next/node_modules
+          tar -tzf /tmp/vercel-build-output.tar.gz \
+            apps/web/.next/package.json >/dev/null
           tar -tzf /tmp/vercel-build-output.tar.gz \
             apps/web/.next/server/chunks >/dev/null
           tar -tzf /tmp/vercel-build-output.tar.gz \
