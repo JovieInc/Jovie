@@ -418,4 +418,112 @@ describe('connectOnboardingSpotifyArtist', () => {
       'artist'
     );
   });
+
+  it('rejects when the Spotify artist is already claimed by a different profile', async () => {
+    queueOwnedProfile();
+    hoisted.selectResults.push([{ id: 'other_profile_456' }]); // existingClaim found
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+
+    const result = await connectOnboardingSpotifyArtist({
+      artistName: 'Artist Name',
+      profileId: 'profile_123',
+      spotifyArtistId: 'artist_spotify_id',
+      spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+    });
+
+    expect(result).toEqual({
+      success: false,
+      importing: false,
+      message:
+        'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.',
+      imported: 0,
+      artistName: 'Artist Name',
+    });
+    // The claim was rejected before any write or import work started.
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
+    expect(hoisted.withDbSessionTxMock).not.toHaveBeenCalled();
+    expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
+    expect(hoisted.claimPrebuiltProfileForUserMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a direct-profile claim awaiting match when no expectedSpotifyArtistId is set yet', async () => {
+    queueOwnedProfile();
+    hoisted.readPendingClaimContextMock.mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'profile_123',
+      username: 'artist',
+      expectedSpotifyArtistId: null,
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+
+    const result = await connectOnboardingSpotifyArtist({
+      artistName: 'Artist Name',
+      profileId: 'profile_123',
+      spotifyArtistId: 'artist_spotify_id',
+      spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+    });
+
+    expect(result).toEqual({
+      success: false,
+      importing: false,
+      message: 'This profile needs a claim link before it can be claimed.',
+      imported: 0,
+      artistName: 'Artist Name',
+    });
+    // Guard fires before the existingClaim lookup, any write, or the claim
+    // finalization/import path.
+    expect(hoisted.selectMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
+    expect(hoisted.withDbSessionTxMock).not.toHaveBeenCalled();
+    expect(hoisted.claimPrebuiltProfileForUserMock).not.toHaveBeenCalled();
+    expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a direct-profile claim when the selected Spotify artist does not match the expected one', async () => {
+    queueOwnedProfile();
+    hoisted.readPendingClaimContextMock.mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'profile_123',
+      username: 'artist',
+      expectedSpotifyArtistId: 'different_artist_id',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+
+    const result = await connectOnboardingSpotifyArtist({
+      artistName: 'Artist Name',
+      profileId: 'profile_123',
+      spotifyArtistId: 'artist_spotify_id',
+      spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+    });
+
+    expect(result).toEqual({
+      success: false,
+      importing: false,
+      message:
+        'Please choose the Spotify artist already attached to this profile.',
+      imported: 0,
+      artistName: 'Artist Name',
+    });
+    // Mismatch guard fires before the existingClaim lookup, any write, or
+    // the claim finalization/import path — a regression that dropped or
+    // inverted this check would otherwise let the wrong artist claim through.
+    expect(hoisted.selectMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
+    expect(hoisted.withDbSessionTxMock).not.toHaveBeenCalled();
+    expect(hoisted.claimPrebuiltProfileForUserMock).not.toHaveBeenCalled();
+    expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
+  });
 });
