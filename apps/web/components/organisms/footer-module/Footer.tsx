@@ -196,7 +196,7 @@ export function Footer({
               </div>
               <Copyright
                 variant='light'
-                className='text-2xs leading-[16px] font-normal tracking-tight opacity-100'
+                className='text-2xs leading-4 font-normal tracking-tight opacity-100'
                 style={{
                   color: 'var(--linear-text-tertiary)',
                 }}
@@ -254,7 +254,7 @@ export function Footer({
             </div>
             <Copyright
               variant={config.colorVariant}
-              className='text-2xs leading-[16px] font-normal tracking-tight opacity-100'
+              className='text-2xs leading-4 font-normal tracking-tight opacity-100'
               style={{
                 color: 'var(--linear-text-tertiary)',
               }}

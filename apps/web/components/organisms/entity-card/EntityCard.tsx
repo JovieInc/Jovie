@@ -308,7 +308,7 @@ export function EntityCard({
 
           <h3
             className={cn(
-              'min-w-0 font-[590] leading-tight tracking-[-0.02em] text-primary-token',
+              'min-w-0 font-[590] leading-tight tracking-tighter text-primary-token',
               titleClampClassName,
               size.titleClass
             )}

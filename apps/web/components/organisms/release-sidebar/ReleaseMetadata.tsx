@@ -48,18 +48,18 @@ const METADATA_ROW_PROPS = {
   size: 'sm' as const,
 };
 const METADATA_TEXT_CLASSNAME =
-  'text-xs font-book leading-[16px] text-secondary-token';
+  'text-xs font-book leading-4 text-secondary-token';
 const METADATA_MUTED_TEXT_CLASSNAME =
   'text-2xs leading-[15px] text-tertiary-token';
 const METADATA_LABEL_CLASSNAME =
   'text-2xs font-medium leading-[15px] tracking-normal text-quaternary-token';
-const METADATA_VALUE_CLASSNAME = 'text-xs leading-[16px] text-secondary-token';
+const METADATA_VALUE_CLASSNAME = 'text-xs leading-4 text-secondary-token';
 const METADATA_BADGE_CLASSNAME =
   'h-5 rounded-full border border-subtle bg-surface-0 px-2 text-3xs font-caption tracking-normal shadow-none';
 const METADATA_ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';
 const METADATA_STACK_CLASSNAME = 'space-y-0.5';
 const METADATA_DISPLAY_VALUE_CLASSNAME =
-  'text-2xs font-book leading-[16px] text-primary-token';
+  'text-2xs font-book leading-4 text-primary-token';
 const METADATA_INPUT_CLASSNAME =
   'h-7 rounded-lg border-subtle bg-surface-0 px-2.5 text-2xs font-book text-primary-token shadow-none';
 

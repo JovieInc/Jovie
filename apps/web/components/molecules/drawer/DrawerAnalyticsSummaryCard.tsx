@@ -97,7 +97,7 @@ function DrawerAnalyticsSummaryBody({
   if (state === 'loading') {
     return (
       <output
-        aria-label='Loading analytics'
+        aria-label='Loading Analytics'
         className={cn('grid gap-2.5', gridClassName)}
       >
         {loadingMetricKeys.map(metricKey => (
@@ -110,7 +110,7 @@ function DrawerAnalyticsSummaryBody({
   if (state === 'error') {
     return (
       <div className='flex min-h-18 items-center'>
-        <p className='text-xs leading-[18px] tracking-[0.01em] text-secondary-token'>
+        <p className='text-xs leading-[18px] tracking-wide text-secondary-token'>
           {errorMessage}
         </p>
       </div>
@@ -130,7 +130,7 @@ function DrawerAnalyticsSummaryBody({
   if (emptyMessage) {
     return (
       <div className='flex min-h-18 items-center'>
-        <p className='text-xs leading-[18px] tracking-[0.01em] text-secondary-token'>
+        <p className='text-xs leading-[18px] tracking-wide text-secondary-token'>
           {emptyMessage}
         </p>
       </div>
