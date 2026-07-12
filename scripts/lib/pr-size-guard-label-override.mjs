@@ -57,3 +57,26 @@ export function buildSizeGuardOverrideCheckRun(input) {
     },
   };
 }
+
+/** Build a success override only after the label workflow recomputed a policy. */
+export function buildValidatedSizeGuardCheckRun(input) {
+  const headSha = String(input.headSha ?? '').trim();
+  const policy = String(input.policy ?? '').trim();
+  const runUrl = String(input.runUrl ?? '').trim();
+  if (!headSha) throw new Error('headSha is required');
+  if (policy !== 'integration-train') {
+    throw new Error(`unsupported validated policy: ${policy || '(empty)'}`);
+  }
+  return {
+    name: PR_SIZE_GUARD_CHECK_NAME,
+    head_sha: headSha,
+    status: 'completed',
+    conclusion: 'success',
+    details_url: runUrl || undefined,
+    output: {
+      title: 'Bounded integration train validated',
+      summary:
+        'The label-event workflow recomputed changed lines/files and validated the machine-readable component PR source block.',
+    },
+  };
+}

@@ -5,6 +5,9 @@ name: PR Size Guard
 # (`gt create` per logical step) or independent sibling PRs. Opt out for
 # approved mechanical codemods (token sweeps, renames, generated output) with
 # the `big-pr` label. Thresholds tunable via repo vars PR_MAX_LINES / PR_MAX_FILES.
+# Circular shared-CI repair trains may use `integration-train`, but only with a
+# machine-readable source block naming 2+ component PRs and the fixed, bounded
+# 2500-line / 60-file cap enforced by pr-size-guard-policy.mjs.
 
 # PR size can only change on a push (opened/synchronize/reopened), never on a
 # label event. This guard is a REQUIRED check, so re-running it on
@@ -38,12 +41,16 @@ jobs:
       github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.head.ref != 'screenshots/auto-update'
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
       - name: Enforce size cap
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
           MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
@@ -94,22 +101,5 @@ jobs:
           lines=$(printf '%s\n' "$counted" | awk -F'\t' '{s+=$1} END{print s+0}')
           files=$(printf '%s\n' "$counted" | grep -c . || true)
 
-          {
-            echo "### PR Size Guard"
-            echo ""
-            echo "| metric (excl. generated/lock) | value | cap |"
-            echo "|---|---|---|"
-            echo "| changed lines | $lines | $MAX_LINES |"
-            echo "| changed files | $files | $MAX_FILES |"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "$lines" -gt "$MAX_LINES" ] || [ "$files" -gt "$MAX_FILES" ]; then
-            echo "::error::PR too large: $lines lines / $files files (cap $MAX_LINES/$MAX_FILES). Split into a Graphite stack of small dependent PRs (gt create per logical step) or independent siblings. Approved mechanical codemod? add the 'big-pr' label."
-            {
-              echo ""
-              echo "> ❌ **Too large to review as one PR.** Split into a **Graphite stack** (\`gt create\` per logical step) or independent sibling PRs."
-              echo "> Approved mechanical codemod (token sweep, rename, generated output)? Add the **\`big-pr\`** label to bypass."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          echo "✅ within size cap ($lines lines / $files files)"
+          PR_LINES="$lines" PR_FILES="$files" \
+            node scripts/lib/pr-size-guard-policy.mjs
