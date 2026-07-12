@@ -65,11 +65,11 @@ run_deploy() {
   local mode="$1"
   shift
 
-  # Three bounded prebuilt attempts plus the source fallback must leave a full
-  # minute beneath the workflow step's 10-minute ceiling, including kill grace.
-  local timeout_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-15}"
+  # One realistically budgeted archive attempt plus the source fallback must
+  # leave a full minute beneath the workflow step's 10-minute ceiling.
+  local timeout_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-180}"
   if [ "$mode" = "source" ]; then
-    timeout_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-475}"
+    timeout_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-340}"
   fi
   local kill_grace_seconds="${VERCEL_DEPLOY_KILL_GRACE_SECONDS:-5}"
 
@@ -158,7 +158,7 @@ echo "Plain prebuilt fallback enabled: $can_use_plain_prebuilt"
 deploy_modes=()
 
 if [ "$has_prebuilt_output" = true ]; then
-  deploy_modes+=(tgz split-tgz)
+  deploy_modes+=(tgz)
 fi
 
 if [ "$can_use_plain_prebuilt" = true ]; then

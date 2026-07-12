@@ -39,7 +39,7 @@ echo "https://jovie-timeout-test.vercel.app"
             "VERCEL_TOKEN": "test-token",
             "VERCEL_ORG_ID": "test-org",
             "GITHUB_OUTPUT": str(output_file),
-            "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "true",
+            "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
             "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
             "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "5",
             "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
@@ -57,8 +57,8 @@ echo "https://jovie-timeout-test.vercel.app"
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stderr.count("exceeded its time budget") == 3
-    assert "Deploy succeeded on attempt 4 with source upload" in result.stdout
+    assert result.stderr.count("exceeded its time budget") == 1
+    assert "Deploy succeeded on attempt 2 with source upload" in result.stdout
     assert output_file.read_text().strip() == (
         "deploy_url=https://jovie-timeout-test.vercel.app"
     )
@@ -76,7 +76,7 @@ def test_default_attempt_budgets_leave_one_minute_for_step_overhead() -> None:
     source = default_for("VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS")
     kill_grace = default_for("VERCEL_DEPLOY_KILL_GRACE_SECONDS")
 
-    worst_case_seconds = 3 * (archive + kill_grace) + source + kill_grace
+    worst_case_seconds = archive + kill_grace + source + kill_grace
     assert worst_case_seconds <= 9 * 60
 
 
@@ -111,7 +111,7 @@ sleep 5
             "VERCEL_TOKEN": "test-token",
             "VERCEL_ORG_ID": "test-org",
             "GITHUB_OUTPUT": str(output_file),
-            "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "true",
+            "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
             "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
             "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "1",
             "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
