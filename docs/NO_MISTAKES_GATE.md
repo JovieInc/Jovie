@@ -19,6 +19,7 @@ Repo-specific commands live in `.no-mistakes.yaml` and delegate to `scripts/hook
 | --- | --- | --- |
 | **lint** | `bash scripts/hooks/pre-push-gate.sh lint` | `pnpm run pre-push`: biome check on changed files (full `biome check .` when no base ref), then proxy-guard + tailwind + typecheck. The single scoped biome step covers lint+format; the web `pre-push` no longer re-runs a repo-wide `biome lint .`. |
 | **test** | `bash scripts/hooks/pre-push-gate.sh test` | `pnpm --filter=@jovie/web run test:fast` |
+| **affected** | `bash scripts/hooks/pre-push-gate.sh affected` | The local git hook: fast lint gate, then affected typecheck, lint, and tests. |
 | **format** | `bash scripts/hooks/pre-push-gate.sh format` | `pnpm biome check --write .` |
 
 Equivalent package.json shortcuts:
@@ -26,6 +27,7 @@ Equivalent package.json shortcuts:
 ```bash
 pnpm run pre-push:gate        # lint profile
 pnpm run pre-push:gate:test   # test profile
+pnpm run pre-push:gate:affected  # affected typecheck, lint, and tests
 pnpm run pre-push:gate:format   # format profile
 pnpm run pre-push:gate:all    # lint + test (local dry-run)
 ```
@@ -66,6 +68,16 @@ After push, monitor with `no-mistakes` (TUI) or `no-mistakes axi status`.
 | Emergency hotfix | `hotfix/*` branch → `main` with `needs-human` label (see `.claude/rules/release.md`) |
 
 The husky hook intentionally runs **lint only** (no tests) to keep local pushes fast. The no-mistakes pipeline adds tests, review, docs, and CI babysitting in the disposable worktree.
+
+## Agent-local verification receipt
+
+Before opening or updating a draft PR, autonomous shippers should run:
+
+```bash
+pnpm ship:verify -- --base origin/main
+```
+
+It classifies the diff with the checked-in CI harness, runs affected local checks plus the risk-required smoke/build commands, and writes a machine-readable receipt to `artifacts/verification/result.json` (ignored by Git). Add `--with-performance` for route-budget verification on performance-sensitive work. This is a fast feedback loop, not a CI replacement: the PR and merge paths still run independently in clean runners.
 
 ## Evidence artifacts
 
