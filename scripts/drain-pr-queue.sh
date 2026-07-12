@@ -141,38 +141,32 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
   local base_delay="${GH_RETRY_BASE_DELAY:-2}"
   local max_delay="${GH_RETRY_MAX_DELAY:-30}"
   local attempt=1
-  local out_file err_file err delay
+  local raw_file out_file err_file err delay
+  raw_file="$(mktemp)"
   out_file="$(mktemp)"
   err_file="$(mktemp)"
 
-  # TERMINAL failures only. Pending/queued/in-progress mean CI isn't done yet, and
-  # `cancelled` is almost always a zombie left by `concurrency: cancel-in-progress`
-  # (a superseded run) — none of those are real failures. Counting them as failures
-  # is what made the drain loop dequeue green PRs every 20 min and starve the queue
-  # for 6h on 2026-06-22. Only FAILURE/ERROR/TIMED_OUT/ACTION_REQUIRED count.
-  local jq_filter='[
-    .[]
-    | select(
-        ((.bucket // "") | test("^fail$"; "i"))
-        or ((.state // "") | test("^(FAILURE|ERROR|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE)$"; "i"))
-      )
-    | select(((.name // "") | test("advisory|Preview Deploy|Slop Gate|Open PR|Secret Scanning|Verify Draft|E2E Smoke"; "i")) | not)
-    | (.name // .workflow // .description // "unnamed check")
-  ]'
-
+  # Positive readiness proof: all required aggregate contexts must exist and
+  # succeed, and any present canonical merge-gate leaf must be complete. A
+  # pending gate is not a failure, but it is not permission to enqueue either.
   while [[ "$attempt" -le "$attempts" ]]; do
+    : >"$raw_file"
     : >"$out_file"
     : >"$err_file"
-    if gh pr checks "$n" -R "$REPO" --required --json name,bucket,state,workflow,description --jq "$jq_filter" >"$out_file" 2>"$err_file"; then
-      if jq -e 'type == "array"' "$out_file" >/dev/null 2>&1; then
+    if gh pr checks "$n" -R "$REPO" --json name,bucket,state,workflow,description,startedAt,completedAt >"$raw_file" 2>"$err_file"; then
+      if jq -e 'type == "array"' "$raw_file" >/dev/null 2>&1 \
+        && node "$(dirname "${BASH_SOURCE[0]}")/lib/pr-check-failures.mjs" \
+          --classify-queue <"$raw_file" >"$out_file"; then
         cat "$out_file"
-        rm -f "$out_file" "$err_file"
+        rm -f "$raw_file" "$out_file" "$err_file"
         return 0
       fi
-    elif jq -e 'type == "array"' "$out_file" >/dev/null 2>&1; then
+    elif jq -e 'type == "array"' "$raw_file" >/dev/null 2>&1 \
+      && node "$(dirname "${BASH_SOURCE[0]}")/lib/pr-check-failures.mjs" \
+        --classify-queue <"$raw_file" >"$out_file"; then
       # `gh pr checks` exits 8 when checks are pending, even with valid JSON.
       cat "$out_file"
-      rm -f "$out_file" "$err_file"
+      rm -f "$raw_file" "$out_file" "$err_file"
       return 0
     fi
 
@@ -180,7 +174,7 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
     if [[ "$attempt" -eq "$attempts" ]] || ! gh_retry_is_transient_error "$err"; then
       [[ -n "$err" ]] && echo "  !! could not read required checks for #$n: $err" >&2
       jq -cn --arg reason "required check status unavailable" '[$reason]'
-      rm -f "$out_file" "$err_file"
+      rm -f "$raw_file" "$out_file" "$err_file"
       return 0
     fi
 
@@ -191,7 +185,7 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
     attempt=$((attempt + 1))
   done
 
-  rm -f "$out_file" "$err_file"
+  rm -f "$raw_file" "$out_file" "$err_file"
   jq -cn --arg reason "required check status unavailable" '[$reason]'
 }
 

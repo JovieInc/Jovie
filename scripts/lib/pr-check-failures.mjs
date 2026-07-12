@@ -1,5 +1,8 @@
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { parseRequiredStatusChecksFromYaml } from './merge-queue-guard.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -24,8 +27,43 @@ export function normalizeCheckName(check) {
   );
 }
 
+// Exact names only. Merge-gate names such as `Preview Deploy (PR)` and
+// `E2E Smoke (PR Fast Feedback)` must never become advisory because they share
+// words with an informational check.
+export const ADVISORY_CHECK_NAMES = Object.freeze([
+  'A11y (authenticated, informational)',
+  'Homepage Smoke (Informational)',
+  'Open PR',
+  'Preview Deploy',
+  'Slop Gate (advisory)',
+]);
+
+const branchProtectionYaml = readFileSync(
+  new URL('../../.github/rulesets/branch-protection.yml', import.meta.url),
+  'utf8'
+);
+const harnessManifest = JSON.parse(
+  readFileSync(
+    new URL('../../.github/ci-harness/manifest.json', import.meta.url),
+    'utf8'
+  )
+);
+
+export const REQUIRED_CHECK_NAMES = Object.freeze(
+  parseRequiredStatusChecksFromYaml(branchProtectionYaml).map(name => ({
+    context: name,
+    names: Object.freeze([name, name.replace(/^CI \/ /, '')]),
+  }))
+);
+
+export const MERGE_GATE_CHECK_NAMES = Object.freeze(
+  harnessManifest.jobs
+    .filter(job => job.mergeGate === true)
+    .map(job => job.name)
+);
+
 export function isAdvisoryCheckName(name) {
-  return /advisory|Preview Deploy|Slop Gate/i.test(name ?? '');
+  return ADVISORY_CHECK_NAMES.includes(name ?? '');
 }
 
 /**
@@ -50,6 +88,153 @@ export function extractTerminalFailures(checks) {
     names.add(name);
   }
   return [...names].sort();
+}
+
+function isSuccessfulCheck(check) {
+  return (
+    String(check?.bucket ?? '').toLowerCase() === 'pass' &&
+    String(check?.state ?? '').toUpperCase() === 'SUCCESS'
+  );
+}
+
+function isSkippedCheck(check) {
+  const bucket = String(check?.bucket ?? '').toLowerCase();
+  const state = String(check?.state ?? '').toUpperCase();
+  return bucket === 'skipping' || state === 'SKIPPED' || state === 'NEUTRAL';
+}
+
+function isPendingCheck(check) {
+  const bucket = String(check?.bucket ?? '').toLowerCase();
+  const state = String(check?.state ?? '').toUpperCase();
+  return (
+    bucket === 'pending' ||
+    /^(QUEUED|IN_PROGRESS|PENDING|WAITING|REQUESTED|EXPECTED)$/.test(state)
+  );
+}
+
+function attemptTimestamp(check, field) {
+  const value = String(check?.[field] ?? '');
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+/**
+ * GitHub may return superseded attempts with the same normalized name. Keep
+ * only the uniquely newest (startedAt, completedAt) tuple. Missing timestamps
+ * or an equal newest tuple are ambiguous and therefore fail closed.
+ */
+export function collapseNewestCheckAttempts(checks) {
+  const groups = new Map();
+  for (const check of checks ?? []) {
+    const name = normalizeCheckName(check);
+    const group = groups.get(name) ?? [];
+    group.push(check);
+    groups.set(name, group);
+  }
+
+  const collapsed = [];
+  const ambiguousNames = [];
+  for (const [name, group] of groups) {
+    if (group.length === 1) {
+      collapsed.push(group[0]);
+      continue;
+    }
+
+    const ranked = group.map(check => ({
+      check,
+      startedAt: attemptTimestamp(check, 'startedAt'),
+      completedAt: attemptTimestamp(check, 'completedAt'),
+      observedAt: null,
+    }));
+    if (
+      ranked.some(
+        attempt => attempt.startedAt === null || attempt.completedAt === null
+      )
+    ) {
+      ambiguousNames.push(name);
+      continue;
+    }
+    for (const attempt of ranked) {
+      attempt.observedAt = Math.max(attempt.startedAt, attempt.completedAt);
+    }
+    ranked.sort(
+      (left, right) =>
+        right.observedAt - left.observedAt ||
+        right.startedAt - left.startedAt ||
+        right.completedAt - left.completedAt
+    );
+    if (
+      ranked[0].observedAt === ranked[1].observedAt &&
+      ranked[0].startedAt === ranked[1].startedAt &&
+      ranked[0].completedAt === ranked[1].completedAt
+    ) {
+      ambiguousNames.push(name);
+      continue;
+    }
+    collapsed.push(ranked[0].check);
+  }
+
+  return { checks: collapsed, ambiguousNames: ambiguousNames.sort() };
+}
+
+/** Positive readiness proof shared by auto-ready and queue enrollment. */
+export function classifyQueueCheckBlockers(
+  checks,
+  { requireVerifyDraft = false } = {}
+) {
+  const latest = collapseNewestCheckAttempts(checks);
+  const allChecks = latest.checks;
+  const blockers = new Set(extractTerminalFailures(allChecks));
+  for (const name of latest.ambiguousNames) {
+    if (!isAdvisoryCheckName(name)) {
+      blockers.add(`${name} (ambiguous latest attempt)`);
+    }
+  }
+
+  for (const required of REQUIRED_CHECK_NAMES) {
+    const matches = allChecks.filter(check =>
+      required.names.includes(normalizeCheckName(check))
+    );
+    if (matches.length === 0) {
+      blockers.add(`${required.context} (missing)`);
+      continue;
+    }
+    if (matches.some(isPendingCheck)) {
+      blockers.add(`${required.context} (pending)`);
+    }
+    if (!matches.some(isSuccessfulCheck)) {
+      blockers.add(`${required.context} (not successful)`);
+    }
+  }
+
+  for (const name of MERGE_GATE_CHECK_NAMES) {
+    const matches = allChecks.filter(
+      check => normalizeCheckName(check) === name
+    );
+    if (matches.length === 0) continue;
+    if (matches.some(isPendingCheck)) {
+      blockers.add(`${name} (pending)`);
+    }
+    if (
+      !matches.some(check => isSuccessfulCheck(check) || isSkippedCheck(check))
+    ) {
+      blockers.add(`${name} (not complete)`);
+    }
+  }
+
+  if (requireVerifyDraft) {
+    const matches = allChecks.filter(
+      check => normalizeCheckName(check) === 'Verify Draft Agent PR'
+    );
+    if (matches.some(isPendingCheck)) {
+      blockers.add('Verify Draft Agent PR (pending)');
+    }
+    if (!matches.some(isSuccessfulCheck)) {
+      blockers.add('Verify Draft Agent PR (missing exact-head success)');
+    }
+  }
+
+  return [...blockers].sort();
 }
 
 async function ghJson(args, { repo } = {}) {
@@ -195,4 +380,24 @@ export async function detectSystemicFailures(
     checks: systemicChecks,
     failCountByCheck,
   };
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  if (process.argv[2] === '--advisory-json') {
+    process.stdout.write(`${JSON.stringify(ADVISORY_CHECK_NAMES)}\n`);
+  } else if (
+    process.argv[2] === '--classify-queue' ||
+    process.argv[2] === '--classify-auto-ready'
+  ) {
+    const chunks = [];
+    for await (const chunk of process.stdin) chunks.push(chunk);
+    const checks = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    const blockers = classifyQueueCheckBlockers(checks, {
+      requireVerifyDraft: process.argv[2] === '--classify-auto-ready',
+    });
+    process.stdout.write(`${JSON.stringify(blockers)}\n`);
+  }
 }
