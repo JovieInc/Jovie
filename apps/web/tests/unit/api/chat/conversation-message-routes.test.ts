@@ -339,4 +339,31 @@ describe('chat conversation message routes', () => {
       'chat-conversation'
     );
   });
+
+  it('returns 401 for GET when the session is invalid, without querying the database', async () => {
+    hoisted.getSessionContextMock.mockRejectedValue(
+      new TypeError('Unauthorized')
+    );
+
+    const mod = await import('@/app/api/chat/session-error-response');
+    const { getSessionErrorResponse } = mod as unknown as {
+      getSessionErrorResponse: ReturnType<typeof vi.fn>;
+    };
+    const { NextResponse } = await import('next/server');
+    getSessionErrorResponse.mockReturnValueOnce(
+      NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    );
+
+    const { GET } = await import('@/app/api/chat/conversations/[id]/route');
+    const response = await GET(
+      new Request('http://localhost/api/chat/conversations/conv-1'),
+      { params: Promise.resolve({ id: 'conv-1' }) }
+    );
+
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body.error).toBe('Unauthorized');
+    // getSessionContext threw before the conversation-detail query ran.
+    expect(hoisted.selectLimitMock).not.toHaveBeenCalled();
+  });
 });
