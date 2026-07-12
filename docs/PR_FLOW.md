@@ -152,7 +152,8 @@ Self-hosted runners must use explicit self-hosted labels only (`jovie-runner`,
 architecture labels, machine labels). Never add GitHub-hosted labels such as
 `ubuntu-latest`, `macos-latest`, or `windows-latest` to self-hosted runners: that
 routes ordinary hosted-runner jobs onto local machines with different toolchains.
-`runner-health-monitor` fails fast if this drift reappears.
+`runner-heartbeat` verifies that the explicit `jovie-runner` route remains live;
+GitHub-hosted jobs are never used to infer self-hosted runner labels.
 
 ## What broke on 2026-06-22
 
