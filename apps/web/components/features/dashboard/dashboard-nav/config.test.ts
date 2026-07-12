@@ -66,27 +66,27 @@ describe('nav IA snapshot', () => {
     expect(toSnapshotProjection(primaryNavigation)).toMatchInlineSnapshot(`
       [
         {
+          "href": "/app",
+          "id": "inbox",
+          "label": "Inbox",
+          "order": 0,
+        },
+        {
           "href": "/app/chat",
           "id": "chat",
-          "label": "New Chat",
-          "order": 0,
+          "label": "Chat",
+          "order": 1,
         },
         {
           "href": "/app/library?view=releases",
           "id": "releases",
-          "label": "Releases",
-          "order": 1,
-        },
-        {
-          "href": "/app/settings/artist-profile",
-          "id": "artist-profile",
-          "label": "Artist Profile",
+          "label": "Library",
           "order": 2,
         },
         {
-          "href": "/app/settings/touring",
-          "id": "touring",
-          "label": "Touring",
+          "href": "/app/contacts",
+          "id": "contacts",
+          "label": "Contacts",
           "order": 3,
         },
         {
@@ -101,12 +101,6 @@ describe('nav IA snapshot', () => {
           "label": "Tasks",
           "order": 5,
         },
-        {
-          "href": "/app/audience",
-          "id": "audience",
-          "label": "Audience",
-          "order": 6,
-        },
       ]
     `);
   });
@@ -119,19 +113,19 @@ describe('nav IA snapshot', () => {
         {
           "href": "/app/chat",
           "id": "chat",
-          "label": "New Chat",
+          "label": "Chat",
           "order": 0,
         },
         {
           "href": "/app/library?view=releases",
           "id": "releases",
-          "label": "Releases",
+          "label": "Library",
           "order": 1,
         },
         {
-          "href": "/app/audience",
-          "id": "audience",
-          "label": "Audience",
+          "href": "/app/tasks",
+          "id": "tasks",
+          "label": "Tasks",
           "order": 2,
         },
       ]
@@ -156,15 +150,15 @@ describe('nav IA snapshot', () => {
           "order": 1,
         },
         {
-          "href": "/app/calendar",
-          "id": "calendar",
-          "label": "Calendar",
+          "href": "/app/contacts",
+          "id": "contacts",
+          "label": "Contacts",
           "order": 2,
         },
         {
-          "href": "/app/tasks",
-          "id": "tasks",
-          "label": "Tasks",
+          "href": "/app/calendar",
+          "id": "calendar",
+          "label": "Calendar",
           "order": 3,
         },
         {
