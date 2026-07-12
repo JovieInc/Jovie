@@ -90,6 +90,10 @@ const config: StorybookConfig = {
           find: '@/app/onboarding/actions/enrich-profile',
           replacement: require.resolve('./enrich-profile-mock.ts'),
         },
+        {
+          find: '@/lib/auth/apple-client-secret',
+          replacement: require.resolve('./apple-client-secret-mock.ts'),
+        },
 
         {
           find: '@/app/app/(shell)/dashboard/actions',
