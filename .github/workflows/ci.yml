@@ -4669,6 +4669,8 @@ jobs:
             echo "::error::Missing required staging deployment credentials: ${missing[*]}"
             exit 1
           fi
+      - name: Cancel stale Vercel preview deployments
+        run: node .github/scripts/cancel-stale-vercel-previews.mjs
       - name: DB safety check (staging preflight)
         id: preflight
         run: pnpm --filter=@jovie/web exec tsx scripts/drizzle-migrate-preflight.ts
