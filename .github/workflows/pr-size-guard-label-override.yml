@@ -13,7 +13,7 @@ name: PR Size Guard Label Override
 on:
   # Use the default-branch workflow definition so old PR heads can receive a
   # newly shipped label policy. All executable code remains pinned to the
-  # immutable base SHA below; no PR-head code runs with checks:write.
+  # immutable workflow SHA below; no PR-head code runs with checks:write.
   pull_request_target:
     types: [labeled]
 
@@ -43,8 +43,9 @@ jobs:
           )
         with:
           # This job has checks:write. Execute policy code only from the
-          # immutable base commit, never from a PR-controlled head.
-          ref: ${{ github.event.pull_request.base.sha }}
+          # exact trusted commit that supplied this workflow, never from a
+          # stale PR base or PR-controlled head.
+          ref: ${{ github.workflow_sha }}
           fetch-depth: 1
           persist-credentials: false
 
