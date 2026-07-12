@@ -161,7 +161,7 @@ const config: StorybookConfig = {
           // real next/server entry drags in compiled ua-parser-js, which
           // needs __dirname and crashes the browser story build.
           find: 'next/server',
-          replacement: require.resolve('./empty-module.js'),
+          replacement: require.resolve('./next-server-mock.js'),
         },
         // Mock Next.js navigation for Storybook
         {
