@@ -45,8 +45,17 @@ vi.mock('@/lib/flags/server', () => ({
   getAppFlagValue: hoisted.getAppFlagValueMock,
 }));
 
+// resolveAlbumArtCapability/resolveRetouchCapability are SYNCHRONOUS in
+// production (apps/web/lib/chat/album-art-capability.ts,
+// apps/web/lib/chat/retouch-capability.ts — plain functions, no `async`, no
+// awaited call sites in route.ts). Mocking them with `.mockResolvedValue`
+// silently returns a Promise instead of the capability object; the route
+// never awaits these calls, so any code path that reads
+// `albumArtCapability.availability` would see `undefined` on a Promise
+// instance rather than the real value. Use `.mockReturnValue` so the mock
+// shape matches the real (sync) contract.
 vi.mock('@/lib/chat/album-art-capability', () => ({
-  resolveAlbumArtCapability: vi.fn().mockResolvedValue({
+  resolveAlbumArtCapability: vi.fn().mockReturnValue({
     availability: 'available',
   }),
   detectAlbumArtGenerationIntent: vi.fn().mockReturnValue(false),
@@ -56,7 +65,7 @@ vi.mock('@/lib/chat/album-art-capability', () => ({
 }));
 
 vi.mock('@/lib/chat/retouch-capability', () => ({
-  resolveRetouchCapability: vi.fn().mockResolvedValue({
+  resolveRetouchCapability: vi.fn().mockReturnValue({
     availability: 'available',
   }),
   detectRetouchIntent: vi.fn().mockReturnValue(false),
@@ -173,8 +182,16 @@ vi.mock('@/lib/chat/tools/merch-tools', () => ({
   createMerchSelectTool: vi.fn(),
 }));
 
+// decodeToolEvents returns `{ events, source }` in production (see
+// DecodedToolEvents in apps/web/lib/chat/tool-events.ts) — both route.ts and
+// its own createAssistantReplayStreamResponse() helper immediately read
+// `.events` off the result. A bare-array mock return (`[]`) makes `.events`
+// resolve to `undefined`, which throws when the replay builder later does
+// `for (const event of decodedToolEvents)`. Match the real shape so the
+// duplicate_completed replay path (and anything else touching tool events)
+// doesn't crash on a harness artifact.
 vi.mock('@/lib/chat/tool-events', () => ({
-  decodeToolEvents: vi.fn().mockReturnValue([]),
+  decodeToolEvents: vi.fn().mockReturnValue({ events: [], source: 'empty' }),
   preparePersistedToolEventsForTurnFinish: vi.fn().mockReturnValue([]),
   resolvePersistedToolEventsForDisplay: vi.fn().mockReturnValue([]),
 }));
@@ -679,6 +696,139 @@ describe('POST /api/chat guard wiring', () => {
         userMessage: 'hello',
         userId: 'user_internal_1',
         creatorProfileId: PROFILE_ID,
+      });
+    });
+
+    describe('duplicate_completed replay path', () => {
+      // route.ts ~2600-2635: when reserveChatTurn resolves 'duplicate_completed'
+      // the route must replay the already-persisted turn instead of dispatching
+      // a fresh LLM call — the whole point being that a retried request for a
+      // turn that already finished costs zero quota and zero model calls.
+      function userMessage() {
+        return {
+          id: 'msg_user_1',
+          conversationId: EXISTING_TURN.conversationId,
+          turnId: EXISTING_TURN.id,
+          clientMessageId: EXISTING_TURN.clientTurnId,
+          role: 'user' as const,
+          content: 'hello',
+          toolCalls: null,
+          assistantSource: null,
+          scriptLineKey: null,
+          createdAt: new Date('2026-01-01T00:00:02.000Z'),
+        };
+      }
+
+      function assistantMessage(
+        overrides: Partial<{ content: string; toolCalls: unknown }> = {}
+      ) {
+        return {
+          id: 'msg_assistant_1',
+          conversationId: EXISTING_TURN.conversationId,
+          turnId: EXISTING_TURN.id,
+          clientMessageId: null,
+          role: 'assistant' as const,
+          content: 'Done! I updated your bio.',
+          toolCalls: null,
+          assistantSource: 'llm',
+          scriptLineKey: null,
+          createdAt: new Date('2026-01-01T00:00:04.000Z'),
+          ...overrides,
+        };
+      }
+
+      it('replays the persisted assistant content instead of re-running the LLM, and never re-charges quota or dispatches a new turn', async () => {
+        const completedTurn = {
+          ...EXISTING_TURN,
+          status: 'completed' as const,
+        };
+        hoisted.reserveChatTurnMock.mockResolvedValue({
+          outcome: 'duplicate_completed',
+          conversationId: completedTurn.conversationId,
+          turn: completedTurn,
+          messages: [userMessage(), assistantMessage()],
+        });
+
+        const response = await POST(chatRequest(duplicateTurnBody()));
+
+        // Status/headers: replay is a normal 200 stream, tagged so the client
+        // can distinguish "here's what already happened" from a live turn.
+        expect(response.status).toBe(200);
+        expect(response.headers.get('x-chat-replay')).toBe('true');
+        expect(response.headers.get('x-conversation-id')).toBe(
+          completedTurn.conversationId
+        );
+        expect(response.headers.get('x-chat-turn-id')).toBe(completedTurn.id);
+        const requestId = response.headers.get('x-request-id');
+        expect(requestId).toBeTruthy();
+
+        const body = await response.text();
+        // The replay carries the ORIGINAL turn's content verbatim — proves
+        // this is a replay, not a freshly generated model response.
+        expect(body).toContain('"type":"text-delta"');
+        expect(body).toContain('"delta":"Done! I updated your bio."');
+        // Metadata on the stream pins the replayed turn/conversation/request ids.
+        expect(body).toContain(
+          `"conversationId":"${completedTurn.conversationId}"`
+        );
+        expect(body).toContain(`"turnId":"${completedTurn.id}"`);
+        expect(body).toContain(`"requestId":"${requestId}"`);
+        expect(body).toContain('"type":"finish"');
+        expect(body).not.toContain('"type":"error"');
+
+        // The whole point of the replay path: no new LLM turn, no quota burn,
+        // no second terminal-message write (the message already exists).
+        expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
+        expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+        expect(
+          hoisted.persistTerminalAssistantMessageMock
+        ).not.toHaveBeenCalled();
+
+        expect(hoisted.reserveChatTurnMock).toHaveBeenCalledTimes(1);
+        expect(hoisted.reserveChatTurnMock).toHaveBeenCalledWith({
+          conversationId: null,
+          clientTurnId: EXISTING_TURN.clientTurnId,
+          clientMessageId: null,
+          source: 'typed',
+          toolIntent: null,
+          userMessage: 'hello',
+          userId: 'user_internal_1',
+          creatorProfileId: PROFILE_ID,
+        });
+      });
+
+      it('falls back to the terminal-turn notice when the completed turn has no persisted assistant message, and still skips billing + the LLM', async () => {
+        const failedTurn = {
+          ...EXISTING_TURN,
+          status: 'failed_model_error' as const,
+        };
+        hoisted.reserveChatTurnMock.mockResolvedValue({
+          outcome: 'duplicate_completed',
+          conversationId: failedTurn.conversationId,
+          turn: failedTurn,
+          // No assistant row was ever persisted for this turn (e.g. it failed
+          // before the model responded) — `.find(role === 'assistant')` finds
+          // nothing, and with no persisted tool state either, the route must
+          // fall back to the generic "already finished" notice rather than
+          // replaying empty/undefined content.
+          messages: [userMessage()],
+        });
+
+        const response = await POST(chatRequest(duplicateTurnBody()));
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get('x-chat-replay')).toBe('true');
+        expect(response.headers.get('x-chat-turn-id')).toBe(failedTurn.id);
+
+        const body = await response.text();
+        expect(body).toContain(
+          '"delta":"This chat action already finished. Please send a new message if you need anything else."'
+        );
+        expect(body).toContain('"type":"finish"');
+        expect(body).not.toContain('"type":"error"');
+
+        expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
+        expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
       });
     });
   });
