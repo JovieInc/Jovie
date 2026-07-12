@@ -283,6 +283,17 @@ describe('shouldUseEssentialShellData', () => {
   it('returns false for null', () => {
     expect(shouldUseEssentialShellData(null)).toBe(false);
   });
+
+  // Note (chunk 1.2, one-shell #12633): after widening this list, the only
+  // routes still paying for the full getDashboardData() fetch are ones this
+  // chunk's HOT ZONE couldn't safely reclassify without a hardcoded route
+  // literal: '/app/contact' and '/app/tipping' (singular alias pages, no
+  // APP_ROUTES constant) — both are pure redirects with zero dashboard-data
+  // usage, same shape as tour-dates/contacts above. Filed as a follow-up
+  // candidate rather than adding a literal here. `admin/*` server actions
+  // and other non-shell callers (chat context, monetization summary, release
+  // actions) keep using the full fetch directly and are unaffected by this
+  // route-classification change.
 });
 
 describe('shouldRedirectToOnboarding', () => {
@@ -332,9 +343,27 @@ describe('shell foundation Wave 3 — route persistence + request budgets (no fu
     expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ACCOUNT)).toBe(true);
   });
 
-  it('full-data routes (earnings etc) correctly opt out of essential to preserve request budget semantics', () => {
-    // Non-essential still hydrate inside the *same* stable HydrateClient + AuthShellWrapper tree.
-    expect(shouldUseEssentialShellData(APP_ROUTES.EARNINGS)).toBe(false);
+  it('returns true for earnings — the page already self-fetches essential shell data via loadAppShellRouteContext before redirecting, so the shell fetch was pure waste', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.EARNINGS)).toBe(true);
+  });
+
+  it('returns true for the youtube revival queue and feature-flags routes — both call loadAppShellRouteContext (essential fetch) themselves', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.YOUTUBE_REVIVAL)).toBe(true);
+    expect(shouldUseEssentialShellData(APP_ROUTES.FEATURE_FLAGS)).toBe(true);
+  });
+
+  it('returns true for tour-dates and contacts — pure redirect pages that render no dashboard-derived UI', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.TOUR_DATES)).toBe(true);
+    expect(shouldUseEssentialShellData(APP_ROUTES.CONTACTS)).toBe(true);
+  });
+
+  it('returns true for jovie-work — JovieWorkPanel only reads selectedProfile, which the essential fetch already provides', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.JOVIE_WORK)).toBe(true);
+  });
+
+  it('returns true for the admin subtree — AdminLayout gates access itself via getCurrentAdminPageAccess() and no admin surface reads useDashboardData()', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.ADMIN)).toBe(true);
+    expect(shouldUseEssentialShellData(`${APP_ROUTES.ADMIN}/users`)).toBe(true);
   });
 
   it('search nav item in sidebar is non-navigating (opens command palette only) — single global search path', () => {
