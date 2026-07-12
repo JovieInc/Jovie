@@ -1,14 +1,18 @@
 'use client';
 
-import { Button, CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
+import {
+  Button,
+  CommonDropdown,
+  type CommonDropdownItem,
+  EmptyState,
+} from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { type OnChangeFn, type SortingState } from '@tanstack/react-table';
-import { Copy, Download, ExternalLink, Users } from 'lucide-react';
+import { Copy, Download, ExternalLink } from 'lucide-react';
 import * as React from 'react';
 import { memo, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
-import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   AudienceMobileCard,
@@ -674,7 +678,6 @@ export const DashboardAudienceTableUnified = memo(
     const emptyStateHeading = 'Grow Your Audience';
     const emptyStateDescription =
       'Share your profile link on social media to invite visitors. Most creators get their first audience member by sharing on X or IG bio.';
-    const emptyStateIcon = <Users className='h-6 w-6' aria-hidden='true' />;
     const emptyStatePrimaryAction = profileUrl
       ? {
           label: copiedProfileLink ? 'Link copied' : 'Copy profile link',
@@ -884,10 +887,9 @@ export const DashboardAudienceTableUnified = memo(
                 <div className='flex-1 min-h-0 overflow-auto'>
                   {rows.length === 0 ? (
                     <EmptyState
-                      icon={emptyStateIcon}
                       heading={emptyStateHeading}
                       description={emptyStateDescription}
-                      action={emptyStatePrimaryAction}
+                      primaryAction={emptyStatePrimaryAction}
                       secondaryAction={emptyStateSecondaryAction}
                       testId='dashboard-audience-empty-state'
                     />
@@ -916,10 +918,9 @@ export const DashboardAudienceTableUnified = memo(
                           isLoading={false}
                           emptyState={
                             <EmptyState
-                              icon={emptyStateIcon}
                               heading={emptyStateHeading}
                               description={emptyStateDescription}
-                              action={emptyStatePrimaryAction}
+                              primaryAction={emptyStatePrimaryAction}
                               secondaryAction={emptyStateSecondaryAction}
                               testId='dashboard-audience-empty-state'
                             />

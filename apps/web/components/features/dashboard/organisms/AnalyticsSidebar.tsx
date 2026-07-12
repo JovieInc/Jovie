@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyState } from '@jovie/ui';
 import { Globe, Link2, MapPin } from 'lucide-react';
 import { type ComponentType, useState } from 'react';
 import {
@@ -205,12 +206,7 @@ function RankedList({
   }
 
   if (items.length === 0) {
-    return (
-      <div className='flex min-h-49 flex-col items-center justify-center text-center'>
-        <IconComponent className='mb-1.5 h-4 w-4 text-quaternary-token' />
-        <p className='text-xs text-tertiary-token'>{emptyMessage}</p>
-      </div>
-    );
+    return <EmptyState heading={emptyMessage} />;
   }
 
   return (
