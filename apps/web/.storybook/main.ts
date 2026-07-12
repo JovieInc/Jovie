@@ -91,7 +91,11 @@ const config: StorybookConfig = {
           replacement: require.resolve('./enrich-profile-mock.ts'),
         },
         {
-          find: '@/lib/auth/apple-client-secret',
+          // lib/auth/better-auth.ts imports this RELATIVELY
+          // ('./apple-client-secret'), so a plain '@/…' find never matches.
+          // Full-specifier regex: .replace() swaps the entire id for the
+          // mock's absolute path, for both aliased and relative forms.
+          find: /^(.*\/)?apple-client-secret$/,
           replacement: require.resolve('./apple-client-secret-mock.ts'),
         },
 
