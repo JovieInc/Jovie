@@ -106,6 +106,8 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
   it('uses a separate labeled workflow that posts a PR Size Guard check override', () => {
     const workflow = readFileSync(OVERRIDE_WORKFLOW, 'utf8');
 
+    expect(workflow).toContain('pull_request_target:');
+    expect(workflow).not.toMatch(/^\s+pull_request:\s*$/m);
     expect(workflow).toContain('types: [labeled]');
     expect(workflow).toContain("github.event.label.name == 'big-pr'");
     expect(workflow).toContain("github.event.label.name == 'codemod'");
