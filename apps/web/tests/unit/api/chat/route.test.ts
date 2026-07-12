@@ -593,4 +593,93 @@ describe('POST /api/chat guard wiring', () => {
       expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
     });
   });
+
+  describe('duplicate clientTurnId handling (idempotency gate)', () => {
+    const EXISTING_TURN = {
+      id: 'turn_existing_1',
+      userId: 'user_internal_1',
+      creatorProfileId: PROFILE_ID,
+      conversationId: 'conv_existing_1',
+      clientTurnId: 'client-turn-duplicate-1',
+      status: 'streaming' as const,
+      source: 'typed' as const,
+      model: null,
+      toolIntent: null,
+      errorCode: null,
+      errorMessage: null,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:05.000Z'),
+      startedAt: new Date('2026-01-01T00:00:01.000Z'),
+      completedAt: null,
+    };
+
+    function duplicateTurnBody(overrides: Record<string, unknown> = {}) {
+      return validBody({
+        clientTurnId: EXISTING_TURN.clientTurnId,
+        ...overrides,
+      });
+    }
+
+    beforeEach(() => {
+      hoisted.getSessionContextMock.mockResolvedValue({
+        user: { id: 'user_internal_1' },
+        profile: { id: PROFILE_ID },
+      });
+    });
+
+    it('returns 409 with the in-progress turn/conversation identifiers, and short-circuits before quota is charged or the LLM is dispatched', async () => {
+      hoisted.reserveChatTurnMock.mockResolvedValue({
+        outcome: 'duplicate_in_progress',
+        conversationId: EXISTING_TURN.conversationId,
+        turn: EXISTING_TURN,
+      });
+
+      const response = await POST(chatRequest(duplicateTurnBody()));
+
+      expect(response.status).toBe(409);
+      const body = await response.json();
+      expect(body.error).toBe('TURN_IN_PROGRESS');
+      expect(body.errorCode).toBe('TURN_IN_PROGRESS');
+      expect(body.conversationId).toBe(EXISTING_TURN.conversationId);
+      expect(body.turnId).toBe(EXISTING_TURN.id);
+      expect(body.requestId).toBeTruthy();
+
+      // Headers surface the existing turn/conversation for client replay
+      // polling, alongside the standard request-id header.
+      expect(response.headers.get('x-conversation-id')).toBe(
+        EXISTING_TURN.conversationId
+      );
+      expect(response.headers.get('x-chat-turn-id')).toBe(EXISTING_TURN.id);
+      expect(response.headers.get('x-request-id')).toBe(body.requestId);
+
+      // Idempotency gate: reservation is consulted (and short-circuits)
+      // BEFORE quota is charged and before the LLM is ever dispatched — a
+      // retried duplicate must not cost the artist a rate-limit unit or spin
+      // up a redundant model call.
+      expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+      expect(
+        hoisted.persistTerminalAssistantMessageMock
+      ).not.toHaveBeenCalled();
+
+      // Session resolved from the authenticated userId (not request body),
+      // and the reservation call carries the resolved session identity plus
+      // the request-derived turn fields — not raw request-body passthrough.
+      expect(hoisted.getSessionContextMock).toHaveBeenCalledWith({
+        clerkUserId: 'user_123',
+        requireProfile: true,
+      });
+      expect(hoisted.reserveChatTurnMock).toHaveBeenCalledTimes(1);
+      expect(hoisted.reserveChatTurnMock).toHaveBeenCalledWith({
+        conversationId: null,
+        clientTurnId: EXISTING_TURN.clientTurnId,
+        clientMessageId: null,
+        source: 'typed',
+        toolIntent: null,
+        userMessage: 'hello',
+        userId: 'user_internal_1',
+        creatorProfileId: PROFILE_ID,
+      });
+    });
+  });
 });
