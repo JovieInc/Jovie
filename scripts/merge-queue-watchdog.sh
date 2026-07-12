@@ -120,8 +120,37 @@ last_kick_age_hours() {  # last_kick_age_hours <num>
 record_kick() {  # record_kick <num> <body>
   local n="$1" body="$2"
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would record kick comment on #$n"; return 0; }
-  bash "$(dirname "${BASH_SOURCE[0]}")/lib/upsert-pr-comment.sh" "$n" "$KICK_MARKER" "$body" \
-    || echo "    !! failed to record kick comment on #$n"
+  if bash "$(dirname "${BASH_SOURCE[0]}")/lib/upsert-pr-comment.sh" "$n" "$KICK_MARKER" "$body"; then
+    echo "    recorded kick comment on #$n"
+    return 0
+  fi
+  echo "    !! failed to record kick comment on #$n" >&2
+  return 1
+}
+
+# A label cycle is a two-step mutation. Unlike the best-effort label helpers
+# used for one-way classifications above, these helpers preserve failure so a
+# removed queue label can always be compensated before the watchdog exits.
+add_queue_label_strict() {  # add_queue_label_strict <num>
+  local n="$1"
+  [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would +merge-queue on #$n"; return 0; }
+  if gh_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
+    echo "    +merge-queue on #$n"
+    return 0
+  fi
+  echo "    !! failed to add merge-queue on #$n" >&2
+  return 1
+}
+
+remove_queue_label_strict() {  # remove_queue_label_strict <num>
+  local n="$1"
+  [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would -merge-queue on #$n"; return 0; }
+  if gh_retry pr edit "$n" -R "$REPO" --remove-label merge-queue >/dev/null; then
+    echo "    -merge-queue on #$n"
+    return 0
+  fi
+  echo "    !! failed to remove merge-queue on #$n; queue membership is unchanged" >&2
+  return 1
 }
 
 # Kicks recorded today (UTC) for this PR, parsed from the marker comment body
@@ -213,6 +242,7 @@ conflicts=0
 dequeued=0
 skipped_fresh=0
 skipped_cooldown=0
+mutation_failures=0
 
 while IFS= read -r pr; do
   n="$(jq -r '.n' <<<"$pr")"
@@ -267,9 +297,26 @@ while IFS= read -r pr; do
   fi
 
   echo "  #$n  $t  STALLED (age=${age_min}m, clean+green) -> label-cycle merge-queue"
-  unlabel "$n" merge-queue
-  label "$n" merge-queue
-  record_kick "$n" "Merge-queue watchdog: label-cycled \`merge-queue\` after ${age_min}m stalled with no terminal check failures (kicked at $(date -u +%Y-%m-%dT%H:%M:%SZ)). Timestamp source: \`merge-queue\` labeled event at ${labeled_at} from the issue timeline. kicks ${today_utc}: $((kicks_today + 1))"
+  if ! remove_queue_label_strict "$n"; then
+    mutation_failures=$((mutation_failures + 1))
+    continue
+  fi
+  if ! add_queue_label_strict "$n"; then
+    echo "    !! re-add failed; compensating by restoring merge-queue on #$n" >&2
+    if ! add_queue_label_strict "$n"; then
+      echo "    !! CRITICAL: compensation failed; #$n may be missing merge-queue" >&2
+    fi
+    mutation_failures=$((mutation_failures + 1))
+    continue
+  fi
+  if ! record_kick "$n" "Merge-queue watchdog: label-cycled \`merge-queue\` after ${age_min}m stalled with no terminal check failures (kicked at $(date -u +%Y-%m-%dT%H:%M:%SZ)). Timestamp source: \`merge-queue\` labeled event at ${labeled_at} from the issue timeline. kicks ${today_utc}: $((kicks_today + 1))"; then
+    echo "    !! comment failed; confirming merge-queue remains restored on #$n" >&2
+    if ! add_queue_label_strict "$n"; then
+      echo "    !! CRITICAL: label confirmation failed; #$n may be missing merge-queue" >&2
+    fi
+    mutation_failures=$((mutation_failures + 1))
+    continue
+  fi
   kicked=$((kicked + 1))
 done < <(jq -c '.[]' <<<"$CANDIDATES")
 
@@ -279,4 +326,6 @@ echo "  conflicts flagged: ${conflicts}"
 echo "  dequeued (terminal red): ${dequeued}"
 echo "  skipped (fresh, <${STALL_MINUTES}m): ${skipped_fresh}"
 echo "  skipped (cooldown): ${skipped_cooldown}"
+echo "  mutation failures: ${mutation_failures}"
 echo "=== done (DRY_RUN=$DRY_RUN) ==="
+[[ "$mutation_failures" -eq 0 ]]
