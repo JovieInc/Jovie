@@ -156,6 +156,13 @@ const config: StorybookConfig = {
           find: 'next/headers',
           replacement: require.resolve('./empty-module.js'),
         },
+        {
+          // lib/auth server modules import NextRequest/NextResponse; the
+          // real next/server entry drags in compiled ua-parser-js, which
+          // needs __dirname and crashes the browser story build.
+          find: 'next/server',
+          replacement: require.resolve('./empty-module.js'),
+        },
         // Mock Next.js navigation for Storybook
         {
           find: 'next/navigation',
