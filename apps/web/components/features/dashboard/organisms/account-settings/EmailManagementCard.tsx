@@ -160,6 +160,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                     id='new-email'
                     type='email'
                     value={newEmail}
+                    // eslint-disable-next-line @jovie/canonical-ui-label-casing -- email placeholder literal
                     placeholder='you@example.com'
                     onChange={event => setNewEmail(event.target.value)}
                     className='h-8 border-subtle bg-surface-0 text-app'
