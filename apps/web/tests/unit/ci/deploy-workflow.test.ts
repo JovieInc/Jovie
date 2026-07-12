@@ -55,6 +55,21 @@ function getJobBlock(workflow: string, jobKey: string): string {
   return block.join('\n');
 }
 
+describe('risk-triggered smoke admission', () => {
+  it('evaluates auth smoke when the optional Neon prerequisite is skipped', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const smokeJob = getJobBlock(workflow, 'ci-e2e-smoke');
+
+    expect(smokeJob).toContain(
+      "if: ${{ always() && needs.ci-path-changes.outputs.skip == 'false'"
+    );
+    expect(smokeJob).toContain(
+      "needs.ci-risk-classifier.outputs.requires_smoke == 'true'"
+    );
+    expect(smokeJob).toContain("needs.neon-db.result == 'skipped'");
+  });
+});
+
 describe('deploy workflow Vercel env resolution', () => {
   it('routes main deploy artifact builds to hosted capacity', () => {
     const workflow = readFileSync(workflowPath, 'utf8');

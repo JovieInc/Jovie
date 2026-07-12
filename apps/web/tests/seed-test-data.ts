@@ -17,6 +17,7 @@ import * as schema from '@/lib/db/schema';
 import { deriveConfirmationStatus } from '@/lib/events/confirmation-status';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import {
+  E2E_PREBUILT_CLAIM_SPOTIFY_ID,
   E2E_PREBUILT_CLAIM_TOKEN,
   E2E_PREBUILT_CLAIM_USERNAME,
 } from '@/lib/testing/e2e-prebuilt-claim';
@@ -64,6 +65,7 @@ interface TestProfile {
   displayName: string;
   bio: string;
   spotifyUrl?: string;
+  spotifyId?: string;
   avatarUrl?: string;
 }
 
@@ -295,7 +297,8 @@ const TEST_PROFILES: TestProfile[] = [
     username: 'testartist',
     displayName: 'Test Artist',
     bio: 'Test artist for E2E tipping tests',
-    spotifyUrl: 'https://open.spotify.com/artist/test',
+    spotifyUrl: `https://open.spotify.com/artist/${E2E_PREBUILT_CLAIM_SPOTIFY_ID}`,
+    spotifyId: E2E_PREBUILT_CLAIM_SPOTIFY_ID,
     avatarUrl: DEFAULT_TEST_AVATAR_URL,
   },
 ];
@@ -721,17 +724,11 @@ const TEST_TOUR_DATES: TestTourDate[] = [
   },
 ];
 
-/**
- * Seeds tour dates for a creator profile.
- * Idempotent — uses onConflictDoNothing to safely backfill.
- */
-async function seedTourDatesForProfile(
-  db: ReturnType<typeof drizzle>,
-  profileId: string
-) {
-  console.log('    Seeding tour dates...');
-
-  const values = TEST_TOUR_DATES.map(td => ({
+export function buildTourDateSeedRow(
+  profileId: string,
+  td: TestTourDate
+): typeof tourDates.$inferInsert {
+  return {
     profileId,
     externalId: td.externalId,
     // confirmation_status is NOT NULL with no default (trust gate) — derive
@@ -750,7 +747,20 @@ async function seedTourDatesForProfile(
     timezone: td.timezone,
     startDate: dateMonthsFromNow(td.monthsFromNow),
     startTime: td.startTime,
-  }));
+  };
+}
+
+/**
+ * Seeds tour dates for a creator profile.
+ * Idempotent — uses onConflictDoNothing to safely backfill.
+ */
+async function seedTourDatesForProfile(
+  db: ReturnType<typeof drizzle>,
+  profileId: string
+) {
+  console.log('    Seeding tour dates...');
+
+  const values = TEST_TOUR_DATES.map(td => buildTourDateSeedRow(profileId, td));
 
   try {
     await withSeedOperationTimeout(
@@ -1387,6 +1397,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           displayName: profile.displayName,
           bio: profile.bio,
           spotifyUrl: profile.spotifyUrl || null,
+          spotifyId: profile.spotifyId || null,
           avatarUrl: profile.avatarUrl || null,
           creatorType: 'artist',
           isPublic: true,

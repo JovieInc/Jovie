@@ -3,6 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   ensureSignedInUser,
+  fillControlledInputUntilEnabled,
   getAdminCredentials,
   hasAdminCredentials,
 } from '../helpers/clerk-auth';
@@ -239,11 +240,9 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const continueButton = page.getByRole('button', {
     name: 'Continue with Email',
   });
-  await emailInput.fill(email);
-  // The standalone app can finish client hydration immediately after its
-  // server-rendered form becomes visible. Wait for React state to enable the
-  // submit control before clicking so the typed address is not lost.
-  await expect(continueButton).toBeEnabled({ timeout: 30_000 });
+  // Hydration can reset the server-rendered controlled input after the first
+  // fill. Refill until React retains the value and enables submission.
+  await fillControlledInputUntilEnabled(emailInput, continueButton, email);
   await continueButton.click();
   await expect(page.locator('[data-auth-email-code-step="code"]')).toBeVisible({
     timeout: 30_000,

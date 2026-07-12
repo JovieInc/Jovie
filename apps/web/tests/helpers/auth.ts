@@ -1,12 +1,6 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
-import {
-  TEST_AUTH_BYPASS_MODE,
-  TEST_MODE_COOKIE,
-  TEST_PERSONA_COOKIE,
-  TEST_USER_ID_COOKIE,
-} from '@/lib/auth/test-mode';
 import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
 import { primeVercelBypassCookie } from './vercel-preview';
 
@@ -204,41 +198,60 @@ export async function setTestAuthBypassSession(
   persona: DevTestAuthPersona | null,
   overrideUserId?: string | null
 ): Promise<void> {
-  const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
-  const userId = resolveBypassFallbackUserId(persona, overrideUserId);
-
-  // Set the test-mode cookies directly on the browser context. This is the
-  // same mechanism the Clerk-era helper used, but the user id is now the
-  // BA user id (not Clerk's). The server's `getCachedDevTestAuthSession`
-  // reads these cookies and resolves the app user via `betterAuthUserId`.
-  await page.context().addCookies([
+  const configuredBaseUrl = process.env.BASE_URL?.trim();
+  const baseUrl =
+    configuredBaseUrl && configuredBaseUrl !== '/'
+      ? configuredBaseUrl.replace(/\/$/, '')
+      : 'http://localhost:3100';
+  const provisionedPersona = persona ?? 'creator';
+  const existingUserId =
+    persona === null && overrideUserId && !overrideUserId.startsWith('e2e-')
+      ? overrideUserId
+      : undefined;
+  const response = await page.request.post(
+    `${baseUrl}/api/dev/test-auth/session`,
     {
-      name: TEST_MODE_COOKIE,
-      value: TEST_AUTH_BYPASS_MODE,
-      url: baseUrl,
-      sameSite: 'Lax',
-    },
-    {
-      name: TEST_USER_ID_COOKIE,
-      value: userId,
-      url: baseUrl,
-      sameSite: 'Lax',
-    },
-    ...(persona
-      ? [
-          {
-            name: TEST_PERSONA_COOKIE,
-            value: persona,
-            url: baseUrl,
-            sameSite: 'Lax' as const,
-          },
-        ]
-      : []),
-  ]);
+      data: {
+        persona: provisionedPersona,
+        ...(existingUserId ? { existingUserId } : {}),
+      },
+    }
+  );
+  const body = (await response.json().catch(() => null)) as {
+    success?: boolean;
+    userId?: string | null;
+  } | null;
 
-  if (!persona) {
-    await page.context().clearCookies({ name: TEST_PERSONA_COOKIE });
+  if (!response.ok() || body?.success !== true || !body.userId) {
+    throw new ClerkTestError(
+      `Better Auth test session provisioning failed (${response.status()}).`,
+      'CLERK_SETUP_FAILED'
+    );
   }
+
+  // Legacy e2e-* override values are scenario labels, not identities. Real
+  // Better Auth IDs take the strict existing-user path and fail closed unless
+  // the server resolves a persisted actor.
+}
+
+/** Refill a controlled field until React hydration retains it and enables submit. */
+export async function fillControlledInputUntilEnabled(
+  input: Locator,
+  submit: Locator,
+  value: string,
+  timeout = 30_000
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        await input.fill(value);
+        return (
+          (await input.inputValue()) === value && (await submit.isEnabled())
+        );
+      },
+      { timeout, intervals: [100, 250, 500] }
+    )
+    .toBe(true);
 }
 
 export async function waitForAuthenticatedHealth(
