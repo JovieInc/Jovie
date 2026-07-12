@@ -171,7 +171,7 @@ class TestDrainPrQueueWiring:
         assert "--limit 200" in content
         assert "statusCheckRollup" not in content
         assert "gh pr checks" in content
-        assert "--required" in content
+        assert "--json name,bucket,state,workflow,description,startedAt,completedAt" in content
         assert "--remove-label" in content
         assert "tim-approved" not in content
         assert "approved:taste" not in content
@@ -190,7 +190,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '["Typecheck"]'
+                  echo '[{"name":"Typecheck","bucket":"fail","state":"FAILURE"}]'
                   exit 1
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -226,7 +226,7 @@ JSON
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
                   [[ "$3" == "101" ]]
-                  echo '[]'
+                  echo '[{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -273,7 +273,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[]'
+                  echo '[{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
                   exit 8
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -319,7 +319,7 @@ JSON
                     echo "HTTP 504: We couldn't respond to your request in time." >&2
                     exit 1
                   fi
-                  echo '[]'
+                  echo '[{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -364,7 +364,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[]'
+                  echo '[{{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -437,7 +437,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[]'
+                  echo '[{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -503,7 +503,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[]'
+                  echo '[{{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -588,7 +588,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '["PR Ready"]'
+                  echo '[{"name":"CI / PR Ready","bucket":"fail","state":"FAILURE"},{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
                   exit 1
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -606,12 +606,12 @@ JSON
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "BLOCKED: 1" in result.stdout
         assert "[dry-run] would -merge-queue on #888" in result.stdout
-        assert "checks=PR Ready" in result.stdout
+        assert "checks=CI / PR Ready" in result.stdout
         assert "=== BLOCKED (red checks" in result.stdout
         assert "#888" in result.stdout
         assert "[dry-run] would +merge-queue on #888" not in result.stdout
 
-    def test_unstable_state_with_no_failures_stays_enrolled(
+    def test_unstable_state_with_missing_required_checks_is_dequeued(
         self, tmp_path: Path
     ) -> None:
         fake_gh = tmp_path / "gh"
@@ -644,10 +644,11 @@ JSON
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "UNSTABLE: 1" in result.stdout
-        # 2026-06-22 stall fix: a MERGEABLE PR that is UNSTABLE/BLOCKED only because
-        # of a zombie cancelled/queued required-check (no TERMINAL failure) must NOT
-        # be dequeued. It stays enrolled and untouched so Graphite can land it.
-        assert "[dry-run] would -merge-queue on #889" not in result.stdout
+        # Queue enrollment requires positive proof that every required aggregate
+        # exists and succeeded. An empty check set must fail closed even when the
+        # GitHub mergeability snapshot still says MERGEABLE.
+        assert "[dry-run] would -merge-queue on #889" in result.stdout
+        assert "CI / PR Ready (missing)" in result.stdout
         assert "[dry-run] would +merge-queue on #889" not in result.stdout
 
     def test_drain_remediate_script_exists(self) -> None:
