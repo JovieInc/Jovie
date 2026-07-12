@@ -18,6 +18,7 @@ def test_timed_out_prebuilt_uploads_fall_back_to_source(tmp_path: Path) -> None:
         """#!/usr/bin/env bash
 set -euo pipefail
 if [[ " $* " == *" --prebuilt "* ]]; then
+  echo "https://jovie-incomplete-prebuilt.vercel.app"
   trap '' TERM
   sleep 5
   exit 1
