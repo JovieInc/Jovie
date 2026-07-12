@@ -213,7 +213,6 @@ function LinkedTabBar<T extends string>({
               <Link
                 key={option.value}
                 href={href}
-                prefetch={false}
                 role='tab'
                 data-testid={`drawer-tab-${option.value}`}
                 aria-selected={selected}
