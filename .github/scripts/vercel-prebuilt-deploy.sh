@@ -65,14 +65,15 @@ run_deploy() {
   local mode="$1"
   shift
 
-  # Three bounded prebuilt attempts plus the source fallback must stay within
-  # the workflow step's 10-minute ceiling, including each 15-second kill grace.
-  local timeout_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-35}"
+  # Three bounded prebuilt attempts plus the source fallback must leave a full
+  # minute beneath the workflow step's 10-minute ceiling, including kill grace.
+  local timeout_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-25}"
   if [ "$mode" = "source" ]; then
-    timeout_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-420}"
+    timeout_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-405}"
   fi
+  local kill_grace_seconds="${VERCEL_DEPLOY_KILL_GRACE_SECONDS:-15}"
 
-  local deploy_cmd=(timeout --signal=TERM --kill-after=15s "$timeout_seconds")
+  local deploy_cmd=(timeout --signal=TERM --kill-after="${kill_grace_seconds}s" "$timeout_seconds")
 
   if [ "$mode" = "tgz" ]; then
     "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=tgz "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
@@ -114,7 +115,7 @@ try_mode() {
   fi
 
   echo "$deploy_output"
-  if [ "$deploy_status" -eq 124 ]; then
+  if [ "$deploy_status" -eq 124 ] || [ "$deploy_status" -eq 137 ]; then
     echo "Deploy attempt $attempt with ${mode} upload exceeded its time budget" >&2
   fi
   return 1

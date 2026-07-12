@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -15,6 +16,7 @@ def test_timed_out_prebuilt_uploads_fall_back_to_source(tmp_path: Path) -> None:
         """#!/usr/bin/env bash
 set -euo pipefail
 if [[ " $* " == *" --prebuilt "* ]]; then
+  trap '' TERM
   sleep 5
   exit 1
 fi
@@ -38,6 +40,7 @@ echo "https://jovie-timeout-test.vercel.app"
             "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "true",
             "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
             "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "5",
+            "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
         }
     )
 
@@ -57,3 +60,19 @@ echo "https://jovie-timeout-test.vercel.app"
     assert output_file.read_text().strip() == (
         "deploy_url=https://jovie-timeout-test.vercel.app"
     )
+
+
+def test_default_attempt_budgets_leave_one_minute_for_step_overhead() -> None:
+    script = DEPLOY_SCRIPT.read_text()
+
+    def default_for(name: str) -> int:
+        match = re.search(rf"\$\{{{name}:-([0-9]+)\}}", script)
+        assert match is not None, f"missing default for {name}"
+        return int(match.group(1))
+
+    archive = default_for("VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS")
+    source = default_for("VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS")
+    kill_grace = default_for("VERCEL_DEPLOY_KILL_GRACE_SECONDS")
+
+    worst_case_seconds = 3 * (archive + kill_grace) + source + kill_grace
+    assert worst_case_seconds <= 9 * 60

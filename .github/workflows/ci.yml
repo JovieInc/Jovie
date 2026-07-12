@@ -510,7 +510,7 @@ jobs:
           # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
           # desktop-release-guard / version-fanout-guard on PRs.
           git fetch origin "${{ github.base_ref }}" --no-tags
-          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|scripts/lib/(ci-|merge-queue)|scripts/ci-)'; then
+          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|scripts/lib/(ci-|merge-queue)|scripts/ci-|scripts/tests/test_vercel_prebuilt_deploy\.py)'; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -518,12 +518,12 @@ jobs:
       - name: Install actionlint (structural)
         if: steps.structural.outputs.skip != 'true'
         uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
-      - name: Set up Python (structural drain tests)
+      - name: Set up Python (structural regression tests)
         if: steps.structural.outputs.skip != 'true'
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
-      - name: Install pytest (structural drain tests)
+      - name: Install pytest (structural regression tests)
         if: steps.structural.outputs.skip != 'true'
         run: pip install pytest --quiet
       - name: Run ci-fast lanes
