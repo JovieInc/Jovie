@@ -28,16 +28,16 @@ jobs:
     name: PR Size Guard Label Override
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 2
-    if: >-
-      github.event.pull_request.user.login != 'dependabot[bot]' &&
-      github.event.pull_request.head.ref != 'screenshots/auto-update' &&
-      (
-        github.event.label.name == 'big-pr' ||
-        github.event.label.name == 'codemod' ||
-        github.event.label.name == 'integration-train'
-      )
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.head.ref != 'screenshots/auto-update' &&
+          (
+            github.event.label.name == 'big-pr' ||
+            github.event.label.name == 'codemod' ||
+            github.event.label.name == 'integration-train'
+          )
         with:
           # This job has checks:write. Execute policy code only from the
           # immutable base commit, never from a PR-controlled head.
@@ -46,7 +46,10 @@ jobs:
           persist-credentials: false
 
       - name: Recompute and validate bounded integration train
-        if: ${{ github.event.label.name == 'integration-train' }}
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.head.ref != 'screenshots/auto-update' &&
+          github.event.label.name == 'integration-train'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -81,6 +84,14 @@ jobs:
             node scripts/lib/pr-size-guard-policy.mjs
 
       - name: Post passing PR Size Guard check
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.head.ref != 'screenshots/auto-update' &&
+          (
+            github.event.label.name == 'big-pr' ||
+            github.event.label.name == 'codemod' ||
+            github.event.label.name == 'integration-train'
+          )
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
