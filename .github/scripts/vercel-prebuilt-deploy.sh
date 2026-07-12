@@ -42,10 +42,6 @@ resolve_vercel_cmd() {
   return 127
 }
 
-run_vercel() {
-  "${VERCEL_CMD[@]}" "$@"
-}
-
 parse_deployment_url() {
   printf '%s\n' "$1" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1 || true
 }
@@ -69,22 +65,32 @@ run_deploy() {
   local mode="$1"
   shift
 
+  # Three bounded prebuilt attempts plus the source fallback must leave a full
+  # minute beneath the workflow step's 10-minute ceiling, including kill grace.
+  local timeout_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-15}"
+  if [ "$mode" = "source" ]; then
+    timeout_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-475}"
+  fi
+  local kill_grace_seconds="${VERCEL_DEPLOY_KILL_GRACE_SECONDS:-5}"
+
+  local deploy_cmd=(timeout --signal=TERM --kill-after="${kill_grace_seconds}s" "$timeout_seconds")
+
   if [ "$mode" = "tgz" ]; then
-    run_vercel deploy --prebuilt --archive=tgz "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
+    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=tgz "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
   if [ "$mode" = "split-tgz" ]; then
-    run_vercel deploy --prebuilt --archive=split-tgz "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
+    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=split-tgz "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
   if [ "$mode" = "plain" ]; then
-    run_vercel deploy --prebuilt "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
+    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
-  run_vercel deploy "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
+  "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
 }
 
 try_mode() {
@@ -93,7 +99,9 @@ try_mode() {
   shift 2
 
   local deploy_output=""
-  if deploy_output="$(run_deploy "$mode" "$@" 2>&1)"; then
+  local deploy_status=0
+  deploy_output="$(run_deploy "$mode" "$@" 2>&1)" || deploy_status=$?
+  if [ "$deploy_status" -eq 0 ]; then
     echo "$deploy_output"
     local deployment_url=""
     deployment_url="$(parse_deployment_url "$deploy_output")"
@@ -107,6 +115,16 @@ try_mode() {
   fi
 
   echo "$deploy_output"
+  if [ "$deploy_status" -eq 124 ] || [ "$deploy_status" -eq 137 ]; then
+    echo "Deploy attempt $attempt with ${mode} upload exceeded its time budget" >&2
+    local accepted_deployment_url=""
+    accepted_deployment_url="$(parse_deployment_url "$deploy_output")"
+    if [ -n "$accepted_deployment_url" ]; then
+      write_deployment_url "$accepted_deployment_url"
+      echo "Vercel accepted ${accepted_deployment_url}; downstream health gates will verify readiness"
+      return 0
+    fi
+  fi
   return 1
 }
 
