@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getBatchCreatorEntitlements,
   getCreatorEntitlements,
@@ -181,6 +181,117 @@ describe('getBatchCreatorEntitlements', () => {
     expect(result.get('profile_123')).toEqual({
       plan: 'pro',
       entitlements: getEntitlements('pro'),
+    });
+  });
+});
+
+describe('trial expiry (read-time normalization)', () => {
+  const NOW = new Date('2026-07-09T12:00:00.000Z');
+  const FUTURE = new Date('2026-07-20T12:00:00.000Z');
+  const PAST = new Date('2026-07-01T12:00:00.000Z');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('grants trial entitlements while the trial window is open', async () => {
+    installQueryResult([
+      {
+        claimedUserId: 'user_claimed',
+        claimedPlan: 'trial',
+        claimedTrialEndsAt: FUTURE,
+        legacyUserId: null,
+        legacyPlan: null,
+        legacyTrialEndsAt: null,
+      },
+    ]);
+
+    const result = await getCreatorEntitlements('profile_trial_active');
+
+    expect(result).toEqual({
+      plan: 'trial',
+      entitlements: getEntitlements('trial'),
+    });
+  });
+
+  it('fails closed to free once the trial has expired (plan column still trial)', async () => {
+    installQueryResult([
+      {
+        claimedUserId: 'user_claimed',
+        claimedPlan: 'trial',
+        claimedTrialEndsAt: PAST,
+        legacyUserId: null,
+        legacyPlan: null,
+        legacyTrialEndsAt: null,
+      },
+    ]);
+
+    const result = await getCreatorEntitlements('profile_trial_expired');
+
+    expect(result).toEqual({
+      plan: 'free',
+      entitlements: getEntitlements('free'),
+    });
+  });
+
+  it('fails closed to free when plan is trial but trialEndsAt is missing', async () => {
+    installQueryResult([
+      {
+        claimedUserId: null,
+        claimedPlan: null,
+        claimedTrialEndsAt: null,
+        legacyUserId: 'user_legacy',
+        legacyPlan: 'trial',
+        legacyTrialEndsAt: null,
+      },
+    ]);
+
+    const result = await getCreatorEntitlements('profile_trial_no_end');
+
+    expect(result).toEqual({
+      plan: 'free',
+      entitlements: getEntitlements('free'),
+    });
+  });
+
+  it('applies trial expiry in the batch lookup', async () => {
+    installBatchQueryResults(
+      [
+        {
+          creatorProfileId: 'profile_active',
+          claimedUserId: 'user_active',
+          legacyUserId: null,
+        },
+        {
+          creatorProfileId: 'profile_expired',
+          claimedUserId: 'user_expired',
+          legacyUserId: null,
+        },
+      ],
+      [
+        { id: 'user_active', plan: 'trial', trialEndsAt: FUTURE },
+        { id: 'user_expired', plan: 'trial', trialEndsAt: PAST },
+      ]
+    );
+
+    const result = await getBatchCreatorEntitlements([
+      'profile_active',
+      'profile_expired',
+    ]);
+
+    expect(result.get('profile_active')).toEqual({
+      plan: 'trial',
+      entitlements: getEntitlements('trial'),
+    });
+    expect(result.get('profile_expired')).toEqual({
+      plan: 'free',
+      entitlements: getEntitlements('free'),
     });
   });
 });
