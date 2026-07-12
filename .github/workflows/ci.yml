@@ -1033,6 +1033,12 @@ jobs:
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
             scope_args=(--scope "$VERCEL_ORG_ID")
           fi
+          # `vercel build` replaces the standalone tree. Snapshot the traced
+          # runtime first, then restore it at the repo-relative paths recorded
+          # in the generated function configs.
+          test -d apps/web/.next/standalone/apps/web/.next/node_modules
+          tar -czf /tmp/vercel-runtime-node-modules.tar.gz \
+            -C apps/web/.next/standalone/apps/web/.next node_modules
           # Do NOT inherit NEXT_PUBLIC_CLERK_MOCK from the turbo build step —
           # deploy artifact must match staging preview compile flags.
           for i in {1..3}; do
@@ -1049,14 +1055,8 @@ jobs:
           # targets with the reusable output so a later runner can deploy the
           # prebuilt artifact without the full ~384 MB .next archive.
           test -d apps/web/.next/server/edge
-          # Vercel function traces point at this standalone runtime tree through
-          # apps/web/.next/node_modules. Materialize that path so the prebuilt
-          # upload is closed over every traced dependency on the deploy runner.
-          test -d apps/web/.next/standalone/apps/web/.next/node_modules
           rm -rf apps/web/.next/node_modules
-          mkdir -p apps/web/.next/node_modules
-          cp -a apps/web/.next/standalone/apps/web/.next/node_modules/. \
-            apps/web/.next/node_modules/
+          tar -xzf /tmp/vercel-runtime-node-modules.tar.gz -C apps/web/.next
           find apps/web/.next/node_modules -maxdepth 1 -type d \
             -name 'import-in-the-middle-*' -print -quit | grep -q .
           tar -czf /tmp/vercel-build-output.tar.gz -C . \
@@ -4762,17 +4762,6 @@ jobs:
           COREPACK_ENABLE_STRICT: 0
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
-      - name: Materialize traced runtime dependencies
-        if: steps.restore_vercel_build.outputs.restored != 'true'
-        run: |
-          set -euo pipefail
-          test -d apps/web/.next/standalone/apps/web/.next/node_modules
-          rm -rf apps/web/.next/node_modules
-          mkdir -p apps/web/.next/node_modules
-          cp -a apps/web/.next/standalone/apps/web/.next/node_modules/. \
-            apps/web/.next/node_modules/
-          find apps/web/.next/node_modules -maxdepth 1 -type d \
-            -name 'import-in-the-middle-*' -print -quit | grep -q .
       - name: Package build output for provenance attestation
         run: |
           set -euo pipefail
