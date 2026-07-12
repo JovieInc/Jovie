@@ -16,6 +16,22 @@ const claimedUsers = aliasedTable(users, 'claimed_users');
 const legacyUsers = aliasedTable(users, 'legacy_users');
 
 /**
+ * users.plan stays 'trial' after the trial window closes (nothing flips it
+ * back to 'free'), so trial expiry must be enforced at read time — mirrors
+ * normalizeBillingPlan in @/lib/entitlements/server.ts.
+ */
+function resolveEffectivePlan(
+  rawPlan: string | null | undefined,
+  trialEndsAt: Date | null | undefined
+): PlanId {
+  const plan = (rawPlan as PlanId | null | undefined) ?? 'free';
+  if (plan === 'trial' && !(trialEndsAt && trialEndsAt > new Date())) {
+    return 'free';
+  }
+  return plan;
+}
+
+/**
  * Look up a creator's plan and entitlements by their profile ID.
  *
  * Used by server-side code that operates outside an authenticated session
@@ -32,8 +48,10 @@ export async function getCreatorEntitlements(
           .select({
             claimedUserId: userProfileClaims.userId,
             claimedPlan: claimedUsers.plan,
+            claimedTrialEndsAt: claimedUsers.trialEndsAt,
             legacyUserId: creatorProfiles.userId,
             legacyPlan: legacyUsers.plan,
+            legacyTrialEndsAt: legacyUsers.trialEndsAt,
           })
           .from(creatorProfiles)
           .leftJoin(
@@ -53,11 +71,12 @@ export async function getCreatorEntitlements(
       return { plan: 'free', entitlements: getEntitlements('free') };
     }
 
-    const plan =
-      ((result?.claimedUserId ? result.claimedPlan : result?.legacyPlan) as
-        | PlanId
-        | null
-        | undefined) ?? 'free';
+    const plan = resolveEffectivePlan(
+      result?.claimedUserId ? result.claimedPlan : result?.legacyPlan,
+      result?.claimedUserId
+        ? result.claimedTrialEndsAt
+        : result?.legacyTrialEndsAt
+    );
 
     return { plan, entitlements: getEntitlements(plan) };
   } catch (error) {
@@ -136,12 +155,19 @@ export async function getBatchCreatorEntitlements(
     ownerIds.length === 0
       ? []
       : await db
-          .select({ id: users.id, plan: users.plan })
+          .select({
+            id: users.id,
+            plan: users.plan,
+            trialEndsAt: users.trialEndsAt,
+          })
           .from(users)
           .where(inArray(users.id, ownerIds));
 
   const planByUserId = new Map(
-    userPlans.map(row => [row.id, (row.plan as PlanId | undefined) ?? 'free'])
+    userPlans.map(row => [
+      row.id,
+      resolveEffectivePlan(row.plan, row.trialEndsAt),
+    ])
   );
 
   const map = new Map<
