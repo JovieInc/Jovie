@@ -45,7 +45,7 @@ concurrency:
 jobs:
   worker:
     name: Run Hermes CLI Worker
-    runs-on: [self-hosted, hermes]
+    runs-on: [self-hosted, Linux, X64, jovie-runner]
     timeout-minutes: 120
     permissions: {}
     env:
