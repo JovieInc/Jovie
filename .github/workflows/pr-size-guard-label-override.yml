@@ -11,7 +11,10 @@ name: PR Size Guard Label Override
 # API only — it cannot cancel the real size-computation job.
 
 on:
-  pull_request:
+  # Use the default-branch workflow definition so old PR heads can receive a
+  # newly shipped label policy. All executable code remains pinned to the
+  # immutable base SHA below; no PR-head code runs with checks:write.
+  pull_request_target:
     types: [labeled]
 
 permissions:
