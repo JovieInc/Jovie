@@ -15,9 +15,18 @@ import { pathToFileURL } from 'node:url';
 import { neon } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
+import {
+  DEFAULT_SKILL_LIFECYCLE,
+  DEFAULT_SKILL_VERSION,
+  normalizeSkillLifecycleState,
+} from '@/lib/agents/lifecycle';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
 import type { SkillDefinition, ToolDefinition } from '@/lib/agents/types';
-import { skillsCatalog, toolsCatalog } from '@/lib/db/schema/agents';
+import {
+  skillsCatalog,
+  skillsCatalogVersions,
+  toolsCatalog,
+} from '@/lib/db/schema/agents';
 
 // Postbuild runs this file under tsx; env-server imports server-only and cannot
 // be loaded outside Next's server graph.
@@ -34,6 +43,7 @@ function createScriptDb(databaseUrl: string) {
   return drizzle(neon(databaseUrl), {
     schema: {
       skillsCatalog,
+      skillsCatalogVersions,
       toolsCatalog,
     },
   });
@@ -41,6 +51,19 @@ function createScriptDb(databaseUrl: string) {
 
 type CatalogDb = Pick<ReturnType<typeof createScriptDb>, 'insert'>;
 type SyncResult = 'skipped' | 'synced';
+
+function skillLifecycleFields(skill: SkillDefinition) {
+  const normalized = normalizeSkillLifecycleState({
+    version: skill.version || DEFAULT_SKILL_VERSION,
+    activeVersion: skill.activeVersion ?? skill.version,
+    lifecycle: skill.lifecycle ?? DEFAULT_SKILL_LIFECYCLE,
+  });
+  return {
+    version: normalized.version,
+    activeVersion: normalized.activeVersion,
+    lifecycle: normalized.lifecycle,
+  };
+}
 
 function readDatabaseUrl(): string {
   const databaseUrl = scriptEnv.DATABASE_URL;
@@ -94,6 +117,8 @@ const skillCatalogChanged = drizzleSql`
   ${skillsCatalog.description} IS DISTINCT FROM excluded.description OR
   ${skillsCatalog.kind} IS DISTINCT FROM excluded.kind OR
   ${skillsCatalog.version} IS DISTINCT FROM excluded.version OR
+  ${skillsCatalog.lifecycle} IS DISTINCT FROM excluded.lifecycle OR
+  ${skillsCatalog.activeVersion} IS DISTINCT FROM excluded.active_version OR
   ${skillsCatalog.entitlementRequired} IS DISTINCT FROM excluded.entitlement_required OR
   ${skillsCatalog.model} IS DISTINCT FROM excluded.model OR
   ${skillsCatalog.promptPath} IS DISTINCT FROM excluded.prompt_path OR
@@ -127,18 +152,23 @@ export async function syncSkillsCatalog(
     await db
       .insert(skillsCatalog)
       .values(
-        nonToolSkills.map(skill => ({
-          id: skill.id,
-          name: skill.name,
-          description: skill.description ?? null,
-          kind: skill.kind,
-          version: skill.version,
-          entitlementRequired: skill.entitlement ?? null,
-          model: skill.model ?? null,
-          promptPath: skill.promptPath ?? null,
-          metadata: skill.metadata,
-          updatedAt: now,
-        }))
+        nonToolSkills.map(skill => {
+          const lifecycleFields = skillLifecycleFields(skill);
+          return {
+            id: skill.id,
+            name: skill.name,
+            description: skill.description ?? null,
+            kind: skill.kind,
+            version: lifecycleFields.version,
+            lifecycle: lifecycleFields.lifecycle,
+            activeVersion: lifecycleFields.activeVersion,
+            entitlementRequired: skill.entitlement ?? null,
+            model: skill.model ?? null,
+            promptPath: skill.promptPath ?? null,
+            metadata: skill.metadata,
+            updatedAt: now,
+          };
+        })
       )
       .onConflictDoUpdate({
         target: skillsCatalog.id,
@@ -147,6 +177,8 @@ export async function syncSkillsCatalog(
           description: drizzleSql`excluded.description`,
           kind: drizzleSql`excluded.kind`,
           version: drizzleSql`excluded.version`,
+          lifecycle: drizzleSql`excluded.lifecycle`,
+          activeVersion: drizzleSql`excluded.active_version`,
           entitlementRequired: drizzleSql`excluded.entitlement_required`,
           model: drizzleSql`excluded.model`,
           promptPath: drizzleSql`excluded.prompt_path`,
@@ -155,6 +187,29 @@ export async function syncSkillsCatalog(
         },
         setWhere: skillCatalogChanged,
       });
+
+    // Preserve per-version snapshots; never mutate an existing version row.
+    await db
+      .insert(skillsCatalogVersions)
+      .values(
+        nonToolSkills.map(skill => {
+          const lifecycleFields = skillLifecycleFields(skill);
+          return {
+            skillId: skill.id,
+            version: lifecycleFields.version,
+            name: skill.name,
+            description: skill.description ?? null,
+            kind: skill.kind,
+            lifecycle: lifecycleFields.lifecycle,
+            entitlementRequired: skill.entitlement ?? null,
+            model: skill.model ?? null,
+            promptPath: skill.promptPath ?? null,
+            metadata: skill.metadata,
+            createdAt: now,
+          };
+        })
+      )
+      .onConflictDoNothing();
   }
 
   if (toolSkills.length > 0) {

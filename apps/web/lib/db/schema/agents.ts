@@ -1,5 +1,6 @@
 /**
- * Agent Registry Schema — Skills Catalog, Tools Catalog, Retouch Jobs
+ * Agent Registry Schema — Skills Catalog, Tools Catalog, Retouch Jobs,
+ * skill version history, and skill run telemetry.
  *
  * This file is the sibling of connectors.ts. It holds the DB-side mirror of the
  * code-side SKILL_REGISTRY so admins can inspect versions, costs,
@@ -11,16 +12,23 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import {
   check,
   index,
+  integer,
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { users } from './auth';
-import { retouchJobStatusEnum, skillKindEnum } from './enums';
+import {
+  retouchJobStatusEnum,
+  skillKindEnum,
+  skillLifecycleEnum,
+} from './enums';
 
 // ---------------------------------------------------------------------------
 // skills_catalog
@@ -31,6 +39,9 @@ import { retouchJobStatusEnum, skillKindEnum } from './enums';
  * One row per vertical-agent or style skill. Upserted on every deploy by
  * scripts/sync-skills-catalog.ts so the admin skills page reflects the
  * deployed version without a separate API call into source.
+ *
+ * Lifecycle + active_version (JOV-3944) enable staged rollout and rollback
+ * without deleting historical versions (see skills_catalog_versions).
  */
 export const skillsCatalog = pgTable(
   'skills_catalog',
@@ -40,6 +51,13 @@ export const skillsCatalog = pgTable(
     description: text('description'),
     kind: skillKindEnum('kind').notNull(),
     version: text('version').notNull(),
+    /** Staged rollout state. Missing column at read time → treat as `ga`. */
+    lifecycle: skillLifecycleEnum('lifecycle').notNull().default('ga'),
+    /**
+     * Version pointer served at invocation. Rollback flips this field;
+     * historical rows live in skills_catalog_versions.
+     */
+    activeVersion: text('active_version').notNull(),
     entitlementRequired: text('entitlement_required'),
     model: text('model'),
     promptPath: text('prompt_path'), // relative to repo root
@@ -56,6 +74,9 @@ export const skillsCatalog = pgTable(
       'skills_catalog_kind_check',
       drizzleSql`${table.kind} IN ('vertical_agent', 'style')`
     ),
+    skillLifecycleIdx: index('skills_catalog_lifecycle_idx').on(
+      table.lifecycle
+    ),
   })
 );
 
@@ -64,6 +85,105 @@ export type NewSkillsCatalogRow = typeof skillsCatalog.$inferInsert;
 
 export const insertSkillsCatalogSchema = createInsertSchema(skillsCatalog);
 export const selectSkillsCatalogSchema = createSelectSchema(skillsCatalog);
+
+// ---------------------------------------------------------------------------
+// skills_catalog_versions — immutable per-version snapshots (JOV-3944)
+// ---------------------------------------------------------------------------
+
+/**
+ * One row per (skill_id, version). Recompiles and registry syncs insert new
+ * rows; released versions are never mutated in place. `skills_catalog`
+ * holds the head pointer (active_version + lifecycle).
+ */
+export const skillsCatalogVersions = pgTable(
+  'skills_catalog_versions',
+  {
+    skillId: text('skill_id').notNull(),
+    version: text('version').notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    kind: skillKindEnum('kind').notNull(),
+    lifecycle: skillLifecycleEnum('lifecycle').notNull().default('draft'),
+    entitlementRequired: text('entitlement_required'),
+    model: text('model'),
+    promptPath: text('prompt_path'),
+    metadata: jsonb('metadata').default({}).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    pk: primaryKey({
+      name: 'skills_catalog_versions_pk',
+      columns: [table.skillId, table.version],
+    }),
+    skillIdIdx: index('skills_catalog_versions_skill_id_idx').on(table.skillId),
+  })
+);
+
+export type SkillsCatalogVersionRow = typeof skillsCatalogVersions.$inferSelect;
+export type NewSkillsCatalogVersionRow =
+  typeof skillsCatalogVersions.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// skill_run_events — per-invocation telemetry (JOV-3946)
+// ---------------------------------------------------------------------------
+
+/**
+ * Exactly one logical event row per skill invocation (idempotent on
+ * `invocation_id`). Status progresses started → completed|error. Fail-open
+ * writers must never break the skill run itself.
+ */
+export const skillRunEvents = pgTable(
+  'skill_run_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Client/server-generated idempotency key for retries. */
+    invocationId: text('invocation_id').notNull(),
+    skillId: text('skill_id').notNull(),
+    skillVersion: text('skill_version').notNull(),
+    userId: uuid('user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    status: text('status').notNull(), // started | completed | error
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    durationMs: integer('duration_ms'),
+    model: text('model'),
+    /** Total tokens (prompt+completion) when known. */
+    tokenCost: integer('token_cost'),
+    costUsd: numeric('cost_usd', { precision: 12, scale: 6 }),
+    /** Optional thumbs vote joined from feedback_items later. */
+    feedbackVote: text('feedback_vote'),
+    successMetricName: text('success_metric_name'),
+    successMetricOutcome: jsonb('success_metric_outcome'),
+    error: text('error'),
+    metadata: jsonb('metadata').default({}).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    invocationUnique: uniqueIndex('skill_run_events_invocation_id_uidx').on(
+      table.invocationId
+    ),
+    skillVersionIdx: index('skill_run_events_skill_version_idx').on(
+      table.skillId,
+      table.skillVersion,
+      table.startedAt
+    ),
+    statusIdx: index('skill_run_events_status_idx').on(
+      table.status,
+      table.startedAt
+    ),
+  })
+);
+
+export type SkillRunEventRow = typeof skillRunEvents.$inferSelect;
+export type NewSkillRunEventRow = typeof skillRunEvents.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // tools_catalog

@@ -540,6 +540,13 @@
       "when": 1783456100000,
       "tag": "0074_suggested_actions_signal_type",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1783456200000,
+      "tag": "0075_skill_lifecycle_telemetry",
+      "breakpoints": true
     }
   ]
 }
