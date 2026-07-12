@@ -21,7 +21,7 @@ export function SettingsLoadingSkeleton({
   children,
 }: Readonly<SettingsLoadingSkeletonProps>) {
   return (
-    <div className='mx-auto max-w-3xl'>
+    <div className='mx-auto max-w-3xl' data-testid='settings-loading-skeleton'>
       <div className='space-y-6 pb-8'>
         <section className='scroll-mt-4'>
           <div className='mb-4 space-y-2'>
