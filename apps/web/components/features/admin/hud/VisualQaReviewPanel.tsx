@@ -111,7 +111,7 @@ function VisualQaSurfaceCard({
     >
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0 space-y-0.5'>
-          <p className='text-app font-[560] text-primary-token'>
+          <p className='text-app font-semibold text-primary-token'>
             {surface.title}
           </p>
           <p className='text-2xs text-tertiary-token'>
@@ -121,7 +121,7 @@ function VisualQaSurfaceCard({
         </div>
         <span
           className={cn(
-            'shrink-0 text-2xs font-[560]',
+            'shrink-0 text-2xs font-semibold',
             SURFACE_STATUS_CLASS[surface.status]
           )}
         >
@@ -294,7 +294,7 @@ export function VisualQaReviewPanel() {
     >
       <div className='flex items-center justify-between gap-3'>
         <div>
-          <p className='text-xs font-[560] text-primary-token'>Visual QA</p>
+          <p className='text-xs font-semibold text-primary-token'>Visual QA</p>
           <p className='text-xs text-secondary-token'>
             Post-deploy screenshot drift. Accept intentional changes; reject
             regressions to route a follow-up.
