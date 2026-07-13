@@ -131,6 +131,78 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('keeps the cancellation healer diff on its focused contract suites', () => {
+    const plan = buildAffectedTestPlan([
+      '.github/workflows/ci-cancellation-healer.yml',
+      'apps/web/tests/unit/ci/ci-cancellation-classifier.test.ts',
+      'apps/web/tests/unit/ci/fixtures/fixed-runner-setup-cancellation.json',
+      'scripts/ci-fast-lanes.mjs',
+      'scripts/lib/ci-cancellation-classifier.mjs',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.relatedFiles).toEqual([
+      'apps/web/tests/unit/ci/ci-cancellation-classifier.test.ts',
+      'apps/web/tests/unit/ci/fixtures/fixed-runner-setup-cancellation.json',
+    ]);
+    expect(plan.mandatoryTests).toEqual([
+      'apps/web/tests/unit/ci/ci-cancellation-classifier.test.ts',
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+    ]);
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/ci/ci-cancellation-classifier.test.ts',
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+    ]);
+  });
+
+  it.each([
+    '.github/workflows/ci-cancellation-healer.yml',
+    'apps/web/tests/unit/ci/ci-cancellation-classifier.test.ts',
+    'apps/web/tests/unit/ci/fixtures/fixed-runner-setup-cancellation.json',
+    'scripts/lib/ci-cancellation-classifier.mjs',
+  ])('maps the cancellation healer input %s independently', input => {
+    const plan = buildAffectedTestPlan([input]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/ci/ci-cancellation-classifier.test.ts',
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+    ]);
+  });
+
+  it('keeps the global ci-fast orchestrator on the full suite standalone', () => {
+    expect(buildAffectedTestPlan(['scripts/ci-fast-lanes.mjs']).mode).toBe(
+      'full'
+    );
+  });
+
+  it('fails closed when the cancellation healer lane includes unknown automation', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/lib/ci-cancellation-classifier.mjs',
+        'scripts/lib/unknown-ci-repair.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when the cancellation healer lane includes an unknown action', () => {
+    expect(
+      buildAffectedTestPlan([
+        '.github/workflows/ci-cancellation-healer.yml',
+        '.github/actions/unknown-runner-repair/action.yml',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when the cancellation healer lane is mixed with unknown source', () => {
+    expect(
+      buildAffectedTestPlan([
+        '.github/workflows/ci-cancellation-healer.yml',
+        'apps/web/lib/unknown.ts',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('fails closed to the full suite for global test inputs', () => {
     expect(buildAffectedTestPlan(['apps/web/tests/setup.ts']).mode).toBe(
       'full'
