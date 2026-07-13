@@ -398,6 +398,27 @@ describe('deploy workflow Vercel env resolution', () => {
 });
 
 describe('canary health gate workflow', () => {
+  it('requires preview-safe robots instead of production SEO metadata', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+    const canaryStep = getStepBlock(workflow, 'Canary health check');
+
+    expect(canaryStep).toContain('Checking preview-safe robots.txt');
+    expect(canaryStep).toContain(
+      'preview robots.txt must globally block crawlers with Disallow: /'
+    );
+    expect(canaryStep).toContain(
+      'preview robots.txt must not advertise a sitemap'
+    );
+    expect(canaryStep).toContain('production SEO is checked by the');
+    expect(canaryStep).toContain(
+      `if ! echo "$robots_body" | grep -Eiq '^[[:space:]]*user-agent:[[:space:]]*\\*[[:space:]]*$' || ! echo "$robots_body" | grep -Eiq '^[[:space:]]*disallow:[[:space:]]*/[[:space:]]*$' || echo "$robots_body" | grep -Eiq '^[[:space:]]*allow:[[:space:]]*/[[:space:]]*$'; then`
+    );
+    expect(canaryStep).not.toContain('sitemap_url=');
+    expect(canaryStep).not.toContain(
+      'Checking production-shaped robots.txt and sitemap.xml'
+    );
+  });
+
   it('fails closed when the automation bypass secret is missing', () => {
     const workflow = readFileSync(canaryWorkflowPath, 'utf8');
     const canaryStep = getStepBlock(workflow, 'Canary health check');

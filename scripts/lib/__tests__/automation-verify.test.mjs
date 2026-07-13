@@ -37,6 +37,7 @@ const PREREQUISITE_TRAIN_MANIFEST = [
   '.github/actions/neon-create-branch-with-retry/create-branch-with-capacity-retry.sh',
   '.github/actions/neon-create-branch-with-retry/create-branch.sh',
   '.github/workflows/ci.yml',
+  '.github/workflows/canary-health-gate.yml',
   '.github/workflows/e2e-full-matrix.yml',
   '.github/workflows/nightly-tests.yml',
   '.github/workflows/visual-regression.yml',
