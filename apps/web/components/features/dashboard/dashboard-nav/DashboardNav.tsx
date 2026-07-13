@@ -36,13 +36,8 @@ import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQue
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
-  artistProfileNavItem,
   artistSettingsNavigation,
-  inboxNavItem,
-  newThreadNavItem,
   primaryNavigation,
-  releasesNavItem,
-  touringNavItem,
   userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
@@ -78,6 +73,13 @@ function isReleasesRoute(pathname: string): boolean {
 }
 
 function isItemActive(pathname: string, item: NavItem): boolean {
+  if (item.id === 'inbox') {
+    // Inbox is the named home at exactly `/app` — it must not stay active
+    // on every `/app/*` subroute the generic prefix-match below would
+    // otherwise catch (GH #12634).
+    return normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD;
+  }
+
   if (item.id === 'releases') {
     return isReleasesRoute(pathname);
   }
@@ -230,7 +232,17 @@ export function DashboardNav(_: DashboardNavProps) {
   const artistSettingsLabel =
     shellChatV1Enabled || isInSettings ? 'Artist' : artistName || 'Artist';
 
-  // Memoize nav sections for dashboard (non-settings) mode
+  // Memoize nav sections for dashboard (non-settings) mode.
+  //
+  // Canonical 6-item nav IA (GH #12634 taste decision / #12640): Inbox,
+  // Chat, Library, Contacts, Calendar, Tasks. `primaryNavigation` in
+  // config.ts is the single source of truth for order/labels/routes; Inbox
+  // is filtered out here (rather than in config.ts) while the `INBOX_HOME`
+  // rollout flag is off, so nav and the /app page title/copy
+  // (OpportunityInboxPageClient) never drift out of sync mid-rollout.
+  // Search is a command-palette trigger, not a nav destination, so it isn't
+  // part of the canonical 6 — it renders alongside them, immediately after
+  // Chat, matching its previous position.
   const navSections = useMemo<readonly DashboardNavSection[]>(() => {
     const decorateItem = (item: NavItem): NavItem => {
       if (item.id === 'tasks') {
@@ -249,61 +261,30 @@ export function DashboardNav(_: DashboardNavProps) {
         };
       }
 
-      if (shellChatV1Enabled && !isInSettings && item.id === 'artist-profile') {
-        return {
-          ...item,
-          name: artistName || item.name,
-          href: APP_ROUTES.CHAT_PROFILE_PANEL,
-        };
-      }
-
       return item;
     };
 
-    const audienceItem = primaryNavigation.find(item => item.id === 'audience');
-    const tasksItem = primaryNavigation.find(item => item.id === 'tasks');
+    const canonicalItems = (
+      inboxHomeEnabled
+        ? primaryNavigation
+        : primaryNavigation.filter(item => item.id !== 'inbox')
+    ).map(decorateItem);
 
-    if (shellChatV1Enabled) {
-      return [
-        {
-          key: 'top',
-          items: [
-            ...(inboxHomeEnabled ? [decorateItem(inboxNavItem)] : []),
-            decorateItem(newThreadNavItem),
+    const chatIndex = canonicalItems.findIndex(item => item.id === 'chat');
+    const items =
+      chatIndex === -1
+        ? [...canonicalItems, searchNavItem]
+        : [
+            ...canonicalItems.slice(0, chatIndex + 1),
             searchNavItem,
-            decorateItem(releasesNavItem),
-          ],
-        },
-        {
-          key: 'artist',
-          label: artistSettingsLabel,
-          items: [
-            decorateItem(artistProfileNavItem),
-            decorateItem(touringNavItem),
-            ...(audienceItem ? [decorateItem(audienceItem)] : []),
-            ...(tasksItem ? [decorateItem(tasksItem)] : []),
-          ],
-        },
-      ];
-    }
+            ...canonicalItems.slice(chatIndex + 1),
+          ];
 
-    return [
-      {
-        key: 'primary',
-        items: [
-          ...(inboxHomeEnabled ? [decorateItem(inboxNavItem)] : []),
-          ...primaryNavigation.map(decorateItem),
-        ],
-      },
-    ];
+    return [{ key: 'primary', items }];
   }, [
     canAccessTasksWorkspace,
     isPlanGateLoading,
-    artistName,
-    artistSettingsLabel,
     inboxHomeEnabled,
-    isInSettings,
-    shellChatV1Enabled,
     taskStats,
     tasksSeenAt,
   ]);
