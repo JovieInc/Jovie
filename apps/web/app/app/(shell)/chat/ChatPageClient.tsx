@@ -27,13 +27,8 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
-import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import { JovieChat } from '@/components/jovie/JovieChat';
-import {
-  CHAT_STARTER_ACTIONS,
-  type ChatStarterActionId,
-} from '@/components/jovie/starter-actions';
 import type { ChatActionCard } from '@/components/jovie/types';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
@@ -43,6 +38,7 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { useClipboard } from '@/hooks/useClipboard';
 import { env } from '@/lib/env-client';
+import { useAppFlag } from '@/lib/flags/client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
@@ -104,12 +100,7 @@ function hasConnectedMusicCatalog(profile: ChatActionProfile): boolean {
   );
 }
 
-/**
- * First-run / empty-thread scaffolding (JOV-3547). Always returns ≥3
- * profile-aware starter actions so the empty chat never renders a bare
- * "Ask Jovie..." box. Setup-gap cards lead when the profile is incomplete.
- */
-export function buildChatActionCards({
+function buildChatActionCards({
   profile,
   profileCompletionPercentage,
   profileCompletionSteps,
@@ -121,46 +112,36 @@ export function buildChatActionCards({
   const artistName = profileDisplayName(profile);
   const completion = normalizeCompletionPercentage(profileCompletionPercentage);
   const nextSetupStep = profileCompletionSteps[0]?.label;
-  const cards: ChatActionCard[] = [];
-
-  const addCard = (id: ChatStarterActionId, prompt?: string) => {
-    const action = CHAT_STARTER_ACTIONS[id];
-    cards.push({
-      id,
-      title: action.label,
-      body: action.description,
-      actionLabel: action.actionLabel,
-      prompt: prompt ?? action.prompt,
-    });
-  };
 
   if (!hasConnectedMusicCatalog(profile)) {
-    addCard(
-      'build-artist-profile',
-      `Help me build my artist profile for ${artistName}. Start by connecting my music catalog and give me the next setup step.`
-    );
-  } else if (completion < 100) {
-    const nextStepContext = nextSetupStep
-      ? ` Start with ${nextSetupStep}.`
-      : '';
-    addCard(
-      'build-artist-profile',
-      `Help me build my artist profile for ${artistName}. Review the missing setup steps and prioritize the highest-impact update.${nextStepContext}`
-    );
+    return [
+      {
+        id: 'connect-music-catalog',
+        title: 'Connect Your Music Catalog',
+        body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
+        actionLabel: 'Plan Setup',
+        prompt: `Help me connect my music catalog for ${artistName}. Use the current profile context and give me the next setup step.`,
+      },
+    ];
   }
 
-  addCard('plan-release', `Help me plan my next release for ${artistName}.`);
-  addCard(
-    'generate-album-art',
-    `Generate album art for my latest release as ${artistName}.`
-  );
-  addCard(
-    'review-signals',
-    `Review my signals as ${artistName} and help me see what is gaining traction.`
-  );
+  if (completion < 100) {
+    const body = nextSetupStep
+      ? `Your profile is ${completion}% complete. Next setup step: ${nextSetupStep}.`
+      : `Your profile is ${completion}% complete. Tighten the missing setup steps before the next share.`;
 
-  // Cap at 3 visible starters so the empty stack stays scannable.
-  return cards.slice(0, 3);
+    return [
+      {
+        id: 'finish-artist-profile',
+        title: 'Complete Your Artist Profile',
+        body,
+        actionLabel: 'Review Gaps',
+        prompt: `Review my artist profile for ${artistName}. Prioritize the missing setup steps and tell me the single highest-impact update to make next.`,
+      },
+    ];
+  }
+
+  return [];
 }
 
 export function shouldRetryWelcomeChatBootstrap(
@@ -392,6 +373,7 @@ export function ChatPageClient({
   const fromOnboarding = searchParams.get('from') === 'onboarding';
   const panelParam = searchParams.get('panel');
   const enablePreviewPanel = !env.IS_E2E || panelParam === 'profile';
+  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   // Keep live profile preview data warm on chat so sidebar profile clicks and
   // @artist mentions can open the same rail used in setup/onboarding.
   const shouldHydratePreviewData = enablePreviewPanel && Boolean(activeProfile);
@@ -442,7 +424,6 @@ export function ChatPageClient({
         url: link.url,
         platform: link.platform,
         isVisible: true,
-        version: link.version ?? 1,
       })),
     [socialLinks]
   );
@@ -466,7 +447,6 @@ export function ChatPageClient({
           activeProfile.settings as Record<string, unknown> | null
         ) ?? null,
       activeSinceYear: activeProfile.activeSinceYear ?? null,
-      profileEditVersion: activeProfile.profileEditVersion,
       links: previewLinks,
       profilePath: `/${activeProfile.username}`,
       dspConnections: {
@@ -510,7 +490,9 @@ export function ChatPageClient({
   }, [conversationId, deleteConversation, router, notifications]);
 
   const headerActions = useMemo(() => {
-    const artistProfileToggle = <ArtistProfileRailToggle />;
+    const artistProfileToggle = designV1ChatEntitiesEnabled ? (
+      <ArtistProfileRailToggle />
+    ) : null;
 
     if (!conversationId) {
       return artistProfileToggle;
@@ -547,6 +529,7 @@ export function ChatPageClient({
     );
   }, [
     conversationId,
+    designV1ChatEntitiesEnabled,
     sessionIdCopied,
     handleCopyConversationId,
     handleArchive,
@@ -876,7 +859,7 @@ export function ChatPageClient({
     <ChatEntityPanelProvider resetKey={conversationId ?? null}>
       <ChatEntityRightPanelHost
         enablePreviewPanel={enablePreviewPanel}
-        enableChatEntityPanels
+        enableChatEntityPanels={designV1ChatEntitiesEnabled}
         profileId={activeProfile.id}
         profileSpotifyArtistId={activeProfile.spotifyId}
         profileContext={{
@@ -914,7 +897,6 @@ export function ChatPageClient({
         }
       >
         <ChatWorkspaceSurface>
-          <NavigationDestinationReady destination='chat' />
           <WelcomeChatBootstrapAnnouncer state={welcomeChatBootstrapState} />
           <JovieChat
             profileId={activeProfile.id}
@@ -927,7 +909,6 @@ export function ChatPageClient({
             avatarUrl={activeProfile.avatarUrl}
             username={activeProfile.username ?? undefined}
             isFirstSession={isFirstSession || dashboardIsFirstSession || false}
-            isProfileComplete={profileCompletion.percentage >= 100}
             actionCards={chatActionCards}
             ambientOwnedByShell
           />

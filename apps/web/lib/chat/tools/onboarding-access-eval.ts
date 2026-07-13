@@ -14,11 +14,6 @@
  * WHAT the decision is.
  */
 
-import {
-  type CanonicalArtistMetrics,
-  getDisplaySpotifyFollowers,
-  normalizeArtistMetrics,
-} from '@/lib/onboarding/canonical-metrics';
 import type {
   AudienceBand,
   InterviewSignal,
@@ -33,13 +28,8 @@ export type AccessDecisionKind =
 export interface AccessDecisionInput {
   /** Collapsed view of all interview signal so far. */
   readonly signal: InterviewSignal;
-  /**
-   * Spotify follower count from confirmSpotifyArtist (if resolved).
-   * Prefer `metrics` when available — this field is normalized either way.
-   */
+  /** Spotify follower count from confirmSpotifyArtist (if resolved). */
   readonly spotifyFollowers: number | null;
-  /** Optional canonical metrics snapshot (preferred over bare followers). */
-  readonly metrics?: CanonicalArtistMetrics | null;
   /** Number of LLM turns observed so far. Used to break stuck loops. */
   readonly turnCount: number;
 }
@@ -90,17 +80,7 @@ const releaseStageRank: Record<ReleaseStage, number> = {
 export function evaluateAccessSignal(
   input: AccessDecisionInput
 ): AccessDecision {
-  const { signal, turnCount } = input;
-
-  // Always resolve followers through the canonical metrics contract so access
-  // decisions cannot mix monthly listeners into the follower threshold.
-  const metrics =
-    input.metrics ??
-    normalizeArtistMetrics(
-      { spotifyFollowers: input.spotifyFollowers },
-      { source: 'tool_output' }
-    );
-  const spotifyFollowers = getDisplaySpotifyFollowers(metrics);
+  const { signal, spotifyFollowers, turnCount } = input;
 
   // 1. Strong Spotify signal — instant access.
   if (

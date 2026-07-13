@@ -833,40 +833,20 @@ export async function waitForOnboardingReadiness(
 /*  Clerk user management                                               */
 /* ------------------------------------------------------------------ */
 
-const GOLDEN_PATH_STALE_USER_AGE_MS = 60 * 60 * 1000;
-
-interface GoldenPathClerkUser {
-  id: string;
-  created_at: number;
-  email_addresses: Array<{ email_address: string }>;
-}
-
-export function isStaleGoldenPathTestUser(
-  user: GoldenPathClerkUser,
-  now = Date.now()
-): boolean {
-  return (
-    Number.isFinite(user.created_at) &&
-    now - user.created_at >= GOLDEN_PATH_STALE_USER_AGE_MS &&
-    user.email_addresses.some(
-      e =>
-        e.email_address.startsWith('gp-') &&
-        e.email_address.endsWith('+clerk_test@test.jovie.com')
-    )
-  );
-}
-
 /**
- * Delete stale golden-path test users from Clerk to stay within the 100-user
- * dev-instance cap. The one-hour grace period exceeds the job's 25-minute
- * timeout, so concurrent golden-path runs cannot delete each other's users.
+ * Delete all stale golden-path test users from Clerk to stay within the
+ * 100-user dev-instance cap. Each test run creates a new
+ * `gp-*+clerk_test@test.jovie.com` user; without cleanup the cap fills up.
  */
 export async function purgeStaleClerkTestUsers() {
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (!secretKey || secretKey.includes('mock')) return;
 
   try {
-    const allUsers: GoldenPathClerkUser[] = [];
+    const allUsers: Array<{
+      id: string;
+      email_addresses: Array<{ email_address: string }>;
+    }> = [];
 
     for (let offset = 0; offset < 500; offset += 100) {
       const url = new URL('https://api.clerk.com/v1/users');
@@ -882,9 +862,12 @@ export async function purgeStaleClerkTestUsers() {
       if (page.length < 100) break;
     }
 
-    const now = Date.now();
-    const toDelete = allUsers.filter(user =>
-      isStaleGoldenPathTestUser(user, now)
+    const toDelete = allUsers.filter(u =>
+      u.email_addresses.some(
+        e =>
+          e.email_address.startsWith('gp-') &&
+          e.email_address.endsWith('+clerk_test@test.jovie.com')
+      )
     );
 
     if (toDelete.length > 0) {

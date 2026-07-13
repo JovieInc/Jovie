@@ -3,14 +3,6 @@ import 'server-only';
 import { inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import {
-  buildNumberedHandleSuggestions,
-  HANDLE_SUGGESTION_LIMIT,
-  type HandleAvailabilityResult,
-  normalizeHandleCandidate,
-  toHandleAvailabilityResult,
-} from '@/lib/onboarding/handle-availability';
-import { assertAuthenticatedOnboardingUser } from '@/lib/onboarding/ownership-gate';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 const MAX_SUFFIX_ATTEMPTS = 30;
@@ -59,54 +51,7 @@ async function findTakenHandles(candidates: string[]): Promise<Set<string>> {
   return new Set(rows.map(r => r.normalized));
 }
 
-/**
- * Check a specific handle's availability and surface numbered alternatives
- * when taken. Never silently replaces the requested handle — alternatives
- * live only in `suggestedAlternatives` for explicit UI labeling.
- */
-export async function checkOnboardingHandleAvailability(
-  requestedHandle: string
-): Promise<HandleAvailabilityResult> {
-  const handle = normalizeHandleCandidate(requestedHandle);
-  const formatGate = toHandleAvailabilityResult({ handle });
-  if (
-    formatGate.reason === 'invalid_format' ||
-    formatGate.reason === 'reserved'
-  ) {
-    return formatGate;
-  }
-
-  const numbered = buildNumberedHandleSuggestions(handle, {
-    limit: HANDLE_SUGGESTION_LIMIT + 5,
-  });
-  const taken = await findTakenHandles([handle, ...numbered]);
-  const available = !taken.has(handle);
-  const suggestedAlternatives = available
-    ? undefined
-    : buildNumberedHandleSuggestions(handle, {
-        limit: HANDLE_SUGGESTION_LIMIT,
-        taken,
-      });
-
-  return toHandleAvailabilityResult({
-    handle,
-    available,
-    suggestedAlternatives,
-  });
-}
-
-/**
- * Pick an available onboarding handle candidate.
- *
- * Auth is required: callers that surface "locked in / reserved" success must
- * only reach this after ownership verification. Fail closed for anonymous.
- */
-export async function reserveOnboardingHandle(
-  name: string,
-  userId: string
-): Promise<string> {
-  assertAuthenticatedOnboardingUser(userId);
-
+export async function reserveOnboardingHandle(name: string): Promise<string> {
   const bases = buildHandleCandidates(name);
 
   // Build all candidates up front, then check availability in a single query

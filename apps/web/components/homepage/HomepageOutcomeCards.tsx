@@ -13,10 +13,10 @@ interface HomepageOutcomeCardsProps {
 }
 
 const HOMEPAGE_OUTCOME_ACCENTS = {
-  'drive-streams': 'var(--color-info)',
-  'sell-out': 'var(--color-accent)',
-  'get-paid': 'var(--color-success)',
-  'share-anywhere': 'var(--color-warning)',
+  'drive-streams': '#0070f3',
+  'sell-out': '#8f5cff',
+  'get-paid': '#00b341',
+  'share-anywhere': '#f5a623',
 } satisfies Record<HomepageOutcomeId, string>;
 
 const HOMEPAGE_OUTCOME_SIZE_CLASSES = {
@@ -38,14 +38,17 @@ export function HomepageOutcomeCards({
   return (
     <section
       data-testid='homepage-outcome-cards'
-      className={cn('homepage-outcome-section', className)}
+      className={cn(
+        'homepage-outcome-section relative w-full bg-(--color-bg-base)',
+        className
+      )}
       aria-labelledby='homepage-outcome-cards-heading'
     >
-      <div className='homepage-outcome-inner'>
+      <div className='homepage-outcome-inner mx-auto w-full'>
         <div className='homepage-outcome-header'>
           <h2
             id='homepage-outcome-cards-heading'
-            className='homepage-outcome-heading'
+            className='homepage-outcome-heading text-black dark:text-white'
           >
             {headline}
           </h2>

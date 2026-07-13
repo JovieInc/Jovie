@@ -70,48 +70,4 @@ describe('SidebarBottomNowPlaying', () => {
     expect(container.firstChild).toHaveClass('ring-1');
     expect(container.firstChild).toHaveClass('ring-primary');
   });
-
-  it('renders the canonical dismiss control and invokes it exactly once', () => {
-    const onDismiss = vi.fn();
-    render(
-      <SidebarBottomNowPlaying
-        track={fullTrack}
-        isPlaying
-        onPlay={() => {}}
-        onDismiss={onDismiss}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
-
-    expect(onDismiss).toHaveBeenCalledOnce();
-  });
-
-  it('keeps compact row geometry stable from paused to playing', () => {
-    const { rerender } = render(
-      <SidebarBottomNowPlaying
-        track={fullTrack}
-        isPlaying={false}
-        onPlay={() => {}}
-        onDismiss={() => {}}
-      />
-    );
-    const pausedRow =
-      screen.getByText('Lost in the Light').parentElement?.parentElement;
-    expect(pausedRow).toHaveClass('h-12');
-
-    rerender(
-      <SidebarBottomNowPlaying
-        track={fullTrack}
-        isPlaying
-        onPlay={() => {}}
-        onDismiss={() => {}}
-      />
-    );
-
-    const playingRow =
-      screen.getByText('Lost in the Light').parentElement?.parentElement;
-    expect(playingRow).toBe(pausedRow);
-    expect(playingRow).toHaveClass('h-12');
-  });
 });

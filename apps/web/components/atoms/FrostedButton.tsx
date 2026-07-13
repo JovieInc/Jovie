@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, type ButtonProps, Link as UILink } from '@jovie/ui';
+import { Button, type ButtonProps } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -16,9 +16,9 @@ const toneToVariant: Record<
   NonNullable<FrostedButtonProps['tone']>,
   ButtonProps['variant']
 > = {
-  solid: 'secondary',
-  ghost: 'ghost',
-  outline: 'secondary',
+  solid: 'frosted',
+  ghost: 'frosted-ghost',
+  outline: 'frosted-outline',
 };
 
 export const FrostedButton = React.forwardRef<
@@ -38,22 +38,17 @@ export const FrostedButton = React.forwardRef<
     );
 
     if (href) {
-      // Button owns the visual contract (asChild); the canonical Link
-      // primitive composes the Next.js anchor underneath it (Radix Slot
-      // chain: Button -> UILink -> next/link).
       return (
         <Button asChild variant={variant} className={frostedClasses} {...props}>
-          <UILink asChild variant={null}>
-            <Link
-              ref={ref as React.Ref<HTMLAnchorElement>}
-              href={href}
-              prefetch={prefetch}
-              target={external ? '_blank' : undefined}
-              rel={external ? 'noopener noreferrer' : undefined}
-            >
-              {children}
-            </Link>
-          </UILink>
+          <Link
+            ref={ref as React.Ref<HTMLAnchorElement>}
+            href={href}
+            prefetch={prefetch}
+            target={external ? '_blank' : undefined}
+            rel={external ? 'noopener noreferrer' : undefined}
+          >
+            {children}
+          </Link>
         </Button>
       );
     }

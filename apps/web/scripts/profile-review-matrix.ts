@@ -1,12 +1,7 @@
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { chromium, type Locator, type Page, type Route } from 'playwright';
-import {
-  resetOwnedOutputDirectory,
-  resetOwnedOutputFiles,
-  resolveOwnedOutputDirectory,
-} from './owned-output-path';
 
 type BreakpointName = 'mobile' | 'tablet' | 'desktop';
 
@@ -225,10 +220,10 @@ function getOutputPaths(cycle: string) {
     ? process.cwd()
     : path.resolve(process.cwd(), 'apps/web');
   const repoRoot = path.resolve(webRoot, '..', '..');
-  const cycleRoot = resolveOwnedOutputDirectory(
-    path.join(repoRoot, '.context/profile-review-matrix'),
-    cycle,
-    'PROFILE_REVIEW_MATRIX_CYCLE'
+  const cycleRoot = path.join(
+    repoRoot,
+    '.context/profile-review-matrix',
+    cycle
   );
 
   return {
@@ -578,41 +573,19 @@ async function captureReviewCase(params: {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const outputPaths = getOutputPaths(options.cycle);
-  const activeCases =
-    options.only.length > 0
-      ? SCREENSHOT_CASES.filter(reviewCase =>
-          options.only.includes(reviewCase.id)
-        )
-      : SCREENSHOT_CASES;
-  const outputBase = path.dirname(outputPaths.cycleRoot);
-  const outputSegment = path.basename(outputPaths.cycleRoot);
-
-  if (options.only.length === 0) {
-    await resetOwnedOutputDirectory(
-      outputBase,
-      outputSegment,
-      'PROFILE_REVIEW_MATRIX_CYCLE'
-    );
-  } else {
-    await resetOwnedOutputFiles(
-      outputBase,
-      outputSegment,
-      'PROFILE_REVIEW_MATRIX_CYCLE',
-      [
-        ...activeCases.flatMap(reviewCase =>
-          BREAKPOINTS.map(
-            breakpoint => `${reviewCase.id}-${breakpoint.name}.png`
-          )
-        ),
-        'summary.json',
-      ]
-    );
-  }
+  await mkdir(outputPaths.cycleRoot, { recursive: true });
 
   const browser = await chromium.launch({ headless: true });
   const summary: Record<string, Record<BreakpointName, string>> = {};
 
   try {
+    const activeCases =
+      options.only.length > 0
+        ? SCREENSHOT_CASES.filter(reviewCase =>
+            options.only.includes(reviewCase.id)
+          )
+        : SCREENSHOT_CASES;
+
     for (const reviewCase of activeCases) {
       summary[reviewCase.id] = {
         mobile: '',

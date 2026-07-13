@@ -18,7 +18,6 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { chatTurns } from '@/lib/db/schema/chat';
@@ -29,7 +28,7 @@ import { parseJsonBody } from '@/lib/http/parse-json';
 import { createRateLimitHeaders, generalLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
-const payloadSchema = chatToolSchema({
+const payloadSchema = z.object({
   messageId: z.string().trim().min(1).max(128),
   /** 'up' | 'down' to vote, null to undo the current vote. */
   vote: z.enum(['up', 'down']).nullable(),

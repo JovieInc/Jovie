@@ -12,19 +12,16 @@ import {
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
-import { track } from '@/lib/analytics';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { deriveChatRailContextTargets } from './chat-context-rail';
-import { ChatActionCard } from './components/ChatActionCard';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
 import { ChatEmptyStateOpportunityCards } from './components/ChatEmptyStateOpportunityCards';
 import { ChatPinnedOpportunityHeader } from './components/ChatPinnedOpportunityHeader';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
-import { SuggestedPrompts } from './components/SuggestedPrompts';
 import {
   useChatFileAttachments,
   useChatJankMonitor,
@@ -41,11 +38,7 @@ import {
   ChatLoadingConversationSkeleton,
   ChatThreadMessages,
 } from './JovieChatSections';
-import { CHAT_STARTER_ACTIONS } from './starter-actions';
-import type {
-  ChatActionCard as ChatActionCardModel,
-  JovieChatProps,
-} from './types';
+import type { JovieChatProps } from './types';
 
 const VIRTUALIZATION_THRESHOLD = 12;
 const CHAT_PICKER_THREAD_CLEARANCE = 'min(620px, calc(100vh - 8rem))';
@@ -72,19 +65,12 @@ export function JovieChat({
   displayName,
   avatarUrl,
   username,
-  isFirstSession = false,
-  isProfileComplete = false,
-  actionCards,
   ambientOwnedByShell = false,
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
-  /** Local dismiss ledger for empty-state action cards (session-scoped). */
-  const [dismissedActionCardIds, setDismissedActionCardIds] = useState<
-    ReadonlySet<ChatActionCardModel['id']>
-  >(() => new Set());
   /**
    * Pinned opportunity card for empty-thread → card-open mode
    * (GH #13177 / #13174 / JOV-3933). Declared before useJovieChat so the
@@ -111,7 +97,6 @@ export function JovieChat({
     inputRef,
     handleSubmit,
     handleRetry,
-    handleSuggestedPrompt,
     submitMessage,
     setChatError,
     isRateLimited,
@@ -126,42 +111,6 @@ export function JovieChat({
     pinnedOpportunity,
   });
 
-  const visibleActionCards = useMemo(() => {
-    if (!actionCards || actionCards.length === 0) return [];
-    return actionCards.filter(card => !dismissedActionCardIds.has(card.id));
-  }, [actionCards, dismissedActionCardIds]);
-
-  // A configured primary card owns its action for the whole empty-state
-  // session, including after dismissal. Do not resurrect it as a lower-context
-  // secondary chip with a potentially conflicting capability state.
-  const promptRailExcludeActionIds = useMemo(
-    () => actionCards?.map(card => card.id) ?? [],
-    [actionCards]
-  );
-
-  const handleDismissActionCard = useCallback((card: ChatActionCardModel) => {
-    track('chat_starter_action_dismissed', {
-      action: CHAT_STARTER_ACTIONS[card.id].telemetryKey,
-      surface: 'card',
-    });
-    setDismissedActionCardIds(prev => {
-      const next = new Set(prev);
-      next.add(card.id);
-      return next;
-    });
-  }, []);
-
-  const handleActOnActionCard = useCallback(
-    (card: ChatActionCardModel) => {
-      track('chat_starter_action_selected', {
-        action: CHAT_STARTER_ACTIONS[card.id].telemetryKey,
-        surface: 'card',
-      });
-      handleSuggestedPrompt(card.prompt);
-    },
-    [handleSuggestedPrompt]
-  );
-
   // ─── Sticky scroll via ResizeObserver ────────────────────────────
   const {
     isStuckToBottom,
@@ -173,6 +122,7 @@ export function JovieChat({
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
+  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   const { chatFileUploadLimit, isPro: isProUser } = usePlanGate();
   const chatEntityPanel = useOptionalChatEntityPanel();
   const { onSend: notifyJankSend } = useChatJankMonitor({
@@ -332,16 +282,18 @@ export function JovieChat({
   const profileRailLabel = displayName ?? username ?? null;
   const railContextTargets = useMemo(
     () =>
-      deriveChatRailContextTargets({
-        messages,
-        profile: profileId
-          ? {
-              id: profileId,
-              label: profileRailLabel,
-            }
-          : null,
-      }),
-    [messages, profileId, profileRailLabel]
+      designV1ChatEntitiesEnabled
+        ? deriveChatRailContextTargets({
+            messages,
+            profile: profileId
+              ? {
+                  id: profileId,
+                  label: profileRailLabel,
+                }
+              : null,
+          })
+        : [],
+    [designV1ChatEntitiesEnabled, messages, profileId, profileRailLabel]
   );
 
   useEffect(() => {
@@ -454,8 +406,7 @@ export function JovieChat({
   const deepLinkOpportunityId = searchParams.get('opportunityId');
 
   // Empty-thread opportunity cards (GH #13177): only when there is no active
-  // conversation content yet. Zero pending → restore actionCards + prompt rail
-  // first-run scaffolding (JOV-3547) instead of a bare composer.
+  // conversation content yet. Zero pending → leave empty state as-is (no pills).
   // Also load when deep-linking a pin from the inbox (JOV-3933).
   const shouldLoadOpportunityCards =
     (!hasMessages && !conversationId && !isLoadingConversation) ||
@@ -503,20 +454,6 @@ export function JovieChat({
   // stays above the transcript, matching inbox → pinned-card behavior.
   const showThreadView = hasMessages || pinnedOpportunity !== null;
   const showBottomComposer = showThreadView;
-  // Hide scaffolding while typing/chips/picker so the composer owns attention.
-  const showEmptyScaffolding =
-    !showThreadView &&
-    !composerPickerOpen &&
-    !input.trim() &&
-    chipTray.chips.length === 0;
-  const showEmptyActionCards =
-    showEmptyScaffolding &&
-    !showEmptyOpportunityCards &&
-    Boolean(actionCards?.length);
-  // Prompt rail is the zero-opportunity scaffolding path (JOV-3547). Hide it
-  // when opportunity cards own the empty state so the rail does not compete.
-  const showEmptyPromptRail =
-    showEmptyScaffolding && !showEmptyOpportunityCards;
   const shouldReservePickerClearance = showBottomComposer && composerPickerOpen;
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE
@@ -679,6 +616,9 @@ export function JovieChat({
         )}
         data-testid='chat-content'
         data-picker-open={composerPickerOpen ? 'true' : undefined}
+        data-design-v1-chat-entities={
+          designV1ChatEntitiesEnabled ? 'true' : undefined
+        }
       >
         {/* Ambient background wash — fills the full chat viewport so the
             gradient never clips to a content-sized region (#12135 / JOV-3614).
@@ -724,7 +664,6 @@ export function JovieChat({
         <div className='relative flex flex-1 flex-col overflow-hidden'>
           <div
             ref={scrollContainerRef}
-            data-testid='chat-message-scroll'
             className={cn(
               'absolute inset-0 overflow-y-auto px-4 py-5 sm:px-5',
               !showThreadView && 'flex flex-col',
@@ -734,14 +673,7 @@ export function JovieChat({
           >
             {!showThreadView ? (
               <div
-                className={cn(
-                  'flex flex-1 flex-col',
-                  // Docked scaffolds (cards/opportunity) fill the viewport so the
-                  // composer can sit at the bottom; welcome state stays centered.
-                  showEmptyActionCards || showEmptyOpportunityCards
-                    ? 'min-h-0'
-                    : 'items-center justify-center'
-                )}
+                className='flex flex-1 flex-col items-center justify-center'
                 data-testid='chat-empty-state-viewport'
               >
                 <ChatEmptyStateComposerRegion
@@ -752,42 +684,10 @@ export function JovieChat({
                         cards={pendingOpportunityCards}
                         onSelect={handleSelectOpportunityCard}
                       />
-                    ) : showEmptyActionCards ? (
-                      <div
-                        className='mx-auto flex w-full max-w-[28rem] flex-col gap-2'
-                        data-testid='chat-empty-state-action-card-slot'
-                      >
-                        {visibleActionCards.map(card => (
-                          <ChatActionCard
-                            key={card.id}
-                            title={card.title}
-                            body={card.body}
-                            actionLabel={card.actionLabel}
-                            ariaLabel={card.title}
-                            onAct={() => handleActOnActionCard(card)}
-                            onDismiss={() => handleDismissActionCard(card)}
-                          />
-                        ))}
-                      </div>
                     ) : undefined
                   }
                 >
                   {composerSurface}
-                  {showEmptyPromptRail ? (
-                    <div
-                      className='mt-4 w-full'
-                      data-testid='chat-empty-state-soft-suggestions-slot'
-                    >
-                      <SuggestedPrompts
-                        onSelect={handleSuggestedPrompt}
-                        isFirstSession={isFirstSession}
-                        isProfileComplete={isProfileComplete}
-                        layout='rail'
-                        dimmed={composerPickerOpen}
-                        excludeActionIds={promptRailExcludeActionIds}
-                      />
-                    </div>
-                  ) : null}
                   {inlineChatError ? (
                     <div className='mt-3 w-full'>{inlineChatError}</div>
                   ) : null}

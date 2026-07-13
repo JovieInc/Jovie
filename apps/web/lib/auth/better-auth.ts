@@ -1,28 +1,12 @@
 import 'server-only';
 
-import { oauthProvider } from '@better-auth/oauth-provider';
-import {
-  type BetterAuthOptions,
-  type BetterAuthPlugin,
-  betterAuth,
-} from 'better-auth';
+import { type BetterAuthOptions, betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { nextCookies } from 'better-auth/next-js';
-import {
-  bearer,
-  emailOTP,
-  jwt,
-  oneTap,
-  oneTimeToken,
-} from 'better-auth/plugins';
+import { bearer, emailOTP, oneTap, oneTimeToken } from 'better-auth/plugins';
 import { db } from '@/lib/db';
 import {
   baAccounts,
-  baJwks,
-  baOauthAccessTokens,
-  baOauthClients,
-  baOauthConsents,
-  baOauthRefreshTokens,
   baSessions,
   baUsers,
   baVerifications,
@@ -32,18 +16,8 @@ import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { generateAppleClientSecret } from './apple-client-secret';
-import { oauthProviderErrorReturn } from './oauth-provider-error-return';
 import { provisionAppUser } from './provision';
-import {
-  AUTH_RATE_LIMIT_RULES,
-  isDeterministicTestOtpEmail,
-} from './rate-limit-rules';
 import { secondaryStorage } from './secondary-storage';
-
-export {
-  AUTH_RATE_LIMIT_RULES,
-  isDeterministicTestOtpEmail,
-} from './rate-limit-rules';
 
 /**
  * Better Auth server instance (Clerk → Better Auth migration; see
@@ -57,6 +31,34 @@ export {
 export const DETERMINISTIC_TEST_OTP = '424242';
 
 /**
+ * Deterministic E2E OTP gate (triple-guarded, plan security row 11):
+ * requires E2E_TEST_MODE=1, hard-blocked on production deploys, and only for
+ * the repo's canonical test-email shapes (`…+e2e…@` / `…+clerk_test…@`,
+ * optionally with a trailing `+suffix` segment as used by
+ * tests/helpers/clerk-auth.ts).
+ */
+const TEST_OTP_EMAIL_PATTERN = /\+(e2e|clerk_test)(\+[^@]*)?@/i;
+
+export function isDeterministicTestOtpEmail(email: string): boolean {
+  return (
+    env.E2E_TEST_MODE === '1' &&
+    env.VERCEL_ENV !== 'production' &&
+    TEST_OTP_EMAIL_PATTERN.test(email)
+  );
+}
+
+/**
+ * Durable rate limits for the new public auth endpoints (plan eng row 28).
+ * Windows are seconds. Stored via secondary storage (Redis) — never
+ * in-memory in production (security.md).
+ */
+export const AUTH_RATE_LIMIT_RULES = {
+  '/sign-in/social': { window: 60, max: 10 },
+  '/email-otp/send-verification-otp': { window: 60, max: 3 },
+  '/one-time-token/verify': { window: 60, max: 10 },
+} as const;
+
+/**
  * Trusted origins: production + staging + local dev + native deep-link
  * schemes. Vercel previews are scoped to the exact deployment URL via the
  * function form — never a bare *.vercel.app wildcard (plan eng row 36).
@@ -64,11 +66,9 @@ export const DETERMINISTIC_TEST_OTP = '424242';
 export const STATIC_TRUSTED_ORIGINS = [
   'https://jov.ie',
   'https://staging.jov.ie',
-  'https://appleid.apple.com',
   'http://localhost:3100',
   'ie.jov.jovie://',
   'jovie://',
-  'logyourbody://',
 ] as const;
 
 function resolveTrustedOrigins(): (string | undefined)[] {
@@ -94,74 +94,9 @@ function resolveSecret(): string | undefined {
     : NON_PRODUCTION_FALLBACK_SECRET;
 }
 
-const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
-
-function resolveLocalBetterAuthUrl(): URL | undefined {
-  if (
-    env.VERCEL_ENV === 'preview' ||
-    env.VERCEL_ENV === 'production' ||
-    !env.BETTER_AUTH_URL
-  ) {
-    return undefined;
-  }
-
-  // A malformed BETTER_AUTH_URL must degrade to the non-local path, never
-  // abort the build while prerendering (page-data collection runs this
-  // module's import graph).
-  let configuredUrl: URL;
-  try {
-    configuredUrl = new URL(env.BETTER_AUTH_URL);
-  } catch {
-    return undefined;
-  }
-  return LOOPBACK_HOSTNAMES.has(configuredUrl.hostname)
-    ? configuredUrl
-    : undefined;
-}
-
-/**
- * Local dev / E2E servers can run on a non-default port (e.g. PORT=3200 for
- * parallel QA runs) while Doppler's BETTER_AUTH_URL stays pinned to 3100.
- * Trust the loopback host for the port this process actually serves so the
- * session lookup's host check doesn't 500 public routes. Loopback-only and
- * never applied to Vercel preview/production deployments.
- */
-function resolveServingPortHost(): string | undefined {
-  if (env.VERCEL_ENV === 'preview' || env.VERCEL_ENV === 'production') {
-    return undefined;
-  }
-  const port = process.env.PORT?.trim();
-  if (!port || !/^\d{2,5}$/.test(port)) {
-    return undefined;
-  }
-  return `localhost:${port}`;
-}
-
-function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
-  const localBetterAuthUrl = resolveLocalBetterAuthUrl();
-
-  return {
-    allowedHosts: [
-      ...new Set(
-        [
-          'jov.ie',
-          'www.jov.ie',
-          'staging.jov.ie',
-          'localhost:3100',
-          localBetterAuthUrl?.host,
-          resolveServingPortHost(),
-          env.VERCEL_URL,
-          env.VERCEL_BRANCH_URL,
-        ].filter((host): host is string => Boolean(host))
-      ),
-    ],
-    protocol:
-      localBetterAuthUrl?.protocol === 'http:' ||
-      env.VERCEL_ENV === 'development' ||
-      (!env.VERCEL_ENV && env.NODE_ENV !== 'production')
-        ? 'http'
-        : 'https',
-  };
+function resolveBaseUrl(): string | undefined {
+  if (env.BETTER_AUTH_URL) return env.BETTER_AUTH_URL;
+  return env.VERCEL_URL ? `https://${env.VERCEL_URL}` : undefined;
 }
 
 /** Providers are included only when their credentials exist (env-gated). */
@@ -181,24 +116,15 @@ function buildSocialProviders(): NonNullable<
     env.AUTH_APPLE_KEY_ID &&
     env.AUTH_APPLE_PRIVATE_KEY
   ) {
-    try {
-      providers.apple = {
-        clientId: env.AUTH_APPLE_CLIENT_ID,
-        // better-auth@1.6.23 requires a pre-signed ES256 JWT (verified against
-        // the installed source) — minted from the .p8 components.
-        clientSecret: generateAppleClientSecret(),
-        // Lets the iOS app's native Sign in with Apple id_token (audience =
-        // bundle id) verify against the same provider.
-        appBundleIdentifier: 'ie.jov.jovie',
-      };
-    } catch (error) {
-      // Prefer degraded Apple sign-in over failing the entire production build
-      // when preview/Vercel env has a corrupt AUTH_APPLE_PRIVATE_KEY.
-      console.error(
-        '[better-auth] Skipping Apple provider — invalid AUTH_APPLE_PRIVATE_KEY',
-        error
-      );
-    }
+    providers.apple = {
+      clientId: env.AUTH_APPLE_CLIENT_ID,
+      // better-auth@1.6.23 requires a pre-signed ES256 JWT (verified against
+      // the installed source) — minted from the .p8 components.
+      clientSecret: generateAppleClientSecret(),
+      // Lets the iOS app's native Sign in with Apple id_token (audience =
+      // bundle id) verify against the same provider.
+      appBundleIdentifier: 'ie.jov.jovie',
+    };
   }
   return providers;
 }
@@ -254,31 +180,10 @@ function buildPlugins() {
       ? [oneTap({ clientId: googleOneTapClientId })]
       : []),
     bearer(),
-    jwt({
-      disableSettingJwtHeader: true,
-      jwks: {
-        keyPairConfig: { alg: 'EdDSA', crv: 'Ed25519' },
-        rotationInterval: 60 * 60 * 24 * 30,
-        gracePeriod: 60 * 60 * 24 * 30,
-      },
-    }),
-    oauthProvider({
-      loginPage: '/identity',
-      consentPage: '/identity',
-      signup: { page: '/identity' },
-      scopes: ['openid', 'profile', 'email', 'offline_access'],
-      grantTypes: ['authorization_code', 'refresh_token'],
-      allowDynamicClientRegistration: false,
-      allowUnauthenticatedClientRegistration: false,
-      accessTokenExpiresIn: 15 * 60,
-      refreshTokenExpiresIn: 60 * 60 * 24 * 30,
-      storeClientSecret: 'hashed',
-      storeTokens: 'hashed',
-      cachedTrustedClients: new Set(['logyourbody-ios', 'logyourbody-web']),
-    }) as BetterAuthPlugin,
-    oauthProviderErrorReturn(),
     oneTimeToken({
+      // Minutes at 1.6.23 (default 3). Covers the native handoff window.
       expiresIn: 5,
+      // Client-callable generate is a cookie→bearer exfil vector (row 29).
       disableClientRequest: true,
       storeToken: 'hashed',
     }),
@@ -292,7 +197,6 @@ export const auth = betterAuth({
   appName: 'Jovie',
   baseURL: resolveBaseUrl(),
   secret: resolveSecret(),
-  disabledPaths: ['/token'],
   database: drizzleAdapter(db, {
     provider: 'pg',
     // Explicit: the repo bans db.transaction(); do not rely on the adapter
@@ -303,11 +207,6 @@ export const auth = betterAuth({
       session: baSessions,
       account: baAccounts,
       verification: baVerifications,
-      jwks: baJwks,
-      oauthClient: baOauthClients,
-      oauthRefreshToken: baOauthRefreshTokens,
-      oauthAccessToken: baOauthAccessTokens,
-      oauthConsent: baOauthConsents,
     },
   }),
   socialProviders: buildSocialProviders(),
@@ -343,22 +242,13 @@ export const auth = betterAuth({
             });
           } catch (error) {
             // provisionAppUser never throws by contract; this is
-            // belt-and-braces so the auth callback can never fail here.
+            // belt-and-braces so the OAuth callback can never fail here.
             // gate.ts lazy-create heals on the next request.
-            try {
-              logger.error('[auth] provision hook failed', error);
-              await captureError('Better Auth provision hook failed', error, {
-                betterAuthUserId: user.id,
-                operation: 'databaseHooks.user.create.after',
-              });
-            } catch (telemetryError) {
-              // Telemetry must never turn the fail-open repair path into an
-              // auth failure. The next request still heals through gate.ts.
-              console.error(
-                '[auth] provision hook telemetry failed',
-                telemetryError
-              );
-            }
+            logger.error('[auth] provision hook failed', error);
+            await captureError('Better Auth provision hook failed', error, {
+              betterAuthUserId: user.id,
+              operation: 'databaseHooks.user.create.after',
+            });
           }
         },
       },

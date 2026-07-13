@@ -1,7 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-
 import { cn } from '@/lib/utils';
 
 export interface SortableHeaderButtonProps
@@ -19,15 +17,14 @@ export function SortableHeaderButton({
   className,
 }: Readonly<SortableHeaderButtonProps>) {
   return (
-    <Button
+    <button
       type='button'
-      variant='ghost'
       onClick={onClick}
       className={cn(
-        'inline-flex h-auto w-full items-center justify-start gap-2 text-left text-app font-medium tracking-normal',
+        'inline-flex w-full items-center gap-2 text-left text-app font-medium tracking-normal',
         'rounded-full px-1.5 py-1 transition-[background-color,color,box-shadow] duration-subtle',
         'text-secondary-token hover:bg-surface-1 hover:text-primary-token',
-        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
         'active:bg-surface-0',
         className
       )}
@@ -47,6 +44,6 @@ export function SortableHeaderButton({
           return direction === 'asc' ? '▴' : '▾';
         })()}
       </span>
-    </Button>
+    </button>
   );
 }

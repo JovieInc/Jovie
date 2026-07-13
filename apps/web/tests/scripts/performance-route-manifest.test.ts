@@ -37,20 +37,12 @@ const CREATOR_SHELL_SLICE_ROUTES = [
     resolvesDynamicPath: true,
   },
   {
-    id: 'creator-inbox-nav',
-    path: APP_ROUTES.DASHBOARD,
+    id: 'creator-releases',
+    path: APP_ROUTES.RELEASES,
     measureMode: 'warm-navigation',
     warmupStrategy: 'authenticated-shell',
     primaryMetric: 'warm-shell-response',
-    navTrigger: `a[href="${APP_ROUTES.DASHBOARD}"]`,
-  },
-  {
-    id: 'creator-chat-nav',
-    path: APP_ROUTES.CHAT,
-    measureMode: 'warm-navigation',
-    warmupStrategy: 'authenticated-shell',
-    primaryMetric: 'warm-shell-response',
-    navTrigger: `a[href="${APP_ROUTES.CHAT}"]`,
+    navTrigger: `a[href="${APP_ROUTES.RELEASES}"]`,
   },
   {
     id: 'creator-library',
@@ -59,22 +51,6 @@ const CREATOR_SHELL_SLICE_ROUTES = [
     warmupStrategy: 'authenticated-shell',
     primaryMetric: 'warm-shell-response',
     navTrigger: `a[href="${APP_ROUTES.LIBRARY}"]`,
-  },
-  {
-    id: 'creator-contacts',
-    path: APP_ROUTES.CONTACTS,
-    measureMode: 'warm-navigation',
-    warmupStrategy: 'authenticated-shell',
-    primaryMetric: 'warm-shell-response',
-    navTrigger: `a[href="${APP_ROUTES.CONTACTS}"]`,
-  },
-  {
-    id: 'creator-calendar',
-    path: APP_ROUTES.CALENDAR,
-    measureMode: 'warm-navigation',
-    warmupStrategy: 'authenticated-shell',
-    primaryMetric: 'warm-shell-response',
-    navTrigger: `a[href="${APP_ROUTES.CALENDAR}"]`,
   },
   {
     id: 'creator-tasks',
@@ -103,44 +79,9 @@ const CREATOR_SHELL_SLICE_ROUTES = [
 
 const RELEASE_BUDGET_CREATOR_SHELL_ROUTE_IDS = [
   'creator-releases',
-  'creator-library-cold',
   'creator-library',
-  'creator-tasks-cold',
   'creator-tasks',
   'creator-lyrics',
-] as const;
-
-const CANONICAL_SHELL_PERF_PAIRS = [
-  {
-    itemId: 'inbox',
-    coldRouteId: 'creator-app-home',
-    warmRouteId: 'creator-inbox-nav',
-  },
-  {
-    itemId: 'chat',
-    coldRouteId: 'creator-chat',
-    warmRouteId: 'creator-chat-nav',
-  },
-  {
-    itemId: 'library',
-    coldRouteId: 'creator-library-cold',
-    warmRouteId: 'creator-library',
-  },
-  {
-    itemId: 'contacts',
-    coldRouteId: 'creator-contacts-cold',
-    warmRouteId: 'creator-contacts',
-  },
-  {
-    itemId: 'calendar',
-    coldRouteId: 'creator-calendar-cold',
-    warmRouteId: 'creator-calendar',
-  },
-  {
-    itemId: 'tasks',
-    coldRouteId: 'creator-tasks-cold',
-    warmRouteId: 'creator-tasks',
-  },
 ] as const;
 
 function requireRoute(id: string) {
@@ -173,11 +114,11 @@ describe('performance route manifest shell slice coverage', () => {
     expect(getPrimaryTimingMetricName(route)).toBe(expectation.primaryMetric);
     expectBudgetCoverage(route);
 
-    if ('navTrigger' in expectation) {
+    if (expectation.navTrigger) {
       expect(route.readySelectors.navTrigger).toContain(expectation.navTrigger);
     }
 
-    if ('resolvesDynamicPath' in expectation) {
+    if (expectation.resolvesDynamicPath) {
       expect(route.resolvePath).toEqual(expect.any(Function));
     }
   });
@@ -190,32 +131,5 @@ describe('performance route manifest shell slice coverage', () => {
       const route = requireRoute(routeId);
       expect(getRouteResourceBudgets(route)).toEqual(releaseResourceBudgets);
     }
-  });
-
-  it.each(
-    CANONICAL_SHELL_PERF_PAIRS
-  )('measures $itemId with both cold-load and warm-navigation routes', expectation => {
-    const coldRoute = requireRoute(expectation.coldRouteId);
-    const warmRoute = requireRoute(expectation.warmRouteId);
-
-    expect(coldRoute.path).toBe(warmRoute.path);
-    expect(coldRoute.measureMode).toBe('page-load');
-    expect(coldRoute.warmupStrategy).toBe('authenticated-route');
-    expect(warmRoute.measureMode).toBe('warm-navigation');
-    expect(warmRoute.warmupStrategy).toBe('authenticated-shell');
-    expect(warmRoute.navigationItemId).toBe(expectation.itemId);
-    expectBudgetCoverage(coldRoute);
-    expectBudgetCoverage(warmRoute);
-  });
-
-  it('uses real profile-rail content rather than its skeleton as readiness', () => {
-    const profileRail = requireRoute('creator-profile-rail');
-
-    expect(profileRail.readySelectors.content).toEqual([
-      '[data-testid="profile-contact-sidebar"]',
-    ]);
-    expect(profileRail.readySelectors.content).not.toContain(
-      '[data-testid="profile-contact-sidebar-skeleton"]'
-    );
   });
 });

@@ -2,10 +2,6 @@
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
-import {
-  type CanonicalArtistMetrics,
-  getDisplaySpotifyFollowers,
-} from '@/lib/onboarding/canonical-metrics';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
@@ -20,12 +16,7 @@ export interface OnboardingProfileArtist {
   readonly name: string;
   readonly url: string;
   readonly imageUrl?: string | null;
-  /**
-   * Display follower count — always `metrics.spotifyFollowers` when metrics
-   * are present. Kept as a convenience mirror; never store monthly listeners here.
-   */
   readonly followers?: number | null;
-  readonly metrics?: CanonicalArtistMetrics | null;
   readonly popularity?: number | null;
   readonly genres?: readonly string[];
   readonly dspMatches?: readonly OnboardingDspMatch[];
@@ -174,21 +165,17 @@ function buildPreviewArtist(
   const firstGenre = artist.genres?.[0]
     ? formatGenreLabel(artist.genres[0])
     : null;
-  // Single source: metrics.spotifyFollowers when present, else followers mirror.
-  const followerCount =
-    getDisplaySpotifyFollowers(artist.metrics) ?? artist.followers ?? null;
-  const followerLabel = formatCompactCount(followerCount);
+  const followerLabel = formatCompactCount(artist.followers);
 
   return {
     id: `onboarding-preview-${artist.id}`,
-    // Preview-only — not a real owner. Manage / claim chrome must stay off.
     owner_user_id: 'onboarding-preview',
     handle: handle ?? 'your-handle',
     spotify_id: artist.id,
     name: artist.name,
     image_url: artist.imageUrl ?? undefined,
     tagline: followerLabel
-      ? `${followerLabel} Spotify followers (source: enrichment)`
+      ? `${followerLabel} Spotify followers`
       : (firstGenre ?? undefined),
     theme: undefined,
     settings: undefined,
@@ -207,8 +194,7 @@ function buildPreviewArtist(
     genres: artist.genres ? [...artist.genres] : null,
     career_highlights: null,
     target_playlists: null,
-    // Not claimed/verified — keep published false so preview never reads as live.
-    published: false,
+    published: true,
     is_verified: false,
     is_featured: false,
     marketing_opt_out: false,
@@ -339,8 +325,6 @@ export function OnboardingProfileRail({
           socialLinks={previewLinks}
           genres={previewArtist.genres}
           profileHref={profileHref}
-          // Never show Live — ownership is unverified during onboarding.
-          showLiveBadge={false}
           dataTestId='onboarding-profile-bento'
           phonePreviewTestId='onboarding-phone-preview'
           surfaceTestId='onboarding-profile-compact-surface'
@@ -358,15 +342,6 @@ export function OnboardingProfileRail({
           phoneFrameClassName={
             isInline ? 'h-105 w-50 sm:h-120 sm:w-57' : 'h-148 w-71'
           }
-          topRight={
-            <span
-              className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/50 px-2.5 text-3xs font-semibold uppercase tracking-wider text-white backdrop-blur-md dark:text-white'
-              data-testid='onboarding-profile-preview-badge'
-            >
-              Preview
-            </span>
-          }
-          caption='Preview — not claimed yet'
           overlay={<DspMatchStrip matches={dspMatches} />}
         />
       </div>

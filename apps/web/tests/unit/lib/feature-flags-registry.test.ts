@@ -7,11 +7,12 @@ import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_KEYS,
   APP_FLAG_TO_STATSIG_GATE,
+  DESIGN_V1_ALIAS_FLAGS,
   LEGACY_STATSIG_GATE_KEYS,
   LOCAL_DEFAULT_ONLY_FLAGS,
 } from '@/lib/flags/contracts';
 
-const SOURCE_DIRECTORIES = ['app', 'components', 'hooks', 'lib', 'scripts'];
+const SOURCE_DIRECTORIES = ['app', 'components', 'hooks', 'lib'];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
 
 const SKIP_DIRECTORIES = new Set([
@@ -67,23 +68,6 @@ function collectSourceFiles(rootDir: string): string[] {
   return files;
 }
 
-interface SourceFile {
-  readonly absolutePath: string;
-  readonly relativePath: string;
-  readonly source: string;
-}
-
-/** Read the source tree once; every registry assertion reuses this snapshot. */
-function collectSourceCorpus(rootDir: string): SourceFile[] {
-  return collectSourceFiles(rootDir).map(absolutePath => ({
-    absolutePath,
-    relativePath: path.relative(rootDir, absolutePath),
-    source: readFileSync(absolutePath, 'utf8'),
-  }));
-}
-
-const SOURCE_CORPUS = collectSourceCorpus(WEB_ROOT);
-
 function readRepoFile(relativePath: string): string {
   return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 }
@@ -92,26 +76,19 @@ describe('feature flag registry integrity', () => {
   it('keeps runtime app flags default-on for internal v1 access', () => {
     // INBOX_HOME is an intentional default-off rollout gate (JOV-3931 / GH #13171).
     const defaultsExcludingRolloutGates = Object.entries(APP_FLAG_DEFAULTS)
-      .filter(
-        ([name]) =>
-          ![
-            'INBOX_HOME',
-            'PROFILES_WORKSPACE',
-            'PROFILE_SEARCH_MONITORING',
-          ].includes(name)
-      )
+      .filter(([name]) => name !== 'INBOX_HOME')
       .map(([, value]) => value);
     expect(defaultsExcludingRolloutGates.every(Boolean)).toBe(true);
     expect(APP_FLAG_DEFAULTS.INBOX_HOME).toBe(false);
-    expect(APP_FLAG_DEFAULTS.PROFILES_WORKSPACE).toBe(false);
-    expect(APP_FLAG_DEFAULTS.PROFILE_SEARCH_MONITORING).toBe(false);
   });
 
   it('keeps all runtime app-flag references registered', () => {
+    const sourceFiles = collectSourceFiles(WEB_ROOT);
     const registeredFlags = new Set<string>(Object.keys(APP_FLAG_KEYS));
     const discoveredFlags = new Set<string>();
 
-    for (const { source } of SOURCE_CORPUS) {
+    for (const sourceFile of sourceFiles) {
+      const source = readFileSync(sourceFile, 'utf8');
       const matches = source.matchAll(APP_FLAG_CALL_REGEX);
 
       for (const [, flag] of matches) {
@@ -127,57 +104,42 @@ describe('feature flag registry integrity', () => {
   });
 
   it('does not include API chat-specific feature flags in the registry', () => {
-    const allowedChatEntries = new Set<string>([
+    const allowedShellRolloutEntries = new Set<string>([
+      'DESIGN_V1',
+      LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
+      'SHELL_CHAT_V1',
+      LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1,
+      'DESIGN_V1_CHAT_ENTITIES',
+      LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_CHAT_ENTITIES,
       // CHAT_JANK_MONITOR is a legitimate app-level instrumentation flag backed
       // by a Statsig gate; it is not an API-chat-only flag.
       'CHAT_JANK_MONITOR',
       LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR,
     ]);
     const chatFlagsInKeys = Object.keys(LEGACY_STATSIG_GATE_KEYS).filter(
-      key => /chat/i.test(key) && !allowedChatEntries.has(key)
+      key => /chat/i.test(key) && !allowedShellRolloutEntries.has(key)
     );
     const chatFlagsInValues = Object.values(LEGACY_STATSIG_GATE_KEYS).filter(
-      flag => /chat/i.test(flag) && !allowedChatEntries.has(flag)
+      flag => /chat/i.test(flag) && !allowedShellRolloutEntries.has(flag)
     );
 
     expect([...chatFlagsInKeys, ...chatFlagsInValues]).toEqual([]);
   });
 
-  it('keeps the retired design rollout family out of every runtime contract', () => {
-    const retiredFlags = [
-      'DESIGN_V1',
-      'SHELL_CHAT_V1',
-      'DESIGN_V1_RELEASES',
-      'DESIGN_V1_TASKS',
-      'DESIGN_V1_CHAT_ENTITIES',
-      'DESIGN_V1_LYRICS',
-      'DESIGN_V1_LIBRARY',
-      'DESIGN_V1_AUTH',
-      'DESIGN_V1_ONBOARDING',
-    ];
+  it('keeps DESIGN_V1 and aliases permanently enabled (no Statsig gate, default true)', () => {
+    // DESIGN_V1 is the only design. It must NOT be backed by a Statsig gate
+    // (so a misconfigured gate cannot turn off the new design in production).
+    // All entries live in LOCAL_DEFAULT_ONLY_FLAGS with default=true.
+    const statsigBackedFlags = new Set(Object.keys(APP_FLAG_TO_STATSIG_GATE));
 
-    for (const flagName of retiredFlags) {
-      expect(APP_FLAG_DEFAULTS).not.toHaveProperty(flagName);
-      expect(APP_FLAG_KEYS).not.toHaveProperty(flagName);
-      expect(APP_FLAG_TO_STATSIG_GATE).not.toHaveProperty(flagName);
-      expect(LEGACY_STATSIG_GATE_KEYS).not.toHaveProperty(flagName);
-      expect([...LOCAL_DEFAULT_ONLY_FLAGS]).not.toContain(flagName);
+    expect(statsigBackedFlags.has('DESIGN_V1')).toBe(false);
+    expect(LOCAL_DEFAULT_ONLY_FLAGS.has('DESIGN_V1')).toBe(true);
+    expect(APP_FLAG_DEFAULTS.DESIGN_V1).toBe(true);
 
-      const productionReferences = SOURCE_CORPUS.filter(({ source }) =>
-        source.includes(flagName)
-      ).map(({ relativePath }) => relativePath);
-      expect(productionReferences).toEqual([]);
-    }
-
-    for (const retiredShellMarker of [
-      'shellChatV1',
-      'data-shell-design',
-      'data-design-v1-auth',
-    ]) {
-      const productionReferences = SOURCE_CORPUS.filter(({ source }) =>
-        source.includes(retiredShellMarker)
-      ).map(({ relativePath }) => relativePath);
-      expect(productionReferences).toEqual([]);
+    for (const aliasFlag of DESIGN_V1_ALIAS_FLAGS) {
+      expect(statsigBackedFlags.has(aliasFlag)).toBe(false);
+      expect(LOCAL_DEFAULT_ONLY_FLAGS.has(aliasFlag)).toBe(true);
+      expect(APP_FLAG_DEFAULTS[aliasFlag]).toBe(true);
     }
   });
 
@@ -192,6 +154,11 @@ describe('feature flag registry integrity', () => {
     expect(docs).toContain('`ai_chat_disabled`');
     expect(docs).toContain('`ai_chat_force_light`');
     expect(docs).toContain('`profile_alert_optin_cta_variant`');
+
+    for (const aliasFlag of DESIGN_V1_ALIAS_FLAGS) {
+      const legacyGateKey = LEGACY_STATSIG_GATE_KEYS[aliasFlag];
+      expect(docs).not.toContain(`| \`${legacyGateKey}\` |`);
+    }
   });
 
   it('documents the server-only Statsig environment contract', () => {
@@ -218,24 +185,32 @@ describe('feature flag registry integrity', () => {
   });
 
   it('forbids legacy feature-flags imports outside lib/flags', () => {
+    const sourceFiles = collectSourceFiles(WEB_ROOT);
     const legacyImportRegex = /from ['"]@\/lib\/feature-flags(?:\/|['"])/;
 
-    const violations = SOURCE_CORPUS.filter(({ source }) =>
-      legacyImportRegex.test(source)
-    )
-      .map(({ relativePath }) => relativePath)
+    const violations = sourceFiles
+      .filter(sourceFile => {
+        const source = readFileSync(sourceFile, 'utf8');
+        return legacyImportRegex.test(source);
+      })
+      .map(sourceFile => path.relative(WEB_ROOT, sourceFile))
       .sort();
 
     expect(violations).toEqual([]);
   });
 
   it('keeps experimental route modules out of production source', () => {
-    const violations = SOURCE_CORPUS.filter(
-      ({ absolutePath }) =>
-        !absolutePath.includes(`${path.sep}app${path.sep}exp${path.sep}`)
-    )
-      .filter(({ source }) => EXP_ROUTE_IMPORT_REGEX.test(source))
-      .map(({ relativePath }) => relativePath)
+    const sourceFiles = collectSourceFiles(WEB_ROOT);
+    const violations = sourceFiles
+      .filter(
+        sourceFile =>
+          !sourceFile.includes(`${path.sep}app${path.sep}exp${path.sep}`)
+      )
+      .filter(sourceFile => {
+        const source = readFileSync(sourceFile, 'utf8');
+        return EXP_ROUTE_IMPORT_REGEX.test(source);
+      })
+      .map(sourceFile => path.relative(WEB_ROOT, sourceFile))
       .sort();
 
     expect(violations).toEqual([]);

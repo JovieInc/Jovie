@@ -1,7 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-
 import { Clock3, ExternalLink } from 'lucide-react';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { cn } from '@/lib/utils';
@@ -60,7 +58,7 @@ function RowActionLink({ href, label }: RowActionLinkProps) {
       rel='noopener noreferrer'
       aria-label={`${label} (opens in a new tab)`}
       onClick={e => e.stopPropagation()}
-      className='inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-[520] text-tertiary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+      className='inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-[520] text-tertiary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
     >
       {label}
       <ExternalLink className='size-3' aria-hidden='true' />
@@ -136,15 +134,14 @@ export function WorkflowRunRow({
 
   return (
     <div className={containerClassName}>
-      <Button
+      <button
         type='button'
-        variant='ghost'
         onClick={() => onSelect(artifact)}
-        className='grid h-auto w-full gap-2 rounded-none text-left hover:bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
+        className='grid gap-2 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
         aria-pressed={isSelected}
       >
         {mainContent}
-      </Button>
+      </button>
       {hasActions ? (
         <div className='flex items-center gap-1 border-t border-subtle pt-2'>
           <RowActionLink href={artifact.pullRequestUrl} label='Open PR' />

@@ -83,16 +83,6 @@ describe('buildContentSecurityPolicy', () => {
     expect(connectSrc).toContain('https://*.public.blob.vercel-storage.com');
   });
 
-  it('includes api.qrserver.com in connect-src for QR code downloads', () => {
-    const csp = buildContentSecurityPolicy({
-      nonce: 'test-nonce',
-      isDev: false,
-    });
-    const connectSrc = findDirective(csp, 'connect-src');
-
-    expect(connectSrc).toContain('https://api.qrserver.com');
-  });
-
   it('includes Sentry regional ingest wildcard in connect-src', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',
@@ -252,27 +242,5 @@ describe('buildContentSecurityPolicyReportOnly', () => {
     expect(result).toContain("default-src 'self'");
     expect(result).toContain("script-src 'self'");
     expect(result).toContain('report-uri');
-  });
-});
-
-describe('Google Identity Services allowlist (JOV-4369)', () => {
-  it('allows the GIS script origin in script-src', () => {
-    const csp = buildContentSecurityPolicy({
-      nonce: 'test-nonce',
-      isDev: false,
-    });
-    const scriptSrc = findDirective(csp, 'script-src');
-
-    expect(scriptSrc).toContain('https://accounts.google.com');
-  });
-
-  it('allows the One Tap iframe origin in frame-src', () => {
-    const csp = buildContentSecurityPolicy({
-      nonce: 'test-nonce',
-      isDev: false,
-    });
-    const frameSrc = findDirective(csp, 'frame-src');
-
-    expect(frameSrc).toContain('https://accounts.google.com');
   });
 });

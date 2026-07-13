@@ -58,8 +58,7 @@ export interface ArtistNotificationsCTAProps {
   readonly portalContainer?: HTMLElement | null;
   /**
    * Controls the base rendering style when notifications are disabled or idle.
-   * "link" matches the static profile button, "button" matches the canonical
-   * @jovie/ui Button primary CTA.
+   * "link" matches the static profile button, "button" matches CTAButton.
    */
   readonly variant?: 'link' | 'button';
   /**
@@ -88,10 +87,4 @@ export interface ArtistNotificationsCTAProps {
   readonly source?: NotificationSource;
   readonly sourceContext?: NotificationSourceContext;
   readonly triggerLabel?: string;
-  /**
-   * Optional override for the trigger button's className. Used by surface
-   * empty states that need the trigger on the unified 36px CTA scale instead
-   * of the default 48px pill.
-   */
-  readonly triggerClassName?: string;
 }

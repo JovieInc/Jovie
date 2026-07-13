@@ -2,7 +2,6 @@
 
 import { and, eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
-import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
@@ -27,8 +26,8 @@ export async function switchActiveProfile(
   profileId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { userId: appUserId } = await getCachedAuth();
-    if (!appUserId) {
+    const { userId: clerkUserId } = await getCachedAuth();
+    if (!clerkUserId) {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -40,7 +39,7 @@ export async function switchActiveProfile(
     const [user] = await db
       .select({ id: users.id, activeProfileId: users.activeProfileId })
       .from(users)
-      .where(appUserIdFilter(appUserId))
+      .where(eq(users.clerkId, clerkUserId))
       .limit(1);
 
     if (!user) {
@@ -119,8 +118,8 @@ export async function createAdditionalProfile(input: {
   username: string;
 }): Promise<{ success: boolean; error?: string; profileId?: string }> {
   try {
-    const { userId: appUserId } = await getCachedAuth();
-    if (!appUserId) {
+    const { userId: clerkUserId } = await getCachedAuth();
+    if (!clerkUserId) {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -160,7 +159,7 @@ export async function createAdditionalProfile(input: {
     const [user] = await db
       .select({ id: users.id })
       .from(users)
-      .where(appUserIdFilter(appUserId))
+      .where(eq(users.clerkId, clerkUserId))
       .limit(1);
 
     if (!user) {

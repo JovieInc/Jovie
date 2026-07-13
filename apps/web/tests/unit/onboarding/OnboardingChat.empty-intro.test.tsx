@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
-import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
+import { ONBOARDING_WELCOME_MESSAGE } from '@/lib/onboarding/empty-state';
 
 const chatMocks = vi.hoisted(() => ({
   messages: [] as Array<{
@@ -114,42 +114,22 @@ describe('OnboardingChat empty intro', () => {
     );
 
     expect(screen.getByTestId('onboarding-empty-intro')).toBeTruthy();
-    expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
+    expect(screen.getByText(ONBOARDING_WELCOME_MESSAGE)).toBeTruthy();
     expect(screen.getByTestId('onboarding-sign-in-skip')).toHaveAttribute(
       'href',
       '/signin'
     );
   });
 
-  it('shows a compact processing state for a validated starter handoff', () => {
-    process.env.NODE_ENV = 'test';
+  it('hides welcome intro when a starter prompt deep link is provided', () => {
     render(
       <OnboardingChat
-        starterHandoff={{
-          kind: 'prompt',
-          prompt: 'Help me plan my next release.',
-        }}
-        turnstileToken={null}
-        turnstileStatus='interactive'
-      />
-    );
-
-    expect(screen.getByText('Getting This Ready')).toBeTruthy();
-    expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
-  });
-
-  it('falls back to blank entry when a stored intent is missing', async () => {
-    render(
-      <OnboardingChat
-        intentId='missing-intent'
+        starterPrompt='Help me plan my next release.'
         turnstileToken='token'
         turnstileStatus='verified'
       />
     );
 
-    await waitFor(() => {
-      expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
-    });
-    expect(screen.getByTestId('onboarding-starter-suggestions')).toBeTruthy();
+    expect(screen.queryByTestId('onboarding-empty-intro')).toBeNull();
   });
 });

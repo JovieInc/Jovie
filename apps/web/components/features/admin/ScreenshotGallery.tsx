@@ -1,7 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-
 import {
   ChevronLeft,
   ChevronRight,
@@ -178,14 +176,13 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
         key={screenshot.id}
         className='group overflow-hidden rounded-lg bg-surface-0'
       >
-        <Button
+        <button
           type='button'
-          variant='ghost'
           onClick={() => setSelectedIndex(globalIndex)}
-          className='block h-auto w-full cursor-pointer rounded-none p-0 hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+          className='block w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
           aria-label={`View ${screenshot.title}`}
         >
-          <div className='relative aspect-video w-full overflow-hidden bg-surface-1'>
+          <div className='relative aspect-video overflow-hidden bg-surface-1'>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={screenshot.url}
@@ -195,7 +192,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
               className='h-full w-full object-cover object-top'
             />
           </div>
-        </Button>
+        </button>
 
         <div className='flex items-center justify-between gap-3 p-3'>
           <div className='min-w-0'>
@@ -259,21 +256,19 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
             </div>
             <div className='flex flex-wrap gap-2'>
               {SURFACE_FILTERS.map(filter => (
-                <Button
+                <button
                   key={filter.id}
                   type='button'
-                  variant='ghost'
-                  size='sm'
                   onClick={() => setSurfaceFilter(filter.id)}
                   aria-pressed={surfaceFilter === filter.id}
-                  className={`h-auto rounded-full border px-3 py-1.5 text-xs ${
+                  className={`rounded-full border px-3 py-1.5 text-xs ${
                     surfaceFilter === filter.id
                       ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
                       : 'border-subtle bg-surface-0 text-secondary-token'
                   }`}
                 >
                   {filter.label}
-                </Button>
+                </button>
               ))}
             </div>
           </div>
@@ -294,21 +289,19 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                 </p>
                 <div className='flex flex-wrap gap-2'>
                   {GROUP_FILTERS.map(filter => (
-                    <Button
+                    <button
                       key={filter.id}
                       type='button'
-                      variant='ghost'
-                      size='sm'
                       onClick={() => setGroupFilter(filter.id)}
                       aria-pressed={groupFilter === filter.id}
-                      className={`h-auto rounded-full border px-3 py-1.5 text-xs ${
+                      className={`rounded-full border px-3 py-1.5 text-xs ${
                         groupFilter === filter.id
                           ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
                           : 'border-subtle bg-surface-1 text-secondary-token'
                       }`}
                     >
                       {filter.label}
-                    </Button>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -318,21 +311,19 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                 </p>
                 <div className='flex flex-wrap gap-2'>
                   {CONSUMER_FILTERS.map(filter => (
-                    <Button
+                    <button
                       key={filter.id}
                       type='button'
-                      variant='ghost'
-                      size='sm'
                       onClick={() => setConsumerFilter(filter.id)}
                       aria-pressed={consumerFilter === filter.id}
-                      className={`h-auto rounded-full border px-3 py-1.5 text-xs ${
+                      className={`rounded-full border px-3 py-1.5 text-xs ${
                         consumerFilter === filter.id
                           ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
                           : 'border-subtle bg-surface-1 text-secondary-token'
                       }`}
                     >
                       {filter.label}
-                    </Button>
+                    </button>
                   ))}
                 </div>
               </div>

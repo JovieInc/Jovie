@@ -18,10 +18,6 @@ import {
   buildReadinessState,
   parseSpotifyImportStatus,
 } from '@/lib/onboarding/discovery-readiness';
-import {
-  assertOnboardingProfileOwner,
-  isOnboardingOwnershipError,
-} from '@/lib/onboarding/ownership-gate';
 import { getHometownFromSettings } from '@/types/db';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -92,8 +88,7 @@ export async function GET(request: Request) {
         spotifyUrl: creatorProfiles.spotifyUrl,
         appleMusicId: creatorProfiles.appleMusicId,
         onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
-        // App users.id (getCachedAuth().userId is the same UUID post BA cutover).
-        ownerUserId: creatorProfiles.userId,
+        clerkId: users.clerkId,
       })
       .from(creatorProfiles)
       .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -107,19 +102,11 @@ export async function GET(request: Request) {
       );
     }
 
-    try {
-      assertOnboardingProfileOwner({
-        authenticatedUserId: userId,
-        profileOwnerUserId: profile.ownerUserId,
-      });
-    } catch (error) {
-      if (isOnboardingOwnershipError(error)) {
-        return NextResponse.json(
-          { error: 'Forbidden', errorCode: error.errorCode },
-          { status: error.status, headers: NO_STORE_HEADERS }
-        );
-      }
-      throw error;
+    if (profile.clerkId !== userId) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
     }
 
     const [

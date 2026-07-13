@@ -50,14 +50,6 @@ export const ServerEnvSchema = z.object({
         'VERCEL_URL must be a hostname or hostname:port without a scheme or path',
     })
     .optional(),
-  VERCEL_BRANCH_URL: z
-    .string()
-    .trim()
-    .refine(isHostWithOptionalPort, {
-      message:
-        'VERCEL_BRANCH_URL must be a hostname or hostname:port without a scheme or path',
-    })
-    .optional(),
   VERCEL_AUTOMATION_BYPASS_SECRET: z.string().optional(),
   PUBLIC_NOAUTH_SMOKE: z.string().optional(),
   /**
@@ -375,14 +367,11 @@ export const ServerEnvSchema = z.object({
   // SMS subscribe handoff (Twilio + intent codes; JOV-1834)
   SMS_INTENT_SECRET: z.string().optional(),
   TWILIO_ACCOUNT_SID: z.string().optional(),
-  TWILIO_API_KEY_SID: z.string().optional(),
-  TWILIO_API_KEY_SECRET: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_AUTH_TOKEN_SECONDARY: z.string().optional(),
   TWILIO_AUTH_TOKEN_SECONDARY_EXPIRES_AT: z.string().optional(),
   TWILIO_MESSAGING_SERVICE_SID: z.string().optional(),
   TWILIO_FROM_NUMBER: z.string().optional(),
-  TWILIO_VERIFY_SERVICE_SID: z.string().optional(),
   /**
    * Master gate for the native SMS handoff CTA + intent API. When 'false'
    * (or unset), `POST /api/notifications/sms-intents` returns 503 and the
@@ -418,7 +407,6 @@ export const ENV_KEYS = [
   'VERCEL_GIT_COMMIT_SHA',
   'VERCEL_DEPLOYMENT_TIME',
   'VERCEL_URL',
-  'VERCEL_BRANCH_URL',
   'VERCEL_AUTOMATION_BYPASS_SECRET',
   'PUBLIC_NOAUTH_SMOKE',
   'CHAT_LLM_FAILURE_INJECTION',
@@ -582,14 +570,11 @@ export const ENV_KEYS = [
   'DEMO_CLERK_USER_ID',
   'SMS_INTENT_SECRET',
   'TWILIO_ACCOUNT_SID',
-  'TWILIO_API_KEY_SID',
-  'TWILIO_API_KEY_SECRET',
   'TWILIO_AUTH_TOKEN',
   'TWILIO_AUTH_TOKEN_SECONDARY',
   'TWILIO_AUTH_TOKEN_SECONDARY_EXPIRES_AT',
   'TWILIO_MESSAGING_SERVICE_SID',
   'TWILIO_FROM_NUMBER',
-  'TWILIO_VERIFY_SERVICE_SID',
   'NATIVE_SMS_ENABLED',
   'OUTBOUND_SMS_ENABLED',
   'SMS_DEMO_BYPASS_PRO_GATE',

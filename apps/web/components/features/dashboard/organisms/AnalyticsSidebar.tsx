@@ -72,19 +72,8 @@ function formatRankedLabel(label: string): string {
   }
 }
 
-/**
- * Shared outer + metric-row chrome for FunnelStage loading/loaded.
- * Must stay identical across branches — padding drift (px-3/py-2 vs
- * px-3.5/py-2.5) caused every funnel row to micro-shift when loading
- * resolved (JOV-4158 / #13819).
- */
-export const FUNNEL_STAGE_OUTER_CLASS = 'space-y-1.5 px-3.5 py-2.5';
-/** min-h-4 reserves space for text-mid value (0.9375rem) so skeleton → loaded is height-stable */
-export const FUNNEL_STAGE_METRIC_ROW_CLASS =
-  'flex min-h-4 items-center justify-between gap-2';
-
 /** Single stage in the vertical funnel waterfall */
-export function FunnelStage({
+function FunnelStage({
   label,
   value,
   rate,
@@ -101,10 +90,10 @@ export function FunnelStage({
 }) {
   if (loading) {
     return (
-      <div className={FUNNEL_STAGE_OUTER_CLASS}>
-        <div className={FUNNEL_STAGE_METRIC_ROW_CLASS}>
+      <div className='space-y-1.5 px-3 py-2'>
+        <div className='flex items-center justify-between'>
           <LoadingSkeleton height='h-3' width='w-20' rounded='sm' />
-          <LoadingSkeleton height='h-4' width='w-12' rounded='sm' />
+          <LoadingSkeleton height='h-3' width='w-12' rounded='sm' />
         </div>
         <div className={cn('h-1.5 rounded-full', TRACK_BG, 'animate-pulse')} />
       </div>
@@ -112,20 +101,20 @@ export function FunnelStage({
   }
 
   return (
-    <div className={FUNNEL_STAGE_OUTER_CLASS}>
-      <div className={FUNNEL_STAGE_METRIC_ROW_CLASS}>
+    <div className='space-y-1.5 px-3.5 py-2.5'>
+      <div className='flex items-baseline justify-between gap-2'>
         <span className='text-xs font-caption text-secondary-token'>
           {label}
         </span>
-        <span className='flex min-h-4 items-center gap-1.5'>
+        <span className='flex items-baseline gap-1.5'>
           <span className='tabular-nums text-mid font-semibold leading-none tracking-tighter text-primary-token'>
             {numberFormatter.format(value)}
           </span>
-          {rate ? (
+          {rate && (
             <span className='tabular-nums text-3xs font-caption text-tertiary-token'>
               {rate}
             </span>
-          ) : null}
+          )}
         </span>
       </div>
       <div className={cn('h-1.5 rounded-full', TRACK_BG)}>

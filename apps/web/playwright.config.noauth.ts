@@ -1,8 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
 
-const isCI = !!process.env.CI;
-
 /**
  * Playwright configuration for tests that don't require authentication
  * This config bypasses Clerk authentication for faster test execution
@@ -26,7 +24,6 @@ process.env.PUBLIC_NOAUTH_SMOKE = '1';
 const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 
 export default defineConfig({
-  captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
   fullyParallel: true,
   timeout: 120_000,
@@ -34,15 +31,15 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: isCI ? 'line' : 'html',
+  reporter: 'html',
   use: {
     baseURL,
-    trace: isCI ? 'off' : 'on-first-retry',
-    video: isCI ? 'off' : 'retain-on-failure',
-    // Keep public contexts genuinely signed out. Tests that exercise protected
-    // routes establish their own deterministic session with
-    // setTestAuthBypassSession; a global bypass header makes auth entry routes
-    // redirect to /app, whose cookie gate then redirects back to /signin.
+    trace: 'on-first-retry',
+    video: 'retain-on-failure',
+    // Add custom headers to bypass Clerk in test mode
+    extraHTTPHeaders: {
+      'x-test-mode': 'bypass-auth',
+    },
   },
   projects: [
     {
@@ -70,6 +67,7 @@ export default defineConfig({
           stdout: 'pipe',
           stderr: 'pipe',
           env: {
+            ...process.env,
             NODE_ENV: 'test',
             PORT: managedWebServerPort,
             NEXT_PUBLIC_E2E_MODE: '1',

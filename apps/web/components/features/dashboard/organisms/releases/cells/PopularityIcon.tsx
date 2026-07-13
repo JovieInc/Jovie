@@ -39,13 +39,13 @@ export const PopularityIcon = memo(function PopularityIcon({
 
   // Color mapping for each level
   const colors = {
-    low: 'bg-tertiary-token',
+    low: 'bg-(--linear-text-tertiary)',
     med: 'bg-amber-400 dark:bg-amber-300',
     high: 'bg-emerald-500 dark:bg-emerald-400',
   };
 
   const activeColor = colors[level];
-  const inactiveColor = 'bg-subtle';
+  const inactiveColor = 'bg-(--linear-border-subtle)';
 
   // Number of bars to fill based on level
   const barCounts: Record<'low' | 'med' | 'high', number> = {
@@ -60,7 +60,7 @@ export const PopularityIcon = memo(function PopularityIcon({
       <TooltipTrigger asChild>
         <button
           type='button'
-          className='inline-flex items-end gap-[1.5px] rounded-sm opacity-80 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+          className='inline-flex items-end gap-[1.5px] rounded-sm opacity-80 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
           aria-label={`Popularity ${displayPopularity} out of 100`}
         >
           {/* Bar 1 - shortest (4px) */}

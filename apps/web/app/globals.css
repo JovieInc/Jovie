@@ -110,11 +110,11 @@ html[data-desktop-runtime="electron"]
   -webkit-app-region: no-drag;
 }
 
-/* Titlebar rail alignment for the canonical app shell — the app-shell-body has
+/* Titlebar rail alignment for shellChatV1 — the app-shell-body has
    p-[--linear-app-shell-gap] on all sides, so the sidebar column starts at
    gap offset from the left edge. Mirror that offset in the titlebar so the
    sidebar-cell left edge aligns with the sidebar rail. */
-html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
+html[data-desktop-runtime="electron"] [data-shell-design="shellChatV1"]
   [data-electron-titlebar="true"] {
   padding-left: var(--linear-app-shell-gap);
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
@@ -123,14 +123,14 @@ html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
 /* Marketing pages use document scrolling rather than app-shell scroll panes.
    Only override html — setting overflow-y:auto on body promotes overflow-x:clip
    to overflow-x:hidden, which creates a scroll container that breaks sticky. */
-html:has(.system-b-marketing),
+html:has(.linear-marketing),
 html:has(.home-viewport) {
   height: auto;
   min-height: 100%;
   overflow-y: auto;
   overscroll-behavior: auto;
 }
-body:has(.system-b-marketing),
+body:has(.linear-marketing),
 body:has(.home-viewport) {
   height: auto;
   min-height: 100%;
@@ -1145,8 +1145,7 @@ body {
     display: grid;
     gap: 0.7rem;
     margin: 1.35rem 0 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-    padding: 1.1rem 0 0;
+    padding: 0;
     list-style: none;
   }
   .marketing-pricing-plan-card__features li {
@@ -1589,6 +1588,48 @@ body {
     &:hover {
       background-color: var(--linear-btn-primary-hover);
       border-color: var(--linear-btn-primary-hover);
+    }
+    /* WCAG SC 2.4.7 — visible focus ring for keyboard users */
+    &:focus-visible {
+      outline: none;
+      box-shadow:
+        var(--shadow-button-inset),
+        0 1px 1px rgba(0, 0, 0, 0.14),
+        0 0 0 2px var(--linear-bg-page),
+        0 0 0 4px
+        color-mix(in oklab, var(--linear-border-focus) 55%, transparent);
+    }
+  }
+  /* Linear Button - Primary CTA styling using tokens */
+  .btn-linear-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--linear-gap-buttons);
+    height: var(--linear-button-height-sm);
+    padding: 0 var(--linear-space-4);
+    border-radius: var(--radius-pill);
+    font-size: var(--linear-caption-size);
+    font-weight: var(--linear-font-weight-medium);
+    line-height: var(--linear-button-height-sm);
+    letter-spacing: var(--linear-tracking-normal);
+    background-color: var(--color-btn-primary-bg);
+    color: var(--color-btn-primary-fg);
+    border: 1px solid
+      color-mix(in oklab, var(--color-btn-primary-bg) 94%, white 6%);
+    max-width: 100%;
+    box-shadow:
+      var(--shadow-button-inset),
+      0 1px 1px rgba(0, 0, 0, 0.14);
+    transition:
+      background-color var(--ds-motion-subtle-duration)
+      var(--ds-motion-subtle-easing),
+      border-color var(--ds-motion-subtle-duration)
+      var(--ds-motion-subtle-easing),
+      box-shadow var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
+      color var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
+    &:hover {
+      background-color: var(--color-btn-primary-hover);
     }
     /* WCAG SC 2.4.7 — visible focus ring for keyboard users */
     &:focus-visible {

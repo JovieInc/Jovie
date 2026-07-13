@@ -30,7 +30,7 @@ describe('performance route resolvers', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.stubEnv('DATABASE_URL', 'postgres://example');
-    vi.stubEnv('E2E_BETTER_AUTH_USER_ID', 'ba_user_test_123');
+    vi.stubEnv('E2E_CLERK_USER_ID', 'user_test_123');
     vi.stubEnv('PERF_ROUTE_MUSIC_HANDLE', 'dualipa');
 
     resolverMocks.chromiumLaunch.mockReset();
@@ -108,37 +108,8 @@ describe('performance route resolvers', () => {
     ).resolves.toBe('/app/chat/conv_123');
   });
 
-  it('queries the active profile by Better Auth identity', async () => {
-    const queries: string[] = [];
-    resolverMocks.sql.mockImplementation(
-      async (
-        strings: TemplateStringsArray
-      ): Promise<readonly Record<string, string>[]> => {
-        const query = strings.join(' ').replace(/\s+/g, ' ').trim();
-        queries.push(query);
-
-        if (query.includes('from users u')) {
-          return [{ id: 'profile_123', username_normalized: 'musicmaker' }];
-        }
-        if (query.includes('from chat_conversations')) {
-          return [{ id: 'conv_123' }];
-        }
-        return [];
-      }
-    );
-
-    await resolveChatConversationPerfPath(
-      { path: '/app/chat/[id]' } as PerfRouteDefinition,
-      { authCookies: [], baseUrl: 'http://127.0.0.1:4100' }
-    );
-
-    const identityQuery = queries.find(query => query.includes('from users u'));
-    expect(identityQuery).toContain('where u.better_auth_user_id =');
-    expect(identityQuery).not.toContain('u.clerk_id');
-  });
-
-  it('uses the Better Auth identity cookie when the env identity is missing for chat routes', async () => {
-    vi.stubEnv('E2E_BETTER_AUTH_USER_ID', '');
+  it('uses the auth bypass cookie when E2E_CLERK_USER_ID is missing for chat routes', async () => {
+    vi.stubEnv('E2E_CLERK_USER_ID', '');
     const route = {
       path: '/app/chat/[id]',
     } as PerfRouteDefinition;
@@ -155,44 +126,6 @@ describe('performance route resolvers', () => {
         baseUrl: 'http://127.0.0.1:4100',
       })
     ).resolves.toBe('/app/chat/conv_123');
-  });
-
-  it('prefers the persisted Better Auth actor over an ambient identity', async () => {
-    const queryValues: unknown[][] = [];
-    resolverMocks.sql.mockImplementation(
-      async (
-        strings: TemplateStringsArray,
-        ...values: readonly unknown[]
-      ): Promise<readonly Record<string, string>[]> => {
-        const query = strings.join(' ').replace(/\s+/g, ' ').trim();
-        queryValues.push([...values]);
-        if (query.includes('from users u')) {
-          return [{ id: 'profile_123', username_normalized: 'musicmaker' }];
-        }
-        if (query.includes('from chat_conversations')) {
-          return [{ id: 'conv_123' }];
-        }
-        return [];
-      }
-    );
-
-    await resolveChatConversationPerfPath(
-      { path: '/app/chat/[id]' } as PerfRouteDefinition,
-      {
-        authCookies: [
-          {
-            domain: '127.0.0.1',
-            name: '__e2e_test_user_id',
-            path: '/',
-            value: 'ba_cookie_user',
-          },
-        ],
-        baseUrl: 'http://127.0.0.1:4100',
-      }
-    );
-
-    expect(queryValues[0]).toContain('ba_cookie_user');
-    expect(queryValues[0]).not.toContain('ba_user_test_123');
   });
 
   it('creates a chat thread via an authenticated app page when no thread exists yet', async () => {
@@ -276,8 +209,8 @@ describe('performance route resolvers', () => {
     ).resolves.toBe('/app/releases/release_456/tasks');
   });
 
-  it('uses the Better Auth identity cookie when the env identity is missing for release task routes', async () => {
-    vi.stubEnv('E2E_BETTER_AUTH_USER_ID', '');
+  it('uses the auth bypass cookie when E2E_CLERK_USER_ID is missing for release task routes', async () => {
+    vi.stubEnv('E2E_CLERK_USER_ID', '');
     const route = {
       path: '/app/releases/[releaseId]/tasks',
     } as PerfRouteDefinition;

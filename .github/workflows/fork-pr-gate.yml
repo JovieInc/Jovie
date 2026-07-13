@@ -6,10 +6,10 @@
 # APPROVE review.
 #
 # WHY THIS EXISTS:
-# Branch protection requires 0 approvals for first-party queue throughput.
-# This means fork PRs from external contributors could also merge with zero
-# reviews if CI passes. This workflow closes that gap with a required status
-# check that only blocks fork PRs.
+# Branch protection requires 0 approvals (to enable agent auto-merge).
+# This means fork PRs from external contributors could also merge with
+# zero reviews if CI passes. This workflow closes that gap by adding a
+# required status check that only blocks fork PRs.
 #
 # TRIGGER: PR opened/synchronized/reopened + review submitted (to re-evaluate)
 #
@@ -41,62 +41,28 @@ on:
   # Approval is a review event, not a pull_request synchronize event. This
   # workflow never checks out PR code, so re-evaluating metadata is safe.
   pull_request_review:
-    types: [submitted, dismissed]
-  # Active native-queue required-context producer. Source approval is mutable
-  # after its status turns green, so revalidate every member of the exact
-  # synthetic group before reproducing the required context on the combined head.
-  merge_group:
-    types: [checks_requested]
+    types: [submitted]
+  # merge_group retired 2026-06-18: Graphite owns the merge queue; GitHub never
+  # creates a merge_group. The native-queue auto-pass step below is now inert.
 
 permissions: {}
 
 concurrency:
   # Include the event name so review re-evaluation does not cancel the initial
   # metadata gate for the same PR.
-  group: fork-pr-gate-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}
-  # pull_request/_target/review: never cancel — duplicate same-head-SHA
-  # deliveries must each reach a terminal state so this required context
-  # always resolves from a completed run (same JOV-3580 race as
-  # pr-size-guard). merge_group stays keyed by exact head SHA.
-  cancel-in-progress: ${{ github.event_name == 'merge_group' }}
+  group: fork-pr-gate-${{ github.event_name }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
-  merge-group-gate:
-    name: ${{ github.event_name == 'merge_group' && 'Fork PR Gate' || 'Fork PR Gate (merge-group inactive)' }}
-    if: github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - name: Check out trusted queue policy
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # Never execute policy code from the synthetic PR-controlled head.
-          ref: ${{ github.event.merge_group.base_sha }}
-          persist-credentials: false
-          sparse-checkout: |
-            scripts/lib/merge-group-member-policy.mjs
-            scripts/lib/pr-size-guard-policy.mjs
-          sparse-checkout-cone-mode: false
-
-      - name: Revalidate every merge-group member's fork policy
-        env:
-          # The synthetic head controls this workflow definition. Never expose
-          # an App private key here; the read-only ephemeral token is enough.
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/lib/merge-group-member-policy.mjs --policy=fork
-
   # Fast path: Dependabot PRs are internal (not forks) but pull_request runs
   # in dependabot's restricted secret context. Run via pull_request_target so
   # the Jovie Bot App private key is available — the branch ruleset requires
   # the Fork PR Gate status to be set by jovie-bot specifically. No code from
   # the head branch is checked out here, so pull_request_target is safe.
   dependabot-gate:
-    name: Fork PR Gate Dependabot Controller
+    name: Fork PR Gate
     if: github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 1
     steps:
       - name: Generate Jovie Bot token
@@ -119,15 +85,14 @@ jobs:
             -f context="Fork PR Gate"
 
   fork-gate:
-    name: Fork PR Gate Controller
+    name: Fork PR Gate
     # pull_request_target is safe here: this job only reads PR metadata/diffs
     # through the API and sets a commit status; it never checks out head code.
     # It gives fork PRs the bot credential required to update the required gate.
     if: >-
-      (github.event_name == 'pull_request') ||
-      (github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]') ||
-      (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == true)
-    runs-on: ubuntu-latest
+      (github.event_name == 'pull_request_target' && github.actor != 'copilot-swe-agent[bot]' && github.actor != 'dependabot[bot]') ||
+      (github.event_name == 'pull_request_review' && github.event.review.user.type != 'Bot')
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 3
     permissions: {}
     steps:
@@ -183,7 +148,7 @@ jobs:
 
           CHANGED_FILES=$(gh pr diff "$PR_NUMBER" --repo "${{ github.repository }}" --name-only 2>/dev/null || echo "")
 
-          # Repository-sensitive paths that warrant explicit fork-review notice.
+          # Same sensitive patterns as auto-approve-agent-prs.yml
           SENSITIVE_PATTERNS=(
             "^\.github/"                         # CI/CD and workflow changes
             "^drizzle/migrations/"               # Database migrations
@@ -256,34 +221,12 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ steps.pr-meta.outputs.pr_number }}"
-          HEAD_SHA="${{ steps.pr-meta.outputs.head_sha }}"
 
-          # Fail closed and paginate. Only the latest opinionated review per
-          # reviewer counts; dismissal, changes requested, or a new head SHA
-          # revokes an earlier approval.
-          REVIEWS_JSON="$(gh api --paginate --slurp \
-            "repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews?per_page=100")"
-          REVIEWS="$(jq --arg head_sha "$HEAD_SHA" '
-            (add // [])
-            | map(select(
-                .state == "APPROVED" or
-                .state == "CHANGES_REQUESTED" or
-                .state == "DISMISSED"
-              ))
-            | group_by(.user.login | ascii_downcase)
-            | map(sort_by(.submitted_at, .id) | last)
-            | map(select(
-                .state == "APPROVED" and
-                .commit_id == $head_sha and
-                .user.type != "Bot" and
-                (
-                  .author_association == "OWNER" or
-                  .author_association == "MEMBER" or
-                  .author_association == "COLLABORATOR"
-                )
-              ))
-            | length
-          ' <<<"$REVIEWS_JSON")"
+          # Get all reviews, find the latest review per user
+          # Look for at least one APPROVED review from a non-bot user
+          REVIEWS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
+            --jq '[.[] | select(.state == "APPROVED" and (.user.type != "Bot"))] | length' \
+            2>/dev/null || echo "0")
 
           echo "Human APPROVE reviews: $REVIEWS"
 

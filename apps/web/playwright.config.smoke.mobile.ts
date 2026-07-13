@@ -1,9 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { MOBILE_SMOKE_SPECS } from './tests/e2e/smoke-manifest';
-import { vercelAutomationHeaders } from './tests/e2e/utils/vercel-automation-headers';
 import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
-
-const vercelAutomation = vercelAutomationHeaders();
 
 /**
  * Smoke Test Playwright Configuration (Mobile)
@@ -18,6 +15,13 @@ const vercelAutomation = vercelAutomationHeaders();
  * Usage:
  *   pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.mobile.ts
  */
+
+const extraHTTPHeaders: Record<string, string> = {};
+if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+  extraHTTPHeaders['x-vercel-protection-bypass'] =
+    process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  extraHTTPHeaders['x-vercel-set-bypass-cookie'] = 'samesitenone';
+}
 
 const baseURL = process.env.BASE_URL || 'http://localhost:3100';
 const managedWebServerUrl = new URL(baseURL);
@@ -45,7 +49,6 @@ function getWorkers(defaultWorkers: number): number {
 }
 
 export default defineConfig({
-  captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
   // Source of truth: tests/e2e/smoke-manifest.ts → MOBILE_SMOKE_SPECS.
   testMatch: [...MOBILE_SMOKE_SPECS],
@@ -55,12 +58,8 @@ export default defineConfig({
   workers: getWorkers(4),
   reporter: [
     ['line'],
-    ...(isCI ? [] : ([['html', { open: 'never' }]] as const)),
-    ...(vercelAutomation.active
-      ? []
-      : ([
-          ['json', { outputFile: 'test-results/results-mobile.json' }],
-        ] as const)),
+    ['html', { open: 'never' }],
+    ['json', { outputFile: 'test-results/results-mobile.json' }],
   ],
 
   timeout: 90_000,
@@ -70,13 +69,11 @@ export default defineConfig({
 
   use: {
     baseURL,
-    trace: isCI ? 'off' : 'on-first-retry',
+    trace: 'on-first-retry',
     video: 'off',
     navigationTimeout: 60_000,
     actionTimeout: 20_000,
-    ...(vercelAutomation.active && {
-      extraHTTPHeaders: vercelAutomation.headers,
-    }),
+    ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
     storageState: { cookies: [], origins: [] },
   },
 
@@ -99,6 +96,7 @@ export default defineConfig({
             ? 'pnpm run dev:fast'
             : 'doppler run --project jovie-web --config dev -- pnpm run dev:fast',
           env: {
+            ...process.env,
             NODE_ENV: 'test',
             PORT: managedWebServerPort,
             NEXT_PUBLIC_E2E_MODE: '1',

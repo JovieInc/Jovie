@@ -198,20 +198,6 @@ function UpsertTourDateContext() {
   return null;
 }
 
-function UpsertEventContext() {
-  const { upsertContext } = useChatEntityPanel();
-  useEffect(() => {
-    upsertContext({
-      kind: 'event',
-      id: 'evt_brooklyn',
-      label: 'Brooklyn Steel',
-      source: 'message',
-      focusKey: 'message-1:event:evt_brooklyn',
-    });
-  }, [upsertContext]);
-  return null;
-}
-
 function UpsertTemplatePlaceholderContexts() {
   const { upsertContexts } = useChatEntityPanel();
   useEffect(() => {
@@ -601,48 +587,6 @@ describe('ChatEntityRightPanelHost', () => {
     expect(screen.getByText('Tour Date Context')).toBeInTheDocument();
     expect(screen.getByText('Jun')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
-  });
-
-  it('normalizes event context into the tour-date context card', async () => {
-    mockPreviewPanelOpen = false;
-    mockUseRegisterRightPanel.mockClear();
-    mockUseEventsQuery.mockReturnValue({
-      data: [
-        {
-          id: 'evt_brooklyn',
-          title: 'Brooklyn Steel',
-          subtitle: 'Brooklyn, NY · Bandsintown',
-          eventDate: '2026-06-12T23:30:00.000Z',
-          eventType: 'tour',
-          venue: 'Brooklyn Steel',
-          city: 'Brooklyn, NY',
-          provider: 'Bandsintown',
-        },
-      ],
-      isLoading: false,
-    });
-
-    render(
-      <ChatEntityPanelProvider>
-        <UpsertEventContext />
-        <ChatEntityRightPanelHost
-          enablePreviewPanel={false}
-          enableChatEntityPanels
-          profileId='profile-1'
-        />
-      </ChatEntityPanelProvider>
-    );
-
-    await waitFor(() => {
-      expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
-    });
-    render(
-      mockUseRegisterRightPanel.mock.calls.at(-1)?.[0] as React.ReactElement
-    );
-
-    expect(
-      screen.getByTestId('chat-rail-entity-card-tour-date')
-    ).toBeInTheDocument();
   });
 
   it('stacks compact context cards above an open child entity panel', async () => {

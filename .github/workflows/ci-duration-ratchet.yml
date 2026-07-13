@@ -8,8 +8,8 @@ name: CI Duration Ratchet
 
 on:
   schedule:
-    # Hosted API measurement, offset from the deeper scheduled suites.
-    - cron: '25 6 * * *'
+    # Nightly at 06:00 UTC (low-traffic window)
+    - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
       sample_limit:
@@ -28,11 +28,11 @@ concurrency:
 jobs:
   measure:
     name: Measure p95 gate duration + check ratchet
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 8
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Measure p95 and check ratchet
         id: measure

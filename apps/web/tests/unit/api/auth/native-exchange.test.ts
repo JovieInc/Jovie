@@ -120,10 +120,7 @@ function setupIosSessionCreation(
     token: sessionToken,
     id: sessionId,
   });
-  mockVerifyOneTimeToken.mockResolvedValue({
-    user: { id: 'user_ba_123' },
-    session: { userId: 'user_ba_123' },
-  });
+  mockVerifyOneTimeToken.mockResolvedValue({ userId: 'user_ba_123' });
 }
 
 describe('native auth exchange route (Better Auth)', () => {
@@ -136,9 +133,8 @@ describe('native auth exchange route (Better Auth)', () => {
     setupSuccessfulExchange();
     setupIosSessionCreation();
 
-    const request = createExchangeRequest('ios');
     const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(request);
+    const response = await POST(createExchangeRequest('ios'));
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -148,8 +144,6 @@ describe('native auth exchange route (Better Auth)', () => {
     expect(data.returnTo).toBe('/app');
     expect(mockVerifyOneTimeToken).toHaveBeenCalledWith({
       body: { token: 'ott_123' },
-      request,
-      asResponse: false,
     });
     expect(mockInternalAdapterCreateSession).toHaveBeenCalledWith(
       'user_ba_123'
@@ -187,67 +181,6 @@ describe('native auth exchange route (Better Auth)', () => {
 
     expect(response.status).toBe(401);
     expect(data.reason).toBe('ott_missing');
-  });
-
-  it('returns 401 ott_user_mismatch when the OTT resolves to a different user', async () => {
-    setupSuccessfulExchange('ott_123', 'user_ba_123');
-    setupIosSessionCreation();
-    mockVerifyOneTimeToken.mockResolvedValue({
-      user: { id: 'user_other_999' },
-      session: { userId: 'user_other_999' },
-    });
-
-    const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest('ios'));
-    const data = await response.json();
-
-    // Handled auth rejection — never a 500
-    expect(response.status).toBe(401);
-    expect(data.reason).toBe('ott_user_mismatch');
-    // Guard preserved: the exchange is rejected, no fresh session is minted
-    expect(mockInternalAdapterCreateSession).not.toHaveBeenCalled();
-    // Handled failures are not reported as unhandled server errors
-    expect(mockCaptureError).not.toHaveBeenCalled();
-    // Telemetry mirrors the ott_missing event shape
-    expect(mockCreateAuthAnalyticsEvent).toHaveBeenCalledWith(
-      'auth_exchange_failed',
-      {
-        client: 'ios',
-        intent: 'sign_in',
-        result: 'failed',
-        reason: 'ott_user_mismatch',
-      }
-    );
-  });
-
-  it('returns 401 ott_user_mismatch when the OTT resolves without a user', async () => {
-    setupSuccessfulExchange('ott_123', 'user_ba_123');
-    setupIosSessionCreation();
-    mockVerifyOneTimeToken.mockResolvedValue(null);
-
-    const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest('ios'));
-    const data = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(data.reason).toBe('ott_user_mismatch');
-    expect(mockInternalAdapterCreateSession).not.toHaveBeenCalled();
-    expect(mockCaptureError).not.toHaveBeenCalled();
-  });
-
-  it('keeps a genuine session-creation failure as a captured 500', async () => {
-    setupSuccessfulExchange();
-    setupIosSessionCreation();
-    mockInternalAdapterCreateSession.mockResolvedValue(null);
-    mockCaptureError.mockResolvedValue(undefined);
-
-    const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest('ios'));
-    const data = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(data.error).toBe('Native auth exchange failed');
-    expect(mockCaptureError).toHaveBeenCalled();
   });
 
   it('returns 401 with reason for invalid exchange (wrong_code)', async () => {

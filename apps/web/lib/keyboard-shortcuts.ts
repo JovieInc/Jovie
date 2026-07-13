@@ -32,8 +32,6 @@ export const GLYPH_CMD = String.fromCodePoint(0x2318);
 export const GLYPH_OPT = String.fromCodePoint(0x2325);
 export const GLYPH_SHIFT = String.fromCodePoint(0x21e7);
 export const GLYPH_ARROW_RIGHT = String.fromCodePoint(0x2192);
-export const WORKSPACE_SWITCH_KEY = 'w';
-export const WORKSPACE_SWITCH_SHORTCUT_KEY = 'Alt+Shift+w';
 
 /**
  * Shipping gate — every shortcut must declare its status before merge.
@@ -89,20 +87,6 @@ export interface KeyboardShortcut {
 export type ShortcutCategory = 'general' | 'navigation' | 'actions' | 'player';
 
 /**
- * Admin-only workspace binding metadata. This intentionally stays outside the
- * public shortcut catalog so non-admin help surfaces cannot reveal OV.
- */
-export const WORKSPACE_SWITCH_SHORTCUT: KeyboardShortcut = {
-  id: 'switch-workspace',
-  label: 'Switch workspace',
-  keys: `${GLYPH_OPT} ${GLYPH_SHIFT} W`,
-  description: 'Switch the active workspace',
-  category: 'actions',
-  shortcutKey: WORKSPACE_SWITCH_SHORTCUT_KEY,
-  decision: { status: 'required', binding: 'useGlobalShortcutActions' },
-};
-
-/**
  * All keyboard shortcuts organized by category
  */
 export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
@@ -118,15 +102,15 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   },
   {
     id: 'current-view-search',
-    label: 'Search Jovie',
-    keys: '/',
-    description: 'Focus the persistent app search in the header',
+    label: 'Search current view',
+    keys: '/ in view',
+    description: 'Open the active page search or filter surface',
     category: 'general',
     icon: Search,
     shortcutKey: '/',
     decision: {
       status: 'required',
-      binding: 'HeaderActionsProvider, HeaderSearchSurface',
+      binding: 'ShellReleasesView, TasksPageClient, LibrarySurface',
     },
   },
   {
@@ -187,7 +171,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'G then C',
     category: 'navigation',
     icon: IdCard,
-    href: APP_ROUTES.CONTACTS,
+    href: APP_ROUTES.SETTINGS_CONTACTS,
     isSequential: true,
     firstKey: 'g',
     secondKey: 'c',
@@ -195,11 +179,11 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   },
   {
     id: 'nav-releases',
-    label: 'Go to library',
+    label: 'Go to releases',
     keys: 'G then R',
     category: 'navigation',
     icon: Music,
-    href: APP_ROUTES.LIBRARY,
+    href: APP_ROUTES.RELEASES,
     isSequential: true,
     firstKey: 'g',
     secondKey: 'r',
@@ -223,7 +207,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'G then O',
     category: 'navigation',
     icon: CalendarDays,
-    href: APP_ROUTES.TOUR_DATES,
+    href: APP_ROUTES.SETTINGS_TOURING,
     isSequential: true,
     firstKey: 'g',
     secondKey: 'o',
@@ -297,6 +281,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     shortcutKey: 'Alt+Shift+Q',
     decision: { status: 'required', binding: 'useGlobalShortcutActions' },
   },
+
   // Player shortcuts — scope: 'player' means only fires when audio player has focus.
   // Bare single-key shortcuts here are intentional and safe in that scoped context.
   {
@@ -344,6 +329,15 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     icon: Radio,
     shortcutKey: 'Meta+\\',
     scope: 'global',
+    decision: { status: 'required', binding: 'AudioBar' },
+  },
+  {
+    id: 'player-search-slash',
+    label: 'Search (player)',
+    keys: '/',
+    category: 'player',
+    icon: Search,
+    scope: 'player',
     decision: { status: 'required', binding: 'AudioBar' },
   },
   {
@@ -396,7 +390,6 @@ export const NAV_SHORTCUTS: Record<string, KeyboardShortcut> = {
   profile: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,
   'artist-profile': KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,
   releases: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-releases')!,
-  library: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-releases')!,
   calendar: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-calendar')!,
   audience: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-audience')!,
   earnings: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-earnings')!,

@@ -1,5 +1,4 @@
 import type { ChatRailContextTarget } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
-import { isChatContextTemplatePlaceholder } from '@/lib/chat/context-label';
 import { parseTokens } from '@/lib/chat/tokens';
 import { encodeToolEvents } from '@/lib/chat/tool-events';
 import type { MessagePart } from './types';
@@ -90,13 +89,6 @@ export function deriveChatRailContextTargets({
         return;
       }
 
-      // The system prompt documents token syntax with literal placeholders
-      // (`@release:<id>[<title>]`); when the model echoes one back, the parsed
-      // id is the placeholder itself, not a real entity id (JOV-3308).
-      if (isChatContextTemplatePlaceholder(token.id)) {
-        return;
-      }
-
       targets.push({
         kind: token.kind,
         id: token.id,
@@ -124,7 +116,7 @@ export function deriveChatRailContextTargets({
           firstStringValue(event.input, field.idKeys) ??
           firstStringValue(event.output, field.idKeys);
 
-        if (!id || isChatContextTemplatePlaceholder(id)) {
+        if (!id) {
           continue;
         }
 

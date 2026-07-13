@@ -32,8 +32,8 @@ export function CollapsibleSectionHeading({
       className={cn(
         DRAWER_SECTION_HEADING_CLASSNAME,
         'flex w-full items-center justify-between rounded-lg border border-transparent px-2.5 py-2 transition-[background-color,color,border-color] duration-subtle',
-        'hover:border-(--app-shell-frame-seam) hover:bg-surface-0 hover:text-secondary-token',
-        'focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        'hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token',
+        'focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
         className
       )}
     >

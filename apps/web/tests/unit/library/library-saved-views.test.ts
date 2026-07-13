@@ -49,37 +49,27 @@ function buildAsset(
 
 describe('library saved views', () => {
   it('recognizes canonical smart filter ids', () => {
-    expect(isLibrarySavedViewId('needs-attention')).toBe(true);
-    expect(isLibrarySavedViewId('missing-audio')).toBe(false);
+    expect(isLibrarySavedViewId('missing-audio')).toBe(true);
     expect(isLibrarySavedViewId('unknown-view')).toBe(false);
   });
 
-  it('matches the consolidated needs-attention smart filter', () => {
-    const needsAttention = getLibrarySavedViewPredicate('needs-attention');
+  it('matches missing audio and no-provider smart filters', () => {
+    const missingAudio = getLibrarySavedViewPredicate('missing-audio');
+    const noProviders = getLibrarySavedViewPredicate('no-providers');
 
-    // Release missing audio.
     expect(
-      needsAttention(
+      missingAudio(
         buildAsset({
           previewUrl: null,
           assetKinds: ['artwork', 'lyrics', 'providers'],
         })
       )
     ).toBe(true);
-    // Release without DSP links.
-    expect(
-      needsAttention(buildAsset({ providerCount: 0, providers: [] }))
-    ).toBe(true);
-    // Anything missing artwork.
-    expect(
-      needsAttention(buildAsset({ artworkUrl: null, hasArtwork: false }))
-    ).toBe(true);
-    // Fully-loaded release is fine.
-    expect(needsAttention(buildAsset())).toBe(false);
-    // Merch with artwork never needs audio/providers attention.
-    expect(
-      needsAttention(buildAsset({ id: 'merch-1', itemKind: 'merch' }))
-    ).toBe(false);
+    expect(missingAudio(buildAsset())).toBe(false);
+    expect(noProviders(buildAsset({ providerCount: 0, providers: [] }))).toBe(
+      true
+    );
+    expect(noProviders(buildAsset())).toBe(false);
   });
 
   it('counts smart filter matches across the catalog', () => {
@@ -99,7 +89,7 @@ describe('library saved views', () => {
       }),
     ];
 
-    expect(countLibrarySavedViewMatches(assets, 'needs-attention')).toBe(1);
+    expect(countLibrarySavedViewMatches(assets, 'missing-audio')).toBe(1);
     expect(countLibrarySavedViewMatches(assets, 'live-merch')).toBe(1);
   });
 
@@ -115,9 +105,9 @@ describe('library saved views', () => {
       },
     });
 
-    persistLibrarySavedView('needs-attention');
-    expect(readPersistedLibrarySavedView()).toBe('needs-attention');
-    expect(storage.get(LIBRARY_SAVED_VIEW_STORAGE_KEY)).toBe('needs-attention');
+    persistLibrarySavedView('missing-audio');
+    expect(readPersistedLibrarySavedView()).toBe('missing-audio');
+    expect(storage.get(LIBRARY_SAVED_VIEW_STORAGE_KEY)).toBe('missing-audio');
 
     persistLibrarySavedView('all');
     expect(readPersistedLibrarySavedView()).toBe('all');

@@ -13,7 +13,7 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
@@ -46,12 +46,12 @@ type StudioMode = 'pages' | 'sections' | 'product' | 'screenshots';
 
 /**
  * Default body composition. Mirrors a "complete" landing page so reviewers
- * see header → hero → feature → testimonial → FAQ → CTA → footer without
- * configuring anything. No separate logo-bar section: `marketing-hero`
- * already embeds the distributor logo-bar proof.
+ * see header → hero → trust → feature → testimonial → FAQ → CTA → footer
+ * without configuring anything.
  */
 const DEFAULT_BODY: readonly string[] = [
   'marketing-hero',
+  'home-trust-default',
   'feature-card-grid-3up',
   'testimonial-card-3up',
   'faq-section-default',
@@ -88,10 +88,15 @@ function parseMode(param: string | null): StudioMode {
   return 'pages';
 }
 
-export function PageBuilderClient() {
+export function PageBuilderClient({
+  designV1Enabled,
+}: Readonly<{
+  designV1Enabled: boolean;
+}>) {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
-  const mode = parseMode(searchParams.get('mode'));
+  const mode = designV1Enabled ? parseMode(searchParams.get('mode')) : 'pages';
   const headerMode = parseHeader(searchParams.get('header'));
   const footerMode = parseFooter(searchParams.get('footer'));
   const ctaMode = parseCta(searchParams.get('cta'));
@@ -111,16 +116,9 @@ export function PageBuilderClient() {
         if (v === undefined) params.delete(k);
         else params.set(k, v);
       }
-      // Native History API, not router.replace: updates `useSearchParams`
-      // without a server round-trip, so chrome toggles stay instant and the
-      // router never re-fetches the route or resets scroll position.
-      window.history.replaceState(
-        null,
-        '',
-        `/exp/page-builder?${params.toString()}`
-      );
+      router.replace(`/exp/page-builder?${params.toString()}`);
     },
-    [searchParams]
+    [router, searchParams]
   );
 
   const setBody = useCallback(
@@ -155,13 +153,6 @@ export function PageBuilderClient() {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Mode switches swap the entire workspace, so a preserved mid-page scroll
-  // offset would land the reviewer in the middle of an unrelated view.
-  // Chrome toggles (header/footer/cta/body) keep scroll untouched.
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [mode]);
-
   // Resolve body section variants. Skip ids that aren't in the registry
   // (e.g. typed manually into the URL) so the page always renders.
   const bodyVariants = useMemo(
@@ -178,13 +169,7 @@ export function PageBuilderClient() {
   );
 
   return (
-    /*
-      `system-b-marketing dark` opts the route into document scrolling (the
-      app-shell global locks `body` to the viewport) and gives the composed
-      marketing sections their token/font context. `overflow-x-clip` (not
-      `-hidden`) avoids creating a scroll container that would break sticky.
-    */
-    <div className='page-builder-root system-b-marketing dark relative min-h-screen w-full overflow-x-clip bg-(--linear-app-content-surface)'>
+    <div className='relative min-h-screen w-full overflow-x-hidden bg-(--linear-app-content-surface)'>
       <Toolbar
         headerMode={headerMode}
         footerMode={footerMode}
@@ -192,6 +177,7 @@ export function PageBuilderClient() {
         // Use the resolved variant count, not raw URL ids — keeps the label
         // truthful when someone hand-types a stale or unknown id into ?body=.
         bodyCount={bodyVariants.length}
+        designV1Enabled={designV1Enabled}
         mode={mode}
         onSetMode={nextMode => setParam({ mode: nextMode })}
         onSetHeader={mode => setParam({ header: mode })}
@@ -202,12 +188,10 @@ export function PageBuilderClient() {
 
       {mode === 'pages' ? (
         /*
-          The composed landing page. `pt-14` clears exactly the toolbar
-          height; page-builder.css offsets the fixed marketing header by the
-          same amount, so header and content stack exactly like production
-          and toggling chrome never shifts layout.
+          The composed landing page. Padding-top = toolbar height so the
+          header always renders below the toolbar without overlap.
         */
-        <div className='page-builder-stage pt-14'>
+        <div className='pt-16'>
           <MarketingHeader
             variant={headerMode === 'transparent' ? 'homepage' : 'landing'}
           />
@@ -248,6 +232,7 @@ interface ToolbarProps {
   readonly footerMode: FooterMode;
   readonly ctaMode: CtaMode;
   readonly bodyCount: number;
+  readonly designV1Enabled: boolean;
   readonly mode: StudioMode;
   readonly onSetMode: (mode: StudioMode) => void;
   readonly onSetHeader: (mode: HeaderMode) => void;
@@ -261,6 +246,7 @@ function Toolbar({
   footerMode,
   ctaMode,
   bodyCount,
+  designV1Enabled,
   mode,
   onSetMode,
   onSetHeader,
@@ -269,9 +255,15 @@ function Toolbar({
   onOpenDrawer,
 }: ToolbarProps) {
   return (
-    <div className='page-builder-toolbar fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-4 overflow-x-auto border-b border-white/10 bg-black/85 px-4 text-white dark:text-white shadow-lg backdrop-blur-md'>
-      <span className='shrink-0 whitespace-nowrap text-xs font-semibold text-white/80'>
-        Design Studio
+    <div className='fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-4 border-b border-white/10 bg-black/85 px-4 text-white dark:text-white shadow-lg backdrop-blur-md'>
+      <span
+        className={
+          designV1Enabled
+            ? 'text-xs font-semibold text-white/80'
+            : 'text-2xs font-semibold uppercase tracking-wider text-white/70'
+        }
+      >
+        {designV1Enabled ? 'Design Studio' : 'Page Builder'}
       </span>
 
       <div
@@ -279,7 +271,7 @@ function Toolbar({
         aria-hidden='true'
       />
 
-      {
+      {designV1Enabled && (
         <div className='inline-flex rounded-md border border-white/10 bg-black/60 p-0.5'>
           {[
             { value: 'pages', label: 'Pages', icon: LayoutTemplate },
@@ -307,7 +299,7 @@ function Toolbar({
             );
           })}
         </div>
-      }
+      )}
 
       {mode === 'pages' ? (
         <>
@@ -712,7 +704,7 @@ function SectionDrawer({
 
   return (
     <div
-      className='page-builder-drawer fixed right-0 top-0 flex h-screen w-full max-w-95 flex-col border-l border-white/10 bg-black dark:bg-black text-white dark:text-white shadow-2xl'
+      className='fixed right-0 top-0 z-[60] flex h-screen w-full max-w-95 flex-col border-l border-white/10 bg-black dark:bg-black text-white dark:text-white shadow-2xl'
       role='dialog'
       aria-modal='true'
       aria-label='Body section composer'

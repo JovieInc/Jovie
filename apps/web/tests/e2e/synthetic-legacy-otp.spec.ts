@@ -62,7 +62,7 @@ async function verifyStartChatCanSendFirstTurn(page: Page) {
   await waitForHydration(page);
   await assertNoFrontDoorConfigErrors(page);
 
-  const textarea = page.locator('[aria-label="Chat Message Input"]');
+  const textarea = page.locator('[aria-label="Chat message input"]');
   await expect(textarea).toBeVisible({ timeout: 20_000 });
   await textarea.fill('I manage a production canary artist.');
 

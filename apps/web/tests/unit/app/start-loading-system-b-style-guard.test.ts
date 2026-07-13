@@ -30,8 +30,6 @@ describe('/start loading System B style guard', () => {
     expect(offenders, `/start loading leaked ${offenders.join(', ')}`).toEqual(
       []
     );
-    expect(source).toContain('AppShellFrame');
-    expect(source).not.toContain('variant=');
     expect(source).toContain('system-b-start-loading-page');
     expect(source).toContain('system-b-start-loading-composer');
     expect(source).not.toContain('JovieMarkElectric');
@@ -52,11 +50,7 @@ describe('/start loading System B style guard', () => {
     expect(loadingCss).toContain('var(--system-b-text-primary)');
     expect(loadingCss).toContain('var(--system-b-app-frame-seam)');
     expect(loadingCss).toContain('var(--system-b-radius-pill)');
-    expect(loadingCss).toContain('var(--radius-3xl)');
-    expect(loadingCss).toContain('var(--system-b-chat-composer-max-width)');
-    expect(loadingCss).toContain(
-      'var(--system-b-chat-loading-composer-height)'
-    );
+    expect(loadingCss).toContain('width: var(--space-8)');
     expect(loadingCss).toContain('height: var(--space-8)');
     expect(loadingCss).toContain('var(--space-10)');
     expect(loadingCss).not.toMatch(/--linear-/);

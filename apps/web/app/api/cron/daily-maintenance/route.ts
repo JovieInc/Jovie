@@ -27,7 +27,6 @@ import { verifyCronRequest } from '@/lib/cron/auth';
 import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { captureError } from '@/lib/error-tracking';
 import { runOnboardingScriptAggregation } from '@/lib/onboarding/script-aggregation';
-import { runProfileSearchMonitoring } from '@/lib/profile-search/runner';
 import { logger } from '@/lib/utils/logger';
 import { runWaitlistAutoAccept } from '@/lib/waitlist/auto-accept';
 import { runReconciliation } from '../billing-reconciliation/route';
@@ -113,35 +112,26 @@ export async function GET(request: Request) {
     runWaitlistAutoAccept
   );
 
-  // 6. Profile search monitoring — bounded to a 90-second sub-budget.
-  results.profileSearchMonitoring = await runSubJob(
-    'profileSearchMonitoring',
-    () =>
-      runProfileSearchMonitoring(
-        Math.min(startTime + 90_000, Date.now() + 90_000)
-      )
-  );
-
-  // 7. Under-enriched discography sweep — bounded daily batch (JOV-3068)
+  // 6. Under-enriched discography sweep — bounded daily batch (JOV-3068)
   results.discographyReEnrich = await runSubJob(
     'discographyReEnrich',
     sweepUnderEnrichedProfilesForCron
   );
 
-  // 8. Onboarding script self-improvement — recompute conversion counters,
+  // 7. Onboarding script self-improvement — recompute conversion counters,
   //    mine lint-clean LLM candidates, promote/retire variants (JOV-3806)
   results.onboardingScriptAggregation = await runSubJob(
     'onboardingScriptAggregation',
     runOnboardingScriptAggregation
   );
 
-  // 9. AI crawler analytics sync — Cloudflare edge analytics (GH-12748)
+  // 8. AI crawler analytics sync — Cloudflare edge analytics (GH-12748)
   results.aiCrawlerAnalytics = await runSubJob(
     'aiCrawlerAnalytics',
     syncAiCrawlerAnalyticsCron
   );
 
-  // 10. Data retention — Sundays only (heavy operation)
+  // 9. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)

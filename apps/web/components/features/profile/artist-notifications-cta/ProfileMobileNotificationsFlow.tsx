@@ -91,11 +91,8 @@ const FLOW_TRANSITION = {
   ease: [0.22, 1, 0.36, 1] as const,
 };
 
-const CAPTURE_CONSENT_COPY: Record<'email' | 'sms', string> = {
-  email:
-    'By submitting, you agree to receive email updates from this artist and Jovie. Unsubscribe anytime.',
-  sms: 'By submitting, you agree to receive text updates from this artist and Jovie. Reply STOP to opt out. Message and data rates may apply.',
-};
+const CAPTURE_CONSENT_COPY =
+  'By submitting, you agree to receive updates from this artist and Jovie. Reply STOP to opt out. Message and data rates may apply.';
 
 const PREFERENCE_META: Record<
   Extract<NotificationContentType, 'newMusic' | 'tourDates' | 'merch'>,
@@ -218,7 +215,7 @@ function PrimaryButton({
         activate();
       }}
       disabled={disabled}
-      className='inline-flex h-12 w-full items-center justify-center rounded-3xl bg-white/14 px-5 text-sm font-semibold tracking-tight text-(--color-text-tooltip) transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-12 w-full items-center justify-center rounded-3xl bg-white/14 px-5 text-sm font-semibold tracking-[-0.01em] text-(--color-text-tooltip) transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -271,7 +268,7 @@ function LabeledInput({
 }>) {
   return (
     <label className='block space-y-2'>
-      <span className='text-app font-medium tracking-tight text-white/42'>
+      <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
         {label}
       </span>
       <input
@@ -514,8 +511,8 @@ export function ProfileMobileNotificationsFlow({
                   {error}
                 </p>
               ) : null}
-              <p className='text-xs leading-4 text-tertiary-token'>
-                {CAPTURE_CONSENT_COPY[isSms ? 'sms' : 'email']}
+              <p className='text-xs leading-4 text-white/42'>
+                {CAPTURE_CONSENT_COPY}
               </p>
               <div className='flex items-center justify-between gap-3'>
                 <button
@@ -725,7 +722,7 @@ export function ProfileMobileNotificationsFlow({
           <div className='space-y-6'>
             <div className='space-y-3'>
               <p
-                className='text-app font-semibold tracking-tight text-white/42'
+                className='text-app font-semibold tracking-[-0.01em] text-white/42'
                 data-testid='profile-mobile-notifications-sent-from'
               >
                 Sent from Jovie
@@ -767,7 +764,7 @@ export function ProfileMobileNotificationsFlow({
               <>
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
-                  <p className='text-app font-semibold tracking-tight text-white/42'>
+                  <p className='text-app font-semibold tracking-[-0.01em] text-white/42'>
                     Sent by {artistName}
                   </p>
 
@@ -834,9 +831,7 @@ export function ProfileMobileNotificationsFlow({
 
   const contentBody = (
     <>
-      {presentation === 'inline' ? null : (
-        <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.055),transparent_42%)]' />
-      )}
+      <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.055),transparent_42%)]' />
 
       <div
         className={cn(
@@ -930,10 +925,8 @@ export function ProfileMobileNotificationsFlow({
         </div>
       </div>
     ) : (
-      // Inline: transparent so the sheet sits on the page's own surface with
-      // no rounded seam against a mismatched background token.
       <div
-        className='relative flex h-full min-h-full flex-1 flex-col dark:text-white'
+        className='relative flex h-full min-h-full flex-1 flex-col rounded-(--profile-card-radius) bg-[color:var(--profile-stage-bg)] dark:text-white'
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}

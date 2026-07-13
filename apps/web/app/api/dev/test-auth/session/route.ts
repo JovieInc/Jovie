@@ -5,7 +5,6 @@ import {
   buildDevTestAuthCookieDescriptors,
   DEV_TEST_AUTH_COOKIE_NAMES,
   ensureDevTestAuthActor,
-  ensureExistingDevTestAuthActor,
   getCachedDevTestAuthSession,
   getDevTestAuthAvailability,
   parseDevTestAuthPersona,
@@ -25,14 +24,6 @@ function readPersonaFromBody(body: unknown): string | null {
   }
 
   return typeof body.persona === 'string' ? body.persona : '';
-}
-
-function readExistingUserIdFromBody(body: unknown): string | null {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
-  if (!('existingUserId' in body)) return null;
-  return typeof body.existingUserId === 'string'
-    ? body.existingUserId.trim()
-    : '';
 }
 
 function applyNoStore(response: NextResponse): NextResponse {
@@ -132,9 +123,8 @@ export async function POST(request: NextRequest) {
 
   const rawBody = await request.json().catch(() => null);
   const requestedPersona = readPersonaFromBody(rawBody);
-  const existingUserId = readExistingUserIdFromBody(rawBody);
 
-  if (requestedPersona === '' || existingUserId === '') {
+  if (requestedPersona === '') {
     return NextResponse.json(
       { success: false, error: 'Invalid persona' },
       { status: 400, headers: NO_STORE_HEADERS }
@@ -151,15 +141,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const actor = existingUserId
-    ? await ensureExistingDevTestAuthActor(existingUserId, parsedPersona)
-    : await ensureDevTestAuthActor(persona);
-  if (!actor) {
-    return NextResponse.json(
-      { success: false, error: 'Unknown Better Auth test user' },
-      { status: 404, headers: NO_STORE_HEADERS }
-    );
-  }
+  const actor = await ensureDevTestAuthActor(persona);
   revalidatePath(APP_ROUTES.DASHBOARD, 'layout');
   const response = NextResponse.json(
     {

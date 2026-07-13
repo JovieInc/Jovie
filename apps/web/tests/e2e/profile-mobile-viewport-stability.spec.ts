@@ -1,3 +1,4 @@
+import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import {
   expect,
@@ -6,7 +7,6 @@ import {
   type TestInfo,
   test,
 } from '@playwright/test';
-import { resetOwnedOutputDirectory } from '../../scripts/owned-output-path';
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import {
   MOBILE_PROFILE_VIEWPORTS,
@@ -26,26 +26,6 @@ test.use({
   storageState: { cookies: [], origins: [] },
 });
 test.describe.configure({ mode: 'serial' });
-
-const WEB_ROOT = process.cwd().endsWith('/apps/web')
-  ? process.cwd()
-  : path.resolve(process.cwd(), 'apps/web');
-const PROFILE_MOBILE_OUTPUT_BASE = path.resolve(WEB_ROOT, '../../.context');
-const PROFILE_MOBILE_OUTPUT_SEGMENT = 'profile-mobile-qa';
-const PROFILE_MOBILE_OUTPUT_ROOT = path.join(
-  PROFILE_MOBILE_OUTPUT_BASE,
-  PROFILE_MOBILE_OUTPUT_SEGMENT
-);
-
-test.beforeAll(async () => {
-  if (process.env.PROFILE_MOBILE_SCREENSHOTS !== '1') return;
-
-  await resetOwnedOutputDirectory(
-    PROFILE_MOBILE_OUTPUT_BASE,
-    PROFILE_MOBILE_OUTPUT_SEGMENT,
-    'PROFILE_MOBILE_SCREENSHOTS'
-  );
-});
 
 type MobileProfileScreen = {
   readonly id: string;
@@ -127,8 +107,8 @@ const PROFILE_MOBILE_SCREENS = [
   },
   {
     id: 'notifications',
-    path: '/testartist?mode=subscribe',
-    rootSelector: '[data-testid="profile-compact-surface"]',
+    path: '/testartist/notifications',
+    rootSelector: '[data-testid="notifications-page"]',
     readySelectors: ['[data-testid="profile-mobile-notifications-step-email"]'],
   },
 ] as const satisfies readonly MobileProfileScreen[];
@@ -501,10 +481,12 @@ async function maybeCaptureScreenshot(
 ) {
   if (process.env.PROFILE_MOBILE_SCREENSHOTS !== '1') return;
 
-  const filePath = path.join(
-    PROFILE_MOBILE_OUTPUT_ROOT,
-    `${viewport.id}-${screenId}.png`
+  const outputDir = path.resolve(
+    process.cwd(),
+    '../../.context/profile-mobile-qa'
   );
+  await mkdir(outputDir, { recursive: true });
+  const filePath = path.join(outputDir, `${viewport.id}-${screenId}.png`);
 
   await page.screenshot({
     path: filePath,
@@ -558,7 +540,7 @@ const MOCK_HOME_RELEASE_CARD_VIEWPORTS = [
 ] as const satisfies readonly MobileProfileViewport[];
 
 type ReleaseCardLayout = {
-  readonly pac: {
+  readonly card: {
     readonly top: number;
     readonly bottom: number;
     readonly left: number;
@@ -566,17 +548,15 @@ type ReleaseCardLayout = {
     readonly width: number;
     readonly height: number;
   };
-  readonly pacBox: {
-    readonly width: number;
-    readonly height: number;
-  };
-  readonly pacIsFirstCard: boolean;
-  readonly peerCard: {
+  readonly artwork: {
     readonly width: number;
     readonly height: number;
   } | null;
-  readonly tabBar: {
+  readonly title: {
     readonly top: number;
+    readonly bottom: number;
+    readonly left: number;
+    readonly right: number;
   } | null;
   readonly hero: {
     readonly top: number;
@@ -591,24 +571,20 @@ async function collectMockHomeReleaseCardLayout(
   page: Page
 ): Promise<ReleaseCardLayout> {
   return page.evaluate(() => {
-    const carousel = document.querySelector<HTMLElement>(
-      '[data-testid="profile-home-carousel"]'
+    const card = document.querySelector<HTMLElement>(
+      '[data-testid="profile-home-carousel"] a'
     );
-    const pac = document.querySelector<HTMLElement>(
-      '[data-testid="profile-pac"]'
-    );
+    const artwork = card?.querySelector<HTMLImageElement>('img') ?? null;
+    const title = card?.querySelector<HTMLElement>('h3') ?? null;
     const hero = document.querySelector<HTMLElement>(
       '[data-testid="profile-hero-identity-block"]'
     );
     const cover = document.querySelector<HTMLElement>(
       '[data-testid="profile-cover"]'
     );
-    const tabBar = document.querySelector<HTMLElement>(
-      '[data-testid="profile-tab-bar"]'
-    );
 
-    if (!carousel || !pac) {
-      throw new Error('Mock-home featured release (PAC) card target missing');
+    if (!card) {
+      throw new Error('Mock-home release card layout target missing');
     }
 
     const rect = (element: Element) => {
@@ -623,23 +599,10 @@ async function collectMockHomeReleaseCardLayout(
       };
     };
 
-    const firstLi = carousel.querySelector(':scope > li');
-    // A peer card in the same track (entity card or alerts card) used to
-    // verify the PAC card shares the fixed 3:4 carousel geometry.
-    const peerLi = [...carousel.querySelectorAll(':scope > li')].find(
-      li => li !== firstLi
-    );
-
     return {
-      pac: rect(pac),
-      // offsetWidth/offsetHeight are transform-free (edge-dimmed peer cards
-      // are scaled to 0.96 via transform, which would skew getBoundingClientRect).
-      pacBox: { width: pac.offsetWidth, height: pac.offsetHeight },
-      pacIsFirstCard: Boolean(firstLi?.contains(pac)),
-      peerCard: peerLi
-        ? { width: peerLi.offsetWidth, height: peerLi.offsetHeight }
-        : null,
-      tabBar: tabBar ? { top: tabBar.getBoundingClientRect().top } : null,
+      card: rect(card),
+      artwork: artwork ? rect(artwork) : null,
+      title: title ? rect(title) : null,
       hero: hero ? rect(hero) : null,
       cover: cover
         ? {
@@ -652,7 +615,7 @@ async function collectMockHomeReleaseCardLayout(
 
 test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', () => {
   for (const viewport of MOCK_HOME_RELEASE_CARD_VIEWPORTS) {
-    test(`${viewport.label} renders a stable featured release card`, async ({
+    test(`${viewport.label} renders a stable bento release card`, async ({
       page,
     }, testInfo) => {
       await page.setViewportSize({
@@ -672,7 +635,7 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
       // budget as navigation so a slow cold compile reads as slow, not failed.
       await waitForAnyVisible(
         page,
-        ['[data-testid="profile-pac"]'],
+        ['[data-testid="profile-home-carousel"] a'],
         SMOKE_TIMEOUTS.NAVIGATION
       );
       await settleLayout(page);
@@ -692,90 +655,34 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
       ).toBeLessThanOrEqual(2);
 
       const layout = await collectMockHomeReleaseCardLayout(page);
-
-      // The featured release card (PAC) is the FIRST card of the single home
-      // carousel — the old stacked bento strip above the carousel is gone.
-      expect(
-        layout.pacIsFirstCard,
-        `${viewport.label} featured release card should be the first carousel card`
-      ).toBe(true);
-
-      // Same fixed 3:4 geometry as every other card in the track.
-      if (layout.peerCard) {
-        expect(
-          Math.abs(layout.pacBox.height - layout.peerCard.height),
-          `${viewport.label} featured card should match peer card height`
-        ).toBeLessThanOrEqual(2);
-        expect(
-          Math.abs(layout.pacBox.width - layout.peerCard.width),
-          `${viewport.label} featured card should match peer card width`
-        ).toBeLessThanOrEqual(2);
-      }
-      expect(
-        Math.abs(layout.pacBox.width / layout.pacBox.height - 0.75),
-        `${viewport.label} featured card should keep the 3:4 card aspect`
-      ).toBeLessThanOrEqual(0.02);
-
       if (layout.hero) {
         expect(
-          layout.pac.top,
-          `${viewport.label} featured card should sit below hero identity`
+          layout.card.top,
+          `${viewport.label} release card should sit below hero identity`
         ).toBeGreaterThanOrEqual(layout.hero.bottom + 4);
       }
 
-      // Fully visible above the bottom tab bar inside the profile shell — no
-      // clipping, no scrolling needed for the primary content. (The demo
-      // phone frame itself can extend past the browser viewport — that is
-      // the showcase page's own presentation, so containment is asserted
-      // against the shell and tab bar, not the window.)
-      const shell = await page.evaluate(() => {
-        const el = document.querySelector<HTMLElement>(
-          '[data-testid="profile-compact-surface"]'
-        );
-        if (!el) return null;
-        const box = el.getBoundingClientRect();
-        return { top: box.top, bottom: box.bottom };
-      });
-      if (shell) {
-        expect(
-          layout.pac.bottom,
-          `${viewport.label} featured card should stay inside the profile shell`
-        ).toBeLessThanOrEqual(shell.bottom + 1);
-        expect(
-          layout.pac.top,
-          `${viewport.label} featured card should stay inside the profile shell`
-        ).toBeGreaterThanOrEqual(shell.top - 1);
-      }
-      if (layout.tabBar) {
-        expect(
-          layout.pac.bottom,
-          `${viewport.label} featured card should clear the bottom tab bar`
-        ).toBeLessThanOrEqual(layout.tabBar.top + 1);
-      }
+      expect(
+        layout.artwork?.width ?? 0,
+        `${viewport.label} bento artwork should fill the card width`
+      ).toBeGreaterThanOrEqual(layout.card.width - 2);
 
-      // Stability: the card's bounding box must not move once rendered.
-      await settleLayout(page);
-      const settled = await collectMockHomeReleaseCardLayout(page);
-      expect(
-        Math.abs(settled.pac.top - layout.pac.top),
-        `${viewport.label} featured card should not shift vertically`
-      ).toBeLessThanOrEqual(1);
-      expect(
-        Math.abs(settled.pac.height - layout.pac.height),
-        `${viewport.label} featured card should not change height`
-      ).toBeLessThanOrEqual(1);
+      if (layout.title) {
+        expect(
+          layout.title.top,
+          `${viewport.label} release title should stay inside the card`
+        ).toBeGreaterThanOrEqual(layout.card.top + 6);
+        expect(
+          layout.title.bottom,
+          `${viewport.label} release title should stay inside the card`
+        ).toBeLessThanOrEqual(layout.card.bottom - 6);
+      }
 
       if (viewport.height <= 820 && layout.cover) {
-        // Token-driven hero: clamp(220px, 34svh, 400px) — the old ≤190px
-        // shrink-wrap band is gone and the hero never collapses.
         expect(
           layout.cover.height,
-          `${viewport.label} home hero should keep its 220px floor on compact viewports`
-        ).toBeGreaterThanOrEqual(220);
-        expect(
-          layout.cover.height,
-          `${viewport.label} home hero should stay within the 400px token cap`
-        ).toBeLessThanOrEqual(400);
+          `${viewport.label} home hero should compress on compact viewports`
+        ).toBeLessThanOrEqual(190);
       }
     });
   }
@@ -898,7 +805,7 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
 
         const response = await smokeNavigate(
           flowPage,
-          '/testartist?mode=subscribe',
+          '/testartist/notifications',
           {
             timeout: 120_000,
           }
@@ -911,10 +818,10 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
           SMOKE_TIMEOUTS.NAVIGATION
         );
 
-        const rootSelector = '[data-testid="profile-compact-surface"]';
-        const activeFlow = flowPage
-          .locator('[data-testid="profile-mobile-notifications-flow"]:visible')
-          .first();
+        const rootSelector = '[data-testid="notifications-page"]';
+        const activeFlow = flowPage.locator(
+          '[role="dialog"][data-testid="profile-mobile-notifications-flow"]'
+        );
         const emailInput = activeFlow.getByTestId('mobile-email-input');
         await focusAndAssertNoShift(
           flowPage,
@@ -925,7 +832,7 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
         await emailInput.fill(`mobile-${viewport.id}@example.com`);
         await activeFlow
           .getByTestId('profile-mobile-notifications-step-email')
-          .getByRole('button', { name: /^submit$/i })
+          .getByRole('button', { name: /^continue$/i })
           .click();
 
         const firstOtpDigit = activeFlow.getByLabel('Digit 1 of 6');

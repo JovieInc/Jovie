@@ -66,8 +66,7 @@ describe('GET /api/onboarding/discovery', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // getCachedAuth().userId is the app users.id UUID (BA cutover).
-    mockGetCachedAuth.mockResolvedValue({ userId: 'user_owner_123' });
+    mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_user_123' });
     mockIsActiveDiscoveryJob.mockReturnValue(false);
   });
 
@@ -142,7 +141,7 @@ describe('GET /api/onboarding/discovery', () => {
           spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
           appleMusicId: null,
           onboardingCompletedAt: new Date('2025-01-01T00:00:00.000Z'),
-          ownerUserId: 'different_user',
+          clerkId: 'different_user',
         },
       ])
     );
@@ -155,10 +154,7 @@ describe('GET /api/onboarding/discovery', () => {
     );
 
     expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({
-      error: 'Forbidden',
-      errorCode: 'FORBIDDEN',
-    });
+    await expect(response.json()).resolves.toEqual({ error: 'Forbidden' });
   });
 
   it('returns a shaped onboarding snapshot with pending discovery state', async () => {
@@ -182,7 +178,7 @@ describe('GET /api/onboarding/discovery', () => {
             spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
             appleMusicId: 'apple_1',
             onboardingCompletedAt: new Date('2025-01-01T00:00:00.000Z'),
-            ownerUserId: 'user_owner_123',
+            clerkId: 'clerk_user_123',
           },
         ])
       )

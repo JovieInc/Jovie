@@ -107,7 +107,6 @@ export function LeadKeywordsManager({
       ) : (
         <Sparkles className='mr-2 h-4 w-4' />
       )}
-      {/* ui-casing-allow: Feature.fm brand lockup */}
       Seed Feature.fm
     </Button>
   );
@@ -136,23 +135,21 @@ export function LeadKeywordsManager({
               </div>
               <div className='flex items-center gap-2'>
                 <Badge variant='secondary' className='text-2xs'>
-                  {keyword.resultsFoundTotal} Results
+                  {keyword.resultsFoundTotal} results
                 </Badge>
-                <Button
+                <button
                   type='button'
-                  variant='ghost'
-                  size='icon'
                   onClick={() => void deleteKeyword(keyword.id)}
                   disabled={deletingId === keyword.id}
-                  className='h-auto w-auto rounded-md p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50'
-                  title='Delete Keyword'
+                  className='rounded-md p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50'
+                  title='Delete keyword'
                 >
                   {deletingId === keyword.id ? (
                     <Loader2 className='h-4 w-4 animate-spin' />
                   ) : (
                     <Trash2 className='h-4 w-4' />
                   )}
-                </Button>
+                </button>
               </div>
             </div>
           ))}
@@ -179,7 +176,7 @@ export function LeadKeywordsManager({
           ) : (
             <Plus className='mr-2 h-4 w-4' />
           )}
-          Add Keywords
+          Add keywords
         </Button>
       </div>
     </div>

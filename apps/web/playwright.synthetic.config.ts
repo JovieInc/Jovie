@@ -1,7 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const isCI = !!process.env.CI;
-
 /**
  * Playwright Configuration for Synthetic Monitoring
  *
@@ -13,13 +11,11 @@ const isCI = !!process.env.CI;
  */
 
 export default defineConfig({
-  captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
   testMatch: [
     '**/synthetic-auth-ui.spec.ts',
     '**/synthetic-golden-path.spec.ts',
     '**/synthetic-legacy-otp.spec.ts',
-    '**/synthetic-better-auth-account.spec.ts',
     '**/onboarding-robot.full.spec.ts',
     '**/public-profile-smoke.spec.ts',
     // Production Journey Auditor: anonymous signup→interview initialization
@@ -43,11 +39,7 @@ export default defineConfig({
           'test-results/results.json',
       },
     ],
-    ...(isCI
-      ? []
-      : ([
-          ['html', { outputFolder: 'playwright-report', open: 'never' }],
-        ] as const)),
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['line'],
     // Compact, redacted failure packet per failed journey (route, step,
     // screenshot, console errors, failed requests, trace path).
@@ -63,9 +55,9 @@ export default defineConfig({
     navigationTimeout: 60_000, // 1 minute for navigation
 
     // Tracing and debugging
-    trace: isCI ? 'off' : 'retain-on-failure',
-    screenshot: isCI ? 'off' : 'only-on-failure',
-    video: isCI ? 'off' : 'retain-on-failure',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
 
     // Browser settings for synthetic monitoring
     ignoreHTTPSErrors: false, // Strict HTTPS validation in prod

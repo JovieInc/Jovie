@@ -18,10 +18,6 @@ const primaryCta: HomepagePosterHeroCta = {
   eventName: 'homepage_poster_cta_clicked',
   eventProperties: { variant: 'A' },
 };
-const secondaryCta: HomepagePosterHeroCta = {
-  label: 'See proof',
-  href: '/artist-profiles',
-};
 
 function renderHero(
   trackedLinkComponent?: ComponentProps<
@@ -33,7 +29,6 @@ function renderHero(
       headline='Your artist work, in motion'
       subtitle='A focused workspace for the next release.'
       primaryCta={primaryCta}
-      secondaryCta={secondaryCta}
       media={<div>Poster media</div>}
       seam={<div>Reserved seam</div>}
       trackedLinkComponent={trackedLinkComponent}
@@ -55,16 +50,6 @@ describe('HomepagePosterHero', () => {
     const primaryLink = screen.getByRole('link', { name: 'Enter Jovie' });
     expect(primaryLink).toHaveAttribute('href', '/signup');
     expect(primaryLink).toHaveAttribute('data-size', 'md');
-    expect(primaryLink).toHaveAttribute('data-variant', 'primary');
-    expect(primaryLink).toHaveClass('active:scale-[0.98]');
-    expect(primaryLink).toHaveClass('motion-reduce:active:scale-100');
-
-    const secondaryLink = screen.getByRole('link', { name: 'See proof' });
-    expect(secondaryLink).toHaveAttribute('href', '/artist-profiles');
-    expect(secondaryLink).toHaveAttribute('data-variant', 'ghost');
-    expect(secondaryLink).toHaveClass('active:scale-[0.98]');
-    // Secondary must stay quieter than the primary conversion control.
-    expect(secondaryLink.getAttribute('data-variant')).not.toBe('primary');
   });
 
   it('keeps the copy, media, and reserved seam slots present', () => {

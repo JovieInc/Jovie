@@ -6,6 +6,8 @@ import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { cn } from '@/lib/utils';
 
+export type AppShellFrameVariant = 'legacy' | 'shellChatV1';
+
 interface AppShellFrameProps {
   readonly sidebar: ReactNode;
   readonly header?: ReactNode;
@@ -15,7 +17,8 @@ interface AppShellFrameProps {
   readonly mobileBottomNav?: ReactNode;
   readonly contentClassName?: string;
   readonly containerClassName?: string;
-  /** When true (desktop), sidebar dims and right rail fully collapses off-canvas. */
+  readonly variant?: AppShellFrameVariant;
+  /** When true (desktop), sidebar dims and right rail slides partially off-screen. */
   readonly composerFocusActive?: boolean;
   /**
    * Chat routes render the ambient blue wash at the shell level so it spans
@@ -52,15 +55,23 @@ export const AppShellFrame = memo(function AppShellFrame({
   mobileBottomNav,
   contentClassName,
   containerClassName,
+  // Default to 'legacy' so callers that don't pass `variant` (AppShellSkeleton,
+  // DemoShell, future surfaces) match the current production state. AuthShell
+  // explicitly passes 'shellChatV1' when DESIGN_V1 is on.
+  variant = 'legacy',
   composerFocusActive = false,
   chatAmbientGradient = false,
 }: Readonly<AppShellFrameProps>) {
+  const isShellChatV1 = variant === 'shellChatV1';
+
   return (
     <div
       data-app-shell-frame='true'
+      data-shell-design={variant}
       data-composer-focus={composerFocusActive ? 'true' : undefined}
       className={cn(
-        'relative flex h-full w-full flex-col overflow-hidden bg-(--linear-bg-page)',
+        'relative flex h-full w-full flex-col overflow-hidden',
+        isShellChatV1 ? 'bg-(--linear-bg-page)' : 'bg-base',
         /* PWA safe area: pad top for notch/Dynamic Island in standalone mode (mobile only) */
         'max-lg:pt-[env(safe-area-inset-top)]',
         containerClassName
@@ -70,7 +81,9 @@ export const AppShellFrame = memo(function AppShellFrame({
       <div
         data-app-shell-body='true'
         className={cn(
-          'flex min-h-0 min-w-0 flex-1 overflow-hidden lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)'
+          'flex min-h-0 min-w-0 flex-1 overflow-hidden',
+          isShellChatV1 &&
+            'lg:gap-(--linear-app-shell-gap) lg:p-(--linear-app-shell-gap)'
         )}
       >
         <div
@@ -86,8 +99,10 @@ export const AppShellFrame = memo(function AppShellFrame({
             // `isolate` gives <main> its own stacking context so the negative-z
             // chat ambient layer below paints above main's background but
             // beneath the in-flow header/content (#13386).
-            'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--color-bg-surface-0)/90',
-            'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
+            'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
+            isShellChatV1
+              ? 'lg:rounded-(--linear-app-shell-radius) lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-(--linear-app-shell-shadow)'
+              : 'lg:border-l lg:border-subtle'
           )}
         >
           {/* Full-bleed ambient wash on chat routes — spans the whole content
@@ -103,7 +118,7 @@ export const AppShellFrame = memo(function AppShellFrame({
             <div
               aria-hidden='true'
               data-testid='chat-ambient-gradient'
-              className='pointer-events-none absolute inset-0 -z-10 bg-(--app-shell-content-surface)'
+              className='pointer-events-none absolute inset-0 -z-10 bg-(--linear-app-content-surface)'
               style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
             />
           ) : null}
@@ -111,7 +126,8 @@ export const AppShellFrame = memo(function AppShellFrame({
           {header}
           <div
             className={cn(
-              'flex flex-1 min-h-0 min-w-0 overflow-hidden lg:gap-(--app-shell-gap)'
+              'flex flex-1 min-h-0 min-w-0 overflow-hidden',
+              isShellChatV1 && 'lg:gap-(--linear-app-shell-gap)'
             )}
           >
             <div
@@ -126,7 +142,9 @@ export const AppShellFrame = memo(function AppShellFrame({
               {main}
             </div>
             {rightPanel ? (
-              <AppShellRightRail>{rightPanel}</AppShellRightRail>
+              <AppShellRightRail variant={variant}>
+                {rightPanel}
+              </AppShellRightRail>
             ) : null}
           </div>
           {audioPlayer}

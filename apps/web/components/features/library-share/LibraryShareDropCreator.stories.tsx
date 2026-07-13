@@ -28,10 +28,6 @@ const meta: Meta<typeof LibraryShareDropCreator> = {
   ],
   args: {
     releaseIds: ['release-1'],
-    candidateAssets: [
-      { id: 'release-1', title: 'Midnight Drive' },
-      { id: 'release-2', title: 'Sunrise Loop' },
-    ],
     defaultTitle: 'Midnight Drive press kit',
   },
 };

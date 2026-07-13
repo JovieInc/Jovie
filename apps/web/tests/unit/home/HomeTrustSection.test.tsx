@@ -51,25 +51,4 @@ describe('HomeTrustSection', () => {
       container.querySelectorAll('[data-mobile-logo="secondary"]')
     ).toHaveLength(1);
   });
-
-  it('accepts editorial label depth without weakening the accessible name', () => {
-    render(
-      <HomeTrustSection
-        ariaLabel='Music does not stop at distribution. Jovie keeps the next decision in view.'
-        label={
-          <span>
-            <span>Music does not stop at distribution.</span>
-            <span>Jovie keeps the next decision in view.</span>
-          </span>
-        }
-        presentation='inline-strip'
-      />
-    );
-
-    expect(
-      screen.getByRole('region', {
-        name: 'Music does not stop at distribution. Jovie keeps the next decision in view. major labels',
-      })
-    ).toBeInTheDocument();
-  });
 });

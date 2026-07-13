@@ -1,7 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-
 import { ListPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -16,16 +14,14 @@ import type { AdminCreatorProfilesWithSidebarProps } from './types';
 
 function BatchIngestButton({ onClick }: { readonly onClick: () => void }) {
   return (
-    <Button
+    <button
       type='button'
-      variant='ghost'
-      size='sm'
       onClick={onClick}
       className={cn(APP_CONTROL_BUTTON_CLASS, 'h-7 rounded-full px-3 text-2xs')}
     >
       <ListPlus className='h-3.5 w-3.5' />
       Batch Ingest
-    </Button>
+    </button>
   );
 }
 
@@ -52,7 +48,7 @@ export function AdminCreatorsPageWrapper(
         <IngestProfileDropdown onIngestPending={handleIngestPending} />
 
         <div
-          className='h-5 w-px bg-(--app-shell-frame-seam)'
+          className='h-5 w-px bg-(--linear-app-frame-seam)'
           aria-hidden='true'
         />
 

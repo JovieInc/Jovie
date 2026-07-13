@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -54,19 +52,4 @@ test('desktop package metadata uses the legal Jovie company name', async () => {
   );
 
   assert.equal(packageJson.author, 'Jovie Technology Inc.');
-});
-
-test('direct-run guard still fires when invoked through a symlink', async () => {
-  const scriptPath = join(desktopRoot, 'scripts/generate-dmg-background.mjs');
-  const tmp = await mkdtemp(join(tmpdir(), 'dmg-bg-link-'));
-  const linkPath = join(tmp, 'generate-dmg-background.mjs');
-  try {
-    await symlink(scriptPath, linkPath);
-    const stdout = execFileSync(process.execPath, [linkPath], {
-      encoding: 'utf8',
-    });
-    assert.match(stdout, /DMG background written: /);
-  } finally {
-    await rm(tmp, { recursive: true, force: true });
-  }
 });

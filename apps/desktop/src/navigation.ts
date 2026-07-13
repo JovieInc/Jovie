@@ -38,36 +38,27 @@ const AUTH_CALLBACK_ROUTE_PREFIXES = [
 ] as const;
 
 const SAME_ORIGIN_EXTERNAL_ROUTE_PREFIXES = [
-  '/a',
   '/about',
   '/ai',
   '/alternatives',
   '/artist-notifications',
   '/artist-profile',
   '/artist-profiles',
-  '/artists',
   '/blog',
   '/brand',
   '/changelog',
-  '/claim',
   '/compare',
   '/demo',
   '/demovideo',
   '/docs',
   '/download',
-  '/drop',
-  '/go',
   '/investors',
   '/launch',
   '/legal',
   '/new',
-  '/out',
-  '/p',
   '/pay',
   '/pricing',
-  '/r',
   '/renders',
-  '/s',
   '/support',
   '/auth/start',
   '/auth/native-complete',
@@ -242,8 +233,7 @@ function isAllowedAuthProviderUrl(parsed: URL): boolean {
   return AUTH_PROVIDER_ORIGINS.some(origin => {
     if (!origin.includes('*')) return parsed.origin === origin;
     // Wildcard matching for Clerk (and future providers): e.g. https://*.clerk.accounts.dev
-    // Match one tenant label only so the bare base domain and multi-label
-    // hosts like evil.com.clerk.accounts.dev stay blocked.
+    // Match one tenant label only so evil.com.clerk.accounts.dev stays blocked.
     const base = origin.replace(/^https?:\/\/\*\./, '');
     if (parsed.protocol !== 'https:') {
       return false;
@@ -251,6 +241,7 @@ function isAllowedAuthProviderUrl(parsed: URL): boolean {
     if (parsed.port && parsed.port !== '443') {
       return false;
     }
+    if (parsed.hostname === base) return true;
     if (!parsed.hostname.endsWith(`.${base}`)) return false;
 
     const tenantLabel = parsed.hostname.slice(0, -(base.length + 1));

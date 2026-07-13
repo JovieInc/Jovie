@@ -333,11 +333,7 @@ async function advanceQueueToIndex(index: number): Promise<void> {
 }
 
 function bindAudioEvents(el: HTMLAudioElement): void {
-  // -Infinity (not 0): with performance.now() clocked from process start, a
-  // timeupdate fired within the first PROGRESS_NOTIFY_MS of uptime would be
-  // swallowed by the throttle when initialized to 0, dropping the first
-  // progress update (surfaced as a shard-order-dependent unit test flake).
-  let lastNotifiedAt = -Infinity;
+  let lastNotifiedAt = 0;
   el.addEventListener('timeupdate', () => {
     // ~4 Hz keeps cross-surface scrub bars smooth without rAF thrash.
     const now =
@@ -384,7 +380,7 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     });
   });
   el.addEventListener('seeked', () => {
-    lastNotifiedAt = -Infinity; // invalidate throttle so next timeupdate fires
+    lastNotifiedAt = 0; // invalidate throttle so next timeupdate fires
     setState({
       currentTime: el.currentTime,
       duration: Number.isFinite(el.duration) ? el.duration : 0,

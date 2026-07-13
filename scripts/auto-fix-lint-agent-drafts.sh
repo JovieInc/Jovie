@@ -115,12 +115,10 @@ SNAP="$ENRICHED"
 
 # Filter to PRs with a failing lint check
 LINT_PR="$(echo "$SNAP" | jq -c '[.[] |
-  select(
-    .draft
-    and ((.head | test("^(tim/|codex/|agent/|claude/|linear/|dependabot/)")))
-    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
-    and ([.fail[]] | any(test("(?i)lint|biome")))
-  )
+  select(.draft)
+  and ((.head | test("^(tim/|codex/|agent/|claude/|linear/|dependabot/)")))
+  and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
+  and ([.fail[]] | any(test("(?i)lint|biome")))
 ]')"
 
 count="$(jq length <<<"$LINT_PR")"
@@ -172,8 +170,7 @@ while IFS= read -r pr; do
 
   # Setup pnpm and install
   if ! command -v pnpm >/dev/null 2>&1; then
-    corepack enable >/dev/null 2>&1
-    corepack prepare pnpm@9.15.4 --activate >/dev/null 2>&1
+    npm install -g pnpm@latest >/dev/null 2>&1
   fi
 
   if ! pnpm install --frozen-lockfile >/dev/null 2>&1; then

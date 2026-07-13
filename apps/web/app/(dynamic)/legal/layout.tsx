@@ -10,7 +10,7 @@ export default function LegalLayout({
 }>) {
   return (
     <PublicPageShell
-      className='public-legal-shell bg-base text-primary-token'
+      className='public-legal-shell bg-white text-neutral-950 dark:bg-base dark:text-neutral-50'
       headerVariant='minimal'
       logoSize='sm'
       mainClassName='py-16 sm:py-20'

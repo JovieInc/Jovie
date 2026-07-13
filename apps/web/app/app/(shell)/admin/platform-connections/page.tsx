@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
-import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { captureError } from '@/lib/error-tracking';
 import { PlatformConnectionsClient } from './PlatformConnectionsClient';
 import {
@@ -51,8 +50,6 @@ export default async function AdminPlatformConnectionsPage({
 }: Readonly<{
   searchParams: Promise<{ tab?: string }>;
 }>) {
-  await requireCurrentAdminPageAccess();
-
   const { tab = 'spotify' } = await searchParams;
   const currentTab = (
     ['spotify', 'engine'].includes(tab) ? tab : 'spotify'

@@ -12,6 +12,7 @@ import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
   type AppFlagName,
+  DESIGN_V1_ALIAS_FLAGS,
   type PartialAppFlagSnapshot,
 } from './contracts';
 import {
@@ -52,6 +53,8 @@ function partitionOverrides(record: AppFlagOverrideRecord): {
   }
   return { valid, orphans };
 }
+
+const DESIGN_V1_ALIAS_FLAG_NAMES = new Set<AppFlagName>(DESIGN_V1_ALIAS_FLAGS);
 
 const AppFlagsContext = createContext<PartialAppFlagSnapshot | null>(null);
 const OverridesContext = createContext<AppFlagOverridesContextValue | null>(
@@ -169,6 +172,14 @@ export function useAppFlag(flagName: AppFlagName): boolean {
 
   if (appFlags && flagName in appFlags) {
     return appFlags[flagName] ?? APP_FLAG_DEFAULTS[flagName];
+  }
+
+  if (
+    DESIGN_V1_ALIAS_FLAG_NAMES.has(flagName) &&
+    appFlags &&
+    'DESIGN_V1' in appFlags
+  ) {
+    return appFlags.DESIGN_V1 ?? APP_FLAG_DEFAULTS[flagName];
   }
 
   return APP_FLAG_DEFAULTS[flagName];

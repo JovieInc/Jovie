@@ -19,11 +19,6 @@ import {
   type ClaimedOnboardingState,
   deriveClaimedOnboardingStateFromMessageRows,
 } from '@/lib/onboarding/claimed-state';
-import {
-  assertOnboardingProfileOwner,
-  describeArtistProfileForVisitor,
-  requireVerifiedOwnerForReservation,
-} from '@/lib/onboarding/ownership-gate';
 import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
@@ -80,13 +75,10 @@ function pickInitialProfileHandle(
 
 async function reserveFallbackProfileHandle(
   state: ClaimedOnboardingState,
-  cleanedProposedHandle: string | null,
-  userId: string
+  cleanedProposedHandle: string | null
 ): Promise<string> {
-  // Fail closed: handle reservation success requires verified ownership.
   return reserveOnboardingHandle(
-    state.artist?.name ?? cleanedProposedHandle ?? 'artist',
-    userId
+    state.artist?.name ?? cleanedProposedHandle ?? 'artist'
   );
 }
 
@@ -293,18 +285,9 @@ async function persistClaimedProfileWithHandleRetry({
   const cleanedProposedHandle = pickInitialProfileHandle(proposedHandle);
   let handle =
     cleanedProposedHandle ??
-    (await reserveFallbackProfileHandle(state, cleanedProposedHandle, userId));
+    (await reserveFallbackProfileHandle(state, cleanedProposedHandle));
 
   for (let attempt = 0; attempt < HANDLE_CLAIM_MAX_ATTEMPTS; attempt++) {
-    // Existing profiles may only be claimed/updated by their verified owner.
-    // New profiles are created for this authenticated user (owner-to-be).
-    if (existingProfile) {
-      assertOnboardingProfileOwner({
-        authenticatedUserId: userId,
-        profileOwnerUserId: existingProfile.userId,
-      });
-    }
-
     const displayName =
       state.artist?.name ?? existingProfile?.displayName ?? handle;
 
@@ -328,11 +311,7 @@ async function persistClaimedProfileWithHandleRetry({
         throw error;
       }
 
-      handle = await reserveFallbackProfileHandle(
-        state,
-        cleanedProposedHandle,
-        userId
-      );
+      handle = await reserveFallbackProfileHandle(state, cleanedProposedHandle);
     }
   }
 
@@ -345,28 +324,6 @@ export async function materializeClaimedOnboardingProfile({
   ipAddress,
   userAgent,
 }: MaterializeClaimedOnboardingProfileInput): Promise<MaterializeClaimedOnboardingProfileResult> {
-  // Auth first (no DB): refuse anonymous materialize / reserve success.
-  const { userId: authenticatedUserId } = requireVerifiedOwnerForReservation({
-    userId,
-  });
-
-  // Conversation ownership: never materialize / "manage as owner" for a
-  // transcript the caller does not own.
-  const [conversation] = await db
-    .select({
-      id: chatConversations.id,
-      userId: chatConversations.userId,
-    })
-    .from(chatConversations)
-    .where(eq(chatConversations.id, conversationId))
-    .limit(1);
-
-  const { userId: verifiedUserId } = requireVerifiedOwnerForReservation({
-    userId: authenticatedUserId,
-    conversationExists: Boolean(conversation),
-    conversationUserId: conversation?.userId ?? null,
-  });
-
   const messageRows = await db
     .select({ toolCalls: chatMessages.toolCalls })
     .from(chatMessages)
@@ -378,14 +335,7 @@ export async function materializeClaimedOnboardingProfile({
     return { profileId: null, handle: null, status: 'skipped' };
   }
 
-  const existingProfile = await fetchExistingProfile(verifiedUserId);
-  if (existingProfile) {
-    assertOnboardingProfileOwner({
-      authenticatedUserId: verifiedUserId,
-      profileOwnerUserId: existingProfile.userId,
-    });
-  }
-
+  const existingProfile = await fetchExistingProfile(userId);
   const now = new Date();
   const settings = buildOnboardingSettings(
     existingProfile?.settings,
@@ -400,7 +350,7 @@ export async function materializeClaimedOnboardingProfile({
 
   const { profileId, handle, status } =
     await persistClaimedProfileWithHandleRetry({
-      userId: verifiedUserId,
+      userId,
       existingProfile,
       state,
       proposedHandle: state.handle,
@@ -412,13 +362,12 @@ export async function materializeClaimedOnboardingProfile({
   await db
     .update(users)
     .set({ activeProfileId: profileId, updatedAt: now })
-    .where(eq(users.id, verifiedUserId));
+    .where(eq(users.id, userId));
 
-  // "Manage as owner" claim row — only after verified ownership above.
   await db
     .insert(userProfileClaims)
     .values({
-      userId: verifiedUserId,
+      userId,
       creatorProfileId: profileId,
       role: 'owner',
     })
@@ -430,17 +379,12 @@ export async function materializeClaimedOnboardingProfile({
     .where(
       and(
         eq(chatConversations.id, conversationId),
-        eq(chatConversations.userId, verifiedUserId)
+        eq(chatConversations.userId, userId)
       )
     );
 
-  const artistLabel = describeArtistProfileForVisitor({
-    ownershipVerified: true,
-    artistName: state.artist?.name ?? null,
-  });
-
   await db.insert(chatAuditLog).values({
-    userId: verifiedUserId,
+    userId,
     creatorProfileId: profileId,
     conversationId,
     action: 'materialize_onboarding_profile',
@@ -452,8 +396,6 @@ export async function materializeClaimedOnboardingProfile({
       status,
       spotifyArtistId: state.artist?.id ?? null,
       spotifyArtistName: state.artist?.name ?? null,
-      // Neutral, ownership-verified label (never pre-verify "you" language).
-      artistProfileLabel: artistLabel,
     },
     ipAddress,
     userAgent,

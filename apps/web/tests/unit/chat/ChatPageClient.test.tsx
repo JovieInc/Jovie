@@ -27,7 +27,6 @@ const {
   mockSetPreviewData,
   mockTogglePreviewPanel,
   mockUseRegisterRightPanel,
-  mockNavigationReady,
 } = vi.hoisted(() => ({
   mockClosePreviewPanel: vi.fn(),
   mockOpenPreviewPanel: vi.fn(),
@@ -37,26 +36,9 @@ const {
   mockSetPreviewData: vi.fn(),
   mockTogglePreviewPanel: vi.fn(),
   mockUseRegisterRightPanel: vi.fn(),
-  mockNavigationReady: vi.fn(),
 }));
 
-vi.mock(
-  '@/components/features/dashboard/NavigationDestinationReady',
-  async () => {
-    const { useEffect } = await import('react');
-    return {
-      NavigationDestinationReady: () => {
-        useEffect(() => {
-          mockNavigationReady();
-        }, []);
-        return null;
-      },
-    };
-  }
-);
-
 let mockSearchParams = new URLSearchParams();
-let mockJovieChatShouldThrow = false;
 
 function hasRegisteredRightPanel(): boolean {
   return mockUseRegisterRightPanel.mock.calls.some(([panel]) => panel !== null);
@@ -118,9 +100,6 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     isFirstSession?: boolean;
     actionCards?: readonly ChatActionCard[];
   }) => {
-    if (mockJovieChatShouldThrow) {
-      throw new Error('simulated chat render failure');
-    }
     capturedOnTitleChange = props.onTitleChange;
     capturedOnConversationCreate = props.onConversationCreate;
     capturedActionCards = props.actionCards;
@@ -240,7 +219,6 @@ describe('ChatPageClient', () => {
     mockPreviewPanelState.isOpen = false;
     globalThis.sessionStorage.clear();
     capturedOnConversationCreate = undefined;
-    mockJovieChatShouldThrow = false;
   });
 
   it('renders JovieChat with profileId from selected profile', () => {
@@ -249,40 +227,23 @@ describe('ChatPageClient', () => {
     expect(chat.getAttribute('data-profile-id')).toBe('profile-1');
   });
 
-  it('does not mark chat ready when the chat surface throws', () => {
-    mockJovieChatShouldThrow = true;
-
-    const { container } = renderChatPage();
-
-    expect(container.textContent).toContain(
-      'Something went wrong loading chat. Please try again.'
-    );
-    expect(mockNavigationReady).not.toHaveBeenCalled();
-  });
-
-  it('passes ≥3 profile-aware action cards to new chat threads (JOV-3547)', () => {
+  it('passes a production-backed action card to new chat threads', () => {
     const { getByTestId } = renderChatPage();
     const chat = getByTestId('jovie-chat');
 
-    expect(chat.getAttribute('data-action-card-count')).toBe('3');
-    expect(capturedActionCards).toHaveLength(3);
+    expect(chat.getAttribute('data-action-card-count')).toBe('1');
     expect(capturedActionCards?.[0]).toEqual(
       expect.objectContaining({
-        id: 'build-artist-profile',
-        title: 'Build Artist Profile',
-        actionLabel: 'Build Profile',
+        id: 'connect-music-catalog',
+        title: 'Connect Your Music Catalog',
+        actionLabel: 'Plan Setup',
         prompt:
-          'Help me build my artist profile for Test Artist. Start by connecting my music catalog and give me the next setup step.',
+          'Help me connect my music catalog for Test Artist. Use the current profile context and give me the next setup step.',
       })
     );
-    expect(capturedActionCards?.map(card => card.id)).toEqual([
-      'build-artist-profile',
-      'plan-release',
-      'generate-album-art',
-    ]);
   });
 
-  it('seeds starter action cards when catalog is connected and profile is complete', () => {
+  it('derives music catalog context from selectedProfile fields', () => {
     const dataWithConnectedMusic: DashboardData = {
       ...baseDashboardData,
       hasMusicLinks: false,
@@ -305,13 +266,7 @@ describe('ChatPageClient', () => {
       </DashboardDataProvider>
     );
 
-    // Fully set-up profiles still get ≥3 grounded starters (no setup-gap lead).
-    expect(capturedActionCards).toHaveLength(3);
-    expect(capturedActionCards?.map(card => card.id)).toEqual([
-      'plan-release',
-      'generate-album-art',
-      'review-signals',
-    ]);
+    expect(capturedActionCards).toEqual([]);
   });
 
   it('passes conversationId to JovieChat', () => {

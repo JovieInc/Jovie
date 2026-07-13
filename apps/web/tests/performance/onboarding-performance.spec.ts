@@ -112,7 +112,7 @@ test.describe('Onboarding Performance', () => {
 
     // Find chat composer (canonical onboarding is now chat-first).
     const handleInput = page
-      .locator('[aria-label="Chat Message Input"]')
+      .locator('[aria-label="Chat message input"]')
       .first();
 
     if (await handleInput.isVisible()) {

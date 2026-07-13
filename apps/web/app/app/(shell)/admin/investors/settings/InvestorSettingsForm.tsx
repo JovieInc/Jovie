@@ -104,7 +104,7 @@ function SettingRow({
   return (
     <div className='flex items-start justify-between gap-4 py-3'>
       <div className='min-w-0 flex-1'>
-        <p className='text-app font-[540] tracking-tighter text-primary-token'>
+        <p className='text-app font-[540] tracking-[-0.02em] text-primary-token'>
           {label}
         </p>
         <p className='mt-0.5 text-xs leading-[18px] text-secondary-token'>
@@ -196,7 +196,7 @@ export function InvestorSettingsForm() {
       <ContentSurfaceCard className='overflow-hidden p-0'>
         <div className='divide-y divide-subtle px-(--linear-app-content-padding-x)'>
           <SettingRow
-            label='Show Progress Bar'
+            label='Show progress bar'
             description='Display a fundraise progress bar in the investor portal sticky bar.'
           >
             <Switch
@@ -239,7 +239,7 @@ export function InvestorSettingsForm() {
             </DrawerFormField>
 
             <DrawerFormField
-              label='Investor Count'
+              label='Investor count'
               helperText='Number of investors committed'
             >
               <Input
@@ -264,7 +264,7 @@ export function InvestorSettingsForm() {
         />
         <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
           <DrawerFormField
-            label='Book A Call URL'
+            label='Book a call URL'
             helperText='Link to your Calendly, Cal.com, or scheduling page.'
           >
             <Input
@@ -303,7 +303,7 @@ export function InvestorSettingsForm() {
         />
         <div className='divide-y divide-subtle px-(--linear-app-content-padding-x)'>
           <SettingRow
-            label='Follow-up Emails'
+            label='Follow-up emails'
             description="Automatically send follow-up emails to investors who view but don't respond."
           >
             <Switch
@@ -316,7 +316,7 @@ export function InvestorSettingsForm() {
 
           <div className='grid gap-4 py-4 sm:grid-cols-3'>
             <DrawerFormField
-              label='Follow-up Delay (Hours)'
+              label='Follow-up delay (hours)'
               helperText='Hours to wait before sending follow-up'
             >
               <Input
@@ -331,7 +331,7 @@ export function InvestorSettingsForm() {
             </DrawerFormField>
 
             <DrawerFormField
-              label='Engaged Threshold'
+              label='Engaged threshold'
               helperText='Engagement score (0-100) to mark investor as "engaged"'
             >
               <Input
@@ -348,7 +348,7 @@ export function InvestorSettingsForm() {
             </DrawerFormField>
 
             <DrawerFormField
-              label='Slack Webhook'
+              label='Slack webhook'
               helperText='Get notified when investors view your portal'
             >
               <Input

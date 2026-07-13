@@ -3,7 +3,6 @@ import { Suspense } from 'react';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ActivityTableUnified } from '@/features/admin/ActivityTableUnified';
 import { getAdminActivityFeed } from '@/lib/admin/overview';
-import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { AdminActivitySkeleton } from './loading';
 
 export const metadata: Metadata = {
@@ -19,9 +18,7 @@ async function ActivityContent() {
 
 const activityTabs = [{ value: 'activity', label: 'Activity' }] as const;
 
-export default async function AdminActivityPage() {
-  await requireCurrentAdminPageAccess();
-
+export default function AdminActivityPage() {
   return (
     <AdminPage
       title='Activity'

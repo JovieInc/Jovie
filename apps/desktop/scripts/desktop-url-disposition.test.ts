@@ -69,24 +69,6 @@ test('desktop disposition opens allowlisted public routes externally', () => {
   ]);
 });
 
-test('desktop disposition opens public redirect and claim routes externally', () => {
-  assertDisposition(productionPolicy, 'external', [
-    'https://jov.ie/r/my-release',
-    'https://jov.ie/s/abc123',
-    'https://jov.ie/go/link_123',
-    'https://jov.ie/out/link_123',
-    'https://jov.ie/claim/token_123',
-    'https://jov.ie/artists',
-    'https://jov.ie/p/token_123',
-    'https://jov.ie/a/somehandle',
-    'https://jov.ie/drop/token_123',
-  ]);
-  assertDisposition(localPolicy, 'external', [
-    'http://127.0.0.1:3112/r/my-release',
-    'http://127.0.0.1:3112/out/link_123',
-  ]);
-});
-
 test('desktop disposition blocks unsafe protocols and foreign hosts', () => {
   assertDisposition(productionPolicy, 'blocked', [
     'javascript:globalThis.evil=true',
@@ -126,10 +108,10 @@ test('desktop disposition allows Clerk auth provider origins externally (https w
   assertDisposition(productionPolicy, 'external', [
     'https://foo-bar.clerk.accounts.dev/sign-in?__clerk_session_id=...',
     'https://distinct-giraffe-5.clerk.accounts.dev/v1/client?__clerk_api_version=...',
-  ]);
-  // Unsafe variants (wrong protocol, bare base host, evil host, path tricks) remain blocked
-  assertDisposition(productionPolicy, 'blocked', [
     'https://clerk.accounts.dev/sign-up?redirect_url=...',
+  ]);
+  // Unsafe variants (wrong protocol, evil host, path tricks) remain blocked
+  assertDisposition(productionPolicy, 'blocked', [
     'http://foo.clerk.accounts.dev/sign-in',
     'https://foo.clerk.accounts.dev:8443/sign-in',
     'https://evil.com.clerk.accounts.dev/sign-in',

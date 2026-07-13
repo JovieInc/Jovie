@@ -10,8 +10,6 @@ Single driver policy, immutable migrations, transaction discipline.
 
 The `file-protection-check.sh` hook blocks edits to existing migration files.
 
-`pnpm db:migrate` trusts the `drizzle.__drizzle_migrations` ledger and can report "up to date" on a drifted database; run `pnpm --filter @jovie/web run db:verify` (also wired into `scripts/setup.sh`) to compare the ledger against the journal and get repair steps.
-
 For migration creation/run details: `docs/DB_MIGRATIONS.md`.
 
 ## Database Access (Single Driver Policy)
@@ -32,7 +30,6 @@ Scripts and migrations use the HTTP driver for stateless one-off operations. The
 
 - **NEVER** introduce new direct `db.transaction()` usage in app code without explicit human approval.
 - Existing transaction-based RLS/session helpers are legacy exceptions and must not be copied into new call-sites.
-- Transaction callbacks contain database work only. Authenticate first, then finish external I/O, retries, and image processing before opening the transaction; pass precomputed values into the database helper.
 - If you need transaction-scoped session state, use an approved wrapper or escalate before adding new transaction logic.
 - For atomicity, use Drizzle's batch operations: `db.insert().values([...items])`.
 - If you need true ACID transactions, document the requirement and discuss alternatives.

@@ -323,7 +323,7 @@ function TrackListRow({
       className={cn(
         'flex items-center gap-3 py-2.5',
         !isLastRow &&
-          'border-b border-[color-mix(in_oklab,var(--app-shell-frame-seam)_58%,transparent)]'
+          'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_58%,transparent)]'
       )}
       data-testid={`release-track-row-${track.id}`}
     >
@@ -332,9 +332,9 @@ function TrackListRow({
         onClick={handleTogglePlayback}
         disabled={!playableUrl && !isActiveTrack}
         className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-caption tabular-nums transition-[background-color,color,border-color] duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-caption tabular-nums transition-[background-color,color,border-color] duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
           isActiveTrack
-            ? 'border border-(--app-shell-frame-seam) bg-surface-0 text-primary-token hover:bg-surface-1'
+            ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token hover:bg-surface-1'
             : 'border border-transparent bg-transparent text-tertiary-token hover:bg-surface-0 hover:text-primary-token',
           !playableUrl &&
             !isActiveTrack &&
@@ -350,7 +350,7 @@ function TrackListRow({
         <button
           type='button'
           onClick={onSelect}
-          className='group/track-open flex min-w-0 flex-1 items-center gap-1.5 rounded-md text-left transition-[color,background-color] duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+          className='group/track-open flex min-w-0 flex-1 items-center gap-1.5 rounded-md text-left transition-[color,background-color] duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
           aria-label={`Open track details for ${track.title}`}
           data-testid={`release-track-open-${track.id}`}
         >

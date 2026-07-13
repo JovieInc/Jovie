@@ -1,4 +1,3 @@
-import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
@@ -19,7 +18,6 @@ export default function AiPage() {
           <p className='text-sm font-medium tracking-tight text-muted-token'>
             Public Brief
           </p>
-          {/* ui-casing-allow: marketing display headline */}
           <h1 className='text-4xl font-semibold tracking-tight sm:text-5xl'>
             The AI operating system behind every Jovie profile
           </h1>
@@ -30,18 +28,17 @@ export default function AiPage() {
             without exposing the private investor portal.
           </p>
           <div className='flex flex-wrap gap-3'>
-            <Button asChild variant='primary'>
-              <Link href={APP_ROUTES.PRICING}>See Pricing</Link>
-            </Button>
-            <Button asChild variant='secondary'>
-              <Link href={APP_ROUTES.SUPPORT}>Contact The Team</Link>
-            </Button>
+            <Link className='btn-linear-primary' href={APP_ROUTES.PRICING}>
+              See Pricing
+            </Link>
+            <Link className='btn-linear-secondary' href={APP_ROUTES.SUPPORT}>
+              Contact The Team
+            </Link>
           </div>
         </section>
 
         <section className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
-            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-lg font-semibold'>1. Identify</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Recognize known fans, captured contacts, and anonymous visitors
@@ -49,7 +46,6 @@ export default function AiPage() {
             </p>
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
-            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-lg font-semibold'>2. Decide</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Route each visit toward the highest-value next action, whether
@@ -57,7 +53,6 @@ export default function AiPage() {
             </p>
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
-            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-lg font-semibold'>3. Measure</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Capture impressions, clicks, and downstream value events so
@@ -65,7 +60,6 @@ export default function AiPage() {
             </p>
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
-            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-lg font-semibold'>4. Learn</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Use those outcomes to improve routing, segmentation, and follow-up
@@ -74,9 +68,8 @@ export default function AiPage() {
           </article>
         </section>
 
-        <section className='grid gap-8 rounded-4xl border border-subtle bg-panel px-6 py-8 lg:grid-cols-[1.2fr_0.8fr]'>
+        <section className='grid gap-8 rounded-[2rem] border border-subtle bg-panel px-6 py-8 lg:grid-cols-[1.2fr_0.8fr]'>
           <div className='space-y-4'>
-            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-2xl font-semibold tracking-tight'>
               What ships in the launch version
             </h2>
@@ -94,7 +87,6 @@ export default function AiPage() {
             </ul>
           </div>
           <div className='space-y-4'>
-            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-2xl font-semibold tracking-tight'>
               Read the public context
             </h2>
@@ -104,14 +96,18 @@ export default function AiPage() {
               creator-facing offer.
             </p>
             <div className='flex flex-wrap gap-3'>
-              <Button asChild variant='secondary'>
-                <Link href={APP_ROUTES.INVESTORS}>Investor Overview</Link>
-              </Button>
-              <Button asChild variant='secondary'>
-                <Link href={APP_ROUTES.BLOG_THE_MYSPACE_PROBLEM}>
-                  Read The Memo
-                </Link>
-              </Button>
+              <Link
+                className='btn-linear-secondary'
+                href={APP_ROUTES.INVESTORS}
+              >
+                Investor Overview
+              </Link>
+              <Link
+                className='btn-linear-secondary'
+                href={APP_ROUTES.BLOG_THE_MYSPACE_PROBLEM}
+              >
+                Read The Memo
+              </Link>
             </div>
           </div>
         </section>

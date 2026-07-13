@@ -11,31 +11,29 @@ const scriptPath = path.resolve(
   'validate-testflight-artifact.sh'
 );
 
-function makePlist(
-  t,
-  {
-    apiBaseUrl = 'https://jov.ie',
-    webBaseUrl = 'https://jov.ie',
-    clerkPublishableKey,
-  } = {}
-) {
+function makePlist(t, clerkPublishableKey) {
   const root = mkdtempSync(path.join(tmpdir(), 'testflight-artifact-'));
   t.after(() => {
     rmSync(root, { recursive: true, force: true });
   });
   const plistPath = path.join(root, 'Configuration.local.plist');
-  const legacyEntry = clerkPublishableKey
-    ? `<key>ClerkPublishableKey</key><string>${clerkPublishableKey}</string>`
-    : '';
+  const payload = {
+    ClerkPublishableKey: clerkPublishableKey,
+    ApiBaseUrl: 'https://jov.ie',
+    WebBaseUrl: 'https://jov.ie',
+  };
+  const entries =
+    clerkPublishableKey === undefined
+      ? ''
+      : `<key>ClerkPublishableKey</key><string>${payload.ClerkPublishableKey}</string>`;
   writeFileSync(
     plistPath,
     [
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
       '<plist version="1.0"><dict>',
-      legacyEntry,
-      `<key>ApiBaseUrl</key><string>${apiBaseUrl}</string>`,
-      `<key>WebBaseUrl</key><string>${webBaseUrl}</string>`,
+      entries,
+      '<key>ApiBaseUrl</key><string>https://jov.ie</string>',
       '</dict></plist>',
       '',
     ].join('\n')
@@ -62,32 +60,38 @@ function runValidatorExpectingFailure(plistPath) {
   }
 }
 
-test('accepts canonical production endpoints without a Clerk client key', t => {
-  const output = runValidator(makePlist(t));
+test('accepts a written artifact embedding a live Clerk key', t => {
+  const plistPath = makePlist(t, 'pk_live_example');
+  const output = runValidator(plistPath);
   assert.match(output, /Validated TestFlight configuration artifact/);
 });
 
-test('rejects a non-production API endpoint', t => {
-  const plistPath = makePlist(t, { apiBaseUrl: 'http://localhost:3100' });
+test('rejects a written artifact embedding the CI placeholder key', t => {
+  const plistPath = makePlist(t, 'pk_test_ci_placeholder');
   const { failed, output } = runValidatorExpectingFailure(plistPath);
   assert.equal(failed, true);
-  assert.match(output, /non-production ApiBaseUrl/);
+  assert.match(output, /CI placeholder Clerk key/);
 });
 
-test('rejects a non-production web endpoint', t => {
-  const plistPath = makePlist(t, { webBaseUrl: 'https://staging.jov.ie' });
+test('rejects a written artifact embedding a development pk_test key', t => {
+  const plistPath = makePlist(t, 'pk_test_abc123');
   const { failed, output } = runValidatorExpectingFailure(plistPath);
   assert.equal(failed, true);
-  assert.match(output, /non-production WebBaseUrl/);
+  assert.match(output, /development Clerk key/);
 });
 
-test('rejects an artifact that still embeds the retired Clerk key', t => {
-  const plistPath = makePlist(t, {
-    clerkPublishableKey: 'pk_live_legacy',
-  });
+test('rejects a written artifact with a malformed key', t => {
+  const plistPath = makePlist(t, 'not-a-clerk-key');
   const { failed, output } = runValidatorExpectingFailure(plistPath);
   assert.equal(failed, true);
-  assert.match(output, /retired ClerkPublishableKey/);
+  assert.match(output, /must start with pk_live_/);
+});
+
+test('rejects when the artifact has no ClerkPublishableKey value', t => {
+  const plistPath = makePlist(t, undefined);
+  const { failed, output } = runValidatorExpectingFailure(plistPath);
+  assert.equal(failed, true);
+  assert.match(output, /no ClerkPublishableKey value/);
 });
 
 test('rejects when the artifact does not exist at all', t => {

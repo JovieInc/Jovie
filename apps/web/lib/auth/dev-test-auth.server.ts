@@ -1,11 +1,9 @@
 import 'server-only';
 
-import { makeSignature } from 'better-auth/crypto';
-import { eq, or } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
 import { auth } from '@/lib/auth/better-auth';
-import { DEFAULT_DEV_TEST_AUTH_EMAILS } from '@/lib/auth/dev-test-auth-identity';
 import type {
   ClientAuthBootstrap,
   DevTestAuthActor,
@@ -44,14 +42,13 @@ import { logger } from '@/lib/utils/logger';
 
 const DEV_TEST_AUTH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 12;
 
-const DEFAULT_CREATOR_EMAIL = DEFAULT_DEV_TEST_AUTH_EMAILS.creator;
+const DEFAULT_CREATOR_EMAIL = 'browse+clerk_test@jov.ie';
 const DEFAULT_CREATOR_USERNAME = 'browse-test-user';
 const DEFAULT_CREATOR_FULL_NAME = 'Browse Test User';
 const DEFAULT_CREATOR_BIO =
   'Stable creator profile for local browse QA and dashboard verification.';
 const DEFAULT_CREATOR_VENMO = 'browse-test-user';
-const DEFAULT_READY_CREATOR_EMAIL =
-  DEFAULT_DEV_TEST_AUTH_EMAILS['creator-ready'];
+const DEFAULT_READY_CREATOR_EMAIL = 'browse-ready+clerk_test@jov.ie';
 const DEFAULT_READY_CREATOR_USERNAME = 'browse-ready-user';
 const DEFAULT_READY_CREATOR_FULL_NAME = 'Browse Ready User';
 const DEFAULT_READY_CREATOR_BIO =
@@ -60,7 +57,7 @@ const DEFAULT_READY_CREATOR_VENMO = 'browse-ready-user';
 const DEFAULT_READY_CREATOR_SPOTIFY_URL =
   'https://open.spotify.com/artist/4NHQUkpP4uKj7LKEMstSxN';
 
-const DEFAULT_ADMIN_EMAIL = DEFAULT_DEV_TEST_AUTH_EMAILS.admin;
+const DEFAULT_ADMIN_EMAIL = 'browse-admin+clerk_test@jov.ie';
 const DEFAULT_ADMIN_USERNAME = 'browse-admin-user';
 const DEFAULT_ADMIN_FULL_NAME = 'Browse Admin';
 const DEFAULT_ADMIN_BIO =
@@ -229,10 +226,9 @@ function getFallbackActorFromPersona(
 }
 
 async function findDevTestAuthSession(
-  authUserId: string,
-  requestedPersona: DevTestAuthPersona | null,
-  allowSyntheticFallback = true
-): Promise<DevTestAuthSession | null> {
+  betterAuthUserId: string,
+  requestedPersona: DevTestAuthPersona | null
+): Promise<DevTestAuthSession> {
   let matchedUser:
     | {
         dbUserId: string;
@@ -260,41 +256,24 @@ async function findDevTestAuthSession(
       })
       .from(users)
       .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-      .where(
-        or(
-          eq(users.betterAuthUserId, authUserId),
-          eq(users.clerkId, authUserId)
-        )
-      )
+      .where(eq(users.betterAuthUserId, betterAuthUserId))
       .limit(1);
   } catch (error) {
-    if (!allowSyntheticFallback) {
-      logger.warn('Failed to validate persisted dev test auth actor', {
-        authUserId,
-        error,
-      });
-      return null;
-    }
     logger.warn('Falling back to synthetic dev test auth actor', {
-      authUserId,
+      betterAuthUserId,
       error,
     });
     return getFallbackActorFromPersona(
-      authUserId,
+      betterAuthUserId,
       requestedPersona ?? 'creator'
     );
   }
 
   if (!matchedUser) {
-    if (!allowSyntheticFallback) return null;
     return getFallbackActorFromPersona(
-      authUserId,
+      betterAuthUserId,
       requestedPersona ?? 'creator'
     );
-  }
-
-  if (!matchedUser.betterAuthUserId) {
-    return null;
   }
 
   const persona =
@@ -307,33 +286,13 @@ async function findDevTestAuthSession(
   return {
     dbUserId: matchedUser.dbUserId,
     persona,
-    clerkUserId: matchedUser.betterAuthUserId,
+    clerkUserId: matchedUser.betterAuthUserId ?? betterAuthUserId,
     email: matchedUser.email ?? config.email,
     username,
     fullName,
     isAdmin: matchedUser.isAdmin,
     profilePath: username ? `/${username}` : null,
   };
-}
-
-export async function ensureExistingDevTestAuthActor(
-  betterAuthUserId: string,
-  requestedPersona: DevTestAuthPersona | null
-): Promise<DevTestAuthActor | null> {
-  const actor = await findDevTestAuthSession(
-    betterAuthUserId,
-    requestedPersona,
-    false
-  );
-  if (!actor) return null;
-
-  await mintBetterAuthSessionForDevTestActor({
-    dbUserId: actor.dbUserId,
-    betterAuthUserId: actor.clerkUserId,
-    email: actor.email,
-    fullName: actor.fullName,
-  });
-  return actor;
 }
 
 async function ensurePersonaProfile(
@@ -561,6 +520,10 @@ async function ensureDevTestAuthActorForBetterAuthUser(
     );
   }
 
+  // Mint a real Better Auth session — this is the primary path now (not
+  // best-effort). The session cookie is set by the dev bypass route's
+  // `buildDevTestAuthCookieDescriptors`; the BA session row means any
+  // direct `auth.api.getSession` call site sees a real session.
   await mintBetterAuthSessionForDevTestActor({
     dbUserId,
     betterAuthUserId,
@@ -634,43 +597,6 @@ async function mintBetterAuthSessionForDevTestActor(params: {
 
   const ctx = await auth.$context;
   await ctx.internalAdapter.createSession(betterAuthUserId, false);
-}
-
-export async function buildBetterAuthSessionCookieDescriptor(
-  actor: DevTestAuthActor,
-  secure: boolean
-) {
-  const ctx = await auth.$context;
-  const session = await ctx.internalAdapter.createSession(
-    actor.clerkUserId,
-    false
-  );
-  if (!session?.token) {
-    throw new Error(
-      'Better Auth performance session creation returned no token'
-    );
-  }
-
-  const signature = await makeSignature(session.token, ctx.secret);
-  const attributes = ctx.authCookies.sessionToken.attributes;
-  const configuredSameSite =
-    typeof attributes.sameSite === 'string'
-      ? attributes.sameSite.toLowerCase()
-      : 'lax';
-  const sameSite: 'lax' | 'strict' | 'none' =
-    configuredSameSite === 'strict' || configuredSameSite === 'none'
-      ? configuredSameSite
-      : 'lax';
-
-  return {
-    name: ctx.authCookies.sessionToken.name,
-    value: `${session.token}.${signature}`,
-    httpOnly: attributes.httpOnly ?? true,
-    maxAge: ctx.sessionConfig.expiresIn,
-    path: attributes.path ?? '/',
-    sameSite,
-    secure: secure || (attributes.secure ?? false),
-  };
 }
 
 export function buildDevTestAuthCookieDescriptors(

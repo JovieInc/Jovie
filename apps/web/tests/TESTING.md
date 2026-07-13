@@ -28,12 +28,14 @@ Rules of thumb:
 - CI: the `ci-e2e-smoke` job runs the focused desktop lane; the `e2e-suite-* / E2E Smoke (PR to Preview)` step runs the tagged lane sharded.
 - Mobile parity is currently opt-in (no CI job by default). Run it locally when changing shell layout, mobile bottom nav, or any responsive code that has shipped with mobile regressions.
 
-### Canonical shell parity
+### Flag-on / Flag-off parity
 
-Shell routes have one production frame. Responsive smoke coverage must prove
-the same navigation, rail, focus, and loading contracts on desktop and mobile.
-The stale-override regression spec additionally proves that retired local
-override data cannot resurrect an alternate shell.
+Shell routes that depend on `DESIGN_V1`/`SHELL_CHAT_V1` overrides require **both** a flag-on smoke and a flag-off smoke so we never ship a change that only works under one flag value:
+
+- `shell-chat-v1.spec.ts` — proves the New Design shell mounts when the override forces it on.
+- `shell-chat-v1-flag-off.spec.ts` — proves the legacy shell still mounts when the override forces it off.
+
+Marketing/product screenshots (`playwright.config.screenshots.ts` + `tests/product-screenshots/catalog.spec.ts`) continue to force the New Design via the production default; the flag-off parity coverage lives in the smoke lanes above.
 
 ## Running Tests
 
@@ -82,10 +84,16 @@ single source of truth shared by `playwright.config.smoke.ts`,
 | **Focused mobile parity** | `pnpm --filter @jovie/web run e2e:smoke:mobile` | `playwright.config.smoke.mobile.ts` | iPhone-class viewport coverage for mobile overflow and viewport stability. Available locally; opt in via the `testing` label for preview QA. |
 | **Tagged / discovery** | `pnpm --filter @jovie/web run e2e:smoke:tagged` | default `playwright.config.ts` | Broader sharded sweep of every `-g @smoke` test. Runs on main and on PRs tagged `testing`. |
 
-Canonical and stale-override shell specs are in the focused desktop manifest.
-They require `E2E_USE_TEST_AUTH_BYPASS=1`; in environments without it they skip
-cleanly. The marketing/product screenshot catalog uses the same canonical
-production shell without adding local shell overrides.
+The flag-gated shell is covered by **both** the flag-on path
+(`shell-chat-v1.spec.ts`) and a flag-off parity path
+(`shell-chat-v1-flag-off.spec.ts`). Both are in the focused desktop manifest so
+the PR gate catches regressions in either direction. They require
+`E2E_USE_TEST_AUTH_BYPASS=1`; in environments without it they skip cleanly.
+
+The marketing/product screenshot catalog (`pnpm --filter @jovie/web screenshots`)
+forces `DESIGN_V1` (the `SHELL_CHAT_V1` override slot) on explicitly before
+every scenario navigates, so the catalog cannot silently flip back to the
+legacy shell if defaults change.
 
 ### Adding a spec to a focused lane
 
@@ -116,11 +124,11 @@ Smoke tests are designed for **fast PR feedback** (< 10 min target):
   - Dashboard navigation after Clerk test-mode sign-in
   - Quick auth-page availability checks
 
-- `shell-chat-v1.spec.ts` - Canonical shell geometry, focus, composer, and
-  navigation coverage (requires `E2E_USE_TEST_AUTH_BYPASS=1`).
+- `shell-chat-v1.spec.ts` - New Design shell renders when `SHELL_CHAT_V1`
+  override is forced on (requires `E2E_USE_TEST_AUTH_BYPASS=1`).
 
-- `shell-chat-v1-flag-off.spec.ts` - Retired local shell override data is
-  ignored and the canonical shell still renders.
+- `shell-chat-v1-flag-off.spec.ts` - Legacy shell still renders when
+  `SHELL_CHAT_V1` override is forced off — flag-off parity guard.
 
 ## Full Suite Files
 
@@ -300,7 +308,7 @@ The helper now prefers the local dev auth route on loopback/private hosts and on
 | `⚠ Skipping: E2E_CLERK_USER_USERNAME not configured` | Missing Doppler env var | Run with `pnpm run test:web:e2e` or another pinned wrapper |
 | `⚠ Skipping: Clerk testing setup was not successful` | `clerkSetup()` failed | Check `CLERK_SECRET_KEY` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` are real keys |
 | Screenshots show login screen | Auth guard skipping tests | Ensure `E2E_CLERK_USER_USERNAME` contains `+clerk_test` |
-| Product screenshot missing | Catalog scenario failed or its registry export was removed | Run `pnpm --filter web screenshots:capture` and inspect the failing `catalog.spec.ts` scenario |
+| `audience-crm.png` missing | Auth guard skipped `audience.spec.ts` | Same as above — fix the auth guard |
 | `CLERK_SETUP_FAILED` | Real Clerk keys not in env | Run via Doppler, not bare `pnpm` |
 | `Failed to load Clerk JS` on localhost | Clerk proxy forces HTTPS, localhost has no SSL | The app now auto-disables the Clerk proxy on insecure local/private HTTP origins. If you are reusing an already-running dev server, restart it so the new runtime path is active. You can still force the old behavior with `NEXT_PUBLIC_CLERK_PROXY_DISABLED=1` when needed for test pipelines. |
 | Local `/browse` still looks signed out | Dev server was not started in browse mode | Restart with `pnpm run dev:web:browse` |

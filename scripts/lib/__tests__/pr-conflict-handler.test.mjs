@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildPlan,
   classifyPr,
+  isSafeAutoResolvableConflict,
   orderPrsDependencyAware,
   summarizeChecks,
 } from '../pr-conflict-handler.mjs';
@@ -211,7 +212,7 @@ describe('dependency-aware ordering and Neon capacity', () => {
 
     expect(plan.capacity.currentCiInFlight).toBe(1);
     expect(plan.items.find(item => item.number === 2).action).toBe(
-      'request_github_rebase'
+      'update_branch'
     );
     expect(plan.items.find(item => item.number === 3).action).toBe(
       'wait_capacity'
@@ -233,19 +234,12 @@ describe('dependency-aware ordering and Neon capacity', () => {
   });
 });
 
-describe('conflict mutation policy', () => {
-  it('labels true conflicts without merging or force-pushing the PR branch', () => {
-    const plan = buildPlan([
-      pr({
-        mergeable: 'CONFLICTING',
-        mergeStateStatus: 'DIRTY',
-        statusCheckRollup: greenRequired,
-      }),
-    ]);
-
-    expect(plan.items[0]).toMatchObject({
-      action: 'label_needs_manual_rebase',
-      triggersCi: false,
-    });
+describe('safe conflict autoresolution policy', () => {
+  it('only considers lockfile-only conflicts safe for automated regeneration', () => {
+    expect(isSafeAutoResolvableConflict(['pnpm-lock.yaml'])).toBe(true);
+    expect(
+      isSafeAutoResolvableConflict(['pnpm-lock.yaml', 'apps/web/app/page.tsx'])
+    ).toBe(false);
+    expect(isSafeAutoResolvableConflict([])).toBe(false);
   });
 });

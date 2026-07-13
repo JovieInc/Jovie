@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import {
   Accessibility,
   Blend,
@@ -10,6 +9,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useState } from 'react';
+import { PrimaryCTA } from '@/components/molecules/PrimaryCTA';
 
 const FEATURE_ITEMS = [
   {
@@ -60,7 +60,6 @@ export function CTAShowcase() {
   return (
     <section className='border-t border-subtle py-20'>
       <div className='mx-auto max-w-5xl px-6'>
-        {/* ui-casing-allow: demo showcase heading */}
         <h2 className='mb-6 text-2xl font-semibold text-primary-token'>
           Apple-Level CTA Buttons
         </h2>
@@ -76,18 +75,15 @@ export function CTAShowcase() {
               Large Size (Default)
             </h3>
             <div className='max-w-sm'>
-              <Button
-                variant='primary'
-                size='lg'
-                aria-label={
-                  isLoading1 ? 'Opening music player...' : 'Listen to music'
-                }
+              <PrimaryCTA
+                ariaLabel='Listen to music'
+                loadingLabel='Opening music player...'
                 loading={isLoading1}
                 onClick={handleDemoClick(setIsLoading1)}
-                className='w-full'
+                size='lg'
               >
                 Listen Now
-              </Button>
+              </PrimaryCTA>
             </div>
             <p className='text-sm text-secondary-token'>
               Click to see the smooth loading transition. Notice how the button{' '}
@@ -101,18 +97,15 @@ export function CTAShowcase() {
               Medium Size
             </h3>
             <div className='max-w-sm'>
-              <Button
-                variant='primary'
-                size='md'
-                aria-label={
-                  isLoading2 ? 'Setting up your account...' : 'Start free trial'
-                }
+              <PrimaryCTA
+                ariaLabel='Start free trial'
+                loadingLabel='Setting up your account...'
                 loading={isLoading2}
                 onClick={handleDemoClick(setIsLoading2)}
-                className='w-full'
+                size='md'
               >
                 Start Free Trial
-              </Button>
+              </PrimaryCTA>
             </div>
             <p className='text-sm text-secondary-token'>
               Compact version perfect for secondary actions or smaller spaces.
@@ -125,15 +118,15 @@ export function CTAShowcase() {
               Auto Width
             </h3>
             <div>
-              <Button
-                variant='primary'
-                size='lg'
-                aria-label={isLoading3 ? 'Saving...' : 'Save changes'}
+              <PrimaryCTA
+                ariaLabel='Save changes'
+                loadingLabel='Saving...'
                 loading={isLoading3}
                 onClick={handleDemoClick(setIsLoading3)}
+                fullWidth={false}
               >
                 Save Changes
-              </Button>
+              </PrimaryCTA>
             </div>
             <p className='text-sm text-secondary-token'>
               Auto-width version that sizes to content while maintaining fixed

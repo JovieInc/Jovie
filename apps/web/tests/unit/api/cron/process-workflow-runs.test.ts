@@ -143,7 +143,7 @@ describe('GET /api/cron/process-workflow-runs', () => {
     expect(response.status).toBe(401);
     expect(data.error).toBe('Unauthorized');
     expect(mockDb.select).not.toHaveBeenCalled();
-  }, 10_000);
+  });
 
   it('returns 401 without authorization', async () => {
     const { GET } = await import('@/app/api/cron/process-workflow-runs/route');

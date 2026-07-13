@@ -1,6 +1,6 @@
 import { getMerchPriceDisplay } from '@/lib/merch/pricing';
 import type { PublicMerchCard } from '@/lib/merch/types';
-import type { TicketStatus, TourDateViewModel } from '@/lib/tour-dates/types';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { formatLocationString } from '@/lib/utils/string-utils';
 import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 import { KIND_PRESETS } from './kind-presets';
@@ -10,6 +10,21 @@ import type {
   EntityCardStatus,
   EntityStatusTone,
 } from './types';
+
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
 
 function toDate(value: Date | string | null | undefined): Date | null {
   if (!value) {
@@ -133,7 +148,6 @@ export interface ShowEntityInput {
   readonly startDate?: Date | string | null;
   readonly ticketUrl?: string | null;
   readonly status?: EntityStatusTone | null;
-  readonly ticketStatus?: TicketStatus | null;
 }
 
 export interface ChatReleaseContextInput {
@@ -172,154 +186,6 @@ export function chatReleaseContextToEntityCard(
     eyebrow: preset.eyebrow,
     title,
     meta,
-  };
-}
-
-/**
- * Inline chat entity mention (chip / hover popover) → compact EntityCard.
- * Accepts the wire mention shape without importing chat command modules so the
- * organism stays free of composer/registry coupling.
- */
-export type ChatEntityMentionKind = 'release' | 'artist' | 'track' | 'event';
-
-export interface ChatEntityMentionInput {
-  readonly kind: ChatEntityMentionKind;
-  readonly id: string;
-  readonly label: string;
-  readonly thumbnail?: string | null;
-  readonly subtitle?: string | null;
-  readonly releaseType?: string | null;
-  readonly totalTracks?: number | null;
-  readonly totalDurationMs?: number | null;
-  readonly followers?: number | null;
-  readonly verified?: boolean;
-  readonly isYou?: boolean;
-  readonly venue?: string | null;
-  readonly city?: string | null;
-  readonly eventType?: string | null;
-  readonly eventDate?: string | null;
-  readonly durationMs?: number | null;
-  readonly releaseTitle?: string | null;
-}
-
-function cardKindForMention(
-  kind: ChatEntityMentionKind
-): EntityCardModel['kind'] {
-  return kind === 'event' ? 'show' : 'music';
-}
-
-function mentionEyebrow(input: ChatEntityMentionInput): string {
-  switch (input.kind) {
-    case 'release': {
-      const typeLabel = formatReleaseType(input.releaseType);
-      return typeLabel ? `Release · ${typeLabel}` : 'Release';
-    }
-    case 'artist': {
-      if (input.isYou) return 'Artist · You';
-      if (input.verified) return 'Artist · Verified';
-      return 'Artist';
-    }
-    case 'event': {
-      if (!input.eventType) return 'Event';
-      const type =
-        input.eventType.charAt(0).toUpperCase() + input.eventType.slice(1);
-      return `Event · ${type}`;
-    }
-    default:
-      return 'Track';
-  }
-}
-
-function mentionMeta(input: ChatEntityMentionInput): string | null {
-  if (input.subtitle?.trim()) {
-    return input.subtitle.trim();
-  }
-
-  const parts: string[] = [];
-  switch (input.kind) {
-    case 'release': {
-      if (typeof input.totalTracks === 'number' && input.totalTracks > 0) {
-        parts.push(
-          `${input.totalTracks} ${input.totalTracks === 1 ? 'track' : 'tracks'}`
-        );
-      }
-      if (
-        typeof input.totalDurationMs === 'number' &&
-        input.totalDurationMs > 0
-      ) {
-        const totalSeconds = Math.round(input.totalDurationMs / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        parts.push(`${minutes}:${seconds.toString().padStart(2, '0')}`);
-      }
-      break;
-    }
-    case 'artist': {
-      if (typeof input.followers === 'number' && input.followers > 0) {
-        parts.push(`${compactFollowers(input.followers)} followers`);
-      }
-      break;
-    }
-    case 'track': {
-      if (input.releaseTitle?.trim()) {
-        parts.push(input.releaseTitle.trim());
-      }
-      if (typeof input.durationMs === 'number' && input.durationMs > 0) {
-        const totalSeconds = Math.round(input.durationMs / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        parts.push(`${minutes}:${seconds.toString().padStart(2, '0')}`);
-      }
-      break;
-    }
-    case 'event': {
-      if (input.venue?.trim()) parts.push(input.venue.trim());
-      if (input.city?.trim()) parts.push(input.city.trim());
-      break;
-    }
-  }
-
-  return parts.length > 0 ? parts.join(' · ') : null;
-}
-
-function compactFollowers(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 10_000) return `${Math.round(value / 1000)}k`;
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-  return value.toString();
-}
-
-/** Chat inline entity mention → compact EntityCard model (popover / rail). */
-export function chatEntityMentionToEntityCard(
-  input: ChatEntityMentionInput,
-  options?: Readonly<{
-    cta?: EntityCardModel['cta'];
-    interactive?: boolean;
-  }>
-): EntityCardModel {
-  const kind = cardKindForMention(input.kind);
-  const preset = KIND_PRESETS[kind];
-  const title = input.label.trim() || 'Untitled';
-  const date = input.kind === 'event' ? toDate(input.eventDate ?? null) : null;
-
-  return {
-    id: input.id,
-    kind,
-    imageUrl: input.thumbnail ?? null,
-    imageAlt: title,
-    accent: preset.accent,
-    eyebrow: mentionEyebrow(input),
-    title,
-    meta: mentionMeta(input),
-    datePill:
-      kind === 'show' && date && !input.thumbnail
-        ? {
-            month: monthFormatter.format(date),
-            day: dayFormatter.format(date),
-          }
-        : null,
-    interactive: options?.interactive === true,
-    cta: options?.cta ?? null,
   };
 }
 
@@ -366,17 +232,8 @@ export function chatTourDateContextToEntityCard(
   };
 }
 
-// Show dates render in UTC everywhere on the profile (card date pills AND the
-// events list) so the two never disagree — local-time formatting split them
-// for evening shows (e.g. "JUL 28" on the card vs "Jul 29" in the list).
-const monthFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  timeZone: 'UTC',
-});
-const dayFormatter = new Intl.DateTimeFormat('en-US', {
-  day: 'numeric',
-  timeZone: 'UTC',
-});
+const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
+const dayFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric' });
 
 function getTourEyebrow(
   isNearYou: boolean,
@@ -513,7 +370,7 @@ export function aiCrawlerAnalyticsToEntityCard(
         ? { label: 'Active', tone: 'live' }
         : { label: 'Collecting', tone: 'neutral' },
     cta: analytics.isTeaser
-      ? { label: 'Upgrade To Pro', href: null, disabled: true }
+      ? { label: 'Upgrade to Pro', href: null, disabled: true }
       : {
           label: preset.ctaLabel,
           href: null,
@@ -532,14 +389,11 @@ export function showToEntityCard(show: ShowEntityInput): EntityCardModel {
   const date = toDate(show.startDate);
   const title = show.title?.trim() || show.venueName?.trim() || 'Show';
   const location = [show.venueName, show.city].filter(Boolean).join(' · ');
-  const isCancelled = show.ticketStatus === 'cancelled';
-  const isSoldOut = show.ticketStatus === 'sold_out';
-  const canBuyTickets = Boolean(show.ticketUrl) && !isCancelled && !isSoldOut;
 
   return {
     id: show.id,
     kind: 'show',
-    href: canBuyTickets ? show.ticketUrl : null,
+    href: show.ticketUrl ?? null,
     imageUrl: null,
     imageAlt: title,
     accent: preset.accent,
@@ -547,21 +401,11 @@ export function showToEntityCard(show: ShowEntityInput): EntityCardModel {
     title,
     meta: location || null,
     datePill: date
-      ? { month: monthFormatter.format(date), day: dayFormatter.format(date) }
+      ? { month: MONTHS[date.getMonth()], day: String(date.getDate()) }
       : null,
     status: null,
-    // A show that cannot sell tickets gets a target-less CTA — the card
-    // renders it as plain muted text, never a dead Tickets link.
-    cta: canBuyTickets
+    cta: show.ticketUrl
       ? { label: preset.ctaLabel, href: show.ticketUrl, external: true }
-      : {
-          label: isCancelled
-            ? 'Cancelled'
-            : isSoldOut
-              ? 'Sold Out'
-              : 'No Tickets',
-          href: null,
-          disabled: true,
-        },
+      : null,
   };
 }

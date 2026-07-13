@@ -24,10 +24,7 @@ const desktopRoot = path.join(__dirname, '..');
 const require = createRequire(import.meta.url);
 
 const electronBinary = require('electron');
-const rawArgs = process.argv.slice(2);
-// Strip a leading '--' so the documented `-- <extra args>` usage doesn't make
-// Chromium stop switch-parsing at the bare separator.
-const extraArgs = rawArgs[0] === '--' ? rawArgs.slice(1) : rawArgs;
+const extraArgs = process.argv.slice(2);
 const electronArgs = ['.'];
 
 if (process.env.JOVIE_DEV === '1') {

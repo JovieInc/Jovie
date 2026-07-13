@@ -9,7 +9,6 @@ import {
   extractTerminalFailures,
   isAgentBranch,
   isTerminalFailure,
-  MERGE_GATE_CHECK_NAMES,
   normalizeCheckName,
 } from '../pr-check-failures.mjs';
 
@@ -52,39 +51,20 @@ describe('pr-check-failures', () => {
     ).toEqual(['Typecheck']);
   });
 
-  it('derives staged advisory evidence from the manifest and preserves safety gates', () => {
+  it('uses an exact advisory allowlist and preserves canonical gates', () => {
     const harness = JSON.parse(
       readFileSync(`${repoRoot}/.github/ci-harness/manifest.json`, 'utf8')
     );
     const e2eSmoke = harness.jobs.find(
-      job => job.name === 'E2E Smoke (manual)'
-    );
-    const extendedSmoke = harness.jobs.find(
-      job => job.name === 'Extended Smoke (manual)'
+      job => job.name === 'E2E Smoke (PR Fast Feedback)'
     );
 
-    expect(e2eSmoke?.mergeGate).toBe(false);
-    expect(extendedSmoke?.mergeGate).toBe(false);
-    expect(MERGE_GATE_CHECK_NAMES).toEqual([
-      'Path Changes',
-      'ci-fast',
-      'CI Risk Classifier',
-      'Secret Scan (gitleaks + trufflehog)',
-      'Migration Guard',
-    ]);
+    expect(e2eSmoke?.mergeGate).toBe(true);
     expect(ADVISORY_CHECK_NAMES).toContain('Preview Deploy');
-    expect(ADVISORY_CHECK_NAMES).toContain(
-      'A11y (authenticated, informational)'
-    );
     expect(ADVISORY_CHECK_NAMES).not.toContain('Gitleaks Secret Scanning');
     expect(ADVISORY_CHECK_NAMES).not.toContain('TruffleHog Secret Scanning');
-    expect(ADVISORY_CHECK_NAMES).toContain('Verify Draft Agent PR');
-    expect(ADVISORY_CHECK_NAMES).toContain('Preview Deploy (PR)');
-    expect(ADVISORY_CHECK_NAMES).toContain('E2E Smoke (PR Fast Feedback)');
-    expect(ADVISORY_CHECK_NAMES).toContain('Extended Smoke (Preview)');
-    expect(ADVISORY_CHECK_NAMES).toContain('Classify PR taste');
-    expect(ADVISORY_CHECK_NAMES).toContain('Claude Review');
-    expect(ADVISORY_CHECK_NAMES).not.toContain('Brand Scrub');
+    expect(ADVISORY_CHECK_NAMES).not.toContain('Verify Draft Agent PR');
+    expect(ADVISORY_CHECK_NAMES).not.toContain('E2E Smoke (PR Fast Feedback)');
     expect(
       extractTerminalFailures([
         { bucket: 'fail', name: 'Preview Deploy' },
@@ -93,10 +73,14 @@ describe('pr-check-failures', () => {
         { bucket: 'fail', name: 'Gitleaks Secret Scanning' },
         { bucket: 'fail', name: 'Verify Draft Agent PR' },
         { bucket: 'fail', name: 'E2E Smoke (PR Fast Feedback)' },
-        { bucket: 'fail', name: 'Extended Smoke (Preview)' },
-        { bucket: 'fail', name: 'A11y (authenticated, informational)' },
       ])
-    ).toEqual(['Gitleaks Secret Scanning', 'Security Advisory Enforcement']);
+    ).toEqual([
+      'E2E Smoke (PR Fast Feedback)',
+      'Gitleaks Secret Scanning',
+      'Preview Deploy (PR)',
+      'Security Advisory Enforcement',
+      'Verify Draft Agent PR',
+    ]);
   });
 
   it('blocks pending and missing required or canonical gates', () => {
@@ -105,6 +89,7 @@ describe('pr-check-failures', () => {
       { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
       { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
       { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Verify Draft Agent PR' },
       {
         bucket: 'pending',
         state: 'IN_PROGRESS',
@@ -112,96 +97,22 @@ describe('pr-check-failures', () => {
       },
     ];
 
-    expect(classifyQueueCheckBlockers(checks)).toEqual([]);
+    expect(classifyQueueCheckBlockers(checks)).toEqual([
+      'E2E Smoke (PR Fast Feedback) (not complete)',
+      'E2E Smoke (PR Fast Feedback) (pending)',
+    ]);
+    expect(
+      classifyQueueCheckBlockers(checks, { requireVerifyDraft: true })
+    ).toEqual([
+      'E2E Smoke (PR Fast Feedback) (not complete)',
+      'E2E Smoke (PR Fast Feedback) (pending)',
+    ]);
+
     expect(
       classifyQueueCheckBlockers(
         checks.filter(check => check.name !== 'PR Ready')
       )
-    ).toContain('PR Ready (missing)');
-  });
-
-  it('keeps opt-in Extended Smoke outside queue readiness', () => {
-    const checks = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
-      {
-        bucket: 'pending',
-        state: 'IN_PROGRESS',
-        name: 'Extended Smoke (Preview)',
-      },
-      {
-        bucket: 'fail',
-        state: 'FAILURE',
-        name: 'A11y (authenticated, informational)',
-      },
-    ];
-
-    expect(classifyQueueCheckBlockers(checks)).toEqual([]);
-  });
-
-  it('fails closed on every unknown or non-advisory terminal red check', () => {
-    const required = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
-    ];
-
-    expect(
-      classifyQueueCheckBlockers([
-        ...required,
-        { bucket: 'fail', state: 'FAILURE', name: 'Brand Scrub' },
-        { bucket: 'fail', state: 'FAILURE', name: 'Future Safety Gate' },
-        { bucket: 'fail', state: 'FAILURE', name: 'Claude Review' },
-      ])
-    ).toEqual(['Brand Scrub', 'Future Safety Gate']);
-  });
-
-  it('duplicate SKIPPED checks with equal timestamps do not block enrollment', () => {
-    const required = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
-    ];
-    const skippedDupes = [
-      {
-        bucket: 'skipping',
-        state: 'SKIPPED',
-        name: 'Fork PR Gate Dependabot Controller',
-        startedAt: '2026-07-21T02:12:55Z',
-        completedAt: '2026-07-21T02:12:54Z',
-      },
-      {
-        bucket: 'skipping',
-        state: 'SKIPPED',
-        name: 'Fork PR Gate Dependabot Controller',
-        startedAt: '2026-07-21T02:12:55Z',
-        completedAt: '2026-07-21T02:12:54Z',
-      },
-      {
-        bucket: 'skipping',
-        state: 'SKIPPED',
-        name: "github.event_name == 'merge_group' && 'Fork PR Gate' || 'Fork PR Gate (merge-group inactive)'",
-        startedAt: '2026-07-21T02:12:55Z',
-        completedAt: '2026-07-21T02:12:54Z',
-      },
-      {
-        bucket: 'skipping',
-        state: 'SKIPPED',
-        name: "github.event_name == 'merge_group' && 'Fork PR Gate' || 'Fork PR Gate (merge-group inactive)'",
-        startedAt: '2026-07-21T02:12:55Z',
-        completedAt: '2026-07-21T02:12:54Z',
-      },
-    ];
-    expect(classifyQueueCheckBlockers([...required, ...skippedDupes])).toEqual(
-      []
-    );
-    expect(collapseNewestCheckAttempts(skippedDupes).ambiguousNames).toEqual(
-      []
-    );
+    ).toContain('CI / PR Ready (missing)');
   });
 
   it('uses only the uniquely newest same-name check attempt', () => {
@@ -240,7 +151,10 @@ describe('pr-check-failures', () => {
     };
     expect(
       classifyQueueCheckBlockers([...required, oldSuccess, newerPending])
-    ).toEqual([]);
+    ).toEqual([
+      'E2E Smoke (PR Fast Feedback) (not complete)',
+      'E2E Smoke (PR Fast Feedback) (pending)',
+    ]);
 
     expect(
       collapseNewestCheckAttempts([
@@ -352,7 +266,7 @@ describe('pr-check-failures', () => {
           completedAt: oldFailure.completedAt,
         },
       ])
-    ).toEqual([]);
+    ).toContain('E2E Smoke (PR Fast Feedback) (ambiguous latest attempt)');
   });
 
   it('keeps queue scripts on the shared exact policy and auto-ready fail-closed', () => {
@@ -371,16 +285,14 @@ describe('pr-check-failures', () => {
     }
 
     expect(autoReady).toContain('--classify-auto-ready');
-    expect(autoReady).not.toContain('Verify Draft Agent PR');
     expect(autoReady).not.toContain('dependabot/');
-    expect(drain).toContain(`fail='["required check status unavailable"]'`);
-    expect(drain).not.toContain("fail='[]'");
   });
 
   it('recognizes agent branches used by drain AGENT_RE', () => {
     expect(isAgentBranch('codex/gh-12734-fix')).toBe(true);
     expect(isAgentBranch('tim/jov-1234')).toBe(true);
     expect(isAgentBranch('agent/wave-1')).toBe(true);
+    expect(isAgentBranch('gtmq_spec_abc')).toBe(false);
     expect(isAgentBranch('feature/user-auth')).toBe(false);
     expect(AGENT_BRANCH_RE.test('feat/onboarding')).toBe(true);
   });

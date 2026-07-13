@@ -47,7 +47,6 @@ import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { createVoicePromoTool } from '@/lib/ai/tools/voice-promo';
 import { getOptionalAuth } from '@/lib/auth/cached';
-import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
 import { createAccountChatTools } from '@/lib/chat/account-tools';
@@ -76,7 +75,6 @@ import {
   resolveRetouchCapability,
 } from '@/lib/chat/retouch-capability';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
-import { isShowTopInsightsTurnRelevant } from '@/lib/chat/show-top-insights-relevance';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import {
   canUsePaidChatTools,
@@ -114,6 +112,7 @@ import {
 import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
@@ -138,6 +137,7 @@ import {
   showArtistPayouts,
   showMerchSales,
   updateMerchCardDetails,
+  updateMerchCardStatus,
 } from '@/lib/merch/service';
 import {
   albumArtGenerationBurstLimiter,
@@ -207,17 +207,13 @@ const CHAT_KILL_SWITCH_GATES = {
 
 /**
  * Fetches artist context server-side from the database.
- * Validates that the authenticated user can manage the profile.
+ * Validates that the profile belongs to the authenticated user.
  */
 async function fetchArtistContext(
   profileId: string,
-  appUserId: string
+  clerkUserId: string
 ): Promise<ArtistContext | null> {
-  const access = await getExactProfileAccess(db, appUserId, profileId);
-  if (!access.ok) {
-    return null;
-  }
-
+  // Fetch profile with ownership check via user join
   const [result] = await db
     .select({
       displayName: creatorProfiles.displayName,
@@ -229,12 +225,14 @@ async function fetchArtistContext(
       spotifyUrl: creatorProfiles.spotifyUrl,
       appleMusicUrl: creatorProfiles.appleMusicUrl,
       profileViews: creatorProfiles.profileViews,
+      userClerkId: users.clerkId,
     })
     .from(creatorProfiles)
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.id, profileId))
     .limit(1);
 
-  if (!result) {
+  if (result?.userClerkId !== clerkUserId) {
     return null;
   }
 
@@ -1269,13 +1267,28 @@ function _createSelectMerchDesignTool(params: {
   });
 }
 
+function getMerchCardUpdateStatus(
+  action: 'pause' | 'unpause' | 'archive'
+): 'paused' | 'archived' | 'live' {
+  if (action === 'pause') {
+    return 'paused';
+  }
+
+  if (action === 'archive') {
+    return 'archived';
+  }
+
+  return 'live';
+}
+
 function createMerchStatusTool(params: {
   readonly action: 'publish' | 'pause' | 'unpause' | 'archive';
   readonly profileId: string | null;
+  readonly clerkUserId: string;
 }) {
   return tool({
     description:
-      'Propose a merch card status change. Use publish for live, pause to take off sale (destructive for fans), unpause to bring back, and archive for delete/remove. All four actions return a confirmation card and do not write until the artist confirms (JOV-3549).',
+      'Change a merch card status. Use publish for live, pause for kill temporarily, unpause to bring back, and archive for delete/remove. Publish, unpause, and archive require user confirmation — they return a confirmation card and do not write immediately.',
     inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),
@@ -1284,12 +1297,31 @@ function createMerchStatusTool(params: {
         return { success: false as const, error: 'Profile ID required' };
       }
 
-      // All destructive / status flips are propose-then-confirm (JOV-3549).
-      return proposeMerchAction({
-        action: params.action,
-        merchCardId,
+      if (
+        params.action === 'publish' ||
+        params.action === 'unpause' ||
+        params.action === 'archive'
+      ) {
+        return proposeMerchAction({
+          action: params.action,
+          merchCardId,
+          profileId: params.profileId,
+        });
+      }
+
+      const status = getMerchCardUpdateStatus(params.action);
+      const card = await updateMerchCardStatus({
+        cardId: merchCardId,
         profileId: params.profileId,
+        clerkUserId: params.clerkUserId,
+        status,
       });
+      return {
+        success: true as const,
+        merchCardId: card.id,
+        status: card.status,
+        title: card.title,
+      };
     },
   });
 }
@@ -1513,13 +1545,10 @@ function createPromoStrategyTool(
   });
 }
 
-function createShowTopInsightsTool(
-  profileId: string | null,
-  lastUserText: string
-) {
+function createShowTopInsightsTool(profileId: string | null) {
   return tool({
     description:
-      "Show the artist's top audience, release, track, and monetization signals as structured insight cards. Call ONLY when the artist is asking about performance, growth, audience, signals, analytics, what is working, or what to focus on next. Do NOT call for distribution deals (e.g. AWAL), legal, bio edits, canvas, album art, merch, billing, or other unrelated topics.",
+      'Show the artist their top audience, release, track, and monetization signals as structured insight cards. Use this when they ask what is working, what to focus on, or how their audience and releases are performing.',
     inputSchema: chatToolSchema({}),
     execute: async () => {
       if (!profileId) {
@@ -1531,24 +1560,12 @@ function createShowTopInsightsTool(
         };
       }
 
-      if (!isShowTopInsightsTurnRelevant(lastUserText)) {
-        return {
-          success: true,
-          title: 'Top signals',
-          totalActive: 0,
-          insights: [],
-          relevant: false,
-          note: 'Current turn is not about performance signals. Answer without insight cards.',
-        };
-      }
-
       const summary = await getInsightsSummary(profileId);
       return {
         success: true,
         title: 'Top signals',
         totalActive: summary.totalActive,
         insights: summary.insights,
-        relevant: true,
       };
     },
   });
@@ -2039,17 +2056,11 @@ function buildChatTools(
   retouchContext?: {
     readonly sourceImageUrl: string | null;
     readonly conversationId: string | null;
-  },
-  lastUserText = ''
+  }
 ) {
   return {
     ...(insightsEnabled
-      ? {
-          showTopInsights: createShowTopInsightsTool(
-            resolvedProfileId,
-            lastUserText
-          ),
-        }
+      ? { showTopInsights: createShowTopInsightsTool(resolvedProfileId) }
       : {}),
     proposeProfileEdit: createProfileEditTool(artistContext),
     importBioFromUrl: createImportBioFromUrlTool({ userId: clerkUserId }),
@@ -2146,18 +2157,22 @@ function buildChatTools(
           publishMerchCard: createMerchStatusTool({
             action: 'publish',
             profileId: resolvedProfileId,
+            clerkUserId,
           }),
           pauseMerchCard: createMerchStatusTool({
             action: 'pause',
             profileId: resolvedProfileId,
+            clerkUserId,
           }),
           unpauseMerchCard: createMerchStatusTool({
             action: 'unpause',
             profileId: resolvedProfileId,
+            clerkUserId,
           }),
           deleteOrArchiveMerchCard: createMerchStatusTool({
             action: 'archive',
             profileId: resolvedProfileId,
+            clerkUserId,
           }),
           reorderMerchCards: tool({
             description:
@@ -2873,8 +2888,7 @@ export async function POST(req: Request) {
               sourceImageUrl: extractLastUserImageUrl(uiMessages),
               conversationId:
                 reservedTurn?.conversationId ?? resolvedConversationId,
-            },
-            userText
+            }
           ),
         }
       : freeTools;

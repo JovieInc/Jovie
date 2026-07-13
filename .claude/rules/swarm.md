@@ -203,7 +203,7 @@ gh pr create --draft --base main --title "fix(design-system): <title>" --body "<
 # Invoke /ship
 # /ship detects the draft PR, promotes it, runs typecheck + lint + tests
 
-# 8. Request GitHub native merge-queue enrollment
+# 8. Add to Graphite merge queue
 PR_NUM=$(gh pr view --json number --jq '.number')
 gh pr edit $PR_NUM --add-label merge-queue
 

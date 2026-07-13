@@ -8,76 +8,25 @@ export const REQUIRED_MERGE_STATUSES = [
   'PR Ready',
   'Migration Guard',
   'Fork PR Gate',
-  'PR Size Guard',
 ];
 
-/** Canonical native merge-queue operating policy (controller + repo guardrails). */
-export const MERGE_QUEUE_POLICY = Object.freeze({
+/** Canonical Graphite merge-queue policy (dashboard + repo guardrails). */
+export const GRAPHITE_QUEUE_POLICY = Object.freeze({
+  mergeStrategy: 'squash',
   enqueueLabel: MERGE_QUEUE_LABEL,
+  optimisticBatching: true,
+  parallelBatchSize: 4,
+  bisectOnBatchFailure: true,
   // 12→16 on 2026-07-09 per JOV-3833 decision trigger (ready→merged p95 718m
   // vs 15m target after one week live; queue-depth deferral was a binding
   // constraint during merge waves). Re-evaluate if runner-pool saturation
   // (per-job queue wait >3m) returns.
   maxQueueDepth: 16,
   perAgentEnqueueLimitPerHour: 6,
+  ciOptimization: true,
   queueTimeoutMinutes: 60,
+  graphiteBypassActorId: 158384,
   rulesetId: '10512119',
-});
-
-export const NATIVE_QUEUE_POLICY = Object.freeze({
-  check_response_timeout_minutes: 60,
-  grouping_strategy: 'ALLGREEN',
-  // 2→8 on 2026-07-21: org Actions concurrency headroom ~120 jobs.
-  // merge_group peak ~10 concurrent jobs/entry → 8 builds ≈ 80 peak MQ jobs,
-  // leaving room for source-PR CI + release. Re-evaluate toward 10–12 if
-  // queue depth stays >8 while runner/job queue wait stays <3m.
-  max_entries_to_build: 8,
-  max_entries_to_merge: 10,
-  merge_method: 'SQUASH',
-  min_entries_to_merge: 1,
-  min_entries_to_merge_wait_minutes: 0,
-});
-
-/** Exact normalized source-of-record policy for live ruleset 10512119. */
-export const NATIVE_BRANCH_PROTECTION_POLICY = Object.freeze({
-  name: 'Main Branch Protection',
-  target: 'branch',
-  enforcement: 'active',
-  bypass_actors: [],
-  conditions: {
-    ref_name: {
-      include: ['refs/heads/main'],
-      exclude: [],
-    },
-  },
-  rules: [
-    {
-      type: 'pull_request',
-      parameters: {
-        allowed_merge_methods: ['merge', 'squash', 'rebase'],
-        dismiss_stale_reviews_on_push: false,
-        dismissal_restriction: { allowed_actors: [], enabled: false },
-        require_code_owner_review: false,
-        require_last_push_approval: false,
-        required_approving_review_count: 0,
-        required_review_thread_resolution: false,
-        required_reviewers: [],
-      },
-    },
-    {
-      type: 'required_status_checks',
-      parameters: {
-        do_not_enforce_on_create: false,
-        required_status_checks: REQUIRED_MERGE_STATUSES.map(context => ({
-          context,
-        })),
-        strict_required_status_checks_policy: false,
-      },
-    },
-    { type: 'deletion' },
-    { type: 'required_linear_history' },
-    { type: 'merge_queue', parameters: NATIVE_QUEUE_POLICY },
-  ],
 });
 
 /**
@@ -96,8 +45,6 @@ export const ALLOWED_REQUIRED_CHECK_CONTEXTS = Object.freeze([
 
 /** Individual job names that must never appear as branch-protection required checks. */
 export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
-  'CI / Path Changes',
-  'Path Changes',
   'CI / ci-fast',
   'ci-fast',
   'CI / Typecheck',
@@ -114,36 +61,7 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Guardrails (proxy)',
   'CI / CI Risk Classifier',
   'CI Risk Classifier',
-  'CI / Secret Scan (gitleaks + trufflehog)',
-  'Secret Scan (gitleaks + trufflehog)',
-  'CI / Layout Guard',
-  'Layout Guard',
-  'CI / Build + Layout (combined)',
-  'Build + Layout (combined)',
-  'CI / iOS Build + Test (combined)',
-  'iOS Build + Test (combined)',
-  'CI / Promptfoo Evals (deterministic)',
-  'Promptfoo Evals (deterministic)',
-  'CI / Golden Eval Set (deterministic)',
-  'Golden Eval Set (deterministic)',
-  // Harness evidence jobs (must stay aggregated under PR Ready / never pin solo)
-  'CI / Lighthouse (public routes manual)',
-  'Lighthouse (public routes manual)',
-  'CI / Lighthouse (dashboard manual)',
-  'Lighthouse (dashboard manual)',
-  'CI / Lighthouse (onboarding manual)',
-  'Lighthouse (onboarding manual)',
-  'CI / Lighthouse (admin manual)',
-  'Lighthouse (admin manual)',
-  'CI / E2E Smoke (manual)',
-  'E2E Smoke (manual)',
-  'CI / Golden Path (manual)',
-  'Golden Path (manual)',
-  'CI / Extended Smoke (manual)',
-  'Extended Smoke (manual)',
-  'CI / Preview Deploy (manual)',
-  'Preview Deploy (manual)',
-  // Legacy names must also remain forbidden while open PR heads roll over.
+  // Harness merge-gate jobs (must stay aggregated under PR Ready / never pin solo)
   'CI / Lighthouse (public routes PR)',
   'Lighthouse (public routes PR)',
   'CI / Lighthouse (dashboard PR)',
@@ -156,8 +74,6 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'E2E Smoke (PR Fast Feedback)',
   'CI / Golden Path (PR)',
   'Golden Path (PR)',
-  'CI / Extended Smoke (Preview)',
-  'Extended Smoke (Preview)',
   'CI / Preview Deploy (PR)',
   'Preview Deploy (PR)',
   // LLM / advisory checks — never pin as branch-protection required contexts
@@ -166,8 +82,6 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Claude Review',
   'Seer Code Review',
   'Storybook A11y Checks',
-  'CI / Storybook A11y',
-  'Storybook A11y',
   'Playwright Visual Regression',
 ]);
 
@@ -759,142 +673,6 @@ export function parseRequiredStatusChecksFromYaml(yamlText = '') {
   return contexts;
 }
 
-function parseSourceScalar(block, key) {
-  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = block.match(
-    new RegExp(`^\\s*${escapedKey}:\\s*([^#\\n]+)`, 'm')
-  );
-  if (!match) return undefined;
-  const raw = match[1].trim();
-  if (raw === 'true') return true;
-  if (raw === 'false') return false;
-  if (/^-?[0-9]+$/.test(raw)) return Number(raw);
-  if (raw === '[]') return [];
-  if (raw.startsWith('[') && raw.endsWith(']')) {
-    return raw
-      .slice(1, -1)
-      .split(',')
-      .map(value => value.trim().replace(/^['"]|['"]$/g, ''))
-      .filter(Boolean);
-  }
-  return raw.replace(/^['"]|['"]$/g, '');
-}
-
-function parseSourceRuleBlocks(yamlText) {
-  const rulesIndex = yamlText.search(/^rules:\s*$/m);
-  if (rulesIndex < 0) return [];
-  const rulesText = yamlText.slice(rulesIndex);
-  const matches = [
-    ...rulesText.matchAll(/^  - type:\s*['"]?([^'"\s]+)['"]?\s*$/gm),
-  ];
-  return matches.map((match, index) => ({
-    type: match[1],
-    block: rulesText.slice(
-      match.index,
-      matches[index + 1]?.index ?? rulesText.length
-    ),
-  }));
-}
-
-/**
- * Normalize the checked-in ruleset source to the GitHub API payload shape.
- * This intentionally supports only fields owned by ruleset 10512119 so an
- * unknown source-schema expansion fails the exact-policy comparison.
- *
- * @param {string} yamlText
- */
-export function normalizeBranchProtectionSource(yamlText = '') {
-  const includeBlock =
-    yamlText.match(/^conditions:\s*\n([\s\S]*?)(?=^rules:\s*$)/m)?.[1] ?? '';
-  const include = includeBlock.match(
-    /^\s*include:\s*\n\s*-\s*['"]?([^'"\n]+)['"]?/m
-  )?.[1];
-  const exclude = parseSourceScalar(includeBlock, 'exclude');
-
-  const rules = parseSourceRuleBlocks(yamlText).map(({ type, block }) => {
-    if (type === 'pull_request') {
-      return {
-        type,
-        parameters: {
-          allowed_merge_methods: parseSourceScalar(
-            block,
-            'allowed_merge_methods'
-          ),
-          dismiss_stale_reviews_on_push: parseSourceScalar(
-            block,
-            'dismiss_stale_reviews_on_push'
-          ),
-          dismissal_restriction: {
-            allowed_actors: parseSourceScalar(block, 'allowed_actors'),
-            enabled: parseSourceScalar(block, 'enabled'),
-          },
-          require_code_owner_review: parseSourceScalar(
-            block,
-            'require_code_owner_review'
-          ),
-          require_last_push_approval: parseSourceScalar(
-            block,
-            'require_last_push_approval'
-          ),
-          required_approving_review_count: parseSourceScalar(
-            block,
-            'required_approving_review_count'
-          ),
-          required_review_thread_resolution: parseSourceScalar(
-            block,
-            'required_review_thread_resolution'
-          ),
-          required_reviewers: parseSourceScalar(block, 'required_reviewers'),
-        },
-      };
-    }
-    if (type === 'required_status_checks') {
-      return {
-        type,
-        parameters: {
-          do_not_enforce_on_create: parseSourceScalar(
-            block,
-            'do_not_enforce_on_create'
-          ),
-          required_status_checks: [
-            ...block.matchAll(/context:\s*['"]?([^'"\n]+)['"]?/g),
-          ].map(match => ({ context: normalizeCheckContext(match[1]) })),
-          strict_required_status_checks_policy: parseSourceScalar(
-            block,
-            'strict_required_status_checks_policy'
-          ),
-        },
-      };
-    }
-    if (type === 'merge_queue') {
-      return {
-        type,
-        parameters: Object.fromEntries(
-          Object.keys(NATIVE_QUEUE_POLICY).map(key => [
-            key,
-            parseSourceScalar(block, key),
-          ])
-        ),
-      };
-    }
-    return { type };
-  });
-
-  return {
-    name: parseSourceScalar(yamlText, 'name'),
-    target: parseSourceScalar(yamlText, 'target'),
-    enforcement: parseSourceScalar(yamlText, 'enforcement'),
-    bypass_actors: parseSourceScalar(yamlText, 'bypass_actors'),
-    conditions: {
-      ref_name: {
-        include: include ? [include] : [],
-        exclude: Array.isArray(exclude) ? exclude : undefined,
-      },
-    },
-    rules,
-  };
-}
-
 export function branchProtectionHasNativeMergeQueueRule(yamlText = '') {
   return /-\s*type:\s*['"]?merge_queue['"]?/i.test(yamlText);
 }
@@ -909,47 +687,22 @@ export function ciWorkflowHasMergeGroupTrigger(yamlText = '') {
  * @param {{
  *   branchProtectionYaml: string,
  *   ciWorkflowYaml: string,
- *   backend?: 'native',
  * }} input
  */
 export function validateMergeQueueRepoConfig(input) {
   const errors = [];
   const warnings = [];
-  const backend = input.backend ?? 'native';
-  const hasNativeQueue = branchProtectionHasNativeMergeQueueRule(
-    input.branchProtectionYaml
-  );
 
-  if (backend !== 'native') {
-    errors.push(`unknown merge queue backend: ${backend}`);
-  }
-  if (!hasNativeQueue) {
-    errors.push('branch-protection.yml must enable GitHub native merge_queue');
-  }
-  if (
-    !/strict_required_status_checks_policy:\s*false\b/i.test(
-      input.branchProtectionYaml
-    )
-  ) {
+  if (branchProtectionHasNativeMergeQueueRule(input.branchProtectionYaml)) {
     errors.push(
-      'branch-protection.yml must leave source status checks loose; native merge_group validates latest main'
+      'branch-protection.yml must not enable GitHub native merge_queue (Graphite owns the queue)'
     );
   }
-  for (const [field, expected] of Object.entries(NATIVE_QUEUE_POLICY)) {
-    const value =
-      typeof expected === 'string' ? `['"]?${expected}['"]?` : expected;
-    if (
-      !new RegExp(`^\\s*${field}:\\s*${value}\\s*$`, 'm').test(
-        input.branchProtectionYaml
-      )
-    )
-      errors.push(
-        `branch-protection.yml native merge_queue ${field} must be ${expected}`
-      );
-  }
 
-  if (!ciWorkflowHasMergeGroupTrigger(input.ciWorkflowYaml)) {
-    errors.push('ci.yml must handle merge_group for the native queue backend');
+  if (ciWorkflowHasMergeGroupTrigger(input.ciWorkflowYaml)) {
+    errors.push(
+      'ci.yml must not declare merge_group trigger (Graphite never creates merge_group events)'
+    );
   }
 
   const contexts = parseRequiredStatusChecksFromYaml(
@@ -974,24 +727,9 @@ export function validateMergeQueueRepoConfig(input) {
     }
   }
 
-  if (
-    !/^\s*bypass_actors:\s*\[\s*\]\s*(?:#.*)?$/m.test(
-      input.branchProtectionYaml
-    )
-  ) {
-    errors.push(
-      'branch-protection.yml native bypass_actors must be an empty array'
-    );
-  }
-  const normalizedSource = normalizeBranchProtectionSource(
-    input.branchProtectionYaml
-  );
-  if (
-    JSON.stringify(normalizedSource) !==
-    JSON.stringify(NATIVE_BRANCH_PROTECTION_POLICY)
-  ) {
-    errors.push(
-      'branch-protection.yml normalized payload must exactly match live native ruleset 10512119 policy'
+  if (!/graphite-app/i.test(input.branchProtectionYaml)) {
+    warnings.push(
+      'branch-protection.yml should document graphite-app bypass actor for queue merges'
     );
   }
 
@@ -1008,42 +746,18 @@ export function validateMergeQueueRepoConfig(input) {
  * Validate a live GitHub ruleset payload (gh api repos/.../rulesets/...).
  *
  * @param {Record<string, unknown>} ruleset
- * @param {{ backend?: 'native' }} [options]
  */
-export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
+export function validateLiveMergeQueueRuleset(ruleset) {
   const errors = [];
-  const backend = options.backend ?? 'native';
   const rules = Array.isArray(ruleset?.rules) ? ruleset.rules : [];
-  const mergeQueueRule = rules.find(rule => rule?.type === 'merge_queue');
 
-  if (backend !== 'native') {
-    errors.push(`unknown merge queue backend: ${backend}`);
+  if (rules.some(rule => rule?.type === 'merge_queue')) {
+    errors.push('live ruleset still has native merge_queue rule');
   }
-  if (!mergeQueueRule) {
-    errors.push('live ruleset is missing the native merge_queue rule');
-  }
-  if (
-    rules.some(rule =>
-      ['required_signatures', 'non_fast_forward'].includes(rule?.type)
-    )
-  ) {
-    errors.push(
-      'live native ruleset unexpectedly enables dormant signature or non-fast-forward rules'
-    );
-  }
-  if (mergeQueueRule)
-    for (const [field, expected] of Object.entries(NATIVE_QUEUE_POLICY))
-      if (mergeQueueRule?.parameters?.[field] !== expected)
-        errors.push(`live native merge_queue ${field} must be ${expected}`);
 
   const statusRule = rules.find(
     rule => rule?.type === 'required_status_checks'
   );
-  if (statusRule?.parameters?.strict_required_status_checks_policy !== false) {
-    errors.push(
-      'live native ruleset must leave source status checks loose; merge_group owns latest-main validation'
-    );
-  }
   const parameters = statusRule?.parameters;
   const contexts = Array.isArray(parameters)
     ? parameters.map(entry => normalizeCheckContext(entry?.context ?? ''))
@@ -1070,13 +784,18 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
     );
   }
 
-  const hasValidBypassActors = Array.isArray(ruleset?.bypass_actors);
-  const bypassActors = hasValidBypassActors ? ruleset.bypass_actors : [];
-  if (!hasValidBypassActors) {
-    errors.push('live ruleset bypass_actors must be an array');
-  }
-  if (bypassActors.length > 0) {
-    errors.push('live native ruleset bypass_actors must be empty');
+  const bypassActors = Array.isArray(ruleset?.bypass_actors)
+    ? ruleset.bypass_actors
+    : [];
+  const hasGraphiteBypass = bypassActors.some(
+    actor =>
+      actor?.actor_id === GRAPHITE_QUEUE_POLICY.graphiteBypassActorId &&
+      actor?.actor_type === 'Integration'
+  );
+  if (!hasGraphiteBypass) {
+    errors.push(
+      `live ruleset missing graphite-app bypass actor (id ${GRAPHITE_QUEUE_POLICY.graphiteBypassActorId})`
+    );
   }
 
   return {
@@ -1084,14 +803,13 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
     errors,
     contexts,
     checks,
-    hasBypassActors: bypassActors.length > 0,
-    hasNativeMergeQueue: Boolean(mergeQueueRule),
+    hasGraphiteBypass,
   };
 }
 
 /**
- * Batch bisection helper: when a parallel batch fails, isolate the culprit PR
- * and requeue siblings. Uses divide-and-conquer over batchPasses(subset).
+ * Graphite bisection: when a parallel batch fails, isolate the culprit PR and
+ * requeue siblings. Uses divide-and-conquer over batchPasses(subset).
  *
  * @param {readonly string[]} batch
  * @param {(subset: readonly string[]) => boolean} batchPasses
@@ -1155,7 +873,6 @@ export const MERGE_QUEUE_REPO_PATHS = Object.freeze({
   branchProtection: BRANCH_PROTECTION_RULESET_PATH,
   ciWorkflow: CI_WORKFLOW_PATH,
   autoenrollWorkflow: MERGE_QUEUE_AUTOENROLL_WORKFLOW_PATH,
-  drainScript: 'scripts/drain-pr-queue.sh',
 });
 
 /**
@@ -1215,82 +932,6 @@ export function validateMergeQueueEnrollHotPath(workflowYaml = '') {
 
   if (!/drain-pr-queue\.sh/.test(enrollBlock)) {
     errors.push('enroll hot path must invoke scripts/drain-pr-queue.sh');
-  }
-  if (!/MERGE_QUEUE_BACKEND:/.test(enrollBlock)) {
-    errors.push('enroll hot path must declare MERGE_QUEUE_BACKEND');
-  }
-  if (
-    !/MERGE_QUEUE_NATIVE_AUTHORIZATION:\s*merge-queue-autoenroll/.test(
-      enrollBlock
-    )
-  ) {
-    errors.push(
-      'enroll hot path must authorize only the native queue controller'
-    );
-  }
-
-  return { ok: errors.length === 0, errors };
-}
-
-const NATIVE_DRAIN_TRANSPORT_AREAS = Object.freeze(['enrollment', 'dequeue']);
-
-function extractNativeDrainTransportArea(script, area) {
-  const startMarker = `# native-queue-transport:${area}:start`;
-  const endMarker = `# native-queue-transport:${area}:end`;
-  const start = script.indexOf(startMarker);
-  const end = script.indexOf(endMarker, start + startMarker.length);
-  if (start < 0 || end < 0) return '';
-  return script.slice(start, end + endMarker.length);
-}
-
-/**
- * Native queue mutations must never use the queue-intent label as transport.
- * Marked transport regions make this invariant deterministic without trying to
- * parse arbitrary Bash control flow.
- *
- * @param {string} drainScript
- */
-export function validateNativeDrainQueueLabelIsolation(drainScript = '') {
-  const errors = [];
-  const areas = new Map();
-  const legacyLabelPatterns = [
-    /--(?:add|remove)-label\s+["']?merge-queue["']?/,
-    /index\(["']merge-queue["']\)/,
-    /(?:^|[\s"'=])merge-queue(?:[\s"']|$)/m,
-  ];
-
-  for (const area of NATIVE_DRAIN_TRANSPORT_AREAS) {
-    const block = extractNativeDrainTransportArea(drainScript, area);
-    areas.set(area, block);
-    if (!block) {
-      errors.push(`native drain ${area} transport markers are required`);
-      continue;
-    }
-    if (legacyLabelPatterns.some(pattern => pattern.test(block))) {
-      errors.push(
-        `native drain ${area} must not read, write, or require the legacy merge-queue label`
-      );
-    }
-  }
-
-  const enrollment = areas.get('enrollment') ?? '';
-  if (!/merge-queue-backend\.mjs enroll "\$n" "\$head_oid"/.test(enrollment)) {
-    errors.push(
-      'native drain enrollment must bind the exact head to backend enrollment'
-    );
-  }
-  if (
-    !/--arg expected_head "\$expected_head"/.test(enrollment) ||
-    !/\.headRefOid/.test(enrollment)
-  ) {
-    errors.push(
-      'native drain enrollment must retain its exact-head postcondition'
-    );
-  }
-
-  const dequeue = areas.get('dequeue') ?? '';
-  if (!/merge-queue-backend\.mjs dequeue "\$n"/.test(dequeue)) {
-    errors.push('native drain dequeue must prove the backend postcondition');
   }
 
   return { ok: errors.length === 0, errors };

@@ -206,62 +206,67 @@ export function PaySelector({
                   {amounts.map((amount, idx) => {
                     const isSelected = idx === selectedIdx;
                     return (
-                      <AmountSelector
+                      <button
                         key={amount}
-                        amount={amount}
-                        isSelected={isSelected}
-                        onClick={handleAmountSelect}
-                        index={idx}
-                        ariaLabel={`Select ${formatAmountForScreenReader(amount)} payment amount`}
-                      />
+                        type='button'
+                        aria-pressed={isSelected}
+                        aria-label={`Select ${formatAmountForScreenReader(amount)} payment amount`}
+                        onClick={() => handleAmountSelect(idx)}
+                        className={cn(
+                          'flex h-23 items-center justify-center rounded-3xl border text-center transition-[border-color,background-color,box-shadow,color,opacity] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                          isSelected
+                            ? 'border-white bg-white dark:bg-surface-1 text-(--color-bg-input) shadow-[0_20px_40px_rgba(255,255,255,0.08)]'
+                            : 'border-white/10 bg-white/[0.02] text-white dark:text-white hover:border-white/18 hover:bg-white/[0.04]'
+                        )}
+                      >
+                        <span className='text-lg font-medium tracking-[-0.03em]'>
+                          {formatAmountForScreenReader(amount)}
+                        </span>
+                      </button>
                     );
                   })}
                 </fieldset>
               )}
             </div>
+
+            <div className='mt-3.5 flex justify-end'>
+              <button
+                type='button'
+                onClick={handleCustomToggle}
+                className='inline-flex items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                aria-pressed={customMode}
+                aria-controls='pay-selector-heading'
+              >
+                <span>Custom Amount</span>
+                <PencilLine className='h-3.5 w-3.5' />
+              </button>
+            </div>
           </div>
 
-          <SmartLinkProviderButton
-            label={
-              isLoading
-                ? `Opening ${resolvedMethod?.label ?? 'payment'}…`
-                : paymentActionLabel
-            }
-            ariaLabel={paymentActionLabel}
-            primary
-            onClick={handleContinue}
-            disabled={isLoading || !canContinue || !isMethodAvailable}
-            icon={
-              resolvedMethod?.id === 'venmo' ? (
-                <SocialIcon
-                  platform='venmo'
-                  size={20}
-                  className='shrink-0'
-                  aria-hidden
-                />
-              ) : null
-            }
-          />
-
-          <Button
+          <button
             type='button'
-            variant='ghost'
-            onClick={handleCustomToggle}
-            className='inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-4 text-app font-medium tracking-[-0.015em] text-secondary-token transition-[border-color,background-color,color] duration-subtle hover:border-white/16 hover:bg-white/[0.05] hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
-            aria-pressed={customMode}
-            aria-controls='pay-selector-heading'
+            onClick={handleContinue}
+            disabled={isLoading || !canContinue}
+            className='flex h-13 w-full items-center justify-center gap-2.5 rounded-full bg-(--profile-pearl-primary-bg) px-5 text-base font-semibold tracking-[-0.025em] text-(--profile-pearl-primary-fg) transition-[opacity] duration-subtle hover:opacity-96 disabled:cursor-not-allowed disabled:opacity-50'
+            aria-label={`${primaryLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
           >
-            <span>Custom Amount</span>
-            <PencilLine className='h-3.5 w-3.5' />
-          </Button>
+            {paymentLabel === 'Venmo' ? (
+              <SocialIcon
+                platform='venmo'
+                size={20}
+                className='shrink-0'
+                aria-hidden
+              />
+            ) : null}
+            {isLoading ? 'Processing...' : primaryLabel}
+          </button>
 
           {showOtherPaymentOptions && paymentLabel ? (
             <div className='space-y-3.5'>
-              <Button
+              <button
                 type='button'
-                variant='ghost'
                 onClick={() => setShowOtherOptions(open => !open)}
-                className='flex h-auto w-full items-center gap-3.5 text-app font-medium tracking-[-0.015em] text-tertiary-token transition-colors duration-subtle hover:bg-transparent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                className='flex w-full items-center gap-3.5 text-app font-medium tracking-[-0.015em] text-tertiary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 aria-expanded={showOtherOptions}
               >
                 <span className='h-px flex-1 bg-white/8' />
@@ -273,7 +278,7 @@ export function PaySelector({
                   )}
                 />
                 <span className='h-px flex-1 bg-white/8' />
-              </Button>
+              </button>
 
               <div
                 className={cn(
@@ -284,9 +289,8 @@ export function PaySelector({
                 )}
               >
                 {showOtherOptions ? (
-                  <Button
+                  <button
                     type='button'
-                    variant='ghost'
                     onClick={handleContinue}
                     disabled={isLoading || !canContinue}
                     className='flex h-12 w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-5 text-sm font-medium tracking-[-0.015em] text-white dark:text-white transition-[border-color,background-color,opacity] duration-subtle hover:border-white/16 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50'
@@ -301,7 +305,7 @@ export function PaySelector({
                       />
                     ) : null}
                     <span>{`Continue with ${paymentLabel}`}</span>
-                  </Button>
+                  </button>
                 ) : null}
               </div>
             </div>

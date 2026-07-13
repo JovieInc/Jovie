@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
-import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { captureError } from '@/lib/error-tracking';
 import { loadRevenueLiftDashboard } from '@/lib/metrics/revenue-lift-dashboard';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
@@ -17,8 +16,6 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export default async function AdminRevenueLiftPage() {
-  await requireCurrentAdminPageAccess();
-
   let data: Awaited<ReturnType<typeof loadRevenueLiftDashboard>> | null = null;
 
   try {

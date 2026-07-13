@@ -108,7 +108,7 @@ function StudioFrame({
   return (
     <div
       className={cn(
-        'min-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-background text-white dark:text-white shadow-2xl',
+        'min-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-background text-white dark:text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)]',
         className
       )}
     >
@@ -490,20 +490,7 @@ function AudioBarPreview() {
 
 function SectionPreview({ variant }: Readonly<{ variant: SectionVariant }>) {
   return (
-    /*
-      `transform-gpu` establishes a containing block so fixed-position
-      sections (the marketing header is `position: fixed; z-index: 100`)
-      pin inside the preview card instead of escaping to the viewport and
-      painting over the studio toolbar.
-    */
-    <div
-      className={cn(
-        'max-h-[360px] transform-gpu overflow-hidden rounded-lg border border-white/10 bg-(--linear-app-content-surface)',
-        // Fixed-position headers contribute no height, so reserve room for
-        // the floating glass pill (~54px) to keep the preview card visible.
-        variant.category === 'header' && 'min-h-20'
-      )}
-    >
+    <div className='max-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-(--linear-app-content-surface)'>
       {variant.render()}
     </div>
   );
@@ -616,7 +603,7 @@ const PRODUCT_SHOWCASE_ITEMS: readonly DesignStudioItem[] = [
       'apps/web/components/shell/DrawerHero.tsx',
       'apps/web/components/shell/AudioBar.tsx',
       'apps/web/components/features/dashboard/organisms/release-provider-matrix/components/TrackRow.tsx',
-      'apps/web/app/exp/shell-v1/ShellV1ExperimentClient.tsx',
+      'apps/web/app/exp/shell-v1/page.tsx',
     ],
     screenshotScenarioIds: ['design-studio-shell-track-desktop'],
     marketingPrompt:

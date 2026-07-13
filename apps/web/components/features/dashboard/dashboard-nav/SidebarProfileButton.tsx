@@ -21,7 +21,7 @@ interface SidebarProfileButtonProps {
  *
  * Behaviour:
  *  - If already on a chat route, just opens the profile drawer.
- *  - Otherwise navigates to the canonical chat profile-panel URL.
+ *  - Otherwise navigates to /app/chat first, then opens the drawer.
  *  - On mobile the RightDrawer renders full-screen automatically.
  */
 export function SidebarProfileButton({
@@ -39,9 +39,14 @@ export function SidebarProfileButton({
       // Already on the chat route — just toggle the drawer open
       open();
     } else {
-      // The destination reads this route state after its preview provider
-      // mounts, so shells without that provider cannot discard the intent.
-      router.push(APP_ROUTES.CHAT_PROFILE_PANEL);
+      // Navigate to a new chat, then open the drawer after navigation
+      router.push(APP_ROUTES.CHAT);
+      // Use a microtask so the navigation starts before we open the panel.
+      // The PreviewPanelProvider is mounted at the shell level so `open`
+      // works even before the chat page renders.
+      queueMicrotask(() => {
+        open();
+      });
     }
   }, [pathname, open, router]);
 

@@ -12,13 +12,6 @@ import {
 } from '@/lib/chat/tools/onboarding-tool-impls';
 import { loadScriptBank, pickFromBank } from './line-source';
 import { renderLine, type ScriptLine, type ScriptStepId } from './script';
-import {
-  isIncompleteAdvanceMessage,
-  ONBOARDING_WIDGET_EVENTS,
-  type OnboardingGuardedStep,
-  parseWidgetEventFromMetadata,
-  WIDGET_COMPLETION_ACTIONS,
-} from './widget-events';
 
 /**
  * Deterministic onboarding fallback engine (JOV-3806).
@@ -26,10 +19,10 @@ import {
  * Stateless per-request: everything it needs is recovered from the inbound
  * UIMessage history (tool outputs persist across turns on the client and in
  * `chat_messages.tool_calls`). When the LLM is down, this walks the same
- * intake rail the LLM walks with explicit guards:
- * Role → ArtistSearch → ArtistSelect → Handle → Social → Contact →
- * Waitlist/Complete. Widget completions emit structured events; free-text
- * acks ("ok", "k") never complete waitlist/reservation.
+ * intake rail the LLM walks: greet → pick artist → confirm → handle →
+ * access decision → checkout/waitlist. The words come from `script.ts`;
+ * the access decision comes from the same `evaluateAccessSignal` the LLM
+ * tool uses — the fallback never invents its own scoring.
  */
 
 export interface FallbackToolEvent {
@@ -42,8 +35,6 @@ export interface FallbackTurn {
   readonly line: ScriptLine;
   readonly text: string;
   readonly toolEvents: readonly FallbackToolEvent[];
-  /** Resolved guarded step for this turn (audit / tests). */
-  readonly guardedStep?: OnboardingGuardedStep;
 }
 
 interface LoosePart {
@@ -91,86 +82,6 @@ function messageText(message: UIMessage): string {
     .filter(part => part.type === 'text' && typeof part.text === 'string')
     .map(part => part.text)
     .join('');
-}
-
-function findWidgetEventInHistory(
-  messages: readonly UIMessage[],
-  eventType: string
-): ReturnType<typeof parseWidgetEventFromMetadata> {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const message = messages[i];
-    if (!message || message.role !== 'user') continue;
-    const event = parseWidgetEventFromMetadata(message.metadata);
-    if (event?.onboardingEvent === eventType) return event;
-  }
-  return null;
-}
-
-function hasHandleConfirmed(messages: readonly UIMessage[]): boolean {
-  if (
-    findLatestToolOutput(messages, WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED)
-  ) {
-    return true;
-  }
-  return Boolean(
-    findWidgetEventInHistory(
-      messages,
-      ONBOARDING_WIDGET_EVENTS.HANDLE_CONFIRMED
-    )
-  );
-}
-
-function indexOfLatestToolAction(
-  messages: readonly UIMessage[],
-  action: string
-): number {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const message = messages[i];
-    if (!message) continue;
-    for (const part of partsOf(message)) {
-      if (isRecord(part.output) && part.output.action === action) {
-        return i;
-      }
-    }
-  }
-  return -1;
-}
-
-/**
- * Social is complete when the Attach Account widget fired, OR the visitor
- * sent a meaningful free-text reply after the social card was proposed
- * (explicit skip of social attach).
- */
-function hasSocialAttached(messages: readonly UIMessage[]): boolean {
-  if (
-    findLatestToolOutput(messages, WIDGET_COMPLETION_ACTIONS.SOCIAL_ATTACHED)
-  ) {
-    return true;
-  }
-  if (
-    findWidgetEventInHistory(messages, ONBOARDING_WIDGET_EVENTS.SOCIAL_ATTACHED)
-  ) {
-    return true;
-  }
-
-  const socialProposedAt = indexOfLatestToolAction(
-    messages,
-    'propose_social_link'
-  );
-  if (socialProposedAt < 0) return false;
-
-  for (let i = socialProposedAt + 1; i < messages.length; i += 1) {
-    const message = messages[i];
-    if (!message || message.role !== 'user') continue;
-    const event = parseWidgetEventFromMetadata(message.metadata);
-    if (event?.onboardingEvent === ONBOARDING_WIDGET_EVENTS.SOCIAL_ATTACHED) {
-      return true;
-    }
-    if (!event && !isIncompleteAdvanceMessage(messageText(message))) {
-      return true;
-    }
-  }
-  return false;
 }
 
 const SPOTIFY_ARTIST_URL_PATTERN = /open\.spotify\.com\/artist\/([A-Za-z0-9]+)/;
@@ -232,53 +143,6 @@ export function handleFromArtistName(name: string): string {
   return slug || 'artist';
 }
 
-/**
- * Resolve the current guarded step from conversation history + turn state.
- * Pure — used by the engine and unit tests.
- */
-export function resolveGuardedStep(input: {
-  readonly uiMessages: readonly UIMessage[];
-  readonly state: OnboardingTurnState;
-  readonly selectedArtistId?: string | null;
-}): OnboardingGuardedStep {
-  const { uiMessages, state, selectedArtistId = null } = input;
-
-  if (
-    findLatestToolOutput(uiMessages, 'propose_next_step') &&
-    (() => {
-      const decision = findLatestToolOutput(uiMessages, 'propose_next_step');
-      const kind = isRecord(decision?.decision) ? decision.decision.kind : null;
-      return kind === 'instant_access' || kind === 'waitlist';
-    })()
-  ) {
-    return 'waitlist_or_complete';
-  }
-
-  if (!state.spotifyArtistId && !selectedArtistId) {
-    if (
-      findLatestToolOutput(uiMessages, 'open_artist_picker') ||
-      state.turnCount > 1
-    ) {
-      return 'artist_search';
-    }
-    return 'role';
-  }
-
-  if (selectedArtistId && state.spotifyArtistId !== selectedArtistId) {
-    return 'artist_select';
-  }
-
-  if (!hasHandleConfirmed(uiMessages)) {
-    return 'handle';
-  }
-
-  if (!hasSocialAttached(uiMessages)) {
-    return 'social';
-  }
-
-  return 'contact';
-}
-
 function proposeNextStepEvent(decision: AccessDecision): FallbackToolEvent {
   return {
     toolName: 'proposeNextStep',
@@ -293,50 +157,18 @@ function proposeNextStepEvent(decision: AccessDecision): FallbackToolEvent {
 
 function decideAccess(
   state: OnboardingTurnState,
-  extraBand: AudienceBand | null,
-  options?: { readonly forceTurnCap?: boolean }
+  extraBand: AudienceBand | null
 ): AccessDecision {
   const recordedAt = new Date().toISOString();
   const signals = state.signals.map(signal => ({ ...signal, recordedAt }));
   if (extraBand) {
     signals.push({ audienceBand: extraBand, recordedAt });
   }
-  // Incomplete acks must not force waitlist via turn cap — freeze turnCount
-  // under the force threshold unless we have real signal this turn.
-  const turnCount =
-    options?.forceTurnCap === false
-      ? Math.min(state.turnCount, 2)
-      : state.turnCount;
   return evaluateAccessSignal({
     signal: collapseInterviewSignals(signals),
     spotifyFollowers: state.spotifyFollowers,
-    turnCount,
+    turnCount: state.turnCount,
   });
-}
-
-function handleConfirmedEventFromLatest(
-  latest: UIMessage | null
-): { handle: string } | null {
-  if (!latest) return null;
-  const event = parseWidgetEventFromMetadata(latest.metadata);
-  if (event?.onboardingEvent !== ONBOARDING_WIDGET_EVENTS.HANDLE_CONFIRMED) {
-    return null;
-  }
-  if (typeof event.handle === 'string' && event.handle.length > 0) {
-    return { handle: event.handle };
-  }
-  return { handle: '' };
-}
-
-function socialAttachedEventFromLatest(
-  latest: UIMessage | null
-): { url: string } | null {
-  if (!latest) return null;
-  const event = parseWidgetEventFromMetadata(latest.metadata);
-  if (event?.onboardingEvent !== ONBOARDING_WIDGET_EVENTS.SOCIAL_ATTACHED) {
-    return null;
-  }
-  return { url: event.url ?? '' };
 }
 
 function decisionTurn(
@@ -368,33 +200,11 @@ function decisionTurn(
       });
     }
     const line = pick('done');
-    return {
-      line,
-      text: renderLine(line, {}),
-      toolEvents: events,
-      guardedStep: 'waitlist_or_complete',
-    };
+    return { line, text: renderLine(line, {}), toolEvents: events };
   }
 
   const latest = lastUserMessage(uiMessages);
-  const latestText = latest ? messageText(latest) : '';
-  const latestEvent = latest
-    ? parseWidgetEventFromMetadata(latest.metadata)
-    : null;
-  const incomplete = !latestEvent && isIncompleteAdvanceMessage(latestText);
-
-  // Incomplete free-text never advances to waitlist/success.
-  if (incomplete) {
-    const line = pick('ask_audience');
-    return {
-      line,
-      text: renderLine(line, {}),
-      toolEvents: [],
-      guardedStep: 'contact',
-    };
-  }
-
-  const parsedBand = parseAudienceBand(latestText);
+  const parsedBand = latest ? parseAudienceBand(messageText(latest)) : null;
   const events: FallbackToolEvent[] = [];
   if (parsedBand) {
     events.push({
@@ -409,10 +219,7 @@ function decisionTurn(
     });
   }
 
-  // Only apply turn-cap force when we have a real (non-ack) reply.
-  const decision = decideAccess(state, parsedBand, {
-    forceTurnCap: Boolean(parsedBand) || latestText.trim().length >= 8,
-  });
+  const decision = decideAccess(state, parsedBand);
   if (decision.kind === 'instant_access') {
     events.push(proposeNextStepEvent(decision));
     events.push({
@@ -426,31 +233,15 @@ function decisionTurn(
       },
     });
     const line = pick('instant_access');
-    return {
-      line,
-      text: renderLine(line, {}),
-      toolEvents: events,
-      guardedStep: 'waitlist_or_complete',
-    };
+    return { line, text: renderLine(line, {}), toolEvents: events };
   }
   if (decision.kind === 'waitlist') {
     events.push(proposeNextStepEvent(decision));
     const line = pick('waitlist');
-    // Success / email language is owned by the client card once email exists.
-    return {
-      line,
-      text: renderLine(line, {}),
-      toolEvents: events,
-      guardedStep: 'waitlist_or_complete',
-    };
+    return { line, text: renderLine(line, {}), toolEvents: events };
   }
   const line = pick('ask_audience');
-  return {
-    line,
-    text: renderLine(line, {}),
-    toolEvents: events,
-    guardedStep: 'contact',
-  };
+  return { line, text: renderLine(line, {}), toolEvents: events };
 }
 
 /**
@@ -473,34 +264,6 @@ export async function decideFallbackTurn(
     pickFromBank(bank, stepId, sessionId);
   const latest = lastUserMessage(uiMessages);
   const selectedArtistId = parseArtistSelection(latest);
-  const latestEvent = latest
-    ? parseWidgetEventFromMetadata(latest.metadata)
-    : null;
-
-  // "None of these" — re-open artist search without treating as selection.
-  if (
-    latestEvent?.onboardingEvent ===
-    ONBOARDING_WIDGET_EVENTS.ARTIST_NONE_OF_THESE
-  ) {
-    const query = '';
-    const line = pick('get_artist');
-    return {
-      line,
-      text: renderLine(line, {}),
-      toolEvents: [
-        {
-          toolName: 'searchSpotifyArtist',
-          input: { query },
-          output: {
-            action: 'open_artist_picker',
-            query: null,
-            summary: 'Pick the matching Spotify artist.',
-          },
-        },
-      ],
-      guardedStep: 'artist_search',
-    };
-  }
 
   // The visitor just picked an artist — confirm it (Spotify enrichment).
   if (selectedArtistId && state.spotifyArtistId !== selectedArtistId) {
@@ -525,7 +288,6 @@ export async function decideFallbackTurn(
           output: output as unknown as Record<string, unknown>,
         },
       ],
-      guardedStep: 'artist_select',
     };
   }
 
@@ -533,16 +295,9 @@ export async function decideFallbackTurn(
   if (!state.spotifyArtistId) {
     if (state.turnCount <= 1) {
       const line = pick('greet');
-      return {
-        line,
-        text: renderLine(line, {}),
-        toolEvents: [],
-        guardedStep: 'role',
-      };
+      return { line, text: renderLine(line, {}), toolEvents: [] };
     }
-    // Prefill from prior user message; skip incomplete acks.
-    const rawQuery = latest ? messageText(latest).slice(0, 50) : '';
-    const query = isIncompleteAdvanceMessage(rawQuery) ? '' : rawQuery;
+    const query = latest ? messageText(latest).slice(0, 50) : '';
     const line = pick('get_artist');
     return {
       line,
@@ -558,18 +313,11 @@ export async function decideFallbackTurn(
           },
         },
       ],
-      guardedStep: 'artist_search',
     };
   }
 
-  // Artist confirmed but handle widget not shown yet (neither check nor confirm).
-  const existingHandleCheck =
-    findLatestToolOutput(uiMessages, 'check_handle') ??
-    findLatestToolOutput(
-      uiMessages,
-      WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
-    );
-  if (!existingHandleCheck) {
+  // Artist confirmed but handle not checked yet.
+  if (!findLatestToolOutput(uiMessages, 'check_handle')) {
     const handle = handleFromArtistName(state.spotifyArtistName ?? '');
     const line = pick('handle');
     return {
@@ -586,125 +334,10 @@ export async function decideFallbackTurn(
           },
         },
       ],
-      guardedStep: 'handle',
     };
   }
 
-  // Handle shown but not confirmed via widget event — stay on handle.
-  // Free-text "ok" / "k" does not advance.
-  if (!hasHandleConfirmed(uiMessages)) {
-    const confirmedNow = handleConfirmedEventFromLatest(latest);
-    if (confirmedNow) {
-      const handle =
-        confirmedNow.handle ||
-        (typeof existingHandleCheck.handle === 'string'
-          ? String(existingHandleCheck.handle)
-          : handleFromArtistName(state.spotifyArtistName ?? ''));
-      // Emit handle_confirmed completion + advance to social.
-      const line = pick('ask_audience');
-      return {
-        line,
-        text: renderLine(line, {}),
-        toolEvents: [
-          {
-            toolName: 'checkHandle',
-            input: { handle },
-            output: {
-              action: WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED,
-              handle,
-              summary: `Handle @${handle} confirmed.`,
-            },
-          },
-          {
-            toolName: 'proposeSocialLink',
-            input: { url: '' },
-            output: {
-              action: 'propose_social_link',
-              url: null,
-              summary: 'Attach a public social account.',
-            },
-          },
-        ],
-        guardedStep: 'social',
-      };
-    }
-    // Re-surface handle step; do not decide access.
-    const handle =
-      typeof existingHandleCheck.handle === 'string'
-        ? existingHandleCheck.handle
-        : handleFromArtistName(state.spotifyArtistName ?? '');
-    const line = pick('handle');
-    return {
-      line,
-      text: renderLine(line, { handle }),
-      toolEvents: [],
-      guardedStep: 'handle',
-    };
-  }
-
-  // Social step: require Attach Account event (or meaningful free-text skip).
-  // hasSocialAttached is false until one of those happens.
-  if (!hasSocialAttached(uiMessages)) {
-    const attachedNow = socialAttachedEventFromLatest(latest);
-    if (attachedNow) {
-      const url = attachedNow.url;
-      const line = pick('ask_audience');
-      return {
-        line,
-        text: renderLine(line, {}),
-        toolEvents: [
-          {
-            toolName: 'proposeSocialLink',
-            input: { url },
-            output: {
-              action: WIDGET_COMPLETION_ACTIONS.SOCIAL_ATTACHED,
-              url: url || null,
-              summary: url ? `Attached ${url}.` : 'Social account attached.',
-            },
-          },
-        ],
-        guardedStep: 'contact',
-      };
-    }
-
-    if (!findLatestToolOutput(uiMessages, 'propose_social_link')) {
-      const line = pick('ask_audience');
-      return {
-        line,
-        text: renderLine(line, {}),
-        toolEvents: [
-          {
-            toolName: 'proposeSocialLink',
-            input: { url: '' },
-            output: {
-              action: 'propose_social_link',
-              url: null,
-              summary: 'Attach a public social account.',
-            },
-          },
-        ],
-        guardedStep: 'social',
-      };
-    }
-
-    // Social proposed; incomplete ack stays put.
-    const latestText = latest ? messageText(latest) : '';
-    if (!latestEvent && isIncompleteAdvanceMessage(latestText)) {
-      const line = pick('ask_audience');
-      return {
-        line,
-        text: renderLine(line, {}),
-        toolEvents: [],
-        guardedStep: 'social',
-      };
-    }
-
-    // Meaningful free-text after social card: skip social → contact/access.
-    // Fall through to decisionTurn; hasSocialAttached will be true next turn
-    // because this user message sits after propose_social_link.
-  }
-
-  // Access decision phase (contact → waitlist/complete).
+  // Access decision phase.
   const existingDecision = findLatestToolOutput(
     uiMessages,
     'propose_next_step'

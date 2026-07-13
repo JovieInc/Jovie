@@ -3,7 +3,10 @@ import { Badge } from '@jovie/ui/atoms/badge';
 import type { Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHeroLayout,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import {
   type ChangelogRelease,
@@ -109,7 +112,7 @@ export default async function ChangelogPage() {
   return (
     <section className='min-h-screen bg-page text-primary-token'>
       {/* Header */}
-      <MarketingHero variant='left'>
+      <MarketingHeroLayout variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>Changelog</p>
         <h1 className='mb-4 mt-6 max-w-xs text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
           What&apos;s New
@@ -131,7 +134,7 @@ export default async function ChangelogPage() {
             RSS Feed
           </Link>
         </div>
-      </MarketingHero>
+      </MarketingHeroLayout>
 
       {/* Releases timeline */}
       <MarketingContainer width='page' className='pb-20 sm:pb-28'>

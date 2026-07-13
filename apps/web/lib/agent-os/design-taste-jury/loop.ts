@@ -1,8 +1,4 @@
 import { promises as fs } from 'node:fs';
-import {
-  retainCompletedRunDirectories,
-  writeTextFileAtomic,
-} from '@/lib/agent-os/run-retention';
 import { getCanonicalSurfaceForScreenshotId } from '@/lib/canonical-surfaces';
 import { buildChangeAwareCapturePlan } from './change-aware';
 import { writeDesignTasteGbrainMemory } from './gbrain-memory';
@@ -12,8 +8,6 @@ import {
   buildDeterministicJurorVerdicts,
 } from './jury';
 import {
-  getDesignTasteJuryRootDirectory,
-  resolveDesignTasteJuryCompletionPath,
   resolveDesignTasteJuryIssueFilingsPath,
   resolveDesignTasteJuryManifestPath,
   resolveDesignTasteJuryRunDirectory,
@@ -119,30 +113,16 @@ export async function runDesignTasteJuryLoop(
     recursive: true,
   });
 
-  await writeTextFileAtomic(
+  await fs.writeFile(
     manifestPath,
-    `${JSON.stringify(parsed.data, null, 2)}\n`
+    `${JSON.stringify(parsed.data, null, 2)}\n`,
+    'utf8'
   );
-  await writeTextFileAtomic(
+  await fs.writeFile(
     issueFilingsPath,
-    `${JSON.stringify(parsed.data.issueFilings, null, 2)}\n`
+    `${JSON.stringify(parsed.data.issueFilings, null, 2)}\n`,
+    'utf8'
   );
-  await writeTextFileAtomic(
-    resolveDesignTasteJuryCompletionPath(params.runId),
-    `${JSON.stringify(
-      { status: 'completed', runId: params.runId, completedAt: computedAt },
-      null,
-      2
-    )}\n`
-  );
-
-  await retainCompletedRunDirectories({
-    completionMarker: 'complete.json',
-    currentRunId: params.runId,
-    keepCompleted: 14,
-    root: getDesignTasteJuryRootDirectory(),
-    staleIncompleteMs: 7 * 24 * 60 * 60 * 1000,
-  });
 
   const manifest: DesignTasteJuryRunManifest = parsed.data;
 

@@ -5,50 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.6.61] - 2026-06-28
+
+> Outbound SMS provider integration ships behind `OUTBOUND_SMS_ENABLED`. Release alerts and webhook auto-replies (STOP/HELP) now route through a single Twilio connector.
+
+### Added
+
+- **[notifications] Outbound SMS connector (JOV-3626)**: `providers/sms/outbound-sms.ts` gates live Twilio POSTs behind `OUTBOUND_SMS_ENABLED`; `sendNotification()` SMS channel and inbound webhook auto-replies both use it; unit-economics spike documented in `NOTIFICATION_GUIDELINES.md`.
+
 ## [Unreleased]
-- **Profile rail edits no longer flicker back to stale data (JOV-4450):** concurrent optimistic bio/link changes keep the newest paint while dashboard/chat hydrations merge by CAS version and skip clobbering mid-save.
-- **Homepage hero focuses the next-move promise (JOV-4475):** approved music-forward headline and supporting line stay primary, Get started remains the sole conversion action, and See a live profile is quiet secondary proof on a truthful product screenshot.
-- [internal] **Manual Full E2E shards now run concurrently (JOV-4483):** all four hosted Preview shards can start together while retaining fail-fast behavior, shared Neon setup, Playwright workers, and cleanup.
-- [internal] **Merge-group visual CI harness repair:** the filtered web workspace can resolve the repository Chromatic config again, DB-free mobile overflow excludes only explicitly database-backed redirects, and a forward-only Storybook audit now requires five clean runs before newly opened UI PRs can be gated.
-- [internal] **Bounded `ci-fast` lane groups (JOV-4477):** independent typecheck and remaining fast-gate checks now run in two hosted groups while preserving the single required `ci-fast` result and complete lane diagnostics.
-- **Library now reads as one compact workspace:** one canonical header toolbar replaces the duplicate search and text-heavy controls, release dates are first-class row information, and the table/footer align to the shared app-shell grid without nested carding.
-- **Unified app shell migration:** the authenticated app now uses one canonical customer/OV navigation model, header search, route-shaped loading states, chat home, Library filters, release/tour-date/profile rails, audio controls, and privacy-safe navigation telemetry. Better Auth production-artifact tests, route-specific readiness contracts, optimistic profile edit concurrency, and a 21-route performance matrix cover the migration end to end.
-- [internal] **Next.js security update (JOV-2569):** upgraded every application to Next.js 16.2.11, patching middleware authorization bypass, SSRF, Server Action disclosure and denial-of-service, cache-confusion, and image-optimization vulnerabilities.
-- [internal] **JavaScript, Ruby, and Python dependency audits now report zero known findings (JOV-2569):** patched Better Auth OAuth audience binding, Sharp/libvips image processing, Vitest browser file access, request parsing, archive handling, HTTP client, and Pytest vulnerabilities; CI Python tooling installs from a fully hashed lockfile, and automated lint repair bootstraps pnpm through Corepack.
-- [internal] **Repository security hygiene (JOV-2569):** workflow test tooling and the autofix package manager are version-pinned, reusable lint runs with an explicit read-only token, and generated Python bytecode is ignored instead of committed.
-- [internal] **App shell loading skeleton** matches `DESIGN_V1` so flag-on users no longer flash the legacy sidebar/header on first `/app` paint.
 
-- [internal] **Post-deploy probes now identify CLI-built production deployments (JOV-4366):** exact immutable build identity replaces optional Vercel source metadata while preserving project, deployment, origin, environment, and main-ancestry proofs.
-- **[internal] Audio playback has one canonical transition contract (JOV-3689):** loading, audible playback, buffering, seeking, stalls, interruptions, completion, and errors are defined in a typed, mutation-tested state machine for playback surfaces to adopt.
-- **[internal] Canonical audio contract foundation (JOV-3685):** one typed package now defines Jovie's MP3, WAV, FLAC, AIFF, AAC, and M4A format registry, MIME aliases, extensions, upload policies, and branded time/BPM units with mutation-tested invariants.
-- **[internal] Staging Better Auth Google OAuth credentials now reach the Vercel build and runtime deploy (#14659):** the release workflow allowlists and forwards both Google client keys, failing closed when either is absent.
-
-## [26.7.0] - 2026-07-21
-
-- **Suggested DSP matches no longer flash a skeleton then collapse (JOV-4159):** when the Music drawer loads with no match suggestions (the common case), the section stays empty instead of flashing skeleton rows and shifting sibling content.
-- **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; build-info prefers the stamped release version (and falls back to bundled `version.json`), and both shell/legacy banners omit the version when unavailable.
-- **Chat audio player no longer doubles up (JOV-3511):** the full docked bottom bar and sidebar mini never show at once; the full bar sits flat under the canvas without elevated float chrome; right-rail release sections tighten spacing; audio thumbnails stay compact; icon actions are borderless at rest and circle on hover.
-- **Library Approval Status is first-class again (#10384):** every Library asset surfaces Draft / Needs Review / Approved / Archived as a badge on grid cards, a list column, and filter chips (rail + pill search), with Release Status kept as a separate labeled axis so the two never collapse into one bare “Draft”.
-- **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; it uses the build-time release version from build-info, or omits the version when unavailable.
-- **Chat Top signals cards no longer repeat the same insight (JOV-3522):** near-duplicate titles collapse to one card, the tool only surfaces on performance/growth turns, and the card chrome is quieter.
-- **Entity mention hover cards now use the same rich entity card as the chat rail:** hovering an inline release, artist, track, or event mention opens the canonical compact EntityCard instead of a one-off popover layout.
-- **Chat tool activity is quieter and indented:** agent tool-call rows sit one rhythm step in from assistant prose with secondary color and book weight, so narrative stays primary and consecutive steps form a quiet run.
-- **Artist profiles now adapt to release, touring, and live-support moments:** one music-native link brings listening, tickets, support, fan capture, setup guidance, and product truth into a clearer responsive journey.
-- **[internal] Production Sentry gate secret binding:** the post-deploy error-rate gate now runs inside the protected production environment, so its API token is available without crossing a nested reusable-workflow boundary.
-- **[internal] Fixed-pool unit routing:** healthy runner heartbeats now select the fixed CI pool through a non-sensitive route token, preserving hosted fail-closed fallback without GitHub suppressing the runner decision.
-- **Vercel preview authentication stays on the preview domain:** Better Auth now derives its server URL from each request using exact production, staging, local, deployment, and branch host allowlists; arbitrary `*.vercel.app` hosts fail closed instead of redirecting previews to a static environment URL.
-- **Profiles now gives artists one place to manage their public identity (JOV-2659):** Jovie, official websites, DSPs, social accounts, authority sources, and service connectors appear in one filterable workspace with profile health, tracked `jov.ie` redirects, Google rank movement, and a consistent detail rail. Daily monitoring is quota-bound by plan, hides locked values on Free, and remains fail-closed behind rollout and provider-health gates.
-- **[internal] Governed Vercel agent skills:** Jovie now pins the reviewed AI SDK, React performance, and React composition skills; a Jovie-owned discovery workflow and CI/pre-commit guard reject OpenReview, broad or global installs, missing policy overlays, and malformed source pins.
-- **[internal] Repository artifact hygiene guardrails (JOV-4264):** CI and pre-commit checks reject recursive/generated paths, temporary files, root screenshots, unapproved binaries, oversized payloads, and repository-wide file/byte/binary budget overruns.
-- **[internal] Bounded artifact lifecycle helpers:** owned-output, atomic issue-output, run-retention, generated-artifact retention, performance-artifact retention, and local-runtime cleanup helpers now cover QA, AgentOS, Hermes, Design Lab, profile review, iOS performance, and screenshot producers with fail-closed symlink and race protections.
-- **[internal] Screenshot evidence is replace-in-place:** homepage, product, visual-regression, contrast, and profile captures write to stable ignored or catalog-owned paths; CI validates the catalog and public export budgets before merge.
-- **[internal] Local cleanup is safe and measured:** setup and Codex cleanup prune only stale, oversized, inactive, repo-owned caches and worktree dependencies while preserving active, dirty, locked, external, or symlinked data.
-- Obsolete root screenshots, stale product-screenshot specs, superseded visual baselines, and the accidentally tracked Vitest cache result.
 - [internal] **Governed marketing section proposals:** the marketing registry now records route-recipe evidence and explicit design gaps, while the admin Design Lab provides desktop/mobile proposal review, comments, approval states, implementation evidence, and auditable model-usage metadata.
-- **Investors can understand Jovie in one focused brief (JOV-3538):** public and personalized investor links now share a responsive, accessible seven-part narrative with a product demo, founder letter, evidence boundaries, key risks, and a collapsed diligence appendix.
-- **Personalized investor links now preserve private engagement context (JOV-3538):** allowlisted demo, narrative, and meeting actions are attributed through HttpOnly server-side tracking without exposing investor identity to the browser, with automated QA and responsive screenshot proof covering the experience.
 - **Homepage labels now meet WCAG AA contrast:** the distributor trust-strip and closed-loop labels use the readable tertiary text token instead of the low-contrast quaternary token.
-- [internal] **Design-system drift ratchet tightened 2613→2586 (JOV-4214)**: converted 25 strict typography stragglers across 11 TSX files on profile, jovie, feedback, and admin surfaces to value-preserving canonical tokens — the strict lossless lane is now fully drained app-wide.
 - [internal] **Design-system drift ratchet tightened 3044→2609 (JOV-4211)**: converted 29 exact-match typography arbitraries to tokens across 18 dashboard/admin/organism/molecule files (`leading-[16px]`→`leading-4`, `tracking-[-0.01em]`→`tracking-tight`, `tracking-[-0.02em]`→`tracking-tighter`, `tracking-[0.01em]`→`tracking-wide`) and re-measured the baseline to the true count, removing ~406 counts of stale regression headroom.
 - [internal] **Desktop renderer recovery (JOV-3595)**: recover from hosted loads that return HTTP 200 but never boot React, and route crashed or unresponsive renderers to the visible recovery shell instead of a permanent black window.
 - [internal] **Preflight ownership check: ledger/keyword-first with 10s hard ceiling (JOV-4185)**: `scripts/agent/preflight.mjs` now resolves gbrain ownership via the agent-job-ledger page first, then the keyword index, and only falls back to a semantic query inside a hard 10s budget — no run can hang on a hybrid query. The winning source (ledger/keyword/semantic) is recorded in the preflight receipt.
@@ -67,13 +35,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - **Public artist profiles now feel native at every size (JOV-2018)**: Square artwork stays square, portraits keep a face-safe crop, profile rails use one consistent card size, scrollbars stay out of sight, and sparse or subscription states no longer leave awkward gaps.
 - **Unclaimed artist profiles now close with a cleaner claim poster (JOV-2018)**: Desktop AEO content uses a tighter editorial rhythm, then ends on oversized `jov.ie/you` type, one Spotify-verified proof line, and one claim action.
-- **Library status badges no longer call released items "Draft" (JOV-3333)**: Release Status is always labeled separately from Approval Status so a released item never reads as bare "Draft". Superseded for surface coverage by #10384 (both axes on cards/list/filters; editor remains once in Details).
+- **Library status badges no longer call released items "Draft" (JOV-3333)**: Grid cards and the release rail hero show Release Status only; Approval Status stays as a single editable control in Details.
 - **Chat release right-rail System B polish (JOV-3493)**: Section cards use Library elevation, DSP rows show provider icons, and typography drops oversized/all-caps chrome.
 - **Chat file attachments render as rich chips (JOV-3492)**: Uploaded audio/docs show a filetype icon + clean filename instead of raw Vercel blob URLs.
 - **Provider-ingested released music can only be archived (JOV-3885)**: Soft-hide via `deleted_at` for ingested published releases; Jovie-created releases still hard-delete.
 - **Search fills the whole screen (JOV-2982)**: Cmd+K opens a full-viewport search surface with the same clean input; results scroll the remaining height instead of a cramped centered card.
 - [internal] **Skill lifecycle pipeline (JOV-3944/3945/3946/3974/3975)**: `skills_catalog` gains `lifecycle` + `active_version` with immutable `skills_catalog_versions` history; kill-switch and legal state transitions; playbook→skill compiler (`playbooks:compile`) registers draft skills; `skill_run_events` telemetry + aggregate helpers (fail-open); authored YouTube channel-optimization and DSP content-audit playbooks.
-- [internal] Chat shell: restore empty-state scaffolding, composer focus/rail yield, System B composer geometry, and truthful action-card dismiss/merch gating (JOV-3547, JOV-3549, JOV-4043, JOV-4041, JOV-3531)
 - [internal] **Single machine-readable design-token source, wave 1 (GH-12009, GH-10158)**: New `apps/web/design/tokens.json` compiled by `scripts/build-design-tokens.mjs` (`pnpm tokens:build` / `tokens:check`) into generated CSS (`--gray1..12` now resolve app-wide), a typed TS export, and an agent manifest. `--linear-*` namespace is now shrink-only ratcheted (`linear-namespace-ratchet.test.ts`, baseline 2242), and a source-vs-emitter divergence guard locks tokens.json to the live accent palette. No visual changes.
 - [internal] **One EmptyState primitive (GH-12638)**: Canonical molecule at `components/molecules/EmptyState` (greyscale icon + Title Case heading + one sentence + primary CTA + optional text-link secondary). Migrated DSP presence/matches, insights, release tasks, and table empty surfaces onto it; deleted 5 bespoke `*EmptyState` components; component-family ratchet emptyState 14→9.
 - Toasts and banners now share one canonical feedback system: confirmations and errors appear bottom-right and dismiss on their own, while system status stays pinned at the top until you dismiss it. (GH-12885)
@@ -130,7 +97,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- **Profile previews now fully cover the mobile app shell (JOV-4464):** opening the full-screen profile preview no longer leaves the shell header painted above the drawer, while desktop right-rail layering stays unchanged.
 - [internal] **Hermes/OpenClaw agent config health**: adds a launchd-backed sentinel for recurring Telegram-dispatched agent failures, catching stale Hermes fallback models, paid OpenRouter fallbacks, and schema-clobbered OpenClaw `memorySearch` blocks before gateway churn.
 - **Smoother dashboard interactions (JOV-3800)**: opening a release, contact, or tour-date panel from chat now shows the details instantly instead of a brief loading state; settings pages no longer nudge when a change is being saved; and the calendar keeps its layout steady while it first loads.
 - [internal] Pre-push Biome gate scopes to changed files (mirroring CI) instead of a repo-wide `biome check .`, so pre-existing Biome drift on `main` no longer blocks `git push` from every worktree and stops training agents toward the `JOVIE_SKIP_PRE_PUSH_GATE=1` escape hatch (GitHub #12475).
@@ -144,14 +110,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **proxy.ts decomposed into lib/auth modules**: the 909-line middleware is now a ~280-line orchestrator; `handleProxyRequest` (routing, CSP nonce, state redirects, circuit breaker) moved to `lib/auth/proxy-request-handler.ts`, Clerk production/staging instance selection to `lib/auth/clerk-middleware-instances.ts`, and the thrice-repeated degraded-auth HTML/JSON block collapsed into `respondAuthDegraded()`. Behavior-preserving — no logic, status-code, or matcher changes; all 619 middleware/auth tests pass unchanged.
 - **Library right rail polish (JOV-3679)**: release status badges now use distinct colors — a released drop reads in accent purple instead of the same green as an approved one — buttons and icon buttons are pill-shaped with a clean hover circle, and streaming providers show their real brand icons (Spotify, Apple Music, …) in both the detail drawer and the filter rail. The approval control drops its redundant inline label.
 - **Homepage collapsed to hero + minimal footer**: the below-the-fold story stack (product statement, trust strip, go-live steps, workspace, artist-profiles carousel, Friday rhythm, bento/loop/stat sections, pricing, FAQ) and the final CTA are flagged off via the existing static marketing flags (`SHOW_HOMEPAGE_UNLOCKED_SECTIONS`, `SHOW_HOMEPAGE_V2_FINAL_CTA`). The header keeps the logo and sign-in but drops the center nav (its anchors pointed at the now-hidden sections), and the homepage footer renders the minimal variant. Fully reversible by flipping the flags back on. Pages stay fully static (`revalidate = false`).
-
-## [26.6.61] - 2026-06-28
-
-> Outbound SMS provider integration ships behind `OUTBOUND_SMS_ENABLED`. Release alerts and webhook auto-replies (STOP/HELP) now route through a single Twilio connector.
-
-### Added
-
-- **[notifications] Outbound SMS connector (JOV-3626)**: `providers/sms/outbound-sms.ts` gates live Twilio POSTs behind `OUTBOUND_SMS_ENABLED`; `sendNotification()` SMS channel and inbound webhook auto-replies both use it; unit-economics spike documented in `NOTIFICATION_GUIDELINES.md`.
 
 ## [26.6.60] - 2026-06-28
 
@@ -1642,6 +1600,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Changed
 
 - [internal] Migrated release and share feature components to shell-v1 design tokens: replaced semi-transparent surface tokens (`bg-surface-1/30`, `/50`, `/70`, `bg-surface-2/80`) with explicit opacity values, replaced raw duration values (`duration-100`, `duration-150`, `duration-200`) with canonical motion tokens (`duration-fast`, `duration-subtle`, `duration-slow`), replaced `text-green-500` with `text-success-token`, replaced decorative hover scale/translate on smart link play button with color-only feedback, replaced `transition-all` with `transition-[transform,opacity]` on icon crossfade animation.
+
 
 ## [26.4.209] - 2026-05-06
      9|

@@ -10,13 +10,12 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
 import { routeChatAudioUpload } from '@/lib/chat/route-audio-upload';
-import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
 
-const chatAudioSchema = chatToolSchema({
+const chatAudioSchema = z.object({
   blobUrl: z.string().url(),
   blobPathname: z.string().min(1),
   fileName: z.string().min(1),

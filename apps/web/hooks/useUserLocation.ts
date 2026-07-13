@@ -13,16 +13,8 @@ interface UseUserLocationResult {
   error: string | null;
 }
 
-export type UserLocationPermissionMode = 'request' | 'granted-only';
-
-export interface UseUserLocationOptions {
+interface UseUserLocationOptions {
   readonly enabled?: boolean;
-  /**
-   * `request` preserves the legacy behavior and may open the browser prompt.
-   * `granted-only` may use a cached or already-granted location, but never
-   * turns a `prompt` permission state into browser chrome on page entry.
-   */
-  readonly permissionMode?: UserLocationPermissionMode;
 }
 
 const LOCATION_CACHE_KEY = 'jovie_user_location';
@@ -37,7 +29,6 @@ const GEOLOCATION_TIMEOUT_MS = 5000; // 5 second timeout for fast UX
  */
 export function useUserLocation({
   enabled = true,
-  permissionMode = 'request',
 }: UseUserLocationOptions = {}): UseUserLocationResult {
   const [location, setLocation] = useState<UserLocation | null>(null);
   const [isLoading, setIsLoading] = useState(enabled);
@@ -69,80 +60,49 @@ export function useUserLocation({
       return;
     }
 
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let timeoutId: ReturnType<typeof setTimeout>;
     let didTimeout = false;
-    let cancelled = false;
 
-    const requestCurrentPosition = () => {
-      if (cancelled) return;
+    // Set a timeout to stop waiting and show default order
+    timeoutId = setTimeout(() => {
+      didTimeout = true;
+      setError('Location request timed out');
+      setIsLoading(false);
+    }, GEOLOCATION_TIMEOUT_MS);
 
-      // Set a timeout to stop waiting and show default order.
-      timeoutId = setTimeout(() => {
-        if (cancelled) return;
-        didTimeout = true;
-        setError('Location request timed out');
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        if (didTimeout) return;
+        clearTimeout(timeoutId);
+
+        const userLocation: UserLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+
+        // Cache the location
+        cacheLocation(userLocation);
+        setLocation(userLocation);
         setIsLoading(false);
-      }, GEOLOCATION_TIMEOUT_MS);
+      },
+      err => {
+        if (didTimeout) return;
+        clearTimeout(timeoutId);
 
-      navigator.geolocation.getCurrentPosition(
-        position => {
-          if (cancelled || didTimeout) return;
-          if (timeoutId) clearTimeout(timeoutId);
-
-          const userLocation: UserLocation = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          };
-
-          cacheLocation(userLocation);
-          setLocation(userLocation);
-          setIsLoading(false);
-        },
-        err => {
-          if (cancelled || didTimeout) return;
-          if (timeoutId) clearTimeout(timeoutId);
-
-          setError(err.message);
-          setIsLoading(false);
-        },
-        {
-          enableHighAccuracy: false,
-          timeout: GEOLOCATION_TIMEOUT_MS,
-          maximumAge: CACHE_DURATION_MS,
-        }
-      );
-    };
-
-    if (permissionMode === 'granted-only') {
-      // Permissions is not uniformly available on older Safari builds. In
-      // that case, fail quietly to the deterministic date order rather than
-      // risking a surprise browser prompt.
-      if (!navigator.permissions?.query) {
+        setError(err.message);
         setIsLoading(false);
-      } else {
-        void navigator.permissions
-          .query({ name: 'geolocation' })
-          .then(permission => {
-            if (cancelled) return;
-            if (permission.state === 'granted') {
-              requestCurrentPosition();
-              return;
-            }
-            setIsLoading(false);
-          })
-          .catch(() => {
-            if (!cancelled) setIsLoading(false);
-          });
+      },
+      {
+        enableHighAccuracy: false, // Low accuracy is faster and sufficient for city-level
+        timeout: GEOLOCATION_TIMEOUT_MS,
+        maximumAge: CACHE_DURATION_MS, // Accept cached browser location
       }
-    } else {
-      requestCurrentPosition();
-    }
+    );
 
     return () => {
-      cancelled = true;
-      if (timeoutId) clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     };
-  }, [enabled, permissionMode]);
+  }, [enabled]);
 
   return { location, isLoading, error };
 }

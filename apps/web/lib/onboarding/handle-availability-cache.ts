@@ -1,11 +1,6 @@
 import 'server-only';
 
 import { captureWarning } from '@/lib/error-tracking';
-import {
-  type HandleAvailabilityResult,
-  normalizeHandleCandidate,
-  toHandleAvailabilityResult,
-} from '@/lib/onboarding/handle-availability';
 import { getRedis } from '@/lib/redis';
 
 const HANDLE_CACHE_KEY_PREFIX = 'onboarding:handle-availability:';
@@ -13,7 +8,7 @@ const HANDLE_AVAILABLE_TTL_SECONDS = 300; // 5 minutes — available handles can
 const HANDLE_UNAVAILABLE_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days — claimed handles rarely become unclaimed
 
 function getHandleCacheKey(handle: string): string {
-  return `${HANDLE_CACHE_KEY_PREFIX}${normalizeHandleCandidate(handle)}`;
+  return `${HANDLE_CACHE_KEY_PREFIX}${handle.toLowerCase()}`;
 }
 
 export async function getCachedHandleAvailability(
@@ -30,18 +25,6 @@ export async function getCachedHandleAvailability(
     captureWarning('[handle-availability] Redis read failed', { error });
     return null;
   }
-}
-
-/**
- * Read cache and project through the canonical availability contract.
- * Returns null on cache miss so callers can fall through to DB.
- */
-export async function getCachedHandleAvailabilityResult(
-  handle: string
-): Promise<HandleAvailabilityResult | null> {
-  const cached = await getCachedHandleAvailability(handle);
-  if (cached === null) return null;
-  return toHandleAvailabilityResult({ handle, available: cached });
 }
 
 export async function cacheHandleAvailability(

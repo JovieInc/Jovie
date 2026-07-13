@@ -7,13 +7,10 @@ import {
 } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
+import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import {
-  expectNoDocumentOverflow,
-  waitForPendingNextRedirect,
-} from './utils/mobile-overflow';
-import {
-  getPublicSurfaceManifestForRuntimeSync,
   type ResolvedPublicSurfaceSpec,
+  resolvePublicSurfaceManifestSync,
 } from './utils/public-surface-manifest';
 import {
   SMOKE_TIMEOUTS,
@@ -101,9 +98,7 @@ function getMobileWidthsFromEnv(value: string | undefined) {
   return widths && widths.length > 0 ? widths : null;
 }
 
-const RESOLVED_PUBLIC_SURFACES = getPublicSurfaceManifestForRuntimeSync({
-  database: HAS_DATABASE,
-});
+const RESOLVED_PUBLIC_SURFACES = resolvePublicSurfaceManifestSync();
 
 const PUBLIC_SURFACES_BY_ID = new Map(
   RESOLVED_PUBLIC_SURFACES.map(surface => [surface.id, surface])
@@ -270,13 +265,6 @@ async function navigateToPublicSurface(
     `${surface.id} should not server-error`
   ).toBeLessThan(500);
 
-  if (surface.family === 'auth-entry') {
-    await waitForPendingNextRedirect(
-      page,
-      response,
-      surface.readyVisibleTimeoutMs ?? SMOKE_TIMEOUTS.VISIBILITY
-    );
-  }
   await waitForHydration(page, {
     timeout: surface.readyVisibleTimeoutMs ?? SMOKE_TIMEOUTS.VISIBILITY,
   });

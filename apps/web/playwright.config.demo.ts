@@ -20,7 +20,6 @@ const port = Number(process.env.PORT ?? '3100');
 const baseUrl = process.env.BASE_URL ?? `http://127.0.0.1:${port}`;
 
 export default defineConfig({
-  captureGitInfo: { commit: false, diff: false },
   ...baseConfig,
   testDir: './tests/e2e',
   testMatch: /founder-demo-video\.spec\.ts/,
@@ -31,12 +30,10 @@ export default defineConfig({
   use: {
     ...baseConfig.use,
     baseURL: baseUrl,
-    video: process.env.CI
-      ? 'off'
-      : {
-          mode: 'on',
-          size: { width: 1280, height: 720 },
-        },
+    video: {
+      mode: 'on',
+      size: { width: 1280, height: 720 },
+    },
     viewport: { width: 1280, height: 720 },
     storageState: { cookies: [], origins: [] },
   },

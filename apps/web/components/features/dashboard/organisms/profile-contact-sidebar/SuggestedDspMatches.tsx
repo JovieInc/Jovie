@@ -55,22 +55,26 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
   const visible = expanded ? sorted : sorted.slice(0, MAX_VISIBLE);
   const hiddenCount = sorted.length - MAX_VISIBLE;
 
-  // Zero matches is the common resolution for this query, so a skeleton
-  // that renders during `isLoading` and then collapses to `null` produces a
-  // visible flash-then-shift for most users (JOV-4159 / #13821). Stay
-  // collapsed while loading and only occupy space once we know there is
-  // something to show — empty and loading share the same zero footprint.
   if (isLoading) {
-    return null;
+    return (
+      <div className='mt-3 space-y-1.5'>
+        <SectionHeading count={0} />
+        {[1, 2, 3].map(i => (
+          <div
+            key={i}
+            className='flex items-center gap-2.5 rounded-md px-2 py-1'
+          >
+            <div className='h-4 w-4 rounded skeleton' />
+            <div className='h-3.5 flex-1 rounded skeleton' />
+          </div>
+        ))}
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <div
-        className='mt-3 space-y-1.5'
-        data-testid='suggested-dsp-matches'
-        data-state='error'
-      >
+      <div className='mt-3 space-y-1.5'>
         <SectionHeading count={0} />
         <p className='px-2 text-xs text-tertiary-token'>
           Couldn&apos;t load suggestions.{' '}
@@ -89,11 +93,7 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
   if (!sorted.length) return null;
 
   return (
-    <div
-      className='mt-3 space-y-1.5'
-      data-testid='suggested-dsp-matches'
-      data-state='ready'
-    >
+    <div className='mt-3 space-y-1.5'>
       <SectionHeading count={sorted.length} />
       <p className='px-2 text-app font-book leading-[18px] text-secondary-token'>
         We found profiles that may be you on other platforms. Confirm or dismiss

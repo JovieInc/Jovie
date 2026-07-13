@@ -142,7 +142,6 @@ export function useMusicLinksForm({
   // Profile mutation for primary DSPs
   const { mutate: updateProfile, isPending: isProfileSaving } =
     useProfileMutation({
-      profileId: artist.id,
       silent: true,
       onSuccess: data => {
         const updatedArtist = convertCreatorProfileToArtist(

@@ -1,7 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -161,38 +159,35 @@ export function GtmSpeedDial() {
     <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-4'>
       <div className='flex flex-wrap items-center gap-2'>
         {SPEED_OPTIONS.map(speed => (
-          <Button
+          <button
             key={speed}
             type='button'
-            variant='ghost'
-            size='sm'
             onClick={() => void applySpeed(speed)}
             disabled={mutation.isPending}
             aria-pressed={currentSpeed === speed}
             className={cn(
-              'h-auto rounded-lg border px-3.5 py-1.5 text-app font-medium transition-colors',
+              'rounded-lg border px-3.5 py-1.5 text-app font-medium transition-colors',
               currentSpeed === speed
                 ? 'border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
                 : 'border-transparent bg-surface-0 text-secondary-token hover:bg-surface-0/80 hover:text-primary-token'
             )}
           >
             {SPEED_LABELS[speed]}
-          </Button>
+          </button>
         ))}
         {currentSpeed === 'custom' && (
           <span className='flex items-center gap-2 text-app text-secondary-token'>
             <span className='rounded-lg bg-surface-0 px-3 py-1.5 font-medium'>
               Custom: {settings.dailySendCap}/day, {settings.maxPerHour}/hr
             </span>
-            <Button
+            <button
               type='button'
-              variant='link'
               onClick={() => void applySpeed('normal')}
               disabled={mutation.isPending}
-              className='h-auto text-xs text-secondary-token underline-offset-2 hover:text-primary-token hover:underline'
+              className='text-xs text-secondary-token underline-offset-2 hover:text-primary-token hover:underline'
             >
-              Reset To Normal
-            </Button>
+              Reset to Normal
+            </button>
           </span>
         )}
       </div>

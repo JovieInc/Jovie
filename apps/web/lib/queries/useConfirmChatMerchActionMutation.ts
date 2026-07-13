@@ -5,11 +5,7 @@ import { createMutationFn } from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError } from './mutation-utils';
 
-export type ConfirmChatMerchActionType =
-  | 'publish'
-  | 'archive'
-  | 'unpause'
-  | 'pause';
+export type ConfirmChatMerchActionType = 'publish' | 'archive' | 'unpause';
 
 export interface ConfirmChatMerchActionInput {
   readonly profileId: string;

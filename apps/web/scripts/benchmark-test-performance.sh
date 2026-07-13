@@ -1,6 +1,4 @@
-#!/usr/bin/env bash
-
-set -euo pipefail
+#!/bin/bash
 
 # Test Performance Benchmarking Script
 # Compares original vs optimized test performance
@@ -11,20 +9,16 @@ echo "This script measures test performance improvements"
 echo "Run this before and after migration to track progress"
 echo ""
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-RESULTS_DIR="$REPO_ROOT/apps/web/test-results/benchmark-test-performance/latest"
-RETENTION_SCRIPT="$REPO_ROOT/scripts/performance-artifact-retention.mjs"
+RESULTS_DIR="test-results"
+mkdir -p "$RESULTS_DIR"
 
-node "$RETENTION_SCRIPT" reset web-test-benchmark --repo-root "$REPO_ROOT" --apply
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BASELINE_FILE="$RESULTS_DIR/baseline_${TIMESTAMP}.txt"
+OPTIMIZED_FILE="$RESULTS_DIR/optimized_${TIMESTAMP}.txt"
 
-# Extract the final reported duration without making an otherwise successful
-# benchmark fail when a reporter omits that optional line.
+# Function to extract duration from test output
 extract_duration() {
-  local output_file="$1"
-  local duration
-  duration="$(sed -n 's/.*Duration: //p' "$output_file" | tail -n 1)"
-  printf '%s\n' "${duration:-not reported}"
+  grep "Duration:" | sed 's/.*Duration: \([0-9.]*s\).*/\1/' | sed 's/s//'
 }
 
 # Function to run and time tests
@@ -33,7 +27,7 @@ time_test() {
   local output_file=$2
 
   echo "Running: $test_file"
-  { time pnpm --dir "$REPO_ROOT" --filter @jovie/web test -- "$test_file" --reporter=verbose 2>&1; } 2>&1 | tee "$output_file"
+  { time npm test -- "$test_file" --reporter=verbose 2>&1; } 2>&1 | tee "$output_file"
 }
 
 echo "Phase 1: Benchmarking Individual Tests"
@@ -43,12 +37,12 @@ echo ""
 # Test 1: ProblemSolutionSection
 echo "1. ProblemSolutionSection"
 echo "   Original:"
-time_test "tests/unit/ProblemSolutionSection.test.tsx" "$RESULTS_DIR/original_problem.txt" > /dev/null 2>&1
-ORIG_PROB_TIME="$(extract_duration "$RESULTS_DIR/original_problem.txt")"
+time_test "tests/unit/ProblemSolutionSection.test.tsx" "$RESULTS_DIR/original_problem_${TIMESTAMP}.txt" > /dev/null 2>&1
+ORIG_PROB_TIME=$(grep "Duration:" "$RESULTS_DIR/original_problem_${TIMESTAMP}.txt" | sed 's/.*Duration: //')
 
 echo "   Optimized:"
-time_test "tests/unit/ProblemSolutionSection.optimized.test.tsx" "$RESULTS_DIR/optimized_problem.txt" > /dev/null 2>&1
-OPT_PROB_TIME="$(extract_duration "$RESULTS_DIR/optimized_problem.txt")"
+time_test "tests/unit/ProblemSolutionSection.optimized.test.tsx" "$RESULTS_DIR/optimized_problem_${TIMESTAMP}.txt" > /dev/null 2>&1
+OPT_PROB_TIME=$(grep "Duration:" "$RESULTS_DIR/optimized_problem_${TIMESTAMP}.txt" | sed 's/.*Duration: //')
 
 echo "   Results: $ORIG_PROB_TIME → $OPT_PROB_TIME"
 echo ""
@@ -56,12 +50,12 @@ echo ""
 # Test 2: ClaimHandleForm
 echo "2. ClaimHandleForm"
 echo "   Original:"
-time_test "tests/unit/ClaimHandleForm.test.tsx" "$RESULTS_DIR/original_claim.txt" > /dev/null 2>&1
-ORIG_CLAIM_TIME="$(extract_duration "$RESULTS_DIR/original_claim.txt")"
+time_test "tests/unit/ClaimHandleForm.test.tsx" "$RESULTS_DIR/original_claim_${TIMESTAMP}.txt" > /dev/null 2>&1
+ORIG_CLAIM_TIME=$(grep "Duration:" "$RESULTS_DIR/original_claim_${TIMESTAMP}.txt" | sed 's/.*Duration: //')
 
 echo "   Optimized:"
-time_test "tests/unit/ClaimHandleForm.optimized.test.tsx" "$RESULTS_DIR/optimized_claim.txt" > /dev/null 2>&1
-OPT_CLAIM_TIME="$(extract_duration "$RESULTS_DIR/optimized_claim.txt")"
+time_test "tests/unit/ClaimHandleForm.optimized.test.tsx" "$RESULTS_DIR/optimized_claim_${TIMESTAMP}.txt" > /dev/null 2>&1
+OPT_CLAIM_TIME=$(grep "Duration:" "$RESULTS_DIR/optimized_claim_${TIMESTAMP}.txt" | sed 's/.*Duration: //')
 
 echo "   Results: $ORIG_CLAIM_TIME → $OPT_CLAIM_TIME"
 echo ""
@@ -69,12 +63,12 @@ echo ""
 # Test 3: Health Checks
 echo "3. Health Checks"
 echo "   Original:"
-time_test "tests/lib/health-checks.test.ts" "$RESULTS_DIR/original_health.txt" > /dev/null 2>&1
-ORIG_HEALTH_TIME="$(extract_duration "$RESULTS_DIR/original_health.txt")"
+time_test "tests/lib/health-checks.test.ts" "$RESULTS_DIR/original_health_${TIMESTAMP}.txt" > /dev/null 2>&1
+ORIG_HEALTH_TIME=$(grep "Duration:" "$RESULTS_DIR/original_health_${TIMESTAMP}.txt" | sed 's/.*Duration: //')
 
 echo "   Optimized:"
-time_test "tests/lib/health-checks.optimized.test.ts" "$RESULTS_DIR/optimized_health.txt" > /dev/null 2>&1
-OPT_HEALTH_TIME="$(extract_duration "$RESULTS_DIR/optimized_health.txt")"
+time_test "tests/lib/health-checks.optimized.test.ts" "$RESULTS_DIR/optimized_health_${TIMESTAMP}.txt" > /dev/null 2>&1
+OPT_HEALTH_TIME=$(grep "Duration:" "$RESULTS_DIR/optimized_health_${TIMESTAMP}.txt" | sed 's/.*Duration: //')
 
 echo "   Results: $ORIG_HEALTH_TIME → $OPT_HEALTH_TIME"
 echo ""
@@ -88,11 +82,10 @@ echo ""
 
 # Run a subset of tests to demonstrate
 echo "Testing subset of unit tests..."
-{ time pnpm --dir "$REPO_ROOT" --filter @jovie/web test -- tests/unit --reporter=verbose 2>&1; } 2>&1 | tee "$RESULTS_DIR/full_suite.txt"
+{ time npm test -- tests/unit --reporter=verbose 2>&1; } 2>&1 | tee "$RESULTS_DIR/full_suite_${TIMESTAMP}.txt"
 
-SUITE_TIME="$(extract_duration "$RESULTS_DIR/full_suite.txt")"
-SUITE_TESTS="$(sed -n '/Tests /{p;q;}' "$RESULTS_DIR/full_suite.txt")"
-SUITE_TESTS="${SUITE_TESTS:-Tests: not reported}"
+SUITE_TIME=$(grep "Duration:" "$RESULTS_DIR/full_suite_${TIMESTAMP}.txt" | sed 's/.*Duration: //')
+SUITE_TESTS=$(grep "Tests " "$RESULTS_DIR/full_suite_${TIMESTAMP}.txt" | head -1)
 
 echo ""
 echo "=== Summary ==="

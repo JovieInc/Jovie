@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { readFileSync } from 'fs';
-import { writeIssueOutputAtomic } from './atomic-issue-output.mjs';
+import { readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
 
 const ISSUES_FILE = 'apps/web/.issues/sonar-issues-latest.json';
 
@@ -278,12 +278,15 @@ function analyzeIssues() {
       }
     });
 
-  // Replace the stable batch plan atomically.
-  const batchesPath = writeIssueOutputAtomic(
-    'batches-latest.json',
-    JSON.stringify(batches, null, 2)
-  );
+  // Save batches
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const batchesPath = join('apps/web/.issues', `batches-${timestamp}.json`);
+  writeFileSync(batchesPath, JSON.stringify(batches, null, 2));
   console.log(`💾 Saved ${batches.length} batches to: ${batchesPath}\n`);
+
+  const latestBatchesPath = join('apps/web/.issues', 'batches-latest.json');
+  writeFileSync(latestBatchesPath, JSON.stringify(batches, null, 2));
+  console.log(`💾 Latest: ${latestBatchesPath}\n`);
 
   // Print batch summary
   console.log('='.repeat(80));

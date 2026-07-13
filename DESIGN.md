@@ -33,7 +33,7 @@ Jovie historically used two related but distinct design systems based on surface
 | Public profiles | System B (public variant) | Expressive but product-native | `[username]/*` |
 | Legal / informational | System A (calmer variant) | Clean, readable | `(dynamic)/legal/*` |
 
-**Decision tree:** Everything → System B. Marketing/selling surfaces (blog, pricing, legal) use the editorial marketing language on System B tokens — System A is retired (founder-directed 2026-06-18, see banner above).
+**Decision tree:** Selling/explaining (blog, pricing, legal) → System A. Everything else (homepage, auth, app, profiles) → System B.
 
 Migration status: homepage migrated 2026-04-22; pricing, download, launch, artist-notifications, and pay since. **Full System A retirement is now in progress (founder-directed 2026-06-18), superseding the earlier 3-month deferral.** Remaining holdouts being reskinned onto System B tokens: `(marketing)/{about, ai, artist-profile, artist-profiles, blog, changelog, compare/[slug], alternatives/[slug], support, investors, voice, new}` and `(dynamic)/legal/*`. Each surface ships with its own `*-system-b-style-guard` test, and a global ratchet keeps the holdout list shrink-only.
 
@@ -370,7 +370,7 @@ These colors differentiate features in bento grids and semantic indicators. They
 **Usage rules:**
 - Apply accent color to feature card **title text only** via `text-[color:var(--accent-*)]`
 - Never use accent colors on CTAs, brand identity, icon backgrounds, or decorative elements
-- Feature accents are defined in `design-system.css` (lines 572-588 light, 840-856 dark, 1395-1401 aliases)
+- Feature accents are defined in `design-system.css` (lines 136-151 light, 362-377 dark, 816-823 aliases)
 
 ### Gray Scale (Radix-style)
 
@@ -537,17 +537,6 @@ the app feeling consistent even as new components land.
 
 These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
 
-### Interaction feedback
-
-- Press feedback uses the shared `--scale-press` token. The canonical value is
-  `0.98`: enough tactile response to register without visible shrink or jump.
-- Shared interactive primitives, including Button, apply the token once.
-  Feature code must not add its own `whileTap` scale or hardcoded active scale.
-- Hover and focus feedback do not scale controls. Use semantic surface, text,
-  border, opacity, or shadow changes that preserve geometry.
-- `prefers-reduced-motion: reduce` disables press transforms. Components that
-  intentionally opt out use the shared Button `static` contract.
-
 **Rule of thumb:** if the user's eye has to track the move (panel sliding in,
 surface growing), it's cinematic. If the user notices it only as feedback
 (button color change, focus ring), it's subtle. Never invent a third tier
@@ -575,63 +564,6 @@ Avoid in new code; prefer the intent tokens above.
 duration token (subtle, cinematic, and raw scale) drops to 0ms automatically.
 
 ---
-
-## App IA & Page Scaffold
-
-The authenticated product has one shell and one reviewed default navigation.
-`apps/web/components/features/dashboard/dashboard-nav/config.ts` is the code
-source of truth; this table records the founder-approved six entries rendered
-by the canonical customer shell. Settings and OV operator tools are contextual
-or mutually exclusive surfaces, not additions to this primary six-item IA.
-
-| Group | Item | Canonical destination | Behavior |
-|-------|------|-----------------------|----------|
-| Primary | Inbox | `/app` | Opens the opportunity and work queue |
-| Primary | Chat | `/app/chat` | Starts or resumes the conversation workspace |
-| Primary | Library | `/app/library` | Opens releases, audio, video, images, and files |
-| Primary | Contacts | `/app/contacts` | Opens the artist contact workspace |
-| Primary | Calendar | `/app/calendar` | Opens release dates, events, and calendar moments |
-| Primary | Tasks | `/app/tasks` | Opens the task workspace |
-
-Any permanent IA change must update `primaryNavigation`, its exact structure
-test, this table, and the route coverage test in the same change. Desktop and
-mobile navigation derive from the same ordered item identities.
-
-### Five Page Types
-
-| Type | Canonical scaffold | First action contract | Route rule |
-|------|--------------------|-----------------------|------------|
-| Inbox / work queue | Shell root + opportunity stack | The first actionable card exposes its decision; do not add a competing page-level CTA | `/app` is the signed-in home |
-| Conversation | Chat workspace + composer | Focus the composer or the next required prompt; the composer owns the primary action | `/app/chat` and `/app/chat/[id]` |
-| Collection / workspace | `PageShell` + `DashboardWorkspacePanel` + `PageToolbar` + framed content | Put at most one primary pill CTA at the toolbar end; filters, display, and navigation stay secondary/ghost | Use the canonical workspace route, never a new alias stub |
-| Entity detail | `EntitySidebarShell` inside the current workspace | Put the next entity action in the rail header or first rail section | Entity detail is rail-only; selecting a row must not create a second page scaffold or page-level entity route |
-| Settings | Settings shell/sidebar + `SettingsSection` | The first editable control begins the flow; one save/confirm action owns primary emphasis | Use the canonical `/app/settings/*` route |
-
-The **first-action contract** means the first viewport communicates exactly one
-next useful action. A page may have many available controls, but it must not
-present multiple primary pills, duplicate the same CTA across header/body/footer,
-or hide the first action behind redundant explanatory chrome. Empty, loading,
-error, and populated states reserve the same action slot so the action does not
-shift.
-
-### Route Canon
-
-- Canonical routes render their scaffold inside the shared authenticated shell.
-- Compatibility redirects are a shrink-only, explicitly baselined exception;
-  new `page.tsx` redirect stubs are blocked.
-- Search is the unified shell-header input, not a duplicate search page route
-  or command-palette popup.
-- Release rows and other entity rows open the right detail rail; task workflows
-  that are true multi-step workspaces retain their reviewed canonical route.
-- Reuse the canonical `EmptyState` family. New bespoke `*EmptyState.tsx`
-  components are blocked; compose an existing primitive or add a state variant.
-
-### IA Decisions
-
-| Date | Decision | Operating trigger |
-|------|----------|-------------------|
-| 2026-07-22 | **EVENT: One authenticated app shell.** Header, sidebar, content frame, and right rail are one system; routes may not introduce a parallel shell. | Ship now: extend the shared shell. Re-evaluate only for a mutually exclusive security boundary that cannot share authenticated navigation. Then: document that boundary before introducing another shell. |
-| 2026-07-22 | **Inbox is home.** `/app` renders the opportunity Inbox and Inbox is the first canonical customer navigation entry. | Ship now: keep `/app` as Inbox. Re-evaluate when 30 days of production navigation telemetry shows more than 25% of signed-in home visits immediately leave without an Inbox action. Then: test a different home entry while preserving one shell and one canonical `/app` route. |
 
 ## Component Patterns
 
@@ -716,23 +648,6 @@ Destructive actions use `destructive` on any variant. Examples: primary destruct
 |-------|-------|------|
 | Hover | `oklch(96.2% 0.003 260)` | `rgba(255,255,255,0.022)` |
 | Selected | `oklch(94.8% 0.006 260)` | `rgba(255,255,255,0.048)` |
-
-### Chat Agent Activity (Tool-Call Rows)
-
-Quiet tool-call / streaming activity in the chat transcript is a first-class System B pattern (GH #13897). It must stay visually subordinate to assistant prose — not a second card chrome family.
-
-| Property | Token / class | Notes |
-|----------|---------------|-------|
-| Indent | `--system-b-chat-activity-indent` (`space-4`) | One rhythm step in from prose left edge |
-| Size | `--system-b-chat-activity-size` (`text-xs`) | One step below chat body (`text-app`) |
-| Weight | `--system-b-chat-activity-weight` (`font-weight-book` / 450) | Lighter than prose |
-| Color | `--system-b-chat-activity-color` (secondary text) | Meta uses tertiary |
-| Surface | `.system-b-chat-activity-feed` + `.system-b-chat-activity-row` | No borders, no nested cards |
-| Motion | spin token + `prefers-reduced-motion` | Running icon only; duration tokens |
-
-**Do:** group consecutive tool steps into one indented activity run; reserve row min-height so body/next-step text does not shift layout.
-
-**Don't:** give activity rows `font-semibold`, primary text color, or full-width card chrome. Interactive empty-state CTAs stay on `.system-b-chat-action-card` (elevated). Artifact / confirm result cards use `.system-b-chat-tool-surface*`.
 
 ### Confirmations & Destructive Actions
 
@@ -853,7 +768,6 @@ The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical examp
 | Context | Convention | Example |
 |---------|------------|---------|
 | Headings (H1-H4) | Title Case | "Grow Your Audience" |
-| Marketing display headlines | Sentence case | "Jovie runs your music career." |
 | Button labels | Title Case | "Copy Profile Link" |
 | Nav / tab labels | Title Case | "Dashboard", "Identified" |
 | Column headers | Title Case | "Last Action" |
@@ -867,13 +781,6 @@ The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical examp
 - Never ALL CAPS except abbreviations (LTV, SMS, UTM)
 - Never lowercase first word of a visible label or heading
 - Dynamic strings forming readable phrases must start with a capital letter
-
-**Marketing display exception (founder-directed 2026-07-21):** large Satoshi
-display headlines on marketing/public surfaces (homepage hero and section
-titles) use sentence case — it reads more editorial and premium at display
-sizes. App/UI headings (H1-H4 inside the product) stay Title Case. In JSX,
-mark intentional marketing sentence-case headlines with
-`{/* ui-casing-allow: marketing display headline */}`.
 
 **Utility:** Use `capitalizeFirst()` from `apps/web/lib/utils/string-utils.ts` for dynamic data.
 
@@ -921,9 +828,6 @@ mark intentional marketing sentence-case headlines with
 | `apps/web/components/site/MarketingHeader.tsx` | Marketing header |
 | `apps/web/components/site/MarketingFooter.tsx` | Marketing footer |
 | `apps/web/components/features/auth/AuthLayout.tsx` | Product-funnel shell |
-| `apps/web/components/features/dashboard/dashboard-nav/config.ts` | Reviewed authenticated-shell navigation and rollout insertions |
-| `apps/web/components/shell/SidebarNavItem.tsx` | Canonical sidebar row and icon chrome |
-| `apps/web/components/organisms/table/molecules/PageToolbar.tsx` | Canonical workspace toolbar and action hierarchy |
 | `apps/web/components/homepage/*` | Homepage chat-intake implementation (System B) |
 | `apps/web/components/features/home/*` | Legacy marketing-home components (still used by `(marketing)/new/*`) |
 | `apps/web/app/(home)/layout.tsx` | Homepage shell — `MarketingHeader` (minimal) + `MarketingFooter` |
@@ -938,7 +842,7 @@ mark intentional marketing sentence-case headlines with
 | 2026-03-23 | Stay on OKLCH color space | Linear uses LCH for rendering but OKLCH-like generation; OKLCH is more modern and positions us for theme generation |
 | 2026-03-23 | Theme base hue: 282 | Match Linear's March 2026 refresh (shifted from 272) |
 | 2026-03-23 | Font weight book: 450 | Linear's default UI weight (was incorrectly set to 400) |
-| 2026-03-23 | Two accent colors: #7170ff (app) + #5E6AD2 (marketing CTA) | Linear uses different accent colors for app vs marketing surfaces. **Superseded 2026-04-11** by the neutral-CTA rule ("No brand color (Apple approach)"): CTAs are white-on-black; accent colors are supporting cast for feature differentiation only. |
+| 2026-03-23 | Two accent colors: #7170ff (app) + #5E6AD2 (marketing CTA) | Linear uses different accent colors for app vs marketing surfaces |
 | 2026-03-23 | Marketing always dark | Linear's marketing pages are dark-only; System A follows this |
 | 2026-03-25 | Remove `color-mix()` from content surfaces | Flat `var(--linear-app-content-surface)` renders more cleanly and avoids compositing artifacts |
 | 2026-03-25 | Right panel inside `<main>` content card | Matches Linear's unified card layout — sidebar and panel share one card with a thin left-border divider |

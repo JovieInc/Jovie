@@ -3,10 +3,17 @@ import {
   devices,
   type ReporterDescription,
 } from '@playwright/test';
-import { vercelAutomationHeaders } from './tests/e2e/utils/vercel-automation-headers';
 import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
 
-const vercelAutomation = vercelAutomationHeaders();
+// Build extra HTTP headers for Vercel Deployment Protection bypass
+// Both headers are required for browser automation to work correctly
+// See: https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation
+const extraHTTPHeaders: Record<string, string> = {};
+if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+  extraHTTPHeaders['x-vercel-protection-bypass'] =
+    process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  extraHTTPHeaders['x-vercel-set-bypass-cookie'] = 'samesitenone';
+}
 
 // Smoke test optimization: faster timeouts for quick feedback
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
@@ -27,9 +34,8 @@ const sentryE2eEnabled =
   process.env.SENTRY_E2E_REPORTING === '1' && Boolean(process.env.SENTRY_DSN);
 const shouldSerializeLocalBypassRuns = !isCI && useTestAuthBypass;
 
-const videoMode: 'off' | 'retain-on-failure' = isCI
-  ? 'off'
-  : 'retain-on-failure';
+const videoMode: 'off' | 'retain-on-failure' =
+  isCI && isSmokeOnly ? 'off' : 'retain-on-failure';
 
 const stableLocalServerCommand =
   process.env.E2E_WEB_SERVER_COMMAND ?? 'pnpm run dev:fast';
@@ -63,12 +69,8 @@ function getWorkers(): number | undefined {
 
 const ciReporters: ReporterDescription[] = [
   ['line'],
-  ...(vercelAutomation.active ||
-  process.env.PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE === 'true'
-    ? []
-    : ([
-        ['json', { outputFile: 'test-results/results.json' }],
-      ] as ReporterDescription[])),
+  ['html', { open: 'never' }],
+  ['json', { outputFile: 'test-results/results.json' }],
 ];
 
 if (sentryE2eEnabled) {
@@ -76,7 +78,6 @@ if (sentryE2eEnabled) {
 }
 
 export default defineConfig({
-  captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
   // Exclude nightly tests - they run via playwright.config.nightly.ts on schedule
   testIgnore: ['**/nightly/**'],
@@ -112,14 +113,13 @@ export default defineConfig({
 
   use: {
     baseURL,
-    trace: isCI ? 'off' : 'on-first-retry',
+    trace: 'on-first-retry',
     video: videoMode,
     // Turbopack compilation needs longer timeouts even for smoke tests
     navigationTimeout: isSmokeOnly ? 60_000 : 120_000, // 60s for smoke, 120s for full (Turbopack)
     actionTimeout: isSmokeOnly ? 20_000 : 30_000, // Increased for slow page loads
-    ...(vercelAutomation.active && {
-      extraHTTPHeaders: vercelAutomation.headers,
-    }),
+    // Add Vercel bypass header when secret is available (for staging/canary)
+    ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
     // Reuse authenticated session from global setup
     // Tests can override this by not using the storage state fixture
     storageState: 'tests/.auth/user.json',
@@ -173,6 +173,7 @@ export default defineConfig({
           // In CI with ephemeral DB, doppler is configured via environment
           command: webServerCommand,
           env: {
+            ...process.env,
             NODE_ENV: 'test',
             PORT: managedWebServerPort,
             NEXT_PUBLIC_E2E_MODE: '1',

@@ -42,16 +42,11 @@ export function decideRendererRecovery(input: {
 }
 
 /**
- * Only arm the boot watchdog for real hosted navigations on the app origin —
- * the app origin is the only one that ever sends the app-booted ping, so
- * arming for any other http(s) URL is a guaranteed false-positive.
- * Skip data: recovery pages, about:blank, and devtools so the failure shell
- * cannot re-trigger itself and auth blanks don't false-alarm.
+ * Only arm the boot watchdog for real hosted navigations.
+ * Skip data: recovery pages, about:blank, and non-http(s) schemes so the
+ * failure shell cannot re-trigger itself and auth blanks don't false-alarm.
  */
-export function shouldArmRendererBootWatchdog(
-  url: string,
-  appOrigin: string
-): boolean {
+export function shouldArmRendererBootWatchdog(url: string): boolean {
   if (!url) return false;
   if (url === 'about:blank') return false;
   if (url.startsWith('data:')) return false;
@@ -59,7 +54,7 @@ export function shouldArmRendererBootWatchdog(
 
   try {
     const parsed = new URL(url);
-    return parsed.origin === appOrigin;
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
   } catch {
     return false;
   }

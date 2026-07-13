@@ -45,7 +45,7 @@ describe('@critical GET /api/health/build-info', () => {
 
   it('prefers build-time commit sha when available in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abcdef1234567890');
+    vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abcdef1');
     vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '1234567890abcdef');
 
     const { GET } = await import('@/app/api/health/build-info/route');
@@ -76,41 +76,5 @@ describe('@critical GET /api/health/build-info', () => {
 
     const body = await response.json();
     expect(body.buildId).toBe('development');
-  });
-
-  it('returns the build-time app version instead of the 0.0.0 fallback (JOV-3459)', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '26.6.61');
-
-    const { GET } = await import('@/app/api/health/build-info/route');
-    const response = GET();
-    const body = await response.json();
-
-    expect(body.version).toBe('26.6.61');
-    expect(body.version).not.toBe('0.0.0');
-  });
-
-  it('falls back to bundled version.json when env version is empty (JOV-3459)', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '');
-
-    const { GET } = await import('@/app/api/health/build-info/route');
-    const response = GET();
-    const body = await response.json();
-
-    expect(body.version).not.toBe('0.0.0');
-    expect(body.version).toMatch(/^\d+\.\d+\.\d+$/);
-  });
-
-  it('falls back to bundled version.json when env version is the placeholder', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '0.0.0');
-
-    const { GET } = await import('@/app/api/health/build-info/route');
-    const response = GET();
-    const body = await response.json();
-
-    expect(body.version).not.toBe('0.0.0');
-    expect(body.version).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });

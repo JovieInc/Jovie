@@ -41,8 +41,7 @@ Jovie is a **100% autonomous shipping** company during development.
 - `CI / PR Ready`, `CI / Migration Guard`, security jobs (Trivy, Gitleaks, Sonar, etc.) — **strict**: every check that ran must succeed
 - `lib/pr_gates.taste_surface` — taste-touching diffs → label `needs-human-taste`, not generic `needs-human`
 - `scripts/taste-label-guard.mjs` (workflow: `Taste Label Guard`) — backstop that auto-clears mis-applied taste labels per the rule below
-- GitHub native merge queue (`merge-queue` intent label), squash, and the
-  repository ruleset
+- Graphite merge queue (`merge-queue` label), squash, signed commits per ruleset
 - Hermes `pr-autofix`, `drain-pr-queue`, `pr-merge-queue` (when `HERMES_AUTOMERGE=1`)
 
 ## What counts as a taste call (canonical, 2026-06-26)
@@ -77,7 +76,7 @@ flip a dashboard toggle).
 | `approved:taste` / `tim-approved` | Taste override — does not bypass CI |
 | `hold` / `gated` | Explicit pause (incident, experiment) |
 | `needs-agent-fix` | Machine second-opinion/spec failed — **agent** fixes, not human review queue |
-| `merge-queue` | Requests native queue enrollment; authoritative membership lives in GitHub's queue |
+| `merge-queue` | Enrolled in Graphite MQ |
 
 **Deprecated for dev-loop gating:** `needs-human` as a generic blocker; `blocked:migration`, `blocked:auth`, `blocked:payments` as human-merge gates (use CI instead).
 

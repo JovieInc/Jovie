@@ -52,7 +52,7 @@
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);
   --avatar-size: clamp(88px, 22vw, 144px);
-  --cover-height: clamp(220px, 34svh, 400px);
+  --cover-height: clamp(300px, min(94vw, 46svh), 430px);
   --content-max: 720px;
   --profile-bottom-nav-height: calc(
     3.125rem +
@@ -64,38 +64,12 @@
   --ds-public-content-max: 1298px; /* canonical public/marketing width */
   --ds-prose-max: 680px; /* prose exception */
 
-  /* Marketing display type scale (System B public surfaces). One canonical
-     ramp for hero display, section titles, and ledes so marketing pages share
-     a single visual hierarchy instead of per-section one-off clamps. Satoshi
-     display + Inter body per the approved exception in DESIGN.md. */
-  --ds-marketing-display-size: clamp(4rem, 6.9vw, 6.25rem);
-  --ds-marketing-display-leading: 0.94;
-  --ds-marketing-display-tracking: -0.045em;
-  --ds-marketing-title-size: clamp(
-    var(--text-4xl),
-    4.6vw,
-    calc(var(--text-5xl) + var(--space-4))
-  );
-  --ds-marketing-title-leading: 1.08;
-  --ds-marketing-title-tracking: 0;
-  --ds-marketing-lede-size: clamp(1.25rem, 1.6vw, 1.375rem);
-  --ds-marketing-lede-leading: var(--leading-normal);
-  --ds-marketing-lede-tracking: -0.015em;
-  /* Eyebrow / kicker spec: quiet uppercase-free label above section titles.
-     0 tracking per the System B contract (see trust-strip style guard). */
-  --ds-marketing-eyebrow-size: calc(var(--text-xs) - 1px);
-  --ds-marketing-eyebrow-weight: var(--font-weight-medium);
-  --ds-marketing-eyebrow-leading: var(--leading-tight);
-  --ds-marketing-eyebrow-tracking: 0;
-  --ds-marketing-eyebrow-color: var(--color-text-tertiary-token);
-
   /* Shell V1 semantic aliases — app chrome should prefer these names when
      touching shared shell geometry. They intentionally resolve to the current
      Linear-derived values so this pass changes the token contract, not visuals. */
   --app-shell-sidebar-width: var(--linear-app-sidebar-width);
   --app-shell-header-height: var(--linear-app-header-height);
   --app-shell-header-height-compact: var(--linear-app-header-height-compact);
-  --app-shell-footer-row-height: calc(var(--space-6) + var(--space-1-5));
   --app-shell-gap: var(--linear-app-shell-gap);
   --app-shell-radius: var(--linear-app-shell-radius);
   --app-shell-border: var(--linear-app-shell-border);
@@ -147,26 +121,9 @@
   --system-b-chat-message-content-max: 66ch;
   --system-b-chat-body-size: var(--text-app);
   --system-b-chat-body-line-height: 1.5;
-  /* Agent activity (tool-call status rows) — one step subordinate to prose */
-  --system-b-chat-activity-indent: var(--space-4);
-  --system-b-chat-activity-size: var(--text-xs);
-  --system-b-chat-activity-line-height: var(--space-4);
-  --system-b-chat-activity-weight: var(--font-weight-book);
-  --system-b-chat-activity-color: var(--color-text-secondary-token);
-  --system-b-chat-activity-meta-color: var(--color-text-tertiary-token);
-  --system-b-chat-activity-gap: var(--space-0-5);
-  --system-b-chat-activity-row-py: var(--space-1);
-  --system-b-chat-activity-icon-size: 0.875rem;
-  --system-b-chat-activity-timeline-color: color-mix(
-    in oklab,
-    var(--linear-app-shell-border) 70%,
-    transparent
-  );
   --system-b-chat-composer-max-width: 45rem;
-  /* Content-safe inset so sticky composer dock never covers last messages/cards.
-     Sized for compact dock (input + padding + safe-area); keep ≥ dock height. */
-  --system-b-chat-composer-thread-scroll-padding: 11rem;
-  --system-b-chat-composer-scroll-fade-height: 8rem;
+  --system-b-chat-composer-thread-scroll-padding: 9rem;
+  --system-b-chat-composer-scroll-fade-height: 7rem;
   --system-b-chat-loading-composer-height: 88px;
   --system-b-duration-fast: var(--ds-motion-subtle-duration);
   --system-b-ease: var(--ds-motion-subtle-easing);
@@ -206,7 +163,7 @@
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);
   --avatar-size: clamp(88px, 22vw, 144px);
-  --cover-height: clamp(220px, 34svh, 400px);
+  --cover-height: clamp(300px, min(94vw, 46svh), 430px);
   --content-max: 720px;
 }
 
@@ -329,124 +286,6 @@
   );
 }
 
-/* Single hero legibility gradient, limited to the bottom ~55% of the cover so
-   the artist photo stays clearly visible in the upper zone. Replaces the old
-   stacked full-height scrims (profile-cover-home-gradient +
-   profile-cover-home-fade) that darkened the whole photo. */
-:where(.profile-cover-home-gradient) {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  height: 55%;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(3, 4, 6, 0.42) 52%,
-    rgba(5, 6, 8, 0.9) 86%,
-    var(--profile-stage-bg) 100%
-  );
-}
-
-/* Profile home carousel card geometry: one 3:4 shape that fills the remaining
-   viewport height. Width derives from height via aspect-ratio; the max-height
-   cap keeps width at or under ~78vw (width = 0.75 × height). Cards center
-   vertically when the track is taller than the capped card height. */
-:where(.profile-entity-card) {
-  aspect-ratio: 3 / 4;
-  height: 100%;
-  max-height: 104vw;
-  align-self: center;
-  /* Size container so card content can respond to the card's own height. */
-  container-type: size;
-  transition:
-    transform var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
-    opacity var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
-}
-
-/* Direction C public-profile rail: one full-content-width card per snap. The
-   9:4 footprint gives the inset square media roughly 42% of the card width,
-   leaving a compact copy/action column. Its 4px artwork radius steps down from
-   the 18px card surface and avoids clipping the artwork with the card border.
-   Portrait remains the default for every other EntityCarousel consumer. */
-:where(.profile-entity-card[data-layout="profile-landscape"]) {
-  aspect-ratio: 9 / 4;
-  width: 100%;
-  height: auto;
-  max-height: none;
-  align-self: flex-start;
-  container-type: inline-size;
-}
-
-/* Unified card anatomy: the art zone is a full-width square, so the text
-   zone + CTA share (card height − card width). Progressive disclosure keeps
-   every line whole instead of clipping mid-line: the meta line hides below
-   the height where it fits (~448px), and the eyebrow hides below the height
-   where it fits next to the title (~360px) — title and CTA always fit. */
-@container (max-height: 447px) {
-  :where(.profile-entity-card:not([data-layout="profile-landscape"]))
-    .entity-card-meta {
-    display: none;
-  }
-}
-
-@container (max-height: 359px) {
-  :where(.profile-entity-card:not([data-layout="profile-landscape"]))
-    .entity-card-eyebrow {
-    display: none;
-  }
-}
-
-/* Scroll-driven edge treatment (transform/opacity only; applied via
-   IntersectionObserver and skipped entirely under reduced motion). */
-:where(.profile-entity-card[data-edge="true"]) {
-  transform: scale(0.96);
-  opacity: 0.75;
-}
-
-:where(
-  .profile-entity-card[data-layout="profile-landscape"][data-edge="true"]
-) {
-  transform: scale(0.985);
-  opacity: 0.82;
-}
-
-/* Chromeless top-chrome icon buttons (back / overflow menu): glyph-only by
-   default, with a legibility drop-shadow so the glyph reads over hero media on
-   touch devices that never hover. The pearl circle reveals on hover /
-   focus-visible only. Unlayered on purpose so it beats the layered variant
-   utilities on the same element. */
-.profile-top-chrome-icon {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  color: var(--profile-status-pill-fg);
-}
-
-.profile-top-chrome-icon > svg {
-  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.72))
-    drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
-}
-
-@media (hover: hover) {
-  .profile-top-chrome-icon:hover {
-    border-color: var(--profile-pearl-border);
-    background: var(--profile-pearl-bg);
-    box-shadow: var(--profile-pearl-shadow);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-  }
-}
-
-.profile-top-chrome-icon:focus-visible {
-  border-color: var(--profile-pearl-border);
-  background: var(--profile-pearl-bg);
-  box-shadow: var(--profile-pearl-shadow);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-}
-
 :where(.profile-horizontal-rail) {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -467,38 +306,6 @@
   display: none;
   width: 0;
   height: 0;
-}
-
-/* Compact profile tab entry. The outgoing panel is replaced in-place, so this
-   transform never participates in layout and cannot move the dock or header. */
-:where(.profile-primary-tab-transition) {
-  animation: profile-tab-enter var(--ds-motion-subtle-duration)
-    var(--ds-motion-subtle-easing) both;
-}
-
-:where(.profile-primary-tab-transition[data-direction="-1"]) {
-  --profile-tab-enter-offset: -6px;
-}
-
-:where(.profile-primary-tab-transition[data-direction="1"]) {
-  --profile-tab-enter-offset: 6px;
-}
-
-@keyframes profile-tab-enter {
-  from {
-    opacity: 0;
-    transform: translateX(var(--profile-tab-enter-offset, 6px));
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :where(.profile-primary-tab-transition) {
-    animation: none;
-  }
 }
 
 :where(.profile-aeo-content__heading),
@@ -528,26 +335,6 @@
 :where(.profile-aeo-content__source:hover) {
   color: var(--profile-aeo-text);
   text-decoration-color: var(--profile-aeo-text);
-}
-
-:where(.profile-aeo-content__facts) {
-  border-color: var(--profile-aeo-border);
-}
-
-:where(.profile-aeo-content__fact-value) {
-  color: var(--profile-aeo-text);
-}
-
-:where(.profile-aeo-content__fact-label),
-:where(.profile-aeo-content__link-label),
-:where(.profile-aeo-content__link),
-:where(.profile-aeo-content__share) {
-  color: var(--profile-aeo-muted);
-}
-
-:where(.profile-aeo-content__link:hover),
-:where(.profile-aeo-content__share:hover) {
-  color: var(--profile-aeo-text);
 }
 
 :where(.profile-aeo-claim-card) {
@@ -612,10 +399,16 @@
   }
 }
 
-/* Compact mobile home hero: one definite token-driven height on every
-   viewport (--cover-height, clamp(220px, 34svh, 400px)). The hero never
-   shrink-wraps; media crops via object-cover and the carousel below owns the
-   remaining viewport height. */
+/* Compact mobile home hero: reserve room for the showcase release card below.
+   On short viewports (≤820px tall) cap the cover at 190px so the bento card
+   stays above the fold (profile-mobile-viewport-stability). Media crops via
+   object-cover; content below the hero scrolls. */
+[data-testid="profile-compact-surface"][data-mode="profile"] {
+  @media (max-height: 820px) {
+    --cover-height: 190px;
+  }
+}
+
 /* Query-mode profile URLs are served from the ISR home shell, then hydrate into
    the requested mode from window.location. Match the mode header on first paint
    so hydration does not move the compact profile frame. */
@@ -645,6 +438,9 @@ html[data-profile-initial-mode]
   .profile-cover-home-gradient,
 html[data-profile-initial-mode]
   [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-home-fade,
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
   [data-testid="profile-hero-identity-block"] {
   display: none !important;
 }
@@ -657,10 +453,7 @@ html[data-profile-initial-mode]
 
 @media (min-width: 768px) {
   .public-profile-compact-shell {
-    /* Proportional hero: on short desktop windows the shell shrinks below
-       740px and a fixed 340px hero would crush the carousel to a sliver.
-       Share the shell height instead (45%, floored at 200px). */
-    --cover-height: clamp(200px, 45%, 340px);
+    --cover-height: 340px;
     height: min(740px, calc(100dvh - (var(--page-pad) * 2)));
   }
 }
@@ -1781,7 +1574,7 @@ html[data-profile-initial-mode]
 
   /* Canonical press-feedback scale for pressable elements
      (.claude/rules/ui.md + .claude/rules/motion.md — tactile, interruptible) */
-  --scale-press: 0.98;
+  --scale-press: 0.96;
 
   /* Pre-composed transition patterns (extracted from Linear)
      Use duration custom properties so prefers-reduced-motion overrides work */
@@ -2020,16 +1813,15 @@ html[data-profile-initial-mode]
    ============================================
 
    Activate Linear styling on marketing pages by adding
-   [data-theme="linear"] to a parent element or the semantic
-   .system-b-marketing wrapper. The legacy .linear-marketing class is
-   retired (System A teardown, 2026-07-21).
+   [data-theme="linear"] to a parent element or using
+   the .linear-marketing class.
 
    This maps Linear tokens to the existing design system
    variables for seamless integration.
 */
 
 [data-theme="linear"],
-.system-b-marketing {
+.linear-marketing {
   /* Unified type (one system, two languages): Inter body + UI; Satoshi reserved
      for display/headings (approved exception). DM Sans retired 2026-06-18. */
   font-family: var(--font-sans);
@@ -2067,7 +1859,7 @@ html[data-profile-initial-mode]
   --color-border-focus: var(--linear-border-focus);
 }
 
-.system-b-marketing.dark,
+.linear-marketing.dark,
 .home-viewport.dark,
 .system-b-root-not-found-page.dark {
   --linear-text-primary: #f7f8f8;
@@ -2154,7 +1946,7 @@ html:not(.dark) [data-testid^="profile-mode-drawer"] :where(a, button, span) {
   transition: none !important;
 }
 
-html:not(.dark) .system-b-marketing :where(a, button, span),
+html:not(.dark) .linear-marketing :where(a, button, span),
 html:not(.dark) [data-testid="header-nav"] a[href="/signin"],
 html:not(.dark) [data-testid="not-found"] :where(a, button, span),
 html:not(.dark) .smart-link-powered-by {
@@ -2165,19 +1957,18 @@ html:not(.dark) .smart-link-powered-by {
   color: rgb(64 64 64) !important;
 }
 
-/* Marketing typography: headings use Satoshi (display font). Product controls
-   on semantic System B surfaces use Inter. */
-.system-b-marketing h1,
-.system-b-marketing h2,
-.system-b-marketing h3,
-.system-b-marketing h4 {
+/* Marketing typography: headings and buttons use Satoshi (display font) */
+.linear-marketing h1,
+.linear-marketing h2,
+.linear-marketing h3,
+.linear-marketing h4 {
   font-family: var(--marketing-font-display);
 }
 
-.system-b-marketing button,
-.system-b-marketing [role="button"],
-.system-b-marketing a[class*="btn"] {
-  font-family: var(--marketing-font-body);
+.linear-marketing button,
+.linear-marketing [role="button"],
+.linear-marketing a[class*="btn"] {
+  font-family: var(--marketing-font-display);
   letter-spacing: -0.01em;
 }
 
@@ -2976,27 +2767,6 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
 }
 
 /* ============================================
-   SYSTEM B MARKETING NOT-FOUND PRIMITIVES
-   ============================================ */
-
-:where(.system-b-marketing-not-found) {
-  min-height: calc(100vh - var(--space-16) * 2);
-}
-
-:where(.system-b-marketing-not-found-code) {
-  display: block;
-  color: var(--color-text-quaternary-token);
-  font-size: clamp(
-    calc(var(--space-24) + var(--space-6)),
-    16vw,
-    calc(var(--space-24) + var(--space-16))
-  );
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--tracking-normal);
-  line-height: 1;
-}
-
-/* ============================================
    SYSTEM B ERROR FALLBACK PRIMITIVES
    ============================================ */
 
@@ -3279,173 +3049,68 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
    SYSTEM B START LOADING PRIMITIVES
    ============================================ */
 
-/* Host matching the SidebarProvider wrapper the resolved /start page renders
-   around AppShellFrame (flex h-svh w-full overflow-x-hidden bg-base). */
 :where(.system-b-start-loading-page) {
-  display: flex;
-  width: 100%;
-  height: 100svh;
-  overflow-x: hidden;
-  background: var(--system-b-bg-page);
-  color: var(--system-b-text-primary);
-  color-scheme: dark;
-}
-
-/* OnboardingShell main wrapper + chat section: fills the shell content panel. */
-:where(.system-b-start-loading-main) {
   position: relative;
   display: flex;
+  height: 100%;
   min-height: 0;
   flex: 1 1 auto;
   flex-direction: column;
   overflow: hidden;
   background: var(--system-b-app-content-surface);
+  color: var(--system-b-text-primary);
+  color-scheme: dark;
 }
 
-/* Chat scroll area (px-4 py-5 sm:px-6 lg:px-8 on the resolved page). */
 :where(.system-b-start-loading-scroll) {
-  position: relative;
   flex: 1 1 auto;
   overflow-y: auto;
-  padding-block: var(--space-5);
-  padding-inline: var(--space-4);
+  padding-block: clamp(var(--space-5), 4svh, var(--space-8));
+  padding-inline: clamp(var(--space-4), 4vw, var(--space-8));
 }
 
-@media (min-width: 640px) {
-  :where(.system-b-start-loading-scroll) {
-    padding-inline: var(--space-6);
-  }
-}
-
-@media (min-width: 1024px) {
-  :where(.system-b-start-loading-scroll) {
-    padding-inline: var(--space-8);
-  }
-}
-
-/* Centering column (max-w-[52rem] justify-center on the resolved page). */
-:where(.system-b-start-loading-column) {
+:where(.system-b-start-loading-content) {
   display: flex;
   width: 100%;
   min-height: 100%;
-  max-width: 52rem;
-  flex-direction: column;
-  justify-content: center;
-  margin-inline: auto;
-}
-
-/* ChatEmptyStateComposerRegion: content shell + centered flex region. */
-:where(.system-b-start-loading-region) {
-  position: relative;
-  display: flex;
-  width: 100%;
-  max-width: var(--system-b-chat-composer-max-width);
-  min-height: 100%;
+  max-width: var(--app-shell-content-max-reading);
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--space-6);
   margin-inline: auto;
-  padding-block: var(--space-8);
-  padding-inline: var(--space-1);
 }
 
-/* Empty-state intro, anchored to the region midline exactly like the resolved
-   `above` slot (absolute inset-x-0 bottom-1/2 mb-12, max-w-[44rem]). */
-:where(.system-b-start-loading-intro) {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 50%;
-  z-index: 1;
+:where(.system-b-start-loading-mark) {
   display: flex;
-  width: 100%;
-  max-width: 44rem;
-  max-height: min(46svh, calc(var(--space-24) * 4));
-  flex-direction: column;
-  gap: var(--space-4);
-  margin-inline: auto;
-  margin-bottom: var(--space-12);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-inline: var(--space-1);
-  padding-bottom: var(--space-1);
-}
-
-:where(.system-b-start-loading-intro-message) {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-:where(.system-b-start-loading-intro-line) {
-  width: 72%;
-  height: var(--space-4);
-}
-
-:where(.system-b-start-loading-intro-line:last-child) {
-  width: 46%;
-}
-
-:where(.system-b-start-loading-intro-pills) {
-  display: flex;
-  gap: var(--space-2);
-  overflow: hidden;
-}
-
-:where(.system-b-start-loading-intro-pill) {
+  width: var(--space-8);
   height: var(--space-8);
   flex-shrink: 0;
-  border-radius: var(--system-b-radius-pill);
-}
-
-:where(.system-b-start-loading-intro-pill:nth-child(1)) {
-  width: calc(var(--space-24) + var(--space-20));
-}
-
-:where(.system-b-start-loading-intro-pill:nth-child(2)) {
-  width: calc(var(--space-24) + var(--space-10));
-}
-
-:where(.system-b-start-loading-intro-pill:nth-child(3)) {
-  width: calc(var(--space-24) + var(--space-16));
-}
-
-:where(.system-b-start-loading-intro-pill:nth-child(4)) {
-  width: calc(var(--space-24) + var(--space-20));
-}
-
-:where(.system-b-start-loading-intro-footer) {
-  width: calc(var(--space-24) + var(--space-24));
-  height: var(--space-3);
-  margin-inline: auto;
-}
-
-:where(.system-b-start-loading-composer-anchor) {
-  position: relative;
-  z-index: 1;
-  width: 100%;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.92;
 }
 
 :where(.system-b-start-loading-composer-wrap) {
   width: 100%;
-  max-width: var(--system-b-chat-composer-max-width);
-  margin-inline: auto;
+  max-width: var(--app-shell-content-max-form);
 }
 
-/* Resolved composer surface: 1px seam border, 3xl radius, content-surface
-   fill, shared chat loading composer height token (matches ChatInput empty
-   geometry within a couple px). */
 :where(.system-b-start-loading-composer) {
-  height: var(--system-b-chat-loading-composer-height);
   overflow: hidden;
   border: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 84%, transparent);
-  border-radius: var(--radius-3xl);
-  background: var(--system-b-app-content-surface);
+  border-radius: var(--system-b-radius-pill);
+  background: color-mix(
+    in oklab,
+    var(--system-b-app-content-surface) 88%,
+    var(--system-b-bg-page) 12%
+  );
 }
 
 :where(.system-b-start-loading-composer-row) {
   display: flex;
-  height: 100%;
+  min-height: calc(var(--space-10) + var(--space-4));
   align-items: center;
   gap: var(--space-2);
   padding-block: var(--space-2);
@@ -4595,16 +4260,15 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(.system-b-chat-entity-panel-section) {
-  /* Tighter right-rail section rhythm — less nested chrome (JOV-3511). */
-  padding: var(--space-2) var(--space-2) 0;
+  padding: var(--space-3) var(--space-3) 0;
 }
 
 :where(.system-b-chat-entity-panel-section:last-child) {
-  padding-bottom: var(--space-2);
+  padding-bottom: var(--space-3);
 }
 
 :where(.system-b-chat-entity-panel-card) {
-  padding: var(--space-2) var(--space-2-5);
+  padding: var(--space-3);
 }
 
 :where(.system-b-chat-entity-panel-header-copy) {
@@ -4759,14 +4423,13 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(.system-b-chat-release-artwork) {
-  /* Compact thumbnail — not a hero image in the right rail (JOV-3511). */
   position: relative;
-  width: var(--space-10);
-  height: var(--space-10);
+  width: var(--space-16);
+  height: var(--space-16);
   flex-shrink: 0;
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
 }
 
 :where(.system-b-chat-release-copy) {
@@ -4809,36 +4472,33 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(.system-b-chat-entity-action-link) {
-  /* Square / pill at rest without border; circle treatment on hover (JOV-3511). */
   display: inline-flex;
   height: var(--space-8);
   align-items: center;
   gap: var(--space-1-5);
-  border: 1px solid transparent;
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
-  background: transparent;
+  background: var(--system-b-bg-surface-1);
   padding-inline: var(--space-3);
   color: var(--color-text-primary-token);
   font-size: var(--text-2xs);
   font-weight: var(--font-weight-medium);
-  transition-property: background-color, border-color, border-radius;
+  transition-property: background-color, border-color;
   transition-duration: 150ms;
 }
 
 :where(.system-b-chat-entity-action-link:hover) {
-  border-color: var(--color-border-subtle);
-  border-radius: var(--radius-full);
+  border-color: var(--color-border-default);
   background: var(--color-bg-surface-2);
 }
 
 :where(.system-b-chat-entity-audio-card),
 :where(.system-b-chat-entity-note-card) {
-  /* Flat surface — drop elevated card shadow in the already-carded rail. */
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   background: var(--color-bg-surface-1);
-  box-shadow: none;
-  padding: var(--space-2) var(--space-2-5);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-2-5) var(--space-3);
   color: var(--color-text-secondary-token);
   font-size: var(--text-nav);
 }
@@ -4846,8 +4506,8 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 :where(.system-b-chat-entity-audio-label) {
   display: flex;
   align-items: center;
-  gap: var(--space-1-5);
-  margin-bottom: var(--space-1-5);
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
   color: var(--color-text-secondary-token);
   font-size: var(--text-2xs);
   font-weight: var(--font-weight-semibold);
@@ -5124,31 +4784,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     var(--jovie-entity-accent) 82%,
     var(--color-text-primary-token) 18%
   );
-}
-
-/* Inline entity links in public profile bio/AEO copy. The entity-kind accent
-   is provided via the `--jovie-entity-accent` custom property on the link. */
-.profile-entity-mention {
-  color: var(--jovie-entity-accent);
-  text-decoration-color: color-mix(
-    in srgb,
-    var(--jovie-entity-accent) 45%,
-    transparent
-  );
-  transition:
-    color var(--system-b-duration-fast) var(--system-b-ease),
-    text-decoration-color var(--system-b-duration-fast) var(--system-b-ease);
-}
-
-.profile-entity-mention:hover,
-.profile-entity-mention:focus-visible {
-  text-decoration-color: var(--jovie-entity-accent);
-}
-
-.profile-entity-mention:focus-visible {
-  outline: 2px solid var(--jovie-entity-accent);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
 }
 
 .system-b-assistant-skill-mention {
@@ -5471,15 +5106,14 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(.system-b-thread-audio-artwork) {
-  /* Small audio thumbnail in thread messages (JOV-3511). */
   display: grid;
-  width: var(--space-8);
-  height: var(--space-8);
+  width: var(--space-10);
+  height: var(--space-10);
   flex-shrink: 0;
   place-items: center;
   border-radius: var(--radius-sm);
   background: var(--system-b-bg-surface-2);
-  box-shadow: none;
+  box-shadow: var(--shadow-button-inset);
 }
 
 :where(.system-b-thread-audio-copy) {
@@ -8832,12 +8466,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   box-shadow: none;
 }
 
-.system-b-chat-composer-input {
-  color: var(--color-text-primary-token);
-  caret-color: var(--color-text-primary-token);
-  -webkit-text-fill-color: currentColor;
-}
-
 :where(.system-b-chat-composer-surface[data-hero="true"]) {
   background: color-mix(
     in oklab,
@@ -8871,10 +8499,7 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     color-mix(in oklab, var(--color-border-focus) 42%, transparent);
 }
 
-/* Web composer focus mode — sidebar dims; right rail fully yields (desktop).
-   Partial translate left the rail slot occupying width/stacking so the focus
-   picker painted over the profile card (JOV-4041). Collapse width to 0 so the
-   main column owns the full canvas; blur restores prior rail state. */
+/* Web composer focus mode — sidebar dims, right rail slides off (desktop only). */
 @media (min-width: 1024px) {
   :where(
     [data-app-shell-frame][data-composer-focus="true"]
@@ -8887,14 +8512,7 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     [data-app-shell-frame][data-composer-focus="true"]
       [data-testid="app-shell-right-rail"]
   ) {
-    width: 0 !important;
-    min-width: 0 !important;
-    max-width: 0 !important;
-    opacity: 0;
-    overflow: hidden;
-    pointer-events: none;
-    border: none;
-    transform: none;
+    transform: translateX(40%);
   }
 }
 
@@ -9098,37 +8716,25 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-  /* End padding so the last chip can scroll fully past the edge fade. */
-  scroll-padding-inline: var(--space-3);
+  scrollbar-width: none;
   mask-image: linear-gradient(
     to right,
     transparent 0,
-    black 12px,
-    black calc(100% - 28px),
+    black 18px,
+    black calc(100% - 18px),
     transparent 100%
   );
   -webkit-mask-image: linear-gradient(
     to right,
     transparent 0,
-    black 12px,
-    black calc(100% - 28px),
+    black 18px,
+    black calc(100% - 18px),
     transparent 100%
   );
 }
 
 :where(.system-b-chat-prompt-rail-scroll::-webkit-scrollbar) {
-  height: 3px;
-}
-
-:where(.system-b-chat-prompt-rail-scroll::-webkit-scrollbar-thumb) {
-  background: color-mix(
-    in oklab,
-    var(--color-text-tertiary-token) 40%,
-    transparent
-  );
-  border-radius: var(--radius-full);
+  display: none;
 }
 
 :where(.system-b-chat-prompt-rail) {
@@ -9137,8 +8743,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   flex-wrap: nowrap;
   align-items: stretch;
   gap: var(--space-1-5);
-  /* Trailing spacer: last chip fully reachable under the edge mask. */
-  padding-inline: 2px calc(var(--space-6) + var(--space-2));
 }
 
 :where(.system-b-chat-prompt-pill) {
@@ -9190,8 +8794,8 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(.system-b-chat-prompt-pill-default) {
-  min-width: 11.5rem;
-  max-width: 16.5rem;
+  min-width: 168px;
+  max-width: 228px;
   padding: var(--space-1-5) var(--space-3);
   font-size: var(--text-xs);
 }
@@ -9661,157 +9265,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   color: var(--color-text-primary-token);
   font-size: var(--system-b-chat-body-size);
   line-height: var(--system-b-chat-body-line-height);
-}
-
-/*
- * Agent activity feed (GH #13897)
- * Quiet tool-call / status rows: indented one rhythm step from prose,
- * secondary color, book weight, one size step below body. Consecutive
- * steps form a single run with no card chrome. Interactive CTA cards
- * stay on `.system-b-chat-action-card` (elevated, not this pattern).
- */
-:where(.system-b-chat-activity-feed) {
-  width: 100%;
-  max-width: var(--system-b-chat-message-content-max);
-  padding-left: var(--system-b-chat-activity-indent);
-  color: var(--system-b-chat-activity-color);
-  font-size: var(--system-b-chat-activity-size);
-  font-weight: var(--system-b-chat-activity-weight);
-  line-height: var(--system-b-chat-activity-line-height);
-}
-
-:where(.system-b-chat-activity-feed[data-variant="inline"]) {
-  max-width: 100%;
-}
-
-:where(.system-b-chat-activity-feed > * + *) {
-  margin-top: var(--system-b-chat-activity-gap);
-}
-
-:where(.system-b-chat-activity-row) {
-  position: relative;
-  display: flex;
-  width: 100%;
-  align-items: flex-start;
-  gap: var(--space-2);
-  /* Reserve vertical space so body/next-step text does not shift layout */
-  min-height: calc(
-    var(--system-b-chat-activity-line-height) +
-    (var(--system-b-chat-activity-row-py) * 2)
-  );
-  padding-block: var(--system-b-chat-activity-row-py);
-  color: var(--system-b-chat-activity-color);
-}
-
-:where(.system-b-chat-activity-timeline) {
-  position: absolute;
-  left: calc(var(--system-b-chat-activity-icon-size) / 2);
-  width: var(--space-px);
-  transform: translateX(-50%);
-  background: var(--system-b-chat-activity-timeline-color);
-}
-
-:where(.system-b-chat-activity-timeline[data-edge="first"]) {
-  top: calc(
-    var(--system-b-chat-activity-row-py) +
-    (var(--system-b-chat-activity-icon-size) / 2)
-  );
-  bottom: 0;
-}
-
-:where(.system-b-chat-activity-timeline[data-edge="last"]) {
-  top: 0;
-  bottom: calc(
-    100% -
-    (
-      var(--system-b-chat-activity-row-py) +
-      (var(--system-b-chat-activity-icon-size) / 2)
-    )
-  );
-}
-
-:where(.system-b-chat-activity-timeline[data-edge="middle"]) {
-  top: 0;
-  bottom: 0;
-}
-
-:where(.system-b-chat-activity-icon) {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: var(--system-b-chat-activity-icon-size);
-  height: var(--system-b-chat-activity-icon-size);
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  margin-top: var(--space-0-5);
-  border-radius: var(--radius-full);
-  background: var(--linear-app-content-surface);
-  color: var(--system-b-chat-activity-color);
-}
-
-:where(.system-b-chat-activity-icon[data-state="success"]) {
-  color: var(--color-success);
-}
-
-:where(.system-b-chat-activity-icon[data-state="error"]) {
-  color: var(--color-error);
-}
-
-:where(.system-b-chat-activity-icon svg) {
-  width: 100%;
-  height: 100%;
-}
-
-:where(.system-b-chat-activity-copy) {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-:where(.system-b-chat-activity-title) {
-  overflow: hidden;
-  color: var(--system-b-chat-activity-color);
-  font-size: var(--system-b-chat-activity-size);
-  font-weight: var(--system-b-chat-activity-weight);
-  line-height: var(--system-b-chat-activity-line-height);
-  letter-spacing: -0.01em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-:where(.system-b-chat-activity-title[data-state="error"]) {
-  color: var(--color-error);
-}
-
-:where(.system-b-chat-activity-body) {
-  display: -webkit-box;
-  margin-top: var(--space-0-5);
-  overflow: hidden;
-  color: var(--system-b-chat-activity-meta-color);
-  font-size: var(--text-2xs);
-  font-weight: var(--system-b-chat-activity-weight);
-  line-height: var(--space-4);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-:where(.system-b-chat-activity-next) {
-  display: -webkit-box;
-  margin-top: var(--space-0-5);
-  overflow: hidden;
-  color: var(--color-text-tertiary-token);
-  font-size: var(--text-3xs);
-  font-weight: var(--system-b-chat-activity-weight);
-  line-height: var(--space-4);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-:where(.system-b-chat-activity-verbose) {
-  margin-top: var(--space-1-5);
-  color: var(--color-text-tertiary-token);
-  font-size: var(--text-3xs);
-  line-height: var(--space-4);
 }
 
 :where(.system-b-chat-markdown) {
@@ -12706,7 +12159,7 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
    stops: -bg (subtle fill / atmosphere), -solid (text/icon/halo), -fg (legible
    text on -solid). Used to rotate accents across feature surfaces (Bento,
    Profile hero, Loop diagram). Never use as primary CTA color — primary CTA
-   stays white-on-black per the neutral-CTA rule (DESIGN.md, 2026-04-11).
+   stays white-on-black per .linear-marketing contract above.
 
    Source: home-page-hero handoff bundle (Claude Design 2026-04).
 */

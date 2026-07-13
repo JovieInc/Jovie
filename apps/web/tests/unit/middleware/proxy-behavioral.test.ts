@@ -53,14 +53,6 @@ const mocks = vi.hoisted(() => ({
   getAudienceBlockIpFromHeaders: vi.fn().mockReturnValue('masked-ip'),
   createBotResponse: vi.fn(),
   clerkMiddleware: vi.fn(),
-  // Better Auth cookie helpers. `getSessionCookie` backs the proxy's
-  // top-level signed-in marker (apps/web/proxy.ts); `getCookieCache` backs
-  // the live `/` -> dashboard convenience redirect inside
-  // `handleProxyRequest` (apps/web/lib/auth/proxy-request-handler.ts).
-  // Both default to "no session" so existing unauthenticated/bypass-based
-  // tests keep their current behavior unless a test explicitly opts in.
-  getSessionCookie: vi.fn().mockReturnValue(null),
-  getCookieCache: vi.fn().mockResolvedValue(null),
   buildProtectedAuthRedirectUrl: vi.fn(
     (authPage: string, pathname: string, search: string) =>
       `${authPage}?redirect_url=${encodeURIComponent(pathname + search)}`
@@ -125,10 +117,6 @@ vi.mock('@/lib/auth/constants', () => ({
 }));
 vi.mock('@clerk/nextjs/server', () => ({
   clerkMiddleware: mocks.clerkMiddleware,
-}));
-vi.mock('better-auth/cookies', () => ({
-  getSessionCookie: mocks.getSessionCookie,
-  getCookieCache: mocks.getCookieCache,
 }));
 vi.mock('@/constants/app', () => ({
   AUDIENCE_ANON_COOKIE: 'audience_anon',
@@ -204,8 +192,6 @@ function resetMocks() {
   mocks.checkProfileVisitorBlocked.mockResolvedValue(false);
   mocks.getAudienceBlockIpFromHeaders.mockReturnValue('masked-ip');
   mocks.createBotResponse.mockReturnValue(undefined);
-  mocks.getSessionCookie.mockReturnValue(null);
-  mocks.getCookieCache.mockResolvedValue(null);
   mocks.fetch.mockResolvedValue(
     new Response('ok', {
       status: 200,
@@ -223,34 +209,6 @@ describe('proxy.ts middleware', () => {
   beforeEach(() => {
     resetMocks();
     // NODE_ENV is already 'test' from vitest — no need to set it
-  });
-
-  describe('trusted app-shell mode header', () => {
-    it('overwrites a spoofed customer mode for canonical OV requests', async () => {
-      const req = createAuthenticatedRequest('admin_test', {
-        pathname: APP_ROUTES.ADMIN_OPS,
-        headers: { 'x-jovie-app-shell-mode': 'customer' },
-      });
-
-      const res = await callMiddleware(req);
-
-      expect(
-        res.headers.get('x-middleware-request-x-jovie-app-shell-mode')
-      ).toBe('ov');
-    });
-
-    it('overwrites a spoofed OV mode for customer requests', async () => {
-      const req = createAuthenticatedRequest('creator_test', {
-        pathname: APP_ROUTES.CHAT,
-        headers: { 'x-jovie-app-shell-mode': 'ov' },
-      });
-
-      const res = await callMiddleware(req);
-
-      expect(
-        res.headers.get('x-middleware-request-x-jovie-app-shell-mode')
-      ).toBe('customer');
-    });
   });
 
   // ==========================================================================
@@ -1110,69 +1068,6 @@ describe('proxy.ts middleware', () => {
       expect(locationUrl.searchParams.get('tab')).toBe('earn');
       expect(locationUrl.hash).toBe('#pay');
       expect(mocks.getUserState).not.toHaveBeenCalled();
-    });
-  });
-
-  // ==========================================================================
-  // Signed-in `/` -> dashboard convenience redirect (audit row 16)
-  //
-  // Live branch in handleProxyRequest
-  // (apps/web/lib/auth/proxy-request-handler.ts ~line 311): a signed-in
-  // session cookie at `/` bounces straight to the dashboard via a cheap
-  // cookie-cache read (no DB hit). This is distinct from the retired
-  // getUserState-based `/` -> /start redirect skipped above -- this branch
-  // is still live and previously had no active test coverage.
-  // ==========================================================================
-  describe('signed-in / -> dashboard redirect (audit row 16)', () => {
-    it('redirects to the dashboard when the signed-in session cookie cache is valid', async () => {
-      mocks.getCookieCache.mockResolvedValue({
-        session: { id: 'session_1' },
-        user: { id: 'user_1' },
-      });
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/',
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(res.status).toBeLessThan(400);
-      expect(isRedirectTo(res, APP_ROUTES.DASHBOARD)).toBe(true);
-      expect(mocks.getCookieCache).toHaveBeenCalled();
-      // Purely cookie-cache based -- no DB user-state lookup on this path.
-      expect(mocks.getUserState).not.toHaveBeenCalled();
-    });
-
-    it('falls through to the homepage when there is no valid session cache (stale/tampered cookie)', async () => {
-      mocks.getCookieCache.mockResolvedValue(null);
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/',
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeLessThan(300);
-      expect(isRedirectTo(res, APP_ROUTES.DASHBOARD)).toBe(false);
-      expect(mocks.getCookieCache).toHaveBeenCalled();
-    });
-
-    it('does not redirect non-navigation methods even with a valid session cache', async () => {
-      mocks.getCookieCache.mockResolvedValue({
-        session: { id: 'session_1' },
-        user: { id: 'user_1' },
-      });
-
-      const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/',
-        method: 'POST',
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBeLessThan(300);
-      expect(isRedirectTo(res, APP_ROUTES.DASHBOARD)).toBe(false);
-      // The isNavigationMethod gate must short-circuit before the cache is
-      // even consulted.
-      expect(mocks.getCookieCache).not.toHaveBeenCalled();
     });
   });
 

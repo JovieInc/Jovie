@@ -6,7 +6,7 @@ import { waitForHydration } from './utils/smoke-test-utils';
 
 test.use({
   storageState: { cookies: [], origins: [] },
-  trace: process.env.CI ? 'off' : 'on',
+  trace: 'on',
   video: 'off',
   viewport: { width: 1280, height: 720 },
 });
@@ -31,7 +31,7 @@ const DAVID_GUETTA_ARTIST = {
   ],
 } as const;
 
-const COMPOSER_TEXTAREA = '[aria-label="Chat Message Input"]';
+const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
 const FALLBACK_ARTIST_IMAGE_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeElEQVR4nO3PQQ3AIADAQMD+/5w9QnJ4QKZsZu2cJwAAAAAAAAAAAAAAANxq7g7wG7iBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9gB9bYCfQMD+LwAAAAASUVORK5CYII=';
 
@@ -532,7 +532,7 @@ test('records David Guetta Spotify-first onboarding demo', async ({
   const handleCard = page.getByTestId('onboarding-handle-check');
   await expect(handleCard.getByText('@davidguetta')).toBeVisible();
   await expect(handleCard.getByText('is available')).toBeVisible();
-  await expect(handleCard.getByLabel('Edit Proposed Handle')).toBeVisible();
+  await expect(handleCard.getByLabel('Edit proposed handle')).toBeVisible();
   await attachDemoScreenshot(page, testInfo, 'editable-handle');
   await attachDemoScreenshot(page, testInfo, 'profile-bento-preview');
 

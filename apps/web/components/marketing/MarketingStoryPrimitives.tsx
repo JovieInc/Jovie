@@ -12,10 +12,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { ArtistNotificationsLandingCopy } from '@/data/artistNotificationsCopy';
-import type {
-  ArtistProfileCaptureVisualCopy,
-  ArtistProfileLandingCopy,
-} from '@/data/artistProfileCopy';
+import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
@@ -114,7 +111,7 @@ export function ArtistProfileCaptureVisual({
   capture,
   className,
 }: Readonly<{
-  capture: ArtistProfileCaptureVisualCopy;
+  capture: ArtistProfileLandingCopy['capture'];
   className?: string;
 }>) {
   const rootRef = useRef<HTMLDivElement>(null);

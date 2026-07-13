@@ -278,7 +278,7 @@ describe('ChatMessage', () => {
     expect(copyButton.querySelector('.system-b-chat-copy-icon')).toBeTruthy();
   });
 
-  it('renders one generic tool as an indented subordinate activity row without card chrome', () => {
+  it('renders one generic tool as an inline activity row without card chrome', () => {
     const messageProps = {
       id: 'assistant-tool-1',
       role: 'assistant' as const,
@@ -295,20 +295,17 @@ describe('ChatMessage', () => {
 
     fastRender(<ChatMessage {...messageProps} />);
 
-    const feed = screen.getByTestId('tool-activity-feed');
     const statusRow = screen.getByTestId('tool-status-row');
-    expect(feed).toHaveClass('system-b-chat-activity-feed');
-    expect(feed).toHaveAttribute('data-tool-count', '1');
-    expect(statusRow).toHaveClass('system-b-chat-activity-row');
     expect(statusRow.className).not.toContain('rounded-xl');
     expect(statusRow.className).not.toContain('border');
-    expect(
-      statusRow.querySelector('.system-b-chat-activity-title')
-    ).toBeTruthy();
+    expect(screen.getByTestId('tool-activity-feed')).toHaveAttribute(
+      'data-tool-count',
+      '1'
+    );
     expect(screen.queryByTestId('tool-activity-timeline-line')).toBeNull();
   });
 
-  it('connects multiple generic tools with timeline lines in one quiet activity run', () => {
+  it('connects multiple generic tools with timeline lines', () => {
     const messageProps = {
       id: 'assistant-tool-2',
       role: 'assistant' as const,
@@ -332,15 +329,14 @@ describe('ChatMessage', () => {
 
     fastRender(<ChatMessage {...messageProps} />);
 
-    const feed = screen.getByTestId('tool-activity-feed');
-    expect(feed).toHaveClass('system-b-chat-activity-feed');
-    expect(feed).toHaveAttribute('data-tool-count', '2');
+    expect(screen.getByTestId('tool-activity-feed')).toHaveAttribute(
+      'data-tool-count',
+      '2'
+    );
     expect(screen.getAllByTestId('tool-status-row')).toHaveLength(2);
-    const timelineLines = screen.getAllByTestId('tool-activity-timeline-line');
-    expect(timelineLines).toHaveLength(2);
-    expect(timelineLines[0]).toHaveAttribute('data-edge', 'first');
-    expect(timelineLines[1]).toHaveAttribute('data-edge', 'last');
-    expect(timelineLines[0]).toHaveClass('system-b-chat-activity-timeline');
+    expect(screen.getAllByTestId('tool-activity-timeline-line')).toHaveLength(
+      2
+    );
     expect(screen.getByText("Couldn't send your feedback")).toBeInTheDocument();
     expect(screen.getByText('Feedback failed.')).toBeInTheDocument();
   });

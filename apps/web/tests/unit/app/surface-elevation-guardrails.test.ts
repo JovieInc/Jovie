@@ -426,13 +426,13 @@ describe('surface elevation guardrails', () => {
     // Guardrails must match production classes exactly — [var(...)] form drifts
     // and fails Unit Tests after #13831.
     expect(shellFrame).toContain(
-      'lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)'
+      'lg:gap-(--linear-app-shell-gap) lg:p-(--linear-app-shell-gap)'
     );
     expect(linearTokens).toContain('--linear-app-sidebar-shadow:');
     expect(sidebar).not.toContain(
       'group-data-[variant=sidebar]:lg:shadow-[var(--linear-app-sidebar-shadow)]'
     );
-    expect(rightDrawer).toContain('border-l border-(--app-shell-frame-seam)');
+    expect(rightDrawer).toContain('border-l border-(--linear-app-frame-seam)');
     // Mobile overlay retains shadow; desktop drawer is flat so elevation
     // comes from DrawerSurfaceCard cards inside the shell, not the outer aside.
     expect(rightDrawer).toContain('shadow-(--linear-app-drawer-shadow)');
@@ -444,7 +444,7 @@ describe('surface elevation guardrails', () => {
       'lg:rounded-[var(--linear-app-shell-radius)]'
     );
     expect(rightDrawer).not.toContain('lg:border');
-    expect(adminTableShell).toContain('bg-(--app-shell-content-surface)/96');
+    expect(adminTableShell).toContain('bg-(--linear-app-content-surface)/96');
   });
 
   it('does not use semi-transparent bg-surface-1 in app shell (bg-surface-1/XX)', () => {

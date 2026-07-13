@@ -3,14 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import type { ReactNode } from 'react';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   consumeHomepageIntent,
   readHomepageIntent,
@@ -34,58 +27,45 @@ import {
   getPreferredErrorMessage,
 } from '@/components/jovie/utils';
 import { track } from '@/lib/analytics';
-import {
-  ONBOARDING_WIDGET_EVENTS,
-  widgetEventDisplayText,
-} from '@/lib/chat/onboarding-script/widget-events';
 import { useAppFlag } from '@/lib/flags/client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
-import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
-import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import { cn } from '@/lib/utils';
-import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
-import { ChatProposeNextStepCard } from './ChatProposeNextStepCard';
 import {
-  OnboardingChatEmptyIntro,
-  type OnboardingEntryMode,
-} from './OnboardingChatEmptyIntro';
-import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
-import type { OnboardingProfileBuilderState } from './OnboardingProfileRail';
+  ChatProposeCheckoutCard,
+  type CheckoutCardPayload,
+} from './ChatProposeCheckoutCard';
+import {
+  ChatProposeNextStepCard,
+  type NextStepCardPayload,
+} from './ChatProposeNextStepCard';
+import { OnboardingChatEmptyIntro } from './OnboardingChatEmptyIntro';
+import type {
+  OnboardingProfileArtist,
+  OnboardingProfileBuilderState,
+} from './OnboardingProfileRail';
 import { OnboardingProfileRail } from './OnboardingProfileRail';
 import {
+  type ArtistConfirmedOutput,
+  type ArtistPickerOutput,
+  type HandleCheckOutput,
   OnboardingArtistConfirmedCard,
   type OnboardingArtistSelection,
   OnboardingHandleCheckCard,
   OnboardingSocialLinkCard,
   OnboardingSpotifyArtistPickerCard,
+  type SocialLinkOutput,
   useArtistSelectionMessage,
 } from './OnboardingToolArtifacts';
 import type { OnboardingTurnstileStatus } from './OnboardingTurnstile';
 import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomationBypass';
-import {
-  deriveProfileBuilderState,
-  findLastAssistantMessageId,
-  getInputQuery,
-  getMessageText,
-  getOnboardingErrorMessage,
-  getToolName,
-  getToolParts,
-  isArtistConfirmedOutput,
-  isArtistPickerOutput,
-  isCheckoutPayload,
-  isHandleCheckOutput,
-  isNextStepPayload,
-  isSocialLinkOutput,
-  THINKING_PLACEHOLDER_ID,
-  type ToolPart,
-} from './onboardingChatHelpers';
 
 /**
  * Anonymous onboarding chat client (JOV-2132 PR 3).
  *
  * Streams against `/api/chat` in `mode='onboarding'`. The first request also
- * carries the Cloudflare Turnstile token; the signed cookie +
- * session-lifetime rate limit carry trust forward after that request.
+ * carries the Cloudflare Turnstile token; subsequent requests in the same
+ * session do not (the signed cookie + session-lifetime rate limit carry
+ * trust forward).
  */
 
 interface OnboardingChatProps {
@@ -109,48 +89,40 @@ interface OnboardingChatProps {
   readonly onProfileBuilderChange?: (
     state: OnboardingProfileBuilderState
   ) => void;
-  /** Validated URL-provided context for an automatic first message. */
-  readonly starterHandoff?: StartEntryHandoff | null;
+  /** URL-provided starter prompt for demo and deep-link flows. */
+  readonly starterPrompt?: string;
 }
 
-class OnboardingChatTransport extends DefaultChatTransport<UIMessage> {
-  private readonly turnstileState: { token: string | null };
-
-  constructor() {
-    const turnstileState = { token: null as string | null };
-    super({
-      api: '/api/chat',
-      prepareSendMessagesRequest: ({ messages, body }) => ({
-        body: {
-          ...body,
-          mode: 'onboarding' as const,
-          messages,
-          ...(turnstileState.token
-            ? { turnstileToken: turnstileState.token }
-            : {}),
-        },
-      }),
-    });
-    this.turnstileState = turnstileState;
-  }
-
-  setTurnstileToken(token: string | null): void {
-    this.turnstileState.token = token;
-  }
-}
-
+/** Pull the user-visible text out of a UIMessage's parts. */
+const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 const BLOCKED_TURNSTILE_TOKEN_STATUSES: ReadonlySet<
   OnboardingTurnstileStatus | undefined
 > = new Set(['expired', 'timeout', 'error', 'unsupported', 'unconfigured']);
+
+function getMessageText(message: UIMessage): string {
+  return (message.parts ?? [])
+    .filter(
+      (p): p is { type: 'text'; text: string } =>
+        p.type === 'text' && typeof p.text === 'string'
+    )
+    .map(p => p.text)
+    .join('');
+}
+
+type ToolPart = MessagePart & {
+  readonly type: string;
+  readonly toolName?: string;
+  readonly toolCallId?: string;
+  readonly input?: unknown;
+  readonly output?: unknown;
+  readonly state?: string;
+};
 
 type OnboardingToolRendererArgs = {
   readonly part: ToolPart;
   readonly key: string;
   readonly isBusy: boolean;
   readonly onHandleCandidateChange: (handle: string | null) => void;
-  readonly onConfirmHandle: (handle: string) => void;
-  readonly onAttachAccount: (url: string) => void;
-  readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 };
@@ -159,12 +131,202 @@ type OnboardingToolRenderer = (
   args: OnboardingToolRendererArgs
 ) => ReactNode | null;
 
+function isToolPart(part: unknown): part is ToolPart {
+  if (!part || typeof part !== 'object') return false;
+  const type = (part as { type?: unknown }).type;
+  return (
+    type === 'dynamic-tool' ||
+    (typeof type === 'string' && type.startsWith('tool-'))
+  );
+}
+
+function getToolName(part: ToolPart): string {
+  if (part.toolName) return part.toolName;
+  // Convention: AI SDK emits parts of type `tool-<name>` when output is present.
+  return part.type.startsWith('tool-')
+    ? part.type.slice('tool-'.length)
+    : part.type;
+}
+
+/**
+ * Extract tool parts from a message. Returns the structured parts (not text)
+ * so the renderer can decide between rich cards (proposeNextStep,
+ * proposeCheckout) and the chip fallback for the rest.
+ */
+function getToolParts(message: UIMessage): readonly ToolPart[] {
+  return ((message.parts ?? []) as readonly MessagePart[]).filter(isToolPart);
+}
+
+interface ToolOutputWithAction {
+  readonly action?: string;
+}
+
+function isNextStepPayload(output: unknown): output is NextStepCardPayload {
+  return (
+    typeof output === 'object' &&
+    output !== null &&
+    (output as ToolOutputWithAction).action === 'propose_next_step'
+  );
+}
+
+function isCheckoutPayload(output: unknown): output is CheckoutCardPayload {
+  return (
+    typeof output === 'object' &&
+    output !== null &&
+    (output as ToolOutputWithAction).action === 'propose_checkout'
+  );
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function isArtistPickerOutput(output: unknown): output is ArtistPickerOutput {
+  return asRecord(output)?.action === 'open_artist_picker';
+}
+
+function isArtistConfirmedOutput(
+  output: unknown
+): output is ArtistConfirmedOutput {
+  return asRecord(output)?.action === 'spotify_artist_confirmed';
+}
+
+function isHandleCheckOutput(output: unknown): output is HandleCheckOutput {
+  return asRecord(output)?.action === 'check_handle';
+}
+
+function isSocialLinkOutput(output: unknown): output is SocialLinkOutput {
+  return asRecord(output)?.action === 'propose_social_link';
+}
+
+function getInputQuery(part: ToolPart): string | null {
+  const input = asRecord(part.input);
+  return typeof input?.query === 'string' ? input.query : null;
+}
+
+function findLastAssistantMessageId(messages: readonly UIMessage[]) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (
+      message.role === 'assistant' &&
+      message.id !== THINKING_PLACEHOLDER_ID
+    ) {
+      return message.id;
+    }
+  }
+  return null;
+}
+
+function getOnboardingErrorMessage(message: string): string {
+  if (/authentication service is initializing/i.test(message)) {
+    return 'Jovie is still connecting. Try again in a moment.';
+  }
+  return message;
+}
+
+function artistFromSelection(
+  artist: OnboardingArtistSelection | null
+): OnboardingProfileArtist | null {
+  if (!artist) return null;
+  return {
+    id: artist.id,
+    name: artist.name,
+    url: artist.url,
+    imageUrl: artist.imageUrl ?? null,
+    followers: artist.followers ?? null,
+    popularity: artist.popularity ?? null,
+    genres: [],
+    dspMatches: [
+      {
+        id: 'spotify',
+        label: 'Spotify',
+        platform: 'spotify',
+        url: artist.url,
+      },
+    ],
+  };
+}
+
+function artistFromConfirmedOutput(
+  output: ArtistConfirmedOutput
+): OnboardingProfileArtist | null {
+  const artist = output.artist;
+  if (!artist) return null;
+  return {
+    id: artist.id,
+    name: artist.name,
+    url: artist.url,
+    imageUrl: artist.imageUrl ?? null,
+    followers: artist.followers ?? null,
+    popularity: artist.popularity ?? null,
+    genres: artist.genres ?? [],
+    dspMatches: [
+      {
+        id: 'spotify',
+        label: 'Spotify',
+        platform: 'spotify',
+        url: artist.url,
+      },
+      ...(artist.dspMatches ?? []),
+    ],
+  };
+}
+
+function cleanHandle(handle: string | undefined): string | null {
+  const cleaned = handle?.replace(/^@/, '').trim().toLowerCase();
+  return cleaned || null;
+}
+
+function deriveProfileBuilderState({
+  handleDraft,
+  messages,
+  selectedArtist,
+}: {
+  readonly handleDraft: string | null;
+  readonly messages: readonly UIMessage[];
+  readonly selectedArtist: OnboardingArtistSelection | null;
+}): OnboardingProfileBuilderState {
+  let artist = artistFromSelection(selectedArtist);
+  let artistConfirmed = false;
+  let handle: string | null = null;
+  const socialLinks: string[] = [];
+
+  for (const message of messages) {
+    for (const part of getToolParts(message)) {
+      const output = part.output;
+
+      if (isArtistConfirmedOutput(output)) {
+        const confirmedArtist = artistFromConfirmedOutput(output);
+        artist = confirmedArtist ?? artist;
+        artistConfirmed =
+          Boolean(confirmedArtist) || Boolean(output.spotifyArtistId);
+      }
+
+      if (isHandleCheckOutput(output)) {
+        handle = cleanHandle(output.handle) ?? handle;
+      }
+
+      if (isSocialLinkOutput(output) && output.url) {
+        socialLinks.push(output.url);
+      }
+    }
+  }
+
+  return {
+    artist,
+    artistConfirmed,
+    handle: handleDraft == null ? handle : cleanHandle(handleDraft),
+    socialLinks,
+  };
+}
+
 const renderSearchSpotifyArtist: OnboardingToolRenderer = ({
   part,
   key,
   isBusy,
   onSelectArtist,
-  onNoneOfTheseArtists,
   selectedArtistId,
 }) => {
   if (selectedArtistId) return null;
@@ -182,7 +344,6 @@ const renderSearchSpotifyArtist: OnboardingToolRenderer = ({
       inputQuery={getInputQuery(part)}
       disabled={isBusy}
       onSelectArtist={onSelectArtist}
-      onNoneOfThese={onNoneOfTheseArtists}
     />
   );
 };
@@ -204,10 +365,8 @@ const renderConfirmSpotifyArtist: OnboardingToolRenderer = ({ part, key }) => {
 
 const renderCheckHandle: OnboardingToolRenderer = ({
   onHandleCandidateChange,
-  onConfirmHandle,
   part,
   key,
-  isBusy,
 }) => {
   const output = part.output;
   if (!(isHandleCheckOutput(output) || output === undefined)) {
@@ -220,18 +379,11 @@ const renderCheckHandle: OnboardingToolRenderer = ({
       state={part.state}
       output={isHandleCheckOutput(output) ? output : null}
       onHandleCandidateChange={onHandleCandidateChange}
-      onConfirmHandle={onConfirmHandle}
-      disabled={isBusy}
     />
   );
 };
 
-const renderProposeSocialLink: OnboardingToolRenderer = ({
-  part,
-  key,
-  isBusy,
-  onAttachAccount,
-}) => {
+const renderProposeSocialLink: OnboardingToolRenderer = ({ part, key }) => {
   const output = part.output;
   if (!(isSocialLinkOutput(output) || output === undefined)) {
     return null;
@@ -242,8 +394,6 @@ const renderProposeSocialLink: OnboardingToolRenderer = ({
       key={key}
       state={part.state}
       output={isSocialLinkOutput(output) ? output : null}
-      onAttachAccount={onAttachAccount}
-      disabled={isBusy}
     />
   );
 };
@@ -289,9 +439,6 @@ function renderOnboardingTools({
   hasMessageText,
   isBusy,
   onHandleCandidateChange,
-  onConfirmHandle,
-  onAttachAccount,
-  onNoneOfTheseArtists,
   onSelectArtist,
   selectedArtistId,
 }: {
@@ -300,9 +447,6 @@ function renderOnboardingTools({
   readonly hasMessageText: boolean;
   readonly isBusy: boolean;
   readonly onHandleCandidateChange: (handle: string | null) => void;
-  readonly onConfirmHandle: (handle: string) => void;
-  readonly onAttachAccount: (url: string) => void;
-  readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 }) {
@@ -328,9 +472,6 @@ function renderOnboardingTools({
         key,
         isBusy,
         onHandleCandidateChange,
-        onConfirmHandle,
-        onAttachAccount,
-        onNoneOfTheseArtists,
         onSelectArtist,
         selectedArtistId,
       });
@@ -366,9 +507,6 @@ function OnboardingMessageList({
   isStreaming,
   lastAssistantMessageId,
   onHandleCandidateChange,
-  onConfirmHandle,
-  onAttachAccount,
-  onNoneOfTheseArtists,
   isBusy,
   onSelectArtist,
   selectedArtistId,
@@ -377,9 +515,6 @@ function OnboardingMessageList({
   readonly isStreaming: boolean;
   readonly lastAssistantMessageId: string | null;
   readonly onHandleCandidateChange: (handle: string | null) => void;
-  readonly onConfirmHandle: (handle: string) => void;
-  readonly onAttachAccount: (url: string) => void;
-  readonly onNoneOfTheseArtists: () => void;
   readonly isBusy: boolean;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
@@ -417,9 +552,6 @@ function OnboardingMessageList({
                   hasMessageText: Boolean(text),
                   isBusy,
                   onHandleCandidateChange,
-                  onConfirmHandle,
-                  onAttachAccount,
-                  onNoneOfTheseArtists,
                   onSelectArtist,
                   selectedArtistId,
                 })
@@ -476,25 +608,76 @@ function getDisplayMessages(
   ];
 }
 
-interface ComposerStatusBannerProps {
+interface ChatErrorStatusBannerProps {
+  readonly chatError: ChatError | null;
+  readonly handleRetry: () => void;
+  readonly isBusy: boolean;
+  readonly isSubmitted: boolean;
+}
+
+function ChatErrorStatusBanner({
+  chatError,
+  handleRetry,
+  isBusy,
+  isSubmitted,
+}: ChatErrorStatusBannerProps) {
+  if (!chatError) return null;
+
+  const canRetry = Boolean(chatError.failedMessage) && !chatError.retryAfter;
+
+  return (
+    <div className='px-3 py-2.5 text-xs leading-5'>
+      <div role='alert' aria-live='assertive' aria-atomic='true'>
+        <p className='font-medium text-primary-token'>Message paused</p>
+        <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
+        {canRetry ? (
+          <button
+            type='button'
+            onClick={handleRetry}
+            disabled={isBusy || isSubmitted}
+            className='mt-2 inline-flex h-7 items-center rounded-lg border border-subtle px-2.5 text-2xs font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
+          >
+            Retry message
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+interface ComposerStatusBannerProps extends ChatErrorStatusBannerProps {
   readonly reserveTurnstileSpace?: boolean;
   readonly shouldShowTurnstileBanner: boolean;
   readonly turnstilePanel: ReactNode;
 }
 
 function ComposerStatusBanner({
+  chatError,
+  handleRetry,
+  isBusy,
+  isSubmitted,
   reserveTurnstileSpace = false,
   shouldShowTurnstileBanner,
   turnstilePanel,
 }: ComposerStatusBannerProps) {
-  if (!shouldShowTurnstileBanner) return null;
+  if (!shouldShowTurnstileBanner && !chatError) return null;
 
   return (
-    <div
-      className={reserveTurnstileSpace ? 'min-h-[10rem]' : undefined}
-      data-testid='onboarding-turnstile-slot'
-    >
-      {turnstilePanel}
+    <div className='divide-y divide-white/[0.065]'>
+      {shouldShowTurnstileBanner ? (
+        <div
+          className={reserveTurnstileSpace ? 'min-h-[10rem]' : undefined}
+          data-testid='onboarding-turnstile-slot'
+        >
+          {turnstilePanel}
+        </div>
+      ) : null}
+      <ChatErrorStatusBanner
+        chatError={chatError}
+        handleRetry={handleRetry}
+        isBusy={isBusy}
+        isSubmitted={isSubmitted}
+      />
     </div>
   );
 }
@@ -507,34 +690,28 @@ interface OnboardingMessageRegionProps {
   readonly lastAssistantMessageId: string | null;
   readonly onboardingComposerSurface: ReactNode;
   readonly onHandleCandidateChange: (handle: string | null) => void;
-  readonly onConfirmHandle: (handle: string) => void;
-  readonly onAttachAccount: (url: string) => void;
-  readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly onSelectStarterSuggestion: (prompt: string) => void;
   readonly profileBuilderState: OnboardingProfileBuilderState;
   readonly shouldDockComposer: boolean;
-  readonly entryMode: OnboardingEntryMode;
+  readonly showEmptyIntro: boolean;
   readonly composerPickerOpen: boolean;
 }
 
 function OnboardingMessageRegion({
   composerPickerOpen,
   displayMessages,
-  entryMode,
   hasConversationStarted,
   isBusy,
   isStreaming,
   lastAssistantMessageId,
   onboardingComposerSurface,
   onHandleCandidateChange,
-  onConfirmHandle,
-  onAttachAccount,
-  onNoneOfTheseArtists,
   onSelectArtist,
   onSelectStarterSuggestion,
   profileBuilderState,
   shouldDockComposer,
+  showEmptyIntro,
 }: OnboardingMessageRegionProps) {
   if (shouldDockComposer) {
     return (
@@ -545,9 +722,6 @@ function OnboardingMessageRegion({
           lastAssistantMessageId={lastAssistantMessageId}
           isBusy={isBusy}
           onHandleCandidateChange={onHandleCandidateChange}
-          onConfirmHandle={onConfirmHandle}
-          onAttachAccount={onAttachAccount}
-          onNoneOfTheseArtists={onNoneOfTheseArtists}
           onSelectArtist={onSelectArtist}
           selectedArtistId={profileBuilderState.artist?.id ?? null}
         />
@@ -558,14 +732,20 @@ function OnboardingMessageRegion({
 
   if (!hasConversationStarted) {
     return (
-      <ChatEmptyStateComposerRegion hideWelcomeHeader>
-        <OnboardingChatEmptyIntro
-          composer={onboardingComposerSurface}
-          mode={entryMode}
-          onSelectSuggestion={onSelectStarterSuggestion}
-          dimmed={composerPickerOpen}
-          isBusy={isBusy}
-        />
+      <ChatEmptyStateComposerRegion
+        above={
+          showEmptyIntro ? (
+            <OnboardingChatEmptyIntro
+              onSelectSuggestion={onSelectStarterSuggestion}
+              dimmed={composerPickerOpen}
+              isBusy={isBusy}
+            />
+          ) : undefined
+        }
+      >
+        <div className='w-full' data-testid='onboarding-centered-composer'>
+          {onboardingComposerSurface}
+        </div>
       </ChatEmptyStateComposerRegion>
     );
   }
@@ -578,9 +758,6 @@ function OnboardingMessageRegion({
         lastAssistantMessageId={lastAssistantMessageId}
         isBusy={isBusy}
         onHandleCandidateChange={onHandleCandidateChange}
-        onConfirmHandle={onConfirmHandle}
-        onAttachAccount={onAttachAccount}
-        onNoneOfTheseArtists={onNoneOfTheseArtists}
         onSelectArtist={onSelectArtist}
         selectedArtistId={profileBuilderState.artist?.id ?? null}
       />
@@ -603,23 +780,18 @@ export function OnboardingChat({
   onProfileBuilderChange,
   onTurnstileRejected,
   onTurnstileRequired,
-  starterHandoff,
+  starterPrompt,
   turnstilePanel,
   turnstilePanelVisible = false,
   turnstileStatus,
   turnstileToken,
 }: OnboardingChatProps) {
-  const initialStarterPrompt = starterHandoff?.prompt ?? '';
+  const initialStarterPrompt = starterPrompt
+    ? sanitizeHomepagePrompt(starterPrompt)
+    : '';
   const hasInitialStarterPrompt = initialStarterPrompt.length > 0;
   const [input, setInput] = useState(initialStarterPrompt);
-  const [entryMode, setEntryMode] = useState<OnboardingEntryMode>(() => {
-    if (starterHandoff?.kind === 'spotify_artist') return 'spotify_handoff';
-    if (starterHandoff) return 'prompt_handoff';
-    if (intentId) return 'restoring_intent';
-    return 'blank';
-  });
   const latestInputRef = useRef(initialStarterPrompt);
-  const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [hasSentFirst, setHasSentFirst] = useState(false);
   const [verificationRequested, setVerificationRequested] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
@@ -659,12 +831,23 @@ export function OnboardingChat({
     }
   }, [turnstileStatus, turnstileToken]);
 
-  // AI SDK's useChat captures its transport when the Chat instance is created.
-  // Keep it stable and update its request state before any passive send effect.
-  const transport = useMemo(() => new OnboardingChatTransport(), []);
-  useLayoutEffect(() => {
-    transport.setTurnstileToken(turnstileToken);
-  }, [transport, turnstileToken]);
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: '/api/chat',
+        // `prepareSendMessagesRequest` lets us mutate the body per-request so
+        // the first POST carries the Turnstile token; subsequent POSTs skip it.
+        prepareSendMessagesRequest: ({ messages, body }) => ({
+          body: {
+            ...body,
+            mode: 'onboarding' as const,
+            messages,
+            ...(turnstileToken ? { turnstileToken } : {}),
+          },
+        }),
+      }),
+    [turnstileToken]
+  );
 
   const { messages, sendMessage, setMessages, status, stop } = useChat({
     id: 'onboarding',
@@ -676,7 +859,7 @@ export function OnboardingChat({
       const failedMessage = lastAttemptedMessageRef.current ?? undefined;
       setChatError({
         type,
-        message: getOnboardingErrorMessage(message, metadata.errorCode, type),
+        message: getOnboardingErrorMessage(message),
         retryAfter: metadata.retryAfter,
         errorCode: metadata.errorCode,
         requestId: metadata.requestId,
@@ -698,11 +881,6 @@ export function OnboardingChat({
   const isSubmitted = status === 'submitted';
   const isStreaming = status === 'streaming';
   const isBusy = isSubmitted || isStreaming;
-  useLayoutEffect(() => {
-    if (!chatError) return;
-    composerInputRef.current?.focus({ preventScroll: true });
-  }, [chatError]);
-
   const requiresTurnstile =
     process.env.NODE_ENV !== 'development' && localAutomationBypass !== true;
   const isAwaitingFirstToken =
@@ -803,39 +981,6 @@ export function OnboardingChat({
     [formatArtistSelectionMessage, submitText]
   );
 
-  const handleConfirmHandle = useCallback(
-    (handle: string) => {
-      const payload = {
-        onboardingEvent: ONBOARDING_WIDGET_EVENTS.HANDLE_CONFIRMED,
-        handle,
-      } as const;
-      submitText(widgetEventDisplayText(payload), payload);
-    },
-    [submitText]
-  );
-
-  const handleAttachAccount = useCallback(
-    (url: string) => {
-      // Fail closed: incomplete hosts (e.g. instagram.com/) never advance the SM.
-      const parsed = parseSocialLinkInput(url);
-      if (!parsed.ok) return;
-      const payload = {
-        onboardingEvent: ONBOARDING_WIDGET_EVENTS.SOCIAL_ATTACHED,
-        url: parsed.url,
-      } as const;
-      submitText(widgetEventDisplayText(payload), payload);
-    },
-    [submitText]
-  );
-
-  const handleNoneOfTheseArtists = useCallback(() => {
-    const payload = {
-      onboardingEvent: ONBOARDING_WIDGET_EVENTS.ARTIST_NONE_OF_THESE,
-    } as const;
-    setSelectedArtist(null);
-    submitText(widgetEventDisplayText(payload), payload);
-  }, [submitText]);
-
   const profileBuilderState = useMemo(
     () => deriveProfileBuilderState({ handleDraft, messages, selectedArtist }),
     [handleDraft, messages, selectedArtist]
@@ -857,15 +1002,16 @@ export function OnboardingChat({
       consumeHomepageIntent(intentId);
     }
 
+    if (!nextPrompt && starterPrompt) {
+      nextPrompt = sanitizeHomepagePrompt(starterPrompt);
+    }
+
     if (nextPrompt) {
       setComposerInput(nextPrompt);
       pendingStarterPromptRef.current = nextPrompt;
       hasInjectedStarterPromptRef.current = true;
-      setEntryMode('prompt_handoff');
-    } else {
-      setEntryMode('blank');
     }
-  }, [intentId, setComposerInput]);
+  }, [intentId, setComposerInput, starterPrompt]);
 
   useEffect(() => {
     const prompt = pendingStarterPromptRef.current;
@@ -962,8 +1108,14 @@ export function OnboardingChat({
     (isAwaitingFirstToken ||
       shouldReserveStarterVerification ||
       verificationRequested);
-  const composerStatusBanner = shouldShowTurnstileBanner ? (
+  const hasComposerStatusBanner =
+    shouldShowTurnstileBanner || chatError !== null;
+  const composerStatusBanner = hasComposerStatusBanner ? (
     <ComposerStatusBanner
+      chatError={chatError}
+      handleRetry={handleRetry}
+      isBusy={isBusy}
+      isSubmitted={isSubmitted}
       reserveTurnstileSpace={shouldReserveStarterVerification}
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
       turnstilePanel={turnstilePanel}
@@ -976,6 +1128,8 @@ export function OnboardingChat({
   const hasConversationStarted = messages.length > 0 || hasSentFirst;
   const shouldDockComposer =
     chatError !== null || userTurnCount > 1 || selectedArtist !== null;
+  const showEmptyIntro = !intentId && !starterPrompt;
+
   useEffect(() => {
     if (shouldDockComposer) return;
     const scrollContainer = scrollContainerRef.current;
@@ -996,30 +1150,20 @@ export function OnboardingChat({
     isStreaming,
     onStop: stop,
     // Raw "Securing chat..." text is replaced in follow-up pass with
-    // statusBanner skeleton treatment. Handle step gets a confirm-oriented
-    // placeholder so incomplete free-text is less tempting.
-    placeholder: handleDraft
-      ? 'Confirm handle or type a different one…'
-      : 'Artist, release, or link...',
+    // statusBanner skeleton treatment; placeholder stays stable.
+    placeholder: 'Artist, release, or link...',
     onPickerOpenChange: setComposerPickerOpen,
     chips: chipTray.chips,
     onRemoveChipAt: chipTray.removeAt,
     onRemoveLastChip: chipTray.removeLast,
     onAddSkill: chipTray.addSkill,
     onAddEntity: chipTray.addEntity,
+    shellChatV1: true,
     statusBanner: composerStatusBanner,
   } as const;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
-      {chatError ? (
-        <OnboardingMessageRecoveryRow
-          chatError={chatError}
-          handleRetry={handleRetry}
-          isBusy={isBusy}
-          isSubmitted={isSubmitted}
-        />
-      ) : null}
-      <ChatInput ref={composerInputRef} {...onboardingChatInputProps} />
+      <ChatInput {...onboardingChatInputProps} />
     </div>
   );
 
@@ -1050,20 +1194,17 @@ export function OnboardingChat({
           <OnboardingMessageRegion
             composerPickerOpen={composerPickerOpen}
             displayMessages={displayMessages}
-            entryMode={entryMode}
             hasConversationStarted={hasConversationStarted}
             isBusy={isBusy}
             isStreaming={isStreaming}
             lastAssistantMessageId={lastAssistantMessageId}
             onboardingComposerSurface={onboardingComposerSurface}
             onHandleCandidateChange={setHandleDraft}
-            onConfirmHandle={handleConfirmHandle}
-            onAttachAccount={handleAttachAccount}
-            onNoneOfTheseArtists={handleNoneOfTheseArtists}
             onSelectArtist={handleArtistSelect}
             onSelectStarterSuggestion={submitText}
             profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}
+            showEmptyIntro={showEmptyIntro}
           />
         </div>
       </div>

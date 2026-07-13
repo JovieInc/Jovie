@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   afterAll,
@@ -429,7 +429,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('does not show the passive billing-status toast on admin surfaces', () => {
-    mockUsePathname.mockReturnValue(APP_ROUTES.OV);
+    mockUsePathname.mockReturnValue('/app/admin');
     mockUseBillingStatusQuery.mockReturnValue({
       data: null,
       isLoading: false,
@@ -442,7 +442,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('does not show the passive billing-status toast after a clean admin login with a healthy subscription', () => {
-    mockUsePathname.mockReturnValue(APP_ROUTES.ADMIN_OPS);
+    mockUsePathname.mockReturnValue('/app/admin/ops');
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
       isLoading: false,
@@ -637,104 +637,5 @@ describe('UserButton billing actions', () => {
     expect(screen.getByText('Usage remaining')).toBeInTheDocument();
     expect(screen.getByText('60%')).toBeInTheDocument();
     expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
-  });
-
-  it('keeps identity and Help inline as sibling roving-focus menu actions', async () => {
-    const longDisplayName =
-      'Adele Adkins and the Very Long International Touring Ensemble';
-    mockUseUserSafe.mockReturnValue({
-      isLoaded: true,
-      isSignedIn: true,
-      user: {
-        id: 'user_123',
-        imageUrl: null,
-        fullName: longDisplayName,
-        firstName: 'Adele',
-        emailAddresses: [{ emailAddress: 'adele@example.com' }],
-        primaryEmailAddress: { emailAddress: 'adele@example.com' },
-      } as any,
-    });
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
-      isLoading: false,
-      error: null,
-    } as any);
-    const openMock = vi.spyOn(window, 'open').mockReturnValue(null);
-
-    const user = userEvent.setup();
-    render(<UserButton showUserInfo />);
-
-    await user.click(screen.getByText(longDisplayName));
-
-    const identityRow = document.querySelector<HTMLElement>(
-      '[data-menu-action-row="profile-help"]'
-    );
-    expect(identityRow).not.toBeNull();
-    expect(screen.getByRole('menu')).toHaveClass(
-      'w-60',
-      'max-w-[calc(100vw-1rem)]'
-    );
-    expect(identityRow).toHaveClass(
-      'grid',
-      'grid-cols-[minmax(0,1fr)_auto]',
-      'min-h-12',
-      'w-full'
-    );
-    expect(identityRow?.querySelectorAll('[role="menuitem"]')).toHaveLength(2);
-    expect(identityRow?.querySelector('button, a')).toBeNull();
-
-    const profileItem = within(identityRow as HTMLElement).getByRole(
-      'menuitem',
-      {
-        name: `Open profile for ${longDisplayName}`,
-      }
-    );
-    expect(profileItem).toHaveClass('min-w-0');
-    expect(within(profileItem).getByText(longDisplayName)).toHaveClass(
-      'truncate'
-    );
-    expect(within(profileItem).getByText(longDisplayName)).toHaveAttribute(
-      'title',
-      longDisplayName
-    );
-
-    const helpItem = within(identityRow as HTMLElement).getByRole('menuitem', {
-      name: 'Help',
-    });
-    expect(helpItem).toHaveClass('shrink-0');
-    await user.keyboard('{ArrowDown}');
-    expect(profileItem).toHaveFocus();
-    await user.keyboard('{ArrowDown}');
-    expect(helpItem).toHaveFocus();
-    await user.keyboard('{ArrowDown}');
-    expect(screen.getByRole('menuitem', { name: /Settings/u })).toHaveFocus();
-    await user.keyboard('{ArrowUp}');
-    expect(helpItem).toHaveFocus();
-    await user.keyboard('{Enter}');
-    expect(openMock).toHaveBeenCalledWith(
-      APP_ROUTES.SUPPORT,
-      '_blank',
-      'noopener,noreferrer'
-    );
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-  });
-
-  it('preserves trigger keyboard and escape-to-close menu semantics', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
-    const user = userEvent.setup();
-    render(<UserButton showUserInfo />);
-
-    const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
-    trigger.focus();
-    await user.keyboard('{Enter}');
-
-    expect(await screen.findByRole('menu')).toBeVisible();
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    expect(trigger).toHaveFocus();
   });
 });

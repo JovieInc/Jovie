@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { PageHeader } from '@/components/organisms/PageShell';
 import { cn } from '@/lib/utils';
 
@@ -36,7 +35,6 @@ export function SettingsSection({
       aria-describedby={descriptionId}
       className={cn('scroll-mt-6', className)}
     >
-      <NavigationDestinationReady destination='settings' />
       <div
         className={cn(
           'flex items-center justify-between border-b border-subtle/80',

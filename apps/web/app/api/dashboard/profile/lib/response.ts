@@ -5,11 +5,7 @@
  */
 
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
-import {
-  invalidateHomepageCache,
-  invalidateProfileCache,
-  invalidateUsernameChange,
-} from '@/lib/cache/profile';
+import { invalidateUsernameChange } from '@/lib/cache/profile';
 import type { creatorProfiles } from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
 
@@ -58,15 +54,10 @@ export async function finalizeProfileResponse({
   oldUsernameNormalized,
   clerkUserId,
 }: FinalizeProfileResponseParams) {
-  if (updatedProfile.usernameNormalized !== oldUsernameNormalized) {
-    await invalidateUsernameChange(
-      updatedProfile.usernameNormalized,
-      oldUsernameNormalized
-    );
-  } else {
-    await invalidateProfileCache(updatedProfile.usernameNormalized);
-    await invalidateHomepageCache();
-  }
+  await invalidateUsernameChange(
+    updatedProfile.usernameNormalized,
+    oldUsernameNormalized
+  );
 
   trackServerEvent('dashboard_profile_updated', undefined, clerkUserId).catch(
     error => logger.warn('Analytics tracking failed:', error)

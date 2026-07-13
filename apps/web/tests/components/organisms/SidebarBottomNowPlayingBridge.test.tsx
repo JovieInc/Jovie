@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   resetAudioChromeSnapshot,
@@ -18,14 +18,12 @@ let _state: Record<string, unknown> = {
   artworkUrl: null,
 };
 
-const { stop } = vi.hoisted(() => ({ stop: vi.fn() }));
-
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
     playbackState: _state,
     toggleTrack: vi.fn(),
     seek: vi.fn(),
-    stop,
+    stop: vi.fn(),
     onError: vi.fn(() => () => undefined),
   }),
 }));
@@ -76,7 +74,7 @@ describe('SidebarBottomNowPlayingBridge', () => {
     expect(screen.getByLabelText('Play')).toBeInTheDocument();
   });
 
-  it('reserves the slot when the full player owns the active track', () => {
+  it('reserves the slot when the persistent compact player owns the active track', () => {
     _state = {
       ..._state,
       activeTrackId: 'track-1',
@@ -86,8 +84,8 @@ describe('SidebarBottomNowPlayingBridge', () => {
     };
     setAudioChromeSnapshot({
       activeTrackId: 'track-1',
-      compactPlayerVisible: false,
-      fullPlayerVisible: true,
+      compactPlayerVisible: true,
+      fullPlayerVisible: false,
     });
 
     render(<SidebarBottomNowPlayingBridge />);
@@ -105,51 +103,7 @@ describe('SidebarBottomNowPlayingBridge', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows the mini player when the full player is minimized', () => {
-    _state = {
-      ..._state,
-      activeTrackId: 'track-1',
-      trackTitle: 'Lost in the Light',
-      artistName: 'Bahamas',
-      isPlaying: false,
-    };
-    setAudioChromeSnapshot({
-      activeTrackId: 'track-1',
-      compactPlayerVisible: true,
-      fullPlayerVisible: false,
-    });
-
-    render(<SidebarBottomNowPlayingBridge />);
-
-    const slot = document.querySelector(
-      '[data-shell-audio-surface="sidebar-compact"]'
-    );
-    expect(slot).toHaveAttribute('data-state', 'visible');
-    expect(screen.getByText('Lost in the Light')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
-  });
-
-  it('wires the compact dismiss control to stop exactly once', () => {
-    _state = {
-      ..._state,
-      activeTrackId: 'track-1',
-      trackTitle: 'Lost in the Light',
-      artistName: 'Bahamas',
-      isPlaying: true,
-    };
-    setAudioChromeSnapshot({
-      activeTrackId: 'track-1',
-      compactPlayerVisible: true,
-      fullPlayerVisible: false,
-    });
-
-    render(<SidebarBottomNowPlayingBridge />);
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
-
-    expect(stop).toHaveBeenCalledOnce();
-  });
-
-  it('still renders when full-player state belongs to a different track', () => {
+  it('still renders when compact state belongs to a different track', () => {
     _state = {
       ..._state,
       activeTrackId: 'track-1',
@@ -159,8 +113,8 @@ describe('SidebarBottomNowPlayingBridge', () => {
     };
     setAudioChromeSnapshot({
       activeTrackId: 'track-2',
-      compactPlayerVisible: false,
-      fullPlayerVisible: true,
+      compactPlayerVisible: true,
+      fullPlayerVisible: false,
     });
 
     render(<SidebarBottomNowPlayingBridge />);

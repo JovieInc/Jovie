@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { getOptionalAuth } from '@/lib/auth/cached';
+import { getAppFlagValue } from '@/lib/flags/server';
 import { PageBuilderClient } from './PageBuilderClient';
-import './page-builder.css';
 
 export const metadata: Metadata = {
   title: 'Page builder — Jovie',
@@ -11,13 +12,16 @@ export const metadata: Metadata = {
 };
 
 export default async function PageBuilderPage() {
+  const { userId } = await getOptionalAuth();
+  const designV1Enabled = await getAppFlagValue('DESIGN_V1', { userId });
+
   // useSearchParams() in PageBuilderClient requires a Suspense boundary,
   // otherwise Next.js opts the entire route out of static prerendering and
   // throws at build time. Fallback is null because the toolbar + composed
   // page render fully on the client immediately.
   return (
     <Suspense fallback={null}>
-      <PageBuilderClient />
+      <PageBuilderClient designV1Enabled={designV1Enabled} />
     </Suspense>
   );
 }

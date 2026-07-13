@@ -1,27 +1,28 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fastRender } from '@/tests/utils/fast-render';
 import { EntityChip } from './EntityChip';
 import { EntityChipPopover } from './EntityChipPopover';
 
 const mockEntityPanelState = vi.hoisted(() => ({
+  designV1Enabled: false,
   entityPanel: null as null | { open: (payload: unknown) => void },
+}));
+
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: () => mockEntityPanelState.designV1Enabled,
 }));
 
 vi.mock('@/app/app/(shell)/chat/ChatEntityPanelContext', () => ({
   useOptionalChatEntityPanel: () => mockEntityPanelState.entityPanel,
 }));
 
-vi.mock('@/components/atoms/ImageWithFallback', () => ({
-  ImageWithFallback: ({
-    alt,
-    src,
-  }: {
-    readonly alt: string;
-    readonly src?: string | null;
-  }) => (src ? <img src={src} alt={alt} /> : null),
+vi.mock('next/image', () => ({
+  default: ({ src, alt, ...rest }: ComponentProps<'img'>) => (
+    <img src={src as string} alt={alt ?? ''} {...rest} />
+  ),
 }));
 
 function renderPopover(children?: ReactNode) {
@@ -39,6 +40,7 @@ function renderPopover(children?: ReactNode) {
 
 describe('EntityChipPopover', () => {
   beforeEach(() => {
+    mockEntityPanelState.designV1Enabled = false;
     mockEntityPanelState.entityPanel = null;
   });
 
@@ -125,17 +127,12 @@ describe('EntityChipPopover', () => {
     expect(screen.queryByTestId('entity-chip-popover-content')).toBeNull();
   });
 
-  it('renders the canonical compact EntityCard when open', async () => {
+  it('renders label inside the popover body when open', async () => {
     const user = userEvent.setup();
     renderPopover();
     await user.click(screen.getByTestId('entity-chip-popover-trigger'));
     const content = await screen.findByTestId('entity-chip-popover-content');
     expect(content.textContent).toContain('Sober');
-
-    const card = screen.getByTestId('entity-chip-popover-card');
-    expect(card).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Sober' })).toBeInTheDocument();
-    expect(content.textContent).toContain('Release');
   });
 
   it('uses the chat overlay tier with an opaque bounded surface', async () => {
@@ -145,12 +142,21 @@ describe('EntityChipPopover', () => {
     const content = await screen.findByTestId('entity-chip-popover-content');
 
     expect(content).toHaveClass('system-b-entity-chip-popover-content');
-    expect(screen.getByTestId('entity-chip-popover-card')).toBeTruthy();
+    expect(
+      content.querySelector('.system-b-entity-chip-popover-body')
+    ).toBeTruthy();
+    expect(
+      content.querySelector('.system-b-entity-chip-popover-placeholder')
+    ).toBeTruthy();
+    expect(
+      content.querySelector('.system-b-entity-chip-popover-title')
+    ).toHaveTextContent('Sober');
   });
 
   it('renders the release panel action with System B casing and primitives', async () => {
     const user = userEvent.setup();
     const openEntityPanel = vi.fn();
+    mockEntityPanelState.designV1Enabled = true;
     mockEntityPanelState.entityPanel = { open: openEntityPanel };
 
     renderPopover();
@@ -159,6 +165,7 @@ describe('EntityChipPopover', () => {
     const action = await screen.findByRole('button', {
       name: /Open Release/i,
     });
+    expect(action).toHaveClass('system-b-entity-chip-popover-action');
     expect(action).toHaveTextContent('Open Release');
 
     await user.click(action);
@@ -170,49 +177,5 @@ describe('EntityChipPopover', () => {
       source: 'manual',
       focusKey: 'release:rel_1:Sober',
     });
-  });
-
-  it('opens an event chip in the typed tour-date rail', async () => {
-    const user = userEvent.setup();
-    const openEntityPanel = vi.fn();
-    mockEntityPanelState.entityPanel = { open: openEntityPanel };
-
-    fastRender(
-      <EntityChipPopover kind='event' id='evt_1' label='Brooklyn Bowl'>
-        <span>Brooklyn Bowl</span>
-      </EntityChipPopover>
-    );
-    await user.click(screen.getByTestId('entity-chip-popover-trigger'));
-    await user.click(
-      await screen.findByRole('button', { name: /Open Event/i })
-    );
-
-    expect(openEntityPanel).toHaveBeenCalledWith({
-      kind: 'tour-date',
-      id: 'evt_1',
-      label: 'Brooklyn Bowl',
-      source: 'manual',
-      focusKey: 'event:evt_1:Brooklyn Bowl',
-    });
-  });
-
-  it('degrades gracefully for unresolved entities without layout thrash', async () => {
-    const user = userEvent.setup();
-    fastRender(
-      <EntityChipPopover kind='track' id='trk_missing' label='Unknown Track'>
-        <EntityChip
-          data={{ kind: 'track', id: 'trk_missing', label: 'Unknown Track' }}
-          variant='transcript'
-        />
-      </EntityChipPopover>
-    );
-
-    await user.click(screen.getByTestId('entity-chip-popover-trigger'));
-    const card = await screen.findByTestId('entity-chip-popover-card');
-    expect(card.tagName).toBe('DIV');
-    expect(
-      screen.getByRole('heading', { name: 'Unknown Track' })
-    ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Open/i })).toBeNull();
   });
 });

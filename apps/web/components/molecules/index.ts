@@ -19,6 +19,7 @@ export { FeatureCard } from './FeatureCard';
 export { FrostedContainer } from './FrostedContainer';
 export { OptimizedImage } from './OptimizedImage';
 export { PaySelector } from './PaySelector';
+export { PrimaryCTA } from './PrimaryCTA';
 export { ProfileNavButton } from './ProfileNavButton';
 export { getQrCodeUrl, QRCode } from './QRCode';
 export { QRCodeCard } from './QRCodeCard';

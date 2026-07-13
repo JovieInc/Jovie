@@ -4,11 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockBuildIosAuthCompleteUrl,
-  mockBuildBetterAuthSessionCookieDescriptor,
   mockBuildDevTestAuthCookieDescriptors,
   mockCreateStoredNativeExchangeCode,
   mockEnsureDevTestAuthActor,
-  mockEnsureExistingDevTestAuthActor,
   mockEnsureLiveDevTestAuthActor,
   mockGetCachedDevTestAuthSession,
   mockGetDevTestAuthAvailability,
@@ -20,11 +18,9 @@ const {
   mockResolveConfiguredNativeTestBetterAuthUserId,
 } = vi.hoisted(() => ({
   mockBuildIosAuthCompleteUrl: vi.fn(),
-  mockBuildBetterAuthSessionCookieDescriptor: vi.fn(),
   mockBuildDevTestAuthCookieDescriptors: vi.fn(),
   mockCreateStoredNativeExchangeCode: vi.fn(),
   mockEnsureDevTestAuthActor: vi.fn(),
-  mockEnsureExistingDevTestAuthActor: vi.fn(),
   mockEnsureLiveDevTestAuthActor: vi.fn(),
   mockGetCachedDevTestAuthSession: vi.fn(),
   mockGetDevTestAuthAvailability: vi.fn(),
@@ -42,8 +38,6 @@ vi.mock('@jovie/auth-routing', () => ({
 }));
 
 vi.mock('@/lib/auth/dev-test-auth.server', () => ({
-  buildBetterAuthSessionCookieDescriptor:
-    mockBuildBetterAuthSessionCookieDescriptor,
   buildDevTestAuthCookieDescriptors: mockBuildDevTestAuthCookieDescriptors,
   DEV_TEST_AUTH_COOKIE_NAMES: [
     '__e2e_test_mode',
@@ -51,7 +45,6 @@ vi.mock('@/lib/auth/dev-test-auth.server', () => ({
     '__e2e_test_persona',
   ],
   ensureDevTestAuthActor: mockEnsureDevTestAuthActor,
-  ensureExistingDevTestAuthActor: mockEnsureExistingDevTestAuthActor,
   ensureLiveDevTestAuthActor: mockEnsureLiveDevTestAuthActor,
   getCachedDevTestAuthSession: mockGetCachedDevTestAuthSession,
   getDevTestAuthAvailability: mockGetDevTestAuthAvailability,
@@ -65,7 +58,6 @@ vi.mock('@/lib/auth/routing-state.server', () => ({
 
 vi.mock('@/lib/auth/test-mode', () => ({
   isTrustedTestBypassRequest: mockIsTrustedTestBypassRequest,
-  TEST_MODE_COOKIE: '__e2e_test_mode',
 }));
 
 vi.mock('@/lib/auth/native-test-clerk-user.server', () => ({
@@ -122,15 +114,6 @@ describe('dev test-auth routes', () => {
       isAdmin: false,
       profilePath: '/browse-test-user',
     });
-    mockEnsureExistingDevTestAuthActor.mockResolvedValue({
-      persona: 'creator',
-      clerkUserId: 'ba-real-user',
-      email: 'existing@test.jovie.com',
-      username: 'existing-user',
-      fullName: 'Existing User',
-      isAdmin: false,
-      profilePath: '/existing-user',
-    });
     mockEnsureLiveDevTestAuthActor.mockResolvedValue({
       persona: 'creator',
       clerkUserId: 'user_creator',
@@ -169,15 +152,6 @@ describe('dev test-auth routes', () => {
         secure: false,
       },
     ]);
-    mockBuildBetterAuthSessionCookieDescriptor.mockResolvedValue({
-      name: 'better-auth.session_token',
-      value: 'session-token.signed',
-      httpOnly: true,
-      maxAge: 3600,
-      path: '/',
-      sameSite: 'lax',
-      secure: false,
-    });
     mockGetCachedDevTestAuthSession.mockResolvedValue(null);
   });
 
@@ -255,51 +229,6 @@ describe('dev test-auth routes', () => {
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_mode');
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_user_id');
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona');
-    expect(response.headers.get('set-cookie')).not.toContain(
-      'better-auth.session_token'
-    );
-  });
-
-  it('validates an existing persisted actor before setting auth cookies', async () => {
-    const { POST } = await import('@/app/api/dev/test-auth/session/route');
-    const response = await POST(
-      new NextRequest('http://localhost:3000/api/dev/test-auth/session', {
-        method: 'POST',
-        body: JSON.stringify({
-          persona: 'creator',
-          existingUserId: 'ba-real-user',
-        }),
-        headers: { 'Content-Type': 'application/json' },
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockEnsureExistingDevTestAuthActor).toHaveBeenCalledWith(
-      'ba-real-user',
-      'creator'
-    );
-    expect(mockEnsureDevTestAuthActor).not.toHaveBeenCalled();
-  });
-
-  it('fails closed when an existing actor is not persisted', async () => {
-    mockEnsureExistingDevTestAuthActor.mockResolvedValueOnce(null);
-    const { POST } = await import('@/app/api/dev/test-auth/session/route');
-    const response = await POST(
-      new NextRequest('http://localhost:3000/api/dev/test-auth/session', {
-        method: 'POST',
-        body: JSON.stringify({
-          persona: 'creator',
-          existingUserId: 'synthetic-user',
-        }),
-        headers: { 'Content-Type': 'application/json' },
-      })
-    );
-
-    expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({
-      success: false,
-      error: 'Unknown Better Auth test user',
-    });
   });
 
   it('accepts POST /session when the URL host is the server bind address but the request host is loopback', async () => {
@@ -507,47 +436,6 @@ describe('dev test-auth routes', () => {
     expect(response.headers.get('location')).toBe('/app/dashboard/earnings');
     expect(mockRevalidatePath).toHaveBeenCalledWith('/app', 'layout');
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona');
-    expect(response.headers.get('set-cookie')).not.toContain(
-      'better-auth.session_token'
-    );
-  });
-
-  it('adds a genuine Better Auth cookie only for explicit performance mode', async () => {
-    const { GET } = await import('@/app/api/dev/test-auth/enter/route');
-    const response = await GET(
-      new NextRequest(
-        'http://localhost:3000/api/dev/test-auth/enter?persona=creator&redirect=/app/chat&session=better-auth'
-      )
-    );
-
-    expect(response.status).toBe(303);
-    expect(mockBuildBetterAuthSessionCookieDescriptor).toHaveBeenCalledWith(
-      expect.objectContaining({ clerkUserId: 'user_creator' }),
-      false
-    );
-    expect(response.headers.get('set-cookie')).toContain(
-      'better-auth.session_token'
-    );
-    expect(response.headers.get('set-cookie')).not.toContain(
-      '__e2e_test_mode=bypass-auth'
-    );
-    expect(response.headers.get('set-cookie')).toContain('__e2e_test_user_id');
-    expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona');
-  });
-
-  it('fails closed when explicit performance session minting fails', async () => {
-    mockBuildBetterAuthSessionCookieDescriptor.mockRejectedValueOnce(
-      new Error('session unavailable')
-    );
-    const { GET } = await import('@/app/api/dev/test-auth/enter/route');
-
-    await expect(
-      GET(
-        new NextRequest(
-          'http://localhost:3000/api/dev/test-auth/enter?persona=creator&redirect=/app/chat&session=better-auth'
-        )
-      )
-    ).rejects.toThrow('session unavailable');
   });
 
   it('accepts GET /enter when URL host is the bind address but Host header is loopback', async () => {

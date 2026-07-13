@@ -12,7 +12,6 @@ const {
   mockDbInsert,
   mockRevalidatePath,
   mockInvalidateProfileCache,
-  mockInvalidateProxyUserStateCache,
   mockEnqueueMusicFetchEnrichmentJob,
   mockEnqueueDspArtistDiscoveryJob,
 } = vi.hoisted(() => ({
@@ -24,7 +23,6 @@ const {
   mockDbInsert: vi.fn(),
   mockRevalidatePath: vi.fn(),
   mockInvalidateProfileCache: vi.fn(),
-  mockInvalidateProxyUserStateCache: vi.fn(),
   mockEnqueueMusicFetchEnrichmentJob: vi.fn(),
   mockEnqueueDspArtistDiscoveryJob: vi.fn(),
 }));
@@ -85,8 +83,12 @@ vi.mock('@/lib/auth/clerk-sync', () => ({
   syncAllClerkMetadata: vi.fn().mockResolvedValue({ success: true }),
 }));
 
+vi.mock('@/lib/auth/ban-check', () => ({
+  invalidateBanStatusCache: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/auth/proxy-state', () => ({
-  invalidateProxyUserStateCache: mockInvalidateProxyUserStateCache,
+  invalidateProxyUserStateCache: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -163,12 +165,9 @@ function createMultiSelectChain(results: unknown[][]) {
     const result = results[callIndex] ?? [];
     callIndex++;
     const limit = vi.fn().mockResolvedValue(result);
-    const orderBy = vi.fn().mockReturnValue({ limit });
     const where = vi
       .fn()
-      .mockReturnValue(
-        Object.assign(Promise.resolve(result), { limit, orderBy })
-      );
+      .mockReturnValue(Object.assign(Promise.resolve(result), { limit }));
     const from = vi.fn().mockReturnValue({ where });
     return { from };
   });
@@ -194,16 +193,8 @@ vi.mock('@/lib/db/schema/auth', () => ({
   users: {
     id: 'users.id',
     clerkId: 'users.clerkId',
-    betterAuthUserId: 'users.betterAuthUserId',
     userStatus: 'users.userStatus',
     deletedAt: 'users.deletedAt',
-  },
-}));
-
-vi.mock('@/lib/db/schema/better-auth', () => ({
-  baSessions: {
-    table: 'baSessions',
-    userId: 'baSessions.userId',
   },
 }));
 
@@ -241,7 +232,6 @@ describe('admin/actions.ts', () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'admin_123' });
     mockIsAdmin.mockResolvedValue(true);
     mockInvalidateProfileCache.mockResolvedValue(undefined);
-    mockInvalidateProxyUserStateCache.mockResolvedValue(undefined);
     // requireAdmin() now does a db.select() to check admin's ban status.
     // Default: return an active admin user. Tests that need different select
     // results should call createSelectChain/createMultiSelectChain after this.
@@ -425,49 +415,6 @@ describe('admin/actions.ts', () => {
       expect(result).toEqual({ queuedCount: 2 });
       expect(mockEnqueueMusicFetchEnrichmentJob).toHaveBeenCalledTimes(2);
       expect(mockEnqueueDspArtistDiscoveryJob).toHaveBeenCalledTimes(2);
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/admin');
-    });
-
-    it('skips profiles missing both spotifyId and spotifyUrl without failing the batch', async () => {
-      const profiles = [
-        {
-          id: 'p1',
-          spotifyId: 'spotify-1',
-          spotifyUrl: null,
-        },
-        {
-          id: 'p2',
-          spotifyId: null,
-          spotifyUrl: null,
-        },
-      ];
-
-      createMultiSelectChain([
-        [{ userStatus: 'active', deletedAt: null }], // requireAdmin lookup
-        profiles, // action's select
-      ]);
-
-      mockEnqueueMusicFetchEnrichmentJob.mockResolvedValue('job-id');
-      mockEnqueueDspArtistDiscoveryJob.mockResolvedValue('discovery-job-id');
-
-      const { bulkRerunCreatorIngestionAction } = await import(
-        '@/app/app/(shell)/admin/actions'
-      );
-
-      const fd = makeFormData({
-        profileIds: JSON.stringify(['p1', 'p2']),
-      });
-
-      await expect(bulkRerunCreatorIngestionAction(fd)).resolves.toEqual({
-        queuedCount: 1,
-      });
-      expect(mockEnqueueMusicFetchEnrichmentJob).toHaveBeenCalledTimes(1);
-      expect(mockEnqueueMusicFetchEnrichmentJob).toHaveBeenCalledWith({
-        creatorProfileId: 'p1',
-        spotifyUrl: 'https://open.spotify.com/artist/spotify-1',
-      });
-      // p2 is skipped entirely -- no DSP discovery fired for the bad record.
-      expect(mockEnqueueDspArtistDiscoveryJob).toHaveBeenCalledTimes(1);
       expect(mockRevalidatePath).toHaveBeenCalledWith('/admin');
     });
 
@@ -803,85 +750,6 @@ describe('admin/actions.ts', () => {
       const fd = new FormData();
       await expect(toggleCreatorMarketingAction(fd)).rejects.toThrow(
         'profileId is required'
-      );
-    });
-  });
-
-  describe('post-Better Auth user moderation', () => {
-    it('revokes every live Better Auth session and app-UUID cache when banning a post-cutover user', async () => {
-      mockGetCachedAuth.mockResolvedValue({
-        userId: '7b4b948f-9720-4c5f-98da-8a7335015da9',
-      });
-      createMultiSelectChain([
-        [{ userStatus: 'active', deletedAt: null }],
-        [
-          {
-            userStatus: 'active',
-            clerkId: null,
-            betterAuthUserId: 'ba-user-live-session-owner',
-          },
-        ],
-      ]);
-      createUpdateChain();
-      const { where: deleteWhere } = createDeleteChain();
-
-      const { banUserAction } = await import('@/app/app/(shell)/admin/actions');
-
-      await banUserAction(
-        makeFormData({
-          userId: 'f95ad825-cd83-4827-b9b9-1f004119884e',
-          reason: 'policy violation',
-        })
-      );
-
-      expect(mockDbSelect).toHaveBeenCalledTimes(2);
-      expect(mockDbDelete).toHaveBeenCalledWith(
-        expect.objectContaining({ table: 'baSessions' })
-      );
-      expect(deleteWhere).toHaveBeenCalledWith({
-        eq: 'ba-user-live-session-owner',
-      });
-      expect(mockDbInsert.mock.results[0]?.value.values).toHaveBeenCalledWith(
-        expect.objectContaining({
-          adminUserId: '7b4b948f-9720-4c5f-98da-8a7335015da9',
-          targetUserId: 'f95ad825-cd83-4827-b9b9-1f004119884e',
-        })
-      );
-      expect(mockInvalidateProxyUserStateCache).toHaveBeenCalledWith(
-        'f95ad825-cd83-4827-b9b9-1f004119884e'
-      );
-    });
-
-    it('uses the authenticated app user ID directly when unbanning a user', async () => {
-      mockGetCachedAuth.mockResolvedValue({
-        userId: '7b4b948f-9720-4c5f-98da-8a7335015da9',
-      });
-      createMultiSelectChain([
-        [{ userStatus: 'active', deletedAt: null }],
-        [{ userStatus: 'banned', deletedAt: null, clerkId: null }],
-        [{ metadata: { previousStatus: 'active' } }],
-      ]);
-      createUpdateChain();
-
-      const { unbanUserAction } = await import(
-        '@/app/app/(shell)/admin/actions'
-      );
-
-      await unbanUserAction(
-        makeFormData({
-          userId: 'f95ad825-cd83-4827-b9b9-1f004119884e',
-        })
-      );
-
-      expect(mockDbSelect).toHaveBeenCalledTimes(3);
-      expect(mockDbInsert.mock.results[0]?.value.values).toHaveBeenCalledWith(
-        expect.objectContaining({
-          adminUserId: '7b4b948f-9720-4c5f-98da-8a7335015da9',
-          targetUserId: 'f95ad825-cd83-4827-b9b9-1f004119884e',
-        })
-      );
-      expect(mockInvalidateProxyUserStateCache).toHaveBeenCalledWith(
-        'f95ad825-cd83-4827-b9b9-1f004119884e'
       );
     });
   });

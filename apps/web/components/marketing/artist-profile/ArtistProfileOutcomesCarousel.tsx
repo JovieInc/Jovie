@@ -1,7 +1,8 @@
 'use client';
 
-import { Check, ChevronLeft, ChevronRight, Mail } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
+import type { CSSProperties } from 'react';
 import { useId, useRef } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import {
@@ -10,9 +11,8 @@ import {
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
 } from '@/features/home/homepage-profile-preview-fixture';
 import { ProfilePrimaryActionCard } from '@/features/profile/ProfilePrimaryActionCard';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
-import './ArtistProfileOutcomesCarousel.css';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
@@ -20,19 +20,28 @@ interface ArtistProfileOutcomesCarouselProps {
   readonly outcomes: ArtistProfileLandingCopy['outcomes'];
 }
 
-type OutcomeId =
-  ArtistProfileLandingCopy['outcomes']['landingCards'][number]['id'];
+type OutcomeId = ArtistProfileLandingCopy['outcomes']['cards'][number]['id'];
+
+const OUTCOME_CARD_ACCENTS: Record<OutcomeId, string> = {
+  'drive-streams': getAccentCssVars('blue').solid,
+  'sell-out': getAccentCssVars('purple').solid,
+  'get-paid': getAccentCssVars('green').solid,
+  'share-anywhere': getAccentCssVars('orange').solid,
+};
 
 // Per-card widths. Horizontal rail lets each outcome take the room its
 // mockup actually needs. Drive streams and Sell out need side-by-side
 // proofs, so they get wider slots; Share anywhere is a single QR card
 // and can stay narrow.
 const OUTCOME_CARD_WIDTHS: Record<OutcomeId, string> = {
-  'straight-to-listen': 'w-full sm:w-136 lg:w-152',
-  'local-dates-first': 'w-full sm:w-144 lg:w-160',
-  'support-without-friction': 'w-full sm:w-120 lg:w-128',
-  'capture-the-fan': 'w-full sm:w-108 lg:w-116',
-  'one-link-everywhere': 'w-full sm:w-96 lg:w-104',
+  'drive-streams': 'w-full sm:w-[34rem] lg:w-[38rem]',
+  'sell-out': 'w-full sm:w-[36rem] lg:w-[40rem]',
+  'get-paid': 'w-full sm:w-[30rem] lg:w-[32rem]',
+  'share-anywhere': 'w-full sm:w-[24rem] lg:w-[26rem]',
+};
+
+type OutcomeAccentStyle = CSSProperties & {
+  readonly '--outcome-accent': string;
 };
 
 const SHOWCASE_VIEWER_LOCATION = {
@@ -45,7 +54,6 @@ export function ArtistProfileOutcomesCarousel({
 }: Readonly<ArtistProfileOutcomesCarouselProps>) {
   const railId = useId();
   const scrollerRef = useRef<HTMLElement | null>(null);
-  const reducedMotion = useReducedMotion();
 
   const scrollByDirection = (direction: 'prev' | 'next') => {
     const rail = scrollerRef.current;
@@ -56,26 +64,23 @@ export function ArtistProfileOutcomesCarousel({
     const scrollStep = Math.max(rail.clientWidth * 0.8, 240);
     const nextLeft = direction === 'next' ? scrollStep : -scrollStep;
 
-    rail.scrollBy({
-      left: nextLeft,
-      behavior: reducedMotion ? 'auto' : 'smooth',
-    });
+    rail.scrollBy({ left: nextLeft, behavior: 'smooth' });
   };
 
   return (
     <ArtistProfileSectionShell
-      className='ap-outcomes'
+      className='bg-white/[0.01]'
       containerClassName='!max-w-none !px-0'
       width='page'
     >
       <div>
-        <div className='mx-auto max-w-public-content px-5 sm:px-6 lg:px-0'>
+        <div className='mx-auto max-w-(--linear-content-max) px-5 sm:px-6 lg:px-0'>
           <ArtistProfileSectionHeader
             align='left'
             headline={outcomes.headline}
             body={outcomes.body}
-            className='max-w-152'
-            bodyClassName='max-w-120'
+            className='max-w-[38rem]'
+            bodyClassName='max-w-[30rem]'
           />
         </div>
 
@@ -86,12 +91,11 @@ export function ArtistProfileOutcomesCarousel({
         />
 
         <p id='artist-profile-outcomes-instructions' className='sr-only'>
-          Browse the five outcome cards. Previous and next controls are
-          available when the cards form a horizontal rail.
+          Use the previous and next controls to browse the outcome cards.
         </p>
 
         <div className='relative mt-10 w-full overflow-x-hidden'>
-          <div className='pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--public-content-max-page))/2))] top-4 z-20 hidden items-center gap-2 lg:flex'>
+          <div className='pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--linear-content-max))/2))] top-4 z-20 hidden items-center gap-2 lg:flex'>
             <button
               type='button'
               aria-controls={railId}
@@ -99,7 +103,7 @@ export function ArtistProfileOutcomesCarousel({
               onClick={() => {
                 scrollByDirection('prev');
               }}
-              className='ap-outcomes__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors'
+              className='pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             >
               <ChevronLeft className='h-4 w-4' aria-hidden='true' />
             </button>
@@ -110,37 +114,35 @@ export function ArtistProfileOutcomesCarousel({
               onClick={() => {
                 scrollByDirection('next');
               }}
-              className='ap-outcomes__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors'
+              className='pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             >
               <ChevronRight className='h-4 w-4' aria-hidden='true' />
             </button>
           </div>
 
-          <div className='hidden sm:block lg:hidden'>
-            <div className='sr-only focus-within:not-sr-only focus-within:absolute focus-within:left-6 focus-within:top-4 focus-within:z-20 focus-within:flex focus-within:gap-2'>
-              <button
-                type='button'
-                aria-controls={railId}
-                aria-label='Scroll Outcomes Left'
-                onClick={() => {
-                  scrollByDirection('prev');
-                }}
-                className='ap-outcomes__rail-btn min-h-11 min-w-11 rounded-full bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold'
-              >
-                Prev
-              </button>
-              <button
-                type='button'
-                aria-controls={railId}
-                aria-label='Scroll Outcomes Right'
-                onClick={() => {
-                  scrollByDirection('next');
-                }}
-                className='ap-outcomes__rail-btn min-h-11 min-w-11 rounded-full bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold'
-              >
-                Next
-              </button>
-            </div>
+          <div className='sr-only focus-within:not-sr-only focus-within:absolute focus-within:left-5 focus-within:top-4 focus-within:z-20 focus-within:flex focus-within:gap-2 sm:focus-within:left-6 lg:hidden'>
+            <button
+              type='button'
+              aria-controls={railId}
+              aria-label='Scroll Outcomes Left'
+              onClick={() => {
+                scrollByDirection('prev');
+              }}
+              className='rounded-full border border-black/12 bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold text-black dark:text-white shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+            >
+              Prev
+            </button>
+            <button
+              type='button'
+              aria-controls={railId}
+              aria-label='Scroll Outcomes Right'
+              onClick={() => {
+                scrollByDirection('next');
+              }}
+              className='rounded-full border border-black/12 bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold text-black dark:text-white shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+            >
+              Next
+            </button>
           </div>
 
           <section
@@ -149,12 +151,9 @@ export function ArtistProfileOutcomesCarousel({
             data-testid='artist-profile-outcomes-grid'
             aria-label='Outcome Showcase'
             aria-describedby='artist-profile-outcomes-instructions'
-            className={cn(
-              'relative grid grid-cols-1 gap-3 overflow-visible pb-3 pl-5 pr-5 sm:flex sm:gap-3.5 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-x-contain sm:snap-x sm:snap-mandatory sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-              !reducedMotion && 'sm:scroll-smooth'
-            )}
+            className='relative grid grid-cols-1 gap-3 overflow-visible pb-3 pl-5 pr-5 sm:flex sm:gap-3.5 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-x-contain sm:scroll-smooth sm:snap-x sm:snap-mandatory sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
           >
-            {outcomes.landingCards.map(card => (
+            {outcomes.cards.map(card => (
               <OutcomeCard key={card.id} card={card} outcomes={outcomes} />
             ))}
           </section>
@@ -168,41 +167,48 @@ function OutcomeCard({
   card,
   outcomes,
 }: Readonly<{
-  card: ArtistProfileLandingCopy['outcomes']['landingCards'][number];
+  card: ArtistProfileLandingCopy['outcomes']['cards'][number];
   outcomes: ArtistProfileLandingCopy['outcomes'];
 }>) {
+  const style: OutcomeAccentStyle = {
+    '--outcome-accent': OUTCOME_CARD_ACCENTS[card.id],
+  };
+
   const proof = outcomes.syntheticProofs;
 
   return (
     <article
       data-testid='artist-profile-outcome-card'
       className={cn(
-        'ap-outcomes__card group relative flex shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-subtle bg-surface-0',
+        'group relative flex shrink-0 snap-start flex-col overflow-hidden rounded-[1.5rem] border border-white/8 bg-(--color-bg-base) shadow-[0_22px_56px_rgba(0,0,0,0.28)]',
         OUTCOME_CARD_WIDTHS[card.id]
       )}
+      style={style}
     >
+      <div
+        className='absolute inset-0 opacity-90'
+        style={{
+          background:
+            'radial-gradient(circle at 80% 78%, color-mix(in srgb, var(--outcome-accent) 18%, transparent), transparent 36%), linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015) 44%, rgba(0,0,0,0.42))',
+        }}
+        aria-hidden='true'
+      />
       <div className='relative flex h-full flex-col p-4 sm:p-5'>
-        <div className='max-w-72'>
-          <h3 className='ap-outcomes__card-title text-2xl font-semibold leading-tight tracking-tight text-primary-token sm:text-3xl'>
+        <div className='max-w-[18rem]'>
+          <h3 className='max-w-[10ch] text-[clamp(1.85rem,3.4vw,3rem)] font-semibold leading-[0.92] tracking-[-0.065em] text-primary-token'>
             {card.title}
           </h3>
-          <p className='ap-outcomes__card-body mt-3 text-app leading-relaxed text-secondary-token'>
-            {card.description}
-          </p>
         </div>
 
-        <div className='mt-6'>
-          {card.id === 'straight-to-listen' ? <DriveStreamsProof /> : null}
-          {card.id === 'local-dates-first' ? (
+        <div className='mt-4'>
+          {card.id === 'drive-streams' ? <DriveStreamsProof /> : null}
+          {card.id === 'sell-out' ? (
             <SellOutProof proof={proof.visualProofs.sellOut} />
           ) : null}
-          {card.id === 'support-without-friction' ? (
+          {card.id === 'get-paid' ? (
             <GetPaidProof proof={proof.visualProofs.getPaid} />
           ) : null}
-          {card.id === 'capture-the-fan' ? (
-            <CaptureFanProof proof={proof.captureFan} />
-          ) : null}
-          {card.id === 'one-link-everywhere' ? (
+          {card.id === 'share-anywhere' ? (
             <ShareProof proof={proof.shareAnywhere} />
           ) : null}
         </div>
@@ -273,8 +279,8 @@ function SellOutProof({
         />
       </div>
 
-      <div className='ap-outcomes__drawer flex h-full flex-col border border-subtle px-3.5 py-3'>
-        <p className='ap-outcomes__drawer-title text-xs font-semibold text-primary-token'>
+      <div className='flex h-full flex-col rounded-[1.08rem] border border-white/8 bg-white/[0.02] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+        <p className='text-xs font-semibold tracking-[-0.02em] text-white dark:text-white'>
           {proof.drawerTitle}
         </p>
         <p className='mt-1 text-2xs text-tertiary-token'>
@@ -286,14 +292,14 @@ function SellOutProof({
               key={row.id}
               className='grid grid-cols-[2.45rem_minmax(0,1fr)_auto] items-center gap-2 py-2.25'
             >
-              <span className='ap-outcomes__tour-month text-2xs font-medium text-secondary-token'>
+              <span className='text-2xs font-medium leading-[1.15] tracking-[-0.01em] text-secondary-token'>
                 {row.month}
-                <span className='ap-outcomes__tour-day block text-sm font-semibold text-primary-token'>
+                <span className='block text-sm font-semibold tracking-[-0.04em] text-white dark:text-white'>
                   {row.day}
                 </span>
               </span>
               <span className='min-w-0'>
-                <span className='block truncate text-xs font-semibold text-primary-token'>
+                <span className='block truncate text-xs font-semibold text-white dark:text-white'>
                   {row.venue}
                 </span>
                 <span className='block truncate text-2xs text-tertiary-token'>
@@ -318,18 +324,18 @@ function GetPaidProof({
 }>) {
   return (
     <div className='grid gap-2 sm:grid-cols-[0.9fr_1.1fr]'>
-      <div className='ap-outcomes__drawer flex flex-col justify-between border border-subtle px-3 py-3 sm:pt-3.5'>
+      <div className='flex flex-col justify-between rounded-[1.08rem] border border-white/8 bg-white/[0.02] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:pt-3.5'>
         <div>
-          <p className='ap-outcomes__drawer-label text-2xs font-medium text-tertiary-token'>
+          <p className='text-2xs font-medium tracking-[-0.01em] text-tertiary-token'>
             {proof.drawerTitle}
           </p>
-          <p className='ap-outcomes__drawer-subtitle mt-1 text-app font-semibold text-primary-token'>
+          <p className='mt-1 text-app font-semibold tracking-[-0.03em] text-white dark:text-white'>
             {proof.drawerSubtitle}
           </p>
         </div>
 
         <div className='mt-3 space-y-1.5'>
-          <p className='ap-outcomes__drawer-label text-2xs font-medium text-tertiary-token'>
+          <p className='text-2xs font-medium tracking-[-0.01em] text-tertiary-token'>
             {proof.chooseAmountLabel}
           </p>
           <div className='grid gap-1.5'>
@@ -337,11 +343,13 @@ function GetPaidProof({
               <div
                 key={row.id}
                 className={cn(
-                  'ap-outcomes__amount flex items-center justify-between px-3 py-1.75 text-xs',
-                  row.featured && 'ap-outcomes__amount--featured'
+                  'flex items-center justify-between rounded-[0.82rem] border px-3 py-1.75 text-xs',
+                  row.featured
+                    ? 'border-white/18 bg-white dark:bg-surface-1 text-black dark:text-white'
+                    : 'border-white/8 bg-white/[0.03] text-white dark:text-white'
                 )}
               >
-                <span className='ap-outcomes__amount-value font-semibold'>
+                <span className='font-semibold tracking-[-0.02em]'>
                   {row.amount}
                 </span>
                 <span
@@ -359,12 +367,12 @@ function GetPaidProof({
           </div>
         </div>
 
-        <span className='mt-3 inline-flex w-fit rounded-full bg-surface-1 px-3.5 py-2 text-2xs font-semibold text-primary-token'>
+        <span className='mt-3 inline-flex w-fit rounded-full bg-white dark:bg-surface-1 px-3.5 py-2 text-2xs font-semibold text-black dark:text-white'>
           {proof.ctaLabel}
         </span>
       </div>
 
-      <article className='ap-outcomes__shot relative min-h-53 overflow-hidden border border-subtle bg-surface-input sm:-translate-y-2'>
+      <article className='relative min-h-[13.25rem] overflow-hidden rounded-[1.08rem] border border-white/8 bg-(--color-bg-input) shadow-[0_14px_32px_rgba(0,0,0,0.22)] sm:-translate-y-2'>
         <Image
           alt={proof.screenshotAlt}
           fill
@@ -377,48 +385,6 @@ function GetPaidProof({
   );
 }
 
-function CaptureFanProof({
-  proof,
-}: Readonly<{
-  proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['captureFan'];
-}>) {
-  return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-4 sm:p-5'>
-      <div className='flex items-center gap-3'>
-        <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-2 text-primary-token'>
-          <Mail className='h-4 w-4' aria-hidden='true' />
-        </span>
-        <div>
-          <p className='text-xs font-semibold text-primary-token'>
-            {proof.inputLabel}
-          </p>
-          <p className='mt-1 font-mono text-xs text-tertiary-token'>
-            {proof.inputValue}
-          </p>
-        </div>
-      </div>
-
-      <div className='mt-4 flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-0 px-3 py-2.5'>
-        <span className='text-xs font-medium text-secondary-token'>
-          {proof.ctaLabel}
-        </span>
-        <span className='inline-flex items-center gap-1.5 rounded-full bg-primary-token px-3 py-1.5 text-3xs font-semibold text-surface-1'>
-          <Check className='h-3 w-3' aria-hidden='true' />
-          {proof.confirmedLabel}
-        </span>
-      </div>
-
-      <p className='mt-4 flex items-center gap-2 text-xs font-medium text-secondary-token'>
-        <span
-          aria-hidden='true'
-          className='h-1.5 w-1.5 rounded-full bg-success'
-        />
-        {proof.followUpLabel}
-      </p>
-    </div>
-  );
-}
-
 function ShareProof({
   proof,
 }: Readonly<{
@@ -426,28 +392,26 @@ function ShareProof({
 }>) {
   return (
     <div className='flex justify-center sm:pt-2'>
-      <div className='ap-outcomes__qr-card relative ml-auto flex w-full max-w-62 flex-col items-center bg-badge-text px-4 py-4.5 text-center text-primary-token'>
-        <p className='ap-outcomes__qr-title text-2xs font-semibold text-secondary-token'>
+      <div className='relative ml-auto flex w-full max-w-[15.5rem] flex-col items-center rounded-[1.2rem] bg-(--color-badge-text) px-4 py-4.5 text-center text-black dark:text-white shadow-[0_16px_32px_rgba(0,0,0,0.14)]'>
+        <p className='text-2xs font-semibold tracking-[0.02em] text-secondary-token'>
           {proof.title}
         </p>
 
-        <div className='ap-outcomes__qr-frame mt-3.5 flex h-39 w-39 items-center justify-center rounded-xl'>
+        <div className='mt-3.5 flex h-39 w-39 items-center justify-center rounded-xl bg-white dark:bg-surface-1 shadow-[inset_0_0_0_1px_rgba(17,17,17,0.06)]'>
           <div className='grid grid-cols-7 gap-2'>
             {QR_CELLS.map(cell => (
               <span
                 key={cell.id}
-                className={cn(
-                  'h-2.5 w-2.5 rounded-xs',
-                  cell.filled
-                    ? 'ap-outcomes__qr-cell--filled'
-                    : 'ap-outcomes__qr-cell--empty'
-                )}
+                className='h-2.5 w-2.5 rounded-xs'
+                style={{
+                  backgroundColor: cell.filled ? '#0b0b0b' : '#f2f0ea',
+                }}
               />
             ))}
           </div>
         </div>
 
-        <p className='ap-outcomes__qr-url mt-3.5 font-mono text-2xs font-semibold text-primary-token'>
+        <p className='mt-3.5 font-mono text-2xs font-semibold tracking-[-0.02em] text-black dark:text-white'>
           {proof.url}
         </p>
         <p className='mt-2 text-2xs font-medium text-tertiary-token'>

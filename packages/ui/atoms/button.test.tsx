@@ -137,14 +137,11 @@ describe('Button', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Press' }).className).toContain(
-      'active:scale-[var(--scale-press)]'
-    );
-    expect(screen.getByRole('button', { name: 'Press' }).className).toContain(
-      'motion-reduce:active:scale-100'
+      'active:scale-[0.96]'
     );
     expect(
       screen.getByRole('button', { name: 'Static' }).className
-    ).not.toContain('active:scale-[var(--scale-press)]');
+    ).not.toContain('active:scale-[0.96]');
   });
 
   it('uses the Jovie focus token', () => {

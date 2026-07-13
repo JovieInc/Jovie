@@ -2,10 +2,6 @@
 
 A modern artist profile and link-in-bio platform built with Next.js, Clerk authentication, Neon PostgreSQL, and Drizzle ORM.
 
-[![CI](https://github.com/JovieInc/Jovie/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/JovieInc/Jovie/actions/workflows/ci.yml?query=branch%3Amain)
-[![CodeQL](https://github.com/JovieInc/Jovie/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/JovieInc/Jovie/actions/workflows/codeql.yml?query=branch%3Amain)
-[![Security](https://github.com/JovieInc/Jovie/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/JovieInc/Jovie/actions/workflows/security.yml?query=branch%3Amain)
-
 ## Security & trust
 
 Jovie tracks OpenSSF security posture in-repository and is working toward an OpenSSF Best Practices badge.
@@ -85,7 +81,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 
 ### Prerequisites
 
-- **Node.js 22.23.1+** (22.x only)
+- **Node.js 22.13.0+** (22.x only)
 - **pnpm 9.15.4** (exact, via Corepack)
 - **ripgrep (`rg`)** for local agent and search tooling
 - **Doppler CLI** (secrets management) - [Install Guide](docs/DOPPLER_SETUP.md)

@@ -83,18 +83,12 @@ describe('pr-size-guard label override helpers', () => {
 describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => {
   it('counts files through paginated REST with bounded transient retry', () => {
     const workflow = readFileSync(SIZE_GUARD_WORKFLOW, 'utf8');
-    const override = readFileSync(OVERRIDE_WORKFLOW, 'utf8');
 
     expect(workflow).toContain('gh api --paginate \\');
     expect(workflow).toContain('"repos/$REPO/pulls/$PR/files?per_page=100"');
     expect(workflow).toContain('for attempt in 1 2 3; do');
-    expect(workflow).toContain('[[ "$attempt" -eq 3 ]]');
     expect(workflow).toContain('HTTP 403|HTTP 429|HTTP 5[0-9][0-9]');
-    expect(workflow).toContain("invalid character '<'");
     expect(workflow).not.toContain('gh pr view "$PR" -R "$REPO" --json files');
-    expect(override).toContain('for attempt in 1 2 3; do');
-    expect(override).toContain('[[ "$attempt" -eq 3 ]]');
-    expect(override).toContain("invalid character '<'");
   });
 
   it('keeps the primary size guard off labeled events', () => {
@@ -103,16 +97,9 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
     expect(workflow).toContain('types: [opened, synchronize, reopened]');
     expect(workflow).not.toMatch(/types:\s*\[[^\]]*labeled/);
     expect(workflow).toContain(
-      "group: pr-size-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}"
+      'group: pr-size-${{ github.event.pull_request.number }}'
     );
-    expect(workflow).toContain(
-      "cancel-in-progress: ${{ github.event_name == 'merge_group' }}"
-    );
-    // #14501: pull_request runs must never cancel — duplicate same-head-SHA
-    // runs (opened + synchronize, or a duplicate webhook delivery) share the
-    // per-PR group, and GitHub's rollup can pin the CANCELLED run as latest
-    // for this required context (JOV-3580). merge_group still cancels.
-    expect(workflow).not.toContain('cancel-in-progress: true');
+    expect(workflow).toContain('cancel-in-progress: true');
     expect(workflow).toContain('JOV-3580');
   });
 
@@ -129,7 +116,13 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
     );
     expect(workflow).toContain('node scripts/lib/pr-size-guard-policy.mjs');
     expect(workflow).toContain('checks: write');
+    expect(workflow).toContain(
+      'ref: ${{ github.event.pull_request.base.sha }}'
+    );
     expect(workflow).toContain('persist-credentials: false');
+    expect(workflow).not.toContain(
+      'ref: ${{ github.event.pull_request.head.sha }}'
+    );
     expect(workflow).toContain(
       'group: pr-size-label-override-${{ github.event.pull_request.number }}'
     );
@@ -139,22 +132,6 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
     );
     expect(workflow).toContain('node scripts/pr-size-guard-label-override.mjs');
     expect(workflow).toContain('JOV-3580');
-  });
-
-  it('executes checks-write policy code from the immutable workflow commit', () => {
-    const workflow = readFileSync(OVERRIDE_WORKFLOW, 'utf8');
-
-    expect(workflow).toContain('ref: ${{ github.workflow_sha }}');
-    expect(workflow).toContain(
-      'exact trusted commit that supplied this workflow'
-    );
-    expect(workflow).toContain('stale PR base or PR-controlled head');
-    expect(workflow).not.toContain(
-      'ref: ${{ github.event.pull_request.base.sha }}'
-    );
-    expect(workflow).not.toContain(
-      'ref: ${{ github.event.pull_request.head.sha }}'
-    );
   });
 
   it('does not skip the job before supported-label step conditions can run', () => {

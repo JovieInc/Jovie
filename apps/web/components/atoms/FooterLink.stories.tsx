@@ -28,7 +28,7 @@ export const Default: Story = {
     tone: 'dark',
   },
   parameters: {
-    backgrounds: { default: 'light' },
+    backgrounds: { default: 'dark' },
   },
 };
 
@@ -48,13 +48,13 @@ export const ExternalLink: Story = {
     tone: 'dark',
   },
   parameters: {
-    backgrounds: { default: 'light' },
+    backgrounds: { default: 'dark' },
   },
 };
 
 export const FooterNavigation: Story = {
   render: () => (
-    <nav className='flex gap-6 rounded-lg border border-black/6 bg-base p-4'>
+    <nav className='flex gap-6 bg-black p-4 rounded-lg'>
       <FooterLink href='/about' tone='dark'>
         About
       </FooterLink>

@@ -20,7 +20,6 @@ interface ClaimTargetProfile {
   readonly usernameNormalized: string;
   readonly displayName: string | null;
   readonly isClaimed: boolean | null;
-  readonly claimedAt: Date | null;
   readonly onboardingCompletedAt: Date | null;
 }
 
@@ -35,7 +34,6 @@ async function getClaimTargetProfile(
       usernameNormalized: creatorProfiles.usernameNormalized,
       displayName: creatorProfiles.displayName,
       isClaimed: creatorProfiles.isClaimed,
-      claimedAt: creatorProfiles.claimedAt,
       onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
     })
     .from(creatorProfiles)
@@ -236,7 +234,7 @@ export async function claimPrebuiltProfileForUser(
       displayName: params.displayName,
       isClaimed: true,
       isPublic: true,
-      claimedAt: profile.claimedAt ?? now,
+      claimedAt: now,
       onboardingCompletedAt: params.finalizeOnboarding
         ? (profile.onboardingCompletedAt ?? now)
         : profile.onboardingCompletedAt,

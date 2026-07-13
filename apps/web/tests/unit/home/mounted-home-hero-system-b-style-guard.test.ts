@@ -40,7 +40,7 @@ function extractMountedHeroCss(source: string): string {
 
 function extractMountedHeroPageSource(source: string): string {
   const heroStart = source.indexOf('function HomepageHero()');
-  const heroEnd = source.indexOf('function HomepageFaq()');
+  const heroEnd = source.indexOf('function HomepageOpportunity()');
 
   expect(heroStart, 'homepage hero source exists').toBeGreaterThanOrEqual(0);
   expect(heroEnd, 'homepage hero source is bounded').toBeGreaterThan(heroStart);
@@ -97,18 +97,11 @@ describe('mounted homepage hero System B source contract', () => {
 
     expect(css).toContain('var(--system-b-bg-page)');
     expect(css).toContain('var(--color-text-primary-token)');
-    expect(css).toContain('var(--color-text-tertiary-token)');
-    expect(css).toContain('var(--homepage-grid-max)');
-    expect(css).toContain('var(--homepage-grid-gutter)');
+    expect(css).toContain('var(--color-text-secondary-token)');
+    expect(css).toContain('var(--ds-public-content-max)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('var(--font-satoshi)');
-    expect(css).toContain(
-      'letter-spacing: var(--ds-marketing-display-tracking);'
-    );
-    expect(css).toContain('font-size: var(--ds-marketing-display-size);');
-    expect(css).toContain('line-height: var(--ds-marketing-display-leading);');
-    expect(css).toContain('font-size: var(--text-lg);');
-    expect(css).toContain('text-wrap: pretty;');
+    expect(css).toContain('letter-spacing: -0.055em;');
     expect(css).toContain('mask-image: linear-gradient(');
     expect(css).toContain('min-height: var(--space-6);');
   });

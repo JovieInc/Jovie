@@ -9,12 +9,19 @@
 name: Security Scanning
 
 on:
-  # PR and merge-group diff scans are required through ci.yml / PR Ready.
-  # This workflow owns post-merge and nightly security scans only.
+  # Risk-tiered CI (JOV-3461). The FAST secret scans (gitleaks + trufflehog,
+  # diff-scoped via `scan-secrets.sh ci-pr`) run on PRs — a leaked key on a
+  # PUBLIC repo is scraped within seconds of hitting main, so secret detection
+  # must gate pre-merge (EVENT-class). The HEAVY scans (Trivy full-tree, CodeQL,
+  # Scorecard) stay post-merge on main + nightly — they saturated runners and
+  # stalled the queue when run per-PR (2026-06-22). Per-job `if:` guards below
+  # keep the heavy ones off the PR path.
   push:
     branches: ['main']
+  pull_request:
+    branches: ['main']
   schedule:
-    - cron: '5 6 * * *' # Offset from other deep scheduled lanes
+    - cron: '0 6 * * *' # Nightly at 06:00 UTC
   workflow_dispatch:
 
 # Default permissions - each job specifies its own required permissions
@@ -46,7 +53,7 @@ jobs:
           git config --local --unset-all remote.origin.promisorRemote 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
           clean: true
@@ -113,7 +120,7 @@ jobs:
           git config --local --unset-all remote.origin.promisorRemote 2>/dev/null || true
 
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
           clean: true
@@ -160,7 +167,7 @@ jobs:
 
   trivy:
     name: Trivy Vulnerability Scanning
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     # Heavy full-tree scan stays off the PR path (post-merge on main + nightly).
     # Only the fast diff-scoped secret scans (gitleaks/trufflehog) gate PRs.
     if: github.event_name != 'pull_request'
@@ -169,7 +176,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run Trivy vulnerability scanner (filesystem mode)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -189,7 +196,7 @@ jobs:
 
   scorecard:
     name: OSSF Scorecard Supply Chain Security
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     # Scorecard only runs on main branch push and schedule to avoid token issues on PRs
     if: github.event_name != 'pull_request'
     permissions:
@@ -198,7 +205,7 @@ jobs:
       id-token: write # Required for OIDC token authentication
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -218,7 +225,7 @@ jobs:
 
   commit-signature-check:
     name: Commit Signature Verification
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     # Run on every push to main so unsigned agent-authored merges are surfaced immediately.
     # This is observability only — blocking unsigned commits requires enabling
     # "Require signed commits" in branch protection settings (human/admin action).

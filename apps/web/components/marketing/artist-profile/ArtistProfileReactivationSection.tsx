@@ -2,7 +2,6 @@ import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ArtistProfileReactivationVisual } from '../MarketingStoryPrimitives';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
-import './ArtistProfileReactivationSection.css';
 
 interface ArtistProfileReactivationSectionProps {
   readonly id?: string;
@@ -26,7 +25,8 @@ export function ArtistProfileReactivationSection({
           align='center'
           headline={reactivation.headline}
           body={reactivation.subhead}
-          bodyClassName='ap-reactivation__body'
+          className='max-w-[46rem]'
+          bodyClassName='mx-auto max-w-[35rem]'
         />
         <ArtistProfileReactivationVisual
           className='mt-10'

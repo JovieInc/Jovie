@@ -296,7 +296,7 @@ export function orderPrsDependencyAware(prs) {
 }
 
 function actionTriggersCi(action) {
-  return action === 'request_github_rebase';
+  return ['update_branch', 'attempt_rebase_safe_autoresolve'].includes(action);
 }
 
 export function decideAction(classification, context = {}) {
@@ -359,10 +359,10 @@ export function decideAction(classification, context = {}) {
       };
     }
     return {
-      action: 'request_github_rebase',
+      action: 'update_branch',
       triggersCi: true,
       reason:
-        'mergeable but behind; request an exact-head GitHub Update Branch rebase',
+        'mergeable but behind; prefer GitHub update-branch over force-rebase',
     };
   }
 
@@ -383,12 +383,19 @@ export function decideAction(classification, context = {}) {
         reason: 'fork/cross-repo conflict requires human-owned rebase',
       };
     }
+    if (plannedCiTriggers >= availableCiSlots) {
+      return {
+        action: 'wait_capacity',
+        triggersCi: false,
+        reason: 'Neon/CI re-trigger capacity is full for this run',
+      };
+    }
     return {
-      action: 'label_needs_manual_rebase',
+      action: 'attempt_rebase_safe_autoresolve',
       label: manualRebaseLabel,
-      triggersCi: false,
+      triggersCi: true,
       reason:
-        'GitHub reports a true conflict; do not merge main or force-push the PR branch',
+        'true merge conflict; try safe rebase/autoresolve, label for manual rebase if non-trivial',
     };
   }
 
@@ -484,4 +491,11 @@ export function formatPlan(plan, { dryRun = true } = {}) {
     `needs-manual-rebase candidates: ${manual.length > 0 ? manual.map(n => `#${n}`).join(', ') : 'none'}`
   );
   return `${lines.join('\n')}\n`;
+}
+
+export function isSafeAutoResolvableConflict(unmergedPaths) {
+  return (
+    unmergedPaths.length > 0 &&
+    unmergedPaths.every(path => path === 'pnpm-lock.yaml')
+  );
 }

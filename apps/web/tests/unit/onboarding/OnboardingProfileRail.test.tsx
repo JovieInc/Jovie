@@ -51,14 +51,7 @@ describe('OnboardingProfileRail', () => {
     expect(screen.getAllByTitle('Spotify').length).toBeGreaterThan(0);
     expect(screen.getAllByTitle('Apple Music').length).toBeGreaterThan(0);
     expect(screen.queryByText('open.spotify.com')).toBeNull();
-    expect(
-      screen.getByText('12.3K Spotify followers (source: enrichment)')
-    ).toBeDefined();
-    expect(
-      screen.getByTestId('onboarding-profile-preview-badge')
-    ).toHaveTextContent('Preview');
-    expect(screen.getByText('Preview — not claimed yet')).toBeDefined();
-    expect(screen.queryByText('Live')).toBeNull();
+    expect(screen.getByText('12.3K Spotify followers')).toBeDefined();
     expect(screen.queryByTestId('onboarding-rail-progress')).toBeNull();
     expect(screen.queryByText('Artist Profile')).toBeNull();
     expect(screen.queryByText('Building profile')).toBeNull();

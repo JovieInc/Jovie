@@ -21,7 +21,6 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         aiPitchGenPerRelease: 1,
         aiRetouchDailyLimit: null,
         chatFileUploadLimit: 5,
-        profileMonitoringLimit: 5,
       });
       expect(free.booleans).toEqual({
         canExportContacts: false,
@@ -65,7 +64,6 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         aiPitchGenPerRelease: 5,
         aiRetouchDailyLimit: 10,
         chatFileUploadLimit: null,
-        profileMonitoringLimit: 25,
       });
       expect(pro.booleans).toEqual({
         canExportContacts: true,
@@ -109,7 +107,6 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         aiPitchGenPerRelease: null,
         aiRetouchDailyLimit: 50,
         chatFileUploadLimit: null,
-        profileMonitoringLimit: null,
       });
       expect(max.booleans).toEqual({
         canExportContacts: true,

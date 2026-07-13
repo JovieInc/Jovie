@@ -14,7 +14,6 @@ import {
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolvePackageJson } from './resolve-package-json.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -198,6 +197,66 @@ function materializeSymlinks(rootDir) {
   return materialized;
 }
 
+function findPackageJsonFromEntry(entryPath, packageName) {
+  let currentDir = path.dirname(entryPath);
+  const rootDir = path.parse(currentDir).root;
+
+  while (currentDir !== rootDir) {
+    const packageJsonPath = path.join(currentDir, 'package.json');
+    if (existsSync(packageJsonPath)) {
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+      if (packageJson.name === packageName) {
+        return packageJsonPath;
+      }
+    }
+
+    currentDir = path.dirname(currentDir);
+  }
+
+  throw new Error(
+    `Unable to find package.json for ${packageName} from ${entryPath}`
+  );
+}
+
+function resolvePackageJson(packageName, paths) {
+  try {
+    return require.resolve(`${packageName}/package.json`, { paths });
+  } catch (error) {
+    if (error?.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') {
+      throw error;
+    }
+
+    for (const basePath of paths) {
+      for (const candidate of [
+        path.join(basePath, ...packageName.split('/'), 'package.json'),
+        path.join(
+          path.dirname(basePath),
+          ...packageName.split('/'),
+          'package.json'
+        ),
+        path.join(
+          path.dirname(path.dirname(basePath)),
+          ...packageName.split('/'),
+          'package.json'
+        ),
+        path.join(
+          basePath,
+          'node_modules',
+          ...packageName.split('/'),
+          'package.json'
+        ),
+      ]) {
+        if (existsSync(candidate)) return candidate;
+      }
+    }
+
+    return findPackageJsonFromEntry(
+      require.resolve(packageName, { paths }),
+      packageName
+    );
+  }
+}
+
 function isOptionalRuntimePackageUnavailable(error) {
   return (
     error?.code === 'MODULE_NOT_FOUND' ||
@@ -214,7 +273,7 @@ function copyRuntimePackageToStandalone(
     return;
   }
 
-  const packageJsonPath = resolvePackageJson(require, packageName, [
+  const packageJsonPath = resolvePackageJson(packageName, [
     resolveFrom,
     path.dirname(require.resolve('next/package.json')),
   ]);
@@ -261,7 +320,7 @@ function copyPackageToNodeModulesRoot(
   const copyKey = `${destinationNodeModulesRoot}:${packageName}`;
   if (copiedPackages.has(copyKey)) return;
 
-  const packageJsonPath = resolvePackageJson(require, packageName, [
+  const packageJsonPath = resolvePackageJson(packageName, [
     resolveFrom,
     appNodeModulesRoot,
     workspaceNodeModulesRoot,
@@ -336,7 +395,7 @@ function hydrateSharpAliasesInStandaloneNextNodeModules() {
     const packageJsonPath = path.join(packageRoot, 'package.json');
     if (!existsSync(packageJsonPath)) continue;
 
-    const realSharpPackageJsonPath = resolvePackageJson(require, 'sharp', [
+    const realSharpPackageJsonPath = resolvePackageJson('sharp', [
       appNodeModulesRoot,
       workspaceNodeModulesRoot,
       path.dirname(require.resolve('next/package.json')),

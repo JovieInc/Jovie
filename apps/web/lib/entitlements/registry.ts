@@ -58,8 +58,7 @@ export type NumericEntitlement =
   | 'aiDailyMessageLimit'
   | 'aiPitchGenPerRelease'
   | 'aiRetouchDailyLimit'
-  | 'chatFileUploadLimit'
-  | 'profileMonitoringLimit';
+  | 'chatFileUploadLimit';
 
 // ---------------------------------------------------------------------------
 // Plan entitlements shape
@@ -77,8 +76,6 @@ export interface PlanEntitlements {
     aiRetouchDailyLimit: number | null;
     /** Max files per chat upload batch. Null = unlimited. */
     chatFileUploadLimit: number | null;
-    /** Max external public surfaces with row-level monitoring. Null = unlimited. */
-    profileMonitoringLimit: number | null;
   };
   marketing: {
     displayName: string;
@@ -131,7 +128,6 @@ const PRO_LIMITS: PlanEntitlements['limits'] = {
   aiPitchGenPerRelease: 5,
   aiRetouchDailyLimit: 10,
   chatFileUploadLimit: null,
-  profileMonitoringLimit: 25,
 };
 
 const PRO_FEATURES: readonly string[] = [
@@ -202,7 +198,6 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       aiPitchGenPerRelease: 1,
       aiRetouchDailyLimit: null,
       chatFileUploadLimit: 5,
-      profileMonitoringLimit: 5,
     },
     marketing: {
       displayName: 'Free',
@@ -286,7 +281,6 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       aiPitchGenPerRelease: null,
       aiRetouchDailyLimit: 50,
       chatFileUploadLimit: null,
-      profileMonitoringLimit: null,
     },
     marketing: {
       displayName: 'Max',
@@ -323,7 +317,6 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       aiPitchGenPerRelease: 3,
       aiRetouchDailyLimit: 10,
       chatFileUploadLimit: 15,
-      profileMonitoringLimit: 15,
     },
     marketing: {
       displayName: 'Pro Trial',

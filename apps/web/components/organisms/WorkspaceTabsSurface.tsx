@@ -121,7 +121,7 @@ export function WorkspaceTabsSurface<
     <div className='space-y-4'>
       {headerless ? (
         shouldShowTabControls ? (
-          <div className='border-b border-(--app-shell-frame-seam) pb-3'>
+          <div className='border-b border-(--linear-app-frame-seam) pb-3'>
             <div className='flex flex-col gap-3'>
               {shouldShowPrimaryControl ? (
                 <LinkedTabBar
@@ -146,7 +146,7 @@ export function WorkspaceTabsSurface<
             title={title}
             subtitle={description}
             actions={actions}
-            className='min-h-0 px-app-header py-3'
+            className='min-h-0 px-(--linear-app-header-padding-x) py-3'
             actionsClassName='shrink-0'
           />
           {shouldShowTabControls ? (

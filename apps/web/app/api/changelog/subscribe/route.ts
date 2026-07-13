@@ -57,8 +57,7 @@ type TurnstileVerificationResult = 'verified' | 'rejected' | 'unavailable';
 
 async function verifyTurnstile(
   token: string,
-  ip: string,
-  hostname?: string | null
+  ip: string
 ): Promise<TurnstileVerificationResult> {
   // Single source of truth: delegate to the shared, bounded (timeout + retry)
   // siteverify helper instead of re-implementing the Cloudflare call here.
@@ -74,7 +73,7 @@ async function verifyTurnstile(
     return 'verified';
   }
 
-  const result = await verifyTurnstileToken(token, ip, hostname);
+  const result = await verifyTurnstileToken(token, ip);
   if (result.success) return 'verified';
   return classifyTurnstileFailure(result);
 }
@@ -181,15 +180,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const host =
-    request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() ||
-    request.headers.get('host') ||
-    null;
-  const turnstileResult = await verifyTurnstile(
-    body.turnstileToken ?? '',
-    ip,
-    host
-  );
+  const turnstileResult = await verifyTurnstile(body.turnstileToken ?? '', ip);
   if (turnstileResult === 'rejected') {
     return NextResponse.json(
       { error: 'Bot verification failed. Please try again.' },

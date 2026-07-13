@@ -65,21 +65,6 @@ describe('ChatLoading (chat home)', () => {
       'true'
     );
   });
-
-  it('does not expose disabled controls as the loading composer', async () => {
-    const { default: ChatLoading } = await import(
-      '@/app/app/(shell)/chat/loading'
-    );
-    render(<ChatLoading />);
-
-    expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.queryByRole('button')).toBeNull();
-    // Product-voice placeholder is decorative under the busy shell.
-    const placeholder = screen.getByText(
-      'Ask Jovie to plan your next release...'
-    );
-    expect(placeholder.closest('[aria-hidden="true"]')).not.toBeNull();
-  });
 });
 
 describe('ChatConversationLoading (chat/[id])', () => {

@@ -1,30 +1,29 @@
 ---
-description: GitHub-native PR drain — enroll clean PRs into the merge queue, fan out worktree fix agents for the rest, never go red
+description: Graphite-native PR drain — enroll clean PRs into the merge queue, fan out worktree fix agents for the rest, never go red
 allowed-tools: Bash(gh:*), Bash(git:*), Bash(pnpm:*), Bash(jq:*), Bash(bash:*), Bash(chmod:*)
 ---
 
-# Drain — GitHub native merge queue to zero
+# Drain — Graphite merge queue to zero
 
-Clears the open-PR backlog through GitHub's **native merge queue**. Agents open
-PRs to `main`; the controller enrolls exact heads; GitHub creates combined
-`merge_group` heads and **re-tests each entry against latest `main` before
-landing**. The queue, not this command, keeps `main` green.
+Clears the open-PR backlog the way the repo actually ships now: agents open PRs
+straight to `main`, the **Graphite merge queue** rebase-merges them server-side,
+and the queue **re-tests each PR against latest `main` before landing** — so the
+queue, not this command, is what keeps `main` green.
 
 ## Hard rules (current CI — do not violate)
 
-- **Never manually run `gh pr merge` / `--auto` / `--admin`.** The authorized
-  native controller owns queue mutation and postcondition checks.
-- **Enrollment intent = add `merge-queue`.** The label wakes the native
-  controller; GitHub's authoritative queue state determines membership.
+- **Never `gh pr merge` / `--auto` / `--admin`.** Branch protection lets only the
+  Graphite app push to `main`; those calls fail and bypass the queue.
+- **Enroll = add the `merge-queue` label.** That is the only way a PR enters the queue.
 - **`fast` is emergency/hotfix-only.** Ordinary generated PRs on `codex/*`,
   `claude/*`, `agent/*`, or similar branches must not use `fast` unless the PR
   is explicitly classified as emergency/hotfix/incident; otherwise the guard
   removes `fast` and gates the PR for human review.
-- **Dequeue hard gates through the controller.** A PR with `needs-human`,
-  `hold`, or `gated` must not occupy native queue slots; remove the intent label
-  only after authoritative dequeue succeeds.
+- **Dequeue hard gates = remove only the `merge-queue` label.** A PR with
+  `needs-human`, `hold`, or `gated` must not keep occupying Graphite MQ slots.
 - **Never retarget to `integration/loop-*`.** That model is dormant; agents go to `main`.
 - **Never close a PR you didn't open.** Surface superseded/stale ones to the human.
+- **Never touch `gtmq_*` draft PRs** (author `app/graphite-app`) — that's the queue working.
 - **Opt-outs:** `needs-human`, `hold`, `gated` → leave the PR for a human after
   removing `merge-queue` if it was already enrolled.
 
@@ -42,15 +41,16 @@ budget; the next operation is deferred to the next tick.
 
 The script enrolls every non-draft, `MERGEABLE`, green, non-opted-out PR and
 prints five work buckets: **DEQUEUE**, **CONFLICT**, **BLOCKED**, **SURFACE**,
-and **NATIVE QUEUE**.
+**GRAPHITE MQ**.
 
 ## Phase 1 — Kill systemic blockers first
 
 If the same required check fails on **3+ PRs**, it's broken on `main`, not in the
 branches. Fix it once on `main` via a single PR, then add `merge-queue` so
-the native controller can enroll it ahead of downstream work. Add `fast` only
-when the PR is explicitly emergency/hotfix/incident-classified. Do not use an
-alternate merge path or fix the same thing on N branches.
+Graphite retests and lands it ahead of downstream work. Add `fast` only when
+the PR is explicitly emergency/hotfix/incident-classified; otherwise use the
+Graphite dashboard's merge-now path for human-approved emergency bypass. Don't
+fix the same thing on N branches.
 
 ```bash
 # failing-check histogram across open PRs
@@ -113,12 +113,16 @@ gh pr list --state open --json number,title --limit 100 \
 - Enrolled into queue: <n> (#…)
 - Fix agents dispatched: <n> (DONE: …, still blocked: …)
 - Surfaced for human: <n> (#… — recommend close/keep + why)
-- Native queue in-flight: <n> entries/groups
+- Graphite MQ in-flight: <n> groups
 - Systemic blockers fixed on main: <…/none>
 - Last merge: <ts>  | Open PRs: <n>
 ```
 
 Flow-health targets: nothing non-draft sits unenrolled; no agent PR open >24h
-without a push; if a labeled PR isn't entering the queue, the intent-label →
-native-controller wiring is broken. Inspect authoritative GitHub queue state
-before retrying or changing labels.
+without a push; if a labeled PR isn't entering the queue, the `merge-queue` →
+Graphite enrollment wiring is broken — flag it.
+
+If a Graphite draft gets stale after a downstack MQ draft closes, first resubmit
+the source PR with `gt submit --always --update-only --no-edit --no-interactive
+--no-verify`. If the stale `gtmq_*` draft remains, use the Graphite dashboard
+to cancel/retry the queue entry. Do not close `gtmq_*` PRs from GitHub.

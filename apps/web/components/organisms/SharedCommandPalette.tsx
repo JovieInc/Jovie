@@ -177,9 +177,9 @@ function CmdKPaletteRow({
         onCommit(index);
       }}
       className={cn(
-        'flex min-h-14 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left outline-none transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+        'flex min-h-14 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left outline-none transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
         isActive
-          ? 'bg-[color-mix(in_oklab,var(--app-shell-content-surface)_76%,white_14%)] text-primary-token shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_36%,transparent),0_10px_28px_-24px_rgba(0,0,0,0.9)]'
+          ? 'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_76%,white_14%)] text-primary-token shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_36%,transparent),0_10px_28px_-24px_rgba(0,0,0,0.9)]'
           : 'hover:bg-white/[0.045]'
       )}
     >
@@ -230,14 +230,14 @@ export function PaletteList({
             className={cn(
               variant === 'cmdk' &&
                 sectionIdx > 0 &&
-                'mt-2 border-t border-[color-mix(in_oklab,var(--app-shell-frame-seam)_72%,transparent)] pt-1'
+                'mt-2 border-t border-[color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] pt-1'
             )}
           >
             <div
               className={cn(
                 variant === 'cmdk'
                   ? 'px-3 pb-1.5 pt-2 text-2xs font-semibold uppercase tracking-[0.08em] text-quaternary-token'
-                  : 'px-3 pb-1 pt-3 text-3xs font-semibold uppercase tracking-[0.1em] text-tertiary-token'
+                  : 'px-3 pb-1 pt-3 text-3xs font-semibold uppercase tracking-[0.1em] text-quaternary-token'
               )}
             >
               {section.label}
@@ -245,11 +245,9 @@ export function PaletteList({
             {section.items.map((item, localIdx) => {
               const flatIdx = start + localIdx;
               const shortcutLabel =
-                item.kind === 'nav' && item.nav.shortcutLabel
-                  ? item.nav.shortcutLabel
-                  : showIndexedShortcuts && flatIdx < 3
-                    ? `${CMD_KEY_LABEL}${flatIdx + 1}`
-                    : undefined;
+                showIndexedShortcuts && flatIdx < 3
+                  ? `${CMD_KEY_LABEL}${flatIdx + 1}`
+                  : undefined;
               if (variant === 'cmdk') {
                 return (
                   <CmdKPaletteRow

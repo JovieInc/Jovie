@@ -1,7 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-
 import { Check, Loader2, X } from 'lucide-react';
 import { useCallback } from 'react';
 import type { CreatorVerificationStatus } from '@/features/admin/useCreatorVerification';
@@ -96,9 +94,8 @@ export function VerificationStatusToggle({
   );
 
   return (
-    <Button
+    <button
       type='button'
-      variant='ghost'
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       disabled={isLoading}
@@ -118,6 +115,6 @@ export function VerificationStatusToggle({
           Failed to update verification
         </span>
       )}
-    </Button>
+    </button>
   );
 }

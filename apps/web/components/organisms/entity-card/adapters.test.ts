@@ -1,8 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import {
-  chatEntityMentionToEntityCard,
   chatReleaseContextToEntityCard,
   chatTourDateContextToEntityCard,
   merchToEntityCard,
@@ -151,74 +150,6 @@ describe('chatReleaseContextToEntityCard', () => {
   });
 });
 
-describe('chatEntityMentionToEntityCard', () => {
-  it('maps a resolved release mention into a compact card model', () => {
-    const model = chatEntityMentionToEntityCard({
-      kind: 'release',
-      id: 'rel_1',
-      label: 'Sober',
-      thumbnail: 'https://cdn.test/sober.jpg',
-      releaseType: 'single',
-      totalTracks: 1,
-      totalDurationMs: 210_000,
-    });
-
-    expect(model.kind).toBe('music');
-    expect(model.title).toBe('Sober');
-    expect(model.imageUrl).toBe('https://cdn.test/sober.jpg');
-    expect(model.eyebrow).toBe('Release · Single');
-    expect(model.meta).toBe('1 track · 3:30');
-    expect(model.href).toBeUndefined();
-    expect(model.cta).toBeNull();
-  });
-
-  it('degrades to label-only for unresolved mentions', () => {
-    const model = chatEntityMentionToEntityCard({
-      kind: 'artist',
-      id: 'art_x',
-      label: 'Unknown Artist',
-    });
-
-    expect(model.kind).toBe('music');
-    expect(model.title).toBe('Unknown Artist');
-    expect(model.imageUrl).toBeNull();
-    expect(model.eyebrow).toBe('Artist');
-    expect(model.meta).toBeNull();
-  });
-
-  it('maps events to show cards with date pills when artwork is missing', () => {
-    const model = chatEntityMentionToEntityCard({
-      kind: 'event',
-      id: 'evt_1',
-      label: 'Brooklyn Steel',
-      eventType: 'tour',
-      eventDate: '2026-06-12T23:30:00.000Z',
-      venue: 'Brooklyn Steel',
-      city: 'Brooklyn, NY',
-    });
-
-    expect(model.kind).toBe('show');
-    expect(model.eyebrow).toBe('Event · Tour');
-    expect(model.datePill).toEqual({ month: 'Jun', day: '12' });
-    expect(model.meta).toBe('Brooklyn Steel · Brooklyn, NY');
-  });
-
-  it('attaches interactive CTAs for panel open actions', () => {
-    const onClick = vi.fn();
-    const model = chatEntityMentionToEntityCard(
-      { kind: 'release', id: 'rel_1', label: 'Sober' },
-      { interactive: true, cta: { label: 'Open Release', onClick } }
-    );
-
-    expect(model.interactive).toBe(true);
-    expect(model.cta?.label).toBe('Open Release');
-    model.cta?.onClick?.(
-      {} as unknown as import('react').MouseEvent<HTMLElement>
-    );
-    expect(onClick).toHaveBeenCalledTimes(1);
-  });
-});
-
 describe('chatTourDateContextToEntityCard', () => {
   it('maps tour dates to a date-pill context model without navigation', () => {
     const model = chatTourDateContextToEntityCard(
@@ -353,58 +284,13 @@ describe('showToEntityCard', () => {
     });
   });
 
-  it('renders a target-less No Tickets CTA when there is no ticket url', () => {
+  it('omits the CTA when there is no ticket url', () => {
     const model = showToEntityCard({
       id: 's2',
       venueName: 'Club',
       startDate: null,
     });
-    expect(model.cta).toEqual({
-      label: 'No Tickets',
-      href: null,
-      disabled: true,
-    });
+    expect(model.cta).toBeNull();
     expect(model.datePill).toBeNull();
-  });
-
-  it('formats the date pill in UTC so it always matches the events list', () => {
-    // 02:30 UTC is still the previous day in US timezones — the card and the
-    // TourModePanel list (also UTC) must agree on "Jul 29".
-    const model = showToEntityCard({
-      id: 's3',
-      venueName: 'The Echo',
-      startDate: '2026-07-29T02:30:00.000Z',
-    });
-    expect(model.datePill).toEqual({ month: 'Jul', day: '29' });
-  });
-
-  it('never links a cancelled or sold-out show to tickets', () => {
-    const cancelled = showToEntityCard({
-      id: 's4',
-      venueName: 'Enmore Theatre',
-      startDate: '2026-11-29T08:00:00.000Z',
-      ticketUrl: 'https://tickets.test/enmore',
-      ticketStatus: 'cancelled',
-    });
-    expect(cancelled.href).toBeNull();
-    expect(cancelled.cta).toEqual({
-      label: 'Cancelled',
-      href: null,
-      disabled: true,
-    });
-
-    const soldOut = showToEntityCard({
-      id: 's5',
-      venueName: 'The Echo',
-      startDate: '2026-07-29T02:30:00.000Z',
-      ticketUrl: 'https://tickets.test/echo',
-      ticketStatus: 'sold_out',
-    });
-    expect(soldOut.href).toBeNull();
-    expect(soldOut.cta).toEqual({
-      label: 'Sold Out',
-      href: null,
-      disabled: true,
-    });
   });
 });

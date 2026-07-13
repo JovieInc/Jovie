@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { POST } from '@/app/api/onboarding/distribution-event/route';
 
 const {
   mockCaptureError,
@@ -78,6 +77,9 @@ describe('POST /api/onboarding/distribution-event', () => {
       callback(createTransactionWithInsert(), 'user_123')
     );
 
+    const { POST } = await import(
+      '@/app/api/onboarding/distribution-event/route'
+    );
     const response = await POST(
       new Request('http://localhost/api/onboarding/distribution-event', {
         body: JSON.stringify({
@@ -102,6 +104,9 @@ describe('POST /api/onboarding/distribution-event', () => {
       callback(createTransactionWithInsert(dbInsertChain.insert), 'user_123')
     );
 
+    const { POST } = await import(
+      '@/app/api/onboarding/distribution-event/route'
+    );
     const response = await POST(
       new Request('http://localhost/api/onboarding/distribution-event', {
         body: JSON.stringify({
@@ -132,6 +137,9 @@ describe('POST /api/onboarding/distribution-event', () => {
   it('returns 401 when auth is missing', async () => {
     mockWithDbSessionTx.mockRejectedValueOnce(new Error('Unauthorized'));
 
+    const { POST } = await import(
+      '@/app/api/onboarding/distribution-event/route'
+    );
     const response = await POST(
       new Request('http://localhost/api/onboarding/distribution-event', {
         body: JSON.stringify({
@@ -166,6 +174,9 @@ describe('POST /api/onboarding/distribution-event', () => {
       callback(createTransactionWithInsert(dbInsertChain.insert), 'user_123')
     );
 
+    const { POST } = await import(
+      '@/app/api/onboarding/distribution-event/route'
+    );
     const response = await POST(
       new Request('http://localhost/api/onboarding/distribution-event', {
         body: JSON.stringify({
@@ -201,6 +212,9 @@ describe('POST /api/onboarding/distribution-event', () => {
       callback(createTransactionWithInsert(dbInsertChain.insert), 'user_123')
     );
 
+    const { POST } = await import(
+      '@/app/api/onboarding/distribution-event/route'
+    );
     const response = await POST(
       new Request('http://localhost/api/onboarding/distribution-event', {
         body: JSON.stringify({

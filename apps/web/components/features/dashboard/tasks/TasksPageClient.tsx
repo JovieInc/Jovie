@@ -35,7 +35,6 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { providerConfig } from '@/app/app/(shell)/dashboard/releases/config';
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
-import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
 import { TaskDataTable } from '@/components/features/dashboard/tasks/TaskDataTable';
 import { TaskDescriptionHelper } from '@/components/features/dashboard/tasks/TaskDescriptionHelper';
@@ -83,6 +82,7 @@ import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
+import { useAppFlag } from '@/lib/flags/client';
 import { useReleaseEntityQuery } from '@/lib/queries/useReleaseEntityQuery';
 import {
   useCreateTaskMutation,
@@ -1366,6 +1366,7 @@ function useTaskActions({
 
 export function TasksPageClient() {
   const router = useRouter();
+  const designV1TasksEnabled = useAppFlag('DESIGN_V1');
   const { selectedProfile } = useDashboardData();
   const isDesktopTaskLayout = useBreakpoint('lg');
   const [hasResolvedResponsiveLayout, setHasResolvedResponsiveLayout] =
@@ -2191,16 +2192,10 @@ export function TasksPageClient() {
 
   return (
     <>
-      <NavigationDestinationReady
-        destination='tasks'
-        ready={
-          !activeIsError &&
-          !(isBoardMode ? isActiveBoardLoading : isActiveListLoading)
-        }
-      />
       <PageShell
         className='absolute inset-0 overflow-hidden'
         data-testid='tasks-workspace'
+        data-design-v1-tasks={designV1TasksEnabled ? 'true' : undefined}
         toolbar={
           isDesktopTaskLayout || headerMode !== 'default' ? (
             <TaskWorkspaceHeaderBar

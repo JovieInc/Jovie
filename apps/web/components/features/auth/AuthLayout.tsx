@@ -15,6 +15,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
+import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import { AuthBrandPanel } from './AuthBrandPanel';
 
@@ -54,6 +55,7 @@ interface AuthLayoutInnerProps {
   readonly showcaseVariant: 'page' | 'image-only';
   readonly isKeyboardVisible: boolean;
   readonly formRef: React.RefObject<HTMLElement | null>;
+  readonly designV1: boolean;
 }
 
 function SplitLayoutContent({
@@ -69,6 +71,7 @@ function SplitLayoutContent({
   showcaseVariant,
   isKeyboardVisible,
   formRef,
+  designV1,
 }: AuthLayoutInnerProps) {
   return (
     <div className='relative z-10 flex w-full flex-1 items-stretch justify-center'>
@@ -200,6 +203,7 @@ export function AuthLayout({
   showcaseVariant = 'page',
 }: Readonly<AuthLayoutProps>) {
   const { isKeyboardVisible } = useMobileKeyboard();
+  const designV1 = useAppFlag('DESIGN_V1');
   const { signOut } = useAuthSafe();
   const formRef = useRef<HTMLElement>(null);
   const isSplitVariant = layoutVariant === 'split';
@@ -222,12 +226,14 @@ export function AuthLayout({
     showcaseVariant,
     isKeyboardVisible,
     formRef,
+    designV1,
   };
 
   return (
     <div
       data-auth-shell
       data-auth-layout-variant={layoutVariant}
+      data-design-v1-auth={designV1 ? 'true' : 'false'}
       className={cn(
         // App-shell base — sidebar/page background tone (matches Linear
         // dark `--linear-bg-page`). The bento card sits inside as the
@@ -250,6 +256,12 @@ export function AuthLayout({
         className='pointer-events-none absolute inset-0 overflow-hidden'
       >
         <div className='auth-shell-grain absolute inset-0 opacity-[0.12]' />
+        {designV1 ? null : (
+          <>
+            <div className='absolute left-[12%] top-[14%] h-[18rem] w-[18rem] rounded-full bg-white/[0.04] blur-[110px]' />
+            <div className='absolute right-[10%] top-[8%] h-[28rem] w-[28rem] rounded-full bg-accent/10 blur-[180px]' />
+          </>
+        )}
         <div
           className='absolute inset-0'
           style={{

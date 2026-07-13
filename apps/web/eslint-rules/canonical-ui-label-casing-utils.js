@@ -232,10 +232,7 @@ function isTitleCase(value) {
   const words = getWords(trimmed);
   for (const word of words) {
     if (isAbbreviation(word) || isBrandWord(word)) continue;
-    // Hyphenated compounds keep segments after the first lowercase, matching
-    // toCanonicalWord ("Follow-up", not "Follow-Up") — without the hyphen
-    // branch the canonical form itself could never satisfy the check.
-    if (!/^[A-Z][a-z0-9'&]*(?:-[a-z0-9'&]+)*$/.test(word)) return false;
+    if (!/^[A-Z][a-z0-9'&]*$/.test(word)) return false;
   }
 
   return trimmed === toCanonicalTitleCase(trimmed);

@@ -2,7 +2,6 @@ import {
   convertToModelMessages,
   type LanguageModel,
   type ModelMessage,
-  smoothStream,
   stepCountIs,
   type ToolSet,
   type UIMessage,
@@ -378,10 +377,6 @@ export async function executeChatTurn(
           return {};
         },
     abortSignal: signal,
-    // JOV-3525: pace raw model deltas into a steady word-level reveal so the
-    // client render cadence is smooth; pairs with useChat
-    // experimental_throttle in useJovieChat.
-    experimental_transform: smoothStream({ delayInMs: 15, chunking: 'word' }),
     experimental_telemetry: buildAiTelemetry({
       functionId: 'jovie-chat',
       identity: {

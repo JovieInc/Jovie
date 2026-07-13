@@ -49,7 +49,7 @@ describe('ErrorBanner', () => {
       render(<ErrorBanner title='Dismissible error' onDismiss={onDismiss} />);
 
       const closeButton = screen.getByRole('button', {
-        name: 'Dismiss Error',
+        name: 'Dismiss error',
       });
       expect(closeButton).toBeInTheDocument();
     });
@@ -58,7 +58,7 @@ describe('ErrorBanner', () => {
       render(<ErrorBanner title='Non-dismissible error' />);
 
       const closeButton = screen.queryByRole('button', {
-        name: 'Dismiss Error',
+        name: 'Dismiss error',
       });
       expect(closeButton).not.toBeInTheDocument();
     });
@@ -68,7 +68,7 @@ describe('ErrorBanner', () => {
       render(<ErrorBanner title='Dismissible error' onDismiss={onDismiss} />);
 
       const closeButton = screen.getByRole('button', {
-        name: 'Dismiss Error',
+        name: 'Dismiss error',
       });
       fireEvent.click(closeButton);
 
@@ -80,9 +80,9 @@ describe('ErrorBanner', () => {
       render(<ErrorBanner title='Dismissible error' onDismiss={onDismiss} />);
 
       const closeButton = screen.getByRole('button', {
-        name: 'Dismiss Error',
+        name: 'Dismiss error',
       });
-      expect(closeButton).toHaveAttribute('aria-label', 'Dismiss Error');
+      expect(closeButton).toHaveAttribute('aria-label', 'Dismiss error');
     });
   });
 });

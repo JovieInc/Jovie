@@ -17,8 +17,7 @@ name: Taste Label Guard
 # See .claude/rules/release.md and docs/company/autonomous-shipping-doctrine.md.
 
 on:
-  # Base-controlled workflow definition; PR head is never checked out.
-  pull_request_target:
+  pull_request:
     types: [labeled]
 
 permissions: {}
@@ -30,7 +29,7 @@ concurrency:
 jobs:
   guard:
     name: Taste Label Guard
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 3
     # Same-repo PRs only (fork PRs get a read-only token), and only when the
     # label just applied is actually a taste gate.
@@ -44,12 +43,9 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Checkout exact trusted base policy
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 1
-          persist-credentials: false
 
       - name: Clear mis-applied taste label
         env:

@@ -217,9 +217,7 @@ export function InsightsPanelView({
             options={CATEGORY_FILTERS}
             aria-label='Filter Insights By Category'
             surface='ghost'
-            layout='hug'
-            className='w-full rounded-none border-0 bg-transparent p-0'
-            listClassName='flex-wrap gap-1.5'
+            className='flex flex-wrap gap-1.5 rounded-none border-0 bg-transparent p-0'
             triggerClassName='min-h-8 border border-subtle bg-surface-1 px-3 py-1 text-xs text-secondary-token hover:border-default hover:bg-surface-0 hover:text-primary-token data-[state=active]:border-default data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token'
           />
 

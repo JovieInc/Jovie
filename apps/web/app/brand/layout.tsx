@@ -1,5 +1,5 @@
 import { SkipToContent } from '@/components/atoms/SkipToContent';
-import { MarketingFooter } from '@/components/site/MarketingFooter';
+import { HomeLegalFooter } from '@/components/homepage/HomeLegalFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
@@ -11,7 +11,7 @@ export default function BrandLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='system-b-marketing dark system-b-brand-layout'>
+    <div className='linear-marketing dark system-b-brand-layout'>
       <SkipToContent />
       <MarketingHeader
         logoSize='sm'
@@ -22,7 +22,7 @@ export default function BrandLayout({
       <main id='main-content' className='system-b-brand-main'>
         {children}
       </main>
-      <MarketingFooter variant='expanded' />
+      <HomeLegalFooter />
     </div>
   );
 }

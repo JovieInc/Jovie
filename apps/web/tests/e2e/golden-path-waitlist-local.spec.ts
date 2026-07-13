@@ -7,12 +7,12 @@ import { waitForHydration } from './utils/smoke-test-utils';
 
 test.use({
   storageState: { cookies: [], origins: [] },
-  video: process.env.CI ? 'off' : 'on',
+  video: 'on',
 });
 
 type StreamChunk = Record<string, unknown>;
 
-const COMPOSER_TEXTAREA = '[aria-label="Chat Message Input"]';
+const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
 
 function uiStreamBody(chunks: readonly StreamChunk[]) {
   return `${chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`;

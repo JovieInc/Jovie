@@ -1,7 +1,5 @@
-import { oauthProviderClient } from '@better-auth/oauth-provider/client';
 import { emailOTPClient, oneTapClient } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
-import { absolutePublicUrl } from '@/lib/env-public';
 
 /**
  * Better Auth browser client.
@@ -15,12 +13,9 @@ import { absolutePublicUrl } from '@/lib/env-public';
  * only configuration input is the public Google client id used by the
  * One Tap plugin.
  *
- * Browser calls keep no explicit `baseURL` — the Better Auth handler lives at
+ * No `baseURL` on purpose — the Better Auth handler lives at
  * `/api/auth/[...all]` on the current origin, so the client derives its
- * base URL from `window.location` (same-origin cookies, no CORS). During
- * SSR/prerender there is no window, so a defensively-normalized base URL is
- * passed instead (see `absolutePublicUrl`): a host-only or missing
- * NEXT_PUBLIC_BETTER_AUTH_URL must never abort the production build.
+ * base URL from `window.location` (same-origin cookies, no CORS).
  */
 
 // Read `process.env.NEXT_PUBLIC_*` textually so Next.js can statically
@@ -31,15 +26,6 @@ import { absolutePublicUrl } from '@/lib/env-public';
 const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
 /**
- * Better Auth clients are proxy-backed, so an unknown property can look
- * callable even when its plugin was not mounted. Keep the compile-time env
- * gate explicit instead of treating `authClient.oneTap` presence as proof.
- */
-export function isGoogleOneTapConfigured(): boolean {
-  return Boolean(googleClientId);
-}
-
-/**
  * Plugins:
  * - `emailOTPClient` — email one-time-code sign-in (replaces the Clerk
  *   email-code strategy used by EmailCodeAuthForm).
@@ -48,20 +34,8 @@ export function isGoogleOneTapConfigured(): boolean {
  *   load the Google Identity Services script path.
  */
 export const authClient = createAuthClient({
-  // SSR/prerender only: give the client a defensively-normalized base URL so
-  // better-auth's own env chain never raw-parses a host-only or missing
-  // NEXT_PUBLIC_BETTER_AUTH_URL during page-data collection (that aborts the
-  // whole production build on /_not-found). In the browser we keep deriving
-  // from window.location (same-origin cookies, no CORS) as designed.
-  baseURL:
-    typeof window === 'undefined'
-      ? absolutePublicUrl(process.env.NEXT_PUBLIC_BETTER_AUTH_URL)
-      : undefined,
   plugins: [
     emailOTPClient(),
-    // Carries the OAuth provider's signed authorization query through the
-    // upstream Apple redirect so the callback can finish the LYB PKCE flow.
-    oauthProviderClient(),
     ...(googleClientId
       ? [
           oneTapClient({

@@ -21,7 +21,7 @@ import {
 } from './utils/smoke-test-utils';
 
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
-const COMPOSER_TEXTAREA = '[aria-label="Chat Message Input"]';
+const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
 const CHAT_CONTENT = '[data-testid="chat-content"]';
 const SLASH_MENU = '[data-testid="slash-command-menu"]';
 
@@ -122,27 +122,6 @@ test.describe('Chat /app/chat axe audit', () => {
       blocking,
       `Blocking accessibility violations on /app/chat:\n${JSON.stringify(blocking, null, 2)}`
     ).toEqual([]);
-  });
-
-  test('composer placeholder stays visually distinct from entered text', async ({
-    page,
-  }) => {
-    const textarea = page.locator(COMPOSER_TEXTAREA);
-    await expect(textarea).toHaveValue('');
-
-    const styles = await textarea.evaluate(element => {
-      const inputStyle = getComputedStyle(element);
-      const placeholderStyle = getComputedStyle(element, '::placeholder');
-
-      return {
-        inputTextFill: inputStyle.webkitTextFillColor,
-        placeholderColor: placeholderStyle.color,
-        placeholderTextFill: placeholderStyle.webkitTextFillColor,
-      };
-    });
-
-    expect(styles.placeholderTextFill).toBe(styles.placeholderColor);
-    expect(styles.placeholderTextFill).not.toBe(styles.inputTextFill);
   });
 
   test('composer with slash picker open — no critical/serious violations', async ({

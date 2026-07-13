@@ -3,26 +3,14 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  MERGE_QUEUE_POLICY,
+  GRAPHITE_QUEUE_POLICY,
   MERGE_QUEUE_REPO_PATHS,
   validateLiveMergeQueueRuleset,
   validateMergeQueueEnrollHotPath,
   validateMergeQueueRepoConfig,
-  validateNativeDrainQueueLabelIsolation,
 } from './lib/merge-queue-guard.mjs';
-import { DEFAULT_MERGE_QUEUE_BACKEND } from './merge-queue-backend.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
-
-function configuredBackend() {
-  // Match the live repository variable/ruleset for bare local and CI callers.
-  const backend =
-    process.env.MERGE_QUEUE_BACKEND?.trim() || DEFAULT_MERGE_QUEUE_BACKEND;
-  if (backend !== 'native') {
-    throw new Error(`Unknown MERGE_QUEUE_BACKEND: ${backend}`);
-  }
-  return /** @type {'native'} */ (backend);
-}
 
 function readRepoFile(relativePath) {
   return readFileSync(resolve(REPO_ROOT, relativePath), 'utf8');
@@ -32,7 +20,10 @@ function loadLiveRuleset() {
   try {
     const json = execFileSync(
       'gh',
-      ['api', `repos/JovieInc/Jovie/rulesets/${MERGE_QUEUE_POLICY.rulesetId}`],
+      [
+        'api',
+        `repos/JovieInc/Jovie/rulesets/${GRAPHITE_QUEUE_POLICY.rulesetId}`,
+      ],
       {
         encoding: 'utf8',
         env: {
@@ -51,14 +42,13 @@ function loadLiveRuleset() {
 }
 
 function printPolicySummary() {
-  console.log(`${configuredBackend()} merge-queue policy (source-of-record):`);
-  for (const [key, value] of Object.entries(MERGE_QUEUE_POLICY)) {
+  console.log('Graphite merge-queue policy (source-of-record):');
+  for (const [key, value] of Object.entries(GRAPHITE_QUEUE_POLICY)) {
     console.log(`  ${key}: ${JSON.stringify(value)}`);
   }
 }
 
 function runValidate({ checkLive = false } = {}) {
-  const backend = configuredBackend();
   const branchProtectionYaml = readRepoFile(
     MERGE_QUEUE_REPO_PATHS.branchProtection
   );
@@ -66,15 +56,11 @@ function runValidate({ checkLive = false } = {}) {
   const autoenrollWorkflowYaml = readRepoFile(
     MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow
   );
-  const drainScript = readRepoFile(MERGE_QUEUE_REPO_PATHS.drainScript);
   const repoValidation = validateMergeQueueRepoConfig({
-    backend,
     branchProtectionYaml,
     ciWorkflowYaml,
   });
   const enrollHotPath = validateMergeQueueEnrollHotPath(autoenrollWorkflowYaml);
-  const drainLabelIsolation =
-    validateNativeDrainQueueLabelIsolation(drainScript);
 
   if (repoValidation.warnings.length > 0) {
     console.warn('Merge queue repo-config warnings:');
@@ -83,7 +69,7 @@ function runValidate({ checkLive = false } = {}) {
     }
   }
 
-  if (!repoValidation.ok || !enrollHotPath.ok || !drainLabelIsolation.ok) {
+  if (!repoValidation.ok || !enrollHotPath.ok) {
     if (!repoValidation.ok) {
       console.error('Merge queue repo-config validation failed:');
       for (const error of repoValidation.errors) {
@@ -96,12 +82,6 @@ function runValidate({ checkLive = false } = {}) {
         console.error(`- ${error}`);
       }
     }
-    if (!drainLabelIsolation.ok) {
-      console.error('Native drain label-isolation validation failed:');
-      for (const error of drainLabelIsolation.errors) {
-        console.error(`- ${error}`);
-      }
-    }
     process.exitCode = 1;
     return;
   }
@@ -110,7 +90,6 @@ function runValidate({ checkLive = false } = {}) {
     `Repo config OK — required aggregates: ${repoValidation.contexts.join(', ')}`
   );
   console.log('Enroll hot path OK — no test-only dependency bootstrap');
-  console.log('Native drain OK — no legacy merge-queue label dependency');
 
   if (!checkLive) {
     return;
@@ -118,12 +97,13 @@ function runValidate({ checkLive = false } = {}) {
 
   const live = loadLiveRuleset();
   if (live.error) {
-    console.error(`Live GitHub ruleset verification failed: ${live.error}`);
-    process.exitCode = 1;
+    console.warn(
+      `Skipping live ruleset verification (gh unavailable): ${live.error}`
+    );
     return;
   }
 
-  const liveValidation = validateLiveMergeQueueRuleset(live, { backend });
+  const liveValidation = validateLiveMergeQueueRuleset(live);
   if (!liveValidation.ok) {
     console.error('Live GitHub ruleset validation failed:');
     for (const error of liveValidation.errors) {
@@ -152,7 +132,7 @@ async function main() {
       printPolicySummary();
       break;
     case 'max-queue-depth':
-      console.log(String(MERGE_QUEUE_POLICY.maxQueueDepth));
+      console.log(String(GRAPHITE_QUEUE_POLICY.maxQueueDepth));
       break;
     default:
       console.error(

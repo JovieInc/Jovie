@@ -1,4 +1,3 @@
-import { Button } from '@jovie/ui';
 import { Check, Minus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -6,7 +5,7 @@ import { notFound } from 'next/navigation';
 import {
   FaqSection,
   MarketingContainer,
-  MarketingHero,
+  MarketingHeroLayout,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -62,7 +61,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
       <script type='application/ld+json'>{faqSchema}</script>
       <script type='application/ld+json'>{breadcrumbSchema}</script>
 
-      <MarketingHero variant='left'>
+      <MarketingHeroLayout variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>Compare</p>
         <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
           {data.heroHeadline}
@@ -70,7 +69,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
         <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
           {data.heroSubheadline}
         </p>
-      </MarketingHero>
+      </MarketingHeroLayout>
 
       {/* Feature Comparison Table */}
       <MarketingContainer width='prose' className='pb-16'>
@@ -160,9 +159,12 @@ export default async function ComparePage({ params }: ComparePageProps) {
             {data.bottomLine}
           </p>
           <div className='mt-8'>
-            <Button asChild variant='primary' size='lg'>
-              <Link href={APP_ROUTES.SIGNUP}>Try {APP_NAME} Free</Link>
-            </Button>
+            <Link
+              href={APP_ROUTES.SIGNUP}
+              className='inline-flex items-center rounded-lg bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:bg-btn-primary-hover'
+            >
+              Try {APP_NAME} Free
+            </Link>
           </div>
         </section>
       </MarketingContainer>

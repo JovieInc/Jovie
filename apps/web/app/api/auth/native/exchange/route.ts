@@ -199,36 +199,10 @@ export async function POST(request: Request) {
 
     let exchangePayload: NativeExchangePayload;
     if (client === 'ios') {
-      const iosExchange = await createIosNativeExchangePayload(
+      exchangePayload = await createIosNativeExchangePayload(
         result.ott,
-        result.userId,
-        request
+        result.userId
       );
-
-      // OTT resolved to a different user than the exchange record. This is an
-      // auth rejection, not a server fault: the guard stays (the exchange is
-      // refused) but the client gets a handled 401 so it can restart
-      // finalization instead of surfacing a bare 500 (JOV-4278). The OTT is
-      // single-use and already consumed by `verifyOneTimeToken`, so it cannot
-      // be replayed after this rejection.
-      if (!iosExchange.ok) {
-        void trackAuthEvent('auth_exchange_failed', {
-          client,
-          intent: 'sign_in',
-          result: 'failed',
-          reason: iosExchange.reason,
-        });
-
-        return NextResponse.json(
-          {
-            error: 'Native auth exchange user mismatch',
-            reason: iosExchange.reason,
-          },
-          { status: 401, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      exchangePayload = iosExchange.payload;
     } else {
       // Electron: return the OTT. The native-complete page POSTs it to
       // `/api/auth/one-time-token/verify` which sets the session cookie.
@@ -278,32 +252,19 @@ export async function POST(request: Request) {
  * `session.expiresIn` (7 days). The iOS client never needs to refresh —
  * the bearer plugin's `set-auth-token` response header refreshes the
  * stored token + expiry on each API call (eng row 31).
- *
- * A user mismatch is returned as a handled failure (`ott_user_mismatch`)
- * rather than thrown: the binding is correct-by-construction, so a
- * mismatch means identity mutated inside the OTT window — an expected
- * auth rejection (401), not an unhandled server error (JOV-4278).
  */
-type IosNativeExchangeResult =
-  | { readonly ok: true; readonly payload: NativeExchangePayload }
-  | { readonly ok: false; readonly reason: 'ott_user_mismatch' };
-
 async function createIosNativeExchangePayload(
   ott: string,
-  expectedUserId: string,
-  request: Request
-): Promise<IosNativeExchangeResult> {
+  expectedUserId: string
+): Promise<NativeExchangePayload> {
   const verification = await auth.api.verifyOneTimeToken({
     body: { token: ott },
-    request,
-    // A full Request makes Better Auth return a raw Response by default.
-    // Keep the direct API's parsed-result and thrown-error behavior here.
-    asResponse: false,
   });
 
-  const verifiedUserId = verification?.user?.id ?? null;
+  const verifiedUserId =
+    (verification as { userId?: string } | null)?.userId ?? null;
   if (!verifiedUserId || verifiedUserId !== expectedUserId) {
-    return { ok: false, reason: 'ott_user_mismatch' };
+    throw new Error('OTT user mismatch');
   }
 
   const ctx = await auth.$context;
@@ -314,12 +275,9 @@ async function createIosNativeExchangePayload(
   }
 
   return {
-    ok: true,
-    payload: {
-      sessionToken: session.token,
-      sessionId: session.id,
-      userId: verifiedUserId,
-      expiresInSeconds: NATIVE_SESSION_EXPIRES_IN_SECONDS,
-    },
+    sessionToken: session.token,
+    sessionId: session.id,
+    userId: verifiedUserId,
+    expiresInSeconds: NATIVE_SESSION_EXPIRES_IN_SECONDS,
   };
 }

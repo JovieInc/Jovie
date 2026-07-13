@@ -81,7 +81,7 @@ describe('ContextMenuOverlay', () => {
       items: [{ label: 'Play', onSelect: () => undefined }],
     };
     render(<ContextMenuOverlay state={state} onClose={onClose} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Close Menu' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close menu' }));
     expect(onClose).toHaveBeenCalledOnce();
   });
 

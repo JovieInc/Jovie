@@ -1,10 +1,22 @@
 name: iOS CI
 
 on:
-  # Full Xcode work is called by ci.yml only for an iOS-changing merge-group
-  # combined head or an unproven direct-main fallback. Source PRs receive the
-  # portable iOS contract inside ci-fast.
-  workflow_call:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/ios/**"
+      - "fastlane/**"
+      - "Gemfile"
+      - "Gemfile.lock"
+      - ".github/workflows/ios-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/ios/**"
+      - "fastlane/**"
+      - "Gemfile"
+      - "Gemfile.lock"
+      - ".github/workflows/ios-ci.yml"
   workflow_dispatch:
 
 permissions:
@@ -21,16 +33,13 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: iOS best-practices lint
         run: bash scripts/ios-best-practices-lint.sh apps/ios/Jovie
 
-      - name: Test iOS release configuration scripts
-        run: |
-          node --test apps/ios/scripts/write-configuration.test.mjs \
-          apps/ios/scripts/validate-testflight-env.test.mjs \
-          apps/ios/scripts/validate-testflight-artifact.test.mjs
+      - name: Test write-configuration script
+        run: node --test apps/ios/scripts/write-configuration.test.mjs
 
       - name: Ensure iOS local configuration exists
         run: bash apps/ios/scripts/ensure-configuration.sh
@@ -64,4 +73,3 @@ jobs:
           name: ios-screenshots
           path: artifacts/ios-screenshots/*.png
           if-no-files-found: error
-          retention-days: 5

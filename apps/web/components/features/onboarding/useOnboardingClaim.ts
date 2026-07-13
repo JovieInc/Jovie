@@ -114,9 +114,8 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
       }
       if (cancelled) return;
 
-      if (response.status === 401 || response.status === 403) {
-        // Unauthenticated or non-owner — ownership gate fails closed; no
-        // reserved / locked-in / manage-as-owner success navigation.
+      if (response.status === 401) {
+        // Clerk session expired between mount and request — bail silently.
         markTriggerCompleted();
         setStatus('error');
         return;

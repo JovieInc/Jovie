@@ -1,15 +1,23 @@
 import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { queryKeys } from '@/lib/queries';
 
 const mocks = vi.hoisted(() => ({
   getCachedAuth: vi.fn(),
   getDashboardShellData: vi.fn(),
+  getDehydratedState: vi.fn(() => ({ dehydrated: true })),
+  getQueryClient: vi.fn(),
   loadReleaseMatrix: vi.fn(),
   loadTourDates: vi.fn(),
   redirect: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`);
   }),
+  fetchQuery: vi.fn(
+    async <T,>(options: { readonly queryFn: () => Promise<T> }) =>
+      options.queryFn()
+  ),
   captureError: vi.fn(),
 }));
 
@@ -23,6 +31,25 @@ vi.mock('@/lib/auth/cached', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mocks.captureError,
+}));
+
+vi.mock('@/lib/queries/HydrateClient', () => ({
+  HydrateClient: ({
+    children,
+    state,
+  }: {
+    readonly children: ReactNode;
+    readonly state: unknown;
+  }) => (
+    <div data-state={JSON.stringify(state)} data-testid='hydrate-client'>
+      {children}
+    </div>
+  ),
+}));
+
+vi.mock('@/lib/queries/server', () => ({
+  getDehydratedState: mocks.getDehydratedState,
+  getQueryClient: mocks.getQueryClient,
 }));
 
 vi.mock('@/features/feedback/PageErrorState', () => ({
@@ -43,8 +70,10 @@ vi.mock('@/app/app/(shell)/dashboard/tour-dates/actions', () => ({
   loadTourDates: mocks.loadTourDates,
 }));
 
-vi.mock('@/app/app/(shell)/calendar/CalendarPageClient', () => ({
-  CalendarPageClient: () => <div data-testid='calendar-client'>Calendar</div>,
+vi.mock('@/app/app/(shell)/calendar/LazyCalendarPageClient', () => ({
+  LazyCalendarPageClient: () => (
+    <div data-testid='calendar-client'>Calendar</div>
+  ),
 }));
 
 const { default: CalendarPage } = await import(
@@ -65,6 +94,9 @@ describe('CalendarPage', () => {
       dashboardLoadError: null,
       needsOnboarding: false,
       selectedProfile,
+    });
+    mocks.getQueryClient.mockReturnValue({
+      fetchQuery: mocks.fetchQuery,
     });
     mocks.loadReleaseMatrix.mockResolvedValue([
       {
@@ -124,8 +156,7 @@ describe('CalendarPage', () => {
       dashboardLoadError,
       { route: APP_ROUTES.CALENDAR }
     );
-    expect(mocks.loadReleaseMatrix).not.toHaveBeenCalled();
-    expect(mocks.loadTourDates).not.toHaveBeenCalled();
+    expect(mocks.fetchQuery).not.toHaveBeenCalled();
   });
 
   it('redirects onboarded auth sessions that still need onboarding', async () => {
@@ -139,15 +170,28 @@ describe('CalendarPage', () => {
       `REDIRECT:${APP_ROUTES.START}`
     );
 
-    expect(mocks.loadReleaseMatrix).not.toHaveBeenCalled();
-    expect(mocks.loadTourDates).not.toHaveBeenCalled();
+    expect(mocks.fetchQuery).not.toHaveBeenCalled();
   });
 
-  it('renders without blocking on release and event queries', async () => {
+  it('hydrates release matrix and events for the selected profile', async () => {
     render(await CalendarPage());
 
+    expect(screen.getByTestId('hydrate-client')).toHaveAttribute(
+      'data-state',
+      '{"dehydrated":true}'
+    );
     expect(screen.getByTestId('calendar-client')).toBeInTheDocument();
-    expect(mocks.loadReleaseMatrix).not.toHaveBeenCalled();
-    expect(mocks.loadTourDates).not.toHaveBeenCalled();
+    expect(mocks.fetchQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: queryKeys.releases.matrix('profile-1'),
+      })
+    );
+    expect(mocks.fetchQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: queryKeys.events.list('profile-1'),
+      })
+    );
+    expect(mocks.loadReleaseMatrix).toHaveBeenCalledWith('profile-1');
+    expect(mocks.loadTourDates).toHaveBeenCalledWith('profile-1');
   });
 });

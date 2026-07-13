@@ -1,6 +1,14 @@
-import { copyFile, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import {
+  copyFile,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
+import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
 import {
   APP_FLAG_OVERRIDES_COOKIE,
   FF_OVERRIDES_KEY,
@@ -14,8 +22,6 @@ import {
   isScreenshotManifestEntry,
   type ScreenshotManifestEntry,
 } from '../../lib/screenshots/types';
-import { pruneFixedOwnedOutputFiles } from '../../scripts/owned-output-path';
-import { replaceWithAtomicSibling } from './atomic-output';
 import {
   assertNoDevOverlays,
   CATALOG_OUTPUT_DIR,
@@ -27,9 +33,20 @@ import {
   waitForSettle,
 } from './helpers';
 
-const SCREENSHOT_FLAG_OVERRIDES = JSON.stringify({});
+// Force DESIGN_V1 (and its SHELL_CHAT_V1 alias) on for every catalog scenario.
+// The override slot for both flag names is `code:DESIGN_V1`, so a single entry
+// covers the entire New Design surface. We pin this explicitly so a future
+// change to APP_FLAG_DEFAULTS or the Statsig gate cannot silently flip
+// marketing/product screenshots back to the legacy shell.
+const SCREENSHOT_FLAG_OVERRIDES = JSON.stringify({
+  [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
+});
 
 const MANIFEST_PATH = join(CATALOG_OUTPUT_DIR, 'manifest.json');
+
+async function ensureDirectory(path: string) {
+  await mkdir(path, { recursive: true });
+}
 
 async function readOptionalFile(path: string): Promise<Buffer | null> {
   try {
@@ -40,6 +57,18 @@ async function readOptionalFile(path: string): Promise<Buffer | null> {
     }
     throw error;
   }
+}
+
+async function removeOrphanFiles(
+  directory: string,
+  ownedFiles: ReadonlySet<string>
+) {
+  const files = await readdir(directory).catch(() => []);
+  await Promise.all(
+    files
+      .filter(file => !ownedFiles.has(file))
+      .map(file => rm(join(directory, file), { force: true, recursive: true }))
+  );
 }
 
 async function readManifestEntries() {
@@ -127,10 +156,7 @@ async function writeManifest(
     return;
   }
 
-  await replaceWithAtomicSibling(MANIFEST_PATH, async temporaryPath => {
-    await writeFile(temporaryPath, nextManifest, 'utf8');
-    return true;
-  });
+  await writeFile(MANIFEST_PATH, nextManifest, 'utf8');
 }
 
 async function captureCatalogImage(
@@ -138,22 +164,29 @@ async function captureCatalogImage(
   scenario: (typeof SCREENSHOT_SCENARIOS)[number],
   catalogPath: string
 ) {
-  return replaceWithAtomicSibling(catalogPath, async nextPath => {
-    if (scenario.captureTarget === 'locator' && scenario.captureSelector) {
-      await page.locator(scenario.captureSelector).first().screenshot({
-        path: nextPath,
-      });
-    } else {
-      await page.screenshot({
-        path: nextPath,
-        fullPage: scenario.fullPage,
-      });
-    }
+  const nextPath = join(CATALOG_OUTPUT_DIR, `${scenario.id}.next.png`);
 
-    const previousBuffer = await readOptionalFile(catalogPath);
-    const nextBuffer = await readFile(nextPath);
-    return previousBuffer === null || !previousBuffer.equals(nextBuffer);
-  });
+  if (scenario.captureTarget === 'locator' && scenario.captureSelector) {
+    await page.locator(scenario.captureSelector).first().screenshot({
+      path: nextPath,
+    });
+  } else {
+    await page.screenshot({
+      path: nextPath,
+      fullPage: scenario.fullPage,
+    });
+  }
+
+  const previousBuffer = await readOptionalFile(catalogPath);
+  const nextBuffer = await readFile(nextPath);
+  const changed = previousBuffer === null || !previousBuffer.equals(nextBuffer);
+
+  if (changed) {
+    await writeFile(catalogPath, nextBuffer);
+  }
+
+  await rm(nextPath, { force: true });
+  return changed;
 }
 
 async function syncPublicExport(catalogPath: string, publicExportPath: string) {
@@ -165,10 +198,7 @@ async function syncPublicExport(catalogPath: string, publicExportPath: string) {
     return;
   }
 
-  await replaceWithAtomicSibling(exportPath, async temporaryPath => {
-    await copyFile(catalogPath, temporaryPath);
-    return true;
-  });
+  await copyFile(catalogPath, exportPath);
 }
 
 async function assertNoShellInternalChrome(
@@ -322,30 +352,27 @@ test.describe('Screenshot Catalog', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeAll(async () => {
-    await pruneFixedOwnedOutputFiles(
-      dirname(CATALOG_OUTPUT_DIR),
-      'current',
+    await ensureDirectory(CATALOG_OUTPUT_DIR);
+    await ensureDirectory(PUBLIC_EXPORT_DIR);
+
+    manifestEntriesById = await readManifestEntries();
+
+    await removeOrphanFiles(
       CATALOG_OUTPUT_DIR,
-      'SCREENSHOT_CATALOG_OUTPUT_DIR',
       new Set(
         SCREENSHOT_SCENARIOS.map(scenario => `${scenario.id}.png`).concat(
           'manifest.json'
         )
       )
     );
-    await pruneFixedOwnedOutputFiles(
-      dirname(PUBLIC_EXPORT_DIR),
-      'product-screenshots',
+    await removeOrphanFiles(
       PUBLIC_EXPORT_DIR,
-      'PUBLIC_SCREENSHOT_EXPORT_DIR',
       new Set(
         SCREENSHOT_SCENARIOS.flatMap(scenario =>
           scenario.publicExportPath ? [scenario.publicExportPath] : []
         )
       )
     );
-
-    manifestEntriesById = await readManifestEntries();
 
     for (const id of [...manifestEntriesById.keys()]) {
       if (!SCREENSHOT_SCENARIOS.some(scenario => scenario.id === id)) {

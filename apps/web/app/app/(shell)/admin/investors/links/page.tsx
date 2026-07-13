@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
-import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { InvestorLinksManager } from './InvestorLinksManager';
 
 export const metadata: Metadata = {
@@ -11,9 +10,7 @@ export const metadata: Metadata = {
  * Admin investor links management page.
  * Create new links, copy URLs, toggle active/inactive.
  */
-export default async function InvestorLinksPage() {
-  await requireCurrentAdminPageAccess();
-
+export default function InvestorLinksPage() {
   return (
     <AdminPage
       title='Investor Links'

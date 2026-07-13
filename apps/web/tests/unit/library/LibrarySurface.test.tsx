@@ -13,8 +13,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
-import { LIBRARY_SAVED_VIEW_STORAGE_KEY } from '@/app/app/(shell)/library/library-saved-views';
-import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
 import { APP_ROUTES } from '@/constants/routes';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import {
@@ -52,7 +51,6 @@ const librarySurfaceLocalVisualRecipePatterns = [
 
 const navigationMock = vi.hoisted(() => ({
   refresh: vi.fn(),
-  replace: vi.fn(),
   searchParams: new URLSearchParams(),
 }));
 
@@ -94,7 +92,7 @@ vi.mock('@vercel/blob/client', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
-    replace: navigationMock.replace,
+    replace: vi.fn(),
     refresh: navigationMock.refresh,
   }),
   useSearchParams: () => navigationMock.searchParams,
@@ -191,7 +189,9 @@ function SidebarOverrideProbe() {
   );
 }
 
-function renderLibraryWithSidebarProbe(assets: readonly LibraryReleaseAsset[]) {
+function renderLibraryWithSidebarOverride(
+  assets: readonly LibraryReleaseAsset[]
+) {
   return render(
     <TooltipProvider>
       <ShellSidebarOverrideProvider>
@@ -208,32 +208,21 @@ function clickGridView() {
 
 describe('LibrarySurface', () => {
   const baseMatchMedia = window.matchMedia;
-  const baseScrollYDescriptor = Object.getOwnPropertyDescriptor(
-    globalThis,
-    'scrollY'
-  );
 
   beforeEach(() => {
     window.localStorage.clear();
-    navigationMock.searchParams = new URLSearchParams();
     audioMock.playbackState = { ...audioMock.basePlaybackState };
     audioMock.toggleTrack.mockClear();
     audioMock.seek.mockClear();
     audioMock.stop.mockClear();
     audioMock.onError.mockClear();
     navigationMock.refresh.mockClear();
-    navigationMock.replace.mockClear();
     blobUploadMock.mockReset();
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     window.matchMedia = baseMatchMedia;
-    if (baseScrollYDescriptor) {
-      Object.defineProperty(globalThis, 'scrollY', baseScrollYDescriptor);
-    } else {
-      Reflect.deleteProperty(globalThis, 'scrollY');
-    }
   });
 
   it('keeps library chrome on System B semantic tokens', () => {
@@ -254,20 +243,14 @@ describe('LibrarySurface', () => {
     // in library-system-b-compliance.test.ts and approval-status.test.ts.
     expect(source).toContain('releaseStatusClasses');
     expect(source).toContain('libraryApprovalStatusClasses');
-    expect(source).toContain('PageToolbarTabButton');
+    expect(source).toContain('system-b-library-filter-pill-active');
     expect(source).toContain("variant={active ? 'secondary' : 'tertiary'}");
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
     expect(source).toContain('ReleaseAudioAssetPanel');
-    expect(source).toContain('function LibraryFilterPanel');
-    expect(source).toContain("data-testid='library-filter-active-indicator'");
-    expect(source).toContain("surfaceMode='table'");
-    expect(source).not.toContain('Search library by title');
-    expect(source).not.toContain('useRegisterShellSidebarOverride');
-    expect(source).not.toContain('max-h-[45svh]');
   });
 
-  it('keeps the table on one workspace plane while preserving grid insets', () => {
+  it('aligns library grid and list insets with the shell header padding contract', () => {
     const source = readFileSync(
       resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),
       'utf8'
@@ -279,8 +262,7 @@ describe('LibrarySurface', () => {
     );
     expect(source).toContain('LIBRARY_GRID_DENSITY_LAYOUT');
     expect(source).toContain('useLibraryGridDensity');
-    expect(source).toContain("containerClassName='h-full'");
-    expect(source).toContain('h-(--app-shell-footer-row-height)');
+    expect(source).toContain('px-(--linear-app-header-padding-x) sm:flex');
     expect(source).not.toContain('px-2.5 pb-2.5 pt-1');
     expect(source).not.toMatch(/grid gap-2\.5/u);
   });
@@ -304,7 +286,6 @@ describe('LibrarySurface', () => {
     renderLibrary([buildAsset()]);
 
     expect(screen.getByRole('table')).toBeInTheDocument();
-    expect(screen.getByText('Apr 28, 2026')).toBeInTheDocument();
     expect(
       screen.getByTestId('library-release-row-release-1')
     ).toBeInTheDocument();
@@ -370,8 +351,8 @@ describe('LibrarySurface', () => {
     expect(portraitCard?.className).toContain('aspect-[9/16]');
   });
 
-  it('surfaces Approval Status on list rows, grid cards, and filter chips (#10384)', async () => {
-    renderLibrary([
+  it('shows release status on cards/rows and never conflates approval Draft with release state', async () => {
+    renderLibraryWithSidebarOverride([
       buildAsset({
         status: 'released',
         approvalStatus: 'draft',
@@ -385,29 +366,14 @@ describe('LibrarySurface', () => {
       buildAsset({
         id: 'release-3',
         title: 'Third Track',
-        status: 'draft',
+        status: 'released',
         approvalStatus: 'approved',
       }),
     ]);
-
-    // List view includes the Approval column cell for every row.
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-2')
-    ).toHaveTextContent('Needs Review');
-    expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveTextContent('Released');
-
     clickGridView();
 
-    // Grid cards surface both axes with explicit labels so Release "Draft"
-    // never collides with Approval "Draft" (#10384 / JOV-3333).
+    // Grid cards surface Release Status (not Approval) so a Released item never
+    // reads as a bare "Draft" (JOV-3333).
     expect(
       screen.getByTestId('library-release-status-release-1')
     ).toHaveTextContent('Released');
@@ -415,163 +381,23 @@ describe('LibrarySurface', () => {
       screen.getByTestId('library-release-status-release-1')
     ).toHaveAccessibleName('Release Status: Released');
     expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-2')
-    ).toHaveTextContent('Needs Review');
-
-    // Filter rail exposes Approval Status as a first-class chip group (#10384).
-    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
-    const rail = screen.getByTestId('library-filter-panel');
-    expect(screen.getByRole('group', { name: 'Library Filters' })).toBe(rail);
-    expect(within(rail).getByText('Approval Status')).toBeInTheDocument();
-    expect(within(rail).getByText('Release Status')).toBeInTheDocument();
-    expect(
-      within(rail).getByRole('button', { name: /Needs Review/u })
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      within(rail).getByRole('button', { name: /Needs Review/u })
-    );
-
-    await waitFor(() => {
-      expect(
-        screen.getByTestId('library-approval-status-release-2')
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId('library-approval-status-release-1')
-      ).toBeNull();
-      expect(
-        screen.queryByTestId('library-approval-status-release-3')
-      ).toBeNull();
-    });
-  });
-
-  it('disambiguates Release Draft from Approval Draft when both axes are draft (#10384)', () => {
-    renderLibrary([
-      buildAsset({
-        status: 'draft',
-        approvalStatus: 'draft',
-      }),
-    ]);
-
-    expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveAccessibleName('Release Status: Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Draft');
-
-    clickGridView();
-
-    expect(
-      screen.getByTestId('library-release-status-release-1')
-    ).toHaveAccessibleName('Release Status: Draft');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Draft');
-  });
-
-  it('filters Release Draft and Approval Draft independently in the filter rail (#10384)', async () => {
-    renderLibrary([
-      buildAsset({
-        id: 'release-a',
-        title: 'Release Draft Only',
-        status: 'draft',
-        approvalStatus: 'approved',
-      }),
-      buildAsset({
-        id: 'release-b',
-        title: 'Approval Draft Only',
-        status: 'released',
-        approvalStatus: 'draft',
-      }),
-      buildAsset({
-        id: 'release-c',
-        title: 'Both Draft',
-        status: 'draft',
-        approvalStatus: 'draft',
-      }),
-    ]);
+      screen.queryByTestId('library-approval-status-release-1')
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
-    const rail = screen.getByTestId('library-filter-panel');
-
-    const approvalSection = within(rail)
-      .getByText('Approval Status')
-      .closest('div');
-    expect(approvalSection).not.toBeNull();
-    const releaseSection = within(rail)
-      .getByText('Release Status')
-      .closest('div');
-    expect(releaseSection).not.toBeNull();
-
-    // Scope Draft clicks to each section so dual "Draft" chips stay independent.
-    const releaseDraftChip = within(releaseSection as HTMLElement).getByRole(
-      'button',
-      { name: /^Draft /u }
-    );
-    fireEvent.click(releaseDraftChip);
+    fireEvent.click(screen.getByRole('button', { name: /Needs Review/u }));
 
     await waitFor(() => {
       expect(
-        screen.getByTestId('library-release-status-release-a')
+        screen.getByTestId('library-release-status-release-2')
       ).toBeInTheDocument();
       expect(
-        screen.getByTestId('library-release-status-release-c')
-      ).toBeInTheDocument();
+        screen.queryByTestId('library-release-status-release-1')
+      ).toBeNull();
       expect(
-        screen.queryByTestId('library-release-status-release-b')
+        screen.queryByTestId('library-release-status-release-3')
       ).toBeNull();
     });
-
-    fireEvent.click(
-      within(rail).getByRole('button', { name: /Clear Filters/u })
-    );
-
-    const approvalDraftChip = within(approvalSection as HTMLElement).getByRole(
-      'button',
-      { name: /^Draft /u }
-    );
-    fireEvent.click(approvalDraftChip);
-
-    await waitFor(() => {
-      expect(
-        screen.getByTestId('library-approval-status-release-b')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByTestId('library-approval-status-release-c')
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId('library-approval-status-release-a')
-      ).toBeNull();
-    });
-  });
-
-  it('renders Archived approval status on list and grid badges (#10384)', () => {
-    renderLibrary([
-      buildAsset({
-        status: 'released',
-        approvalStatus: 'archived',
-      }),
-    ]);
-
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Archived');
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveAccessibleName('Approval Status: Archived');
-
-    clickGridView();
-
-    expect(
-      screen.getByTestId('library-approval-status-release-1')
-    ).toHaveTextContent('Archived');
   });
 
   it('keeps Approval Status once in the detail rail editor only', () => {
@@ -800,7 +626,9 @@ describe('LibrarySurface', () => {
     fireEvent.click(drawer.getByRole('button', { name: 'Providers' }));
     const providerLink = drawer.getByRole('link', { name: /Spotify/u });
 
-    expect(overflowButton.className).toContain('focus-visible:ring-ring');
+    expect(overflowButton.className).toContain(
+      'focus-visible:ring-(--linear-border-focus)'
+    );
     for (const element of [previewButton, providerLink]) {
       expect(element.className).toContain(
         'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
@@ -871,9 +699,6 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('columnheader', { name: 'Title' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('columnheader', { name: 'Release Date' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('columnheader', { name: 'Artist' })
@@ -1024,9 +849,8 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'Filter Current View' })
+      screen.getByRole('button', { name: 'Filter library assets' })
     );
     fireEvent.change(screen.getByLabelText('Filter library assets'), {
       target: { value: 'Never' },
@@ -1044,7 +868,7 @@ describe('LibrarySurface', () => {
   });
 
   it('filters library assets from sidebar smart filter views', async () => {
-    renderLibrary([
+    renderLibraryWithSidebarOverride([
       buildAsset(),
       buildAsset({
         id: 'release-2',
@@ -1059,14 +883,14 @@ describe('LibrarySurface', () => {
     expect(
       screen.getByTestId('library-saved-filter-views')
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Needs Attention/u }));
+    fireEvent.click(screen.getByRole('button', { name: /Missing audio/u }));
 
     await waitFor(() => {
       expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
       expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /^All Items/u }));
+    fireEvent.click(screen.getByRole('button', { name: /^All items/u }));
 
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
@@ -1103,58 +927,8 @@ describe('LibrarySurface', () => {
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
   });
 
-  it('keeps global header search as the only Library search surface', () => {
-    renderLibraryWithHeader([
-      buildAsset(),
-      buildAsset({
-        id: 'release-2',
-        title: 'Never Say A Word',
-        artist: 'Other Artist',
-      }),
-    ]);
-
-    expect(screen.queryByLabelText('Search library by title')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-    expect(
-      screen.getAllByRole('combobox', { name: 'Search Jovie' })
-    ).toHaveLength(1);
-  });
-
-  it('labels the grid-card provider count badge', () => {
-    renderLibrary([buildAsset({ providerCount: 3 })]);
-    clickGridView();
-
-    expect(screen.getByRole('img', { name: '3 Providers' })).toHaveTextContent(
-      '3'
-    );
-  });
-
-  it('stacks duplicate release versions into one row (JOV-3089)', () => {
-    renderLibrary([
-      buildAsset({
-        id: 'release-1',
-        title: 'All This Noise EP',
-        trackCount: 6,
-      }),
-      buildAsset({
-        id: 'release-2',
-        title: 'All This Noise (Remixed)',
-        trackCount: 0,
-      }),
-    ]);
-
-    // The most complete ingest survives; the near-duplicate stacks behind it.
-    expect(
-      screen.getByTestId('library-release-row-release-1')
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId('library-release-row-release-2')
-    ).not.toBeInTheDocument();
-  });
-
   it('keeps Library inside the standard app shell without a route sidebar takeover', async () => {
-    renderLibraryWithSidebarProbe([
+    renderLibraryWithSidebarOverride([
       buildAsset(),
       buildAsset({
         id: 'release-2',
@@ -1165,15 +939,19 @@ describe('LibrarySurface', () => {
 
     const contract = await screen.findByTestId('library-sidebar-override');
 
-    await waitFor(() => expect(contract).toHaveTextContent('missing'));
-    expect(contract).not.toHaveAttribute('data-key');
-    expect(contract).not.toHaveAttribute('data-back-href');
-    expect(contract).not.toHaveAttribute('data-back-label');
+    await waitFor(() => {
+      expect(contract).toHaveTextContent('registered');
+    });
+    expect(contract).toHaveAttribute('data-key', 'library');
+    expect(contract).toHaveAttribute('data-back-href', APP_ROUTES.CHAT);
+    expect(contract).toHaveAttribute('data-back-label', 'Back to App');
     expect(screen.getByTestId('library-view-filter-chips')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Merch/u })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Audio/u })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
-    expect(screen.getByTestId('library-filter-panel')).toBeInTheDocument();
+    expect(
+      screen.getByRole('navigation', { name: 'Library Filters' })
+    ).toBeInTheDocument();
     expect(
       screen.getByTestId('library-saved-filter-views')
     ).toBeInTheDocument();
@@ -1182,7 +960,7 @@ describe('LibrarySurface', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('presents the shared filter panel in a desktop popover with Escape focus return', async () => {
+  it('keeps library filters reachable on desktop without taking over the shell sidebar', async () => {
     window.matchMedia = vi.fn().mockImplementation(query => ({
       matches: query === '(min-width: 1024px)',
       media: query,
@@ -1194,7 +972,7 @@ describe('LibrarySurface', () => {
       dispatchEvent: vi.fn(),
     }));
 
-    renderLibrary([
+    renderLibraryWithSidebarOverride([
       buildAsset(),
       buildAsset({
         id: 'release-2',
@@ -1203,196 +981,13 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    const user = userEvent.setup();
-    const trigger = screen.getByRole('button', { name: 'Show filters' });
-    await user.click(trigger);
+    const contract = await screen.findByTestId('library-sidebar-override');
 
-    expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId('library-filter-popover')).toHaveAccessibleName(
-      'Library Filters'
-    );
-    expect(screen.getByTestId('library-filter-panel')).toBeInTheDocument();
-
-    await user.keyboard('{Escape}');
     await waitFor(() => {
-      expect(
-        screen.queryByTestId('library-filter-popover')
-      ).not.toBeInTheDocument();
+      expect(contract).toHaveTextContent('registered');
     });
-    expect(trigger).toHaveFocus();
-  });
-
-  it('keeps every saved view and facet reachable from the shared filter panel', async () => {
-    const user = userEvent.setup();
-    renderLibrary([
-      buildAsset(),
-      buildAsset({
-        id: 'release-2',
-        title: 'Scheduled Album',
-        releaseType: 'album',
-        status: 'scheduled',
-        approvalStatus: 'needs_review',
-        previewUrl: null,
-        videoUrl: 'https://cdn.example.com/video.mp4',
-        providers: [
-          {
-            key: 'apple',
-            label: 'Apple Music',
-            url: 'https://music.apple.com/album/scheduled-album',
-          },
-        ],
-        assetKinds: ['artwork', 'video', 'providers'],
-      }),
-    ]);
-
-    const filterTrigger = screen.getByRole('button', {
-      name: 'Show filters',
-    });
-    expect(filterTrigger).toHaveClass('h-7', 'w-7');
-    expect(
-      screen.queryByTestId('library-filter-active-indicator')
-    ).not.toBeInTheDocument();
-
-    await user.click(filterTrigger);
-    const panel = screen.getByTestId('library-filter-panel');
-    const savedViews = within(panel).getByTestId('library-saved-filter-views');
-
-    for (const savedView of [
-      'All Items',
-      'Scheduled',
-      'Drafts',
-      'Needs Attention',
-      'Updated This Week',
-      'Live Merch',
-    ]) {
-      expect(
-        within(savedViews).getByRole('button', {
-          name: new RegExp(`^${savedView} `, 'u'),
-        })
-      ).toBeInTheDocument();
-    }
-
-    for (const facet of [
-      'Approval Status',
-      'Release Status',
-      'Type',
-      'Assets',
-      'Providers',
-    ]) {
-      expect(within(panel).getByText(facet)).toBeInTheDocument();
-    }
-
-    expect(
-      within(panel).getByRole('button', { name: /Needs Review/u })
-    ).toBeInTheDocument();
-    expect(
-      within(panel).getAllByRole('button', { name: /Scheduled/u })
-    ).toHaveLength(2);
-    expect(
-      within(panel).getByRole('button', { name: /Album/u })
-    ).toBeInTheDocument();
-    expect(
-      within(panel).getByRole('button', { name: /Video/u })
-    ).toBeInTheDocument();
-    expect(
-      within(panel).getByRole('button', { name: /Apple Music/u })
-    ).toBeInTheDocument();
-
-    await user.click(
-      within(panel).getByRole('button', { name: /Needs Review/u })
-    );
-    expect(filterTrigger).toHaveAttribute('aria-label', 'Show filters (1)');
-    expect(
-      screen.getByTestId('library-filter-active-indicator')
-    ).toBeInTheDocument();
-  });
-
-  it('restores URL presets and persisted smart filters without changing their contracts', async () => {
-    navigationMock.searchParams = new URLSearchParams('view=audio');
-    window.localStorage.setItem(
-      LIBRARY_SAVED_VIEW_STORAGE_KEY,
-      'needs-attention'
-    );
-
-    const user = userEvent.setup();
-    renderLibrary([
-      buildAsset(),
-      buildAsset({
-        id: 'release-2',
-        title: 'Missing Audio',
-        previewUrl: null,
-        assetKinds: ['artwork', 'providers'],
-      }),
-    ]);
-
-    expect(screen.getByRole('button', { name: /Audio/u })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
-    expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
-    expect(screen.queryByText('Missing Audio')).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /^All /u }));
-    expect(navigationMock.replace).toHaveBeenCalledWith(APP_ROUTES.LIBRARY, {
-      scroll: false,
-    });
-    expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
-    expect(screen.getByText('Missing Audio')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Show filters' }));
-    expect(
-      screen.getByRole('button', { name: /Needs Attention/u })
-    ).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('uses a mobile overlay without moving content, losing scroll, or hiding the asset drawer', async () => {
-    const user = userEvent.setup();
-    Object.defineProperty(globalThis, 'scrollY', {
-      configurable: true,
-      value: 320,
-    });
-
-    renderLibrary([buildAsset()]);
-    fireEvent.click(screen.getByTestId('library-release-row-release-1'));
-
-    const contentFrame = screen.getByTestId('library-content-frame');
-    const before = contentFrame.getBoundingClientRect();
-    const trigger = screen.getByRole('button', { name: 'Show filters' });
-    expect(trigger).toHaveClass('h-7', 'w-7');
-    expect(trigger.className).toContain('before:h-10');
-    expect(trigger.className).toContain('before:min-w-10');
-    expect(trigger.className).not.toContain('min-h-11');
-    expect(trigger.className).not.toContain('min-w-11');
-
-    await user.click(trigger);
-
-    const sheet = screen.getByTestId('library-filter-sheet');
-    expect(sheet).toBeInTheDocument();
-    expect(screen.getByTestId('library-surface').contains(sheet)).toBe(false);
-    expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
-      'aria-hidden',
-      'false'
-    );
-    const afterOpen = contentFrame.getBoundingClientRect();
-    expect({
-      x: afterOpen.x,
-      y: afterOpen.y,
-      width: afterOpen.width,
-      height: afterOpen.height,
-    }).toEqual({
-      x: before.x,
-      y: before.y,
-      width: before.width,
-      height: before.height,
-    });
-
-    await user.keyboard('{Escape}');
-    await waitFor(() => {
-      expect(
-        screen.queryByTestId('library-filter-sheet')
-      ).not.toBeInTheDocument();
-    });
-    expect(trigger).toHaveFocus();
-    expect(globalThis.scrollY).toBe(320);
+    expect(contract).toHaveAttribute('data-key', 'library');
+    expect(contract).toHaveAttribute('data-back-href', APP_ROUTES.CHAT);
+    expect(contract).toHaveAttribute('data-back-label', 'Back to App');
   });
 });

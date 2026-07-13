@@ -1,7 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import type { AsyncIterableStream } from 'ai';
 
-import { toWhatwgReadableStream } from '@/lib/ai/stream-normalization';
 import {
   detectSystemPromptLeak,
   PROMPT_DISCLOSURE_REFUSAL,
@@ -315,10 +314,7 @@ function createGuardedTextStream(
     }
   }
 
-  // Normalize back to a genuine WHATWG ReadableStream: the AI SDK's
-  // `createUIMessageStreamResponse` calls `stream.pipeThrough(...)`, which a
-  // bare generator does not have (JOV-3694 / JOV-3693).
-  return toWhatwgReadableStream(generator());
+  return generator() as unknown as AsyncIterableStream<string>;
 }
 
 type TextDeltaChunk = {
@@ -370,9 +366,7 @@ function createGuardedDeltaStream<T>(
     }
   }
 
-  // See createGuardedTextStream: keep the AsyncIterableStream contract whole
-  // (ReadableStream + AsyncIterable) for `toUIMessageStreamResponse()`.
-  return toWhatwgReadableStream(generator());
+  return generator() as unknown as AsyncIterableStream<T>;
 }
 
 type StreamTextOptions = {

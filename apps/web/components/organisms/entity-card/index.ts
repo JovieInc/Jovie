@@ -1,6 +1,4 @@
 export type {
-  ChatEntityMentionInput,
-  ChatEntityMentionKind,
   ChatReleaseContextInput,
   ChatTourDateContextInput,
   ReleaseEntityInput,
@@ -9,7 +7,6 @@ export type {
 } from './adapters';
 export {
   aiCrawlerAnalyticsToEntityCard,
-  chatEntityMentionToEntityCard,
   chatReleaseContextToEntityCard,
   chatTourDateContextToEntityCard,
   merchToEntityCard,

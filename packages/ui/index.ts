@@ -76,7 +76,6 @@ export { CommonDropdown } from './atoms/common-dropdown';
 // Common Dropdown
 export type {
   CommonDropdownActionItem,
-  CommonDropdownActionRow,
   CommonDropdownCheckboxItem,
   CommonDropdownCustomItem,
   CommonDropdownItem,
@@ -92,7 +91,6 @@ export type {
 } from './atoms/common-dropdown-types';
 export {
   isActionItem,
-  isActionRow,
   isCheckboxItem,
   isCustomItem,
   isLabel,

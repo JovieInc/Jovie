@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
  * editorial type classes (marketing-*-linear / marketing-kicker). Named System
  * B token utilities only. The .linear-marketing bridge (layout-owned) stays
  * until the final coordinated teardown; this guard only governs the page's own
- * files. Shared components (MarketingHero, VoiceDemoVisual,
+ * files. Shared components (SharedMarketingHero, VoiceDemoVisual,
  * LandingCTAButton) live outside app/(marketing)/voice/ and are intentionally
  * not scanned here.
  */

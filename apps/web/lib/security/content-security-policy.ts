@@ -86,14 +86,9 @@ const STATIC_CSP_PARTS = {
     'https://vercel.live',
     'https://challenges.cloudflare.com',
     'https://r2.leadsy.ai',
-    // Leadsy dynamically injects scripts from this CloudFront domain (JOVIE-WEB-R7)
-    'https://ddwl4m2hdecbv.cloudfront.net',
     'https://tag.trovo-tag.com',
     // Google Analytics 4 / gtag.js (JOV-3664)
     'https://www.googletagmanager.com',
-    // Google Identity Services (accounts.google.com/gsi/client) — required
-    // for Google One Tap / Google sign-in (JOV-4369).
-    'https://accounts.google.com',
   ].join(' '),
 
   // Pre-computed img-src from canonical CDN domain registry
@@ -115,7 +110,6 @@ const STATIC_CSP_PARTS = {
     'wss://ws-us3.pusher.com',
     'https://r2.leadsy.ai',
     'https://wvbknd.leadsy.ai',
-    'https://api.instantly.ai',
     // Google OAuth + AI Connector APIs (JOV-2230)
     'https://accounts.google.com',
     'https://oauth2.googleapis.com',
@@ -134,9 +128,6 @@ const STATIC_CSP_PARTS = {
     'https://js.stripe.com',
     'https://checkout.stripe.com',
     'https://challenges.cloudflare.com',
-    // Google One Tap renders its prompt in an accounts.google.com iframe
-    // (JOV-4369).
-    'https://accounts.google.com',
   ].join(' '),
 } as const;
 

@@ -264,10 +264,6 @@ const nextConfig = {
       { source: '/account', destination: '/app/settings/account' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
-      {
-        source: '/app/releases',
-        destination: '/app/library?view=releases',
-      },
       // NOTE: shell-owned aliases such as /app/profile, /app/tipping,
       // /app/earnings, /app/contacts, /app/tour-dates, and dashboard profile
       // aliases are intentionally omitted here. App Router pages handle their
@@ -317,39 +313,35 @@ const nextConfig = {
       },
       {
         source: '/app/admin/waitlist',
-        destination: '/app/ov/people?view=waitlist',
+        destination: '/app/admin/people?view=waitlist',
       },
       {
         source: '/app/admin/creators',
-        destination: '/app/ov/people?view=creators',
+        destination: '/app/admin/people?view=creators',
       },
       {
         source: '/app/admin/users',
-        destination: '/app/ov/people?view=users',
+        destination: '/app/admin/people?view=users',
       },
       {
         source: '/app/admin/feedback',
-        destination: '/app/ov/people?view=feedback',
+        destination: '/app/admin/people?view=feedback',
       },
       {
         source: '/app/admin/leads',
-        destination: '/app/ov/growth?view=leads',
+        destination: '/app/admin/growth?view=leads',
       },
       {
         source: '/app/admin/outreach',
-        destination: '/app/ov/growth?view=outreach',
+        destination: '/app/admin/growth?view=outreach',
       },
       {
         source: '/app/admin/campaigns',
-        destination: '/app/ov/growth?view=campaigns',
+        destination: '/app/admin/growth?view=campaigns',
       },
       {
         source: '/app/admin/ingest',
-        destination: '/app/ov/growth?view=ingest',
-      },
-      {
-        source: '/app/admin/:path*',
-        destination: '/app/ov/:path*',
+        destination: '/app/admin/growth?view=ingest',
       },
     ].map(route => ({
       ...route,
@@ -422,21 +414,15 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    return [
-      {
-        source: '/app/ov/:path*',
-        destination: '/app/admin/:path*',
-      },
-    ];
+    return [];
   },
   env: {
     // Build-time env vars — these get inlined into client bundles by Next.js
     NEXT_PUBLIC_APP_VERSION: APP_VERSION,
-    NEXT_PUBLIC_BUILD_SHA: (
-      process.env.NEXT_PUBLIC_BUILD_SHA ||
-      process.env.VERCEL_GIT_COMMIT_SHA ||
-      ''
-    ).slice(0, 7),
+    NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(
+      0,
+      7
+    ),
     NEXT_PUBLIC_CI: process.env.CI === 'true' ? 'true' : 'false',
   },
   // Keep @statsig/statsig-node-core external so Next.js does not webpack-bundle
@@ -449,7 +435,6 @@ const nextConfig = {
   // See JOV-2322.
   serverExternalPackages: ['@statsig/statsig-node-core'],
   experimental: {
-    cpus: process.env.GITHUB_ACTIONS === 'true' ? 2 : undefined,
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
     // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup
@@ -537,7 +522,6 @@ function exposeBaseStaticConfigForTooling(config) {
   }
 
   return Object.assign(config, {
-    experimental: nextConfig.experimental,
     images: nextConfig.images,
     redirects: nextConfig.redirects,
     rewrites: nextConfig.rewrites,

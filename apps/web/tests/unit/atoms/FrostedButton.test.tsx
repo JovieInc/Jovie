@@ -10,9 +10,6 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
-  // Canonical Link primitive: passthrough so the Slot chain renders the
-  // Next.js anchor child in these unit tests.
-  Link: ({ children }: any) => <>{children}</>,
 }));
 
 vi.mock('next/link', () => ({
@@ -35,22 +32,22 @@ describe('FrostedButton', () => {
     expect(link).toHaveAttribute('href', '/page');
   });
 
-  it('applies solid tone by default (maps to secondary variant)', () => {
+  it('applies solid tone by default (maps to frosted variant)', () => {
     render(<FrostedButton>Solid</FrostedButton>);
     const button = screen.getByRole('button', { name: 'Solid' });
-    expect(button).toHaveAttribute('data-variant', 'secondary');
+    expect(button).toHaveAttribute('data-variant', 'frosted');
   });
 
-  it('applies ghost tone (maps to ghost variant)', () => {
+  it('applies ghost tone (maps to frosted-ghost variant)', () => {
     render(<FrostedButton tone='ghost'>Ghost</FrostedButton>);
     const button = screen.getByRole('button', { name: 'Ghost' });
-    expect(button).toHaveAttribute('data-variant', 'ghost');
+    expect(button).toHaveAttribute('data-variant', 'frosted-ghost');
   });
 
-  it('applies outline tone (maps to secondary variant)', () => {
+  it('applies outline tone (maps to frosted-outline variant)', () => {
     render(<FrostedButton tone='outline'>Outline</FrostedButton>);
     const button = screen.getByRole('button', { name: 'Outline' });
-    expect(button).toHaveAttribute('data-variant', 'secondary');
+    expect(button).toHaveAttribute('data-variant', 'frosted-outline');
   });
 
   it('adds target="_blank" and rel="noopener noreferrer" when external=true', () => {

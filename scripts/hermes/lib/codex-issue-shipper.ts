@@ -111,16 +111,6 @@ export interface ShipperConfig {
 export type ShipperAgent = 'claude' | 'codex' | 'grok';
 export type RiskLevel = 'low' | 'medium' | 'high';
 export type ModelProfile = 'simple' | 'standard' | 'escalation';
-export type AgentFailureDisposition =
-  | 'task_terminal'
-  | 'task_retryable'
-  | 'provider_cooldown'
-  | 'system_retryable';
-export type AgentFailureAction =
-  | 'fallback'
-  | 'release_incident'
-  | 'retry_task'
-  | 'block_task';
 export type CodexSandboxMode =
   | 'read-only'
   | 'workspace-write'
@@ -166,75 +156,6 @@ export interface BuildPromptInput {
   readonly route: TaskRoute;
   readonly gbrain: GbrainContext;
   readonly repoRoot: string;
-}
-
-const TERMINAL_TASK_FAILURE_PATTERN =
-  /human[- ]review[- ]required|requires? human (?:review|decision|approval)|security (?:review|blocker)|policy (?:violation|blocker)|destructive operation requires approval|credential (?:change|rotation) requires approval/i;
-
-const SYSTEM_FAILURE_PATTERN =
-  /gbrain.*(?:failed|unavailable|timeout|refused)|(?:github|gh|graphql).*rate limit|github.*(?:5\d\d|timeout|unavailable)|spawn(?:sync)?.*(?:ENOENT|EAGAIN|ETIMEDOUT)|\b(?:ENOENT|EAGAIN|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH)\b|command not found|executable.*(?:missing|not found)|no such file or directory|error connecting to agent|transport (?:closed|error)|network (?:error|timeout|unreachable)|internet.*(?:offline|unavailable)/i;
-
-const DETERMINISTIC_TASK_FAILURE_PATTERN =
-  /AssertionError|Test Files?\s+\d+ failed|Tests?\s+\d+ failed|typecheck.*(?:failed|error)|biome.*(?:failed|error)|lint.*(?:failed|error)|\berror TS\d{4}\b/i;
-
-const PROVIDER_FAILURE_PATTERN =
-  /(?:http|status)\s*(?:402|429)\b|too many requests|rate limit|weekly limit|(?:5|five)[- ]hour limit|usage limit|quota (?:exceeded|exhausted)|(?:insufficient|low) (?:funds|credits?|balance)|credit balance.*(?:low|exhausted)|cannot afford|max_tokens.*afford|oauth.*(?:expired|refresh failed)|failed to authenticate|(?:disabled.*subscription|subscription.*(?:disabled|exhausted|limit))|login required|not logged in|unknown model|model.*(?:not found|retired|deprecated)|provider.*(?:outage|unavailable)/i;
-
-/**
- * Classify a failed agent attempt without mutating issue or controller state.
- *
- * Provider and system incidents belong to the controller, not the issue. A
- * deterministic task failure remains retryable unless the agent explicitly
- * reports a human/security/policy boundary that automation must not cross.
- */
-export function classifyAgentFailure(
-  status: number | null,
-  signal: NodeJS.Signals | null,
-  output = '',
-  error = ''
-): AgentFailureDisposition {
-  const evidence = `${output}\n${error}`;
-
-  if (
-    status === null ||
-    signal !== null ||
-    status === 137 ||
-    status === 143 ||
-    /timeout|timed out|killed/i.test(error)
-  ) {
-    return 'system_retryable';
-  }
-  if (TERMINAL_TASK_FAILURE_PATTERN.test(evidence)) return 'task_terminal';
-  if (SYSTEM_FAILURE_PATTERN.test(evidence)) return 'system_retryable';
-  if (DETERMINISTIC_TASK_FAILURE_PATTERN.test(evidence)) {
-    return 'task_retryable';
-  }
-  if (PROVIDER_FAILURE_PATTERN.test(evidence)) return 'provider_cooldown';
-  return 'task_retryable';
-}
-
-/** Only deterministic task retries consume the task's durable retry budget. */
-export function consumesTaskRetryBudget(
-  disposition: AgentFailureDisposition
-): boolean {
-  return disposition === 'task_retryable';
-}
-
-/** Map a disposition to the only issue mutation the controller may perform. */
-export function actionForAgentFailure(
-  disposition: AgentFailureDisposition,
-  hasFallback: boolean
-): AgentFailureAction {
-  if (hasFallback && disposition !== 'task_terminal') {
-    return 'fallback';
-  }
-  if (
-    disposition === 'provider_cooldown' ||
-    disposition === 'system_retryable'
-  ) {
-    return 'release_incident';
-  }
-  return disposition === 'task_terminal' ? 'block_task' : 'retry_task';
 }
 
 const HIGH_RISK_PATTERN =
@@ -727,7 +648,7 @@ export function buildAgentPrompt(input: BuildPromptInput): string {
       '    * Narrow lint and typecheck results (e.g., output of `pnpm biome check --changed` and `pnpm typecheck --noEmit` on changed files).',
       '    * Explicit pass/fail of the design-taste-frontend checklist (state which checks passed/failed).',
       '- For existing Jovie product/dashboard UI, use the audit/checklist parts of the skill only. Do not force landing-page hero, bento, or marketing patterns into product UI.',
-      `- Safe UI-only fast-track lane: if and only if the final diff is limited to visual UI paths allowed by \`.github/MERGE_QUEUE.md\`, add PR labels \`ui\`, \`${UI_FAST_TRACK_LABEL}\`, \`fast\`, and \`merge-queue\` so the native queue controller can prioritize eligible UI work after evidence.`,
+      `- Safe UI-only fast-track lane: if and only if the final diff is limited to visual UI paths allowed by \`.github/MERGE_QUEUE.md\`, add PR labels \`ui\`, \`${UI_FAST_TRACK_LABEL}\`, \`fast\`, and \`merge-queue\` so Graphite can bypass unrelated backend trains after evidence.`,
       '- When requesting UI fast-track, include a PR section titled `## Fast-track UI eligibility` with `Why eligible`, `Before`, `After`, and `Checks run` lines. Evidence must include before/after screenshots or component evidence, narrow typecheck output, narrow lint/Biome output, and affected component/test output or an explicit explanation when none exists. Do not request fast-track for API routes, auth, billing, DB/migrations, security/CSP, infra/cron, routing behavior, package manifests, CI, or broad refactors.',
       '- If the issue is not UI-focused, do not enforce this skill.',
     ]);
@@ -1114,10 +1035,6 @@ export const MAX_RETRY_RELEASES = 3;
  */
 export const RETRY_RELEASE_COMMENT_HEADER =
   'Jovie agent (codex issue shipper) released this issue for retry.';
-
-/** Controller incidents are deliberately excluded from task retry counting. */
-export const INCIDENT_RELEASE_COMMENT_HEADER =
-  'Jovie agent (codex issue shipper) released this issue after a controller incident.';
 
 export interface IssueComment {
   readonly body: string;

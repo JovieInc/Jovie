@@ -4,22 +4,13 @@ permissions:
   contents: read
 
 on:
-  schedule:
-    # Deep production coverage runs independently of the disabled Agent Tick
-    # monolith and is intentionally outside the deploy-blocking path.
-    - cron: '17 */6 * * *'
-  workflow_dispatch:
-
-concurrency:
-  group: production-synthetic-monitoring
-  cancel-in-progress: false
+  workflow_dispatch: # Manual trigger (cron moved to agent-tick.yml)
 
 jobs:
   synthetic-test:
     name: Production Synthetic Tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 20
-    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true' }
 
     steps:
       - name: Safety check - only run on schedule or manual dispatch
@@ -30,9 +21,7 @@ jobs:
           exit 1
 
       - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
@@ -77,7 +66,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-auth-ui-results.json
         run: |
-          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-auth-ui.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-auth-ui
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-auth-ui.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-auth-ui
         continue-on-error: true
 
       - name: Run Golden Path Health + Performance
@@ -90,7 +79,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-golden-path-results.json
         run: |
-          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
         continue-on-error: true
 
       - name: Run Onboarding Robot Full Synthetic (JOV-2681)
@@ -103,7 +92,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/onboarding-robot-full-results.json
         run: |
-          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.full.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/onboarding-robot-full
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.full.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/onboarding-robot-full
         continue-on-error: true
 
       - name: Run Legacy OTP Signup Canary (gated, JOV-2446 cutover)
@@ -122,25 +111,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-legacy-otp-results.json
         run: |
-          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-legacy-otp.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-legacy-otp
-        continue-on-error: true
-
-      - name: Run Better Auth Production Account Canary
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          BASE_URL: https://jov.ie
-          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
-          E2E_SKIP_WEB_SERVER: '1'
-          E2E_SYNTHETIC_MODE: 'true'
-          E2E_PROD_ACCOUNT_CANARY_ENABLED: 'true'
-          E2E_ENVIRONMENT: production
-          SYNTHETIC_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
-          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-better-auth-account-results.json
-        run: |
-          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-better-auth-account.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-better-auth-account
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-legacy-otp.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-legacy-otp
         continue-on-error: true
 
       - name: Run Public Profile Smoke Test (JOV-1653)
@@ -153,19 +124,27 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/public-profile-smoke-results.json
         run: |
-          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
         continue-on-error: true
+
+      - name: Upload Public Profile Smoke Screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-profile-smoke-screenshots
+          path: apps/web/test-results/public-profile-smoke-*.png
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Confirm scoped synthetic cleanup
         if: always()
         run: |
-          echo "Better Auth account cleanup is transactionally scoped to the exact +jovie-ba-prod-canary-<run> address and must prove zero residue."
+          echo "Production signup canary cleanup is scoped by exact plus-addressed email."
           echo "Onboarding robot cleanup is scoped by exact robot email, Clerk user id, run id, and generated handle."
           echo "No broad production Clerk cleanup script is run from this workflow."
 
       - name: Parse test results
         id: test-results
-        if: ${{ always() }}
         env:
           LEGACY_CANARY_ENABLED: ${{ vars.E2E_PROD_LEGACY_CANARY != '0' && '1' || '0' }}
         run: |
@@ -195,17 +174,23 @@ jobs:
           NODE
 
       - name: Upload test results
-        uses: ./.github/actions/upload-safe-playwright-artifact
-        if: ${{ always() && hashFiles('apps/web/test-results/*-results.json') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
         with:
           name: synthetic-test-results
           path: |
             apps/web/test-results/
-            !apps/web/test-results/public-profile-smoke-*.png
+            apps/web/playwright-report/
           retention-days: 30
 
+      - name: Fail job if tests failed
+        if: steps.test-results.outputs.test_status != 'passed'
+        run: |
+          echo "Marking job as failed because synthetic status is '${{ steps.test-results.outputs.test_status }}'"
+          exit 1
+
       - name: Send Slack Alert on Failure
-        if: ${{ always() && (failure() || steps.test-results.outputs.test_status != 'passed') }}
+        if: steps.test-results.outputs.test_status != 'passed'
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -230,7 +215,7 @@ jobs:
                     },
                     {
                       "title": "Artifacts",
-                      "value": "Sanitized JSON failure packets are attached under synthetic-test-results; CI intentionally omits trace, video, HTML, and screenshots.",
+                      "value": "Trace, video, screenshots, and JSON results are attached to this workflow run under synthetic-test-results.",
                       "short": false
                     },
                     {
@@ -246,7 +231,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Send Slack Success Notification (Scheduled Summary)
-        if: ${{ always() && !failure() && steps.test-results.outputs.test_status == 'passed' && github.event_name == 'schedule' }}
+        if: steps.test-results.outputs.test_status == 'passed' && github.event_name == 'schedule'
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -280,12 +265,3 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-      # Preserve the red signal only after the failure alert has had a chance to
-      # run. `always()` also covers setup/checkout/parser failures that produced
-      # no structured test result.
-      - name: Fail job if tests failed
-        if: ${{ always() && (failure() || steps.test-results.outputs.test_status != 'passed') }}
-        run: |
-          echo "Marking job as failed because synthetic status is '${{ steps.test-results.outputs.test_status }}'"
-          exit 1

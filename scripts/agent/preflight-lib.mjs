@@ -82,7 +82,6 @@ export function evaluateWorktree(input) {
  *   gbrainOutput: string | null,
  *   source?: 'ledger' | 'keyword' | 'semantic' | 'gbrain' | null,
  *   timedOut?: boolean,
- *   diagnostics?: object,
  *   requireGbrain?: boolean,
  *   task?: string | null,
  *   ms?: number,
@@ -108,7 +107,6 @@ export function evaluateOwnership(input) {
         source: 'gbrain-missing',
         reachable: false,
         ms: input.ms ?? 0,
-        diagnostics: input.diagnostics ?? null,
       },
       blockers,
     };
@@ -132,7 +130,6 @@ export function evaluateOwnership(input) {
         source: timedOut ? 'gbrain-timeout' : 'gbrain-empty',
         reachable: false,
         ms: input.ms ?? 0,
-        diagnostics: input.diagnostics ?? null,
       },
       blockers,
     };
@@ -146,7 +143,6 @@ export function evaluateOwnership(input) {
       source: input.source || 'gbrain',
       reachable: true,
       ms: input.ms ?? 0,
-      diagnostics: input.diagnostics ?? null,
     },
     blockers,
   };

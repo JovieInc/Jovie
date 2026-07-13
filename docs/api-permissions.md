@@ -12,7 +12,6 @@ This document tracks required privilege levels by API namespace so new routes ar
 | `/api/dashboard/**` | Authenticated user | Must scope all reads/writes to the current authenticated user. |
 | `/api/account/**` | Authenticated user | User self-service only; never accept arbitrary target user IDs without ownership checks. |
 | `/api/billing/**` | Authenticated user | Return only caller billing context; no cross-user lookup by untrusted input. |
-| `/api/analytics/navigation` | Authenticated user (POST); admin-only (GET) | POST uses authenticated identity only as a rate-limit key, then discards it before aggregate storage. Payloads are strict low-cardinality buckets; GET returns only privacy-suppressed aggregate baselines. |
 | `/api/dev/**` | Authenticated user (dev-only behavior where applicable) | Non-production test and developer utilities. |
 | `/api/cron/**` | Cron secret | Must validate `CRON_SECRET` before execution. |
 | `/api/webhooks/**` | Signed provider webhook | Must validate provider signature/token. |

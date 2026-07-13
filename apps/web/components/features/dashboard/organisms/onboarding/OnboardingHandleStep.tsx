@@ -100,9 +100,9 @@ export function OnboardingHandleStep({
           <div
             className={cn(
               'flex items-center gap-2 rounded-full border px-2 py-1.5 transition-[background-color,border-color,box-shadow] duration-subtle',
-              'border-subtle bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))]',
+              'border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))]',
               'hover:border-default hover:bg-surface-0',
-              'focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-ring/16',
+              'focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/16',
               hasError && 'border-destructive/60'
             )}
           >

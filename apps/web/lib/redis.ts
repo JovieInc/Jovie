@@ -11,23 +11,6 @@ let _redisLastAttempt = 0;
 let _redisMissingConfigWarned = false;
 const REDIS_RETRY_INTERVAL_MS = 30000; // 30 seconds between retry attempts
 
-function isValidUpstashRestUrl(url: string | undefined | null): url is string {
-  if (!url) return false;
-  const trimmed = url.trim();
-  // Upstash REST client requires https. Invalid placeholders / empty / rediss://
-  // must fail soft — never throw during Next page data collection / build.
-  return /^https:\/\//i.test(trimmed);
-}
-
-function getUpstashConfig(): { url: string; token: string } | null {
-  const url = env.UPSTASH_REDIS_REST_URL;
-  const token = env.UPSTASH_REDIS_REST_TOKEN;
-  if (!isValidUpstashRestUrl(url) || !token?.trim()) {
-    return null;
-  }
-  return { url: url.trim(), token: token.trim() };
-}
-
 export interface GetRedisOptions {
   signal?: AbortSignal;
 }
@@ -51,16 +34,15 @@ function captureMissingRedisConfigWarningOnce(): void {
  */
 export function getRedis(options?: GetRedisOptions): Redis | null {
   if (options?.signal) {
-    const cfg = getUpstashConfig();
-    if (!cfg) {
+    if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
       captureMissingRedisConfigWarningOnce();
       return null;
     }
 
     try {
       return new Redis({
-        url: cfg.url,
-        token: cfg.token,
+        url: env.UPSTASH_REDIS_REST_URL,
+        token: env.UPSTASH_REDIS_REST_TOKEN,
         signal: options.signal,
       });
     } catch (error) {
@@ -88,16 +70,15 @@ export function getRedis(options?: GetRedisOptions): Redis | null {
   _redisLastAttempt = now;
 
   // Check if Redis is configured (both URL and token are required)
-  const cfg = getUpstashConfig();
-  if (!cfg) {
+  if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
     captureMissingRedisConfigWarningOnce();
     return null;
   }
 
   try {
     _redis = new Redis({
-      url: cfg.url,
-      token: cfg.token,
+      url: env.UPSTASH_REDIS_REST_URL,
+      token: env.UPSTASH_REDIS_REST_TOKEN,
     });
     Sentry.addBreadcrumb({
       category: 'redis',

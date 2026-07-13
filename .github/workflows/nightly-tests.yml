@@ -5,14 +5,15 @@
 #
 # REPLACES: nightly-unit-tests.yml, nightly-e2e-tests.yml
 #
-# SCHEDULE: Daily at 11:30 PM America/Los_Angeles. This leaves at least a
-# 90-minute buffer before the fixed 09:00 UTC screenshot and Tuesday harness.
+# SCHEDULE: Daily at 2:00 AM America/Los_Angeles during daylight saving time
+# (both suites run in parallel). Keep UTC here until actionlint accepts
+# GitHub's timezone-aware schedule key.
 
 name: Nightly Tests
 
 on:
   schedule:
-    - cron: '30 23 * * *'
+    - cron: '0 2 * * *'
       timezone: 'America/Los_Angeles'
   workflow_dispatch:
     inputs:
@@ -36,7 +37,6 @@ on:
         default: ''
 
 permissions:
-  actions: read
   contents: read
 
 concurrency:
@@ -50,10 +50,10 @@ jobs:
       github.event_name == 'schedule' ||
       github.event.inputs.suite == 'all' ||
       github.event.inputs.suite == 'unit'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -71,13 +71,10 @@ jobs:
       github.event_name == 'schedule' ||
       github.event.inputs.suite == 'all' ||
       github.event.inputs.suite == 'unit'
-    runs-on: ubuntu-latest
-    # The unsharded suite was still making steady progress when the 30m cap
-    # cancelled it every night (Jul 15-20, JOV-4326). 60m fits the current
-    # suite with headroom; the nightly cadence tolerates the longer lane.
-    timeout-minutes: 60
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -113,14 +110,12 @@ jobs:
       github.event.inputs.suite == 'e2e' ||
       github.event.inputs.suite == 'design-v1'
     environment: Preview – jovie
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 45
-    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
-          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -201,11 +196,6 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
-          # Cap the dev-server V8 heap the same way playwright.config.smoke.ts
-          # does for CI: GitHub-hosted runners expose ~7 GiB RAM and the
-          # dev-fast default of 8 GiB starves the OS + Playwright, wedging the
-          # bypass server mid-sweep (ECONNREFUSED / socket hang up, JOV-4326).
-          NODE_OPTIONS: '--max-old-space-size=4096'
           PORT: '3100'
           BASE_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
@@ -227,7 +217,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1' }}
         run: |
           cd apps/web
-          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm run qa:routes
+          pnpm run qa:routes
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
@@ -239,14 +229,10 @@ jobs:
         if: ${{ github.event_name == 'schedule' || (github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1') }}
         run: |
           cd apps/web
-          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- bash -c "
-            pnpm playwright test tests/e2e/nightly/full-surface-chaos.spec.ts --config=playwright.config.nightly.ts --project=chromium
-            status=\$?
-            if [ -f test-results/nightly-results.json ]; then
-              cp test-results/nightly-results.json test-results/full-surface-chaos-report.json || exit \$?
-            fi
-            exit \"\$status\"
-          "
+          pnpm playwright test tests/e2e/nightly/full-surface-chaos.spec.ts --config=playwright.config.nightly.ts --project=chromium
+          if [ -f test-results/nightly-results.json ]; then
+            cp test-results/nightly-results.json test-results/full-surface-chaos-report.json
+          fi
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
@@ -271,14 +257,13 @@ jobs:
           fi
 
       - name: Run nightly E2E tests
-        id: nightly-e2e
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.suite != 'design-v1' }}
         run: |
           cd apps/web
           if [ -n "${{ github.event.inputs.test_filter }}" ]; then
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test "${{ github.event.inputs.test_filter }}" --config=playwright.config.nightly.ts --project=chromium
+            pnpm playwright test "${{ github.event.inputs.test_filter }}" --config=playwright.config.nightly.ts --project=chromium --reporter=line
           else
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --config=playwright.config.nightly.ts --project=chromium --grep-invert=@full-surface-chaos
+            pnpm playwright test --config=playwright.config.nightly.ts --project=chromium --reporter=line --grep-invert=@full-surface-chaos
           fi
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
@@ -289,30 +274,38 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
+      - name: Upload Playwright Report on Failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-e2e-report-${{ github.run_id }}
+          path: apps/web/playwright-report/
+          retention-days: 7
+
       - name: Upload Test Results on Failure
-        if: ${{ always() && steps.nightly-e2e.outcome == 'failure' && hashFiles('apps/web/test-results/nightly-results.json') != '' }}
-        uses: ./.github/actions/upload-safe-playwright-artifact
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nightly-e2e-results-${{ github.run_id }}
-          path: apps/web/test-results/nightly-results.json
+          path: apps/web/test-results/
           retention-days: 7
 
       - name: Upload route QA ledger
-        if: ${{ always() && github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1' && hashFiles('apps/web/test-results/route-qa/nightly-route-qa/route-matrix.json') != '' && hashFiles('apps/web/test-results/route-qa/nightly-route-qa/findings-ledger.json') != '' }}
-        uses: ./.github/actions/upload-safe-playwright-artifact
+        if: ${{ always() && (github.event_name == 'schedule' || github.event.inputs.test_filter == '') }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nightly-route-qa-${{ github.run_id }}
-          path: |
-            apps/web/test-results/route-qa/nightly-route-qa/route-matrix.json
-            apps/web/test-results/route-qa/nightly-route-qa/findings-ledger.json
+          path: apps/web/test-results/route-qa/nightly-route-qa/
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Upload full surface chaos report
-        if: ${{ always() && (github.event_name == 'schedule' || (github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1')) && hashFiles('apps/web/test-results/full-surface-chaos-report.json') != '' }}
-        uses: ./.github/actions/upload-safe-playwright-artifact
+        if: ${{ always() && (github.event_name == 'schedule' || github.event.inputs.test_filter == '') }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: full-surface-chaos-${{ github.run_id }}
           path: apps/web/test-results/full-surface-chaos-report.json
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Cleanup Clerk E2E test users
@@ -353,7 +346,7 @@ jobs:
     name: Notify Results
     needs: [knip, unit-tests, e2e-tests]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     steps:
       - name: Slack notification on Knip failure
         if: ${{ needs.knip.result == 'failure' }}

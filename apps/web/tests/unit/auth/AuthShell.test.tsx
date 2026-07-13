@@ -5,8 +5,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   authState,
   providerEnabledState,
-  oneTapConfiguredState,
-  oneTapMock,
   searchParamsState,
   signInSocialMock,
   sendOtpMock,
@@ -19,8 +17,6 @@ const {
     google: true,
     apple: true,
   },
-  oneTapConfiguredState: { value: false },
-  oneTapMock: vi.fn(),
   searchParamsState: { value: '' },
   signInSocialMock: vi.fn(),
   sendOtpMock: vi.fn(),
@@ -42,9 +38,8 @@ vi.mock('@/lib/auth/client', () => ({
     emailOtp: {
       sendVerificationOtp: sendOtpMock,
     },
-    oneTap: oneTapMock,
+    oneTap: undefined,
   },
-  isGoogleOneTapConfigured: () => oneTapConfiguredState.value,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -83,11 +78,9 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     authState.isSignedIn = false;
     providerEnabledState.google = true;
     providerEnabledState.apple = true;
-    oneTapConfiguredState.value = false;
     searchParamsState.value = '';
     signInSocialMock.mockResolvedValue(undefined);
     sendOtpMock.mockResolvedValue({ data: {} });
-    oneTapMock.mockResolvedValue(undefined);
   });
 
   it('is ready at first paint without a Clerk-loaded gate', () => {
@@ -95,26 +88,6 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(
       container.querySelector('[data-auth-shell-ready="true"]')
     ).not.toBeNull();
-  });
-
-  it('does not call the proxy-backed One Tap route when the plugin is unconfigured', async () => {
-    render(<AuthShell mode='sign-up' />);
-
-    await waitFor(() => {
-      expect(oneTapMock).not.toHaveBeenCalled();
-    });
-  });
-
-  it('calls One Tap only when its client id configured the plugin', async () => {
-    oneTapConfiguredState.value = true;
-    render(<AuthShell mode='sign-up' />);
-
-    await waitFor(() => {
-      expect(oneTapMock).toHaveBeenCalledWith({
-        callbackURL: '/signup',
-        context: 'signup',
-      });
-    });
   });
 
   it('starts Google sign-in through Better Auth social with mode-aware callbacks', async () => {

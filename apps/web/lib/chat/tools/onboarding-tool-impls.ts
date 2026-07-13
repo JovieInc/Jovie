@@ -11,16 +11,6 @@ import {
   type InterviewSignal,
   interviewSignalSchema,
 } from '@/lib/chat/tools/onboarding-signals';
-import {
-  type CanonicalArtistMetrics,
-  normalizeArtistMetrics,
-} from '@/lib/onboarding/canonical-metrics';
-import {
-  type HandleAvailabilityResult,
-  normalizeHandleCandidate,
-  toHandleAvailabilityResult,
-} from '@/lib/onboarding/handle-availability';
-import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import { buildSpotifyArtistUrl, getSpotifyArtist } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
 
@@ -69,13 +59,7 @@ export interface OnboardingTurnState {
   spotifyImageUrl: string | null;
   spotifyGenres: string[];
   spotifyPopularity: number | null;
-  /**
-   * Canonical Spotify follower count. Always derived via
-   * `normalizeArtistMetrics` — never dual-sourced against monthly listeners.
-   */
   spotifyFollowers: number | null;
-  /** Full metrics snapshot for UI surfaces that need source/updatedAt. */
-  artistMetrics: CanonicalArtistMetrics | null;
   /** Append-only log of recordInterviewSignal calls within this turn. */
   signals: InterviewSignal[];
   /** Cumulative LLM turn count (1-indexed). Drives the proposeNextStep eval. */
@@ -124,36 +108,10 @@ function restoreArtistFromOutput(
     typeof artist?.imageUrl === 'string'
       ? artist.imageUrl
       : state.spotifyImageUrl;
-
-  // Prefer embedded metrics snapshot; fall back to loose artist fields.
-  // Always go through normalizeArtistMetrics so followers ≠ monthly listeners.
-  const metricsRecord = isRecord(output.metrics)
-    ? output.metrics
-    : isRecord(artist?.metrics)
-      ? artist.metrics
-      : null;
-  const preservedSource =
-    metricsRecord && typeof metricsRecord.source === 'string'
-      ? (metricsRecord.source as CanonicalArtistMetrics['source'])
-      : 'tool_output';
-  const metrics = normalizeArtistMetrics(
-    metricsRecord ?? {
-      followers: artist?.followers,
-      spotifyFollowers: artist?.spotifyFollowers,
-      monthlyListeners: artist?.monthlyListeners,
-      monthly_listeners: artist?.monthly_listeners,
-    },
-    {
-      source: preservedSource,
-      updatedAt:
-        metricsRecord && typeof metricsRecord.updatedAt === 'string'
-          ? metricsRecord.updatedAt
-          : undefined,
-    }
-  );
-  state.artistMetrics = metrics;
-  state.spotifyFollowers = metrics.spotifyFollowers;
-
+  state.spotifyFollowers =
+    typeof artist?.followers === 'number' && Number.isFinite(artist.followers)
+      ? artist.followers
+      : state.spotifyFollowers;
   state.spotifyPopularity =
     typeof artist?.popularity === 'number' && Number.isFinite(artist.popularity)
       ? artist.popularity
@@ -192,7 +150,6 @@ export function createOnboardingTurnState(input: {
     spotifyGenres: [],
     spotifyPopularity: null,
     spotifyFollowers: null,
-    artistMetrics: null,
     signals: [],
     turnCount: input.turnCount,
   };
@@ -233,30 +190,10 @@ export interface ConfirmSpotifyArtistOutput {
     readonly name: string;
     readonly url: string;
     readonly imageUrl: string | null;
-    /** @deprecated Prefer metrics.spotifyFollowers — kept for rehydration. */
     readonly followers: number | null;
     readonly popularity: number | null;
     readonly genres: readonly string[];
-    readonly metrics: CanonicalArtistMetrics;
   } | null;
-  /** Top-level metrics mirror for consumers that do not unwrap artist. */
-  readonly metrics: CanonicalArtistMetrics | null;
-  readonly summary: string;
-}
-
-export interface CheckHandleOutput {
-  readonly action: 'check_handle';
-  readonly handle: string;
-  readonly availability: HandleAvailabilityResult;
-  readonly summary: string;
-}
-
-export interface ProposeSocialLinkOutput {
-  readonly action: 'propose_social_link';
-  readonly url: string | null;
-  readonly parseOk: boolean;
-  readonly reason?: string;
-  readonly platform?: string;
   readonly summary: string;
 }
 
@@ -276,7 +213,6 @@ export async function buildConfirmSpotifyArtistOutput(
   state.spotifyGenres = [];
   state.spotifyPopularity = null;
   state.spotifyFollowers = null;
-  state.artistMetrics = null;
   let artist: Awaited<ReturnType<typeof getSpotifyArtist>> = null;
 
   try {
@@ -289,44 +225,30 @@ export async function buildConfirmSpotifyArtistOutput(
   }
 
   if (artist) {
-    const metrics = normalizeArtistMetrics(
-      {
-        followersObject: artist.followers,
-        followers: artist.followers?.total,
-      },
-      { source: 'spotify_api' }
-    );
     state.spotifyArtistName = artist.name;
     state.spotifyImageUrl = artist.images?.[0]?.url ?? null;
     state.spotifyGenres = artist.genres ?? [];
     state.spotifyPopularity = artist.popularity ?? null;
-    state.artistMetrics = metrics;
-    state.spotifyFollowers = metrics.spotifyFollowers;
-
-    return {
-      action: 'spotify_artist_confirmed' as const,
-      spotifyArtistId,
-      artist: {
-        id: artist.id,
-        name: artist.name,
-        url: buildSpotifyArtistUrl(artist.id),
-        imageUrl: artist.images?.[0]?.url ?? null,
-        followers: metrics.spotifyFollowers,
-        popularity: artist.popularity ?? null,
-        genres: artist.genres?.slice(0, 3) ?? [],
-        metrics,
-      },
-      metrics,
-      summary: `${artist.name} matched on Spotify.`,
-    };
+    state.spotifyFollowers = artist.followers?.total ?? null;
   }
 
   return {
     action: 'spotify_artist_confirmed' as const,
     spotifyArtistId,
-    artist: null,
-    metrics: null,
-    summary: 'Spotify artist selected.',
+    artist: artist
+      ? {
+          id: artist.id,
+          name: artist.name,
+          url: buildSpotifyArtistUrl(artist.id),
+          imageUrl: artist.images?.[0]?.url ?? null,
+          followers: artist.followers?.total ?? null,
+          popularity: artist.popularity ?? null,
+          genres: artist.genres?.slice(0, 3) ?? [],
+        }
+      : null,
+    summary: artist
+      ? `${artist.name} matched on Spotify.`
+      : 'Spotify artist selected.',
   };
 }
 
@@ -370,21 +292,14 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       description: TOOL_SCHEMAS.checkHandle.description,
       inputSchema: TOOL_SCHEMAS.checkHandle.inputSchema,
       execute: async ({ handle }) => {
-        // Client-side rendering hits /api/handle/check for the live boolean.
-        // Emit the canonical availability shell (requested handle only — never
-        // a silent numbered swap). UI fills available via the shared helper.
-        const normalized = normalizeHandleCandidate(handle);
-        const availability = toHandleAvailabilityResult({
-          handle: normalized,
-          checking: true,
-        });
-        const payload: CheckHandleOutput = {
-          action: 'check_handle',
-          handle: normalized,
-          availability,
-          summary: `Checking @${normalized}.`,
+        // Client-side rendering hits /api/handle/check directly so the gate
+        // surfaces the same constant-time response budget regardless of who
+        // asks. The tool just emits the marker + the proposed handle.
+        return {
+          action: 'check_handle' as const,
+          handle: handle.toLowerCase(),
+          summary: `Checking @${handle.toLowerCase()}.`,
         };
-        return payload;
       },
     }),
 
@@ -392,28 +307,13 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       description: TOOL_SCHEMAS.proposeSocialLink.description,
       inputSchema: TOOL_SCHEMAS.proposeSocialLink.inputSchema,
       execute: async ({ url }) => {
-        // Reject incomplete parses (e.g. bare instagram.com) so the rail and
-        // artifacts never attach a host without an account path.
-        const parsed = parseSocialLinkInput(url);
-        if (!parsed.ok) {
-          const payload: ProposeSocialLinkOutput = {
-            action: 'propose_social_link',
-            url: null,
-            parseOk: false,
-            reason: parsed.reason,
-            platform: parsed.platform,
-            summary: 'Link needs a full profile URL with account path.',
-          };
-          return payload;
-        }
-        const payload: ProposeSocialLinkOutput = {
-          action: 'propose_social_link',
-          url: parsed.url,
-          parseOk: true,
-          platform: parsed.platform,
+        // Preserve the exact URL so the UI can render a review state before
+        // any commitment.
+        return {
+          action: 'propose_social_link' as const,
+          url,
           summary: 'Social link ready to review.',
         };
-        return payload;
       },
     }),
 
@@ -447,7 +347,6 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
             }))
           ),
           spotifyFollowers: state.spotifyFollowers,
-          metrics: state.artistMetrics,
           turnCount: state.turnCount,
         });
         const payload: NextStepCardPayload = {

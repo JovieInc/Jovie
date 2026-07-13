@@ -569,7 +569,7 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
   ReleaseSidebar: () => null,
 }));
 
-import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
 import type { HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
 import {
   HeaderActionsProvider,
@@ -625,13 +625,12 @@ function getLatestTableProps() {
 }
 
 function openDesktopTaskSearch() {
-  fireEvent.click(
-    within(screen.getByTestId('header-actions-host')).getByRole('button', {
-      name: 'Search',
-    })
-  );
-  fireEvent.click(screen.getByRole('button', { name: 'Filter Current View' }));
+  fireEvent.click(screen.getByRole('button', { name: /filter tasks/i }));
   return screen.getByRole('combobox', { name: 'Filter Tasks' });
+}
+
+function enableDesignV1Tasks() {
+  mockUseAppFlag.mockImplementation(flagName => flagName === 'DESIGN_V1');
 }
 
 describe('TasksPageClient', () => {
@@ -792,7 +791,9 @@ describe('TasksPageClient', () => {
     expect(tableProps?.data?.map(task => task.id)).toEqual(['task-jovie']);
   });
 
-  it('keeps canonical desktop unselected until the user opens a task', () => {
+  it('keeps DESIGN_V1 desktop unselected until the user opens a task', () => {
+    enableDesignV1Tasks();
+
     renderPage();
 
     expect(screen.getByTestId('task-document-pane')).toBeInTheDocument();
@@ -808,7 +809,9 @@ describe('TasksPageClient', () => {
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
   });
 
-  it('marks the opened canonical task with the shared selected row state', () => {
+  it('marks the opened DESIGN_V1 task with the shared selected row state', () => {
+    enableDesignV1Tasks();
+
     renderPage();
 
     expect(
@@ -827,7 +830,8 @@ describe('TasksPageClient', () => {
     );
   });
 
-  it('resets the canonical detail selection when subview filters exclude the selected task', () => {
+  it('resets the DESIGN_V1 detail selection when subview filters exclude the selected task', () => {
+    enableDesignV1Tasks();
     mockTasksData = [mockTaskTwo, mockJovieTask];
 
     renderPage();
@@ -848,7 +852,8 @@ describe('TasksPageClient', () => {
     ]);
   });
 
-  it('keeps all assignee subviews wired in the canonical workspace', () => {
+  it('keeps all assignee subviews wired under DESIGN_V1', () => {
+    enableDesignV1Tasks();
     mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
 
     renderPage();
@@ -1255,14 +1260,15 @@ describe('TasksPageClient', () => {
     expect(screen.getByRole('button', { name: 'Next Task' })).toBeEnabled();
   }, 10000);
 
-  it('registers task filtering behind the shared global search trigger', () => {
+  it('registers shell search exposing the task count in the shared trigger', () => {
     renderPage();
 
-    expect(latestHeaderSearchAdapter?.totalCount).toBe(2);
-    const searchTrigger = within(
-      screen.getByTestId('header-actions-host')
-    ).getByRole('button', { name: 'Search' });
-    expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
+    const filterTrigger = screen.getByRole('button', { name: /filter tasks/i });
+    expect(filterTrigger).toHaveTextContent('2');
+    expect(filterTrigger).toHaveAttribute('data-app-search-trigger', 'true');
+    expect(
+      screen.queryByRole('button', { name: 'Search tasks' })
+    ).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId('header-actions-host')).getByRole('button', {
         name: 'Create Task',
@@ -1463,7 +1469,9 @@ describe('TasksPageClient', () => {
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
   });
 
-  it('lets keyboard navigation intentionally open the first canonical task from empty detail', () => {
+  it('lets keyboard navigation intentionally open the first DESIGN_V1 task from empty detail', () => {
+    enableDesignV1Tasks();
+
     renderPage();
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
@@ -1473,7 +1481,9 @@ describe('TasksPageClient', () => {
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
   });
 
-  it('closes the canonical task detail with Escape from the ambient task surface', () => {
+  it('closes the DESIGN_V1 task detail with Escape from the ambient task surface', () => {
+    enableDesignV1Tasks();
+
     renderPage();
 
     act(() => {
@@ -1561,7 +1571,8 @@ describe('TasksPageClient', () => {
     expect(screen.getByText(mockTask.title)).toBeInTheDocument();
   });
 
-  it('keeps mobile assignee subviews and detail layout disjoint in the canonical workspace', () => {
+  it('keeps mobile assignee subviews and detail layout disjoint under DESIGN_V1', () => {
+    enableDesignV1Tasks();
     mockIsXlUp = false;
     mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
 

@@ -94,9 +94,7 @@ describe('Tooltip', () => {
       render(
         <TooltipProvider>
           <Tooltip open={true}>
-            <TooltipTrigger>
-              <button type='button'>Trigger</button>
-            </TooltipTrigger>
+            <TooltipTrigger>Trigger</TooltipTrigger>
             <TooltipContent>Content</TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -108,9 +106,7 @@ describe('Tooltip', () => {
       render(
         <TooltipProvider delayDuration={500}>
           <Tooltip open={true}>
-            <TooltipTrigger>
-              <button type='button'>Trigger</button>
-            </TooltipTrigger>
+            <TooltipTrigger>Trigger</TooltipTrigger>
             <TooltipContent>Content</TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -145,9 +141,7 @@ describe('Tooltip', () => {
       render(
         <TooltipProvider>
           <Tooltip open={true}>
-            <TooltipTrigger>
-              <button type='button'>Trigger</button>
-            </TooltipTrigger>
+            <TooltipTrigger>Trigger</TooltipTrigger>
             <TooltipContent testId='custom-tooltip'>Content</TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -230,9 +224,7 @@ describe('Tooltip', () => {
       render(
         <TooltipProvider>
           <Tooltip open={true}>
-            <TooltipTrigger>
-              <button type='button'>Trigger</button>
-            </TooltipTrigger>
+            <TooltipTrigger>Trigger</TooltipTrigger>
             <TooltipContent className='custom-class'>Content</TooltipContent>
           </Tooltip>
         </TooltipProvider>

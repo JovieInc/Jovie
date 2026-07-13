@@ -97,13 +97,11 @@ function LeadActionsCell({
 
   return (
     <div className='flex gap-1'>
-      <Button
+      <button
         type='button'
-        variant='ghost'
-        size='icon'
         onClick={() => onUpdateStatus(lead.id, 'approved')}
         disabled={isBusy}
-        className='h-auto w-auto rounded-full p-1 text-success hover:bg-success/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-success/50 disabled:opacity-50'
+        className='rounded-full p-1 text-success hover:bg-success/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-success/50 disabled:opacity-50'
         aria-label={`Approve ${lead.displayName || lead.linktreeHandle}`}
       >
         {isApproving ? (
@@ -111,18 +109,16 @@ function LeadActionsCell({
         ) : (
           <Check className='h-4 w-4' />
         )}
-      </Button>
-      <Button
+      </button>
+      <button
         type='button'
-        variant='ghost'
-        size='icon'
         onClick={() => onUpdateStatus(lead.id, 'rejected')}
         disabled={isBusy}
-        className='h-auto w-auto rounded-full p-1 text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-destructive/50 disabled:opacity-50'
+        className='rounded-full p-1 text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-destructive/50 disabled:opacity-50'
         aria-label={`Reject ${lead.displayName || lead.linktreeHandle}`}
       >
         <X className='h-4 w-4' />
-      </Button>
+      </button>
     </div>
   );
 }

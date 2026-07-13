@@ -15,14 +15,13 @@ import { logger } from '@/lib/utils/logger';
 const confirmMerchActionSchema = chatToolSchema({
   profileId: z.string().uuid(),
   merchCardId: z.string().uuid(),
-  action: z.enum(['publish', 'archive', 'unpause', 'pause']),
+  action: z.enum(['publish', 'archive', 'unpause']),
 });
 
 const AUDIT_ACTION_BY_CONFIRM = {
   publish: 'publish_merch',
   archive: 'archive_merch',
   unpause: 'unpause_merch',
-  pause: 'pause_merch',
 } as const;
 
 export async function POST(req: Request) {
@@ -85,12 +84,7 @@ export async function POST(req: Request) {
             cardId: merchCardId,
             profileId,
             clerkUserId: userId,
-            status:
-              action === 'archive'
-                ? 'archived'
-                : action === 'pause'
-                  ? 'paused'
-                  : 'live',
+            status: action === 'archive' ? 'archived' : 'live',
           });
 
     const ipAddress = getClientIP(req);

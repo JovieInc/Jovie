@@ -43,9 +43,26 @@ export default function ChatLoading() {
                 aria-hidden='true'
               >
                 <div className='relative flex items-end gap-2 px-3 py-2.5'>
-                  <div
+                  <button
+                    type='button'
+                    disabled
+                    aria-label='Attachment Options'
                     className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token opacity-80'
-                    data-label={CHAT_COMPOSER_ATTACH_ARIA_LABEL}
+                  >
+                    <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
+                  </button>
+                  <textarea
+                    disabled
+                    rows={1}
+                    aria-label='Chat Message Input'
+                    placeholder='What are you working on?'
+                    className='min-w-0 flex-1 resize-none bg-transparent py-1.5 text-sm leading-6 text-primary-token placeholder:text-tertiary-token focus:outline-none'
+                  />
+                  <button
+                    type='button'
+                    disabled
+                    aria-label='Send Message'
+                    className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-tertiary-token'
                   >
                     <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
                   </div>

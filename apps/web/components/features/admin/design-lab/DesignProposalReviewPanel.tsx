@@ -1,7 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -300,11 +298,10 @@ export function DesignProposalReviewPanel() {
               : 'Approve design proposal with notes'
           }
         >
-          <Button
+          <button
             type='button'
-            variant='ghost'
-            aria-label='Close Review Notes Dialog'
-            className='absolute inset-0 h-auto w-auto cursor-default rounded-none border-0 bg-transparent p-0 hover:bg-transparent'
+            aria-label='Close review notes dialog'
+            className='absolute inset-0 cursor-default'
             onClick={() => {
               if (submittingId) return;
               setPendingNotes(null);

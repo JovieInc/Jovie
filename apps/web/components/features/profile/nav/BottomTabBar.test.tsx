@@ -9,8 +9,7 @@
  *  - Tab click handler calls onTabSelect with correct mode
  *  - Grid column count matches visible tab count
  *  - No horizontal overflow at narrow viewports (320px) — structural check
- *  - Compact 48px floating capsule with full-cell interaction geometry
- *  - Labels remain screen-reader-only
+ *  - 44×44pt touch target minimum via min-h-13 class
  *  - Empty Events tabs remain reachable so the surface can show alert signup
  */
 
@@ -185,21 +184,11 @@ describe('BottomTabBar — grid layout', () => {
     expect(grid?.getAttribute('style')).toContain('repeat(4,');
   });
 
-  it('keeps visible chrome compact while each full grid cell remains interactive', () => {
+  it('all primary tab buttons have min-h-13 for 44pt touch target compliance', () => {
     const { container } = render(<BottomTabBar {...makeProps()} />);
-    const nav = screen.getByTestId('profile-bottom-nav');
-    expect(nav.className).toContain('h-12');
-    expect(nav.className).toContain('rounded-full');
-
-    const grid = container.querySelector('[style*="grid-template-columns"]');
-    expect(grid?.className).toContain('h-11');
-    expect(grid?.className).toContain('-my-0.5');
-
     const buttons = container.querySelectorAll('button');
     for (const btn of buttons) {
-      expect(btn.className).toContain('h-full');
-      expect(btn.className).not.toContain('min-h-13');
-      expect(btn.querySelector('span')?.className).toContain('sr-only');
+      expect(btn.className).toContain('min-h-13');
     }
   });
 

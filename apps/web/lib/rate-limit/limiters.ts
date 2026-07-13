@@ -53,11 +53,6 @@ export const albumArtGenerationBurstLimiter = createRateLimiter(
  */
 export const apiLimiter = createRateLimiter(RATE_LIMITERS.api);
 
-/** Aggregate-only shell navigation telemetry, keyed by authenticated user. */
-export const navigationTelemetryLimiter = createRateLimiter(
-  RATE_LIMITERS.navigationTelemetry
-);
-
 // ============================================================================
 // Onboarding Operations
 // ============================================================================
@@ -112,11 +107,6 @@ export interface AnonymousChatLimitInput {
  */
 export const dashboardLinksLimiter = createRateLimiter(
   RATE_LIMITERS.dashboardLinks
-);
-
-/** Rate limiter for keystroke-driven header search, keyed by authenticated user. */
-export const headerSearchLimiter = createRateLimiter(
-  RATE_LIMITERS.headerSearch
 );
 
 /**
@@ -1068,14 +1058,12 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     albumArtGeneration: albumArtGenerationLimiter,
     albumArtGenerationBurst: albumArtGenerationBurstLimiter,
     api: apiLimiter,
-    navigationTelemetry: navigationTelemetryLimiter,
     onboarding: onboardingLimiter,
     handleCheck: handleCheckLimiter,
     anonymousOnboardingChatIp: anonymousOnboardingChatIpLimiter,
     anonymousOnboardingChatAsn: anonymousOnboardingChatAsnLimiter,
     anonymousOnboardingChatSession: anonymousOnboardingChatSessionLimiter,
     dashboardLinks: dashboardLinksLimiter,
-    headerSearch: headerSearchLimiter,
     paymentIntent: paymentIntentLimiter,
     tipCheckout: tipCheckoutLimiter,
     merchCheckout: merchCheckoutLimiter,

@@ -38,15 +38,14 @@ export function IconBtn({
         onClick={onClick}
         data-testid={testId}
         className={cn(
-          // Square at rest (no border); full circle + soft fill on hover only (JOV-3511).
-          'h-7 w-7 grid place-items-center rounded-md border border-transparent transition-[background-color,color,border-color,border-radius] duration-subtle ease-subtle focus-ring-themed hover:rounded-full hover:border-subtle',
+          'h-7 w-7 rounded-md grid place-items-center transition-colors duration-subtle ease-subtle focus-ring-themed',
           isGhost
             ? active
-              ? 'rounded-full border-subtle text-primary-token bg-surface-1/40'
-              : 'text-quaternary-token hover:bg-surface-1/50 hover:text-primary-token'
+              ? 'text-primary-token'
+              : 'text-quaternary-token hover:text-primary-token'
             : active
-              ? 'rounded-full border-subtle text-primary-token bg-surface-1/60'
-              : 'text-quaternary-token hover:bg-surface-1/60 hover:text-primary-token',
+              ? 'text-primary-token bg-surface-1/60'
+              : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1/60',
           className
         )}
         aria-label={label}

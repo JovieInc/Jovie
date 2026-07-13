@@ -1,11 +1,10 @@
-import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
   FaqSection,
   MarketingContainer,
-  MarketingHero,
+  MarketingHeroLayout,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -63,7 +62,7 @@ export default async function AlternativesPage({
       <script type='application/ld+json'>{faqSchema}</script>
       <script type='application/ld+json'>{breadcrumbSchema}</script>
 
-      <MarketingHero variant='left'>
+      <MarketingHeroLayout variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>Alternative</p>
         <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
           {data.heroHeadline}
@@ -71,7 +70,7 @@ export default async function AlternativesPage({
         <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
           {data.heroSubheadline}
         </p>
-      </MarketingHero>
+      </MarketingHeroLayout>
 
       {/* Why Switch */}
       <MarketingContainer width='prose' className='pb-16'>
@@ -124,9 +123,12 @@ export default async function AlternativesPage({
             <p className='mt-2 text-sm text-secondary-token'>
               Create your free profile in under a minute.
             </p>
-            <Button asChild variant='primary' size='lg' className='mt-6'>
-              <Link href={APP_ROUTES.SIGNUP}>Request Access</Link>
-            </Button>
+            <Link
+              href={APP_ROUTES.SIGNUP}
+              className='mt-6 inline-flex items-center rounded-lg bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:bg-btn-primary-hover'
+            >
+              Request Access
+            </Link>
           </div>
         </section>
       </MarketingContainer>

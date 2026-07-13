@@ -67,8 +67,6 @@ export type { LogoVariant } from './Logo';
 export { Logo } from './Logo';
 export { LogoLink } from './LogoLink';
 export { LogoLoader } from './LogoLoader';
-export type { NavBadgeProps } from './NavBadge';
-export { NavBadge } from './NavBadge';
 export type { NavLinkProps } from './NavLink';
 export { NavLink } from './NavLink';
 export { PlaceholderImage } from './PlaceholderImage';

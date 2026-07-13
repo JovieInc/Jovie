@@ -116,12 +116,6 @@ The `DashboardHeader` breadcrumb already renders the page name prominently. Do N
 **Allowed:** `<PageToolbar start={<span>3 matched platforms</span>} end={<ActionButton />} />`
 **Banned:** `<PageToolbar start={<span>Earnings</span>} />` — duplicates the breadcrumb
 
-A `PageToolbar` may contain **at most one primary pill CTA**, and that primary
-action belongs in `end={}`. The canonical `Button` is pill-shaped and defaults
-to `variant='primary'`, so an omitted variant counts as primary. Filters,
-display controls, navigation, cancel, and overflow actions must use secondary,
-tertiary, ghost, or `PageToolbarActionButton` treatment.
-
 ## Taste Rules (Hard Invariants)
 
 ### No Emoji in UI — Use Icons
@@ -187,8 +181,6 @@ Before adding a title, header, card wrapper, or label to a component, **read the
 | `Card` with `CardHeader` | `CardTitle` | Nested Card or redundant heading inside `CardContent` |
 | `DrawerSurfaceCard` | Card surface + optional header | Do not nest another `Card` inside; use `variant='flat'` for inner elements |
 | `DashboardHeader` breadcrumb | Page name | `PageToolbar start=` repeating the page name |
-| `PageToolbar` | Contextual action cluster | More than one primary pill CTA, or the same CTA repeated in page content |
-| `SidebarNavItem` | Shell nav row, icon, active, focus, collapsed, and density chrome | Bespoke link/button classes that recreate sidebar navigation chrome |
 
 **Checklist (run before every UI component PR):**
 
@@ -196,21 +188,11 @@ Before adding a title, header, card wrapper, or label to a component, **read the
 2. **Grep for repeated text** — search the route tree for your title/label string. If the same label appears 3+ times on one screen, deduplicate.
 3. **Check surface nesting** — if the parent is already a Card, Sheet, or `DrawerSurfaceCard`, do not wrap children in another Card. Use `variant='flat'` or plain `div`.
 4. **One heading per visual section** — a section gets exactly one title. If the container already renders one, your component renders zero.
-5. **One primary toolbar action** — a `PageToolbar` gets zero or one primary
-   pill CTA. Demote every supporting action.
-
-**SidebarNavItem invariant:** every authenticated-shell sidebar row—link or
-button—must compose `SidebarNavItem` or its exported
-`getSidebarNavRowClassName` and `getSidebarNavIconClassName` helpers. Active,
-focus, collapsed, nested, and density chrome belong to that primitive. Do not
-copy its class string or create route-specific sidebar row styling.
 
 **Banned patterns:**
 - `EntitySidebarShell title="X"` → child renders `<CardHeader><CardTitle>X</CardTitle></CardHeader>` (double title)
 - `Sheet` body wrapped in `Card` when Sheet already provides the surface (redundant carding)
 - Same CTA label (e.g., "Get notified") appearing in header, body, AND footer of one screen
-- Two primary pill buttons inside one `PageToolbar`
-- A shell navigation link or button with bespoke row/icon chrome instead of the `SidebarNavItem` primitive/helpers
 
 This is the subtraction principle applied specifically to container boundaries. When in doubt, remove the inner chrome.
 
@@ -218,7 +200,7 @@ This is the subtraction principle applied specifically to container boundaries. 
 
 - Hover states must not move layout or shift components without a product reason.
 - Do **NOT** use `translate`, `scale`, lift-on-hover, or floating-card motion on buttons, cards, screenshots, auth surfaces, or marketing panels as a default polish move.
-- Press/click feedback uses the shared `--scale-press` token (`0.98`) when tactile feedback is useful. Shared controls must disable the transform under reduced motion and provide a static opt-out where motion would distract.
+- Press/click feedback may use a subtle `scale(0.96)` when it is tactile and interruptible; provide a static opt-out when the motion would distract.
 - Menus, panels, drawers, and sidebars may use intentional `translate`/`scale` motion for open/close because the movement communicates spatial state.
 - Prefer background-color, border-color, text-color, opacity, or shadow changes for hover feedback.
 - If motion is necessary because the UI is directly manipulating something spatial, it must be intentional and clearly tied to that interaction.

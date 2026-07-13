@@ -320,10 +320,7 @@ test.describe('Profile Subscribe Flow @smoke', () => {
     // Type an invalid email and submit
     await submitEmail(page, 'notanemail');
 
-    await expectSubscribeError(
-      page,
-      'Email address must include a local part, @, domain, and top-level domain.'
-    );
+    await expectSubscribeError(page, 'Please enter a valid email address');
   });
 
   test('wrong OTP shows error', async ({ page }) => {

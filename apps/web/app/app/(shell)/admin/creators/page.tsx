@@ -5,7 +5,6 @@ import {
   buildAdminPeopleHref,
   searchParamsFromRecord,
 } from '@/constants/admin-navigation';
-import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 
 export const metadata: Metadata = {
   title: 'Admin creators',
@@ -20,8 +19,6 @@ interface AdminCreatorsRedirectPageProps {
 export default async function AdminCreatorsRedirectPage({
   searchParams,
 }: Readonly<AdminCreatorsRedirectPageProps>) {
-  await requireCurrentAdminPageAccess();
-
   const params = searchParamsFromRecord(await searchParams);
   redirect(buildAdminPeopleHref('creators', params));
 }

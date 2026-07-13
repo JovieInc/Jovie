@@ -122,11 +122,6 @@ export {
   type BaUser,
   type BaVerification,
   baAccounts,
-  baJwks,
-  baOauthAccessTokens,
-  baOauthClients,
-  baOauthConsents,
-  baOauthRefreshTokens,
   baSessions,
   baUsers,
   baVerifications,
@@ -855,35 +850,6 @@ export {
   productUpdateSubscribers,
   selectProductUpdateSubscriberSchema,
 } from './product-update-subscribers';
-// Provider-neutral artist search monitoring and issue evidence
-export {
-  type ProfileSearchQuery,
-  type ProfileSearchResult,
-  type ProfileSearchRun,
-  type ProfileSurfaceIssue,
-  profileSearchProviderHealth,
-  profileSearchQueries,
-  profileSearchResults,
-  profileSearchRuns,
-  profileSurfaceIssues,
-} from './profile-search';
-// Unified public profile surface registry
-export {
-  insertProfileSurfaceSchema,
-  insertProfileSurfaceSourceSchema,
-  type NewProfileSurface,
-  type NewProfileSurfaceSource,
-  type ProfileSurface,
-  type ProfileSurfaceMonitoringPreference,
-  type ProfileSurfaceQualificationEvent,
-  type ProfileSurfaceSource,
-  profileSurfaceMonitoringPreferences,
-  profileSurfaceQualificationEvents,
-  profileSurfaceSources,
-  profileSurfaces,
-  selectProfileSurfaceSchema,
-  selectProfileSurfaceSourceSchema,
-} from './profile-surfaces';
 // Creator Profiles
 export {
   type CreatorAvatarCandidate,

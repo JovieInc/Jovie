@@ -30,7 +30,7 @@ concurrency:
 jobs:
   dispatch:
     name: Dispatch Ready GitHub Issues
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -50,16 +50,15 @@ jobs:
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
       - name: Checkout tracker helpers
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           sparse-checkout: |
             scripts/lib/tracker.mjs
-            scripts/lib/agent-branch-pattern.mjs
             scripts/github-query-todo.mjs
           sparse-checkout-cone-mode: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '22'
 
@@ -69,22 +68,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Single source of truth: scripts/lib/agent-branch-pattern.mjs (#10463).
-          # Paginate so dispatcher/orchestrator/auto-pr see the same PR universe.
-          REPO="${{ github.repository }}"
-          if ! OPEN_AGENT_PRS=$(
-            set -o pipefail
-            gh api --paginate "repos/${REPO}/pulls?state=open&per_page=100" \
-              | jq -s '.' \
-              | node scripts/lib/agent-branch-pattern.mjs --count
-          ); then
-            echo "::error::Failed to count open agent PRs; failing closed"
-            exit 1
-          fi
-          if [[ ! "$OPEN_AGENT_PRS" =~ ^[0-9]+$ ]]; then
-            echo "::error::Invalid open agent PR count (${OPEN_AGENT_PRS}); failing closed"
-            exit 1
-          fi
+          OPEN_AGENT_PRS=$(gh api "repos/${{ github.repository }}/pulls?state=open&per_page=100" \
+            | jq '[.[] | select(.head.ref | test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+-"; "i"))] | length')
 
           CAPACITY=$((MAX_OPEN_AGENT_PRS - OPEN_AGENT_PRS))
           if [[ "$CAPACITY" -le 0 ]]; then

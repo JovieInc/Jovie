@@ -147,7 +147,7 @@ describe('RightDrawer', () => {
       'fixed',
       'inset-0',
       'translate-x-full',
-      'bg-(--app-shell-content-surface)',
+      'bg-(--linear-app-content-surface)',
       'outline-none'
     );
 

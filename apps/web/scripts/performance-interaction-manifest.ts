@@ -5,7 +5,6 @@ export type InteractionTier = 'P0' | 'P1' | 'P2';
 export type InteractionClass =
   | 'audio-transport-visual-response'
   | 'cached-route-view-switch'
-  | 'chat-message-round-trip'
   | 'cold-view-useful-shell'
   | 'command-palette-open'
   | 'keyboard-selection-row-movement'
@@ -45,12 +44,8 @@ export type RootCauseBucket =
 
 export interface InteractionLatencyBudget {
   readonly firstFeedbackP95Ms: number;
-  readonly firstFeedbackP50Ms?: number;
   readonly usableStateP95Ms?: number;
   readonly dataReadyP95Ms?: number;
-  readonly renderToInteractiveP95Ms?: number;
-  readonly maxDroppedFrames?: number;
-  readonly minimumSampleCount?: number;
   readonly targetLabel: string;
 }
 
@@ -99,16 +94,6 @@ export const INTERACTION_CLASS_BUDGETS = {
     firstFeedbackP95Ms: 200,
     usableStateP95Ms: 200,
     targetLabel: 'Cached route/view switch <=200ms p95',
-  },
-  'chat-message-round-trip': {
-    firstFeedbackP50Ms: 100,
-    firstFeedbackP95Ms: 100,
-    usableStateP95Ms: 300,
-    renderToInteractiveP95Ms: 50,
-    maxDroppedFrames: 0,
-    minimumSampleCount: 5,
-    targetLabel:
-      'Chat feedback <100ms p50, first reply <300ms p95, interactive <50ms p95, zero dropped scroll frames',
   },
   'cold-view-useful-shell': {
     firstFeedbackP95Ms: 500,
@@ -246,7 +231,7 @@ export const INTERACTION_HOT_PATHS = [
     ],
     selectors: {
       firstFeedback: '[data-testid="slash-command-menu"]',
-      focusOrigin: '[aria-label="Chat Message Input"]',
+      focusOrigin: '[aria-label="Chat message input"]',
       usableState: '[data-testid="slash-command-menu"]',
     },
     firstSlice: true,
@@ -359,51 +344,9 @@ export const INTERACTION_HOT_PATHS = [
     ],
     selectors: {
       firstFeedback: '[data-testid="app-shell-scroll"], main',
-      usableState: '[aria-label="Chat Message Input"]',
+      usableState: '[aria-label="Chat message input"]',
     },
     firstSlice: false,
-  },
-  {
-    id: 'chat-message-round-trip',
-    title: 'Chat composer send to first reply',
-    tier: 'P0',
-    route: APP_ROUTES.CHAT,
-    requiresAuth: true,
-    interactionClass: 'chat-message-round-trip',
-    managerLoopProximity: 'high',
-    expectedFrequency: 'high',
-    trustRisk: 'high',
-    budget: INTERACTION_CLASS_BUDGETS['chat-message-round-trip'],
-    ia: {
-      trigger: 'Send a message from the chat composer',
-      focusOrigin: 'Chat composer textarea',
-      firstVisibleFeedback: 'Optimistic user message is visible in the thread',
-      usableState:
-        'First assistant reply token is visible and composer is usable',
-      focusDestination: 'Chat composer textarea',
-      escapePath: 'Escape closes transient composer surfaces',
-      returnFocus: 'Chat composer textarea',
-      contextPreservation: [
-        'message history',
-        'draft attachments',
-        'scroll position',
-        'active audio state',
-      ],
-      dataTrustClass: 'editable',
-      feedbackSemantics: ['optimistic', 'pending', 'success', 'failure'],
-    },
-    likelyRootCauseBuckets: [
-      'react-render-cascade',
-      'main-thread-blocking',
-      'network-gated-ui',
-      'request-waterfall',
-    ],
-    selectors: {
-      firstFeedback: '[data-testid="chat-user-bubble"]',
-      focusOrigin: '[aria-label="Chat Message Input"]',
-      usableState: '[data-testid="chat-message-reply"]',
-    },
-    firstSlice: true,
   },
   {
     id: 'metadata-save-feedback',
@@ -448,7 +391,7 @@ export const INTERACTION_HOT_PATHS = [
         '[aria-busy="true"], [data-save-state], [data-pending="true"]',
       usableState: '[data-save-state], [data-pending="true"]',
     },
-    firstSlice: false,
+    firstSlice: true,
   },
   {
     id: 'lyrics-toggle',

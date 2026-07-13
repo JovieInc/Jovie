@@ -48,7 +48,7 @@ export const White: Story = {
     variant: 'white',
   },
   parameters: {
-    backgrounds: { default: 'light' },
+    backgrounds: { default: 'dark' },
   },
 };
 

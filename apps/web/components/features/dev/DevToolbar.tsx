@@ -1,8 +1,12 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import * as Switch from '@radix-ui/react-switch';
 import {
-  Activity,
+  type QueryClient,
+  useQueryClient as useQueryClientBase,
+} from '@tanstack/react-query';
+import {
   ArrowUpCircle,
   Check,
   ChevronDown,
@@ -27,31 +31,32 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
-import { useStoredAppFlagOverrides } from '@/lib/flags/client';
+import { useAppFlag, useStoredAppFlagOverrides } from '@/lib/flags/client';
 import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
+  DESIGN_V1_ALIAS_FLAGS,
 } from '@/lib/flags/contracts';
-import {
-  getUxLatencySummaries,
-  subscribeUxLatency,
-} from '@/lib/monitoring/interaction-latency';
+import { queryKeys } from '@/lib/queries/keys';
+import { useBillingStatusQuery } from '@/lib/queries/useBillingStatusQuery';
+
+/** Safe query client — returns null outside QueryClientProvider (root layout). */
+function useSafeQueryClient(): QueryClient | null {
+  try {
+    return useQueryClientBase();
+  } catch {
+    return null;
+  }
+}
+
 import {
   registerServiceWorker,
   SW_ENABLED_KEY,
   unregisterServiceWorker,
 } from '@/lib/service-worker/control';
-import { FlagRow, OrphanOverrides, PlanToggle } from './DevToolbarRows';
 import { useFlagBadges } from './FlagBadgeContext';
 
 type FlagEntry = {
@@ -63,12 +68,16 @@ type FlagEntry = {
 
 const ALL_FLAGS: FlagEntry[] = (
   Object.entries(APP_FLAG_OVERRIDE_KEYS) as [string, string][]
-).map(([name, key]) => ({
-  name,
-  key,
-  source: 'code' as const,
-  serverDefault: APP_FLAG_DEFAULTS[name as keyof typeof APP_FLAG_DEFAULTS],
-}));
+)
+  .filter(
+    ([name]) => !(DESIGN_V1_ALIAS_FLAGS as readonly string[]).includes(name)
+  )
+  .map(([name, key]) => ({
+    name,
+    key,
+    source: 'code' as const,
+    serverDefault: APP_FLAG_DEFAULTS[name as keyof typeof APP_FLAG_DEFAULTS],
+  }));
 
 /**
  * Lookup table: override-storage-key -> server default. Used to detect
@@ -236,7 +245,7 @@ function getSwButtonProps(enabled: boolean) {
     title: enabled
       ? 'Service worker active — click to disable'
       : 'Service worker disabled — click to enable',
-    className: `h-auto flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
+    className: `flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
       enabled
         ? 'text-accent bg-accent/10'
         : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
@@ -254,20 +263,14 @@ function getPromoteTitle(
   return 'Promote to production';
 }
 
-function formatLatencyMs(value: number | null): string {
-  return value === null ? '—' : `${Math.round(value)}ms`;
-}
-
 export function DevToolbar({
   env,
   sha,
   version,
-  defaultHidden = false,
 }: Readonly<{
   env: string;
   sha: string;
   version: string;
-  defaultHidden?: boolean;
 }>) {
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(true);
@@ -291,9 +294,6 @@ export function DevToolbar({
   const [personaAction, setPersonaAction] = useState<PersonaActionState>(null);
   const personaStatusAbortRef = useRef<AbortController | null>(null);
   const [swEnabled, setSwEnabled] = useState(false);
-  const [latencySummaries, setLatencySummaries] = useState(() =>
-    getUxLatencySummaries()
-  );
   const [promoteState, setPromoteState] = useState<
     'idle' | 'checking' | 'ready' | 'promoting' | 'done' | 'error'
   >('idle');
@@ -303,6 +303,7 @@ export function DevToolbar({
   } | null>(null);
   const { theme, setTheme } = useTheme();
   const overridesCtx = useStoredAppFlagOverrides();
+  const designV1Enabled = useAppFlag('DESIGN_V1');
   const flagBadgeCtx = useFlagBadges();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -331,20 +332,10 @@ export function DevToolbar({
   // prior expanded session on another route cannot overwhelm the chat UI.
   useEffect(() => {
     setMounted(true);
-    const storedOpen = localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1';
-    setOpen(defaultHidden ? false : storedOpen);
-    const storedHidden = localStorage.getItem(TOOLBAR_HIDDEN_KEY);
-    setHidden(storedHidden === null ? defaultHidden : storedHidden === '1');
+    setOpen(localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1');
+    setHidden(localStorage.getItem(TOOLBAR_HIDDEN_KEY) === '1');
     setSwEnabled(localStorage.getItem(SW_ENABLED_KEY) === '1');
-  }, [defaultHidden]);
-
-  useEffect(
-    () =>
-      subscribeUxLatency(() => {
-        setLatencySummaries(getUxLatencySummaries());
-      }),
-    []
-  );
+  }, []);
 
   // Keyboard shortcut: Cmd+Shift+D (Mac) / Ctrl+Shift+D (other)
   useEffect(() => {
@@ -378,7 +369,7 @@ export function DevToolbar({
 
   // Expose toolbar height as a CSS variable so scrollable content areas can
   // add their own bottom padding without shrinking the full-viewport app shell.
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (hidden) {
       document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
       return;
@@ -391,13 +382,9 @@ export function DevToolbar({
       );
     };
     updateVar();
-    const observer =
-      typeof ResizeObserver === 'undefined'
-        ? null
-        : new ResizeObserver(updateVar);
-    if (toolbarRef.current) observer?.observe(toolbarRef.current);
+    const timer = setTimeout(updateVar, 220);
     return () => {
-      observer?.disconnect();
+      clearTimeout(timer);
       document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
     };
   }, [open, hidden]);
@@ -596,6 +583,14 @@ export function DevToolbar({
       ).length,
     [validOverrides]
   );
+  const designV1OverrideKey = APP_FLAG_OVERRIDE_KEYS.DESIGN_V1;
+  const designV1Overridden =
+    designV1OverrideKey in overrides &&
+    isMeaningfulOverride(
+      designV1OverrideKey,
+      overrides[designV1OverrideKey] as boolean
+    );
+
   /**
    * Set an override unless the new value matches the server default — in
    * which case clear the override so the count stays accurate and stale
@@ -621,18 +616,12 @@ export function DevToolbar({
     [collapseDrawer, flashFlag, overridesCtx]
   );
 
-  const clearOverrideAndCollapse = useCallback(
-    (key: string) => {
-      overridesCtx.removeOverride(key);
-      collapseDrawer();
-    },
-    [collapseDrawer, overridesCtx]
-  );
-
-  const clearAllOverridesAndCollapse = useCallback(() => {
-    overridesCtx.clearOverrides();
-    collapseDrawer();
-  }, [collapseDrawer, overridesCtx]);
+  const toggleDesignV1 = useCallback(() => {
+    const currentOverride = overrides[designV1OverrideKey];
+    const current =
+      typeof currentOverride === 'boolean' ? currentOverride : designV1Enabled;
+    setOrClearOverride(designV1OverrideKey, !current);
+  }, [designV1Enabled, designV1OverrideKey, overrides, setOrClearOverride]);
 
   // Unified flag list: filter by search, sort overrides to top
   const filteredFlags = useMemo(() => {
@@ -768,155 +757,123 @@ export function DevToolbar({
       className='fixed bottom-0 left-0 right-0 z-[9999] font-mono text-xs'
     >
       {/* Expanded panel */}
-      {open ? (
-        <div
-          data-testid='dev-toolbar-flag-drawer'
-          className='overflow-y-auto border-t border-default backdrop-blur-sm bg-surface-1/80'
-          style={{ maxHeight: 'min(400px, calc(100dvh - 7rem))' }}
-        >
-          <div className='flex flex-col'>
-            {/*
-             * Visual states: hidden/collapsed omit the drawer; expanded always
-             * reserves this exact-height strip. Empty and populated samples
-             * render the same five cells, so live telemetry changes text only.
-             * Narrow viewports scroll horizontally without moving controls.
-             */}
-            <section
-              data-testid='dev-toolbar-latency'
-              className='flex h-12 shrink-0 items-stretch overflow-x-auto border-b border-subtle'
-              aria-label='UX Latency P50 And P95'
-            >
-              <div className='flex w-24 shrink-0 items-center gap-1.5 px-4 text-3xs font-medium text-(--color-text-tertiary)'>
-                <Activity size={11} aria-hidden />
-                Latency
-              </div>
-              {latencySummaries.map(summary => (
-                <div
-                  key={summary.metric}
-                  className='flex w-32 shrink-0 flex-col justify-center border-l border-subtle px-3'
-                  data-metric={summary.metric}
-                >
-                  <span className='truncate text-3xs text-(--color-text-tertiary)'>
-                    {summary.label}
+      <div
+        className='overflow-hidden border-t border-default backdrop-blur-sm bg-surface-1/80'
+        style={{
+          maxHeight: open ? '400px' : '0px',
+          borderTopWidth: open ? undefined : 0,
+          transitionDuration: 'var(--duration-subtle)',
+          transitionProperty: 'max-height, border-top-width',
+          transitionTimingFunction: 'var(--ease-subtle)',
+        }}
+      >
+        <div className='flex flex-col'>
+          {/* Search bar */}
+          <div className='flex items-center gap-2 px-4 py-2 border-b border-subtle'>
+            <Search size={12} className='shrink-0 text-quaternary-token' />
+            <input
+              ref={searchRef}
+              type='text'
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder='Search flags...'
+              className='flex-1 bg-transparent text-(--color-text-primary) placeholder:text-quaternary-token outline-none text-xs'
+              aria-label='Search Flags'
+            />
+            {search && (
+              <Button
+                type='button'
+                variant='ghost'
+                onClick={() => setSearch('')}
+                className='h-auto w-auto shrink-0 p-0 text-quaternary-token hover:bg-transparent hover:text-(--color-text-primary) transition-colors'
+                aria-label='Clear Search'
+              >
+                <X size={11} />
+              </Button>
+            )}
+            <span className='shrink-0 text-3xs text-quaternary-token'>
+              {matchCount} of {filteredFlags.total}
+            </span>
+          </div>
+
+          {/* Flags list */}
+          <div className='px-4 py-2 max-h-48 overflow-y-auto'>
+            {/* Overridden flags group */}
+            {filteredFlags.overridden.length > 0 && (
+              <div className='mb-2 border-l-2 border-accent pl-3'>
+                <div className='flex items-center justify-between mb-1'>
+                  <span className='text-3xs font-semibold uppercase tracking-wide text-accent'>
+                    Overrides ({filteredFlags.overridden.length})
                   </span>
-                  <span className='whitespace-nowrap text-3xs text-quaternary-token'>
-                    P50 {formatLatencyMs(summary.p50Ms)} · P95{' '}
-                    {formatLatencyMs(summary.p95Ms)}
-                  </span>
+                  <Button
+                    type='button'
+                    variant='link'
+                    onClick={overridesCtx.clearOverrides}
+                    className='text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
+                  >
+                    Clear All
+                  </Button>
                 </div>
-              ))}
-            </section>
-
-            {/* Search bar */}
-            <div className='flex items-center gap-2 px-4 py-2 border-b border-subtle'>
-              <Search size={12} className='shrink-0 text-quaternary-token' />
-              <input
-                ref={searchRef}
-                type='text'
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder='Search flags...'
-                className='flex-1 bg-transparent text-(--color-text-primary) placeholder:text-quaternary-token outline-none text-xs'
-                aria-label='Search Flags'
-              />
-              {search && (
-                <Button
-                  type='button'
-                  variant='ghost'
-                  onClick={() => setSearch('')}
-                  className='h-auto w-auto shrink-0 p-0 text-quaternary-token hover:bg-transparent hover:text-(--color-text-primary) transition-colors'
-                  aria-label='Clear Search'
-                >
-                  <X size={11} />
-                </Button>
-              )}
-              <span className='shrink-0 text-3xs text-quaternary-token'>
-                {matchCount} of {filteredFlags.total}
-              </span>
-            </div>
-
-            {/* Flags list */}
-            <div className='px-4 py-2 max-h-48 overflow-y-auto'>
-              {/* Overridden flags group */}
-              {filteredFlags.overridden.length > 0 && (
-                <div className='mb-2 border-l-2 border-accent pl-3'>
-                  <div className='flex items-center justify-between mb-1'>
-                    <span className='text-3xs font-semibold uppercase tracking-wide text-accent'>
-                      Overrides ({filteredFlags.overridden.length})
-                    </span>
-                    <Button
-                      type='button'
-                      variant='link'
-                      onClick={clearAllOverridesAndCollapse}
-                      className='text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
-                    >
-                      Clear All
-                    </Button>
-                  </div>
-                  <div className='flex flex-col gap-0.5'>
-                    {filteredFlags.overridden.map(flag => (
-                      <FlagRow
-                        key={flag.key}
-                        label={flag.name.toLowerCase().replaceAll('_', ' ')}
-                        flashing={flashedKey === flag.key}
-                        isOverridden
-                        checked={overrides[flag.key]}
-                        serverDefault={flag.serverDefault}
-                        onCheckedChange={v => setOrClearOverride(flag.key, v)}
-                        onClear={() => clearOverrideAndCollapse(flag.key)}
-                        source={flag.source}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Orphan overrides — keys in localStorage that no longer match the contract */}
-              {orphanKeys.length > 0 && !search && (
-                <OrphanOverrides
-                  keys={orphanKeys}
-                  onPurge={overridesCtx.purgeOrphans}
-                />
-              )}
-
-              {/* Non-overridden flags */}
-              {filteredFlags.nonOverridden.length > 0 && (
                 <div className='flex flex-col gap-0.5'>
-                  {filteredFlags.nonOverridden.map(flag => {
-                    const checked =
-                      flag.source === 'code' ? flag.serverDefault : false;
-                    return (
-                      <FlagRow
-                        key={flag.key}
-                        label={flag.name.toLowerCase().replaceAll('_', ' ')}
-                        flashing={flashedKey === flag.key}
-                        isOverridden={false}
-                        checked={checked}
-                        onCheckedChange={v => setOrClearOverride(flag.key, v)}
-                        onClear={() => clearOverrideAndCollapse(flag.key)}
-                        source={flag.source}
-                      />
-                    );
-                  })}
+                  {filteredFlags.overridden.map(flag => (
+                    <FlagRow
+                      key={flag.key}
+                      label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                      flashing={flashedKey === flag.key}
+                      isOverridden
+                      checked={overrides[flag.key]}
+                      serverDefault={flag.serverDefault}
+                      onCheckedChange={v => setOrClearOverride(flag.key, v)}
+                      onClear={() => overridesCtx.removeOverride(flag.key)}
+                      source={flag.source}
+                    />
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Empty search state */}
-              {matchCount === 0 && search && (
-                <div className='py-3 text-center text-quaternary-token'>
-                  No flags match &lsquo;{search}&rsquo;
-                </div>
-              )}
-            </div>
+            {/* Orphan overrides — keys in localStorage that no longer match the contract */}
+            {orphanKeys.length > 0 && !search && (
+              <OrphanOverrides
+                keys={orphanKeys}
+                onPurge={overridesCtx.purgeOrphans}
+              />
+            )}
+
+            {/* Non-overridden flags */}
+            {filteredFlags.nonOverridden.length > 0 && (
+              <div className='flex flex-col gap-0.5'>
+                {filteredFlags.nonOverridden.map(flag => {
+                  const checked =
+                    flag.source === 'code' ? flag.serverDefault : false;
+                  return (
+                    <FlagRow
+                      key={flag.key}
+                      label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                      flashing={flashedKey === flag.key}
+                      isOverridden={false}
+                      checked={checked}
+                      onCheckedChange={v => setOrClearOverride(flag.key, v)}
+                      onClear={() => overridesCtx.removeOverride(flag.key)}
+                      source={flag.source}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Empty search state */}
+            {matchCount === 0 && search && (
+              <div className='py-3 text-center text-quaternary-token'>
+                No flags match &lsquo;{search}&rsquo;
+              </div>
+            )}
           </div>
         </div>
-      ) : null}
+      </div>
 
       {/* Bottom bar (always visible) */}
-      <div
-        data-testid='dev-toolbar-bottom-bar'
-        className='relative flex items-center h-9 overflow-x-auto overscroll-x-contain px-4 gap-2 border-t border-default backdrop-blur-sm bg-surface-1/80 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'
-      >
+      <div className='relative flex items-center h-9 px-4 gap-2 border-t border-default backdrop-blur-sm bg-surface-1/80 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'>
         {/* Center: brand logo */}
         <div className='absolute left-1/2 -translate-x-1/2 pointer-events-none'>
           <BrandLogo size={16} tone='auto' aria-hidden rounded={false} />
@@ -957,6 +914,24 @@ export function DevToolbar({
           {breakpoint}
         </span>
 
+        <Button
+          type='button'
+          variant='ghost'
+          aria-pressed={designV1Enabled}
+          title='Toggle New Design (DESIGN_V1)'
+          onClick={toggleDesignV1}
+          className={`h-auto shrink-0 gap-1 px-1.5 py-1 rounded text-3xs transition-colors ${
+            designV1Enabled
+              ? 'text-accent bg-accent/10 hover:bg-accent/15'
+              : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
+          }`}
+        >
+          <span>New Design</span>
+          {designV1Overridden && (
+            <span className='text-3xs opacity-70'>(override)</span>
+          )}
+        </Button>
+
         <div className='flex-1' />
 
         {/* Quick actions */}
@@ -985,13 +960,12 @@ export function DevToolbar({
             { value: 'light', icon: Sun, label: 'Light Theme' },
             { value: 'system', icon: Monitor, label: 'System Theme' },
           ].map(({ value, icon: Icon, label }) => (
-            <Button
+            <button
               type='button'
-              variant='ghost'
               key={value}
               onClick={() => setTheme(value)}
               title={label}
-              className={`h-auto p-1.5 rounded transition-colors ${
+              className={`p-1.5 rounded transition-colors ${
                 mounted && theme === value
                   ? 'text-accent bg-accent/10'
                   : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
@@ -999,7 +973,7 @@ export function DevToolbar({
               aria-label={label}
             >
               <Icon size={12} />
-            </Button>
+            </button>
           ))}
 
           <div className='w-px h-4 mx-1 bg-subtle' />
@@ -1032,17 +1006,19 @@ export function DevToolbar({
             <span className='max-sm:hidden sm:inline text-3xs'>Route</span>
           </Button>
 
-          <Link
-            href={APP_ROUTES.DESIGN_STUDIO}
-            title='Open Design Studio'
-            className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
-            aria-label='Design Studio'
-          >
-            <PanelsTopLeft size={11} />
-            <span className='max-sm:hidden sm:inline text-3xs'>
-              Design Studio
-            </span>
-          </Link>
+          {designV1Enabled && (
+            <Link
+              href={APP_ROUTES.DESIGN_STUDIO}
+              title='Open Design Studio'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
+              aria-label='Design Studio'
+            >
+              <PanelsTopLeft size={11} />
+              <span className='max-sm:hidden sm:inline text-3xs'>
+                Design Studio
+              </span>
+            </Link>
+          )}
 
           <Link
             href={APP_ROUTES.ADMIN}
@@ -1056,15 +1032,14 @@ export function DevToolbar({
 
           {env !== 'production' && (
             <div className='relative'>
-              <Button
+              <button
                 type='button'
-                variant='ghost'
                 onClick={() => setPersonaPanelOpen(value => !value)}
                 title='Switch test persona'
                 aria-label='Test Persona'
                 aria-expanded={personaPanelOpen}
                 aria-haspopup='menu'
-                className={`h-auto flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors ${
+                className={`flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors ${
                   personaSession?.active ? 'text-accent bg-accent/10' : ''
                 }`}
               >
@@ -1072,7 +1047,7 @@ export function DevToolbar({
                 <span className='max-sm:hidden sm:inline text-3xs'>
                   Persona
                 </span>
-              </Button>
+              </button>
 
               {personaPanelOpen && (
                 <div
@@ -1114,14 +1089,13 @@ export function DevToolbar({
                           personaSession?.persona === option.persona;
                         const isSwitching = personaAction === option.persona;
                         return (
-                          <Button
+                          <button
                             key={option.persona}
                             type='button'
-                            variant='ghost'
                             role='menuitem'
                             disabled={Boolean(personaAction) || isActive}
                             onClick={() => handleSelectPersona(option.persona)}
-                            className='h-auto w-full justify-start rounded-none flex items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-2 disabled:cursor-default disabled:opacity-75'
+                            className='flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-2 disabled:cursor-default disabled:opacity-75'
                           >
                             <span className='flex size-4 shrink-0 items-center justify-center text-accent'>
                               {isSwitching ? (
@@ -1143,18 +1117,17 @@ export function DevToolbar({
                                 {option.description}
                               </span>
                             </span>
-                          </Button>
+                          </button>
                         );
                       })}
 
                       {personaSession?.active && (
-                        <Button
+                        <button
                           type='button'
-                          variant='ghost'
                           role='menuitem'
                           disabled={Boolean(personaAction)}
                           onClick={handleExitPersona}
-                          className='mt-1 h-auto w-full justify-start rounded-none flex items-center gap-2 border-t border-subtle px-3 py-2 text-left text-2xs text-(--color-text-tertiary) transition-colors hover:bg-surface-2 hover:text-(--color-text-primary) disabled:cursor-not-allowed disabled:opacity-50'
+                          className='mt-1 flex w-full items-center gap-2 border-t border-subtle px-3 py-2 text-left text-2xs text-(--color-text-tertiary) transition-colors hover:bg-surface-2 hover:text-(--color-text-primary) disabled:cursor-not-allowed disabled:opacity-50'
                         >
                           <span className='flex size-4 shrink-0 items-center justify-center'>
                             {personaAction === 'exit' ? (
@@ -1164,7 +1137,7 @@ export function DevToolbar({
                             )}
                           </span>
                           Exit Persona
-                        </Button>
+                        </button>
                       )}
                     </div>
                   )}
@@ -1183,53 +1156,50 @@ export function DevToolbar({
           <PlanToggle />
 
           {env !== 'production' && (
-            <Button
+            <button
               type='button'
-              variant='ghost'
               onClick={handleClearSession}
               disabled={
                 clearSessionState === 'loading' || clearSessionState === 'done'
               }
               title='Clear all cookies, localStorage, and sessionStorage'
-              className='h-auto flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Clear Session'
             >
               <AsyncActionIcon state={clearSessionState} idleIcon={Trash2} />
               <span className='max-sm:hidden sm:inline text-3xs'>
                 {ASYNC_ACTION_LABELS.clear[clearSessionState]}
               </span>
-            </Button>
+            </button>
           )}
 
           {env !== 'production' && (
-            <Button
+            <button
               type='button'
-              variant='ghost'
               onClick={handleUnwaitlist}
               disabled={
                 unwaitlistState === 'loading' || unwaitlistState === 'done'
               }
               title='Approve your own waitlist entry (dev only)'
-              className='h-auto flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Unwaitlist'
             >
               <AsyncActionIcon state={unwaitlistState} idleIcon={UserCheck} />
               <span className='max-sm:hidden sm:inline text-3xs'>
                 {ASYNC_ACTION_LABELS.unwaitlist[unwaitlistState]}
               </span>
-            </Button>
+            </button>
           )}
 
           {env !== 'production' && (
-            <Button
+            <button
               type='button'
-              variant='ghost'
               onClick={handleSyncClerk}
               disabled={
                 syncClerkState === 'loading' || syncClerkState === 'done'
               }
               title='Sync Clerk user ID to DB (fixes clerk_id mismatch between dev/prod)'
-              className='h-auto flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Sync Clerk ID'
             >
               {syncClerkState === 'loading' && (
@@ -1255,13 +1225,12 @@ export function DevToolbar({
                   }[syncClerkState]
                 }
               </span>
-            </Button>
+            </button>
           )}
 
           {env !== 'production' && (
-            <Button
+            <button
               type='button'
-              variant='ghost'
               onClick={async () => {
                 const next = !swEnabled;
                 setSwEnabled(next);
@@ -1277,7 +1246,7 @@ export function DevToolbar({
             >
               <Globe size={11} />
               <span className='max-sm:hidden sm:inline text-3xs'>SW</span>
-            </Button>
+            </button>
           )}
 
           {/* Promote to production — preview only */}
@@ -1286,15 +1255,14 @@ export function DevToolbar({
             promoteState !== 'checking' && (
               <>
                 <div className='w-px h-4 mx-1 bg-subtle' />
-                <Button
+                <button
                   type='button'
-                  variant='ghost'
                   onClick={handlePromote}
                   disabled={
                     promoteState === 'promoting' || promoteState === 'done'
                   }
                   title={getPromoteTitle(promoteSha)}
-                  className={`h-auto flex items-center gap-1 px-1.5 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getPromoteButtonColor(promoteState)}`}
+                  className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getPromoteButtonColor(promoteState)}`}
                   aria-label='Promote To Production'
                 >
                   <PromoteIcon state={promoteState} />
@@ -1306,31 +1274,29 @@ export function DevToolbar({
                       {promoteSha.staging}→{promoteSha.prod}
                     </span>
                   )}
-                </Button>
+                </button>
               </>
             )}
 
           <div className='w-px h-4 mx-1 bg-subtle' />
 
           {/* Expand/collapse + hide */}
-          <Button
+          <button
             type='button'
-            variant='ghost'
             onClick={toggleOpen}
-            className='h-auto flex items-center gap-1 px-2 py-1 rounded text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
+            className='flex items-center gap-1 px-2 py-1 rounded text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
             aria-label={open ? 'Collapse Dev Toolbar' : 'Expand Dev Toolbar'}
           >
             <ExpandCollapseIcon open={open} />
-          </Button>
-          <Button
+          </button>
+          <button
             type='button'
-            variant='ghost'
             onClick={hide}
-            className='h-auto flex items-center px-2 py-1 rounded text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
+            className='flex items-center px-2 py-1 rounded text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
             aria-label='Hide Dev Toolbar'
           >
             <X size={13} />
-          </Button>
+          </button>
         </div>
       </div>
     </div>
@@ -1338,3 +1304,173 @@ export function DevToolbar({
 }
 
 /** Plan toggle gate — only renders inner component when QueryClientProvider exists. */
+function PlanToggle() {
+  const queryClient = useSafeQueryClient();
+  if (!queryClient) return null;
+  return <PlanToggleInner queryClient={queryClient} />;
+}
+
+/** Plan toggle for admin users. Uses billing query to show/switch plans. */
+function PlanToggleInner({
+  queryClient,
+}: {
+  readonly queryClient: QueryClient;
+}) {
+  const { data: billing } = useBillingStatusQuery();
+  const [switching, setSwitching] = useState(false);
+  const currentPlan = billing?.plan ?? 'free';
+
+  return (
+    <>
+      <div className='w-px h-4 mx-1 bg-subtle' />
+      <div className='flex items-center gap-0.5'>
+        <span className='text-3xs text-quaternary-token mr-0.5'>Plan</span>
+        {(['free', 'pro', 'max'] as const).map(plan => (
+          <button
+            key={plan}
+            type='button'
+            disabled={switching}
+            onClick={async () => {
+              if (plan === currentPlan || switching) return;
+              setSwitching(true);
+              try {
+                const res = await fetch('/api/admin/set-plan', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ plan }),
+                });
+                if (res.ok) {
+                  await queryClient.invalidateQueries({
+                    queryKey: queryKeys.billing.all,
+                  });
+                }
+              } finally {
+                setSwitching(false);
+              }
+            }}
+            className={`px-1.5 py-0.5 rounded text-3xs transition-colors ${
+              plan === currentPlan
+                ? 'font-semibold text-accent bg-accent/10'
+                : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
+            } ${switching ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            title={`Switch to ${plan} plan`}
+            aria-label={`Switch to ${plan} plan`}
+          >
+            {plan}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function OrphanOverrides({
+  keys,
+  onPurge,
+}: Readonly<{ keys: string[]; onPurge: () => void }>) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className='mb-2 mt-1 border-l-2 border-yellow-500/50 pl-3'>
+      <div className='flex items-center justify-between mb-1'>
+        <span
+          className='text-3xs font-semibold uppercase tracking-wide text-yellow-400'
+          title='Override keys in localStorage that no longer match any flag in APP_FLAG_OVERRIDE_KEYS. Likely from renamed or removed flags.'
+        >
+          Orphans ({keys.length})
+        </span>
+        <div className='flex items-center gap-2'>
+          <button
+            type='button'
+            onClick={() => setExpanded(prev => !prev)}
+            className='text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
+          >
+            {expanded ? 'hide' : 'inspect'}
+          </button>
+          <button
+            type='button'
+            onClick={onPurge}
+            className='text-3xs text-yellow-400 hover:text-yellow-300 underline transition-colors'
+          >
+            purge
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <div className='flex flex-col gap-0.5 pb-1'>
+          {keys.map(k => (
+            <span
+              key={k}
+              className='truncate text-3xs text-quaternary-token font-mono'
+            >
+              {k}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FlagRow({
+  label,
+  isOverridden,
+  checked,
+  flashing = false,
+  serverDefault,
+  onCheckedChange,
+  onClear,
+  source = 'statsig',
+}: Readonly<{
+  label: string;
+  isOverridden: boolean;
+  checked: boolean;
+  /** Parent-driven flash highlight — survives row re-categorization. */
+  flashing?: boolean;
+  serverDefault?: boolean;
+  onCheckedChange: (v: boolean) => void;
+  onClear: () => void;
+  source?: 'statsig' | 'code';
+}>) {
+  return (
+    <div
+      className={`flex items-center gap-2 py-0.5 rounded-sm transition-colors duration-subtle ${
+        flashing ? 'bg-accent/10' : ''
+      }`}
+    >
+      <Switch.Root
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        className={`relative w-7 h-4 rounded-full transition-colors outline-none cursor-pointer shrink-0 ${
+          checked ? 'bg-accent' : 'bg-surface-3'
+        }`}
+      >
+        <Switch.Thumb className='block w-3 h-3 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-3.5 shadow-sm dark:bg-white' />
+      </Switch.Root>
+      <span
+        className={`flex-1 truncate ${isOverridden ? 'text-(--color-text-primary)' : 'text-(--color-text-tertiary)'}`}
+      >
+        {label}
+      </span>
+      {isOverridden && serverDefault !== undefined && (
+        <span className='shrink-0 text-3xs text-quaternary-token'>
+          server: {serverDefault ? 'on' : 'off'}
+        </span>
+      )}
+      {isOverridden && (
+        <button
+          type='button'
+          onClick={onClear}
+          title='Remove override'
+          className='shrink-0 text-quaternary-token hover:text-(--color-text-secondary) transition-colors'
+        >
+          <X size={10} />
+        </button>
+      )}
+      {!isOverridden && (
+        <span className='shrink-0 text-3xs text-quaternary-token'>
+          {source}
+        </span>
+      )}
+    </div>
+  );
+}

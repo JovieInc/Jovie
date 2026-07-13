@@ -18,7 +18,6 @@ import { cn } from '@/lib/utils';
 import { formatLocationString } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
 import { ArtistNotificationsCTA } from './artist-notifications-cta/ArtistNotificationsCTA';
-import { subscriptionPrimaryActionClassName } from './artist-notifications-cta/shared';
 import type { NotificationSourceContext } from './artist-notifications-cta/types';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
 
@@ -160,9 +159,12 @@ function TourDateRow({
           {getTicketStatusLabel(item.date.ticketStatus, canBuyTickets)}
         </a>
       ) : (
-        // No ticket target: plain muted meta text — a non-interactive span
-        // must never wear button chrome.
-        <span className='shrink-0 text-xs font-medium text-white/38'>
+        <span
+          className={cn(
+            'inline-flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-xs font-semibold tracking-tight',
+            getTicketStatusClassName(item.date.ticketStatus, canBuyTickets)
+          )}
+        >
           {getTicketStatusLabel(item.date.ticketStatus, canBuyTickets)}
         </span>
       )}
@@ -189,7 +191,7 @@ function TourDatesContent({
         <Button
           type='button'
           variant='primary'
-          className='h-9 w-full rounded-full'
+          className='h-11 w-full rounded-full'
           disabled
         >
           Turn On Event Alerts
@@ -201,9 +203,7 @@ function TourDatesContent({
           hideListenFallback
           source={emptyStateSourceContext.ctaLocation}
           sourceContext={emptyStateSourceContext}
-          triggerLabel='Turn On Event Alerts'
-          // Unified 36px CTA scale — matches the Listen CTA on home cards.
-          triggerClassName={`${subscriptionPrimaryActionClassName} h-9! w-full justify-center gap-2 px-4 text-xs`}
+          triggerLabel='Event Alerts'
           presentation='overlay'
         />
       );
@@ -242,7 +242,7 @@ function TourDatesContent({
     <div data-testid='tour-drawer-list'>
       {groups.map(group => (
         <section key={group.label} className='pb-4'>
-          <div className='px-4 pb-2 pt-3 text-2xs font-semibold text-tertiary-token'>
+          <div className='px-4 pb-2 pt-3 text-2xs font-bold uppercase tracking-[0.16em] text-white/32'>
             {group.label}
           </div>
           <div className='border-y border-white/[0.075]'>

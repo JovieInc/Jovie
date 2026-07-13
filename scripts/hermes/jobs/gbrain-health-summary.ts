@@ -4,14 +4,10 @@ import { pathToFileURL } from 'node:url';
 
 import { gbrainLearn } from '../lib/gbrain';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
-import { sendOpsAlert } from '../lib/ops-notify';
+import { notifyOps } from '../lib/ops-notify';
 
 const JOB = 'gbrain-health-summary';
 const GBRAIN = process.env.HERMES_GBRAIN_BIN ?? 'gbrain';
-const HEALTH_URL =
-  process.env.HERMES_GBRAIN_HEALTH_URL ?? 'http://127.0.0.1:7801/health';
-const SOURCE_FRESHNESS_HOURS = 48;
-const CODE_SOURCE_FRESHNESS_HOURS = 24;
 
 type HealthStatus = 'healthy' | 'degraded' | 'down';
 type HealthCheck = {
@@ -19,7 +15,6 @@ type HealthCheck = {
   readonly ok: boolean;
   readonly detail: string;
   readonly durationMs: number;
-  readonly required?: boolean;
 };
 
 type HealthSummary = {
@@ -38,13 +33,6 @@ type GBrainExec = (
     readonly maxBuffer?: number;
   }
 ) => string;
-
-type GBrainSource = {
-  readonly id?: unknown;
-  readonly name?: unknown;
-  readonly page_count?: unknown;
-  readonly last_sync_at?: unknown;
-};
 
 function summarizeOutput(output: string, maxChars = 700): string {
   const cleaned = output.replace(/\s+/g, ' ').trim();
@@ -83,94 +71,9 @@ function statusFromDoctor(output: string): { ok: boolean; detail: string } {
   }
 }
 
-function statusFromHealthEndpoint(output: string): {
-  ok: boolean;
-  detail: string;
-} {
-  const text = output.trim();
-  if (!text)
-    return { ok: false, detail: 'health endpoint returned empty output' };
-  try {
-    const parsed = JSON.parse(text) as Record<string, unknown>;
-    const status = parsed.status;
-    const ok = status === 'ok' || status === 'healthy';
-    return {
-      ok,
-      detail:
-        typeof status === 'string' ? `status=${status}` : summarizeOutput(text),
-    };
-  } catch {
-    return {
-      ok: false,
-      detail: `invalid health JSON: ${summarizeOutput(text)}`,
-    };
-  }
-}
-
-function sourceFreshnessFromOutput(
-  output: string,
-  now: Date
-): { ok: boolean; detail: string } {
-  try {
-    const parsed = JSON.parse(output) as { readonly sources?: unknown };
-    if (!Array.isArray(parsed.sources) || parsed.sources.length === 0) {
-      return { ok: false, detail: 'sources list contained no sources' };
-    }
-    const stale = parsed.sources.flatMap(raw => {
-      if (!raw || typeof raw !== 'object') return ['invalid source record'];
-      const source = raw as GBrainSource;
-      if (typeof source.page_count !== 'number' || source.page_count === 0) {
-        return [];
-      }
-      const id =
-        typeof source.id === 'string'
-          ? source.id
-          : typeof source.name === 'string'
-            ? source.name
-            : 'unknown';
-      const syncedAt =
-        typeof source.last_sync_at === 'string'
-          ? new Date(source.last_sync_at)
-          : null;
-      if (!syncedAt || Number.isNaN(syncedAt.getTime())) {
-        return [`${id}: missing last_sync_at`];
-      }
-      const ageHours = (now.getTime() - syncedAt.getTime()) / 3_600_000;
-      const maxAgeHours = /code/i.test(id)
-        ? CODE_SOURCE_FRESHNESS_HOURS
-        : SOURCE_FRESHNESS_HOURS;
-      return ageHours > maxAgeHours
-        ? [`${id}: ${Math.floor(ageHours)}h old (max ${maxAgeHours}h)`]
-        : [];
-    });
-    return stale.length === 0
-      ? { ok: true, detail: 'all indexed sources are fresh' }
-      : { ok: false, detail: `stale sources: ${stale.join(', ')}` };
-  } catch {
-    return { ok: false, detail: 'sources list returned invalid JSON' };
-  }
-}
-
-function serverProcessStatus(output: string): { ok: boolean; detail: string } {
-  const processes = output
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean);
-  return processes.length === 1
-    ? { ok: true, detail: 'exactly one gbrain serve process is running' }
-    : {
-        ok: false,
-        detail: `expected exactly one gbrain serve process, found ${processes.length}`,
-      };
-}
-
 function timedCheck(
   name: string,
-  run: () => {
-    readonly ok: boolean;
-    readonly detail: string;
-  },
-  required = true
+  run: () => { readonly ok: boolean; readonly detail: string }
 ): HealthCheck {
   const started = Date.now();
   try {
@@ -180,7 +83,6 @@ function timedCheck(
       ok: result.ok,
       detail: result.detail,
       durationMs: Date.now() - started,
-      required,
     };
   } catch (err) {
     return {
@@ -188,7 +90,6 @@ function timedCheck(
       ok: false,
       detail: err instanceof Error ? err.message : String(err),
       durationMs: Date.now() - started,
-      required,
     };
   }
 }
@@ -197,10 +98,9 @@ export function buildGBrainHealthSummary(args: {
   readonly generatedAt: string;
   readonly checks: readonly HealthCheck[];
 }): HealthSummary {
-  const requiredChecks = args.checks.filter(check => check.required !== false);
-  const failed = requiredChecks.filter(check => !check.ok);
+  const failed = args.checks.filter(check => !check.ok);
   const status: HealthStatus =
-    requiredChecks.length === 0 || failed.length === requiredChecks.length
+    args.checks.length === 0 || failed.length === args.checks.length
       ? 'down'
       : failed.length === 0
         ? 'healthy'
@@ -225,7 +125,7 @@ export function renderGBrainHealthSummary(summary: HealthSummary): string {
     '',
     ...summary.checks.map(
       check =>
-        `- ${check.ok ? 'OK' : check.required === false ? 'WARN' : 'FAIL'} ${check.name} (${check.durationMs}ms): ${check.detail}`
+        `- ${check.ok ? 'OK' : 'FAIL'} ${check.name} (${check.durationMs}ms): ${check.detail}`
     ),
     '',
     `Recommendation: ${summary.recommendation}`,
@@ -236,57 +136,35 @@ export function renderGBrainHealthSummary(summary: HealthSummary): string {
 export function collectGBrainHealthSummary(options?: {
   readonly exec?: GBrainExec;
   readonly now?: Date;
-  readonly healthUrl?: string;
 }): HealthSummary {
   const exec = options?.exec ?? execFileSync;
   const generatedAt = (options?.now ?? new Date()).toISOString();
-  const now = options?.now ?? new Date();
-  const healthUrl = options?.healthUrl ?? HEALTH_URL;
   const checks = [
-    timedCheck('http-health', () =>
-      statusFromHealthEndpoint(
-        exec(
-          'curl',
-          ['--fail', '--silent', '--show-error', '--max-time', '10', healthUrl],
-          {
-            encoding: 'utf8',
-            timeout: 15_000,
-            maxBuffer: 2 * 1024 * 1024,
-          }
-        )
-      )
-    ),
-    timedCheck(
-      'doctor',
-      () =>
-        statusFromDoctor(
-          exec(GBRAIN, ['doctor', '--fast', '--json'], {
-            encoding: 'utf8',
-            timeout: 30_000,
-            maxBuffer: 2 * 1024 * 1024,
-          })
-        ),
-      false
-    ),
-    timedCheck('source-freshness', () =>
-      sourceFreshnessFromOutput(
-        exec(GBRAIN, ['sources', 'list', '--json'], {
+    timedCheck('doctor', () =>
+      statusFromDoctor(
+        exec(GBRAIN, ['doctor', '--fast', '--json'], {
           encoding: 'utf8',
           timeout: 30_000,
-          maxBuffer: 2 * 1024 * 1024,
-        }),
-        now
-      )
-    ),
-    timedCheck('serve-processes', () =>
-      serverProcessStatus(
-        exec('pgrep', ['-fl', 'gbrain.*serve'], {
-          encoding: 'utf8',
-          timeout: 10_000,
           maxBuffer: 2 * 1024 * 1024,
         })
       )
     ),
+    timedCheck('search', () => {
+      const out = exec(
+        GBRAIN,
+        ['search', 'gbrain health summary smoke', '--limit', '1'],
+        {
+          encoding: 'utf8',
+          timeout: 30_000,
+          maxBuffer: 2 * 1024 * 1024,
+        }
+      );
+      const found = out.trim().length > 0;
+      return {
+        ok: found,
+        detail: found ? 'search returned output' : 'empty output',
+      };
+    }),
   ];
 
   return buildGBrainHealthSummary({ generatedAt, checks });
@@ -340,7 +218,7 @@ export async function runGBrainHealthSummary(options?: {
 
   if (options?.notify !== false) {
     try {
-      await (options?.notifyOps ?? sendOpsAlert)(body);
+      await (options?.notifyOps ?? notifyOps)(body);
     } catch (err) {
       logJobEvent({
         job: JOB,

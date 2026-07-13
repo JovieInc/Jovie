@@ -18,7 +18,7 @@ import {
   writeStatus,
 } from '../lib/agentcookie';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
-import { sendOpsAlert } from '../lib/ops-notify';
+import { notifyOps } from '../lib/ops-notify';
 
 const JOB = 'agentcookie-sync';
 
@@ -34,7 +34,7 @@ async function main(): Promise<void> {
         ? (Date.now() - new Date(lastAlertAt).getTime()) / 3_600_000
         : Infinity;
       if (hoursSinceLast > 24) {
-        await sendOpsAlert(
+        await notifyOps(
           'agentcookie binary not found on Air. Install via bootstrap-air.sh or set AGENTCOOKIE_BIN. ' +
             'Session sync disabled. See GH#10930.'
         );
@@ -62,7 +62,7 @@ async function main(): Promise<void> {
       });
       // Alert only if we thought it was running before (state flip).
       if (prev.running) {
-        await sendOpsAlert(
+        await notifyOps(
           'agentcookie receiver stopped on Air. Session sync is offline. ' +
             'Restart: launchctl kickstart -k gui/$(id -u)/co.jovie.hermes.agentcookie-receiver'
         );

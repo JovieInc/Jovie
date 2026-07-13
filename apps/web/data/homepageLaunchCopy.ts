@@ -27,15 +27,13 @@ export const HOMEPAGE_LAUNCH_COPY = {
       'Jovie is the AI artist workspace that surfaces opportunities in your catalog — presaves, captures, pitches — and helps you ship the next one.',
   },
   hero: {
-    headline: 'Jovie helps you move your music forward.',
-    subhead:
-      'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.',
+    headline: 'Jovie runs your music career.',
+    subhead: 'You make the music.',
     primaryCta: {
       ...HOMEPAGE_FRONT_DOOR_CTA.primary,
       label: 'Get started',
     },
     secondaryCta: {
-      // Quiet proof path — not a peer conversion objective to Get started.
       label: 'See a live profile',
       href: APP_ROUTES.ARTIST_PROFILES,
     },
@@ -48,7 +46,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
   workspace: {
     kicker: 'What Jovie finds.',
     headline: 'All your music.\nWorking while you sleep.',
-    screenshotKey: 'shell-v1-library-desktop',
+    screenshotKey: 'shell-v1-releases-desktop',
     callouts: [
       {
         key: 'import',
@@ -73,9 +71,9 @@ export const HOMEPAGE_LAUNCH_COPY = {
   productStatement: {
     eyebrow: '',
     lead: '',
-    body: 'Release day is not the finish line.',
+    body: 'Your always-on AI artist manager.',
     description:
-      'It is the start of the job. You worked too hard on the song to stop there.',
+      'Jovie finds the next opportunity across every release, fan signal, and playlist move.',
     cards: [
       {
         number: '',
@@ -96,7 +94,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
   },
   aiComposer: {
     headline: 'Ask once. Surface the next opportunity.',
-    body: 'Drafts and plans built from your catalog, not a blank prompt.',
+    body: 'Jovie turns a release into the capture, presave, or pitch your team can ship.',
   },
   intentBand: {
     eyebrow: 'Ask Jovie',
@@ -199,11 +197,6 @@ export const HOMEPAGE_LAUNCH_COPY = {
       question: 'What does Jovie actually do?',
       answer:
         'Connect your music. Jovie watches your catalog, fans, and stream movement, then surfaces specific opportunities. A release worth a presave. A playlist that fits your sound. A fan moment to capture.',
-    },
-    {
-      question: 'Is Jovie a distributor?',
-      answer:
-        'No. Your distributor gets the song onto Spotify and Apple Music. Jovie runs the work that starts after it goes live.',
     },
     {
       question: 'Where does my catalog data come from?',

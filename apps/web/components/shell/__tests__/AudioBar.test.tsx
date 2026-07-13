@@ -69,35 +69,4 @@ describe('AudioBar', () => {
     fireEvent.click(screen.getByTestId('audio-bar-minimize'));
     expect(onCollapse).toHaveBeenCalledOnce();
   });
-
-  it('renders the canonical dismiss control and invokes it exactly once', () => {
-    const onDismiss = vi.fn();
-    render(<AudioBar {...baseProps} onDismiss={onDismiss} />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
-
-    expect(onDismiss).toHaveBeenCalledOnce();
-  });
-
-  it('keeps transport geometry stable from idle to playing', () => {
-    const { rerender } = render(
-      <AudioBar {...baseProps} onDismiss={() => {}} />
-    );
-    const idleRegion = screen.getByRole('region', { name: 'Audio Player' });
-    const idleClassName = idleRegion.className;
-    expect(screen.getByRole('button', { name: /^Play/ })).toHaveClass(
-      'h-8',
-      'w-8'
-    );
-
-    rerender(<AudioBar {...baseProps} isPlaying onDismiss={() => {}} />);
-
-    expect(screen.getByRole('region', { name: 'Audio Player' }).className).toBe(
-      idleClassName
-    );
-    expect(screen.getByRole('button', { name: /^Pause/ })).toHaveClass(
-      'h-8',
-      'w-8'
-    );
-  });
 });

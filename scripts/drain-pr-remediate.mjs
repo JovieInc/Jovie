@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-/** Phase 2 of /drain: rebase stale BLOCKED agent PRs onto their latest base. */
-import { execFile } from 'node:child_process';
+/** Phase 2 of /drain: rebase stale BLOCKED agent PRs onto latest main. */
+import { execFile, execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { tryGitHubRebase } from './lib/github-update-branch.mjs';
 import { listBlockedAgentPrs } from './lib/pr-check-failures.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -81,15 +82,83 @@ function parseArgs(argv) {
   return options;
 }
 
-function hoursSince(isoTimestamp, nowMs = Date.now()) {
+function hoursSince(isoTimestamp) {
   if (!isoTimestamp) return Number.POSITIVE_INFINITY;
-  const deltaMs = nowMs - Date.parse(isoTimestamp);
+  const deltaMs = Date.now() - Date.parse(isoTimestamp);
   if (!Number.isFinite(deltaMs)) return Number.POSITIVE_INFINITY;
   return deltaMs / (1000 * 60 * 60);
 }
 
-function hasPrLabel(pr, labelName) {
-  return (pr.labels ?? []).some(label => (label.name ?? label) === labelName);
+function runGit(args, cwd) {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+function runGh(args, cwd = process.cwd()) {
+  return execFileSync('gh', args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+async function ghJson(args) {
+  const { stdout } = await execFileAsync('gh', args, {
+    encoding: 'utf8',
+    maxBuffer: 20 * 1024 * 1024,
+  });
+  return JSON.parse(stdout);
+}
+
+function tryMechanicalRebase({ repo, pr, baseRef, dryRun }) {
+  if (dryRun) {
+    return {
+      ok: true,
+      dryRun: true,
+      reason: 'dry-run: would rebase onto origin/' + baseRef,
+    };
+  }
+
+  const workdir = mkdtempSync(
+    join(tmpdir(), `jovie-drain-rebase-${pr.number}-`)
+  );
+  try {
+    runGh(['repo', 'clone', repo, '.', '--', '--no-tags'], workdir);
+    runGit(
+      ['fetch', 'origin', baseRef, pr.headRefName, '--depth', '80'],
+      workdir
+    );
+    runGit(
+      ['checkout', '-B', pr.headRefName, `origin/${pr.headRefName}`],
+      workdir
+    );
+    try {
+      runGit(['rebase', `origin/${baseRef}`], workdir);
+    } catch (_error) {
+      runGit(['rebase', '--abort'], workdir);
+      return {
+        ok: false,
+        conflict: true,
+        reason: 'rebase conflict — needs human resolution',
+      };
+    }
+
+    runGit(
+      ['push', '--force-with-lease', 'origin', `HEAD:${pr.headRefName}`],
+      workdir
+    );
+    return {
+      ok: true,
+      dryRun: false,
+      reason:
+        'rebased onto origin/' + baseRef + ' and pushed --force-with-lease',
+    };
+  } finally {
+    rmSync(workdir, { recursive: true, force: true });
+  }
 }
 
 async function labelPr(repo, prNumber, labelName) {
@@ -98,25 +167,6 @@ async function labelPr(repo, prNumber, labelName) {
     ['pr', 'edit', String(prNumber), '-R', repo, '--add-label', labelName],
     { encoding: 'utf8' }
   );
-}
-
-async function removeLabelPr(repo, prNumber, labelName) {
-  try {
-    await execFileAsync(
-      'gh',
-      [
-        'api',
-        '-X',
-        'DELETE',
-        `repos/${repo}/issues/${prNumber}/labels/${encodeURIComponent(labelName)}`,
-      ],
-      { encoding: 'utf8' }
-    );
-  } catch (error) {
-    const detail = `${error?.stderr ?? ''} ${error?.message ?? ''}`;
-    if (/HTTP 404|Not Found/i.test(detail)) return;
-    throw error;
-  }
 }
 
 async function commentPr(repo, prNumber, body) {
@@ -139,22 +189,26 @@ async function commentPr(repo, prNumber, body) {
   );
 }
 
-export async function remediateBlockedPrs(options, dependencies = {}) {
-  const listBlockedAgentPrsImpl =
-    dependencies.listBlockedAgentPrsImpl ?? listBlockedAgentPrs;
-  const rebaseImpl = dependencies.rebaseImpl ?? tryGitHubRebase;
-  const labelPrImpl = dependencies.labelPrImpl ?? labelPr;
-  const removeLabelPrImpl = dependencies.removeLabelPrImpl ?? removeLabelPr;
-  const commentPrImpl = dependencies.commentPrImpl ?? commentPr;
-  const nowMs = dependencies.nowMs ?? Date.now();
+async function fetchBaseRefName(repo, prNumber) {
+  const pr = await ghJson([
+    'pr',
+    'view',
+    String(prNumber),
+    '-R',
+    repo,
+    '--json',
+    'baseRefName',
+  ]);
+  return pr.baseRefName ?? 'main';
+}
 
-  const blocked = await listBlockedAgentPrsImpl(options.repo, {
+export async function remediateBlockedPrs(options) {
+  const blocked = await listBlockedAgentPrs(options.repo, {
     limit: options.limit,
   });
 
   const results = [];
   let applied = 0;
-  let mutationBudgetUsed = 0;
 
   console.log('=== REMEDIATE (BLOCKED agent PRs → rebase onto main) ===');
   console.log(
@@ -162,16 +216,20 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
   );
 
   for (const pr of blocked) {
-    if (mutationBudgetUsed >= options.maxPerRun) {
+    if (applied >= options.maxPerRun) {
       console.log(
-        `  mutation cap reached (${mutationBudgetUsed}/${options.maxPerRun}); remaining candidates skipped`
+        `  cap reached (${options.maxPerRun}/run); remaining candidates skipped`
       );
       break;
     }
 
-    const hours = hoursSince(pr.updatedAt, nowMs);
-    const hasConflictLabel = hasPrLabel(pr, 'needs-conflict-resolution');
-    if (hours < options.cooldownHours && !hasConflictLabel) {
+    const baseRef =
+      options.baseRef === 'main'
+        ? await fetchBaseRefName(options.repo, pr.number)
+        : options.baseRef;
+
+    const hours = hoursSince(pr.updatedAt);
+    if (hours < options.cooldownHours) {
       const item = {
         number: pr.number,
         headRefName: pr.headRefName,
@@ -190,43 +248,28 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
       `  #${pr.number} [${pr.headRefName}] rebase candidate — ${pr.failures.join(', ')}`
     );
 
-    const rebase = await rebaseImpl({
+    const rebase = tryMechanicalRebase({
       repo: options.repo,
       pr,
-      expectedBaseRefName: options.baseRef === 'main' ? null : options.baseRef,
+      baseRef,
       dryRun: options.dryRun,
     });
-    const baseRef = rebase.baseRefName ?? options.baseRef;
-    const consumedBudget = options.dryRun
-      ? Boolean(rebase.updated)
-      : Boolean(rebase.mutationAttempted);
-    if (consumedBudget) mutationBudgetUsed += 1;
 
     const item = {
       number: pr.number,
       headRefName: pr.headRefName,
-      action: rebase.ok
-        ? rebase.updated
-          ? 'rebased'
-          : 'rebase_noop'
-        : 'rebase_failed',
+      action: rebase.ok ? 'rebased' : 'rebase_failed',
       reason: rebase.reason,
       failures: pr.failures,
       conflict: Boolean(rebase.conflict),
       dryRun: Boolean(rebase.dryRun),
-      category: rebase.category ?? null,
-      expectedHeadOid: rebase.expectedHeadOid ?? null,
-      observedHeadOid: rebase.observedHeadOid ?? null,
-      mutationAttempted: Boolean(rebase.mutationAttempted),
-      mutationApplied: Boolean(rebase.mutationApplied),
-      consumedBudget,
     };
     results.push(item);
 
     if (!rebase.ok) {
       if (!options.dryRun && rebase.conflict) {
-        await labelPrImpl(options.repo, pr.number, 'needs-conflict-resolution');
-        await commentPrImpl(
+        await labelPr(options.repo, pr.number, 'needs-conflict-resolution');
+        await commentPr(
           options.repo,
           pr.number,
           '## Drain auto-rebase blocked\n\nAutomatic rebase onto latest `main` hit merge conflicts. Resolve conflicts locally, push, then re-enroll with the `merge-queue` label.'
@@ -236,33 +279,14 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
       continue;
     }
 
-    if (!rebase.updated) {
-      if (!options.dryRun && hasConflictLabel) {
-        await removeLabelPrImpl(
-          options.repo,
-          pr.number,
-          'needs-conflict-resolution'
-        );
-      }
-      console.log(`    - ${rebase.reason}`);
-      continue;
-    }
-
     applied += 1;
 
     if (!options.dryRun) {
-      if (hasConflictLabel) {
-        await removeLabelPrImpl(
-          options.repo,
-          pr.number,
-          'needs-conflict-resolution'
-        );
-      }
-      await labelPrImpl(options.repo, pr.number, 'merge-queue');
-      await commentPrImpl(
+      await labelPr(options.repo, pr.number, 'merge-queue');
+      await commentPr(
         options.repo,
         pr.number,
-        `## Drain auto-rebase\n\nGitHub Update Branch rebased the exact PR head onto latest \`${baseRef}\` to re-trigger CI after a possible main-side fix.\n\nHead: \`${rebase.expectedHeadOid}\` → \`${rebase.observedHeadOid}\`\n\nFailing checks before rebase: ${pr.failures.join(', ')}`
+        `## Drain auto-rebase\n\nRebased onto latest \`${baseRef}\` to re-trigger CI after a possible main-side fix.\n\nFailing checks before rebase: ${pr.failures.join(', ')}`
       );
       console.log(`    ✓ ${rebase.reason}; +merge-queue`);
     } else {
@@ -275,15 +299,9 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
   }
 
   console.log(
-    `=== remediate done (applied=${applied}, mutationBudgetUsed=${mutationBudgetUsed}, dryRun=${options.dryRun}) ===`
+    `=== remediate done (applied=${applied}, dryRun=${options.dryRun}) ===`
   );
-  return {
-    blocked: blocked.length,
-    applied,
-    mutationBudgetUsed,
-    results,
-    dryRun: options.dryRun,
-  };
+  return { blocked: blocked.length, applied, results, dryRun: options.dryRun };
 }
 
 async function main() {

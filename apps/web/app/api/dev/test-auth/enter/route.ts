@@ -2,17 +2,13 @@ import { revalidatePath } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import {
-  buildBetterAuthSessionCookieDescriptor,
   buildDevTestAuthCookieDescriptors,
   ensureDevTestAuthActor,
   getDevTestAuthAvailability,
   parseDevTestAuthPersona,
   sanitizeDevTestAuthRedirectPath,
 } from '@/lib/auth/dev-test-auth.server';
-import {
-  isTrustedTestBypassRequest,
-  TEST_MODE_COOKIE,
-} from '@/lib/auth/test-mode';
+import { isTrustedTestBypassRequest } from '@/lib/auth/test-mode';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 /**
@@ -48,7 +44,6 @@ export async function GET(request: NextRequest) {
   }
 
   const personaParam = request.nextUrl.searchParams.get('persona');
-  const sessionParam = request.nextUrl.searchParams.get('session');
   const redirectParam = request.nextUrl.searchParams.get('redirect');
   const parsedPersona = parseDevTestAuthPersona(personaParam);
 
@@ -60,12 +55,6 @@ export async function GET(request: NextRequest) {
   }
 
   const persona = parsedPersona ?? 'creator';
-  if (sessionParam && sessionParam !== 'better-auth') {
-    return NextResponse.json(
-      { success: false, error: 'Invalid session mode' },
-      { status: 400, headers: NO_STORE_HEADERS }
-    );
-  }
   const redirectPath = sanitizeDevTestAuthRedirectPath(redirectParam);
 
   if (!redirectPath) {
@@ -82,23 +71,11 @@ export async function GET(request: NextRequest) {
   response.headers.set('Cache-Control', NO_STORE_HEADERS['Cache-Control']);
   response.headers.set('Location', redirectPath);
 
-  const cookieDescriptors = buildDevTestAuthCookieDescriptors(
+  for (const cookie of buildDevTestAuthCookieDescriptors(
     actor,
     request.nextUrl.protocol === 'https:'
-  );
-  for (const cookie of cookieDescriptors) {
-    if (sessionParam === 'better-auth' && cookie.name === TEST_MODE_COOKIE) {
-      continue;
-    }
+  )) {
     response.cookies.set(cookie);
-  }
-  if (sessionParam === 'better-auth') {
-    response.cookies.set(
-      await buildBetterAuthSessionCookieDescriptor(
-        actor,
-        request.nextUrl.protocol === 'https:'
-      )
-    );
   }
 
   return response;

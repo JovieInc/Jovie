@@ -133,7 +133,10 @@ const MobileCardList = memo(function MobileCardList({
   return (
     <div className='md:hidden h-full overflow-auto'>
       {rows.map(member => (
-        <div key={member.id} className='border-b border-subtle'>
+        <div
+          key={member.id}
+          className='border-b border-(--linear-app-frame-seam)'
+        >
           <AudienceMobileCard
             member={member}
             mode={mode}

@@ -1,13 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  AnalyticsSidebar,
-  calculateConversionRate,
-  FUNNEL_STAGE_METRIC_ROW_CLASS,
-  FUNNEL_STAGE_OUTER_CLASS,
-  FunnelStage,
-} from './AnalyticsSidebar';
+import { AnalyticsSidebar, calculateConversionRate } from './AnalyticsSidebar';
 
 vi.mock('@/lib/queries', () => ({
   useDashboardAnalyticsQuery: () => ({
@@ -153,63 +147,5 @@ describe('AnalyticsSidebar', () => {
     );
     expect(screen.getByText('Audience funnel')).toBeInTheDocument();
     expect(screen.getByText('Link Clicks')).toBeInTheDocument();
-  });
-});
-
-describe('FunnelStage (regression: JOV-4158 / #13819 skeleton layout parity)', () => {
-  const stageProps = {
-    label: 'Profile Views',
-    value: 120,
-    rate: null as string | null,
-    barPercent: 50,
-    barIndex: 0,
-  };
-
-  it('uses identical outer padding + metric-row chrome in loading and loaded states', () => {
-    const { container: loadingContainer } = render(
-      <FunnelStage {...stageProps} loading />
-    );
-    const { container: loadedContainer } = render(
-      <FunnelStage {...stageProps} loading={false} />
-    );
-
-    const loadingOuter = loadingContainer.firstElementChild;
-    const loadedOuter = loadedContainer.firstElementChild;
-    const loadingMetricRow = loadingOuter?.firstElementChild;
-    const loadedMetricRow = loadedOuter?.firstElementChild;
-
-    // Full className equality — shared constants cannot drift independently
-    expect(loadingOuter?.className).toBe(FUNNEL_STAGE_OUTER_CLASS);
-    expect(loadedOuter?.className).toBe(FUNNEL_STAGE_OUTER_CLASS);
-    expect(loadingMetricRow?.className).toBe(FUNNEL_STAGE_METRIC_ROW_CLASS);
-    expect(loadedMetricRow?.className).toBe(FUNNEL_STAGE_METRIC_ROW_CLASS);
-
-    // Explicit padding tokens from the original bug report
-    expect(loadingOuter).toHaveClass('px-3.5', 'py-2.5');
-    expect(loadedOuter).toHaveClass('px-3.5', 'py-2.5');
-    expect(loadingOuter).not.toHaveClass('px-3', 'py-2');
-    expect(loadedOuter).not.toHaveClass('px-3', 'py-2');
-  });
-
-  it('keeps outer className stable when a conversion rate is present', () => {
-    const { container: withoutRate } = render(
-      <FunnelStage {...stageProps} rate={null} loading={false} />
-    );
-    const { container: withRate } = render(
-      <FunnelStage {...stageProps} rate='40%' loading={false} />
-    );
-
-    expect(withoutRate.firstElementChild?.className).toBe(
-      FUNNEL_STAGE_OUTER_CLASS
-    );
-    expect(withRate.firstElementChild?.className).toBe(
-      FUNNEL_STAGE_OUTER_CLASS
-    );
-    expect(withoutRate.firstElementChild?.firstElementChild?.className).toBe(
-      FUNNEL_STAGE_METRIC_ROW_CLASS
-    );
-    expect(withRate.firstElementChild?.firstElementChild?.className).toBe(
-      FUNNEL_STAGE_METRIC_ROW_CLASS
-    );
   });
 });

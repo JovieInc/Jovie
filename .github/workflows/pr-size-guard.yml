@@ -1,17 +1,13 @@
 name: PR Size Guard
 
 # Forces small, reviewable PRs — which forces stacking. A change too big to
-# review as one PR must be split into dependent PRs managed with the `gt` CLI
+# review as one PR must be split into a Graphite stack of dependent PRs
 # (`gt create` per logical step) or independent sibling PRs. Opt out for
 # approved mechanical codemods (token sweeps, renames, generated output) with
 # the `big-pr` label. Thresholds tunable via repo vars PR_MAX_LINES / PR_MAX_FILES.
 # Circular shared-CI repair trains may use `integration-train`, but only with a
-# machine-readable source block naming 2+ component PRs, each pinned as
-# `- https://github.com/JovieInc/Jovie/pull/123 @ <40-character-head-sha>`.
-# Every source path must be present in the train unless a reviewed path appears
-# in the JSON `integration-train-omissions` body block. Source identity, path
-# coverage, and the fixed 2500-line / 60-file cap are fail-closed in
-# pr-size-guard-policy.mjs.
+# machine-readable source block naming 2+ component PRs and the fixed, bounded
+# 2500-line / 60-file cap enforced by pr-size-guard-policy.mjs.
 
 # PR size can only change on a push (opened/synchronize/reopened), never on a
 # label event. This guard is a REQUIRED check, so re-running it on
@@ -19,120 +15,57 @@ name: PR Size Guard
 # merge loop does this constantly) cancels the in-flight run via
 # cancel-in-progress, leaving a CANCELLED/QUEUED run as the latest for a
 # required context → GitHub pins the PR BLOCKED even though it's green
-# (JOV-3580). The same pinning hits two pull_request runs firing on the SAME
-# head SHA in the same second (e.g. opened + synchronize, or a duplicate
-# webhook delivery — PR #14453): they share the per-PR concurrency group, so
-# cancel-in-progress kills one and the rollup can pin the CANCELLED run.
-# pull_request runs therefore never cancel (cancel-in-progress is
-# merge_group-only below); at ~12s per run, serializing same-PR duplicates is
-# negligible. The big-pr/codemod opt-out is honored on push via the webhook
+# (JOV-3580). The big-pr/codemod opt-out is honored on push via the webhook
 # payload (no GraphQL — avoids rate-limit flakes on bypass). When the label
 # lands after a failing run,
 # pr-size-guard-label-override.yml posts a passing check-run override.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  # Active native-queue required-context producer. Labels and policy inputs can
-  # change after a source status turns green, so revalidate every member of the
-  # exact synthetic group before reproducing the required context on the head.
-  merge_group:
-    types: [checks_requested]
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: pr-size-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}
-  # pull_request: never cancel — duplicate same-head-SHA runs must each reach
-  # a terminal success/failure so the rollup cannot pin a CANCELLED run for
-  # this required context (JOV-3580). merge_group stays keyed by exact head.
-  cancel-in-progress: ${{ github.event_name == 'merge_group' }}
+  group: pr-size-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
-  merge-group-size:
-    name: ${{ github.event_name == 'merge_group' && 'PR Size Guard' || 'PR Size Guard (merge-group inactive)' }}
-    if: github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    steps:
-      - name: Check out trusted queue policy
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # Never execute policy code from the synthetic PR-controlled head.
-          ref: ${{ github.event.merge_group.base_sha }}
-          persist-credentials: false
-          sparse-checkout: |
-            scripts/lib/merge-group-member-policy.mjs
-            scripts/lib/pr-size-guard-policy.mjs
-          sparse-checkout-cone-mode: false
-
-      - name: Revalidate every merge-group member's size policy
-        env:
-          # The synthetic head controls this workflow definition. Never expose
-          # an App private key here; the read-only ephemeral token is enough.
-          GH_TOKEN: ${{ github.token }}
-          MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
-          MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
-        run: node scripts/lib/merge-group-member-policy.mjs --policy=size
-
   size:
-    name: ${{ github.event_name == 'pull_request' && 'PR Size Guard' || 'PR Size Guard (source inactive)' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: github.event_name == 'pull_request'
+    name: PR Size Guard
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 3
+    # Skip automated dependency / screenshot PRs — lockfile & asset churn is expected.
+    if: >-
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.head.ref != 'screenshots/auto-update'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
-
-      - name: Fetch PR base
-        run: git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
-
-      - name: Enforce repository hygiene
-        run: node scripts/repo-hygiene-guard.mjs --diff-base "${{ github.event.pull_request.base.sha }}"
-
-      - name: Enforce Agent Skill governance
-        run: node scripts/skill-governance-guard.mjs
-
-      - name: Detect screenshot integrity changes
-        id: screenshot-integrity
-        run: |
-          if git diff --quiet "${{ github.event.pull_request.base.sha }}" HEAD -- \
-            apps/web/lib/screenshots/ \
-            apps/web/screenshot-catalog/current/ \
-            apps/web/public/product-screenshots/ \
-            'apps/web/scripts/check-screenshot-catalog*.ts'; then
-            echo "required=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "required=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Set up Node and pnpm for screenshot integrity
-        if: steps.screenshot-integrity.outputs.required == 'true'
-        uses: ./.github/actions/setup-node-pnpm
-
-      - name: Enforce screenshot catalog integrity
-        if: steps.screenshot-integrity.outputs.required == 'true'
-        working-directory: apps/web
-        run: pnpm exec tsx scripts/check-screenshot-catalog.ts
-
       - name: Enforce size cap
-        # Lockfile and generated screenshot churn skip line-count review, but the
-        # repository-hygiene byte/path gate above still applies.
-        if: >-
-          github.event.pull_request.user.login != 'dependabot[bot]' &&
-          github.event.pull_request.head.ref != 'screenshots/auto-update'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
           MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
         run: |
           set -euo pipefail
+
+          # Graphite merge-queue group drafts don't inherit member labels, so a
+          # `big-pr`-bypassed member would fail size guard on the synthetic draft and
+          # abort the whole merge group. Members were already size-checked individually.
+          # Exit 0 (not skip) so the required "PR Size Guard" context reports success.
+          title="$PR_TITLE"
+          case "$title" in
+            '[Graphite MQ]'*)
+              echo "✅ Graphite merge-queue group draft — size guard not applicable (members checked individually)"; exit 0;;
+          esac
 
           labels="$PR_LABELS"
           case ",$labels," in
@@ -156,7 +89,7 @@ jobs:
               break
             fi
             if [[ "$attempt" -eq 3 ]] || ! grep -qiE \
-              "rate limit|HTTP 403|HTTP 429|HTTP 5[0-9][0-9]|invalid character '<'" "$api_error"; then
+              'rate limit|HTTP 403|HTTP 429|HTTP 5[0-9][0-9]' "$api_error"; then
               cat "$api_error" >&2
               exit 1
             fi
