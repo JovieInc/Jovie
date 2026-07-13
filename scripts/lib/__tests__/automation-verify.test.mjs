@@ -55,6 +55,42 @@ describe('automation-verify affected scope', () => {
     expect(plan.selectedTests).toHaveLength(5);
   });
 
+  it('maps the seed confirmation boundary diff to focused behavior tests', () => {
+    const plan = buildAffectedTestPlan([
+      'apps/web/lib/events/confirmation-status.test.ts',
+      'apps/web/lib/events/confirmation-status.ts',
+      'apps/web/lib/events/insert.ts',
+      'apps/web/tests/seed-test-data.ts',
+      'apps/web/tests/unit/events/insert.test.ts',
+      'apps/web/tests/unit/testing/seed-test-data-import-boundary.test.ts',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.relatedFiles).toHaveLength(6);
+    expect(plan.selectedTests).toEqual([
+      'apps/web/lib/events/confirmation-status.test.ts',
+      'apps/web/tests/unit/events/insert.test.ts',
+      'apps/web/tests/unit/testing/seed-test-data-import-boundary.test.ts',
+    ]);
+  });
+
+  it('maps deterministic Promptfoo changes to their contract tests', () => {
+    const plan = buildAffectedTestPlan([
+      'apps/web/scripts/run-deterministic-promptfoo-evals.sh',
+      'apps/web/tests/eval/promptfoo/jovie-chat-provider.ts',
+      'apps/web/tests/eval/promptfoo/promptfooconfig.yaml',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.relatedFiles).toEqual([
+      'apps/web/tests/eval/promptfoo/jovie-chat-provider.ts',
+    ]);
+    expect(plan.selectedTests).toEqual([
+      'apps/web/lib/agents/registry.test.ts',
+      'apps/web/scripts/sync-skills-catalog.test.ts',
+    ]);
+  });
+
   it('fails closed to the full suite for global test inputs', () => {
     expect(buildAffectedTestPlan(['apps/web/tests/setup.ts']).mode).toBe(
       'full'
@@ -122,8 +158,12 @@ describe('automation-verify affected scope', () => {
       const deadline = Date.now() + 5000;
       while (Date.now() < deadline) {
         try {
-          grandchildPid = Number(readFileSync(pidFile, 'utf8'));
-          break;
+          const candidatePid = Number(readFileSync(pidFile, 'utf8'));
+          if (Number.isInteger(candidatePid) && candidatePid > 0) {
+            grandchildPid = candidatePid;
+            break;
+          }
+          await new Promise(resolveWait => setTimeout(resolveWait, 25));
         } catch {
           await new Promise(resolveWait => setTimeout(resolveWait, 25));
         }

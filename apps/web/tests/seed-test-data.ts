@@ -14,7 +14,7 @@ import { Redis } from '@upstash/redis';
 import { and, eq, not } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
-import { deriveConfirmationStatus } from '@/lib/events/insert';
+import { deriveConfirmationStatus } from '@/lib/events/confirmation-status';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import {
   E2E_PREBUILT_CLAIM_TOKEN,

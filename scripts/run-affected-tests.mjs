@@ -33,6 +33,18 @@ export function buildAffectedTestPlan(changedFiles) {
     /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)
   );
   const mandatoryTests = [];
+  const hasSeedConfirmationChange = files.some(
+    file =>
+      file === 'apps/web/tests/seed-test-data.ts' ||
+      file === 'apps/web/lib/events/confirmation-status.ts'
+  );
+  if (hasSeedConfirmationChange) {
+    mandatoryTests.push(
+      'apps/web/lib/events/confirmation-status.test.ts',
+      'apps/web/tests/unit/events/insert.test.ts',
+      'apps/web/tests/unit/testing/seed-test-data-import-boundary.test.ts'
+    );
+  }
   if (
     files.some(
       file =>
@@ -67,6 +79,12 @@ export function buildAffectedTestPlan(changedFiles) {
       'apps/web/eslint-rules/canonical-ui-label-casing.test.ts'
     );
   }
+  if (files.some(file => file.startsWith('apps/web/tests/eval/promptfoo/'))) {
+    mandatoryTests.push(
+      'apps/web/lib/agents/registry.test.ts',
+      'apps/web/scripts/sync-skills-catalog.test.ts'
+    );
+  }
 
   const selectedTests = unique([...directTests, ...mandatoryTests]);
   const isCoveredSource = file => {
@@ -76,6 +94,14 @@ export function buildAffectedTestPlan(changedFiles) {
     if (file.startsWith('apps/web/components/')) return true;
     if (file.startsWith('apps/web/app/')) return true;
     if (file.startsWith('packages/ui/')) return true;
+    if (file.startsWith('apps/web/tests/eval/promptfoo/')) return true;
+    if (
+      hasSeedConfirmationChange &&
+      (file === 'apps/web/tests/seed-test-data.ts' ||
+        file === 'apps/web/lib/events/confirmation-status.ts' ||
+        file === 'apps/web/lib/events/insert.ts')
+    )
+      return true;
     if (file.startsWith('apps/web/eslint-rules/canonical-ui-label-casing'))
       return true;
     return (
