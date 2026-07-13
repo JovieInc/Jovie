@@ -21,10 +21,12 @@ const script = readFileSync(
 
 const PREREQUISITE_TRAIN_CORNERS = [
   'scripts/ci/neon-orphan-reaper.mjs',
+  'apps/web/app/(home)/home.css',
   'apps/web/lib/testing/e2e-prebuilt-claim.ts',
   'apps/web/app/api/chat/onboarding-handler.ts',
   'apps/web/styles/design-system.css',
   'apps/web/components/shell/SidebarNavItem.tsx',
+  'apps/web/components/features/auth/GoogleOneTap.tsx',
   'apps/web/app/app/(shell)/chat/loading.tsx',
   'apps/web/tests/e2e/utils/golden-path-rate-limit-identity.ts',
   'apps/web/tests/e2e/utils/runtime-automation-bypass.ts',
@@ -38,10 +40,12 @@ const PREREQUISITE_TRAIN_MANIFEST = [
   '.github/workflows/e2e-full-matrix.yml',
   '.github/workflows/nightly-tests.yml',
   '.github/workflows/visual-regression.yml',
+  'apps/web/app/(home)/home.css',
   'apps/web/app/app/(shell)/chat/loading.tsx',
   'apps/web/app/api/chat/onboarding-handler.ts',
   'apps/web/app/api/dev/test-auth/session/route.ts',
   'apps/web/components/features/onboarding/OnboardingChat.tsx',
+  'apps/web/components/features/auth/GoogleOneTap.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
   'apps/web/components/organisms/SharedCommandPalette.tsx',
   'apps/web/components/shell/SidebarNavItem.tsx',
@@ -59,6 +63,7 @@ const PREREQUISITE_TRAIN_MANIFEST = [
   'apps/web/tests/helpers/auth.ts',
   'apps/web/tests/seed-test-data.ts',
   'apps/web/tests/unit/api/chat/onboarding-handler.test.ts',
+  'apps/web/tests/unit/auth/AuthShell.test.tsx',
   'apps/web/tests/unit/chat/ChatInput.aria.test.tsx',
   'apps/web/tests/unit/chat/ChatLoading.test.tsx',
   'apps/web/tests/unit/chat/chat-composer-system-b-style-guard.test.ts',
@@ -71,6 +76,7 @@ const PREREQUISITE_TRAIN_MANIFEST = [
   'apps/web/tests/unit/e2e/noauth-config.test.ts',
   'apps/web/tests/unit/e2e/runtime-automation-bypass.test.ts',
   'apps/web/tests/unit/e2e/seed-test-data.test.ts',
+  'apps/web/tests/unit/home/mounted-home-workspace-system-b-style-guard.test.ts',
   'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
   'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
   'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
@@ -80,6 +86,7 @@ const PREREQUISITE_TRAIN_MANIFEST = [
 ];
 const PREREQUISITE_TRAIN_TESTS = [
   'apps/web/tests/unit/api/chat/onboarding-handler.test.ts',
+  'apps/web/tests/unit/auth/AuthShell.test.tsx',
   'apps/web/tests/unit/chat/ChatInput.aria.test.tsx',
   'apps/web/tests/unit/chat/ChatLoading.test.tsx',
   'apps/web/tests/unit/chat/chat-composer-system-b-style-guard.test.ts',
@@ -92,6 +99,7 @@ const PREREQUISITE_TRAIN_TESTS = [
   'apps/web/tests/unit/e2e/noauth-config.test.ts',
   'apps/web/tests/unit/e2e/runtime-automation-bypass.test.ts',
   'apps/web/tests/unit/e2e/seed-test-data.test.ts',
+  'apps/web/tests/unit/home/mounted-home-workspace-system-b-style-guard.test.ts',
   'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
   'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
   'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
@@ -310,7 +318,7 @@ describe('automation-verify affected scope', () => {
     const plan = buildAffectedTestPlan(PREREQUISITE_TRAIN_MANIFEST);
 
     expect(plan.mode).toBe('selected');
-    expect(plan.relatedFiles).toHaveLength(35);
+    expect(plan.relatedFiles).toHaveLength(38);
     expect(plan.mandatoryTests).toEqual([
       'apps/web/lib/events/confirmation-status.test.ts',
       'apps/web/tests/unit/events/insert.test.ts',

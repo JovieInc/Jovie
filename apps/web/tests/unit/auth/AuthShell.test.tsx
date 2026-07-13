@@ -8,6 +8,7 @@ const {
   searchParamsState,
   signInSocialMock,
   sendOtpMock,
+  oneTapMock,
 } = vi.hoisted(() => ({
   authState: {
     isLoaded: true,
@@ -20,6 +21,7 @@ const {
   searchParamsState: { value: '' },
   signInSocialMock: vi.fn(),
   sendOtpMock: vi.fn(),
+  oneTapMock: vi.fn(),
 }));
 
 vi.mock('@/hooks/useClerkSafe', () => ({
@@ -38,7 +40,7 @@ vi.mock('@/lib/auth/client', () => ({
     emailOtp: {
       sendVerificationOtp: sendOtpMock,
     },
-    oneTap: undefined,
+    oneTap: oneTapMock,
   },
 }));
 
@@ -81,6 +83,8 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     searchParamsState.value = '';
     signInSocialMock.mockResolvedValue(undefined);
     sendOtpMock.mockResolvedValue({ data: {} });
+    oneTapMock.mockResolvedValue(undefined);
+    delete document.documentElement.dataset.clerkMock;
   });
 
   it('is ready at first paint without a Clerk-loaded gate', () => {
@@ -88,6 +92,15 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(
       container.querySelector('[data-auth-shell-ready="true"]')
     ).not.toBeNull();
+  });
+
+  it('does not mount Google One Tap in a mock standalone runtime', async () => {
+    document.documentElement.dataset.clerkMock = '1';
+    render(<AuthShell mode='sign-up' />);
+
+    await waitFor(() => {
+      expect(oneTapMock).not.toHaveBeenCalled();
+    });
   });
 
   it('starts Google sign-in through Better Auth social with mode-aware callbacks', async () => {

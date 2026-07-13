@@ -330,13 +330,36 @@ async function seedAnonymousOnboardingJourney(page: Page, handle: string) {
     sendButton.click(),
   ]);
   expect(response.status()).toBe(200);
-  const conversationId = response.headers()['x-conversation-id'];
+  const requestBody = response.request().postDataJSON() as {
+    messages?: Array<{ id?: string; role?: string }>;
+  };
+  const clientMessageId = requestBody.messages
+    ?.toReversed()
+    .find(message => message.role === 'user')?.id;
+  expect(
+    clientMessageId,
+    'Anonymous chat request did not include a user message id'
+  ).toBeTruthy();
+
+  const sql = neon(dbUrl);
+  const persistedMessages = await sql`
+    SELECT conversation_id
+    FROM chat_messages
+    WHERE client_message_id = ${clientMessageId}
+      AND role = 'user'
+    ORDER BY created_at DESC
+    LIMIT 2
+  `;
+  expect(
+    persistedMessages.length,
+    'Anonymous chat user message was not persisted exactly once'
+  ).toBe(1);
+  const conversationId = persistedMessages[0]?.conversation_id;
   expect(
     conversationId,
     'Anonymous chat did not reserve a conversation'
   ).toBeTruthy();
 
-  const sql = neon(dbUrl);
   const toolCalls = [
     {
       schemaVersion: 2,

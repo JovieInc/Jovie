@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { authClient } from '@/lib/auth/client';
+import { publicEnv } from '@/lib/env-public';
 import type { AuthShellMode } from './AuthShell';
 
 /**
@@ -47,6 +48,10 @@ export function GoogleOneTap({ mode, suppress }: GoogleOneTapProps) {
   useEffect(() => {
     if (suppress) return;
     if (isNativeWebview()) return;
+    // Shared CI build artifacts can be restored from a cache created with a
+    // public Google client id. The runtime mock marker remains authoritative:
+    // never call a Better Auth plugin that mock standalone servers omit.
+    if (publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1') return;
 
     // `authClient.oneTap` is only present when the `oneTapClient` plugin was
     // mounted in `lib/auth/client.ts` (i.e. `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is

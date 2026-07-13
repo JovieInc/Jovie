@@ -377,7 +377,40 @@ test('chat route picker opens without moving the shell or composer', async ({
   const { composer, input, shellScroll } = shellChatFrameLocators(page);
   await expect(composer).toBeVisible({ timeout: 30_000 });
 
-  const beforeBox = await composer.boundingBox();
+  const stableComposerBox = async () => {
+    let previous = await composer.boundingBox();
+    let settled = previous;
+    let consecutiveStableSamples = 0;
+
+    await expect
+      .poll(
+        async () => {
+          const current = await composer.boundingBox();
+          if (!current || !previous) {
+            previous = current;
+            consecutiveStableSamples = 0;
+            return false;
+          }
+
+          const stable = (['x', 'y', 'width', 'height'] as const).every(
+            key => Math.abs(current[key] - previous![key]) <= 0.1
+          );
+          consecutiveStableSamples = stable ? consecutiveStableSamples + 1 : 0;
+          previous = current;
+          settled = current;
+          // Framer Motion springs can cross a low-velocity point before their
+          // final resting position. Hold the geometry steady for 500ms so the
+          // assertion compares settled states, not an intermediate frame.
+          return consecutiveStableSamples >= 5;
+        },
+        { timeout: 10_000, intervals: [100] }
+      )
+      .toBe(true);
+
+    return settled;
+  };
+
+  const beforeBox = await stableComposerBox();
   const beforeScrollTop = await shellScroll.evaluate(
     element => element.scrollTop
   );
@@ -388,7 +421,7 @@ test('chat route picker opens without moving the shell or composer', async ({
     timeout: 10_000,
   });
 
-  const afterBox = await composer.boundingBox();
+  const afterBox = await stableComposerBox();
   const afterScrollTop = await shellScroll.evaluate(
     element => element.scrollTop
   );

@@ -1506,6 +1506,14 @@ jobs:
 
           export NEXT_PUBLIC_CLERK_MOCK=1
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          # Standalone Next uses HOSTNAME when constructing absolute redirects.
+          # Pin both values to the same loopback origin used by Lighthouse.
+          export HOSTNAME=127.0.0.1
+          export NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000
+          # Anonymous public-route APIs fail closed when their Redis-backed
+          # limiters are unavailable; Lighthouse must exercise the real store.
+          export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
+          export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
 
           if [ ! -f .next/standalone/apps/web/server.js ]; then
             echo "Standalone server not found - public Lighthouse cannot start."
@@ -1552,6 +1560,8 @@ jobs:
           PROFILE_MOBILE_PERF_BUDGETS: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           DATABASE_URL: ${{ env.DATABASE_URL }}
           PUBLIC_NOAUTH_SMOKE: '1'
           URL_ENCRYPTION_KEY: lighthouse-public-ci-url-encryption-key

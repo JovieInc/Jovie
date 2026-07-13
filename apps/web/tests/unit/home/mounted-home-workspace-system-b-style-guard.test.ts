@@ -105,7 +105,7 @@ describe('mounted homepage workspace System B source contract', () => {
     expect(css).toContain('var(--system-b-app-frame-seam)');
     expect(css).toContain('var(--system-b-app-content-surface)');
     expect(css).toContain('var(--color-text-primary-token)');
-    expect(css).toContain('var(--color-text-tertiary-token)');
+    expect(css).toContain('var(--color-text-secondary-token)');
     expect(css).toContain('var(--radius-3xl)');
     expect(css).toContain('var(--radius-xl)');
     expect(css).toContain('var(--text-5xl)');

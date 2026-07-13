@@ -102,6 +102,41 @@ describe('golden-path smoke OTP contract', () => {
       'SESSION_SECRET: ${{ secrets.SESSION_SECRET }}'
     );
   });
+
+  it('provides Redis to standalone anonymous-chat runtimes', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    for (const stepName of [
+      'Run Lighthouse CI (public launch thresholds)',
+      'Run Required Smoke Tests',
+    ]) {
+      const step = getStepBlock(workflow, stepName);
+      expect(step).toContain(
+        'export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"'
+      );
+      expect(step).toContain(
+        'export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"'
+      );
+      expect(step).toContain(
+        'UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}'
+      );
+      expect(step).toContain(
+        'UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}'
+      );
+    }
+  });
+
+  it('keeps public Lighthouse redirects on its canonical loopback origin', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const step = getStepBlock(
+      workflow,
+      'Run Lighthouse CI (public launch thresholds)'
+    );
+
+    expect(step).toContain('export HOSTNAME=127.0.0.1');
+    expect(step).toContain('export NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000');
+    expect(step).toContain('BASE_URL: http://127.0.0.1:3000');
+  });
 });
 
 describe('deploy workflow Vercel env resolution', () => {
