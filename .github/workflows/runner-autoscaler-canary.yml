@@ -2,9 +2,6 @@ name: Runner Autoscaler Canary
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - codex/jov-4248-autoscaler-canary
 
 permissions:
   contents: read
