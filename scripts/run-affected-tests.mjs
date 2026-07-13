@@ -81,6 +81,25 @@ const PREREQUISITE_TRAIN_MANIFEST = new Set([
   ...PREREQUISITE_TRAIN_TESTS,
   'scripts/ci/neon-orphan-reaper.mjs',
 ]);
+const VERCEL_CONGESTION_CONTROL_MANIFEST = new Set([
+  '.github/scripts/cancel-stale-vercel-previews.mjs',
+  '.github/scripts/cancel-stale-vercel-previews.test.mjs',
+  '.github/scripts/vercel-prebuilt-deploy.sh',
+  'scripts/tests/test_vercel_prebuilt_deploy.py',
+]);
+const VERCEL_CONGESTION_CONTROL_ROOT_VITEST_TESTS = [
+  '.github/scripts/cancel-stale-vercel-previews.test.mjs',
+];
+const VERCEL_CONGESTION_CONTROL_PYTHON_TESTS = [
+  'scripts/tests/test_vercel_prebuilt_deploy.py',
+];
+const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+]);
+const AFFECTED_TEST_SELECTOR_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
 
 function isInvestorNoteIngestionInput(file) {
   return (
@@ -115,6 +134,19 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactPrerequisiteTrain =
     hasPrerequisiteTrainCorners &&
     files.every(file => PREREQUISITE_TRAIN_MANIFEST.has(file));
+  const vercelCongestionControlInputCount = files.filter(file =>
+    VERCEL_CONGESTION_CONTROL_MANIFEST.has(file)
+  ).length;
+  const isExactVercelCongestionControl =
+    vercelCongestionControlInputCount ===
+      VERCEL_CONGESTION_CONTROL_MANIFEST.size &&
+    files.length === VERCEL_CONGESTION_CONTROL_MANIFEST.size;
+  const affectedTestSelectorInputCount = files.filter(file =>
+    AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+  ).length;
+  const isExactAffectedTestSelector =
+    affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
+    files.length === AFFECTED_TEST_SELECTOR_MANIFEST.size;
   const relatedFiles = files.filter(
     file =>
       TESTABLE_FILE.test(file) &&
@@ -195,6 +227,15 @@ export function buildAffectedTestPlan(changedFiles) {
   }
 
   const selectedTests = unique([...directTests, ...mandatoryTests]);
+  const rootVitestTests = isExactVercelCongestionControl
+    ? VERCEL_CONGESTION_CONTROL_ROOT_VITEST_TESTS
+    : [];
+  const pythonTests = isExactVercelCongestionControl
+    ? VERCEL_CONGESTION_CONTROL_PYTHON_TESTS
+    : [];
+  const scriptVitestTests = isExactAffectedTestSelector
+    ? AFFECTED_TEST_SELECTOR_TESTS
+    : [];
   const isCoveredSource = file => {
     if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return true;
     if (file.startsWith('apps/web/components/features/profile/')) return true;
@@ -237,20 +278,33 @@ export function buildAffectedTestPlan(changedFiles) {
     files.length === 1 && PREREQUISITE_TRAIN_STANDALONE_GLOBALS.has(files[0]);
   const hasUnknownPrerequisiteTrainPeer =
     hasPrerequisiteTrainCorners && !isExactPrerequisiteTrain;
+  const hasIncompleteVercelCongestionControl =
+    vercelCongestionControlInputCount > 0 && !isExactVercelCongestionControl;
+  const hasIncompleteAffectedTestSelector =
+    affectedTestSelectorInputCount > 0 && !isExactAffectedTestSelector;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
     hasUnknownCiCancellationHealerPeer ||
     hasStandaloneCiFastLanesChange ||
     hasIncompletePrerequisiteTrain ||
     hasStandalonePrerequisiteGlobal ||
-    hasUnknownPrerequisiteTrainPeer;
+    hasUnknownPrerequisiteTrainPeer ||
+    hasIncompleteVercelCongestionControl ||
+    hasIncompleteAffectedTestSelector;
+  const hasSelectedTests =
+    selectedTests.length > 0 ||
+    rootVitestTests.length > 0 ||
+    pythonTests.length > 0 ||
+    scriptVitestTests.length > 0;
   return {
     mode: hasUncoveredSource
       ? 'full'
-      : selectedTests.length > 0 &&
+      : hasSelectedTests &&
           (relatedFiles.length > 0 ||
             hasCiCancellationHealerChange ||
-            isExactPrerequisiteTrain)
+            isExactPrerequisiteTrain ||
+            isExactVercelCongestionControl ||
+            isExactAffectedTestSelector)
         ? 'selected'
         : relatedFiles.length === 0
           ? 'none'
@@ -258,6 +312,9 @@ export function buildAffectedTestPlan(changedFiles) {
     relatedFiles,
     mandatoryTests: unique(mandatoryTests),
     selectedTests,
+    rootVitestTests,
+    pythonTests,
+    scriptVitestTests,
   };
 }
 
@@ -280,7 +337,7 @@ function changedFiles(base) {
     .filter(Boolean);
 }
 
-export async function runCommand(command, args) {
+async function runCommandStatus(command, args) {
   const child = spawn(command, args, {
     cwd: REPO_ROOT,
     stdio: 'inherit',
@@ -304,7 +361,77 @@ export async function runCommand(command, args) {
   });
   process.removeListener('SIGINT', onInterrupt);
   process.removeListener('SIGTERM', onTerminate);
-  process.exit(status);
+  return status;
+}
+
+export async function runCommand(command, args) {
+  process.exit(await runCommandStatus(command, args));
+}
+
+async function runCommands(commands) {
+  for (const [command, args] of commands) {
+    const status = await runCommandStatus(command, args);
+    if (status !== 0) process.exit(status);
+  }
+  process.exit(0);
+}
+
+export function buildSelectedTestCommands(plan, maxWorkers) {
+  const commands = [];
+  if (plan.scriptVitestTests.length > 0) {
+    commands.push([
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        '--root',
+        'scripts',
+        '--config',
+        'vitest.config.mts',
+        'run',
+        ...plan.scriptVitestTests.map(file => file.replace(/^scripts\//, '')),
+        '--maxWorkers',
+        maxWorkers,
+      ],
+    ]);
+  }
+  if (plan.rootVitestTests.length > 0) {
+    commands.push([
+      'pnpm',
+      [
+        'exec',
+        'vitest',
+        'run',
+        '--root',
+        '.',
+        '--config',
+        'apps/web/vitest.config.mts',
+        ...plan.rootVitestTests,
+        '--maxWorkers',
+        maxWorkers,
+      ],
+    ]);
+  }
+  if (plan.pythonTests.length > 0) {
+    commands.push(['python3', ['-m', 'pytest', ...plan.pythonTests, '-q']]);
+  }
+  if (plan.selectedTests.length > 0) {
+    commands.push([
+      'pnpm',
+      [
+        '--filter',
+        '@jovie/web',
+        'exec',
+        'vitest',
+        'run',
+        ...plan.selectedTests.map(file => file.replace(/^apps\/web\//, '')),
+        '--passWithNoTests',
+        '--maxWorkers',
+        maxWorkers,
+      ],
+    ]);
+  }
+  return commands;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -325,15 +452,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     await runCommand('pnpm', ['--filter', '@jovie/web', 'run', 'test']);
   }
 
-  await runCommand('pnpm', [
-    '--filter',
-    '@jovie/web',
-    'exec',
-    'vitest',
-    'run',
-    ...plan.selectedTests.map(file => file.replace(/^apps\/web\//, '')),
-    '--passWithNoTests',
-    '--maxWorkers',
-    maxWorkers,
-  ]);
+  await runCommands(buildSelectedTestCommands(plan, maxWorkers));
 }
