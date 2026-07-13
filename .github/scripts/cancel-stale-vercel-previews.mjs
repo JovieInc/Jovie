@@ -2,17 +2,12 @@
 
 const API_BASE = 'https://api.vercel.com';
 const ACTIVE_STATES = ['QUEUED', 'BUILDING'];
-const MINIMUM_AGE_MS = 20 * 60 * 1000;
 const MAX_CANCELLATIONS = 100;
 
-export function isStalePreview(
-  deployment,
-  { currentSha, projectId, now = Date.now() }
-) {
+export function isStalePreview(deployment, { currentSha, projectId }) {
   const commitSha = deployment.meta?.githubCommitSha;
   const commitRef = deployment.meta?.githubCommitRef;
   const state = (deployment.readyState ?? deployment.state ?? '').toUpperCase();
-  const createdAt = Number(deployment.createdAt ?? deployment.created ?? 0);
 
   return (
     deployment.projectId === projectId &&
@@ -21,9 +16,7 @@ export function isStalePreview(
     commitRef === 'main' &&
     typeof commitSha === 'string' &&
     commitSha.length > 0 &&
-    commitSha !== currentSha &&
-    createdAt > 0 &&
-    now - createdAt >= MINIMUM_AGE_MS
+    commitSha !== currentSha
   );
 }
 

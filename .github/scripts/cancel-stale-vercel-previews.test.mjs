@@ -13,7 +13,7 @@ const activePreview = (overrides = {}) => ({
   projectId,
   target: null,
   readyState: 'QUEUED',
-  createdAt: now - 21 * 60 * 1000,
+  createdAt: now - 60 * 1000,
   meta: { githubCommitRef: 'main', githubCommitSha: 'old-sha' },
   ...overrides,
 });
@@ -39,12 +39,12 @@ describe('cancel stale Vercel previews', () => {
       )
     ).toBe(false);
     expect(
-      isStalePreview(activePreview({ createdAt: now - 5 * 60 * 1000 }), {
+      isStalePreview(activePreview({ createdAt: now - 1000 }), {
         currentSha,
         projectId,
         now,
       })
-    ).toBe(false);
+    ).toBe(true);
     expect(
       isStalePreview(
         activePreview({
