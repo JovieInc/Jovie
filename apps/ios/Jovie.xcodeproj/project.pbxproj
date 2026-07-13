@@ -32,6 +32,8 @@
 		70003B11B0FA1692B2017553 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */; };
 		71B98E46403E1759256C61A5 /* IntentNavigationStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */; };
 		74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E33DCDBD6A55190F563B419C /* DashboardView.swift */; };
+		3CDFFABED4224A5D83E914F7 /* AppleWalletViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152143118D2540508F176DD0 /* AppleWalletViews.swift */; };
+		E4C87A1B36144E34A8EAA3FE /* QRCodeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 866FA1C7533B466290B8FE45 /* QRCodeCardView.swift */; };
 		7F479BE5BDDDDCF9BFFF256B /* JovieAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A40F1B3BFCC6AD8FF8EAF93 /* JovieAppIntents.swift */; };
 		A0J0V11070000000000000002 /* ConversationUserActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V11070000000000000001 /* ConversationUserActivity.swift */; };
 		8747690FEEF7BD069EBF7430 /* MeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */; };
@@ -227,6 +229,8 @@
 		D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Configuration.local.plist; sourceTree = "<group>"; };
 		DD30F57584F71E958D8C0514 /* LaunchMode.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchMode.swift; sourceTree = "<group>"; };
 		E33DCDBD6A55190F563B419C /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		152143118D2540508F176DD0 /* AppleWalletViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleWalletViews.swift; sourceTree = "<group>"; };
+		866FA1C7533B466290B8FE45 /* QRCodeCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QRCodeCardView.swift; sourceTree = "<group>"; };
 		E4EAFC467F76300BCFC2659F /* Configuration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthScreen.swift; sourceTree = "<group>"; };
 		F4562819B40056163650929C /* JovieAppIntentsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieAppIntentsTests.swift; sourceTree = "<group>"; };
@@ -544,6 +548,8 @@
 			isa = PBXGroup;
 			children = (
 				E33DCDBD6A55190F563B419C /* DashboardView.swift */,
+				152143118D2540508F176DD0 /* AppleWalletViews.swift */,
+				866FA1C7533B466290B8FE45 /* QRCodeCardView.swift */,
 				7DEB4AD6A6B0BBDE4A347E2D /* VenueModeView.swift */,
 			);
 			name = Dashboard;
@@ -807,6 +813,8 @@
 				5F4F3551CC9F4C09A2520AEB /* AppShellView.swift in Sources */,
 				F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */,
 				74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */,
+				3CDFFABED4224A5D83E914F7 /* AppleWalletViews.swift in Sources */,
+				E4C87A1B36144E34A8EAA3FE /* QRCodeCardView.swift in Sources */,
 				A0J0V36380000000000000002 /* AudienceHighlightsView.swift in Sources */,
 				BE57F23AE56E75A83692D03D /* VenueModeView.swift in Sources */,
 				F3E8220C7612A63FF54DB345 /* NeedsOnboardingView.swift in Sources */,
