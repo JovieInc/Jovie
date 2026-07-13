@@ -4845,6 +4845,10 @@ jobs:
             if [ $i -eq 3 ]; then exit 1; fi
           done
         env:
+          # The restored prebuilt artifact uploads but its function runtime is
+          # not healthy. Use Vercel's source-build cache until the artifact is
+          # proven runtime-closed by canary.
+          VERCEL_FORCE_SOURCE_DEPLOY: 'true'
           # The closed staging artifact contains more than Vercel's 15k plain
           # upload limit. Give the archive path the full prebuilt budget.
           VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'false'

@@ -142,6 +142,17 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(deployScript).toContain('"${VERCEL_SCOPE_ARGS[@]}"');
     expect(deployScript).toContain('.vercel/jovie-generated-public-files');
     expect(deployScript).toContain('rm -f -- "$generated_file"');
+    expect(deployScript).toContain('VERCEL_FORCE_SOURCE_DEPLOY');
+  });
+
+  it('uses the Vercel source cache while prebuilt runtime closure is unhealthy', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const deployStep = getStepBlock(
+      workflow,
+      'Deploy (staging preview, prebuilt)'
+    );
+
+    expect(deployStep).toContain("VERCEL_FORCE_SOURCE_DEPLOY: 'true'");
   });
 
   it('packages generated public trace files and budgets remote fallback readiness', () => {

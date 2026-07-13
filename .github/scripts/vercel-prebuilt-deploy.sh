@@ -138,6 +138,7 @@ try_mode() {
 
 plain_prebuilt_limit=15000
 plain_prebuilt_requested="${VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK:-false}"
+force_source_deploy="${VERCEL_FORCE_SOURCE_DEPLOY:-false}"
 prebuilt_file_count="$(count_prebuilt_files)"
 has_prebuilt_output=true
 can_use_plain_prebuilt=true
@@ -162,14 +163,15 @@ resolve_vercel_cmd
 echo "Using Vercel CLI command: ${VERCEL_CMD[*]}"
 echo "Plain prebuilt fallback requested: $plain_prebuilt_requested"
 echo "Plain prebuilt fallback enabled: $can_use_plain_prebuilt"
+echo "Force source deploy: $force_source_deploy"
 
 deploy_modes=()
 
-if [ "$has_prebuilt_output" = true ]; then
+if [ "$has_prebuilt_output" = true ] && [ "$force_source_deploy" != "true" ]; then
   deploy_modes+=(tgz)
 fi
 
-if [ "$can_use_plain_prebuilt" = true ]; then
+if [ "$can_use_plain_prebuilt" = true ] && [ "$force_source_deploy" != "true" ]; then
   deploy_modes+=(plain)
 fi
 
