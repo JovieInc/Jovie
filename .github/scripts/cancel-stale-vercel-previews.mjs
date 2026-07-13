@@ -3,12 +3,25 @@
 const API_BASE = 'https://api.vercel.com';
 const ACTIVE_STATES = ['QUEUED', 'BUILDING'];
 const MAX_CANCELLATIONS = 100;
-export const DEFAULT_MIN_AGE_MS = 15 * 60 * 1000;
+export const DEFAULT_QUEUED_MIN_AGE_MS = 30 * 60 * 1000;
+export const DEFAULT_BUILDING_MIN_AGE_MS = 30 * 60 * 1000;
 
-function requireValidMinAge(minAgeMs) {
-  if (!Number.isFinite(minAgeMs) || minAgeMs < 0) {
-    throw new Error('Vercel preview minimum age must be a non-negative number');
+function requireValidMinAges(queuedMinAgeMs, buildingMinAgeMs) {
+  if (!Number.isFinite(queuedMinAgeMs) || queuedMinAgeMs < 0) {
+    throw new Error(
+      'Vercel queued preview minimum age must be a non-negative number'
+    );
   }
+  if (!Number.isFinite(buildingMinAgeMs) || buildingMinAgeMs < 0) {
+    throw new Error(
+      'Vercel building preview minimum age must be a non-negative number'
+    );
+  }
+}
+
+function validTimestamp(value) {
+  const timestamp = Number(value);
+  return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;
 }
 
 export function isStalePreview(
@@ -16,22 +29,25 @@ export function isStalePreview(
   {
     projectId,
     now = Date.now(),
-    minAgeMs = DEFAULT_MIN_AGE_MS,
+    queuedMinAgeMs = DEFAULT_QUEUED_MIN_AGE_MS,
+    buildingMinAgeMs = DEFAULT_BUILDING_MIN_AGE_MS,
     currentSha = '',
   }
 ) {
-  requireValidMinAge(minAgeMs);
+  requireValidMinAges(queuedMinAgeMs, buildingMinAgeMs);
   const state = (deployment.readyState ?? deployment.state ?? '').toUpperCase();
-  const createdAt = Number(deployment.createdAt ?? deployment.created);
+  const createdAt = validTimestamp(deployment.createdAt ?? deployment.created);
+  const buildingAt = validTimestamp(deployment.buildingAt);
+  const activeSince = state === 'BUILDING' ? buildingAt : createdAt;
+  const minAgeMs = state === 'BUILDING' ? buildingMinAgeMs : queuedMinAgeMs;
   const deploymentSha = deployment.meta?.githubCommitSha ?? '';
 
   return (
     deployment.projectId === projectId &&
     deployment.target !== 'production' &&
     ACTIVE_STATES.includes(state) &&
-    Number.isFinite(createdAt) &&
-    createdAt > 0 &&
-    now - createdAt >= minAgeMs &&
+    activeSince !== null &&
+    now - activeSince >= minAgeMs &&
     (!currentSha || deploymentSha !== currentSha)
   );
 }
@@ -63,12 +79,13 @@ export async function cancelStalePreviews({
   token,
   orgId,
   projectId,
-  minAgeMs = DEFAULT_MIN_AGE_MS,
+  queuedMinAgeMs = DEFAULT_QUEUED_MIN_AGE_MS,
+  buildingMinAgeMs = DEFAULT_BUILDING_MIN_AGE_MS,
   currentSha = '',
   now = Date.now(),
   request = vercelRequest,
 }) {
-  requireValidMinAge(minAgeMs);
+  requireValidMinAges(queuedMinAgeMs, buildingMinAgeMs);
   const deployments = [];
 
   for (const state of ACTIVE_STATES) {
@@ -91,7 +108,8 @@ export async function cancelStalePreviews({
         .filter(deployment =>
           isStalePreview(deployment, {
             projectId,
-            minAgeMs,
+            queuedMinAgeMs,
+            buildingMinAgeMs,
             currentSha,
             now,
           })
@@ -140,8 +158,11 @@ async function main() {
   const orgId = process.env.VERCEL_ORG_ID ?? '';
   const projectId = process.env.VERCEL_PROJECT_ID ?? '';
   const currentSha = process.env.GITHUB_SHA ?? '';
-  const minAgeMinutes = Number(
-    process.env.VERCEL_PREVIEW_MIN_AGE_MINUTES ?? '15'
+  const queuedMinAgeMinutes = Number(
+    process.env.VERCEL_PREVIEW_QUEUED_MIN_AGE_MINUTES ?? '30'
+  );
+  const buildingMinAgeMinutes = Number(
+    process.env.VERCEL_PREVIEW_BUILDING_MIN_AGE_MINUTES ?? '30'
   );
   const missing = Object.entries({ token, orgId, projectId })
     .filter(([, value]) => !value)
@@ -153,8 +174,15 @@ async function main() {
     );
   }
 
-  if (!Number.isFinite(minAgeMinutes) || minAgeMinutes < 0) {
-    throw new Error('VERCEL_PREVIEW_MIN_AGE_MINUTES must be non-negative');
+  if (!Number.isFinite(queuedMinAgeMinutes) || queuedMinAgeMinutes < 0) {
+    throw new Error(
+      'VERCEL_PREVIEW_QUEUED_MIN_AGE_MINUTES must be non-negative'
+    );
+  }
+  if (!Number.isFinite(buildingMinAgeMinutes) || buildingMinAgeMinutes < 0) {
+    throw new Error(
+      'VERCEL_PREVIEW_BUILDING_MIN_AGE_MINUTES must be non-negative'
+    );
   }
 
   await cancelStalePreviews({
@@ -162,7 +190,8 @@ async function main() {
     orgId,
     projectId,
     currentSha,
-    minAgeMs: minAgeMinutes * 60 * 1000,
+    queuedMinAgeMs: queuedMinAgeMinutes * 60 * 1000,
+    buildingMinAgeMs: buildingMinAgeMinutes * 60 * 1000,
   });
 }
 
