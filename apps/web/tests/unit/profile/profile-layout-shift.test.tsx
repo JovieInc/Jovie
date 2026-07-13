@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProfileNotificationsContextValue } from '@/components/organisms/profile-shell/types';
+import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
+import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA';
 import type { Artist } from '@/types/db';
 
 const mockUseSubscriptionForm = vi.fn();
@@ -142,10 +144,6 @@ describe('notification flow shell sizing', () => {
       buildFormState({ hydrationStatus: 'checking' })
     );
 
-    const { ArtistNotificationsCTA } = await import(
-      '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
-    );
-
     const { container } = render(
       <ArtistNotificationsCTA artist={artist} autoOpen />
     );
@@ -155,10 +153,6 @@ describe('notification flow shell sizing', () => {
 
   it('ArtistNotificationsCTA uses the full-height inline flow shell when expanded', async () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
-
-    const { ArtistNotificationsCTA } = await import(
-      '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
-    );
 
     render(<ArtistNotificationsCTA artist={artist} autoOpen />);
 
@@ -170,10 +164,6 @@ describe('notification flow shell sizing', () => {
 
   it('ProfileInlineNotificationsCTA reuses the same full-height inline shell', async () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
-
-    const { ProfileInlineNotificationsCTA } = await import(
-      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
-    );
 
     render(
       <ProfileInlineNotificationsCTA artist={artist} presentation='inline' />
