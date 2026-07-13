@@ -35,38 +35,18 @@ runs:
       with:
         dest: ${{ runner.temp }}/setup-pnpm
 
-    # Actions-cache-backed pnpm caching is GitHub-hosted only. Self-hosted
-    # runners (jovie-runner) keep a persistent pnpm store on disk, so the
-    # restore is pointless and the post-run save uploads ~1.2 GB — observed
-    # stalling at 0 B/s and eating the whole job timeout (Typecheck cancelled
-    # at 10m during the "Post Run" cache save, 2026-07-06).
+    # setup-node's pnpm cache is GitHub-hosted only. Every self-hosted runner,
+    # fixed or ephemeral, skips Actions cache restore/save. Fixed runners reuse
+    # their persistent local pnpm store; ephemeral runners warm a fresh store
+    # below. Do not add a separate actions/cache step here: run 29220980115
+    # uploaded a 1.335 GB store at 1-1.5 MB/s until the 20-minute canary timed
+    # out after all tests had passed.
     - name: Setup Node.js with pnpm cache
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
       with:
         node-version: '22'
         cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
         cache-dependency-path: '**/pnpm-lock.yaml'
-
-    - name: Get pnpm store directory
-      id: pnpm-cache
-      shell: bash
-      run: |
-        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-
-    - name: Setup pnpm cache
-      # Static self-hosted runners reuse this store across jobs. Ephemeral
-      # containers do not, so actions/cache would upload the whole store during
-      # teardown and can keep an otherwise-finished job occupied until timeout.
-      if: >-
-        runner.environment != 'github-hosted' &&
-        !startsWith(runner.name, 'jovie-eph-') &&
-        !startsWith(runner.name, 'jovie-iso-')
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-        key: ${{ runner.os }}-pnpm-store-${{ runner.name }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-pnpm-store-${{ runner.name }}-
 
     - name: Warm pnpm store
       shell: bash
