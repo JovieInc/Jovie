@@ -63,6 +63,7 @@ jobs:
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
+          DRAIN_MUTATION_AUTHORIZATION: merge-queue-autoenroll
         run: bash scripts/drain-pr-queue.sh
 
   rebase:
