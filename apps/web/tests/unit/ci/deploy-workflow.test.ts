@@ -169,6 +169,8 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(buildJob).toContain('.vercel/jovie-generated-public-files');
     expect(readinessStep).toContain('--timeout 20m');
+    expect(readinessStep).toContain('BUILDING|QUEUED|INITIALIZING)');
+    expect(readinessStep).toContain('handing off to retrying canary');
   });
 
   it('passes signup readiness keys into the staging preview runtime', () => {
