@@ -127,7 +127,7 @@ try_mode() {
     echo "Deploy attempt $attempt with ${mode} upload exceeded its time budget" >&2
     local accepted_deployment_url=""
     accepted_deployment_url="$(parse_deployment_url "$deploy_output")"
-    if [ "$mode" = "source" ] && [ -n "$accepted_deployment_url" ]; then
+    if [ -n "$accepted_deployment_url" ]; then
       write_deployment_url "$accepted_deployment_url"
       echo "Vercel accepted ${accepted_deployment_url}; downstream health gates will verify readiness"
       return 0
