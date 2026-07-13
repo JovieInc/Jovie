@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [main, 'integration/**']
+    types: [opened, synchronize, reopened, ready_for_review]
   # merge_group retired 2026-06-18: Graphite owns the merge queue; GitHub never
   # creates a merge_group, so this trigger would never fire. See .github/MERGE_QUEUE.md.
   push:
@@ -56,6 +57,23 @@ jobs:
   # runs first (fail-open), then path detection.
   ci-path-changes:
     name: Path Changes
+    # Eligible draft agent PRs run the smaller Agent PR Verify Ready workflow.
+    # That workflow promotes the PR only after affected checks pass; the
+    # resulting ready_for_review event starts this canonical merge-gate DAG.
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        !(
+          github.event.pull_request.draft &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          (
+            startsWith(github.event.pull_request.head.ref, 'linear/') ||
+            startsWith(github.event.pull_request.head.ref, 'claude/') ||
+            startsWith(github.event.pull_request.head.ref, 'codegen-bot/') ||
+            startsWith(github.event.pull_request.head.ref, 'codex/')
+          )
+        )
+      }}
     # Hosted-only root of the PR DAG. Self-hosted cancel/hang here cascades into
     # SKIPPED risk/ci-fast/unit leaves and a red PR Ready (JOV-3464 drain).
     runs-on: ubuntu-latest

@@ -73,6 +73,20 @@ describe('ci-harness manifest', () => {
     );
   });
 
+  it('hands draft agent PRs from affected verification to canonical CI once', () => {
+    expect(ciWorkflow).toContain(
+      'types: [opened, synchronize, reopened, ready_for_review]'
+    );
+    const pathChangesJob = ciWorkflow.slice(
+      ciWorkflow.indexOf('  ci-path-changes:'),
+      ciWorkflow.indexOf('  neon-db:')
+    );
+    expect(pathChangesJob).toContain('github.event.pull_request.draft &&');
+    expect(pathChangesJob).toContain(
+      "startsWith(github.event.pull_request.head.ref, 'codex/')"
+    );
+  });
+
   it('locks risk-rule smoke/preview/auto-merge contracts (characterization)', () => {
     const rules = listRiskRuleContracts(manifest);
     expect(rules.map(rule => rule.id)).toEqual([

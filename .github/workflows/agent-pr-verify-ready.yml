@@ -1,8 +1,8 @@
 # Agent PR Verify + Ready
 #
-# Draft agent PRs do not run the main CI/scope automation. This workflow gives
-# same-repo agent branches a small unprivileged verification gate and marks the
-# PR ready only after that gate passes.
+# Eligible draft agent PRs defer canonical CI while this workflow runs a small
+# unprivileged affected gate. Marking the PR ready emits ready_for_review, which
+# starts canonical CI exactly once on the verified head.
 
 name: Agent PR Verify Ready
 
