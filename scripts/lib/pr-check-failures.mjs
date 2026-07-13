@@ -121,7 +121,9 @@ function attemptTimestamp(check, field) {
 /**
  * GitHub may return superseded attempts with the same normalized name. Keep
  * only the uniquely newest (startedAt, completedAt) tuple. Missing timestamps
- * or an equal newest tuple are ambiguous and therefore fail closed.
+ * or an equal newest tuple are ambiguous and therefore fail closed. A skipped
+ * duplicate is non-evidence when the group already contains a success, but a
+ * newer pending or terminal attempt still supersedes that success.
  */
 export function collapseNewestCheckAttempts(checks) {
   const groups = new Map();
@@ -140,7 +142,16 @@ export function collapseNewestCheckAttempts(checks) {
       continue;
     }
 
-    const ranked = group.map(check => ({
+    // A skipped duplicate carries no new gate result. Preserve an existing
+    // success unless a newer pending or terminal attempt supplies real state.
+    const candidates = group.some(isSuccessfulCheck)
+      ? group.filter(check => !isSkippedCheck(check))
+      : group;
+    if (candidates.length === 1) {
+      collapsed.push(candidates[0]);
+      continue;
+    }
+    const ranked = candidates.map(check => ({
       check,
       startedAt: attemptTimestamp(check, 'startedAt'),
       completedAt: attemptTimestamp(check, 'completedAt'),
