@@ -1,0 +1,149 @@
+name: CI Cancellation Healer
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: fixed-runner-cancel-heal-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  classify-and-heal:
+    name: Classify and heal fixed-runner setup cancellation
+    if: github.event.workflow_run.conclusion == 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Verify GitHub CLI
+        run: gh --version
+
+      - name: Checkout main policy code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lib/ci-cancellation-classifier.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Collect cancellation evidence
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          run_file="$RUNNER_TEMP/source-run.json"
+          jobs_file="$RUNNER_TEMP/source-jobs.json"
+          pr_file="$RUNNER_TEMP/live-pr.json"
+          recent_file="$RUNNER_TEMP/recent-runs.json"
+          input_file="$RUNNER_TEMP/cancellation-input.json"
+          decision_file="$RUNNER_TEMP/cancellation-decision.json"
+
+          gh api "repos/$REPOSITORY/actions/runs/$SOURCE_RUN_ID" > "$run_file"
+          gh api --paginate "repos/$REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs?filter=all&per_page=100" \
+            | jq -s '{jobs: [.[].jobs[]]}' > "$jobs_file"
+
+          pr_number=$(jq -r '.pull_requests[0].number // empty' "$run_file")
+          if [[ -z "$pr_number" ]]; then
+            head_branch=$(jq -r '.head_branch' "$run_file")
+            head_sha=$(jq -r '.head_sha' "$run_file")
+            pr_number=$(gh api --paginate "repos/$REPOSITORY/pulls?state=open&per_page=100" \
+              | jq -sr --arg branch "$head_branch" --arg sha "$head_sha" \
+                '[.[][] | select(.head.ref == $branch and .head.sha == $sha)] | first | .number // empty')
+          fi
+
+          if [[ -n "$pr_number" ]]; then
+            gh api "repos/$REPOSITORY/pulls/$pr_number" > "$pr_file"
+          else
+            printf 'null\n' > "$pr_file"
+          fi
+
+          workflow_id=$(jq -r '.workflow_id' "$run_file")
+          head_branch=$(jq -r '.head_branch' "$run_file")
+          gh api --method GET "repos/$REPOSITORY/actions/workflows/$workflow_id/runs" \
+            -f branch="$head_branch" -f event=pull_request -f per_page=100 \
+            --jq '.workflow_runs' > "$recent_file"
+
+          jq -n \
+            --slurpfile run "$run_file" \
+            --slurpfile jobs "$jobs_file" \
+            --slurpfile live_pr "$pr_file" \
+            --slurpfile recent_runs "$recent_file" \
+            '{run: $run[0], jobs: $jobs[0].jobs, livePr: $live_pr[0], recentRuns: $recent_runs[0]}' \
+            > "$input_file"
+
+          node scripts/lib/ci-cancellation-classifier.mjs --input "$input_file" \
+            | tee "$decision_file"
+
+          {
+            echo "retryable=$(jq -r '.retryable' "$decision_file")"
+            echo "pr_number=$(jq -r '.diagnostics.prNumber // empty' "$decision_file")"
+            echo "source_head_sha=$(jq -r '.run.head_sha' "$input_file")"
+            echo "workflow_id=$workflow_id"
+            echo "head_branch=$head_branch"
+            echo "source_created_at=$(jq -r '.run.created_at' "$input_file")"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo '### Fixed-runner cancellation diagnosis'
+            echo
+            jq -r '"- Classification: `\(.classification)`\n- Action: `\(.action)`\n- Reason: `\(.reason)`\n- Source run: `\(.diagnostics.sourceRunId // "unknown")` attempt `\(.diagnostics.sourceRunAttempt // "unknown")`\n- Job: `\(.diagnostics.jobName // "unknown")` (`\(.diagnostics.jobId // "unknown")`)\n- Runner: `\(.diagnostics.runnerName // "unknown")` (`\(.diagnostics.runnerId // "unknown")`)\n- Tests executed: `\(.diagnostics.testsExecuted // "unknown")`"' "$decision_file"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Revalidate and rerun failed jobs once
+        if: steps.classify.outputs.retryable == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          SOURCE_HEAD_SHA: ${{ steps.classify.outputs.source_head_sha }}
+          SOURCE_CREATED_AT: ${{ steps.classify.outputs.source_created_at }}
+          PR_NUMBER: ${{ steps.classify.outputs.pr_number }}
+          WORKFLOW_ID: ${{ steps.classify.outputs.workflow_id }}
+          HEAD_BRANCH: ${{ steps.classify.outputs.head_branch }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_run=$(gh api "repos/$REPOSITORY/actions/runs/$SOURCE_RUN_ID")
+          current_attempt=$(jq -r '.run_attempt' <<< "$current_run")
+          current_status=$(jq -r '.status' <<< "$current_run")
+          current_conclusion=$(jq -r '.conclusion' <<< "$current_run")
+
+          if [[ "$current_attempt" != "1" ]]; then
+            echo "Run already advanced to attempt $current_attempt; no duplicate retry."
+            exit 0
+          fi
+          if [[ "$current_status" != "completed" || "$current_conclusion" != "cancelled" ]]; then
+            echo "::error::Source run changed state before retry: status=$current_status conclusion=$current_conclusion"
+            exit 1
+          fi
+
+          live_head=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" --jq '.head.sha')
+          if [[ "$live_head" != "$SOURCE_HEAD_SHA" ]]; then
+            echo "::error::PR head moved before retry: source=$SOURCE_HEAD_SHA live=$live_head"
+            exit 1
+          fi
+
+          newer_count=$(gh api --method GET "repos/$REPOSITORY/actions/workflows/$WORKFLOW_ID/runs" \
+            -f branch="$HEAD_BRANCH" -f event=pull_request -f per_page=100 \
+            --jq "[.workflow_runs[] | select(.id != $SOURCE_RUN_ID and .head_sha == \"$SOURCE_HEAD_SHA\" and .created_at > \"$SOURCE_CREATED_AT\")] | length")
+          if [[ "$newer_count" != "0" ]]; then
+            echo "::error::A newer CI run exists for the same head; refusing stale retry."
+            exit 1
+          fi
+
+          gh run rerun "$SOURCE_RUN_ID" --failed --repo "$REPOSITORY"
+          echo "Rerun requested for failed/cancelled jobs in run $SOURCE_RUN_ID (attempt 1 only)."

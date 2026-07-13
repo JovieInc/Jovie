@@ -1,0 +1,63 @@
+{
+  "run": {
+    "id": 29232227016,
+    "name": "CI",
+    "workflow_id": 91331092,
+    "run_number": 18421,
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "cancelled",
+    "head_sha": "ce8f486c62973ad3b567a053905a4cb8d6e0ac4f",
+    "created_at": "2026-07-13T07:29:15Z"
+  },
+  "jobs": [
+    {
+      "id": 86758828370,
+      "name": "Unit Tests (2/5)",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "runner_id": 57,
+      "runner_name": "gem-linux-4",
+      "labels": ["jovie-fixed"],
+      "started_at": "2026-07-13T07:35:00Z",
+      "completed_at": "2026-07-13T07:35:05Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "cancelled"
+        }
+      ]
+    },
+    {
+      "id": 86759949156,
+      "name": "PR Ready",
+      "status": "completed",
+      "conclusion": "failure",
+      "labels": ["ubuntu-latest"],
+      "steps": [
+        {
+          "name": "Evaluate required PR checks",
+          "status": "completed",
+          "conclusion": "failure"
+        }
+      ]
+    }
+  ],
+  "livePr": {
+    "number": 14265,
+    "state": "open",
+    "head": {
+      "sha": "ce8f486c62973ad3b567a053905a4cb8d6e0ac4f"
+    }
+  },
+  "recentRuns": [
+    {
+      "id": 29232227016,
+      "workflow_id": 91331092,
+      "run_number": 18421,
+      "head_sha": "ce8f486c62973ad3b567a053905a4cb8d6e0ac4f",
+      "created_at": "2026-07-13T07:29:15Z"
+    }
+  ]
+}
