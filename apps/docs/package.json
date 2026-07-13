@@ -13,7 +13,7 @@
     "start": "next start",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo"
   },
   "dependencies": {
     "next": "16.2.6",

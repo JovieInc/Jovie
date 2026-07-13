@@ -32,7 +32,7 @@
     "prepackage:local": "node scripts/sync-version.mjs && cross-env ELECTRON_ENV=local node scripts/write-env.mjs && pnpm run prepare:assets",
     "package:local": "tsc && electron-builder --config electron-builder.local.yml --publish never",
     "pretypecheck": "node scripts/write-env.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo"
   },
   "dependencies": {
     "electron-updater": "^6.3.0"

@@ -49,6 +49,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'ci-fast',
   'CI / Typecheck',
   'Typecheck',
+  'CI / Typecheck Stable Safety Gate',
+  'Typecheck Stable Safety Gate',
   'CI / Lint',
   'Lint',
   'CI / Structural Contract',

@@ -136,7 +136,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Tier | Purpose | Merge-gate jobs |
 | --- | --- | --- |
-| Fast Gate | Cheap deterministic checks required for every merge candidate. | `ci-fast`, `Unit Tests` |
+| Fast Gate | Cheap deterministic checks required for every merge candidate. | `ci-fast`, `Typecheck Stable Safety Gate`, `Unit Tests` |
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `Structural Contract`, `CI Risk Classifier` |
 | Risk-Triggered Smoke | Focused smoke validation for sensitive auth, billing, DB, config, and agent-control-plane changes. | `E2E Smoke (PR Fast Feedback)`, `Golden Path (PR)` |
 | Preview Evidence | Preview deploys and visual/a11y/performance evidence for review. | `Build (public routes)`, `Lighthouse (public routes PR)`, `Lighthouse (dashboard PR)`, `Lighthouse (onboarding PR)`, `Lighthouse (admin PR)`, `Preview Deploy (PR)` |
@@ -150,6 +150,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Job | Tier | Local remediation command |
 | --- | --- | --- |
 | `ci-fast` | fast-gate | `pnpm run typecheck && pnpm run biome:check` |
+| `Typecheck Stable Safety Gate` | fast-gate | `pnpm --filter @jovie/web run typecheck:stable -- --pretty false` |
 | `Structural Contract` | structural-contract | `pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors` |
 | `CI Risk Classifier` | structural-contract | `pnpm ci:harness:check` |
 | `Unit Tests` | fast-gate | `pnpm --filter=@jovie/web run test:fast` |

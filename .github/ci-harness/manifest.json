@@ -56,6 +56,14 @@
       "remediation": "Fix TypeScript, Biome, ESLint server-boundary, or proxy guard failures before expanding the change."
     },
     {
+      "id": "ci-typecheck-stable",
+      "name": "Typecheck Stable Safety Gate",
+      "tier": "fast-gate",
+      "mergeGate": true,
+      "nextLocalCommand": "pnpm --filter @jovie/web run typecheck:stable -- --pretty false",
+      "remediation": "The stable TS6 safety gate diverged from the native fast path. Fix the type error or investigate compiler parity before merging."
+    },
+    {
       "id": "ci-structural-contract",
       "name": "Structural Contract",
       "tier": "structural-contract",

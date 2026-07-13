@@ -24,7 +24,7 @@ import { resolve } from 'node:path';
 
 const REPO_ROOT = process.cwd();
 
-/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string }} LaneResult */
+/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', durationMs: number, logExcerpt: string }} LaneResult */
 
 const LANES = [
   {
@@ -254,11 +254,13 @@ function writeSummary(results) {
   const lines = [
     '### ci-fast lanes (JOV-3464)',
     '',
-    '| Lane | Status | Next local command |',
-    '| --- | --- | --- |',
+    '| Lane | Status | Duration | Next local command |',
+    '| --- | --- | ---: | --- |',
   ];
   for (const r of results) {
-    lines.push(`| ${r.name} | **${r.status}** | \`${r.nextLocalCommand}\` |`);
+    lines.push(
+      `| ${r.name} | **${r.status}** | ${(r.durationMs / 1000).toFixed(2)}s | \`${r.nextLocalCommand}\` |`
+    );
   }
   lines.push('');
   const failed = results.filter(r => r.status === 'failure');
@@ -283,6 +285,7 @@ function main() {
 
   for (const lane of LANES) {
     console.log(`\n======== lane: ${lane.id} ========`);
+    const startedAt = performance.now();
     let outcome;
     try {
       outcome = lane.run();
@@ -299,12 +302,15 @@ function main() {
         ? 'success'
         : 'failure';
     const logExcerpt = excerpt(outcome.output);
+    const durationMs = Math.round(performance.now() - startedAt);
 
     if (status === 'failure') {
       annotateFailure(lane, logExcerpt);
     }
 
-    console.log(`[ci-fast] ${lane.id}: ${status}`);
+    console.log(
+      `[ci-fast] ${lane.id}: ${status} (${(durationMs / 1000).toFixed(2)}s)`
+    );
     if (logExcerpt && status !== 'success') {
       console.log(logExcerpt);
     }
@@ -314,6 +320,7 @@ function main() {
       name: lane.name,
       nextLocalCommand: lane.nextLocalCommand,
       status,
+      durationMs,
       logExcerpt,
     });
   }
@@ -326,7 +333,7 @@ function main() {
     outPath,
     JSON.stringify(
       {
-        schemaVersion: 1,
+        schemaVersion: 2,
         job: 'ci-fast',
         lanes: results,
         generatedAt: new Date().toISOString(),

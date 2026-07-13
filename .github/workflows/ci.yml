@@ -492,13 +492,18 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-node-pnpm
-      - name: Cache Turbo
+      # JOV-4250: ci-fast forces Turbo execution (JOV-3499), so restoring
+      # `.turbo` cannot replay task results and only adds cache transfer time.
+      # Restore TypeScript's own incremental graph instead. `tsc` still runs and
+      # validates every input hash, so a stale successful task cannot be replayed.
+      - name: Restore TypeScript incremental state
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ hashFiles('turbo.json', '**/pnpm-lock.yaml') }}
+          path: |
+            **/.cache/tsbuildinfo*
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', '**/tsconfig*.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-turbo-
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', '**/tsconfig*.json') }}-
       - name: Decide structural lane
         id: structural
         shell: bash
@@ -543,6 +548,29 @@ jobs:
           path: ${{ runner.temp }}/ci-fast-lanes.json
           retention-days: 7
           if-no-files-found: warn
+
+  ci-typecheck-stable:
+    name: Typecheck Stable Safety Gate
+    # JOV-4250: TS7 native is the fast path; TS6 remains an independent merge
+    # gate until the pinned native compiler has sustained error-set parity.
+    needs: [ci-path-changes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Restore stable TypeScript incremental state
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.cache/tsbuildinfo
+          key: ${{ runner.os }}-web-tsbuildinfo-stable-${{ hashFiles('pnpm-lock.yaml', 'apps/web/tsconfig*.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-web-tsbuildinfo-stable-${{ hashFiles('pnpm-lock.yaml', 'apps/web/tsconfig*.json') }}-
+      - name: Run stable TypeScript safety gate
+        run: pnpm --filter @jovie/web run typecheck:stable -- --pretty false
 
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
@@ -3882,6 +3910,7 @@ jobs:
         ci-path-changes,
         ci-risk-classifier,
         ci-fast,
+        ci-typecheck-stable,
         ci-unit-tests,
         ci-build-public,
         ci-pr-vercel-preview,
@@ -3899,6 +3928,7 @@ jobs:
         run: |
           PATH_RESULT="${{ needs.ci-path-changes.result }}"
           FAST_RESULT="${{ needs.ci-fast.result }}"
+          STABLE_TYPECHECK_RESULT="${{ needs.ci-typecheck-stable.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
           A11Y_RESULT="${{ needs.ci-a11y.result }}"
@@ -3913,6 +3943,7 @@ jobs:
           HAS_CODE_CHANGES="${{ needs.ci-path-changes.outputs.has_code_changes }}"
           echo "ci-path-changes: $PATH_RESULT (has_code_changes=$HAS_CODE_CHANGES)"
           echo "ci-fast: $FAST_RESULT"
+          echo "ci-typecheck-stable: $STABLE_TYPECHECK_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
           echo "ci-build-public: $BUILD_RESULT"
           echo "ci-a11y: $A11Y_RESULT"
@@ -3927,6 +3958,7 @@ jobs:
             echo "| --- | --- | --- |"
             echo "| Path Changes | $PATH_RESULT | re-run workflow if cancelled/failed |"
             echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
+            echo "| Stable TypeScript safety gate | $STABLE_TYPECHECK_RESULT | \`pnpm --filter @jovie/web run typecheck:stable -- --pretty false\` |"
             echo "| Unit Tests | $UNIT_RESULT | \`pnpm --filter=@jovie/web run test:fast\` |"
             echo "| Build (public routes) | $BUILD_RESULT | \`pnpm run build:web\` |"
             echo "| A11y (axe) | $A11Y_RESULT | \`pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium\` |"
@@ -3961,9 +3993,18 @@ jobs:
               echo "Likely fix: pnpm run typecheck && pnpm run biome:check (see ci-fast step summary for the failing lane)."
               exit 1
             fi
+            if [[ "$STABLE_TYPECHECK_RESULT" != "success" ]]; then
+              echo "❌ Stable TypeScript safety gate did not pass (result: $STABLE_TYPECHECK_RESULT) on a code-changing PR"
+              echo "Likely fix: pnpm --filter @jovie/web run typecheck:stable -- --pretty false."
+              exit 1
+            fi
           elif [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
             echo "❌ ci-fast did not pass (result: $FAST_RESULT)"
             echo "Likely fix: pnpm run typecheck && pnpm run biome:check (see ci-fast step summary for the failing lane)."
+            exit 1
+          elif [[ "$STABLE_TYPECHECK_RESULT" != "success" && "$STABLE_TYPECHECK_RESULT" != "skipped" ]]; then
+            echo "❌ Stable TypeScript safety gate did not pass (result: $STABLE_TYPECHECK_RESULT)"
+            echo "Likely fix: pnpm --filter @jovie/web run typecheck:stable -- --pretty false."
             exit 1
           fi
 

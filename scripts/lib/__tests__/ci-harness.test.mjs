@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildCiHarnessArtifact,
@@ -14,10 +16,15 @@ import {
 import { replaceGeneratedBlock } from '../ci-harness.mjs';
 
 const manifest = loadCiHarnessManifest();
+const ciWorkflow = readFileSync(
+  resolve(import.meta.dirname, '../../../.github/workflows/ci.yml'),
+  'utf8'
+);
 
 /** Locked PR merge-gate set (manifest is source of truth for harness docs + artifact). */
 const EXPECTED_MERGE_GATE_NAMES = [
   'ci-fast',
+  'Typecheck Stable Safety Gate',
   'Structural Contract',
   'CI Risk Classifier',
   'Unit Tests',
@@ -53,6 +60,17 @@ describe('ci-harness manifest', () => {
       'Deploy staging',
       'Test Flakiness Report',
     ]);
+  });
+
+  it('fans the stable typecheck safety gate into PR Ready', () => {
+    const prReadyJob = ciWorkflow.slice(ciWorkflow.indexOf('  ci-pr-ready:'));
+    expect(prReadyJob).toContain('ci-typecheck-stable,');
+    expect(prReadyJob).toContain(
+      'STABLE_TYPECHECK_RESULT="${{ needs.ci-typecheck-stable.result }}"'
+    );
+    expect(prReadyJob).toContain(
+      'if [[ "$STABLE_TYPECHECK_RESULT" != "success" ]]'
+    );
   });
 
   it('locks risk-rule smoke/preview/auto-merge contracts (characterization)', () => {
