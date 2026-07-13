@@ -31,4 +31,17 @@ describe('self-hosted runner setup action', () => {
       "cache-dependency-path: '**/pnpm-lock.yaml'"
     );
   });
+
+  it('skips non-bundled onnxruntime downloads in both CI install phases', () => {
+    for (const stepName of ['Warm pnpm store', 'Install dependencies']) {
+      const step = action.match(
+        new RegExp(
+          `- name: ${stepName}\\n(?<step>[\\s\\S]*?)(?=\\n    - name:|$)`
+        )
+      )?.groups?.step;
+
+      expect(step).toContain('ONNXRUNTIME_NODE_INSTALL: skip');
+    }
+    expect(action.match(/ONNXRUNTIME_NODE_INSTALL: skip/g)).toHaveLength(2);
+  });
 });

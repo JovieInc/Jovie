@@ -50,8 +50,12 @@ runs:
 
     - name: Warm pnpm store
       shell: bash
+      env:
+        ONNXRUNTIME_NODE_INSTALL: skip
       run: pnpm fetch --frozen-lockfile
 
     - name: Install dependencies
       shell: bash
+      env:
+        ONNXRUNTIME_NODE_INSTALL: skip
       run: pnpm install --frozen-lockfile
