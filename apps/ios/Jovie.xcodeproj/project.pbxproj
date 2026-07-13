@@ -111,6 +111,7 @@
 		F3E8220C7612A63FF54DB345 /* NeedsOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88FB8A38A81A1249F313D416 /* NeedsOnboardingView.swift */; };
 		F8BC948A5A68297B746E217F /* MeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918FBCBCF600AA8C10191F60 /* MeCache.swift */; };
 		F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */; };
+		CCA8CB157DC140048C2D28B9 /* MobileAuthCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA18C2D747C4D929F25DF70 /* MobileAuthCoordinator.swift */; };
 		FA8D45F4123178BDD33F82C5 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D156B3220339CAB0DBE1DD /* SplashView.swift */; };
 		FDD930D67ACF374B16E87FDE /* MeRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 191669F70597A1039C74C0B1 /* MeRepositoryTests.swift */; };
 /* End PBXBuildFile section */
@@ -239,6 +240,7 @@
 		866FA1C7533B466290B8FE45 /* QRCodeCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QRCodeCardView.swift; sourceTree = "<group>"; };
 		E4EAFC467F76300BCFC2659F /* Configuration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthScreen.swift; sourceTree = "<group>"; };
+		BCA18C2D747C4D929F25DF70 /* MobileAuthCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileAuthCoordinator.swift; sourceTree = "<group>"; };
 		F4562819B40056163650929C /* JovieAppIntentsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieAppIntentsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -585,6 +587,7 @@
 			isa = PBXGroup;
 			children = (
 				EDFB0D6D1DA6A287207AC1A6 /* AuthScreen.swift */,
+				BCA18C2D747C4D929F25DF70 /* MobileAuthCoordinator.swift */,
 			);
 			name = Auth;
 			path = Auth;
@@ -823,6 +826,7 @@
 				A0J0V3632A0000000000000E /* InboxSurfaceView.swift in Sources */,
 				5F4F3551CC9F4C09A2520AEB /* AppShellView.swift in Sources */,
 				F95545618F95E792DCBCA7DF /* AuthScreen.swift in Sources */,
+				CCA8CB157DC140048C2D28B9 /* MobileAuthCoordinator.swift in Sources */,
 				74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */,
 				3CDFFABED4224A5D83E914F7 /* AppleWalletViews.swift in Sources */,
 				E4C87A1B36144E34A8EAA3FE /* QRCodeCardView.swift in Sources */,
