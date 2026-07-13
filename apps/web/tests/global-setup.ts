@@ -7,7 +7,16 @@ import {
   ensureDevTestAuthPersona,
   resolveDevTestAuthPersona,
 } from './helpers/dev-test-auth-personas';
-import { seedTestData } from './seed-test-data';
+
+// Lazy import (below, at call site) keeps `@/lib/db` — and its `server-only`
+// env module — out of this file's eager module graph. `seed-test-data.ts`
+// transitively imports `@/lib/db` (via `@/lib/events/insert`), and a
+// top-level static import here would load that whole chain unconditionally,
+// even on the `isCI && BASE_URL` early-return path below where seeding never
+// runs. `server-only` throws unconditionally outside a Next.js bundler
+// context, so eagerly loading it here trips the guard before this function
+// ever gets a chance to skip seeding. See the identical lazy-import pattern
+// (and rationale) in `lib/testing/test-user-provision.server.ts`.
 
 // Load environment variables in priority order (first-loaded wins with override: false)
 const webRoot = path.resolve(__dirname, '..');
@@ -84,6 +93,7 @@ async function globalSetup() {
   } else if (process.env.DATABASE_URL) {
     try {
       console.log('🌱 Seeding test data...');
+      const { seedTestData } = await import('./seed-test-data');
       await seedTestData();
       console.log('✓ Test data seeded successfully');
     } catch (error) {
