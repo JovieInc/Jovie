@@ -1,4 +1,4 @@
 {
   "$comment": "Shrink-only floor for --linear-* namespace usage (JOV #12009). Lower this when you migrate consumers; never raise it.",
-  "count": 2200
+  "count": 2194
 }
