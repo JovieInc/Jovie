@@ -711,6 +711,29 @@ describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
 });
 
 describe('ci-fast critical deploy contract', () => {
+  it('caches only production compiler state and reuses it across PR heads', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const nativeCache = getStepBlock(
+      workflow,
+      'Restore TypeScript incremental state'
+    );
+    const stableCache = getStepBlock(
+      workflow,
+      'Restore stable TypeScript incremental state'
+    );
+
+    expect(nativeCache).toContain(
+      '${{ github.event.pull_request.base.sha || github.sha }}'
+    );
+    expect(nativeCache).toContain('apps/web/.cache/tsbuildinfo-native');
+    expect(nativeCache).not.toContain('**/.cache/tsbuildinfo*');
+    expect(nativeCache).not.toContain('tsbuildinfo-native-probe');
+    expect(nativeCache).not.toContain('tsbuildinfo-stable-probe');
+    expect(stableCache).toContain(
+      '${{ github.event.pull_request.base.sha || github.sha }}'
+    );
+  });
+
   it('excludes base-only changes from PR lint and boundary lanes', () => {
     const ciFastLanes = readFileSync(ciFastLanesPath, 'utf8');
 

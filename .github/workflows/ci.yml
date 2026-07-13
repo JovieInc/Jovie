@@ -518,8 +518,17 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            **/.cache/tsbuildinfo*
-          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', '**/tsconfig*.json') }}-${{ github.sha }}
+            apps/console/.cache/tsbuildinfo
+            apps/desktop/.cache/tsbuildinfo
+            apps/docs/.cache/tsbuildinfo
+            apps/extension/.cache/tsbuildinfo
+            apps/should-i-make/.cache/tsbuildinfo
+            apps/web/.cache/tsbuildinfo-native
+            packages/auth-routing/.cache/tsbuildinfo
+            packages/extension-contracts/.cache/tsbuildinfo
+            packages/ui/.cache/tsbuildinfo
+            workers/observability-ingest/.cache/tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', '**/tsconfig*.json') }}-${{ github.event.pull_request.base.sha || github.sha }}
           restore-keys: |
             ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', '**/tsconfig*.json') }}-
       - name: Decide structural lane
@@ -584,7 +593,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/web/.cache/tsbuildinfo
-          key: ${{ runner.os }}-web-tsbuildinfo-stable-${{ hashFiles('pnpm-lock.yaml', 'apps/web/tsconfig*.json') }}-${{ github.sha }}
+          key: ${{ runner.os }}-web-tsbuildinfo-stable-${{ hashFiles('pnpm-lock.yaml', 'apps/web/tsconfig*.json') }}-${{ github.event.pull_request.base.sha || github.sha }}
           restore-keys: |
             ${{ runner.os }}-web-tsbuildinfo-stable-${{ hashFiles('pnpm-lock.yaml', 'apps/web/tsconfig*.json') }}-
       - name: Run stable TypeScript safety gate
