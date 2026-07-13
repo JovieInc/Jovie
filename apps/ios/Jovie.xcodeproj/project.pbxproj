@@ -77,6 +77,8 @@
 		A0J0V2549000000000000000E /* MobileChatClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V2549000000000000000D /* MobileChatClientTests.swift */; };
 		A0J0V36070000000000000002 /* MobileChatContentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36070000000000000001 /* MobileChatContentParser.swift */; };
 		6250AA6B2FC2435BB97DDE7D /* MobileChatContentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DC5F646E5F24F72B0116997 /* MobileChatContentModels.swift */; };
+		45227160A0834284B3D0B56D /* MobileChatLabels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30DC37856B5444494C3FB5D /* MobileChatLabels.swift */; };
+		2B1AECC3722E4029A1DB02C0 /* MobileChatProseTokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D197F4CBEFF14BB7855D392F /* MobileChatProseTokenizer.swift */; };
 		A0J0V36070000000000000004 /* MobileChatToolCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36070000000000000003 /* MobileChatToolCardView.swift */; };
 		A0J0V36080000000000000002 /* MobileChatMerchOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36080000000000000001 /* MobileChatMerchOptionsView.swift */; };
 		A0J0V36070000000000000006 /* MobileChatContentParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36070000000000000005 /* MobileChatContentParserTests.swift */; };
@@ -207,6 +209,8 @@
 		A0J0V2549000000000000000D /* MobileChatClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatClientTests.swift; sourceTree = "<group>"; };
 		A0J0V36070000000000000001 /* MobileChatContentParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatContentParser.swift; sourceTree = "<group>"; };
 		0DC5F646E5F24F72B0116997 /* MobileChatContentModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatContentModels.swift; sourceTree = "<group>"; };
+		B30DC37856B5444494C3FB5D /* MobileChatLabels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatLabels.swift; sourceTree = "<group>"; };
+		D197F4CBEFF14BB7855D392F /* MobileChatProseTokenizer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatProseTokenizer.swift; sourceTree = "<group>"; };
 		A0J0V36070000000000000003 /* MobileChatToolCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatToolCardView.swift; sourceTree = "<group>"; };
 		A0J0V36080000000000000001 /* MobileChatMerchOptionsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatMerchOptionsView.swift; sourceTree = "<group>"; };
 		A0J0V36070000000000000005 /* MobileChatContentParserTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatContentParserTests.swift; sourceTree = "<group>"; };
@@ -461,6 +465,8 @@
 				A0J0V25490000000000000005 /* MobileChatClient.swift */,
 				A0J0V36070000000000000001 /* MobileChatContentParser.swift */,
 				0DC5F646E5F24F72B0116997 /* MobileChatContentModels.swift */,
+				B30DC37856B5444494C3FB5D /* MobileChatLabels.swift */,
+				D197F4CBEFF14BB7855D392F /* MobileChatProseTokenizer.swift */,
 				A0J0V25490000000000000007 /* MobileChatModels.swift */,
 				A0GH13008000000000000001 /* VoiceCaptureService.swift */,
 				3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */,
@@ -774,6 +780,8 @@
 				A0GH13008000000000000002 /* VoiceCaptureService.swift in Sources */,
 				A0J0V36070000000000000002 /* MobileChatContentParser.swift in Sources */,
 				6250AA6B2FC2435BB97DDE7D /* MobileChatContentModels.swift in Sources */,
+				45227160A0834284B3D0B56D /* MobileChatLabels.swift in Sources */,
+				2B1AECC3722E4029A1DB02C0 /* MobileChatProseTokenizer.swift in Sources */,
 				52C5CBF9C24E4C502FA64955 /* MobileMeResponse.swift in Sources */,
 				A0J0V36380000000000000004 /* MobileAudienceHighlightsResponse.swift in Sources */,
 				A0GH12706000000000000002 /* MobileActionLoopInboxResponse.swift in Sources */,
