@@ -1,0 +1,160 @@
+import { spawn } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
+
+const runner = readFileSync(
+  resolve(import.meta.dirname, '../../run-affected-tests.mjs'),
+  'utf8'
+);
+
+const script = readFileSync(
+  resolve(import.meta.dirname, '../../automation-verify.sh'),
+  'utf8'
+);
+
+describe('automation-verify affected scope', () => {
+  it('selects related tests instead of the whole affected workspace package', () => {
+    expect(script).toContain('node scripts/run-affected-tests.mjs');
+    expect(script).not.toContain('turbo-local.mjs test --affected');
+  });
+
+  it('fails closed on an unresolved base and retains mandatory risk policy', () => {
+    expect(script).toContain(
+      'git rev-parse --verify --quiet "${BASE_REF}^{commit}"'
+    );
+    expect(script).toContain('pnpm ci:harness:check');
+  });
+
+  it('bounds local test fanout', () => {
+    expect(script).toContain(
+      '--max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}"'
+    );
+  });
+
+  it('keeps a #14044-like typography change bounded with required layout lanes', () => {
+    const plan = buildAffectedTestPlan([
+      'apps/web/components/features/profile/ProfileHeroCard.tsx',
+      'apps/web/components/jovie/components/ErrorDisplay.tsx',
+      'apps/web/eslint-rules/canonical-ui-label-casing.test.ts',
+      'apps/web/tests/unit/design-system/arbitrary-values.baseline.json',
+      'CHANGELOG.md',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.relatedFiles).toHaveLength(4);
+    expect(plan.mandatoryTests).toEqual([
+      'apps/web/tests/unit/profile/profile-layout-shift.test.tsx',
+      'apps/web/tests/unit/profile/profile-card-layout.test.tsx',
+      'apps/web/tests/unit/profile/profile-compact-surface-hero-layout.test.ts',
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/eslint-rules/canonical-ui-label-casing.test.ts',
+    ]);
+    expect(plan.selectedTests).toHaveLength(5);
+  });
+
+  it('fails closed to the full suite for global test inputs', () => {
+    expect(buildAffectedTestPlan(['apps/web/tests/setup.ts']).mode).toBe(
+      'full'
+    );
+  });
+
+  it('fails closed when a web source has no test lane', () => {
+    expect(buildAffectedTestPlan(['apps/web/lib/unknown.ts']).mode).toBe(
+      'full'
+    );
+  });
+
+  it('fails closed when an unknown source is mixed with a direct test', () => {
+    expect(
+      buildAffectedTestPlan([
+        'apps/web/lib/unknown.ts',
+        'apps/web/tests/unit/known.test.ts',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when an unknown source is mixed with a known profile surface', () => {
+    expect(
+      buildAffectedTestPlan([
+        'apps/web/lib/unknown.ts',
+        'apps/web/components/features/profile/ProfileHeroCard.tsx',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('classifies a deleted unknown source as full-suite work', () => {
+    expect(buildAffectedTestPlan(['apps/web/lib/deleted.ts']).mode).toBe(
+      'full'
+    );
+    expect(runner).toContain('--diff-filter=ACDMR');
+  });
+
+  it.each([
+    'SIGINT',
+    'SIGTERM',
+  ])('terminates the owned child process group on %s', async signal => {
+    if (process.platform === 'win32') return;
+    const dir = mkdtempSync(resolve(tmpdir(), 'affected-process-group-'));
+    const pidFile = resolve(dir, 'grandchild.pid');
+    const childCode = `
+        const { spawn } = require('node:child_process');
+        const { writeFileSync } = require('node:fs');
+        const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+        writeFileSync(${JSON.stringify(pidFile)}, String(grandchild.pid));
+        setInterval(() => {}, 1000);
+      `;
+    const wrapperCode = `
+        import { runCommand } from ${JSON.stringify(
+          new URL('../../run-affected-tests.mjs', import.meta.url).href
+        )};
+        await runCommand(process.execPath, ['-e', ${JSON.stringify(childCode)}]);
+      `;
+    const wrapper = spawn(
+      process.execPath,
+      ['--input-type=module', '-e', wrapperCode],
+      { stdio: 'ignore' }
+    );
+    let grandchildPid;
+    try {
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        try {
+          grandchildPid = Number(readFileSync(pidFile, 'utf8'));
+          break;
+        } catch {
+          await new Promise(resolveWait => setTimeout(resolveWait, 25));
+        }
+      }
+      expect(grandchildPid).toBeGreaterThan(0);
+      wrapper.kill(signal);
+      await Promise.race([
+        new Promise(resolveExit => wrapper.once('exit', resolveExit)),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('wrapper did not exit')), 5000)
+        ),
+      ]);
+      const exitDeadline = Date.now() + 5000;
+      let alive = true;
+      while (alive && Date.now() < exitDeadline) {
+        try {
+          process.kill(grandchildPid, 0);
+          await new Promise(resolveWait => setTimeout(resolveWait, 25));
+        } catch {
+          alive = false;
+        }
+      }
+      expect(alive).toBe(false);
+    } finally {
+      if (wrapper.exitCode === null) wrapper.kill('SIGKILL');
+      if (grandchildPid) {
+        try {
+          process.kill(grandchildPid, 'SIGKILL');
+        } catch {}
+      }
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 15000);
+});
