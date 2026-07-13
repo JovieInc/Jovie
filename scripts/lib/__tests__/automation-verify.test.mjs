@@ -80,6 +80,17 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const GTMQ_SOURCE_GATE_REAPER_MANIFEST = [
+  '.github/actions/setup-node-pnpm/action.yml',
+  '.github/workflows/gtmq-source-authorization.yml',
+  '.github/workflows/merge-queue-autoenroll.yml',
+  'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+  'scripts/drain-pr-queue.sh',
+  'scripts/guard-gtmq-source-authorization.sh',
+  'scripts/tests/test_gh_retry.py',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
 
 describe('automation-verify affected scope', () => {
   it('selects related tests instead of the whole affected workspace package', () => {
@@ -427,6 +438,67 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...AFFECTED_TEST_SELECTOR_MANIFEST,
         'scripts/lib/unknown-selector-helper.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the Graphite source-gate regression and selector self-test for the exact repair signature', () => {
+    const plan = buildAffectedTestPlan(GTMQ_SOURCE_GATE_REAPER_MANIFEST);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.pythonTests).toEqual(['scripts/tests/test_gh_retry.py']);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          'exec',
+          'vitest',
+          '--root',
+          'scripts',
+          '--config',
+          'vitest.config.mts',
+          'run',
+          'lib/__tests__/automation-verify.test.mjs',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+      ['python3', ['-m', 'pytest', 'scripts/tests/test_gh_retry.py', '-q']],
+      [
+        'pnpm',
+        [
+          '--filter',
+          '@jovie/web',
+          'exec',
+          'vitest',
+          'run',
+          'tests/unit/ci/runner-setup-action.test.ts',
+          '--passWithNoTests',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
+  });
+
+  it.each(
+    GTMQ_SOURCE_GATE_REAPER_MANIFEST
+  )('fails closed when the Graphite source-gate repair is missing %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        GTMQ_SOURCE_GATE_REAPER_MANIFEST.filter(file => file !== missingInput)
+      ).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when the Graphite source-gate repair includes an unknown peer', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...GTMQ_SOURCE_GATE_REAPER_MANIFEST,
+        'scripts/unknown-graphite-controller.sh',
       ]).mode
     ).toBe('full');
   });

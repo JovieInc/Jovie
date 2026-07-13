@@ -9,7 +9,12 @@
 #   - run `gh pr merge` (branch protection lets only the Graphite app push to
 #     main; Graphite rebase-merges enrolled PRs server-side)
 #   - retarget to integration/loop-* (agents ship straight to main now)
-#   - close PRs (surfaced for a human instead — see the SURFACE bucket)
+#   - close ordinary PRs (surfaced for a human instead — see the SURFACE bucket)
+#
+# Graphite synthetic drafts are different: their generated `gtmq_*` branch can
+# still land after a source PR's queue authorization is withdrawn. The
+# synthetic-source guard below closes those generated drafts unless every open
+# source remains explicitly `merge-queue` enrolled and free of hard gates.
 #
 # Buckets that need code work (CONFLICT / BLOCKED) are printed for the
 # /drain command to fan out per-PR worktree agents (cheap model for mechanical
@@ -17,14 +22,33 @@
 #
 # Env:
 #   DRY_RUN=1   classify and print only; apply no labels
+#   DRAIN_MUTATION_AUTHORIZATION  required for every live mutation run
+#   DRAIN_EXPECT_GH  optional exact gh path assertion used by test fixtures
 #   DRAIN_MAX_SECONDS  hard wall-clock budget between GitHub calls (default 900)
 set -euo pipefail
+
+DRY_RUN="${DRY_RUN:-0}"
+if [[ "$DRY_RUN" != "1" ]]; then
+  case "${DRAIN_MUTATION_AUTHORIZATION:-}" in
+    merge-queue-autoenroll | test-fixture) ;;
+    *)
+      echo "::error::Refusing live drain without recognized DRAIN_MUTATION_AUTHORIZATION" >&2
+      exit 2
+      ;;
+  esac
+fi
+if [[ -n "${DRAIN_EXPECT_GH:-}" ]]; then
+  resolved_gh="$(command -v gh || true)"
+  if [[ "$resolved_gh" != "$DRAIN_EXPECT_GH" ]]; then
+    echo "::error::Refusing drain: expected gh at $DRAIN_EXPECT_GH, resolved ${resolved_gh:-missing}" >&2
+    exit 2
+  fi
+fi
 
 # shellcheck source=./scripts/lib/gh-retry.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 
 REPO="${REPO:-JovieInc/Jovie}"
-DRY_RUN="${DRY_RUN:-0}"
 DRAIN_MAX_SECONDS="${DRAIN_MAX_SECONDS:-900}"
 DRAIN_STARTED_AT="$SECONDS"
 
@@ -190,7 +214,7 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
 }
 
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-  --json number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName --jq '
+  --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName --jq '
   [ .[] | {
     n: .number,
     t: (.title[0:48]),
@@ -198,9 +222,19 @@ SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
     m: .mergeable,
     ms: (.mergeStateStatus // "UNKNOWN"),
     head: .headRefName,
+    body: (.body // ""),
     L: [.labels[].name],
     fail: []
   } ]')"
+
+# --- Graphite MQ synthetic authorization: fail closed before expensive checks ---
+# A source can be dequeued or gated after Graphite has already materialized a
+# speculative gtmq branch. Removing the source label alone does not reliably
+# cancel that generated branch, so re-check each source and close the synthetic
+# before this run spends its budget on checks or mutates ordinary enrollment.
+echo "=== GRAPHITE MQ source authorization ==="
+printf '%s\n' "$SNAP" | GTMQ_MUTATION_AUTHORIZATION=drain-snapshot \
+  bash "$(dirname "${BASH_SOURCE[0]}")/guard-gtmq-source-authorization.sh" --snapshot
 
 ENRICHED="[]"
 while IFS= read -r pr; do
@@ -359,9 +393,5 @@ echo "=== SURFACE (human decision; not touched) ==="
 echo "$SNAP" | jq -r '.[]
   | select(.draft or ([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred")))
   | "  #\(.n)  \(.t)  {\(.L|join(","))}"'
-
-# --- Graphite MQ working drafts (the queue itself; leave alone) ---
-echo "=== GRAPHITE MQ in-flight (leave) ==="
-echo "$SNAP" | jq -r '.[] | select(.head|startswith("gtmq_")) | "  #\(.n)  \(.t)"'
 
 echo "=== done (DRY_RUN=$DRY_RUN) ==="

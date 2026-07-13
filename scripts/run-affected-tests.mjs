@@ -100,6 +100,21 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const GTMQ_SOURCE_GATE_REAPER_MANIFEST = new Set([
+  '.github/actions/setup-node-pnpm/action.yml',
+  '.github/workflows/gtmq-source-authorization.yml',
+  '.github/workflows/merge-queue-autoenroll.yml',
+  'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+  'scripts/drain-pr-queue.sh',
+  'scripts/guard-gtmq-source-authorization.sh',
+  'scripts/tests/test_gh_retry.py',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+]);
+const GTMQ_SOURCE_GATE_REAPER_PYTHON_TESTS = ['scripts/tests/test_gh_retry.py'];
+const GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
 
 function isInvestorNoteIngestionInput(file) {
   return (
@@ -147,6 +162,12 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactAffectedTestSelector =
     affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
     files.length === AFFECTED_TEST_SELECTOR_MANIFEST.size;
+  const gtmqSourceGateReaperInputCount = files.filter(file =>
+    GTMQ_SOURCE_GATE_REAPER_MANIFEST.has(file)
+  ).length;
+  const isExactGtmqSourceGateReaper =
+    gtmqSourceGateReaperInputCount === GTMQ_SOURCE_GATE_REAPER_MANIFEST.size &&
+    files.length === GTMQ_SOURCE_GATE_REAPER_MANIFEST.size;
   const relatedFiles = files.filter(
     file =>
       TESTABLE_FILE.test(file) &&
@@ -230,12 +251,20 @@ export function buildAffectedTestPlan(changedFiles) {
   const rootVitestTests = isExactVercelCongestionControl
     ? VERCEL_CONGESTION_CONTROL_ROOT_VITEST_TESTS
     : [];
-  const pythonTests = isExactVercelCongestionControl
-    ? VERCEL_CONGESTION_CONTROL_PYTHON_TESTS
-    : [];
-  const scriptVitestTests = isExactAffectedTestSelector
-    ? AFFECTED_TEST_SELECTOR_TESTS
-    : [];
+  const pythonTests = unique([
+    ...(isExactVercelCongestionControl
+      ? VERCEL_CONGESTION_CONTROL_PYTHON_TESTS
+      : []),
+    ...(isExactGtmqSourceGateReaper
+      ? GTMQ_SOURCE_GATE_REAPER_PYTHON_TESTS
+      : []),
+  ]);
+  const scriptVitestTests = unique([
+    ...(isExactAffectedTestSelector ? AFFECTED_TEST_SELECTOR_TESTS : []),
+    ...(isExactGtmqSourceGateReaper
+      ? GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS
+      : []),
+  ]);
   const isCoveredSource = file => {
     if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return true;
     if (file.startsWith('apps/web/components/features/profile/')) return true;
@@ -281,7 +310,13 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompleteVercelCongestionControl =
     vercelCongestionControlInputCount > 0 && !isExactVercelCongestionControl;
   const hasIncompleteAffectedTestSelector =
-    affectedTestSelectorInputCount > 0 && !isExactAffectedTestSelector;
+    affectedTestSelectorInputCount > 0 &&
+    !isExactAffectedTestSelector &&
+    !isExactGtmqSourceGateReaper;
+  const hasIncompleteGtmqSourceGateReaper =
+    gtmqSourceGateReaperInputCount > 0 &&
+    !isExactGtmqSourceGateReaper &&
+    !isExactAffectedTestSelector;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
     hasUnknownCiCancellationHealerPeer ||
@@ -290,7 +325,8 @@ export function buildAffectedTestPlan(changedFiles) {
     hasStandalonePrerequisiteGlobal ||
     hasUnknownPrerequisiteTrainPeer ||
     hasIncompleteVercelCongestionControl ||
-    hasIncompleteAffectedTestSelector;
+    hasIncompleteAffectedTestSelector ||
+    hasIncompleteGtmqSourceGateReaper;
   const hasSelectedTests =
     selectedTests.length > 0 ||
     rootVitestTests.length > 0 ||
@@ -304,7 +340,8 @@ export function buildAffectedTestPlan(changedFiles) {
             hasCiCancellationHealerChange ||
             isExactPrerequisiteTrain ||
             isExactVercelCongestionControl ||
-            isExactAffectedTestSelector)
+            isExactAffectedTestSelector ||
+            isExactGtmqSourceGateReaper)
         ? 'selected'
         : relatedFiles.length === 0
           ? 'none'
