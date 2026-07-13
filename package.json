@@ -105,6 +105,8 @@
     "lint": "node scripts/run-scoped-turbo-task.mjs lint",
     "lint:fix": "node scripts/turbo-local.mjs lint:fix",
     "typecheck": "node scripts/run-scoped-turbo-task.mjs typecheck",
+    "typecheck:benchmark": "node scripts/typecheck-benchmark.mjs",
+    "typecheck:safety-probe": "node scripts/typecheck-safety-probe.mjs",
     "test": "node scripts/turbo-local.mjs test",
     "evals": "pnpm --filter @jovie/web run evals",
     "evals:golden": "pnpm --filter @jovie/web run evals:golden",
