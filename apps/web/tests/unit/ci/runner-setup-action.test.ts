@@ -11,7 +11,12 @@ describe('self-hosted runner setup action', () => {
       'utf8'
     );
 
-    expect(action).toContain("!startsWith(runner.name, 'jovie-eph-')");
-    expect(action).toContain("!startsWith(runner.name, 'jovie-iso-')");
+    const cacheStep = action.match(
+      /- name: Setup pnpm cache\n(?<step>[\s\S]*?)(?=\n    - name:)/
+    )?.groups?.step;
+
+    expect(cacheStep).toContain('uses: actions/cache@');
+    expect(cacheStep).toContain("!startsWith(runner.name, 'jovie-eph-')");
+    expect(cacheStep).toContain("!startsWith(runner.name, 'jovie-iso-')");
   });
 });
