@@ -16,7 +16,7 @@ concurrency:
 jobs:
   unit-shard:
     name: Autoscaled Unit Tests (1/5)
-    runs-on: [self-hosted, Linux, X64, "${{ 'jovie-runner' }}"]
+    runs-on: [self-hosted, Linux, X64, "${{ 'jovie-ephemeral' }}"]
     timeout-minutes: 25
     steps:
       - name: Verify ephemeral runner identity
