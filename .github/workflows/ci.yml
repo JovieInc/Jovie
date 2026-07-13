@@ -884,7 +884,9 @@ jobs:
     # On main push: always runs for full coverage + JOV-4087 vercel deploy artifact.
     # Fork PRs are excluded (no secrets) — skipped via fork-pr-gate.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Production deploy artifacts must not wait behind the saturated fixed PR
+    # runner. Keep PR builds on jovie-fixed; route main to hosted capacity.
+    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'ubuntu-latest' || vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     outputs:
       has_artifact: ${{ steps.check_changes.outputs.run_full_ci }}

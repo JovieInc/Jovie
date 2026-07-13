@@ -56,6 +56,15 @@ function getJobBlock(workflow: string, jobKey: string): string {
 }
 
 describe('deploy workflow Vercel env resolution', () => {
+  it('routes main deploy artifact builds to hosted capacity', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const buildJob = getJobBlock(workflow, 'ci-build-public');
+
+    expect(buildJob).toContain("github.ref == 'refs/heads/main'");
+    expect(buildJob).toContain("&& 'ubuntu-latest'");
+    expect(buildJob).toContain("|| vars.CI_FAST_RUNNER");
+  });
+
   it('pins Vercel pull and build commands to the configured project', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const steps = [
