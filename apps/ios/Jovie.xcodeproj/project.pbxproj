@@ -76,6 +76,7 @@
 		A0J0V2549000000000000000A /* MobileChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000009 /* MobileChatView.swift */; };
 		687D02CF59BD4E45B18E1015 /* MobileChatMessageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1798791CB4DC41E4A2599EEF /* MobileChatMessageViews.swift */; };
 		A0J0V36390000000000000002 /* ComposerWorkflowSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36390000000000000001 /* ComposerWorkflowSheet.swift */; };
+		6895FBF3ADAD473EA0C9B45F /* ChatComposerBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5B3F00DDDFE4093A1B4C360 /* ChatComposerBar.swift */; };
 		A0J0V36390000000000000004 /* ComposerWorkflowSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36390000000000000003 /* ComposerWorkflowSheetTests.swift */; };
 		A0J0V2549000000000000000C /* ChatRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V2549000000000000000B /* ChatRepositoryTests.swift */; };
 		A0J0V2549000000000000000E /* MobileChatClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V2549000000000000000D /* MobileChatClientTests.swift */; };
@@ -214,6 +215,7 @@
 		A0J0V25490000000000000009 /* MobileChatView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatView.swift; sourceTree = "<group>"; };
 		1798791CB4DC41E4A2599EEF /* MobileChatMessageViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatMessageViews.swift; sourceTree = "<group>"; };
 		A0J0V36390000000000000001 /* ComposerWorkflowSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ComposerWorkflowSheet.swift; sourceTree = "<group>"; };
+		B5B3F00DDDFE4093A1B4C360 /* ChatComposerBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatComposerBar.swift; sourceTree = "<group>"; };
 		A0J0V36390000000000000003 /* ComposerWorkflowSheetTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ComposerWorkflowSheetTests.swift; sourceTree = "<group>"; };
 		A0J0V2549000000000000000B /* ChatRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatRepositoryTests.swift; sourceTree = "<group>"; };
 		A0J0V2549000000000000000D /* MobileChatClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatClientTests.swift; sourceTree = "<group>"; };
@@ -544,6 +546,7 @@
 			isa = PBXGroup;
 			children = (
 				A0J0V36390000000000000001 /* ComposerWorkflowSheet.swift */,
+				B5B3F00DDDFE4093A1B4C360 /* ChatComposerBar.swift */,
 				A0J0V25490000000000000009 /* MobileChatView.swift */,
 				1798791CB4DC41E4A2599EEF /* MobileChatMessageViews.swift */,
 				25CADBED3F6B431494F2C0DF /* MobileChatPlaceholderView.swift */,
@@ -835,6 +838,7 @@
 				F3E8220C7612A63FF54DB345 /* NeedsOnboardingView.swift in Sources */,
 				F178AB3E908746C78645E4EE /* SettingsView.swift in Sources */,
 				A0J0V36390000000000000002 /* ComposerWorkflowSheet.swift in Sources */,
+				6895FBF3ADAD473EA0C9B45F /* ChatComposerBar.swift in Sources */,
 				A0J0V2549000000000000000A /* MobileChatView.swift in Sources */,
 				687D02CF59BD4E45B18E1015 /* MobileChatMessageViews.swift in Sources */,
 				99FBB80FCDBD4660BE1B0DCC /* MobileChatPlaceholderView.swift in Sources */,
