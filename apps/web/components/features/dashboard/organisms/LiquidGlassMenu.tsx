@@ -225,8 +225,14 @@ export function LiquidGlassMenu({
     setIsExpanded(false);
   }, [pathname]);
 
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
+  // Inbox is the named home at exactly `/app` — the generic prefix-match
+  // below would otherwise keep it active on every `/app/*` route. Mirrors
+  // the exact-match special case in DashboardNav's `isItemActive` (GH
+  // #12634 / #14206) so desktop and mobile agree on when Inbox is current.
+  const isActive = (item: LiquidGlassMenuItem) =>
+    item.id === 'inbox'
+      ? pathname === item.href
+      : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
   const allMenuItems = [...primaryItems, ...expandedItems];
   const hasAdminItems = adminItems && adminItems.length > 0;
@@ -280,7 +286,7 @@ export function LiquidGlassMenu({
                 <MenuItemLink
                   key={item.id}
                   item={item}
-                  active={isActive(item.href)}
+                  active={isActive(item)}
                 />
               ))}
 
@@ -295,7 +301,7 @@ export function LiquidGlassMenu({
                     <MenuItemLink
                       key={item.id}
                       item={item}
-                      active={isActive(item.href)}
+                      active={isActive(item)}
                     />
                   ))}
                 </>
@@ -340,7 +346,7 @@ export function LiquidGlassMenu({
           {/* Primary nav items with labels */}
           {primaryItems.slice(0, 4).map(item => {
             const Icon = item.icon;
-            const active = isActive(item.href);
+            const active = isActive(item);
 
             return (
               <Link
