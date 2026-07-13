@@ -227,7 +227,8 @@ function getFallbackActorFromPersona(
 
 async function findDevTestAuthSession(
   betterAuthUserId: string,
-  requestedPersona: DevTestAuthPersona | null
+  requestedPersona: DevTestAuthPersona | null,
+  allowPersonaProvisioning = true
 ): Promise<DevTestAuthSession> {
   let matchedUser:
     | {
@@ -270,6 +271,17 @@ async function findDevTestAuthSession(
   }
 
   if (!matchedUser) {
+    if (requestedPersona && allowPersonaProvisioning) {
+      const actor = await ensureDevTestAuthActor(requestedPersona);
+      return findDevTestAuthSession(actor.clerkUserId, requestedPersona, false);
+    }
+
+    if (requestedPersona) {
+      throw new Error(
+        `Dev test auth persona ${requestedPersona} was provisioned but no app user row was found`
+      );
+    }
+
     return getFallbackActorFromPersona(
       betterAuthUserId,
       requestedPersona ?? 'creator'

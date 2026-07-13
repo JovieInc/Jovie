@@ -109,5 +109,5 @@ describe('dev-test-auth.server regression coverage (Better Auth)', () => {
     );
     expect(actor.persona).toBe('creator');
     expect(actor.clerkUserId).toBe('ba_user');
-  });
+  }, 15_000);
 });

@@ -9,6 +9,9 @@ const {
   mockEnsureUserRecord,
   mockInvalidateTestUserCaches,
   mockLoggerWarn,
+  mockCookies,
+  mockHeaders,
+  mockSessionQueryLimit,
   mockSetActiveProfileForUser,
 } = vi.hoisted(() => ({
   mockEnsureClerkTestUser: vi.fn(),
@@ -19,20 +22,23 @@ const {
   mockEnsureUserRecord: vi.fn(),
   mockInvalidateTestUserCaches: vi.fn(),
   mockLoggerWarn: vi.fn(),
+  mockCookies: vi.fn(),
+  mockHeaders: vi.fn(),
+  mockSessionQueryLimit: vi.fn(),
   mockSetActiveProfileForUser: vi.fn(),
 }));
 
+vi.mock('next/headers', () => ({
+  cookies: mockCookies,
+  headers: mockHeaders,
+}));
+
 vi.mock('@/lib/db', () => {
-  const limit = vi
-    .fn()
-    .mockResolvedValue([{ id: 'db_user', betterAuthUserId: 'ba_user_clerk' }]);
-  const where = vi.fn(() => ({
-    limit,
-    where: vi.fn().mockResolvedValue(undefined),
-  }));
-  const from = vi.fn(() => ({ where }));
+  const updateWhere = vi.fn().mockResolvedValue(undefined);
+  const where = vi.fn(() => ({ limit: mockSessionQueryLimit }));
+  const from = vi.fn(() => ({ leftJoin: vi.fn(() => ({ where })), where }));
   const select = vi.fn(() => ({ from }));
-  const set = vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) }));
+  const set = vi.fn(() => ({ where: updateWhere }));
   const update = vi.fn(() => ({ set }));
   const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
   const values = vi.fn(() => ({ onConflictDoUpdate }));
@@ -57,7 +63,15 @@ vi.mock('drizzle-orm', () => ({
 }));
 
 vi.mock('@/lib/db/schema/auth', () => ({
-  users: { id: 'id', betterAuthUserId: 'betterAuthUserId' },
+  users: {
+    id: 'id',
+    activeProfileId: 'activeProfileId',
+    clerkId: 'clerkId',
+    betterAuthUserId: 'betterAuthUserId',
+    email: 'email',
+    name: 'name',
+    isAdmin: 'isAdmin',
+  },
 }));
 
 vi.mock('@/lib/db/schema/better-auth', () => ({
@@ -94,6 +108,34 @@ describe('dev-test-auth.server', () => {
       id: 'db_user',
       previousClerkId: null,
     });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        host: 'localhost:3100',
+      })
+    );
+    mockCookies.mockResolvedValue({
+      get: (name: string) => {
+        const values: Record<string, string> = {
+          __e2e_test_mode: 'bypass-auth',
+          __e2e_test_user_id: 'stale-cookie-user',
+          __e2e_test_persona: 'creator-ready',
+        };
+        const value = values[name];
+        return value ? { value } : undefined;
+      },
+    });
+    mockSessionQueryLimit.mockResolvedValue([
+      {
+        dbUserId: 'db_user',
+        clerkUserId: 'ba_user_clerk',
+        betterAuthUserId: 'ba_user_clerk',
+        email: 'browse-ready+clerk_test@jov.ie',
+        fullName: 'Browse Ready User',
+        isAdmin: false,
+        username: 'browse-ready-user',
+        displayName: 'Browse Ready User',
+      },
+    ]);
     mockEnsureCreatorProfileRecord.mockResolvedValue('profile_1');
     mockInvalidateTestUserCaches.mockResolvedValue(undefined);
     mockLoggerWarn.mockReset();
@@ -400,6 +442,43 @@ describe('dev-test-auth.server', () => {
     });
 
     expect(currentUser.username).toBeNull();
+  });
+
+  it('self-heals persona bypass cookies before returning an app user id', async () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('VERCEL_ENV', '');
+    mockSessionQueryLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        dbUserId: 'db_user',
+        clerkUserId: 'ba_user_clerk',
+        betterAuthUserId: 'ba_user_clerk',
+        email: 'browse-ready+clerk_test@jov.ie',
+        fullName: 'Browse Ready User',
+        isAdmin: false,
+        username: 'browse-ready-user',
+        displayName: 'Browse Ready User',
+      },
+    ]);
+
+    const { getCachedDevTestAuthSession } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    const session = await getCachedDevTestAuthSession();
+
+    expect(mockEnsureBetterAuthTestUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'browse-ready+clerk_test@jov.ie',
+      })
+    );
+    expect(session).toEqual(
+      expect.objectContaining({
+        dbUserId: 'db_user',
+        clerkUserId: 'ba_user_clerk',
+        persona: 'creator-ready',
+      })
+    );
   });
 
   it('does not fail bootstrap when cache invalidation fails', async () => {
