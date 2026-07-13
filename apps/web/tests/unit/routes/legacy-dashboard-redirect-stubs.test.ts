@@ -45,4 +45,48 @@ describe('legacy dashboard redirect stubs', () => {
       `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
     );
   });
+
+  // Demoted-route continuity (6-item nav IA, GH #12634 / #12633 chunk 1.5):
+  // routes that lost their primary nav slot must keep working via redirect.
+  it('sends legacy audience traffic to the canonical audience route', async () => {
+    const { default: LegacyAudienceRedirect } = await import(
+      '../../../app/app/(shell)/dashboard/audience/page'
+    );
+
+    LegacyAudienceRedirect();
+
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.AUDIENCE);
+  });
+
+  it('sends legacy tasks traffic to the canonical tasks route', async () => {
+    const { default: LegacyTasksRedirect } = await import(
+      '../../../app/app/(shell)/dashboard/tasks/page'
+    );
+
+    LegacyTasksRedirect();
+
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.TASKS);
+  });
+
+  it('sends the demoted releases route to the Library releases view', async () => {
+    const { default: ReleasesRedirect } = await import(
+      '../../../app/app/(shell)/releases/page'
+    );
+
+    await ReleasesRedirect();
+
+    expect(redirectMock).toHaveBeenCalledWith(
+      `${APP_ROUTES.LIBRARY}?view=releases`
+    );
+  });
+
+  it('sends legacy threads traffic to the canonical chats route', async () => {
+    const { default: ThreadsRedirect } = await import(
+      '../../../app/app/(shell)/threads/page'
+    );
+
+    await ThreadsRedirect();
+
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.CHATS);
+  });
 });
