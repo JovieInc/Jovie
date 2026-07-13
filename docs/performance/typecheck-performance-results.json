@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-07-13",
+  "machine": {
+    "platform": "darwin-arm64",
+    "logicalCpus": 10,
+    "memoryBytes": 34359738368,
+    "node": "v22.22.1",
+    "pnpm": "9.15.4"
+  },
+  "baseline": {
+    "coldFull": {
+      "p95Ms": 294930,
+      "samples": 1,
+      "peakMemoryBytes": 3028254720
+    },
+    "warmCompilerExecuted": { "p95Ms": 22360, "samples": 1 },
+    "incrementalLeaf": {
+      "p50Ms": 80330,
+      "p95Ms": 97510,
+      "samples": 3,
+      "coefficientOfVariation": 0.131
+    },
+    "ciTypecheck": {
+      "p50Ms": 77660,
+      "p95Ms": 87930,
+      "samples": 6,
+      "coefficientOfVariation": 0.0547
+    },
+    "largestPackageShare": { "package": "@jovie/web", "share": 0.5119 },
+    "program": {
+      "files": 9255,
+      "linesOfTypeScript": 716066,
+      "linesOfDefinitions": 674505,
+      "identifiers": 1477799,
+      "symbolsWarmIncremental": 848676,
+      "typesWarmIncremental": 89
+    }
+  },
+  "final": {
+    "coldFull": {
+      "p50Ms": 26560,
+      "p95Ms": 27990,
+      "samples": 3,
+      "coefficientOfVariation": 0.036,
+      "peakMemoryBytes": 4669095936
+    },
+    "warmFull": {
+      "p50Ms": 800,
+      "p95Ms": 830,
+      "samples": 3,
+      "coefficientOfVariation": 0.034
+    },
+    "incrementalLeaf": {
+      "p50Ms": 3588,
+      "p95Ms": 4894,
+      "samples": 10,
+      "coefficientOfVariation": 0.1158,
+      "peakMemoryBytes": 1940750336
+    },
+    "incrementalWidelyImported": {
+      "p50Ms": 17774,
+      "p95Ms": 19986,
+      "samples": 10,
+      "coefficientOfVariation": 0.0703,
+      "peakMemoryBytes": 1926512640
+    },
+    "ciWarm": {
+      "p50Ms": 8700,
+      "p95Ms": 10120,
+      "samples": 3,
+      "coefficientOfVariation": 0.114,
+      "aggregateProcessTreePeakMemoryBytesObserved": 2676555776
+    },
+    "ciWarmInitialControlledCampaign": {
+      "p50Ms": 6150,
+      "p95Ms": 7855,
+      "samples": 10,
+      "coefficientOfVariation": 0.1335,
+      "peakMemoryBytes": 1909800960
+    },
+    "stableCiWarm": {
+      "p50Ms": 9860,
+      "p95Ms": 10520,
+      "samples": 3,
+      "coefficientOfVariation": 0.058,
+      "peakMemoryBytes": 1858732032
+    },
+    "largestPackageShare": { "package": "@jovie/web", "share": 0.2294 },
+    "program": {
+      "files": 9255,
+      "identifiers": 1473540,
+      "symbols": 5494065,
+      "types": 1913828,
+      "instantiations": 11836593,
+      "compilerMemoryBytes": 3515229184
+    },
+    "cpuUtilization": {
+      "coldFullCoreEquivalentsMean": 2.1136,
+      "warmFullCoreEquivalentsMean": 1.8064,
+      "ciWarmCoreEquivalentsMean": 2.5796,
+      "stableCiWarmCoreEquivalentsMean": 1.0688,
+      "incrementalLeafCoreEquivalentsMean": 2.1436,
+      "incrementalWideCoreEquivalentsMean": 3.3463
+    },
+    "cacheHitRate": {
+      "coldFull": 0,
+      "warmFull": 1,
+      "ciWarmForced": 0,
+      "incrementalWideForced": 0
+    },
+    "memoryMeasurement": "100ms Linux cgroup usage sampling (250ms aggregate process-tree RSS fallback), divided by the lower of host and cgroup memory limits"
+  },
+  "observedActivity": {
+    "windowDays": 30,
+    "pullRequestCiRuns": 79,
+    "pullRequestCiRunsPerDay": 2.6333,
+    "mainFirstParentCommits": 137,
+    "mainFirstParentCommitsPerDay": 4.5667
+  },
+  "estimatedDailySavings": {
+    "localSeconds": 350.47,
+    "ciRunnerSeconds": 265.05,
+    "totalSeconds": 615.52,
+    "assumptions": [
+      "One local leaf-like pre-push typecheck per first-parent main commit.",
+      "One CI typecheck per observed pull-request CI run.",
+      "CI runner savings compare the old typecheck plus observed 39-second ineffective Turbo cache transfer against both new native and stable parallel gates."
+    ]
+  }
+}

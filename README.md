@@ -19,8 +19,8 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 ### Core Framework
 - **Next.js 16** - React framework with App Router, Server Components, and Server Actions
 - **React 19** - Latest React with concurrent features
-- **TypeScript 5** - Type-safe development across the entire stack
-- **Turborepo 2.8** - Monorepo build system with intelligent caching, shared worktree cache, and `turbo docs` CLI
+- **TypeScript 6 + pinned native preview** - Stable merge-gate safety with fast local and CI batch checking
+- **Turborepo 2.9** - Monorepo build system with intelligent caching, shared worktree cache, and `turbo docs` CLI
 
 ### Authentication & Security
 - **Clerk 7** - Complete user management with social login, MFA, and webhooks
@@ -302,12 +302,13 @@ git worktree remove ../Jovie-agent-1
 The project uses **trunk-based development**:
 
 - **Main Branch** → deploys directly to production (`jov.ie`)
-- **PR Checks** - Fast validation (typecheck, lint) - ~30 seconds
+- **PR Checks** - Fast native typecheck/lint plus an independent stable TypeScript safety gate
 - **Post-Merge** - Full CI (build, tests, E2E) then deploy
 - **Canary Gate** - Health check before deployment success
 - **Smoke Tests** - Production validation after deploy
 
 See [.github/workflows/README.md](.github/workflows/README.md) for workflow details.
+See [Typecheck performance](docs/performance/typecheck-performance.md) for measured P50/P95 targets, reproducible benchmarks, and the nightly regression policy.
 
 ## Environment Variables
 

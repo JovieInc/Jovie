@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-13T00:00:00Z",
+  "baselineProfile": { "platform": "darwin", "arch": "arm64" },
+  "targets": {
+    "localIncrementalMs": 5000,
+    "widelyImportedIncrementalMs": 25000,
+    "warmFullMs": 10000,
+    "coldFullMs": 30000,
+    "ciMs": 45000,
+    "maximumPackageShare": 0.3,
+    "maximumMemoryFraction": 0.75,
+    "maximumCoefficientOfVariation": 0.15
+  },
+  "baselines": {
+    "cold-full": { "p50Ms": 26560, "p95Ms": 27990, "samples": 3 },
+    "warm-full": { "p50Ms": 800, "p95Ms": 830, "samples": 3 },
+    "incremental-leaf": { "p50Ms": 3590, "p95Ms": 4890, "samples": 10 },
+    "incremental-wide": { "p50Ms": 17770, "p95Ms": 19990, "samples": 10 },
+    "ci-warm": { "p50Ms": 8700, "p95Ms": 10120, "samples": 3 },
+    "stable-ci-warm": { "p50Ms": 9860, "p95Ms": 10520, "samples": 3 },
+    "web-diagnostics": { "p95Ms": 49480, "samples": 1 },
+    "ci": { "p50Ms": 80060, "p95Ms": 87930, "samples": 6 }
+  },
+  "ratchet": {
+    "warningRegression": 0.1,
+    "failureRegression": 0.2,
+    "minimumFailureSamples": 3,
+    "immediateFailureMultiplier": 1.25
+  },
+  "targetJustification": {
+    "localIncrementalMs": "The default 2s target is not realistic for the current 9,255-file / 1.45M-line web program. The pinned native compiler reduced leaf-edit P95 from 97.51s to 4.89s; 5s is the measured repo-specific ratchet.",
+    "widelyImportedIncrementalMs": "The shared UI source boundary invalidates both @jovie/ui and @jovie/web. Native P95 is 19.99s at fixed four-task concurrency; 25s leaves noise headroom while project-reference work remains visible.",
+    "coldFullMs": "Native TS7 reduced sustained cold full-repo P95 from 294.93s to 27.99s, so the original 30s default is now enforced."
+  },
+  "packageShareJustification": {}
+}

@@ -12,7 +12,7 @@
     "start": "next start --port 3003",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo",
     "test": "vitest run",
     "test:watch": "vitest",
     "sweep": "tsx scripts/taste-inbox-sweep.ts"

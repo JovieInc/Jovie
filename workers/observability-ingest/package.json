@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test src/index.test.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250317.0",

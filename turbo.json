@@ -97,7 +97,7 @@
         "tsconfig.*.json",
         "package.json"
       ],
-      "outputs": [".cache/tsbuildinfo"]
+      "outputs": [".cache/tsbuildinfo*"]
     },
     "dev": {
       "description": "Starts the development server with hot module replacement (persistent, not cached)",
