@@ -13,13 +13,13 @@ const activePreview = (overrides = {}) => ({
   projectId,
   target: null,
   readyState: 'QUEUED',
-  createdAt: now - 60 * 1000,
+  createdAt: now - 20 * 60 * 1000,
   meta: { githubCommitRef: 'main', githubCommitSha: 'old-sha' },
   ...overrides,
 });
 
 describe('cancel stale Vercel previews', () => {
-  it('selects every active project preview while preserving production', () => {
+  it('only selects old active previews and preserves production, fresh, and current-SHA deployments', () => {
     expect(isStalePreview(activePreview(), { projectId, now })).toBe(true);
     expect(
       isStalePreview(activePreview({ target: 'production' }), {
@@ -32,15 +32,15 @@ describe('cancel stale Vercel previews', () => {
         activePreview({
           meta: { githubCommitRef: 'main', githubCommitSha: currentSha },
         }),
-        { projectId, now }
+        { projectId, now, currentSha }
       )
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isStalePreview(activePreview({ createdAt: now - 1000 }), {
         projectId,
         now,
       })
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isStalePreview(
         activePreview({
@@ -58,6 +58,33 @@ describe('cancel stale Vercel previews', () => {
         now,
       })
     ).toBe(false);
+  });
+
+  it('fails closed for invalid timestamps and minimum-age configuration', () => {
+    expect(
+      isStalePreview(activePreview({ createdAt: 'invalid' }), {
+        projectId,
+        now,
+      })
+    ).toBe(false);
+    expect(() =>
+      isStalePreview(activePreview(), { projectId, now, minAgeMs: Number.NaN })
+    ).toThrow(/minimum age/);
+  });
+
+  it('does not call Vercel when minimum-age configuration is invalid', async () => {
+    const request = vi.fn();
+
+    await expect(
+      cancelStalePreviews({
+        token: 'token',
+        orgId: 'team_org',
+        projectId,
+        minAgeMs: Number.NaN,
+        request,
+      })
+    ).rejects.toThrow(/minimum age/);
+    expect(request).not.toHaveBeenCalled();
   });
 
   it('lists both active states and cancels each stale preview once', async () => {

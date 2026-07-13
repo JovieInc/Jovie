@@ -62,7 +62,7 @@ describe('deploy workflow Vercel env resolution', () => {
 
     expect(buildJob).toContain("github.ref == 'refs/heads/main'");
     expect(buildJob).toContain("&& 'ubuntu-latest'");
-    expect(buildJob).toContain("|| vars.CI_FAST_RUNNER");
+    expect(buildJob).toContain('|| vars.CI_FAST_RUNNER');
   });
 
   it('runs main deploy control jobs on hosted capacity', () => {

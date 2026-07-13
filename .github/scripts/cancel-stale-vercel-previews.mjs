@@ -3,14 +3,36 @@
 const API_BASE = 'https://api.vercel.com';
 const ACTIVE_STATES = ['QUEUED', 'BUILDING'];
 const MAX_CANCELLATIONS = 100;
+export const DEFAULT_MIN_AGE_MS = 15 * 60 * 1000;
 
-export function isStalePreview(deployment, { projectId }) {
+function requireValidMinAge(minAgeMs) {
+  if (!Number.isFinite(minAgeMs) || minAgeMs < 0) {
+    throw new Error('Vercel preview minimum age must be a non-negative number');
+  }
+}
+
+export function isStalePreview(
+  deployment,
+  {
+    projectId,
+    now = Date.now(),
+    minAgeMs = DEFAULT_MIN_AGE_MS,
+    currentSha = '',
+  }
+) {
+  requireValidMinAge(minAgeMs);
   const state = (deployment.readyState ?? deployment.state ?? '').toUpperCase();
+  const createdAt = Number(deployment.createdAt ?? deployment.created);
+  const deploymentSha = deployment.meta?.githubCommitSha ?? '';
 
   return (
     deployment.projectId === projectId &&
     deployment.target !== 'production' &&
-    ACTIVE_STATES.includes(state)
+    ACTIVE_STATES.includes(state) &&
+    Number.isFinite(createdAt) &&
+    createdAt > 0 &&
+    now - createdAt >= minAgeMs &&
+    (!currentSha || deploymentSha !== currentSha)
   );
 }
 
@@ -41,8 +63,12 @@ export async function cancelStalePreviews({
   token,
   orgId,
   projectId,
+  minAgeMs = DEFAULT_MIN_AGE_MS,
+  currentSha = '',
+  now = Date.now(),
   request = vercelRequest,
 }) {
+  requireValidMinAge(minAgeMs);
   const deployments = [];
 
   for (const state of ACTIVE_STATES) {
@@ -62,7 +88,14 @@ export async function cancelStalePreviews({
   const stale = [
     ...new Map(
       deployments
-        .filter(deployment => isStalePreview(deployment, { projectId }))
+        .filter(deployment =>
+          isStalePreview(deployment, {
+            projectId,
+            minAgeMs,
+            currentSha,
+            now,
+          })
+        )
         .map(deployment => [deployment.uid ?? deployment.id, deployment])
     ).values(),
   ]
@@ -106,6 +139,10 @@ async function main() {
   const token = process.env.VERCEL_TOKEN ?? '';
   const orgId = process.env.VERCEL_ORG_ID ?? '';
   const projectId = process.env.VERCEL_PROJECT_ID ?? '';
+  const currentSha = process.env.GITHUB_SHA ?? '';
+  const minAgeMinutes = Number(
+    process.env.VERCEL_PREVIEW_MIN_AGE_MINUTES ?? '15'
+  );
   const missing = Object.entries({ token, orgId, projectId })
     .filter(([, value]) => !value)
     .map(([key]) => key);
@@ -116,7 +153,17 @@ async function main() {
     );
   }
 
-  await cancelStalePreviews({ token, orgId, projectId });
+  if (!Number.isFinite(minAgeMinutes) || minAgeMinutes < 0) {
+    throw new Error('VERCEL_PREVIEW_MIN_AGE_MINUTES must be non-negative');
+  }
+
+  await cancelStalePreviews({
+    token,
+    orgId,
+    projectId,
+    currentSha,
+    minAgeMs: minAgeMinutes * 60 * 1000,
+  });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
