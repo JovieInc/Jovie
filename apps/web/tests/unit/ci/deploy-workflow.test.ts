@@ -65,6 +65,17 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(buildJob).toContain("|| vars.CI_FAST_RUNNER");
   });
 
+  it('runs main deploy control jobs on hosted capacity', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    expect(getJobBlock(workflow, 'deploy-gate')).toContain(
+      'runs-on: ubuntu-latest'
+    );
+    expect(getJobBlock(workflow, 'deploy-staging')).toContain(
+      'runs-on: ubuntu-latest'
+    );
+  });
+
   it('pins Vercel pull and build commands to the configured project', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const steps = [
