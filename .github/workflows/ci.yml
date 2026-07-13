@@ -4921,7 +4921,7 @@ jobs:
     name: Alias verified preview to staging.jov.ie
     needs: [deploy-staging, canary-health-gate]
     if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     concurrency:
       group: production-deploy
@@ -4946,7 +4946,7 @@ jobs:
     name: Promote to Production
     needs: [deploy-staging, canary-health-gate, alias-staging]
     if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
       group: production-deploy

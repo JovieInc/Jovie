@@ -74,6 +74,15 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(getJobBlock(workflow, 'deploy-staging')).toContain(
       'runs-on: ubuntu-latest'
     );
+    expect(getJobBlock(workflow, 'alias-staging')).toContain(
+      'runs-on: ubuntu-latest'
+    );
+    expect(getJobBlock(workflow, 'promote-production')).toContain(
+      'runs-on: ubuntu-latest'
+    );
+    expect(readFileSync(canaryWorkflowPath, 'utf8')).toContain(
+      'runs-on: ubuntu-latest'
+    );
   });
 
   it('pins Vercel pull and build commands to the configured project', () => {
