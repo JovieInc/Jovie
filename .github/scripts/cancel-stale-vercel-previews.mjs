@@ -4,7 +4,7 @@ const API_BASE = 'https://api.vercel.com';
 const ACTIVE_STATES = ['QUEUED', 'BUILDING'];
 const MAX_CANCELLATIONS = 100;
 
-export function isStalePreview(deployment, { currentSha, projectId }) {
+export function isStalePreview(deployment, { projectId }) {
   const commitSha = deployment.meta?.githubCommitSha;
   const commitRef = deployment.meta?.githubCommitRef;
   const state = (deployment.readyState ?? deployment.state ?? '').toUpperCase();
@@ -15,8 +15,7 @@ export function isStalePreview(deployment, { currentSha, projectId }) {
     ACTIVE_STATES.includes(state) &&
     commitRef === 'main' &&
     typeof commitSha === 'string' &&
-    commitSha.length > 0 &&
-    commitSha !== currentSha
+    commitSha.length > 0
   );
 }
 
@@ -47,7 +46,6 @@ export async function cancelStalePreviews({
   token,
   orgId,
   projectId,
-  currentSha,
   request = vercelRequest,
 }) {
   const deployments = [];
@@ -69,9 +67,7 @@ export async function cancelStalePreviews({
   const stale = [
     ...new Map(
       deployments
-        .filter(deployment =>
-          isStalePreview(deployment, { currentSha, projectId })
-        )
+        .filter(deployment => isStalePreview(deployment, { projectId }))
         .map(deployment => [deployment.uid ?? deployment.id, deployment])
     ).values(),
   ]
@@ -116,8 +112,7 @@ async function main() {
   const token = process.env.VERCEL_TOKEN ?? '';
   const orgId = process.env.VERCEL_ORG_ID ?? '';
   const projectId = process.env.VERCEL_PROJECT_ID ?? '';
-  const currentSha = process.env.GITHUB_SHA ?? '';
-  const missing = Object.entries({ token, orgId, projectId, currentSha })
+  const missing = Object.entries({ token, orgId, projectId })
     .filter(([, value]) => !value)
     .map(([key]) => key);
 
@@ -127,7 +122,7 @@ async function main() {
     );
   }
 
-  await cancelStalePreviews({ token, orgId, projectId, currentSha });
+  await cancelStalePreviews({ token, orgId, projectId });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
