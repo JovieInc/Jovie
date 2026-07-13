@@ -90,6 +90,14 @@ run_deploy() {
     return
   fi
 
+  if [ -f ".vercel/jovie-generated-public-files" ]; then
+    while IFS= read -r generated_file; do
+      if [ -n "$generated_file" ]; then
+        rm -f -- "$generated_file"
+      fi
+    done < ".vercel/jovie-generated-public-files"
+  fi
+
   "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
 }
 

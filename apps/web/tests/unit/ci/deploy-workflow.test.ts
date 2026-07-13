@@ -140,6 +140,24 @@ describe('deploy workflow Vercel env resolution', () => {
       'VERCEL_SCOPE_ARGS=(--scope "$VERCEL_ORG_ID")'
     );
     expect(deployScript).toContain('"${VERCEL_SCOPE_ARGS[@]}"');
+    expect(deployScript).toContain('.vercel/jovie-generated-public-files');
+    expect(deployScript).toContain('rm -f -- "$generated_file"');
+  });
+
+  it('packages generated public trace files and budgets remote fallback readiness', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const buildJob = getJobBlock(workflow, 'ci-build-public');
+    const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const readinessStep = getStepBlock(
+      stagingJob,
+      'Wait for staging deployment readiness'
+    );
+
+    expect(buildJob).toContain(
+      'cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt'
+    );
+    expect(buildJob).toContain('.vercel/jovie-generated-public-files');
+    expect(readinessStep).toContain('--timeout 12m');
   });
 
   it('passes signup readiness keys into the staging preview runtime', () => {
