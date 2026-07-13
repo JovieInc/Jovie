@@ -4,21 +4,29 @@ import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { LeadTable } from '@/components/features/admin/leads/LeadTable';
 import type { AdminLead } from '@/lib/queries';
 
 // Mock the queries
-const mockLeadsInfiniteQuery = vi.fn();
-const mockUpdateLeadStatusMutation = vi.fn();
+const { mockLeadsInfiniteQuery, mockUpdateLeadStatusMutation } = vi.hoisted(
+  () => ({
+    mockLeadsInfiniteQuery: vi.fn(),
+    mockUpdateLeadStatusMutation: vi.fn(),
+  })
+);
 
-vi.mock('@/lib/queries', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/queries')>();
-  return {
-    ...actual,
-    useLeadsInfiniteQuery: (...args: unknown[]) =>
-      mockLeadsInfiniteQuery(...args),
-    useUpdateLeadStatusMutation: () => mockUpdateLeadStatusMutation(),
-  };
-});
+vi.mock('@/lib/queries', () => ({
+  queryKeys: {
+    admin: {
+      leads: {
+        all: () => ['admin', 'leads'],
+      },
+    },
+  },
+  useLeadsInfiniteQuery: (...args: unknown[]) =>
+    mockLeadsInfiniteQuery(...args),
+  useUpdateLeadStatusMutation: () => mockUpdateLeadStatusMutation(),
+}));
 
 // Mock HeaderSearchAction (uses Tooltip which needs provider)
 vi.mock('@/components/molecules/HeaderSearchAction', () => ({
@@ -81,14 +89,6 @@ function renderWithProviders(ui: ReactElement) {
   );
 }
 
-// Lazy import to allow mocks to be set up first
-async function getLeadTable() {
-  const { LeadTable } = await import(
-    '@/components/features/admin/leads/LeadTable'
-  );
-  return LeadTable;
-}
-
 describe('LeadTable', () => {
   afterEach(() => {
     cleanup();
@@ -112,7 +112,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     // UnifiedTable shows skeleton rows during loading — verify no data rows appear
@@ -132,7 +131,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(
@@ -151,7 +149,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByText('Test Artist')).toBeInTheDocument();
@@ -177,7 +174,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByText('All')).toBeInTheDocument();
@@ -197,7 +193,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     const user = userEvent.setup();
@@ -222,7 +217,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByLabelText(/^Approve /)).toBeInTheDocument();
@@ -240,7 +234,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     // The "Approve & ingest" title should not appear as an action button
@@ -265,7 +258,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByText('Spotify')).toBeInTheDocument();
@@ -286,7 +278,6 @@ describe('LeadTable', () => {
       refetch,
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByText('Unable to load leads')).toBeInTheDocument();

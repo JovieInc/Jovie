@@ -15,14 +15,10 @@ const {
   mockWithDbSessionTx: vi.fn(),
 }));
 
-vi.mock('@/lib/auth/session', async () => {
-  const actual =
-    await vi.importActual<typeof import('@/lib/auth/session')>(
-      '@/lib/auth/session'
-    );
-
+vi.mock('@/lib/auth/session', () => {
   return {
-    ...actual,
+    isUnauthorizedSessionError: (error: unknown) =>
+      error instanceof Error && error.message === 'Unauthorized',
     withDbSessionTx: mockWithDbSessionTx,
   };
 });
@@ -41,6 +37,8 @@ vi.mock('@/lib/utils/logger', () => ({
     error: mockLoggerError,
   },
 }));
+
+import { POST } from '@/app/api/onboarding/distribution-event/route';
 
 function createDbInsertChain() {
   const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);

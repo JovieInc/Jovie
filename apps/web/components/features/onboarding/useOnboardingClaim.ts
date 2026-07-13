@@ -11,16 +11,10 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  * Auto-claim the anonymous onboarding conversation when the visitor
  * authenticates mid-flow (JOV-2132 PR 4).
  *
- * Fires on mount and after completed chat turns while Clerk reports the user
+ * Fires on mount and after completed chat turns while auth reports the user
  * is signed in. Calls POST /api/onboarding/claim — the server reads the signed
  * `jovie_onboarding_session` cookie and attaches matching anonymous
  * conversations to the freshly created user.
- *
- * Handles the Clerk → DB user-mirror race: the claim endpoint returns
- * `{ retryAfterWebhook: true }` when Clerk has authenticated the user but
- * the Clerk webhook hasn't yet written them into our `users` table. We
- * retry up to 3 times with a 1.5s gap before giving up — the webhook
- * almost always lands in under 2s.
  *
  * On success (claimed >= 1) the hook navigates to `/onboarding/checkout`
  * so the existing post-claim path takes over. If the claim returned
@@ -28,25 +22,18 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  * and retry after later chat activity.
  *
  * Duplicate-request guard (JOV-2203):
- * React 18+ re-runs effects whenever any dependency changes. Clerk's auth
+ * React 18+ re-runs effects whenever any dependency changes. Auth
  * state updates (`isLoaded`, `isSignedIn`) can fire the effect multiple
  * times before the first fetch resolves, causing duplicate POST calls.
  * `inflightTriggersRef` prevents a second fetch starting for the same
  * `claimTrigger` value while one is already in-flight.
  */
 
-type ClaimStatus =
-  | 'idle'
-  | 'pending'
-  | 'claimed'
-  | 'no-op'
-  | 'retry-after-webhook'
-  | 'error';
+type ClaimStatus = 'idle' | 'pending' | 'claimed' | 'no-op' | 'error';
 
 interface ClaimResponse {
   readonly claimed?: number;
   readonly conversationId?: string;
-  readonly retryAfterWebhook?: boolean;
   readonly alreadyClaimed?: boolean;
   readonly errorCode?: string;
   readonly profile?: {
@@ -55,9 +42,6 @@ interface ClaimResponse {
     readonly status: 'created' | 'updated' | 'skipped';
   } | null;
 }
-
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1_500;
 
 export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
   const { isLoaded, isSignedIn } = useAuthSafe();
@@ -84,7 +68,7 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
       inflightTriggersRef.current.delete(claimTrigger);
     };
 
-    const attemptClaim = async (attempt: number): Promise<void> => {
+    const attemptClaim = async (): Promise<void> => {
       setStatus('pending');
       let response: Response;
       try {
@@ -115,17 +99,9 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
       if (cancelled) return;
 
       if (response.status === 401) {
-        // Clerk session expired between mount and request — bail silently.
+        // The auth session expired between mount and request — bail silently.
         markTriggerCompleted();
         setStatus('error');
-        return;
-      }
-
-      if (body.retryAfterWebhook && attempt < MAX_RETRIES) {
-        setStatus('retry-after-webhook');
-        setTimeout(() => {
-          if (!cancelled) void attemptClaim(attempt + 1);
-        }, RETRY_DELAY_MS);
         return;
       }
 
@@ -175,7 +151,7 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
       setStatus('no-op');
     };
 
-    void attemptClaim(1);
+    void attemptClaim();
 
     return () => {
       cancelled = true;

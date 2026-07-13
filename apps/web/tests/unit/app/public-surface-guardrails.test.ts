@@ -1,5 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { validateProductionRobots } from '@/lib/seo/ratchet';
+import * as aiPage from '../../../app/(marketing)/ai/page';
+import * as investorsPage from '../../../app/(marketing)/investors/page';
+import * as demoLayout from '../../../app/demo/layout';
+import * as hudPage from '../../../app/hud/page';
+import * as investorPortalLayout from '../../../app/investor-portal/layout';
+import * as investorPortalPage from '../../../app/investor-portal/page';
+import * as investorPortalRespondPage from '../../../app/investor-portal/respond/page';
+import * as pitchPage from '../../../app/pitch/page';
+import * as sandboxPage from '../../../app/sandbox/page';
+import * as sentryExampleLayout from '../../../app/sentry-example-page/layout';
+import * as spinnerTestPage from '../../../app/spinner-test/page';
+import * as uiLayout from '../../../app/ui/layout';
 
 describe('public surface guardrails', () => {
   it('keeps production robots disallows scoped to safe namespaces', async () => {
@@ -108,21 +120,21 @@ describe('public surface guardrails', () => {
     });
   });
 
-  it('marks sensitive utility and investor routes as noindex', async () => {
-    const modules = await Promise.all([
-      import('../../../app/demo/layout'),
-      import('../../../app/ui/layout'),
-      import('../../../app/sandbox/page'),
-      import('../../../app/spinner-test/page'),
-      import('../../../app/sentry-example-page/layout'),
-      import('../../../app/hud/page'),
-      import('../../../app/investor-portal/layout'),
-      import('../../../app/investor-portal/page'),
-      import('../../../app/investor-portal/respond/page'),
-      import('../../../app/(marketing)/ai/page'),
-      import('../../../app/(marketing)/investors/page'),
-      import('../../../app/pitch/page'),
-    ]);
+  it('marks sensitive utility and investor routes as noindex', () => {
+    const modules = [
+      demoLayout,
+      uiLayout,
+      sandboxPage,
+      spinnerTestPage,
+      sentryExampleLayout,
+      hudPage,
+      investorPortalLayout,
+      investorPortalPage,
+      investorPortalRespondPage,
+      aiPage,
+      investorsPage,
+      pitchPage,
+    ];
 
     for (const routeModule of modules) {
       expect(routeModule.metadata).toMatchObject({
@@ -136,5 +148,5 @@ describe('public surface guardrails', () => {
         },
       });
     }
-  }, 15_000);
+  });
 });

@@ -138,14 +138,13 @@ export function OnboardingShell({
     resetTurnstileVerification('Verify you are human to send');
   }, [resetTurnstileVerification]);
 
-  // Auto-claim any anonymous transcript onto the user the moment Clerk
-  // reports they're authenticated, then retry after completed chat turns.
+  // Auto-claim any anonymous transcript onto the authenticated app user,
+  // then retry after completed chat turns.
   // On success, this hook navigates away to
   // /onboarding/checkout, so the rest of the shell never gets a chance to
   // render a "now what?" state. Idle for unauthenticated visitors.
   const claimStatus = useOnboardingClaim(claimTrigger);
-  const isLinking =
-    claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
+  const isLinking = claimStatus === 'pending';
   const sideProfileRail = profileBuilderState.artist ? (
     <OnboardingProfileRail state={profileBuilderState} />
   ) : null;

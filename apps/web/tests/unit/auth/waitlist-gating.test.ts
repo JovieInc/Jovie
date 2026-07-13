@@ -34,113 +34,26 @@
  *    - Max staleness: 2-5 minutes (Redis TTL)
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import {
+  CanonicalUserState,
+  canAccessApp,
+  canAccessOnboarding,
+  getRedirectForState,
+  requiresRedirect,
+} from '@/lib/auth/canonical-user-state';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
+import {
+  isProfileComplete,
+  resolveProfileState,
+} from '@/lib/auth/profile-state-resolver';
+import { checkUserStatus } from '@/lib/auth/status-checker';
 
 // ============================================================================
 // Tests for status-checker.ts
 // ============================================================================
 
 describe('checkUserStatus', () => {
-  // Import directly since it has no server-only guard
-  let checkUserStatus: typeof import('@/lib/auth/status-checker').checkUserStatus;
-  let CanonicalUserState: typeof import('@/lib/auth/gate').CanonicalUserState;
-
-  beforeEach(async () => {
-    vi.resetModules();
-
-    // Mock server-only to prevent import error
-    vi.doMock('server-only', () => ({}));
-
-    // Mock database dependencies that gate.ts imports
-    vi.doMock('@/lib/db', () => ({
-      db: {
-        select: vi.fn().mockReturnThis(),
-        from: vi.fn().mockReturnThis(),
-        leftJoin: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([]),
-        insert: vi.fn().mockReturnThis(),
-        values: vi.fn().mockReturnThis(),
-        onConflictDoUpdate: vi.fn().mockReturnThis(),
-        returning: vi.fn().mockResolvedValue([]),
-        update: vi.fn().mockReturnThis(),
-        set: vi.fn().mockReturnThis(),
-      },
-    }));
-
-    vi.doMock('@/lib/db/schema/auth', () => ({
-      users: {
-        id: 'id',
-        clerkId: 'clerkId',
-        email: 'email',
-        userStatus: 'userStatus',
-        isAdmin: 'isAdmin',
-        isPro: 'isPro',
-        deletedAt: 'deletedAt',
-        waitlistEntryId: 'waitlistEntryId',
-      },
-    }));
-
-    vi.doMock('@/lib/db/schema/profiles', () => ({
-      creatorProfiles: {
-        id: 'id',
-        userId: 'userId',
-        isClaimed: 'isClaimed',
-        username: 'username',
-        usernameNormalized: 'usernameNormalized',
-        displayName: 'displayName',
-        isPublic: 'isPublic',
-        onboardingCompletedAt: 'onboardingCompletedAt',
-      },
-    }));
-
-    vi.doMock('@/lib/db/schema/waitlist', () => ({
-      waitlistEntries: {
-        id: 'id',
-        email: 'email',
-        status: 'status',
-      },
-    }));
-
-    vi.doMock('@/lib/error-tracking', () => ({
-      captureError: vi.fn(),
-      captureCriticalError: vi.fn(),
-      captureWarning: vi.fn(),
-    }));
-
-    vi.doMock('@/lib/auth/cached', () => ({
-      getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
-      getCachedCurrentUser: vi.fn().mockResolvedValue(null),
-    }));
-
-    vi.doMock('@/lib/auth/clerk-sync', () => ({
-      syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
-    }));
-
-    vi.doMock('@/lib/utils/email', () => ({
-      normalizeEmail: (e: string) => e.toLowerCase().trim(),
-    }));
-
-    vi.doMock('drizzle-orm', () => ({
-      and: (...args: unknown[]) => args,
-      eq: (a: unknown, b: unknown) => [a, b],
-      isNull: (a: unknown) => a,
-      ne: (a: unknown, b: unknown) => [a, b],
-    }));
-
-    vi.doMock('@sentry/nextjs', () => ({
-      getClient: vi.fn(() => undefined),
-      captureMessage: vi.fn(),
-      captureException: vi.fn(),
-      addBreadcrumb: vi.fn(),
-    }));
-
-    const statusModule = await import('@/lib/auth/status-checker');
-    checkUserStatus = statusModule.checkUserStatus;
-    const gateModule = await import('@/lib/auth/gate');
-    CanonicalUserState = gateModule.CanonicalUserState;
-  });
-
   it('allows active users (no ban, no deletion)', () => {
     const result = checkUserStatus('active', null);
     expect(result.isBlocked).toBe(false);
@@ -192,91 +105,6 @@ describe('checkUserStatus', () => {
 // ============================================================================
 
 describe('resolveProfileState', () => {
-  let resolveProfileState: typeof import('@/lib/auth/profile-state-resolver').resolveProfileState;
-  let isProfileComplete: typeof import('@/lib/auth/profile-state-resolver').isProfileComplete;
-  let CanonicalUserState: typeof import('@/lib/auth/gate').CanonicalUserState;
-
-  beforeEach(async () => {
-    vi.resetModules();
-
-    vi.doMock('server-only', () => ({}));
-    vi.doMock('@/lib/db', () => ({
-      db: {
-        select: vi.fn().mockReturnThis(),
-        from: vi.fn().mockReturnThis(),
-        leftJoin: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([]),
-        insert: vi.fn().mockReturnThis(),
-        values: vi.fn().mockReturnThis(),
-        onConflictDoUpdate: vi.fn().mockReturnThis(),
-        returning: vi.fn().mockResolvedValue([]),
-        update: vi.fn().mockReturnThis(),
-        set: vi.fn().mockReturnThis(),
-      },
-    }));
-    vi.doMock('@/lib/db/schema/auth', () => ({
-      users: {
-        id: 'id',
-        clerkId: 'clerkId',
-        email: 'email',
-        userStatus: 'userStatus',
-        isAdmin: 'isAdmin',
-        isPro: 'isPro',
-        deletedAt: 'deletedAt',
-        waitlistEntryId: 'waitlistEntryId',
-      },
-    }));
-    vi.doMock('@/lib/db/schema/profiles', () => ({
-      creatorProfiles: {
-        id: 'id',
-        userId: 'userId',
-        isClaimed: 'isClaimed',
-        username: 'username',
-        usernameNormalized: 'usernameNormalized',
-        displayName: 'displayName',
-        isPublic: 'isPublic',
-        onboardingCompletedAt: 'onboardingCompletedAt',
-      },
-    }));
-    vi.doMock('@/lib/db/schema/waitlist', () => ({
-      waitlistEntries: { id: 'id', email: 'email', status: 'status' },
-    }));
-    vi.doMock('@/lib/error-tracking', () => ({
-      captureError: vi.fn(),
-      captureCriticalError: vi.fn(),
-      captureWarning: vi.fn(),
-    }));
-    vi.doMock('@/lib/auth/cached', () => ({
-      getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
-      getCachedCurrentUser: vi.fn().mockResolvedValue(null),
-    }));
-    vi.doMock('@/lib/auth/clerk-sync', () => ({
-      syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
-    }));
-    vi.doMock('@/lib/utils/email', () => ({
-      normalizeEmail: (e: string) => e.toLowerCase().trim(),
-    }));
-    vi.doMock('drizzle-orm', () => ({
-      and: (...args: unknown[]) => args,
-      eq: (a: unknown, b: unknown) => [a, b],
-      isNull: (a: unknown) => a,
-      ne: (a: unknown, b: unknown) => [a, b],
-    }));
-    vi.doMock('@sentry/nextjs', () => ({
-      getClient: vi.fn(() => undefined),
-      captureMessage: vi.fn(),
-      captureException: vi.fn(),
-      addBreadcrumb: vi.fn(),
-    }));
-
-    const mod = await import('@/lib/auth/profile-state-resolver');
-    resolveProfileState = mod.resolveProfileState;
-    isProfileComplete = mod.isProfileComplete;
-    const gateMod = await import('@/lib/auth/gate');
-    CanonicalUserState = gateMod.CanonicalUserState;
-  });
-
   const completeProfile = {
     id: 'profile-1',
     username: 'testuser',
@@ -438,14 +266,6 @@ describe('proxy-state user state determination', () => {
 // ============================================================================
 
 describe('sanitizeRedirectUrl', () => {
-  let sanitizeRedirectUrl: typeof import('@/lib/auth/constants').sanitizeRedirectUrl;
-
-  beforeEach(async () => {
-    vi.resetModules();
-    const mod = await import('@/lib/auth/constants');
-    sanitizeRedirectUrl = mod.sanitizeRedirectUrl;
-  });
-
   it('accepts valid relative paths', () => {
     expect(sanitizeRedirectUrl('/app')).toBe('/app');
     expect(sanitizeRedirectUrl('/app/dashboard')).toBe('/app/dashboard');
@@ -485,98 +305,10 @@ describe('sanitizeRedirectUrl', () => {
 });
 
 // ============================================================================
-// Tests for gate.ts utility functions
+// Tests for canonical-user-state.ts utility functions
 // ============================================================================
 
-describe('gate.ts utility functions', () => {
-  let CanonicalUserState: typeof import('@/lib/auth/gate').CanonicalUserState;
-  let canAccessApp: typeof import('@/lib/auth/gate').canAccessApp;
-  let canAccessOnboarding: typeof import('@/lib/auth/gate').canAccessOnboarding;
-  let requiresRedirect: typeof import('@/lib/auth/gate').requiresRedirect;
-  let getRedirectForState: typeof import('@/lib/auth/gate').getRedirectForState;
-
-  beforeEach(async () => {
-    vi.resetModules();
-
-    vi.doMock('server-only', () => ({}));
-    vi.doMock('@/lib/db', () => ({
-      db: {
-        select: vi.fn().mockReturnThis(),
-        from: vi.fn().mockReturnThis(),
-        leftJoin: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([]),
-        insert: vi.fn().mockReturnThis(),
-        values: vi.fn().mockReturnThis(),
-        onConflictDoUpdate: vi.fn().mockReturnThis(),
-        returning: vi.fn().mockResolvedValue([]),
-        update: vi.fn().mockReturnThis(),
-        set: vi.fn().mockReturnThis(),
-      },
-    }));
-    vi.doMock('@/lib/db/schema/auth', () => ({
-      users: {
-        id: 'id',
-        clerkId: 'clerkId',
-        email: 'email',
-        userStatus: 'userStatus',
-        isAdmin: 'isAdmin',
-        isPro: 'isPro',
-        deletedAt: 'deletedAt',
-        waitlistEntryId: 'waitlistEntryId',
-      },
-    }));
-    vi.doMock('@/lib/db/schema/profiles', () => ({
-      creatorProfiles: {
-        id: 'id',
-        userId: 'userId',
-        isClaimed: 'isClaimed',
-        username: 'username',
-        usernameNormalized: 'usernameNormalized',
-        displayName: 'displayName',
-        isPublic: 'isPublic',
-        onboardingCompletedAt: 'onboardingCompletedAt',
-      },
-    }));
-    vi.doMock('@/lib/db/schema/waitlist', () => ({
-      waitlistEntries: { id: 'id', email: 'email', status: 'status' },
-    }));
-    vi.doMock('@/lib/error-tracking', () => ({
-      captureError: vi.fn(),
-      captureCriticalError: vi.fn(),
-      captureWarning: vi.fn(),
-    }));
-    vi.doMock('@/lib/auth/cached', () => ({
-      getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
-      getCachedCurrentUser: vi.fn().mockResolvedValue(null),
-    }));
-    vi.doMock('@/lib/auth/clerk-sync', () => ({
-      syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
-    }));
-    vi.doMock('@/lib/utils/email', () => ({
-      normalizeEmail: (e: string) => e.toLowerCase().trim(),
-    }));
-    vi.doMock('drizzle-orm', () => ({
-      and: (...args: unknown[]) => args,
-      eq: (a: unknown, b: unknown) => [a, b],
-      isNull: (a: unknown) => a,
-      ne: (a: unknown, b: unknown) => [a, b],
-    }));
-    vi.doMock('@sentry/nextjs', () => ({
-      getClient: vi.fn(() => undefined),
-      captureMessage: vi.fn(),
-      captureException: vi.fn(),
-      addBreadcrumb: vi.fn(),
-    }));
-
-    const mod = await import('@/lib/auth/gate');
-    CanonicalUserState = mod.CanonicalUserState;
-    canAccessApp = mod.canAccessApp;
-    canAccessOnboarding = mod.canAccessOnboarding;
-    requiresRedirect = mod.requiresRedirect;
-    getRedirectForState = mod.getRedirectForState;
-  });
-
+describe('canonical-user-state.ts utility functions', () => {
   describe('canAccessApp', () => {
     it('returns true only for ACTIVE state', () => {
       expect(canAccessApp(CanonicalUserState.ACTIVE)).toBe(true);
@@ -852,86 +584,6 @@ describe('cache invalidation contract', () => {
 // ============================================================================
 
 describe('CanonicalUserState enum', () => {
-  let CanonicalUserState: typeof import('@/lib/auth/gate').CanonicalUserState;
-
-  beforeEach(async () => {
-    vi.resetModules();
-
-    vi.doMock('server-only', () => ({}));
-    vi.doMock('@/lib/db', () => ({
-      db: {
-        select: vi.fn().mockReturnThis(),
-        from: vi.fn().mockReturnThis(),
-        leftJoin: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([]),
-        insert: vi.fn().mockReturnThis(),
-        values: vi.fn().mockReturnThis(),
-        onConflictDoUpdate: vi.fn().mockReturnThis(),
-        returning: vi.fn().mockResolvedValue([]),
-        update: vi.fn().mockReturnThis(),
-        set: vi.fn().mockReturnThis(),
-      },
-    }));
-    vi.doMock('@/lib/db/schema/auth', () => ({
-      users: {
-        id: 'id',
-        clerkId: 'clerkId',
-        email: 'email',
-        userStatus: 'userStatus',
-        isAdmin: 'isAdmin',
-        isPro: 'isPro',
-        deletedAt: 'deletedAt',
-        waitlistEntryId: 'waitlistEntryId',
-      },
-    }));
-    vi.doMock('@/lib/db/schema/profiles', () => ({
-      creatorProfiles: {
-        id: 'id',
-        userId: 'userId',
-        isClaimed: 'isClaimed',
-        username: 'username',
-        usernameNormalized: 'usernameNormalized',
-        displayName: 'displayName',
-        isPublic: 'isPublic',
-        onboardingCompletedAt: 'onboardingCompletedAt',
-      },
-    }));
-    vi.doMock('@/lib/db/schema/waitlist', () => ({
-      waitlistEntries: { id: 'id', email: 'email', status: 'status' },
-    }));
-    vi.doMock('@/lib/error-tracking', () => ({
-      captureError: vi.fn(),
-      captureCriticalError: vi.fn(),
-      captureWarning: vi.fn(),
-    }));
-    vi.doMock('@/lib/auth/cached', () => ({
-      getCachedAuth: vi.fn().mockResolvedValue({ userId: null }),
-      getCachedCurrentUser: vi.fn().mockResolvedValue(null),
-    }));
-    vi.doMock('@/lib/auth/clerk-sync', () => ({
-      syncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
-    }));
-    vi.doMock('@/lib/utils/email', () => ({
-      normalizeEmail: (e: string) => e.toLowerCase().trim(),
-    }));
-    vi.doMock('drizzle-orm', () => ({
-      and: (...args: unknown[]) => args,
-      eq: (a: unknown, b: unknown) => [a, b],
-      isNull: (a: unknown) => a,
-      ne: (a: unknown, b: unknown) => [a, b],
-    }));
-    vi.doMock('@sentry/nextjs', () => ({
-      getClient: vi.fn(() => undefined),
-      captureMessage: vi.fn(),
-      captureException: vi.fn(),
-      addBreadcrumb: vi.fn(),
-    }));
-
-    const mod = await import('@/lib/auth/gate');
-    CanonicalUserState = mod.CanonicalUserState;
-  });
-
   it('contains all expected states', () => {
     expect(CanonicalUserState.UNAUTHENTICATED).toBeDefined();
     expect(CanonicalUserState.NEEDS_DB_USER).toBeDefined();

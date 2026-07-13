@@ -62,9 +62,18 @@ vi.mock('@jovie/ui', () => ({
     React.createElement('div', null, children),
 }));
 
-vi.mock('sonner', () => ({
+vi.mock('@sentry/nextjs', () => ({
+  addBreadcrumb: vi.fn(),
+}));
+
+vi.mock('@/components/feedback', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
+
+vi.mock(
+  '@/features/dashboard/organisms/profile-contact-sidebar/SuggestedDspMatches',
+  () => ({ SuggestedDspMatches: () => null })
+);
 
 function makeLink(
   overrides: Partial<PreviewPanelLink> & {
@@ -84,7 +93,7 @@ describe('ProfileLinkList — render-layer dedupe and label fallback', () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => cleanup());
 
-  it('collapses three identical YouTube rows into one row', async () => {
+  it('collapses three identical YouTube rows into one row', () => {
     // Exact reproduction of the production screenshot data.
     const links: PreviewPanelLink[] = [
       makeLink({
@@ -111,7 +120,7 @@ describe('ProfileLinkList — render-layer dedupe and label fallback', () => {
     expect(rows[0]).toHaveTextContent('@timwhite');
   });
 
-  it('keeps multiple legitimate YouTube channels with distinct URLs', async () => {
+  it('keeps multiple legitimate YouTube channels with distinct URLs', () => {
     const links: PreviewPanelLink[] = [
       makeLink({
         id: '1',
@@ -130,7 +139,7 @@ describe('ProfileLinkList — render-layer dedupe and label fallback', () => {
     expect(screen.getAllByTestId(/^sidebar-link-row-/)).toHaveLength(2);
   });
 
-  it('falls back to a hostname (not the platform name) when no handle is extractable', async () => {
+  it('falls back to a hostname (not the platform name) when no handle is extractable', () => {
     // YouTube URL with no @handle segment — extractHandleFromUrl returns null.
     const links: PreviewPanelLink[] = [
       makeLink({
@@ -153,7 +162,7 @@ describe('ProfileLinkList — render-layer dedupe and label fallback', () => {
     expectNoBrokenStrings(container);
   });
 
-  it('renders multiple platforms with no duplicates after a noisy fixture (regression)', async () => {
+  it('renders multiple platforms with no duplicates after a noisy fixture (regression)', () => {
     // Recreates the production screenshot exactly: Instagram + TikTok +
     // YouTube × 3 (two dupes + one malformed handle-less URL).
     const links: PreviewPanelLink[] = [

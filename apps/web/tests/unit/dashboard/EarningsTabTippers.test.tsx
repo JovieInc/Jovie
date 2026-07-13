@@ -1,18 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EarningsTab } from '@/components/features/dashboard/organisms/EarningsTab';
 
 // Mock the queries
-const mockEarningsQuery = vi.fn();
-vi.mock('@/lib/queries', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/queries')>();
-  return {
-    ...actual,
-    useEarningsQuery: (...args: unknown[]) => mockEarningsQuery(...args),
-  };
-});
+const mockEarningsQuery = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/queries', () => ({
+  useEarningsQuery: (...args: unknown[]) => mockEarningsQuery(...args),
+}));
 
 // Mock DashboardDataContext
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
@@ -59,6 +55,10 @@ function renderWithProviders(ui: ReactElement) {
 }
 
 describe('EarningsTab - Tippers Table', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });

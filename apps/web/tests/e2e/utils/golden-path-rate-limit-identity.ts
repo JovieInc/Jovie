@@ -28,3 +28,27 @@ export function createGoldenPathTestIp(
 
   return `2001:db8:${segments.join(':')}::1`;
 }
+
+export function createGoldenPathPlaywrightTestIp(
+  githubRunId: string | undefined,
+  scope: string,
+  testId: string,
+  retry: number,
+  workerIndex: number
+): string {
+  return createGoldenPathTestIp(
+    githubRunId,
+    `${scope}:${testId}:retry-${retry}:worker-${workerIndex}`
+  );
+}
+
+export function withGoldenPathTestIpHeaders(
+  headers: Readonly<Record<string, string>>,
+  testClientIp: string
+): Record<string, string> {
+  return {
+    ...headers,
+    'x-forwarded-for': testClientIp,
+    'x-real-ip': testClientIp,
+  };
+}

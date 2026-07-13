@@ -7,7 +7,11 @@ import {
   getAdminCredentials,
   hasAdminCredentials,
 } from '../helpers/clerk-auth';
-import { createGoldenPathTestIp } from './utils/golden-path-rate-limit-identity';
+import {
+  createGoldenPathPlaywrightTestIp,
+  createGoldenPathTestIp,
+  withGoldenPathTestIpHeaders,
+} from './utils/golden-path-rate-limit-identity';
 import { installRuntimeAutomationBypass } from './utils/runtime-automation-bypass';
 
 /**
@@ -84,6 +88,31 @@ async function ensureDbUser(betterAuthUserId: string) {
     SET spotify_id = NULL, spotify_url = NULL
     WHERE spotify_id = ${KNOWN_TIM_WHITE_SPOTIFY_ID}
   `;
+
+  // Better Auth's user.create.after hook provisions the app-user mirror.
+  // The auth session can become readable a moment before that async hook is
+  // visible over Neon's HTTP connection, so do not let the UPDATE below turn
+  // a missing mirror into a silent no-op. This mirrors the production claim
+  // hook's retry window and fails with the actual prerequisite if provisioning
+  // never converges.
+  await expect
+    .poll(
+      async () => {
+        const rows = await sql`
+          SELECT id
+          FROM users
+          WHERE better_auth_user_id = ${betterAuthUserId}
+          LIMIT 1
+        `;
+        return rows.length;
+      },
+      {
+        message: 'Better Auth app-user mirror was not provisioned',
+        timeout: 10_000,
+        intervals: [250, 500, 1_000],
+      }
+    )
+    .toBe(1);
 
   await sql`
     UPDATE users
@@ -222,7 +251,19 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
   await expect(page.locator('[data-auth-email-code-step="code"]')).toBeVisible({
     timeout: 30_000,
   });
+  const claimResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/onboarding/claim',
+    { timeout: 30_000 }
+  );
   await page.getByLabel('Digit 1 of 6').pressSequentially('424242');
+  const claimResponse = await claimResponsePromise;
+  expect(claimResponse.status()).toBe(200);
+  const claimPayload = (await claimResponse.json()) as {
+    claimed?: number;
+    conversationId?: string;
+  };
   await page.waitForURL(/\/(start|onboarding)/, { timeout: 30_000 });
   await page.waitForLoadState('domcontentloaded');
 
@@ -245,7 +286,7 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const betterAuthUserId = await sessionHandle.jsonValue<string>();
 
   await ensureDbUser(betterAuthUserId);
-  return { email, betterAuthUserId };
+  return { email, betterAuthUserId, claimPayload };
 }
 
 async function createFreshUser(page: import('@playwright/test').Page) {
@@ -296,11 +337,13 @@ async function seedAnonymousOnboardingJourney(page: Page, handle: string) {
   );
   await page.route('**/api/chat', async route => {
     await route.continue({
-      headers: {
-        ...route.request().headers(),
-        'x-jovie-e2e-llm-failure': '1',
-        'x-real-ip': testClientIp,
-      },
+      headers: withGoldenPathTestIpHeaders(
+        {
+          ...route.request().headers(),
+          'x-jovie-e2e-llm-failure': '1',
+        },
+        testClientIp
+      ),
     });
   });
   await page.goto('/start', { waitUntil: 'domcontentloaded' });
@@ -410,11 +453,24 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
   // Fresh browser — no inherited auth state
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     if (!hasRealEnv()) {
       test.skip(true, 'Better Auth/DB env vars not configured');
     }
 
+    // Better Auth's credential endpoints intentionally keep strict per-IP
+    // limits. Give each CI lane its own deterministic TEST-NET identity so
+    // parallel golden/smoke jobs cannot consume one shared loopback bucket.
+    // Page-level headers merge with context headers, preserving any Vercel
+    // deployment-protection headers supplied by Playwright config.
+    const authTestIp = createGoldenPathPlaywrightTestIp(
+      process.env.GITHUB_RUN_ID,
+      `${process.env.GITHUB_JOB || 'local'}:auth`,
+      testInfo.testId,
+      testInfo.retry,
+      testInfo.workerIndex
+    );
+    await page.setExtraHTTPHeaders(withGoldenPathTestIpHeaders({}, authTestIp));
     await interceptTrackingCalls(page);
   });
 
@@ -450,14 +506,16 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     // ──────────────────────────────────────────────────────────────────
     // STEP 3: Create account
     // ──────────────────────────────────────────────────────────────────
-    const { betterAuthUserId } = await createFreshUser(page);
+    const { betterAuthUserId, claimPayload } = await createFreshUser(page);
     const TEST_SPOTIFY_ID = '4Uwpa6zW3zzCSQvooQNksm';
     const testSpotifyUrl = `https://open.spotify.com/artist/${TEST_SPOTIFY_ID}`;
 
-    // Exercise the real activation endpoint. Signup may already have called it;
-    // the endpoint is intentionally idempotent, so assert its durable outcome.
-    const claim = await page.request.post('/api/onboarding/claim');
-    expect(claim.status()).toBe(200);
+    // Assert the real client auto-claim response captured during OTP completion.
+    // A duplicate request here would race the hook and mask which caller won.
+    expect(claimPayload).toMatchObject({
+      claimed: 1,
+      conversationId,
+    });
     const sql = neon(process.env.DATABASE_URL!);
     await expect
       .poll(async () => {

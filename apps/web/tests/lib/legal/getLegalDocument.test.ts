@@ -1,5 +1,21 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getLegalDocument } from '@/lib/legal/getLegalDocument';
+
+vi.mock('@/components/marketing', () => ({
+  MarketingContainer: () => null,
+}));
+vi.mock('@/components/site/PublicPageShell', () => ({
+  PublicPageShell: () => null,
+}));
+vi.mock('@/components/organisms/LegalPage', () => ({
+  LegalPage: () => null,
+}));
+
+import * as cookiesRoute from '@/app/(dynamic)/legal/cookies/page';
+import * as dmcaRoute from '@/app/(dynamic)/legal/dmca/page';
+import { revalidate as layoutRevalidate } from '@/app/(dynamic)/legal/layout';
+import * as privacyRoute from '@/app/(dynamic)/legal/privacy/page';
+import * as termsRoute from '@/app/(dynamic)/legal/terms/page';
 
 describe('getLegalDocument', () => {
   it('uses legal markdown title and date as document metadata', async () => {
@@ -22,20 +38,17 @@ describe('getLegalDocument', () => {
     expect(doc.html).toContain('<code>jv_cc</code>');
   });
 
-  it('keeps legal routes fully static', async () => {
-    const layout = await import('@/app/(dynamic)/legal/layout');
-    const routeModules = await Promise.all([
-      import('@/app/(dynamic)/legal/privacy/page'),
-      import('@/app/(dynamic)/legal/terms/page'),
-      import('@/app/(dynamic)/legal/cookies/page'),
-      import('@/app/(dynamic)/legal/dmca/page'),
-    ]);
+  it('keeps legal routes fully static', () => {
+    expect(layoutRevalidate).toBe(false);
 
-    expect(layout.revalidate).toBe(false);
-
-    for (const routeModule of routeModules) {
+    for (const routeModule of [
+      privacyRoute,
+      termsRoute,
+      cookiesRoute,
+      dmcaRoute,
+    ]) {
       expect(routeModule.dynamic).toBe('force-static');
       expect(routeModule.revalidate).toBe(false);
     }
-  }, 15_000);
+  });
 });

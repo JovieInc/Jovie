@@ -13,7 +13,7 @@ import { env, isSecureEnv } from '@/lib/env-server';
  * have — only the server can mint valid cookies.
  *
  * The sessionId is later written onto chat_conversations rows and claimed
- * onto a real Clerk user via /api/onboarding/claim once the user signs up.
+ * onto the authenticated app user via /api/onboarding/claim after signup.
  */
 
 const COOKIE_NAME = 'jovie_onboarding_session';

@@ -768,12 +768,15 @@ describe('CI mobile overflow workflow', () => {
 });
 
 describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
-  const neonBranchCreateJobs = [
-    'neon-db',
-    'ci-lighthouse-dashboard-pr',
-    'ci-e2e-smoke',
-    'ci-admin-smoke',
-  ] as const;
+  const neonBranchCreateJobs = new Map([
+    ['neon-db', 'neon-endpoint-pool-neon-db-'],
+    [
+      'ci-lighthouse-dashboard-pr',
+      'neon-endpoint-pool-ci-lighthouse-dashboard-pr-',
+    ],
+    ['ci-e2e-smoke', 'neon-endpoint-pool-ci-e2e-smoke-'],
+    ['ci-admin-smoke', 'neon-endpoint-pool-ci-admin-smoke-'],
+  ] as const);
 
   const neonArtifactConsumerJobs = [
     'ci-lighthouse-pr',
@@ -787,10 +790,11 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
   it('caps cross-PR Neon branch creation with a four-slot queue', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
-    for (const jobKey of neonBranchCreateJobs) {
+    expect(workflow).not.toContain('neon-endpoint-pool-${{ github.job }}');
+    for (const [jobKey, groupPrefix] of neonBranchCreateJobs) {
       const job = getJobBlock(workflow, jobKey);
       expect(job).toContain('concurrency:');
-      expect(job).toContain('group: neon-endpoint-pool-${{ github.job }}-');
+      expect(job).toContain(`group: ${groupPrefix}`);
       expect(job).toContain('cancel-in-progress: false');
     }
   });
@@ -805,12 +809,14 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
     'group: neon-endpoint-pool-ci-golden-path',
   ] as const;
 
-  it('scopes branch-creation pool per job so siblings in one workflow are not cancelled', () => {
+  it('scopes branch-creation pool with nonempty literal job ids', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const poolGroups =
       workflow.match(/group: neon-endpoint-pool-[^\n]+/g) ?? [];
 
-    expect(poolGroups.length).toBeGreaterThan(0);
+    expect(poolGroups).toHaveLength(
+      neonBranchCreateJobs.size + intentionallySerializedPoolGroups.length
+    );
     for (const group of poolGroups) {
       if (
         intentionallySerializedPoolGroups.includes(
@@ -819,7 +825,8 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
       ) {
         continue;
       }
-      expect(group).toContain('${{ github.job }}');
+      expect(group).not.toContain('neon-endpoint-pool--');
+      expect(group).not.toContain('${{ github.job }}');
     }
   });
 

@@ -6,7 +6,7 @@
  */
 import { readFileSync } from 'node:fs';
 import type { Metadata } from 'next';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   loadSeoRatchetBaseline,
   resolveSeoSourcePath,
@@ -23,6 +23,89 @@ import * as changelogRoute from '../../../app/(marketing)/changelog/page';
 import * as downloadRoute from '../../../app/(marketing)/download/page';
 import * as pricingRoute from '../../../app/(marketing)/pricing/layout';
 import * as supportRoute from '../../../app/(marketing)/support/page';
+
+// This suite validates route metadata, not page rendering. Keep render-only
+// component graphs out of the metadata import path so the ratchet remains
+// stable under the native 5s test timeout on a cold transform cache.
+vi.mock('next/dynamic', () => ({ default: () => () => null }));
+vi.mock('next/image', () => ({ default: () => null }));
+vi.mock('next/link', () => ({ default: () => null }));
+vi.mock('next/cache', () => ({
+  unstable_cache: (callback: unknown) => callback,
+}));
+vi.mock('@jovie/ui', () => ({ Badge: () => null, Button: () => null }));
+vi.mock('@jovie/ui/atoms/badge', () => ({ Badge: () => null }));
+vi.mock('lucide-react', () => ({
+  ArrowDownToLine: () => null,
+  Check: () => null,
+  Laptop: () => null,
+  QrCode: () => null,
+  ShieldCheck: () => null,
+  Smartphone: () => null,
+  Sparkles: () => null,
+}));
+vi.mock('@/components/features/home/HomeTrustSection', () => ({
+  HomeTrustSection: () => null,
+}));
+vi.mock('@/components/homepage/HomepageArtistOutcomes', () => ({
+  HomepageArtistOutcomes: () => null,
+}));
+vi.mock('@/components/homepage/HomepageClosedLoop', () => ({
+  HomepageClosedLoop: () => null,
+}));
+vi.mock('@/components/homepage/HomepageElectricSeam', () => ({
+  HomepageElectricSeam: () => null,
+}));
+vi.mock('@/components/homepage/HomepageHeroCommandCenter', () => ({
+  HomepageHeroCommandCenter: () => null,
+}));
+vi.mock('@/components/homepage/HomepageOpportunitySection', () => ({
+  HomepageOpportunitySection: () => null,
+}));
+vi.mock('@/components/homepage/HomepagePosterHero', () => ({
+  HomepagePosterHero: () => null,
+}));
+vi.mock('@/components/homepage/HomepageTrackedLink', () => ({
+  HomepageTrackedLink: () => null,
+}));
+vi.mock('@/components/homepage/HomepageWorkspaceSectionLazy', () => ({
+  HomepageWorkspaceSectionLazy: () => null,
+}));
+vi.mock('@/components/marketing', () => ({
+  FaqSection: () => null,
+  MarketingContainer: () => null,
+  MarketingHeroLayout: () => null,
+}));
+vi.mock('@/features/home/AuthRedirectHandler', () => ({
+  AuthRedirectHandler: () => null,
+}));
+vi.mock(
+  '@/components/marketing/artist-profile/ArtistProfileLandingRoute',
+  () => ({
+    ArtistProfileLandingRoute: () => null,
+  })
+);
+vi.mock('@/components/site/MarketingFooterCta', () => ({
+  MarketingFooterCta: () => null,
+}));
+vi.mock('@/lib/screenshots/registry', () => ({
+  getMarketingExportImage: () => '/test-marketing-export.png',
+}));
+vi.mock('@/lib/blog/getBlogPosts', () => ({ getBlogPosts: vi.fn() }));
+vi.mock('@/lib/blog/resolveAuthor', () => ({ resolveAuthor: vi.fn() }));
+vi.mock('@/lib/services/profile', () => ({
+  getProfilesByUsernames: vi.fn(),
+}));
+vi.mock('../../../app/(marketing)/blog/components/BlogCard', () => ({
+  BlogCard: () => null,
+}));
+vi.mock('../../../app/(marketing)/support/SupportContent', () => ({
+  SupportChannels: () => null,
+  SupportCta: () => null,
+}));
+vi.mock('../../../app/(marketing)/changelog/ChangelogEmailSignup', () => ({
+  ChangelogEmailSignup: () => null,
+}));
 
 const baseline = loadSeoRatchetBaseline();
 
