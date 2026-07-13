@@ -3,7 +3,7 @@
 const API_BASE = 'https://api.vercel.com';
 const ACTIVE_STATES = ['QUEUED', 'BUILDING'];
 const MINIMUM_AGE_MS = 20 * 60 * 1000;
-const MAX_CANCELLATIONS = 10;
+const MAX_CANCELLATIONS = 100;
 
 export function isStalePreview(
   deployment,

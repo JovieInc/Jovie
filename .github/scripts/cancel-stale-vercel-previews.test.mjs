@@ -92,4 +92,31 @@ describe('cancel stale Vercel previews', () => {
     );
     expect(request.mock.calls[2][2]).toEqual({ method: 'PATCH' });
   });
+
+  it('drains a full Vercel result page instead of leaving stale work queued', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    const deployments = Array.from({ length: 100 }, (_, index) =>
+      activePreview({ uid: `dpl_${index}` })
+    );
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ deployments })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ deployments: [] })));
+    for (let index = 0; index < deployments.length; index += 1) {
+      request.mockResolvedValueOnce(
+        new Response(JSON.stringify({ readyState: 'CANCELED' }))
+      );
+    }
+
+    const canceled = await cancelStalePreviews({
+      token: 'token',
+      orgId: 'team_org',
+      projectId,
+      currentSha,
+      request,
+    });
+
+    expect(canceled).toHaveLength(100);
+    expect(request).toHaveBeenCalledTimes(102);
+  });
 });
