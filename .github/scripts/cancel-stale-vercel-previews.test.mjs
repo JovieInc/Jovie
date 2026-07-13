@@ -19,7 +19,7 @@ const activePreview = (overrides = {}) => ({
 });
 
 describe('cancel stale Vercel previews', () => {
-  it('only selects stale active GitHub previews', () => {
+  it('selects every active project preview while preserving production', () => {
     expect(isStalePreview(activePreview(), { projectId, now })).toBe(true);
     expect(
       isStalePreview(activePreview({ target: 'production' }), {
@@ -48,6 +48,15 @@ describe('cancel stale Vercel previews', () => {
         }),
         { projectId, now }
       )
+    ).toBe(true);
+    expect(
+      isStalePreview(activePreview({ meta: undefined }), { projectId, now })
+    ).toBe(true);
+    expect(
+      isStalePreview(activePreview({ projectId: 'prj_other' }), {
+        projectId,
+        now,
+      })
     ).toBe(false);
   });
 

@@ -5,17 +5,12 @@ const ACTIVE_STATES = ['QUEUED', 'BUILDING'];
 const MAX_CANCELLATIONS = 100;
 
 export function isStalePreview(deployment, { projectId }) {
-  const commitSha = deployment.meta?.githubCommitSha;
-  const commitRef = deployment.meta?.githubCommitRef;
   const state = (deployment.readyState ?? deployment.state ?? '').toUpperCase();
 
   return (
     deployment.projectId === projectId &&
     deployment.target !== 'production' &&
-    ACTIVE_STATES.includes(state) &&
-    commitRef === 'main' &&
-    typeof commitSha === 'string' &&
-    commitSha.length > 0
+    ACTIVE_STATES.includes(state)
   );
 }
 
@@ -76,9 +71,8 @@ export async function cancelStalePreviews({
 
   for (const deployment of stale) {
     const id = deployment.uid ?? deployment.id;
-    const commitSha = deployment.meta.githubCommitSha;
     const state = deployment.readyState ?? deployment.state;
-    console.log(`Canceling stale preview ${id} (${state}, ${commitSha})`);
+    console.log(`Canceling active preview ${id} (${state})`);
 
     const url = scopedUrl(
       `/v12/deployments/${encodeURIComponent(id)}/cancel`,
