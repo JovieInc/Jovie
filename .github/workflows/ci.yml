@@ -4860,22 +4860,30 @@ jobs:
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
         run: |
+          inspect_wait_status=0
           ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
             --wait \
             --timeout 20m \
             --token "$VERCEL_TOKEN" \
-            --scope "$VERCEL_ORG_ID"
+            --scope "$VERCEL_ORG_ID" || inspect_wait_status=$?
           deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
             --format=json \
             --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID")"
-          if ! jq -e '((.readyState // .state // .status // "") | ascii_upcase) == "READY"' \
-            <<<"$deployment_json" >/dev/null; then
-            echo "::error::Vercel inspect returned before the staging deployment reached READY."
-            jq -r '"Current deployment state: \(.readyState // .state // .status // "unknown")"' \
-              <<<"$deployment_json"
-            exit 1
-          fi
+          deployment_state="$(jq -r '(.readyState // .state // .status // "unknown") | ascii_upcase' \
+            <<<"$deployment_json")"
+          echo "Current deployment state: $deployment_state"
+          case "$deployment_state" in
+            READY)
+              ;;
+            BUILDING|QUEUED|INITIALIZING)
+              echo "::warning::Vercel is still $deployment_state after readiness wait (status $inspect_wait_status); handing off to retrying canary."
+              ;;
+            *)
+              echo "::error::Vercel deployment entered terminal state $deployment_state."
+              exit 1
+              ;;
+          esac
 
       - name: Encode deployment URL for downstream jobs
         id: encode_deploy_url

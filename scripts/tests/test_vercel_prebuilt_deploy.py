@@ -261,7 +261,7 @@ def test_masked_deployment_url_is_encoded_across_job_boundary() -> None:
     assert "base64 --decode" in canary_workflow
 
 
-def test_readiness_gate_checks_ready_state_after_vercel_wait() -> None:
+def test_readiness_gate_hands_active_deployment_to_retrying_canary() -> None:
     workflow = CI_WORKFLOW.read_text()
     readiness = workflow[
         workflow.index("- name: Wait for staging deployment readiness") : workflow.index(
@@ -271,4 +271,6 @@ def test_readiness_gate_checks_ready_state_after_vercel_wait() -> None:
 
     assert "--wait" in readiness
     assert "--format=json" in readiness
-    assert 'ascii_upcase) == "READY"' in readiness
+    assert "BUILDING|QUEUED|INITIALIZING)" in readiness
+    assert "handing off to retrying canary" in readiness
+    assert "terminal state" in readiness
