@@ -4621,7 +4621,7 @@ jobs:
     # saturate the production-deploy concurrency slot.
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() && needs.deploy-gate.outputs.is_head == 'true' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 30
+    timeout-minutes: 40
     # Deploy concurrency: serialize main deploys instead of cancelling them.
     # Cancelling in-progress main deploys during merge bursts can starve
     # production promotion and leave main without a completed deploy run.
@@ -4856,13 +4856,13 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
 
       - name: Wait for staging deployment readiness
-        timeout-minutes: 13
+        timeout-minutes: 21
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
         run: |
           ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
             --wait \
-            --timeout 12m \
+            --timeout 20m \
             --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID"
           deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
