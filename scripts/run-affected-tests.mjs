@@ -13,6 +13,18 @@ const GLOBAL_TEST_INPUTS = new Set([
   'apps/web/tests/setup.ts',
 ]);
 const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
+const INVESTOR_NOTE_INGESTION_TESTS = [
+  'apps/web/tests/unit/investors/note-ingestion.test.ts',
+  'apps/web/tests/unit/investors/note-ingestion-cli.test.ts',
+];
+
+function isInvestorNoteIngestionInput(file) {
+  return (
+    file === 'apps/web/lib/investors/note-ingestion.ts' ||
+    file === 'apps/web/scripts/ingest-investor-note.ts' ||
+    /^apps\/web\/tests\/fixtures\/investors\/note-[^/]+\.json$/.test(file)
+  );
+}
 
 function unique(values) {
   return [...new Set(values)];
@@ -85,6 +97,9 @@ export function buildAffectedTestPlan(changedFiles) {
       'apps/web/scripts/sync-skills-catalog.test.ts'
     );
   }
+  if (files.some(isInvestorNoteIngestionInput)) {
+    mandatoryTests.push(...INVESTOR_NOTE_INGESTION_TESTS);
+  }
 
   const selectedTests = unique([...directTests, ...mandatoryTests]);
   const isCoveredSource = file => {
@@ -95,6 +110,7 @@ export function buildAffectedTestPlan(changedFiles) {
     if (file.startsWith('apps/web/app/')) return true;
     if (file.startsWith('packages/ui/')) return true;
     if (file.startsWith('apps/web/tests/eval/promptfoo/')) return true;
+    if (isInvestorNoteIngestionInput(file)) return true;
     if (
       hasSeedConfirmationChange &&
       (file === 'apps/web/tests/seed-test-data.ts' ||

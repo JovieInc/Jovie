@@ -91,6 +91,46 @@ describe('automation-verify affected scope', () => {
     ]);
   });
 
+  it('keeps the #14010 investor note ingestion diff on its focused suites', () => {
+    const plan = buildAffectedTestPlan([
+      'apps/web/lib/investors/note-ingestion.ts',
+      'apps/web/scripts/ingest-investor-note.ts',
+      'apps/web/tests/fixtures/investors/note-a.json',
+      'apps/web/tests/fixtures/investors/note-b.json',
+      'apps/web/tests/unit/investors/note-ingestion-cli.test.ts',
+      'apps/web/tests/unit/investors/note-ingestion.test.ts',
+      'docs/fundraising/investor-note-ingestion.md',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.relatedFiles).toHaveLength(6);
+    expect(plan.mandatoryTests).toEqual([
+      'apps/web/tests/unit/investors/note-ingestion.test.ts',
+      'apps/web/tests/unit/investors/note-ingestion-cli.test.ts',
+    ]);
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/investors/note-ingestion-cli.test.ts',
+      'apps/web/tests/unit/investors/note-ingestion.test.ts',
+    ]);
+  });
+
+  it('fails closed when the investor ingestion lane is mixed with unknown source', () => {
+    expect(
+      buildAffectedTestPlan([
+        'apps/web/lib/investors/note-ingestion.ts',
+        'apps/web/lib/investors/deleted-unknown.ts',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('fails closed for an unrelated investor fixture', () => {
+    expect(
+      buildAffectedTestPlan([
+        'apps/web/tests/fixtures/investors/portfolio-summary.json',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('fails closed to the full suite for global test inputs', () => {
     expect(buildAffectedTestPlan(['apps/web/tests/setup.ts']).mode).toBe(
       'full'
