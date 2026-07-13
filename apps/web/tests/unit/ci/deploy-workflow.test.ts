@@ -313,6 +313,25 @@ describe('deploy workflow Vercel env resolution', () => {
   });
 });
 
+describe('unit-test runner capacity', () => {
+  it('fills the ephemeral pool while retaining hosted burst protection', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const unitJob = getJobBlock(workflow, 'ci-unit-tests');
+
+    expect(unitJob).toContain(
+      "runs-on: ${{ vars.CI_UNIT_RUNNER || 'ubuntu-latest' }}"
+    );
+    expect(unitJob).toContain(
+      "max-parallel: ${{ vars.CI_UNIT_RUNNER == 'jovie-ephemeral' && 5 || 3 }}"
+    );
+    expect(unitJob).toContain('10-slot autoscaled ephemeral pool');
+    expect(unitJob).toContain('two PRs use all 10');
+    expect(unitJob).toContain(
+      'hosted fallback retains the original 3-shard cap'
+    );
+  });
+});
+
 describe('canary health gate workflow', () => {
   it('fails closed when the automation bypass secret is missing', () => {
     const workflow = readFileSync(canaryWorkflowPath, 'utf8');
