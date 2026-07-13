@@ -13,6 +13,36 @@ const GLOBAL_TEST_INPUTS = new Set([
   'apps/web/tests/setup.ts',
 ]);
 const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
+const INVESTOR_NOTE_INGESTION_TESTS = [
+  'apps/web/tests/unit/investors/note-ingestion.test.ts',
+  'apps/web/tests/unit/investors/note-ingestion-cli.test.ts',
+];
+const CI_CANCELLATION_HEALER_TESTS = [
+  'apps/web/tests/unit/ci/ci-cancellation-classifier.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+];
+const CI_CANCELLATION_HEALER_PRIMARY_INPUTS = new Set([
+  '.github/workflows/ci-cancellation-healer.yml',
+  'apps/web/tests/unit/ci/ci-cancellation-classifier.test.ts',
+  'apps/web/tests/unit/ci/fixtures/fixed-runner-setup-cancellation.json',
+  'scripts/lib/ci-cancellation-classifier.mjs',
+]);
+const CI_CANCELLATION_HEALER_COMPANION = 'scripts/ci-fast-lanes.mjs';
+
+function isInvestorNoteIngestionInput(file) {
+  return (
+    file === 'apps/web/lib/investors/note-ingestion.ts' ||
+    file === 'apps/web/scripts/ingest-investor-note.ts' ||
+    /^apps\/web\/tests\/fixtures\/investors\/note-[^/]+\.json$/.test(file)
+  );
+}
+
+function isCiCancellationHealerInput(file) {
+  return (
+    CI_CANCELLATION_HEALER_PRIMARY_INPUTS.has(file) ||
+    file === CI_CANCELLATION_HEALER_COMPANION
+  );
+}
 
 function unique(values) {
   return [...new Set(values)];
@@ -85,6 +115,15 @@ export function buildAffectedTestPlan(changedFiles) {
       'apps/web/scripts/sync-skills-catalog.test.ts'
     );
   }
+  if (files.some(isInvestorNoteIngestionInput)) {
+    mandatoryTests.push(...INVESTOR_NOTE_INGESTION_TESTS);
+  }
+  const hasCiCancellationHealerChange = files.some(file =>
+    CI_CANCELLATION_HEALER_PRIMARY_INPUTS.has(file)
+  );
+  if (hasCiCancellationHealerChange) {
+    mandatoryTests.push(...CI_CANCELLATION_HEALER_TESTS);
+  }
 
   const selectedTests = unique([...directTests, ...mandatoryTests]);
   const isCoveredSource = file => {
@@ -95,6 +134,8 @@ export function buildAffectedTestPlan(changedFiles) {
     if (file.startsWith('apps/web/app/')) return true;
     if (file.startsWith('packages/ui/')) return true;
     if (file.startsWith('apps/web/tests/eval/promptfoo/')) return true;
+    if (isInvestorNoteIngestionInput(file)) return true;
+    if (isCiCancellationHealerInput(file)) return true;
     if (
       hasSeedConfirmationChange &&
       (file === 'apps/web/tests/seed-test-data.ts' ||
@@ -109,13 +150,28 @@ export function buildAffectedTestPlan(changedFiles) {
       'apps/web/tests/unit/design-system/arbitrary-values.baseline.json'
     );
   };
-  const hasUncoveredSource = relatedFiles.some(file => !isCoveredSource(file));
+  const hasUnknownCiCancellationHealerPeer =
+    hasCiCancellationHealerChange &&
+    files.some(
+      file =>
+        (file.startsWith('scripts/') || file.startsWith('.github/')) &&
+        !isCiCancellationHealerInput(file)
+    );
+  const hasStandaloneCiFastLanesChange =
+    files.includes(CI_CANCELLATION_HEALER_COMPANION) &&
+    !hasCiCancellationHealerChange;
+  const hasUncoveredSource =
+    relatedFiles.some(file => !isCoveredSource(file)) ||
+    hasUnknownCiCancellationHealerPeer ||
+    hasStandaloneCiFastLanesChange;
   return {
-    mode:
-      relatedFiles.length === 0
-        ? 'none'
-        : !hasUncoveredSource && selectedTests.length > 0
-          ? 'selected'
+    mode: hasUncoveredSource
+      ? 'full'
+      : selectedTests.length > 0 &&
+          (relatedFiles.length > 0 || hasCiCancellationHealerChange)
+        ? 'selected'
+        : relatedFiles.length === 0
+          ? 'none'
           : 'full',
     relatedFiles,
     mandatoryTests: unique(mandatoryTests),
