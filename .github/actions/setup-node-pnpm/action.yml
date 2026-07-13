@@ -54,7 +54,13 @@ runs:
         echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
 
     - name: Setup pnpm cache
-      if: runner.environment != 'github-hosted'
+      # Static self-hosted runners reuse this store across jobs. Ephemeral
+      # containers do not, so actions/cache would upload the whole store during
+      # teardown and can keep an otherwise-finished job occupied until timeout.
+      if: >-
+        runner.environment != 'github-hosted' &&
+        !startsWith(runner.name, 'jovie-eph-') &&
+        !startsWith(runner.name, 'jovie-iso-')
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
