@@ -8,6 +8,7 @@ import {
   hasAdminCredentials,
 } from '../helpers/clerk-auth';
 import { createGoldenPathTestIp } from './utils/golden-path-rate-limit-identity';
+import { installRuntimeAutomationBypass } from './utils/runtime-automation-bypass';
 
 /**
  * Golden Path E2E — Anonymous Chat -> Signup -> Claim -> Live Profile
@@ -288,9 +289,7 @@ async function seedAnonymousOnboardingJourney(page: Page, handle: string) {
   // The real-Clerk artifact intentionally omits compile-time E2E flags. Mark
   // only this browser as local automation before React initializes so the
   // anonymous turn bypasses Turnstile without enabling auth bypass.
-  await page.addInitScript(() => {
-    document.documentElement.dataset.e2eMode = '1';
-  });
+  await page.addInitScript(installRuntimeAutomationBypass);
   const testClientIp = createGoldenPathTestIp(
     process.env.GITHUB_RUN_ID,
     `golden-path:${handle}`

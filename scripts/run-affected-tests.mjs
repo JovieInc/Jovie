@@ -40,6 +40,7 @@ const PREREQUISITE_TRAIN_TESTS = [
   'apps/web/tests/unit/e2e/auth-helper.test.ts',
   'apps/web/tests/unit/e2e/golden-path-rate-limit-identity.test.ts',
   'apps/web/tests/unit/e2e/noauth-config.test.ts',
+  'apps/web/tests/unit/e2e/runtime-automation-bypass.test.ts',
   'apps/web/tests/unit/e2e/seed-test-data.test.ts',
   'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
   'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
@@ -53,6 +54,7 @@ const PREREQUISITE_TRAIN_CORNERS = [
   'apps/web/components/shell/SidebarNavItem.tsx',
   'apps/web/app/app/(shell)/chat/loading.tsx',
   'apps/web/tests/e2e/utils/golden-path-rate-limit-identity.ts',
+  'apps/web/tests/e2e/utils/runtime-automation-bypass.ts',
 ];
 const PREREQUISITE_TRAIN_PLAYWRIGHT_SPECS = new Set([
   'apps/web/tests/e2e/chat-axe.spec.ts',
@@ -92,6 +94,7 @@ const PREREQUISITE_TRAIN_MANIFEST = new Set([
   'apps/web/tests/e2e/helpers/e2e-helpers.ts',
   'apps/web/tests/e2e/shell-chat-v1.spec.ts',
   'apps/web/tests/e2e/utils/golden-path-rate-limit-identity.ts',
+  'apps/web/tests/e2e/utils/runtime-automation-bypass.ts',
   'apps/web/tests/helpers/auth.ts',
   'apps/web/tests/seed-test-data.ts',
   ...PREREQUISITE_TRAIN_TESTS,

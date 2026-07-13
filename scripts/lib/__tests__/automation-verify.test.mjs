@@ -27,6 +27,7 @@ const PREREQUISITE_TRAIN_CORNERS = [
   'apps/web/components/shell/SidebarNavItem.tsx',
   'apps/web/app/app/(shell)/chat/loading.tsx',
   'apps/web/tests/e2e/utils/golden-path-rate-limit-identity.ts',
+  'apps/web/tests/e2e/utils/runtime-automation-bypass.ts',
 ];
 const PREREQUISITE_TRAIN_MANIFEST = [
   '.github/actions/neon-branch-cleanup/action.yml',
@@ -54,6 +55,7 @@ const PREREQUISITE_TRAIN_MANIFEST = [
   'apps/web/tests/e2e/helpers/e2e-helpers.ts',
   'apps/web/tests/e2e/shell-chat-v1.spec.ts',
   'apps/web/tests/e2e/utils/golden-path-rate-limit-identity.ts',
+  'apps/web/tests/e2e/utils/runtime-automation-bypass.ts',
   'apps/web/tests/helpers/auth.ts',
   'apps/web/tests/seed-test-data.ts',
   'apps/web/tests/unit/api/chat/onboarding-handler.test.ts',
@@ -67,6 +69,7 @@ const PREREQUISITE_TRAIN_MANIFEST = [
   'apps/web/tests/unit/e2e/auth-helper.test.ts',
   'apps/web/tests/unit/e2e/golden-path-rate-limit-identity.test.ts',
   'apps/web/tests/unit/e2e/noauth-config.test.ts',
+  'apps/web/tests/unit/e2e/runtime-automation-bypass.test.ts',
   'apps/web/tests/unit/e2e/seed-test-data.test.ts',
   'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
   'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
@@ -87,6 +90,7 @@ const PREREQUISITE_TRAIN_TESTS = [
   'apps/web/tests/unit/e2e/auth-helper.test.ts',
   'apps/web/tests/unit/e2e/golden-path-rate-limit-identity.test.ts',
   'apps/web/tests/unit/e2e/noauth-config.test.ts',
+  'apps/web/tests/unit/e2e/runtime-automation-bypass.test.ts',
   'apps/web/tests/unit/e2e/seed-test-data.test.ts',
   'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
   'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
@@ -306,7 +310,7 @@ describe('automation-verify affected scope', () => {
     const plan = buildAffectedTestPlan(PREREQUISITE_TRAIN_MANIFEST);
 
     expect(plan.mode).toBe('selected');
-    expect(plan.relatedFiles).toHaveLength(33);
+    expect(plan.relatedFiles).toHaveLength(35);
     expect(plan.mandatoryTests).toEqual([
       'apps/web/lib/events/confirmation-status.test.ts',
       'apps/web/tests/unit/events/insert.test.ts',
