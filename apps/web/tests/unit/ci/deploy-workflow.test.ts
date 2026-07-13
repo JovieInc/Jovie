@@ -78,6 +78,30 @@ describe('golden-path smoke OTP contract', () => {
     expect(smokeStep).toContain('export E2E_TEST_MODE=1');
     expect(smokeStep).toContain('export E2E_USE_TEST_AUTH_BYPASS=1');
   });
+
+  it('provides the session signing secret to the real golden-path server', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const goldenPathStep = getStepBlock(
+      workflow,
+      'Run Golden Path (Chromium, Better Auth)'
+    );
+
+    expect(goldenPathStep).toContain(
+      'SESSION_SECRET: ${{ secrets.SESSION_SECRET }}'
+    );
+  });
+
+  it('provides the session signing secret to the extended smoke server', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const smokeStep = getStepBlock(workflow, 'Run Required Smoke Tests');
+
+    expect(smokeStep).toContain(
+      'export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"'
+    );
+    expect(smokeStep).toContain(
+      'SESSION_SECRET: ${{ secrets.SESSION_SECRET }}'
+    );
+  });
 });
 
 describe('deploy workflow Vercel env resolution', () => {
