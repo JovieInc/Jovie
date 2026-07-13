@@ -1,18 +1,18 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
-  type ConfirmationStatus,
   type EventType,
   type NewTourDate,
   type TourDate,
   type TourDateProvider,
   tourDates,
 } from '@/lib/db/schema/tour';
+import { deriveConfirmationStatus } from '@/lib/events/confirmation-status';
 
 /**
- * Single insertion path for events. The `confirmationStatus` rule lives here
- * (not as a DB default) so it cannot be bypassed by a future migration that
- * sets a default and forgets the trust gate.
+ * Single insertion path for events. The `confirmationStatus` rule lives in a
+ * server-neutral helper (not as a DB default) so app inserts and test fixtures
+ * share the trust gate without pulling database code across runtime boundaries.
  *
  * NOTE on fan notifications: when a future code path fires fan notifications
  * on event creation/update, it must gate on
@@ -26,12 +26,6 @@ export type InsertEventInput = Omit<
   provider: TourDateProvider;
   eventType?: EventType;
 };
-
-export function deriveConfirmationStatus(
-  provider: TourDateProvider
-): ConfirmationStatus {
-  return provider === 'manual' ? 'confirmed' : 'pending';
-}
 
 export async function insertEvent(input: InsertEventInput): Promise<TourDate> {
   const confirmationStatus = deriveConfirmationStatus(input.provider);
