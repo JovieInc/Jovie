@@ -290,7 +290,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.2",
+    "@axe-core/playwright": "^4.12.1",
     "@biomejs/biome": "^2.5.1",
     "@chromatic-com/storybook": "^5.2.1",
     "@lhci/cli": "^0.15.1",
