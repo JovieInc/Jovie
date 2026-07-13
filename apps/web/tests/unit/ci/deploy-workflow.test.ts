@@ -112,6 +112,14 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(configureStep).toContain('>> "$GITHUB_ENV"');
 
+    const queueReaperStep = getStepBlock(
+      stagingJob,
+      'Cancel stale Vercel preview deployments'
+    );
+    expect(queueReaperStep).toContain(
+      'node .github/scripts/cancel-stale-vercel-previews.mjs'
+    );
+
     for (const { command, name } of stagingSteps) {
       const step = getStepBlock(stagingJob, name);
       expect(step).toContain(command);
