@@ -93,8 +93,13 @@ function changedFiles(patterns) {
   }
 
   const pathspecs = patterns.map(p => `'${p}'`).join(' ');
+  // Compare from the merge base for PRs. A two-dot diff against the moving
+  // base tip also reports base-only changes, which can make an unrelated new
+  // commit on main fail this branch's lint lane.
+  const diffRange =
+    event === 'pull_request' ? `${diffBase}...HEAD` : `${diffBase} HEAD`;
   const result = shell(
-    `git diff --diff-filter=d --name-only ${diffBase} HEAD -- ${pathspecs}`
+    `git diff --diff-filter=d --name-only ${diffRange} -- ${pathspecs}`
   );
   if (result.code !== 0) {
     // Fall back to full set (caller decides).

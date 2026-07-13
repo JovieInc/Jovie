@@ -62,7 +62,7 @@ describe('deploy workflow Vercel env resolution', () => {
 
     expect(buildJob).toContain("github.ref == 'refs/heads/main'");
     expect(buildJob).toContain("&& 'ubuntu-latest'");
-    expect(buildJob).toContain("|| vars.CI_FAST_RUNNER");
+    expect(buildJob).toContain('|| vars.CI_FAST_RUNNER');
   });
 
   it('runs main deploy control jobs on hosted capacity', () => {
@@ -711,6 +711,13 @@ describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
 });
 
 describe('ci-fast critical deploy contract', () => {
+  it('excludes base-only changes from PR lint and boundary lanes', () => {
+    const ciFastLanes = readFileSync(ciFastLanesPath, 'utf8');
+
+    expect(ciFastLanes).toContain("event === 'pull_request'");
+    expect(ciFastLanes).toContain('`${diffBase}...HEAD`');
+  });
+
   it('targets the web test directly so a zero-task Turbo run cannot pass', () => {
     const ciFastLanes = readFileSync(ciFastLanesPath, 'utf8');
     const command =
