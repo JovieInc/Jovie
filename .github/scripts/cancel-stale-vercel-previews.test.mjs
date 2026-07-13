@@ -13,7 +13,7 @@ const activePreview = (overrides = {}) => ({
   projectId,
   target: null,
   readyState: 'QUEUED',
-  createdAt: now - 20 * 60 * 1000,
+  createdAt: now - 31 * 60 * 1000,
   meta: { githubCommitRef: 'main', githubCommitSha: 'old-sha' },
   ...overrides,
 });
@@ -60,6 +60,54 @@ describe('cancel stale Vercel previews', () => {
     ).toBe(false);
   });
 
+  it('uses independent 30-minute boundaries for queued and building previews', () => {
+    expect(
+      isStalePreview(activePreview({ createdAt: now - (30 * 60 * 1000 - 1) }), {
+        projectId,
+        now,
+      })
+    ).toBe(false);
+    expect(
+      isStalePreview(activePreview({ createdAt: now - 30 * 60 * 1000 }), {
+        projectId,
+        now,
+      })
+    ).toBe(true);
+
+    const building = activePreview({
+      readyState: 'BUILDING',
+      createdAt: now - 45 * 60 * 1000,
+      buildingAt: now - (30 * 60 * 1000 - 1),
+    });
+    expect(isStalePreview(building, { projectId, now })).toBe(false);
+    expect(
+      isStalePreview(
+        { ...building, buildingAt: now - 30 * 60 * 1000 },
+        { projectId, now }
+      )
+    ).toBe(true);
+  });
+
+  it('preserves building previews when the building timestamp is missing or invalid', () => {
+    const staleBuilding = activePreview({
+      readyState: 'BUILDING',
+      createdAt: now - 31 * 60 * 1000,
+    });
+    expect(isStalePreview(staleBuilding, { projectId, now })).toBe(false);
+    expect(
+      isStalePreview(
+        { ...staleBuilding, buildingAt: 'invalid' },
+        { projectId, now }
+      )
+    ).toBe(false);
+    expect(
+      isStalePreview(
+        { ...staleBuilding, createdAt: 'invalid', buildingAt: 'invalid' },
+        { projectId, now }
+      )
+    ).toBe(false);
+  });
+
   it('fails closed for invalid timestamps and minimum-age configuration', () => {
     expect(
       isStalePreview(activePreview({ createdAt: 'invalid' }), {
@@ -68,28 +116,47 @@ describe('cancel stale Vercel previews', () => {
       })
     ).toBe(false);
     expect(() =>
-      isStalePreview(activePreview(), { projectId, now, minAgeMs: Number.NaN })
-    ).toThrow(/minimum age/);
+      isStalePreview(activePreview(), {
+        projectId,
+        now,
+        queuedMinAgeMs: Number.NaN,
+      })
+    ).toThrow(/queued preview minimum age/);
+    expect(() =>
+      isStalePreview(activePreview(), {
+        projectId,
+        now,
+        buildingMinAgeMs: Number.NaN,
+      })
+    ).toThrow(/building preview minimum age/);
   });
 
   it('does not call Vercel when minimum-age configuration is invalid', async () => {
     const request = vi.fn();
 
-    await expect(
-      cancelStalePreviews({
-        token: 'token',
-        orgId: 'team_org',
-        projectId,
-        minAgeMs: Number.NaN,
-        request,
-      })
-    ).rejects.toThrow(/minimum age/);
+    for (const invalidConfig of [
+      { queuedMinAgeMs: Number.NaN },
+      { buildingMinAgeMs: Number.NaN },
+    ]) {
+      await expect(
+        cancelStalePreviews({
+          token: 'token',
+          orgId: 'team_org',
+          projectId,
+          ...invalidConfig,
+          request,
+        })
+      ).rejects.toThrow(/preview minimum age/);
+    }
     expect(request).not.toHaveBeenCalled();
   });
 
   it('lists both active states and cancels each stale preview once', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(now);
-    const stale = activePreview({ readyState: 'BUILDING' });
+    const stale = activePreview({
+      readyState: 'BUILDING',
+      buildingAt: now - 31 * 60 * 1000,
+    });
     const production = activePreview({ uid: 'dpl_prod', target: 'production' });
     const request = vi
       .fn()
