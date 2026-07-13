@@ -20,12 +20,9 @@ const activePreview = (overrides = {}) => ({
 
 describe('cancel stale Vercel previews', () => {
   it('only selects stale active GitHub previews', () => {
-    expect(
-      isStalePreview(activePreview(), { currentSha, projectId, now })
-    ).toBe(true);
+    expect(isStalePreview(activePreview(), { projectId, now })).toBe(true);
     expect(
       isStalePreview(activePreview({ target: 'production' }), {
-        currentSha,
         projectId,
         now,
       })
@@ -35,12 +32,11 @@ describe('cancel stale Vercel previews', () => {
         activePreview({
           meta: { githubCommitRef: 'main', githubCommitSha: currentSha },
         }),
-        { currentSha, projectId, now }
+        { projectId, now }
       )
-    ).toBe(false);
+    ).toBe(true);
     expect(
       isStalePreview(activePreview({ createdAt: now - 1000 }), {
-        currentSha,
         projectId,
         now,
       })
@@ -50,7 +46,7 @@ describe('cancel stale Vercel previews', () => {
         activePreview({
           meta: { githubCommitRef: 'feature', githubCommitSha: 'old' },
         }),
-        { currentSha, projectId, now }
+        { projectId, now }
       )
     ).toBe(false);
   });
@@ -76,7 +72,6 @@ describe('cancel stale Vercel previews', () => {
         token: 'token',
         orgId: 'team_org',
         projectId,
-        currentSha,
         request,
       })
     ).resolves.toEqual(['dpl_stale']);
@@ -112,7 +107,6 @@ describe('cancel stale Vercel previews', () => {
       token: 'token',
       orgId: 'team_org',
       projectId,
-      currentSha,
       request,
     });
 
