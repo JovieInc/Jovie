@@ -183,6 +183,79 @@ describe('pr-check-failures', () => {
     ).toEqual([
       expect.objectContaining({ name: 'Fork PR Gate', state: 'SUCCESS' }),
     ]);
+
+    const requiredWithoutForkGate = required.filter(
+      check => check.name !== 'Fork PR Gate'
+    );
+    const forkGateSuccess = {
+      bucket: 'pass',
+      state: 'SUCCESS',
+      name: 'Fork PR Gate',
+      startedAt: '2026-07-13T08:34:09Z',
+      completedAt: '2026-07-13T08:34:16Z',
+    };
+    const skippedForkGateAttempts = [
+      {
+        bucket: 'skipping',
+        state: 'SKIPPED',
+        name: 'Fork PR Gate',
+        startedAt: '2026-07-13T08:49:01Z',
+        completedAt: '2026-07-13T08:49:00Z',
+      },
+      {
+        bucket: 'skipping',
+        state: 'SKIPPED',
+        name: 'Fork PR Gate',
+        startedAt: '2026-07-13T08:49:08Z',
+        completedAt: '2026-07-13T08:49:00Z',
+      },
+    ];
+    expect(
+      classifyQueueCheckBlockers([
+        ...requiredWithoutForkGate,
+        forkGateSuccess,
+        ...skippedForkGateAttempts,
+      ])
+    ).toEqual([]);
+
+    const newerForkGateFailure = {
+      bucket: 'fail',
+      state: 'FAILURE',
+      name: 'Fork PR Gate',
+      startedAt: '2026-07-13T08:50:00Z',
+      completedAt: '2026-07-13T08:50:10Z',
+    };
+    expect(
+      classifyQueueCheckBlockers([
+        ...requiredWithoutForkGate,
+        forkGateSuccess,
+        ...skippedForkGateAttempts,
+        newerForkGateFailure,
+      ])
+    ).toEqual(['Fork PR Gate', 'Fork PR Gate (not successful)']);
+
+    const newerForkGatePending = {
+      bucket: 'pending',
+      state: 'IN_PROGRESS',
+      name: 'Fork PR Gate',
+      startedAt: '2026-07-13T08:50:00Z',
+      completedAt: '0001-01-01T00:00:00Z',
+    };
+    expect(
+      classifyQueueCheckBlockers([
+        ...requiredWithoutForkGate,
+        forkGateSuccess,
+        ...skippedForkGateAttempts,
+        newerForkGatePending,
+      ])
+    ).toEqual(['Fork PR Gate (not successful)', 'Fork PR Gate (pending)']);
+
+    expect(
+      classifyQueueCheckBlockers([
+        ...requiredWithoutForkGate,
+        ...skippedForkGateAttempts,
+      ])
+    ).toEqual(['Fork PR Gate (not successful)']);
     expect(
       classifyQueueCheckBlockers([
         ...required,
