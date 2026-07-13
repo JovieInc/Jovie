@@ -30,25 +30,35 @@ const CI_CANCELLATION_HEALER_PRIMARY_INPUTS = new Set([
 const CI_CANCELLATION_HEALER_COMPANION = 'scripts/ci-fast-lanes.mjs';
 const PREREQUISITE_TRAIN_TESTS = [
   'apps/web/tests/unit/api/chat/onboarding-handler.test.ts',
+  'apps/web/tests/unit/chat/ChatInput.aria.test.tsx',
+  'apps/web/tests/unit/chat/ChatLoading.test.tsx',
   'apps/web/tests/unit/chat/chat-composer-system-b-style-guard.test.ts',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
   'apps/web/tests/unit/ci/neon-endpoint-admission.test.ts',
   'apps/web/tests/unit/ci/visual-a11y-workflow.test.ts',
+  'apps/web/tests/unit/dashboard/DashboardNav.test.tsx',
   'apps/web/tests/unit/e2e/auth-helper.test.ts',
+  'apps/web/tests/unit/e2e/golden-path-rate-limit-identity.test.ts',
   'apps/web/tests/unit/e2e/noauth-config.test.ts',
   'apps/web/tests/unit/e2e/seed-test-data.test.ts',
   'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
   'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
+  'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
 ];
 const PREREQUISITE_TRAIN_CORNERS = [
   'scripts/ci/neon-orphan-reaper.mjs',
   'apps/web/lib/testing/e2e-prebuilt-claim.ts',
   'apps/web/app/api/chat/onboarding-handler.ts',
   'apps/web/styles/design-system.css',
+  'apps/web/components/shell/SidebarNavItem.tsx',
+  'apps/web/app/app/(shell)/chat/loading.tsx',
+  'apps/web/tests/e2e/utils/golden-path-rate-limit-identity.ts',
 ];
 const PREREQUISITE_TRAIN_PLAYWRIGHT_SPECS = new Set([
+  'apps/web/tests/e2e/chat-axe.spec.ts',
   'apps/web/tests/e2e/claim-prebuilt.smoke.spec.ts',
   'apps/web/tests/e2e/golden-path.spec.ts',
+  'apps/web/tests/e2e/shell-chat-v1.spec.ts',
 ]);
 const PREREQUISITE_TRAIN_STANDALONE_GLOBALS = new Set([
   '.github/workflows/ci.yml',
@@ -65,21 +75,29 @@ const PREREQUISITE_TRAIN_MANIFEST = new Set([
   '.github/workflows/e2e-full-matrix.yml',
   '.github/workflows/nightly-tests.yml',
   '.github/workflows/visual-regression.yml',
+  'apps/web/app/app/(shell)/chat/loading.tsx',
   'apps/web/app/api/chat/onboarding-handler.ts',
   'apps/web/app/api/dev/test-auth/session/route.ts',
   'apps/web/components/features/onboarding/OnboardingChat.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
   'apps/web/components/organisms/SharedCommandPalette.tsx',
+  'apps/web/components/shell/SidebarNavItem.tsx',
   'apps/web/lib/auth/dev-test-auth.server.ts',
   'apps/web/lib/testing/e2e-prebuilt-claim.ts',
   'apps/web/playwright.config.noauth.ts',
   'apps/web/styles/design-system.css',
+  'apps/web/tests/e2e/chat-axe.spec.ts',
   'apps/web/tests/e2e/claim-prebuilt.smoke.spec.ts',
   'apps/web/tests/e2e/golden-path.spec.ts',
+  'apps/web/tests/e2e/helpers/e2e-helpers.ts',
+  'apps/web/tests/e2e/shell-chat-v1.spec.ts',
+  'apps/web/tests/e2e/utils/golden-path-rate-limit-identity.ts',
   'apps/web/tests/helpers/auth.ts',
   'apps/web/tests/seed-test-data.ts',
   ...PREREQUISITE_TRAIN_TESTS,
   'scripts/ci/neon-orphan-reaper.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/run-affected-tests.mjs',
 ]);
 const VERCEL_CONGESTION_CONTROL_MANIFEST = new Set([
   '.github/scripts/cancel-stale-vercel-previews.mjs',
@@ -312,11 +330,13 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompleteAffectedTestSelector =
     affectedTestSelectorInputCount > 0 &&
     !isExactAffectedTestSelector &&
-    !isExactGtmqSourceGateReaper;
+    !isExactGtmqSourceGateReaper &&
+    !isExactPrerequisiteTrain;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
-    !isExactAffectedTestSelector;
+    !isExactAffectedTestSelector &&
+    !isExactPrerequisiteTrain;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
     hasUnknownCiCancellationHealerPeer ||

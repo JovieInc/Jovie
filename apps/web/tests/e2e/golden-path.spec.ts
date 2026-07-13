@@ -7,6 +7,7 @@ import {
   getAdminCredentials,
   hasAdminCredentials,
 } from '../helpers/clerk-auth';
+import { createGoldenPathTestIp } from './utils/golden-path-rate-limit-identity';
 
 /**
  * Golden Path E2E — Anonymous Chat -> Signup -> Claim -> Live Profile
@@ -43,33 +44,6 @@ function hasRealEnv(): boolean {
 }
 
 /**
- * Clear onboarding rate limits from Upstash Redis.
- * Repeated test runs exhaust the "3 per hour per IP" limit.
- */
-async function clearOnboardingRateLimits() {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return; // No Redis — rate limiting uses in-memory fallback
-
-  try {
-    // Find all onboarding IP rate limit keys
-    const keysResp = await fetch(`${url}/keys/onboarding:ip:*`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const keysJson = (await keysResp.json()) as { result?: string[] };
-    const keys = keysJson.result ?? [];
-
-    if (keys.length > 0) {
-      await fetch(`${url}/del/${keys.join('/')}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    }
-  } catch {
-    // Non-critical — if Redis is down, in-memory limiter resets per server restart
-  }
-}
-
-/**
  * Approve the newly provisioned Better Auth user via direct Neon HTTP query.
  *
  * The onboarding page's server component creates users via the WebSocket
@@ -85,9 +59,6 @@ async function ensureDbUser(betterAuthUserId: string) {
   if (!dbUrl) throw new Error('DATABASE_URL required for DB user creation');
 
   const sql = neon(dbUrl);
-
-  // Clear onboarding rate limits from previous test runs
-  await clearOnboardingRateLimits();
 
   // Release ALL test-linked Spotify artist IDs from previous test profiles.
   // Multiple artists named "Tim White" exist on Spotify; the user might
@@ -320,11 +291,16 @@ async function seedAnonymousOnboardingJourney(page: Page, handle: string) {
   await page.addInitScript(() => {
     document.documentElement.dataset.e2eMode = '1';
   });
+  const testClientIp = createGoldenPathTestIp(
+    process.env.GITHUB_RUN_ID,
+    `golden-path:${handle}`
+  );
   await page.route('**/api/chat', async route => {
     await route.continue({
       headers: {
         ...route.request().headers(),
         'x-jovie-e2e-llm-failure': '1',
+        'x-real-ip': testClientIp,
       },
     });
   });

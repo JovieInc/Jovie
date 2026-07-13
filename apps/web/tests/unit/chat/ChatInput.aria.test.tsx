@@ -142,6 +142,11 @@ function getTextarea(): HTMLTextAreaElement {
 }
 
 describe('ChatInput combobox ARIA wiring', () => {
+  it('keeps the canonical case-sensitive accessible name', () => {
+    render(withProviders(<Harness />));
+    expect(getTextarea()).toHaveAttribute('aria-label', 'Chat Message Input');
+  });
+
   it('starts with no combobox-only attrs when picker closed', () => {
     render(withProviders(<Harness />));
     const textarea = getTextarea();

@@ -326,6 +326,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(result?.status).toBe(200);
     expect(result?.headers.get('x-fallback-reason')).toBeNull();
     expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalledTimes(1);
   });
 
   it('ignores the injection header on production deploys even with the env flag', async () => {
@@ -365,6 +366,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(result?.status).toBe(200);
     expect(result?.headers.get('x-fallback-reason')).toBeNull();
     expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalledTimes(1);
   });
 
   it('ignores injection and dispatches normally on preview deploys', async () => {
@@ -413,6 +415,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       '203.0.113.5'
     );
     expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalledTimes(1);
   });
 
   it('returns 400 when the messages array is missing', async () => {

@@ -348,7 +348,9 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
   await expect(chatContent).toBeVisible({ timeout: 30_000 });
   await expect(composer).toHaveCSS(
     'border-radius',
-    /^(?:999px|18px|20px|24px|28px|36px|45rem)$/
+    // --radius-full is canonically 9999px; the other values cover responsive
+    // legacy surfaces while the token migration remains in flight.
+    /^(?:9999px|999px|18px|20px|24px|28px|36px|45rem)$/
   );
   await expect(page.locator('.animate-shell-in')).toHaveCount(0);
 });
