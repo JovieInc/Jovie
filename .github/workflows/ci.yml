@@ -1058,8 +1058,18 @@ jobs:
           tar -xzf /tmp/vercel-runtime-node-modules.tar.gz -C apps/web/.next
           find apps/web/.next/node_modules -maxdepth 1 -type d \
             -name 'import-in-the-middle-*' -print -quit | grep -q .
+          # Vercel's function trace references the generated robots response at
+          # its public-file path even though the source route is app/robots.ts.
+          # Materialize it only inside the deploy artifact; the deploy helper
+          # removes generated public files before any source fallback.
+          test -f apps/web/.next/server/app/robots.txt.body
+          cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt
+          printf '%s\n' 'apps/web/public/robots.txt' \
+            > .vercel/jovie-generated-public-files
           tar -czf /tmp/vercel-build-output.tar.gz -C . \
             .vercel/output \
+            .vercel/jovie-generated-public-files \
+            apps/web/public/robots.txt \
             apps/web/.next/BUILD_ID \
             apps/web/.next/app-path-routes-manifest.json \
             apps/web/.next/build-manifest.json \
@@ -1074,6 +1084,8 @@ jobs:
             apps/web/.next/server/chunks >/dev/null
           tar -tzf /tmp/vercel-build-output.tar.gz \
             apps/web/.next/node_modules >/dev/null
+          tar -tzf /tmp/vercel-build-output.tar.gz \
+            apps/web/public/robots.txt >/dev/null
           echo "vercel_artifact=true" >> "$GITHUB_OUTPUT"
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
@@ -4609,7 +4621,7 @@ jobs:
     # saturate the production-deploy concurrency slot.
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() && needs.deploy-gate.outputs.is_head == 'true' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 25
+    timeout-minutes: 30
     # Deploy concurrency: serialize main deploys instead of cancelling them.
     # Cancelling in-progress main deploys during merge bursts can starve
     # production promotion and leave main without a completed deploy run.
@@ -4840,13 +4852,13 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
 
       - name: Wait for staging deployment readiness
-        timeout-minutes: 9
+        timeout-minutes: 13
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
         run: |
           ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
             --wait \
-            --timeout 8m \
+            --timeout 12m \
             --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID"
           deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
