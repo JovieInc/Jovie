@@ -468,6 +468,17 @@ async function runScenario(name, definition, samples, warmups, cooldownMs) {
     samples: results,
     aggregate: aggregateScenarioResults(results),
     packages: aggregatePackages(results),
+    telemetry: {
+      expectedSamples: results.length,
+      memorySamples: results.filter(result =>
+        Number.isFinite(result.peakMemoryBytes)
+      ).length,
+      packageSamples: results.filter(
+        result =>
+          result.packageDurationsMs !== null &&
+          Object.keys(result.packageDurationsMs).length > 0
+      ).length,
+    },
   };
 }
 
@@ -646,6 +657,9 @@ async function main() {
         packageShareJustification: config.packageShareJustification,
         requiresPackageTelemetry:
           SCENARIOS[scenario.name].requiresPackageTelemetry ?? false,
+        expectedSamples: scenario.telemetry.expectedSamples,
+        packageTelemetrySamples: scenario.telemetry.packageSamples,
+        memoryTelemetrySamples: scenario.telemetry.memorySamples,
       }),
     ])
   );

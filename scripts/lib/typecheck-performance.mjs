@@ -219,9 +219,13 @@ export function evaluatePerformanceConstraints({
   targets,
   packageShareJustification = {},
   requiresPackageTelemetry = false,
+  expectedSamples = 1,
+  packageTelemetrySamples = Object.keys(packages).length > 0 ? 1 : 0,
+  memoryTelemetrySamples = Number.isFinite(peakMemoryBytes) ? 1 : 0,
 }) {
   const packageEntries = Object.entries(packages);
-  const packageTelemetryPresent = packageEntries.length > 0;
+  const packageTelemetryPresent =
+    packageTelemetrySamples === expectedSamples && expectedSamples > 0;
   const packageViolations = packageEntries
     .filter(
       ([name, stats]) =>
@@ -229,7 +233,10 @@ export function evaluatePerformanceConstraints({
         !packageShareJustification[name]
     )
     .map(([name, stats]) => ({ name, share: stats.share }));
-  const memoryTelemetryPresent = Number.isFinite(peakMemoryBytes);
+  const memoryTelemetryPresent =
+    Number.isFinite(peakMemoryBytes) &&
+    memoryTelemetrySamples === expectedSamples &&
+    expectedSamples > 0;
   const memoryFraction = memoryTelemetryPresent
     ? peakMemoryBytes / memoryLimitBytes
     : null;
@@ -238,11 +245,13 @@ export function evaluatePerformanceConstraints({
       coefficientOfVariation === null ||
       coefficientOfVariation <= targets.maximumCoefficientOfVariation,
     packageTelemetryPresent,
+    packageTelemetrySamples,
     packageSharePassed:
       (!requiresPackageTelemetry || packageTelemetryPresent) &&
       packageViolations.length === 0,
     packageViolations,
     memoryTelemetryPresent,
+    memoryTelemetrySamples,
     memoryFraction,
     memoryPassed:
       memoryTelemetryPresent &&

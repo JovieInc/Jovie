@@ -212,6 +212,32 @@ describe('typecheck performance aggregation and ratchet', () => {
     ).toMatchObject({ packageSharePassed: true, memoryPassed: true });
   });
 
+  it('fails closed when any measured sample is missing telemetry', () => {
+    const result = evaluatePerformanceConstraints({
+      coefficientOfVariation: 0.1,
+      packages: { '@jovie/web': { share: 0.2 } },
+      peakMemoryBytes: 500,
+      memoryLimitBytes: 1000,
+      targets: {
+        maximumPackageShare: 0.3,
+        maximumMemoryFraction: 0.75,
+        maximumCoefficientOfVariation: 0.15,
+      },
+      requiresPackageTelemetry: true,
+      expectedSamples: 10,
+      packageTelemetrySamples: 9,
+      memoryTelemetrySamples: 9,
+    });
+    expect(result).toMatchObject({
+      packageTelemetryPresent: false,
+      packageTelemetrySamples: 9,
+      packageSharePassed: false,
+      memoryTelemetryPresent: false,
+      memoryTelemetrySamples: 9,
+      memoryPassed: false,
+    });
+  });
+
   it('warns above 10% and fails above 20% only with three samples', () => {
     expect(
       evaluateRatchet({ samples: [111], baseline: 100, absoluteTarget: 200 })
