@@ -15,14 +15,14 @@
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
     "next": "^16.2.6",
-    "react": "19.2.6",
+    "react": "19.2.7",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
     "@fontsource-variable/inter": "^5.2.8",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^22.13.0",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.0",
