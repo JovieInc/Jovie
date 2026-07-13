@@ -117,6 +117,24 @@ def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
         assert "run: corepack enable" not in content, workflow_name
 
 
+def test_conflict_resolver_executes_on_synchronize_for_stale_label_cleanup() -> None:
+    """A clean synchronized PR must reach the resolver's stale-label removal path."""
+    content = (WORKFLOWS / "auto-resolve-conflicts.yml").read_text(encoding="utf-8")
+    assert "types: [labeled, synchronize, opened, reopened]" in content
+    assert "github.event.action == 'synchronize'" in _job_block(
+        "auto-resolve-conflicts.yml", "resolve-conflicts"
+    )
+
+
+def test_pr_ready_fails_closed_on_required_smoke_evidence() -> None:
+    """The aggregate cannot green while its declared high-risk smoke lane skips."""
+    job = _job_block("ci.yml", "ci-pr-ready")
+    assert "ci-e2e-smoke," in job
+    assert "needs.ci-risk-classifier.outputs.requires_smoke" in job
+    assert 'RISK_REQUIRES_SMOKE" == "true"' in job
+    assert 'SMOKE_RESULT" != "success"' in job
+
+
 def test_trigger_guard_materializes_systemic_detector_import_closure() -> None:
     """The detector must not fail before it can classify a systemic failure."""
     step = _step_block("agent-pipeline.yml", "Checkout systemic detector")

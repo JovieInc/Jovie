@@ -3884,6 +3884,7 @@ jobs:
         ci-fast,
         ci-unit-tests,
         ci-build-public,
+        ci-e2e-smoke,
         ci-pr-vercel-preview,
         ci-a11y,
         ci-layout-guard,
@@ -3906,9 +3907,11 @@ jobs:
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_REQUIRES_PREVIEW="${{ needs.ci-risk-classifier.outputs.requires_preview }}"
+          RISK_REQUIRES_SMOKE="${{ needs.ci-risk-classifier.outputs.requires_smoke }}"
           RISK_BLOCKS_UNATTENDED="${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
           PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
+          SMOKE_RESULT="${{ needs.ci-e2e-smoke.result }}"
           IS_DEPENDABOT="${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
           HAS_CODE_CHANGES="${{ needs.ci-path-changes.outputs.has_code_changes }}"
           echo "ci-path-changes: $PATH_RESULT (has_code_changes=$HAS_CODE_CHANGES)"
@@ -3919,6 +3922,7 @@ jobs:
           echo "ci-layout-guard: $LAYOUT_GUARD_RESULT"
           echo "ci-risk-classifier: $RISK_RESULT ($RISK_LEVEL; rules: ${RISK_RULES:-none})"
           echo "ci-pr-vercel-preview: $PREVIEW_RESULT"
+          echo "ci-e2e-smoke: $SMOKE_RESULT"
 
           {
             echo "### PR Ready"
@@ -3933,6 +3937,7 @@ jobs:
             echo "| Layout Guard | $LAYOUT_GUARD_RESULT | \`pnpm exec playwright test tests/e2e/layout-overlap-guard.spec.ts --project=chromium\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo "| Preview Deploy | $PREVIEW_RESULT | \`pnpm run build:web\` |"
+            echo "| E2E Smoke | $SMOKE_RESULT | \`pnpm run test:web:smoke\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -3998,6 +4003,11 @@ jobs:
           if [[ "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
             echo "❌ Risk classifier requires preview evidence, but Preview Deploy result was $PREVIEW_RESULT"
             echo "Likely fix: inspect the Preview Deploy logs, then run pnpm run build:web locally."
+            exit 1
+          fi
+          if [[ "$RISK_REQUIRES_SMOKE" == "true" && "$SMOKE_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
+            echo "❌ Risk classifier requires smoke evidence, but E2E Smoke result was $SMOKE_RESULT"
+            echo "Likely fix: inspect the E2E Smoke logs, then run pnpm run test:web:smoke locally."
             exit 1
           fi
           if [[ "$IS_DEPENDABOT" == "true" && "$PREVIEW_RESULT" == "skipped" ]]; then

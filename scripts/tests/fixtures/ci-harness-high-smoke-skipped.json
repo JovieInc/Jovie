@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "run": { "sha": "test-fixture-head" },
+  "requiredGates": [
+    { "id": "ci-e2e-smoke", "status": "skipped" },
+    { "id": "ci-pr-vercel-preview", "status": "skipped" }
+  ],
+  "evidence": {
+    "previewUrl": null,
+    "risk": { "requiresSmoke": true, "requiresPreview": false }
+  }
+}

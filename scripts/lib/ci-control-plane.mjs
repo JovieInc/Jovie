@@ -8,6 +8,7 @@
  */
 export {
   buildCiHarnessArtifact,
+  ciHarnessEnrollmentDecision,
   classifyCiRisk,
   DEFAULT_MANIFEST_PATH,
   generateCiHarnessDocs,

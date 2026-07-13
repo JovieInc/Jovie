@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import {
   buildCiHarnessArtifact,
+  ciHarnessEnrollmentDecision,
   classifyCiRisk,
   generateDocsFiles,
   listMergeGateJobs,
@@ -140,6 +141,33 @@ function runPrintContract(manifest) {
   console.log(JSON.stringify(contract, null, 2));
 }
 
+function runVerifyEnrollment(args) {
+  const artifactPath = argValue(args, '--artifact');
+  const headSha = argValue(args, '--head-sha');
+  if (!artifactPath || !headSha) {
+    console.error(
+      'verify-enrollment requires --artifact <path> and --head-sha <sha>'
+    );
+    process.exitCode = 1;
+    return;
+  }
+  let artifact;
+  try {
+    artifact = JSON.parse(readFileSync(artifactPath, 'utf8'));
+  } catch (error) {
+    const decision = {
+      ok: false,
+      blockers: [`CI harness artifact could not be read: ${error.message}`],
+    };
+    console.log(JSON.stringify(decision));
+    process.exitCode = 1;
+    return;
+  }
+  const decision = ciHarnessEnrollmentDecision(artifact, { headSha });
+  console.log(JSON.stringify(decision));
+  if (!decision.ok) process.exitCode = 1;
+}
+
 function main() {
   const [, , command, ...args] = process.argv;
   const manifest = loadCiHarnessManifest(
@@ -162,9 +190,12 @@ function main() {
     case 'print-contract':
       runPrintContract(manifest);
       break;
+    case 'verify-enrollment':
+      runVerifyEnrollment(args);
+      break;
     default:
       console.error(
-        'Usage: node scripts/ci-harness.mjs <validate|generate-docs|classify-risk|emit-artifact|print-contract>'
+        'Usage: node scripts/ci-harness.mjs <validate|generate-docs|classify-risk|emit-artifact|print-contract|verify-enrollment>'
       );
       process.exitCode = 1;
   }

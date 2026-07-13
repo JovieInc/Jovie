@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCiHarnessArtifact,
+  ciHarnessEnrollmentDecision,
   classifyCiRisk,
   FORBIDDEN_PINNED_JOB_CONTEXTS,
   generateCiHarnessDocs,
@@ -408,5 +409,90 @@ describe('ci-harness artifact formatter', () => {
         command.includes('pnpm run typecheck')
       )
     ).toBe(true);
+  });
+});
+
+describe('CI harness queue enrollment evidence', () => {
+  function artifact({
+    sha = 'head-sha',
+    requiresSmoke = false,
+    requiresPreview = false,
+    smokeStatus = 'skipped',
+    previewStatus = 'skipped',
+    previewUrl = null,
+  } = {}) {
+    return {
+      schemaVersion: 1,
+      run: { sha },
+      requiredGates: [
+        { id: 'ci-e2e-smoke', status: smokeStatus },
+        { id: 'ci-pr-vercel-preview', status: previewStatus },
+      ],
+      evidence: {
+        previewUrl,
+        risk: { requiresSmoke, requiresPreview },
+      },
+    };
+  }
+
+  it('keeps low-risk optional smoke and preview skips eligible', () => {
+    expect(
+      ciHarnessEnrollmentDecision(artifact(), { headSha: 'head-sha' })
+    ).toEqual({ ok: true, blockers: [] });
+  });
+
+  it('blocks required smoke unless the exact artifact gate succeeded', () => {
+    const decision = ciHarnessEnrollmentDecision(
+      artifact({ requiresSmoke: true }),
+      { headSha: 'head-sha' }
+    );
+    expect(decision.ok).toBe(false);
+    expect(decision.blockers).toContain(
+      'required smoke evidence is not successful'
+    );
+  });
+
+  it('blocks required preview when success has no evidence URL', () => {
+    const decision = ciHarnessEnrollmentDecision(
+      artifact({ requiresPreview: true, previewStatus: 'success' }),
+      { headSha: 'head-sha' }
+    );
+    expect(decision.ok).toBe(false);
+    expect(decision.blockers).toContain(
+      'required preview evidence URL is missing'
+    );
+  });
+
+  it('accepts exact-head high-risk evidence only when required lanes pass', () => {
+    expect(
+      ciHarnessEnrollmentDecision(
+        artifact({
+          requiresSmoke: true,
+          requiresPreview: true,
+          smokeStatus: 'success',
+          previewStatus: 'success',
+          previewUrl: 'https://preview.example.com',
+        }),
+        { headSha: 'head-sha' }
+      )
+    ).toEqual({ ok: true, blockers: [] });
+  });
+
+  it.each([
+    [null, 'CI harness artifact is missing or malformed'],
+    [
+      { schemaVersion: 1 },
+      'CI harness artifact does not match the exact PR head',
+    ],
+    [
+      artifact({ sha: 'old-head' }),
+      'CI harness artifact does not match the exact PR head',
+    ],
+  ])('fails closed for missing, malformed, or stale evidence', (input, blocker) => {
+    const decision = ciHarnessEnrollmentDecision(input, {
+      headSha: 'head-sha',
+    });
+    expect(decision.ok).toBe(false);
+    expect(decision.blockers).toContain(blocker);
   });
 });

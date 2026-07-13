@@ -585,6 +585,63 @@ export function buildCiHarnessArtifact({
   };
 }
 
+/**
+ * Fail-closed queue eligibility derived from the exact-head CI harness artifact.
+ * Optional smoke/preview lanes may skip for low-risk changes; once the risk
+ * classifier requires a lane, only positive machine evidence is permission to
+ * enroll.
+ */
+export function ciHarnessEnrollmentDecision(artifact, { headSha } = {}) {
+  const blockers = [];
+  if (!artifact || typeof artifact !== 'object' || Array.isArray(artifact)) {
+    return {
+      ok: false,
+      blockers: ['CI harness artifact is missing or malformed'],
+    };
+  }
+  if (artifact.schemaVersion !== HARNESS_SCHEMA_VERSION) {
+    blockers.push(
+      `CI harness schema mismatch (expected ${HARNESS_SCHEMA_VERSION}, got ${String(artifact.schemaVersion)})`
+    );
+  }
+  if (!headSha || artifact.run?.sha !== headSha) {
+    blockers.push('CI harness artifact does not match the exact PR head');
+  }
+
+  const risk = artifact.evidence?.risk;
+  if (
+    !risk ||
+    typeof risk.requiresSmoke !== 'boolean' ||
+    typeof risk.requiresPreview !== 'boolean'
+  ) {
+    blockers.push('CI harness risk evidence is missing or malformed');
+    return { ok: false, blockers };
+  }
+
+  const gates = Array.isArray(artifact.requiredGates)
+    ? artifact.requiredGates
+    : [];
+  const statusFor = id => {
+    const matches = gates.filter(gate => gate?.id === id);
+    return matches.length === 1 ? matches[0]?.status : null;
+  };
+
+  if (risk.requiresSmoke && statusFor('ci-e2e-smoke') !== 'success') {
+    blockers.push('required smoke evidence is not successful');
+  }
+  if (risk.requiresPreview) {
+    if (statusFor('ci-pr-vercel-preview') !== 'success') {
+      blockers.push('required preview evidence is not successful');
+    }
+    const previewUrl = artifact.evidence?.previewUrl;
+    if (typeof previewUrl !== 'string' || previewUrl.trim().length === 0) {
+      blockers.push('required preview evidence URL is missing');
+    }
+  }
+
+  return { ok: blockers.length === 0, blockers };
+}
+
 export function parseJobResultsFromEnv(env, manifest) {
   return (manifest.jobs ?? []).map(job => ({
     id: job.id,

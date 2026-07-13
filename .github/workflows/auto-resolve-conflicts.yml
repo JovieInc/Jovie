@@ -31,6 +31,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event.label.name == 'needs-conflict-resolution') ||
+      (github.event_name == 'pull_request_target' && github.event.action == 'synchronize') ||
       (github.event_name == 'pull_request_target' && github.event.action == 'opened') ||
       (github.event_name == 'pull_request_target' && github.event.action == 'reopened')
     name: Resolve Conflicts

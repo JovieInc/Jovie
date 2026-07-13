@@ -10,6 +10,7 @@ Run with:
 from __future__ import annotations
 
 import os
+import shutil
 import stat
 import subprocess
 import textwrap
@@ -21,10 +22,20 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _GH_RETRY = _REPO_ROOT / "scripts" / "lib" / "gh-retry.sh"
 _DRAIN_SCRIPT = _REPO_ROOT / "scripts" / "drain-pr-queue.sh"
 _WATCHDOG_SCRIPT = _REPO_ROOT / "scripts" / "merge-queue-watchdog.sh"
+_LOW_RISK_HARNESS = _REPO_ROOT / "scripts" / "tests" / "fixtures" / "ci-harness-low-risk.json"
+_HIGH_SMOKE_SKIPPED_HARNESS = (
+    _REPO_ROOT / "scripts" / "tests" / "fixtures" / "ci-harness-high-smoke-skipped.json"
+)
+_HIGH_PREVIEW_URL_MISSING_HARNESS = (
+    _REPO_ROOT / "scripts" / "tests" / "fixtures" / "ci-harness-high-preview-url-missing.json"
+)
 
 
 def _run_bash(script: str, *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     merged = os.environ.copy()
+    merged.setdefault("DRAIN_CI_HARNESS_ARTIFACT_FILE", str(_LOW_RISK_HARNESS))
+    merged.setdefault("DRAIN_CI_HARNESS_TEST_HEAD_SHA", "test-fixture-head")
+    merged.setdefault("DRAIN_CI_HARNESS_TEST_MODE", "1")
     if env:
         merged.update(env)
     return subprocess.run(
@@ -210,6 +221,222 @@ JSON
         assert "=== BLOCKED (red checks" in result.stdout
         assert "#123" in result.stdout
         assert "Typecheck" in result.stdout
+
+    @pytest.mark.parametrize(
+        ("artifact", "blocker"),
+        [
+            (_HIGH_SMOKE_SKIPPED_HARNESS, "required smoke evidence is not successful"),
+            (_HIGH_PREVIEW_URL_MISSING_HARNESS, "required preview evidence URL is missing"),
+        ],
+    )
+    def test_high_risk_harness_evidence_blocks_enqueue(
+        self, tmp_path: Path, artifact: Path, blocker: str
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{"n":124,"t":"Risk evidence missing","draft":false,"m":"MERGEABLE","head":"codex/risk","L":[],"fail":[]}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{"name":"PR Ready","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"},{"name":"Migration Guard","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"}]'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"',
+            env={"DRAIN_CI_HARNESS_ARTIFACT_FILE": str(artifact)},
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would +merge-queue on #124" not in result.stdout
+        assert blocker in result.stdout
+
+    def test_harness_api_failure_blocks_enqueue(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{"n":125,"t":"Artifact API unavailable","draft":false,"m":"MERGEABLE","head":"codex/api-fail","sha":"exact-head","L":[],"fail":[]}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" && "$*" == *"link"* ]]; then
+                  echo '[{"name":"PR Ready","state":"SUCCESS","completedAt":"2026-07-13T00:01:00Z","link":"https://github.com/JovieInc/Jovie/actions/runs/999/job/1"}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{"name":"PR Ready","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"},{"name":"Migration Guard","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "api repos/JovieInc/Jovie/actions/runs/999" ]]; then
+                  echo "HTTP 503: unavailable" >&2
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" GH_RETRY_ATTEMPTS=1 DRY_RUN=1 bash "{_DRAIN_SCRIPT}"',
+            env={"DRAIN_CI_HARNESS_ARTIFACT_FILE": ""},
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would +merge-queue on #125" not in result.stdout
+        assert "CI harness workflow metadata unavailable" in result.stdout
+
+    def test_malformed_classification_output_blocks_enqueue(self, tmp_path: Path) -> None:
+        real_node = shutil.which("node")
+        assert real_node is not None
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$*" == *"pr-check-failures.mjs --classify-queue"* ]]; then
+                  echo 'not-json'
+                  exit 0
+                fi
+                exec "${REAL_NODE:?}" "$@"
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{"n":126,"t":"Malformed classification","draft":false,"m":"MERGEABLE","head":"codex/malformed","L":[],"fail":[]}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{"name":"PR Ready","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"}]'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"',
+            env={"REAL_NODE": real_node},
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would +merge-queue on #126" not in result.stdout
+        assert "required check/evidence classification unavailable" in result.stdout
+
+    @pytest.mark.parametrize("edit_exit", [0, 1])
+    def test_artifact_ineligible_queue_removal_must_be_proven(
+        self, tmp_path: Path, edit_exit: int
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":127,"t":"Queued without smoke","draft":false,"m":"MERGEABLE","head":"codex/no-smoke","L":["merge-queue"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  exit {edit_exit}
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"labels":[{{"name":"merge-queue"}}]}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" bash "{_DRAIN_SCRIPT}"',
+            env={
+                "DRAIN_CI_HARNESS_ARTIFACT_FILE": str(_HIGH_SMOKE_SKIPPED_HARNESS)
+            },
+        )
+
+        assert result.returncode != 0
+        assert "Failed to prove blocked PR #127 is outside merge queue" in result.stderr
+
+    def test_failed_remove_is_safe_when_authoritative_state_is_already_absent(
+        self, tmp_path: Path
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{"n":128,"t":"Concurrent dequeue","draft":false,"m":"MERGEABLE","head":"codex/concurrent","L":["merge-queue"],"fail":[]}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{"name":"PR Ready","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"},{"name":"Migration Guard","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS","startedAt":"2026-07-13T00:00:00Z","completedAt":"2026-07-13T00:01:00Z"}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  exit 1
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{"labels":[]}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            f'PATH="{tmp_path}:$PATH" bash "{_DRAIN_SCRIPT}"',
+            env={
+                "DRAIN_CI_HARNESS_ARTIFACT_FILE": str(_HIGH_SMOKE_SKIPPED_HARNESS)
+            },
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "merge-queue already absent on #128" in result.stdout
 
     def test_hard_gated_prs_dequeue_and_do_not_enqueue(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
@@ -477,7 +704,7 @@ JSON
             (
                 "READ_FAILURE",
                 1,
-                "CRITICAL: could not prove failed enrollment was compensated",
+                "remove-label request failed",
             ),
         ],
     )
