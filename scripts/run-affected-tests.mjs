@@ -13,6 +13,89 @@ const GLOBAL_TEST_INPUTS = new Set([
   'apps/web/tests/setup.ts',
 ]);
 const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
+const INVESTOR_NOTE_INGESTION_TESTS = [
+  'apps/web/tests/unit/investors/note-ingestion.test.ts',
+  'apps/web/tests/unit/investors/note-ingestion-cli.test.ts',
+];
+const CI_CANCELLATION_HEALER_TESTS = [
+  'apps/web/tests/unit/ci/ci-cancellation-classifier.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+];
+const CI_CANCELLATION_HEALER_PRIMARY_INPUTS = new Set([
+  '.github/workflows/ci-cancellation-healer.yml',
+  'apps/web/tests/unit/ci/ci-cancellation-classifier.test.ts',
+  'apps/web/tests/unit/ci/fixtures/fixed-runner-setup-cancellation.json',
+  'scripts/lib/ci-cancellation-classifier.mjs',
+]);
+const CI_CANCELLATION_HEALER_COMPANION = 'scripts/ci-fast-lanes.mjs';
+const PREREQUISITE_TRAIN_TESTS = [
+  'apps/web/tests/unit/api/chat/onboarding-handler.test.ts',
+  'apps/web/tests/unit/chat/chat-composer-system-b-style-guard.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/ci/neon-endpoint-admission.test.ts',
+  'apps/web/tests/unit/ci/visual-a11y-workflow.test.ts',
+  'apps/web/tests/unit/e2e/auth-helper.test.ts',
+  'apps/web/tests/unit/e2e/noauth-config.test.ts',
+  'apps/web/tests/unit/e2e/seed-test-data.test.ts',
+  'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
+  'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
+];
+const PREREQUISITE_TRAIN_CORNERS = [
+  'scripts/ci/neon-orphan-reaper.mjs',
+  'apps/web/lib/testing/e2e-prebuilt-claim.ts',
+  'apps/web/app/api/chat/onboarding-handler.ts',
+  'apps/web/styles/design-system.css',
+];
+const PREREQUISITE_TRAIN_PLAYWRIGHT_SPECS = new Set([
+  'apps/web/tests/e2e/claim-prebuilt.smoke.spec.ts',
+  'apps/web/tests/e2e/golden-path.spec.ts',
+]);
+const PREREQUISITE_TRAIN_STANDALONE_GLOBALS = new Set([
+  '.github/workflows/ci.yml',
+  'apps/web/tests/seed-test-data.ts',
+  'apps/web/tests/e2e/claim-prebuilt.smoke.spec.ts',
+  'apps/web/tests/e2e/golden-path.spec.ts',
+]);
+const PREREQUISITE_TRAIN_MANIFEST = new Set([
+  '.github/actions/neon-branch-cleanup/action.yml',
+  '.github/actions/neon-create-branch-with-retry/action.yml',
+  '.github/actions/neon-create-branch-with-retry/create-branch-with-capacity-retry.sh',
+  '.github/actions/neon-create-branch-with-retry/create-branch.sh',
+  '.github/workflows/ci.yml',
+  '.github/workflows/e2e-full-matrix.yml',
+  '.github/workflows/nightly-tests.yml',
+  '.github/workflows/visual-regression.yml',
+  'apps/web/app/api/chat/onboarding-handler.ts',
+  'apps/web/app/api/dev/test-auth/session/route.ts',
+  'apps/web/components/features/onboarding/OnboardingChat.tsx',
+  'apps/web/components/jovie/components/ChatInput.tsx',
+  'apps/web/components/organisms/SharedCommandPalette.tsx',
+  'apps/web/lib/auth/dev-test-auth.server.ts',
+  'apps/web/lib/testing/e2e-prebuilt-claim.ts',
+  'apps/web/playwright.config.noauth.ts',
+  'apps/web/styles/design-system.css',
+  'apps/web/tests/e2e/claim-prebuilt.smoke.spec.ts',
+  'apps/web/tests/e2e/golden-path.spec.ts',
+  'apps/web/tests/helpers/auth.ts',
+  'apps/web/tests/seed-test-data.ts',
+  ...PREREQUISITE_TRAIN_TESTS,
+  'scripts/ci/neon-orphan-reaper.mjs',
+]);
+
+function isInvestorNoteIngestionInput(file) {
+  return (
+    file === 'apps/web/lib/investors/note-ingestion.ts' ||
+    file === 'apps/web/scripts/ingest-investor-note.ts' ||
+    /^apps\/web\/tests\/fixtures\/investors\/note-[^/]+\.json$/.test(file)
+  );
+}
+
+function isCiCancellationHealerInput(file) {
+  return (
+    CI_CANCELLATION_HEALER_PRIMARY_INPUTS.has(file) ||
+    file === CI_CANCELLATION_HEALER_COMPANION
+  );
+}
 
 function unique(values) {
   return [...new Set(values)];
@@ -24,13 +107,26 @@ export function buildAffectedTestPlan(changedFiles) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
   }
 
+  const prerequisiteTrainCornerCount = PREREQUISITE_TRAIN_CORNERS.filter(file =>
+    files.includes(file)
+  ).length;
+  const hasPrerequisiteTrainCorners =
+    prerequisiteTrainCornerCount === PREREQUISITE_TRAIN_CORNERS.length;
+  const isExactPrerequisiteTrain =
+    hasPrerequisiteTrainCorners &&
+    files.every(file => PREREQUISITE_TRAIN_MANIFEST.has(file));
   const relatedFiles = files.filter(
     file =>
       TESTABLE_FILE.test(file) &&
       (file.startsWith('apps/web/') || file.startsWith('packages/'))
   );
-  const directTests = relatedFiles.filter(file =>
-    /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)
+  const directTests = relatedFiles.filter(
+    file =>
+      /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file) &&
+      !(
+        isExactPrerequisiteTrain &&
+        PREREQUISITE_TRAIN_PLAYWRIGHT_SPECS.has(file)
+      )
   );
   const mandatoryTests = [];
   const hasSeedConfirmationChange = files.some(
@@ -85,6 +181,18 @@ export function buildAffectedTestPlan(changedFiles) {
       'apps/web/scripts/sync-skills-catalog.test.ts'
     );
   }
+  if (files.some(isInvestorNoteIngestionInput)) {
+    mandatoryTests.push(...INVESTOR_NOTE_INGESTION_TESTS);
+  }
+  const hasCiCancellationHealerChange = files.some(file =>
+    CI_CANCELLATION_HEALER_PRIMARY_INPUTS.has(file)
+  );
+  if (hasCiCancellationHealerChange) {
+    mandatoryTests.push(...CI_CANCELLATION_HEALER_TESTS);
+  }
+  if (isExactPrerequisiteTrain) {
+    mandatoryTests.push(...PREREQUISITE_TRAIN_TESTS);
+  }
 
   const selectedTests = unique([...directTests, ...mandatoryTests]);
   const isCoveredSource = file => {
@@ -95,6 +203,10 @@ export function buildAffectedTestPlan(changedFiles) {
     if (file.startsWith('apps/web/app/')) return true;
     if (file.startsWith('packages/ui/')) return true;
     if (file.startsWith('apps/web/tests/eval/promptfoo/')) return true;
+    if (isInvestorNoteIngestionInput(file)) return true;
+    if (isCiCancellationHealerInput(file)) return true;
+    if (isExactPrerequisiteTrain && PREREQUISITE_TRAIN_MANIFEST.has(file))
+      return true;
     if (
       hasSeedConfirmationChange &&
       (file === 'apps/web/tests/seed-test-data.ts' ||
@@ -109,13 +221,39 @@ export function buildAffectedTestPlan(changedFiles) {
       'apps/web/tests/unit/design-system/arbitrary-values.baseline.json'
     );
   };
-  const hasUncoveredSource = relatedFiles.some(file => !isCoveredSource(file));
+  const hasUnknownCiCancellationHealerPeer =
+    hasCiCancellationHealerChange &&
+    files.some(
+      file =>
+        (file.startsWith('scripts/') || file.startsWith('.github/')) &&
+        !isCiCancellationHealerInput(file)
+    );
+  const hasStandaloneCiFastLanesChange =
+    files.includes(CI_CANCELLATION_HEALER_COMPANION) &&
+    !hasCiCancellationHealerChange;
+  const hasIncompletePrerequisiteTrain =
+    prerequisiteTrainCornerCount > 0 && !hasPrerequisiteTrainCorners;
+  const hasStandalonePrerequisiteGlobal =
+    files.length === 1 && PREREQUISITE_TRAIN_STANDALONE_GLOBALS.has(files[0]);
+  const hasUnknownPrerequisiteTrainPeer =
+    hasPrerequisiteTrainCorners && !isExactPrerequisiteTrain;
+  const hasUncoveredSource =
+    relatedFiles.some(file => !isCoveredSource(file)) ||
+    hasUnknownCiCancellationHealerPeer ||
+    hasStandaloneCiFastLanesChange ||
+    hasIncompletePrerequisiteTrain ||
+    hasStandalonePrerequisiteGlobal ||
+    hasUnknownPrerequisiteTrainPeer;
   return {
-    mode:
-      relatedFiles.length === 0
-        ? 'none'
-        : !hasUncoveredSource && selectedTests.length > 0
-          ? 'selected'
+    mode: hasUncoveredSource
+      ? 'full'
+      : selectedTests.length > 0 &&
+          (relatedFiles.length > 0 ||
+            hasCiCancellationHealerChange ||
+            isExactPrerequisiteTrain)
+        ? 'selected'
+        : relatedFiles.length === 0
+          ? 'none'
           : 'full',
     relatedFiles,
     mandatoryTests: unique(mandatoryTests),
