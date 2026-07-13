@@ -1,6 +1,7 @@
 name: Runner Isolation Smoke
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - codex/jov-4248-isolated-runner-validation

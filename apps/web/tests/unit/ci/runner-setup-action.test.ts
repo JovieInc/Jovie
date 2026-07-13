@@ -8,7 +8,7 @@ describe('self-hosted runner setup action', () => {
   it('does not save pnpm caches from ephemeral runners', () => {
     const action = readFileSync(
       resolve(repoRoot, '.github/actions/setup-node-pnpm/action.yml'),
-      'utf8',
+      'utf8'
     );
 
     expect(action).toContain("!startsWith(runner.name, 'jovie-eph-')");
