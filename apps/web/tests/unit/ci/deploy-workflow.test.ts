@@ -168,7 +168,7 @@ describe('deploy workflow Vercel env resolution', () => {
       'cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt'
     );
     expect(buildJob).toContain('.vercel/jovie-generated-public-files');
-    expect(readinessStep).toContain('--timeout 12m');
+    expect(readinessStep).toContain('--timeout 20m');
   });
 
   it('passes signup readiness keys into the staging preview runtime', () => {
