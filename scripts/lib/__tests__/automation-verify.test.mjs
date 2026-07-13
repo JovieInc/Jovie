@@ -15,6 +15,59 @@ const script = readFileSync(
   'utf8'
 );
 
+const PREREQUISITE_TRAIN_CORNERS = [
+  'scripts/ci/neon-orphan-reaper.mjs',
+  'apps/web/lib/testing/e2e-prebuilt-claim.ts',
+  'apps/web/app/api/chat/onboarding-handler.ts',
+  'apps/web/styles/design-system.css',
+];
+const PREREQUISITE_TRAIN_MANIFEST = [
+  '.github/actions/neon-branch-cleanup/action.yml',
+  '.github/actions/neon-create-branch-with-retry/action.yml',
+  '.github/actions/neon-create-branch-with-retry/create-branch-with-capacity-retry.sh',
+  '.github/actions/neon-create-branch-with-retry/create-branch.sh',
+  '.github/workflows/ci.yml',
+  '.github/workflows/e2e-full-matrix.yml',
+  '.github/workflows/nightly-tests.yml',
+  '.github/workflows/visual-regression.yml',
+  'apps/web/app/api/chat/onboarding-handler.ts',
+  'apps/web/app/api/dev/test-auth/session/route.ts',
+  'apps/web/components/features/onboarding/OnboardingChat.tsx',
+  'apps/web/components/jovie/components/ChatInput.tsx',
+  'apps/web/components/organisms/SharedCommandPalette.tsx',
+  'apps/web/lib/auth/dev-test-auth.server.ts',
+  'apps/web/lib/testing/e2e-prebuilt-claim.ts',
+  'apps/web/playwright.config.noauth.ts',
+  'apps/web/styles/design-system.css',
+  'apps/web/tests/e2e/claim-prebuilt.smoke.spec.ts',
+  'apps/web/tests/e2e/golden-path.spec.ts',
+  'apps/web/tests/helpers/auth.ts',
+  'apps/web/tests/seed-test-data.ts',
+  'apps/web/tests/unit/api/chat/onboarding-handler.test.ts',
+  'apps/web/tests/unit/chat/chat-composer-system-b-style-guard.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/ci/neon-endpoint-admission.test.ts',
+  'apps/web/tests/unit/ci/visual-a11y-workflow.test.ts',
+  'apps/web/tests/unit/e2e/auth-helper.test.ts',
+  'apps/web/tests/unit/e2e/noauth-config.test.ts',
+  'apps/web/tests/unit/e2e/seed-test-data.test.ts',
+  'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
+  'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
+  'scripts/ci/neon-orphan-reaper.mjs',
+];
+const PREREQUISITE_TRAIN_TESTS = [
+  'apps/web/tests/unit/api/chat/onboarding-handler.test.ts',
+  'apps/web/tests/unit/chat/chat-composer-system-b-style-guard.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/ci/neon-endpoint-admission.test.ts',
+  'apps/web/tests/unit/ci/visual-a11y-workflow.test.ts',
+  'apps/web/tests/unit/e2e/auth-helper.test.ts',
+  'apps/web/tests/unit/e2e/noauth-config.test.ts',
+  'apps/web/tests/unit/e2e/seed-test-data.test.ts',
+  'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
+  'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
+];
+
 describe('automation-verify affected scope', () => {
   it('selects related tests instead of the whole affected workspace package', () => {
     expect(script).toContain('node scripts/run-affected-tests.mjs');
@@ -200,6 +253,67 @@ describe('automation-verify affected scope', () => {
         '.github/workflows/ci-cancellation-healer.yml',
         'apps/web/lib/unknown.ts',
       ]).mode
+    ).toBe('full');
+  });
+
+  it('keeps the four-commit prerequisite train on its focused contracts', () => {
+    const plan = buildAffectedTestPlan(PREREQUISITE_TRAIN_MANIFEST);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.relatedFiles).toHaveLength(22);
+    expect(plan.mandatoryTests).toEqual([
+      'apps/web/lib/events/confirmation-status.test.ts',
+      'apps/web/tests/unit/events/insert.test.ts',
+      'apps/web/tests/unit/testing/seed-test-data-import-boundary.test.ts',
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      ...PREREQUISITE_TRAIN_TESTS,
+    ]);
+    expect(plan.selectedTests).toEqual([
+      ...PREREQUISITE_TRAIN_TESTS,
+      'apps/web/lib/events/confirmation-status.test.ts',
+      'apps/web/tests/unit/events/insert.test.ts',
+      'apps/web/tests/unit/testing/seed-test-data-import-boundary.test.ts',
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+    ]);
+    expect(plan.selectedTests).not.toContain(
+      'apps/web/tests/e2e/claim-prebuilt.smoke.spec.ts'
+    );
+    expect(plan.selectedTests).not.toContain(
+      'apps/web/tests/e2e/golden-path.spec.ts'
+    );
+  });
+
+  it.each(
+    PREREQUISITE_TRAIN_CORNERS
+  )('fails closed when the prerequisite train cornerstone %s is standalone', cornerstone => {
+    expect(buildAffectedTestPlan([cornerstone]).mode).toBe('full');
+  });
+
+  it.each([
+    '.github/workflows/ci.yml',
+    'apps/web/tests/seed-test-data.ts',
+    'apps/web/tests/e2e/claim-prebuilt.smoke.spec.ts',
+    'apps/web/tests/e2e/golden-path.spec.ts',
+  ])('fails closed when the prerequisite train global input %s is standalone', input => {
+    expect(buildAffectedTestPlan([input]).mode).toBe('full');
+  });
+
+  it.each(
+    PREREQUISITE_TRAIN_CORNERS
+  )('fails closed when the prerequisite train is missing %s', missingCornerstone => {
+    expect(
+      buildAffectedTestPlan(
+        PREREQUISITE_TRAIN_MANIFEST.filter(file => file !== missingCornerstone)
+      ).mode
+    ).toBe('full');
+  });
+
+  it.each([
+    'apps/web/lib/unknown-prerequisite.ts',
+    '.github/actions/unknown-prerequisite/action.yml',
+  ])('fails closed when the prerequisite train includes unknown peer %s', peer => {
+    expect(
+      buildAffectedTestPlan([...PREREQUISITE_TRAIN_MANIFEST, peer]).mode
     ).toBe('full');
   });
 
