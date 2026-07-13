@@ -3,7 +3,10 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
+import {
+  buildAffectedTestPlan,
+  buildSelectedTestCommands,
+} from '../../run-affected-tests.mjs';
 
 const runner = readFileSync(
   resolve(import.meta.dirname, '../../run-affected-tests.mjs'),
@@ -66,6 +69,16 @@ const PREREQUISITE_TRAIN_TESTS = [
   'apps/web/tests/unit/e2e/seed-test-data.test.ts',
   'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
   'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
+];
+const VERCEL_CONGESTION_CONTROL_MANIFEST = [
+  '.github/scripts/cancel-stale-vercel-previews.mjs',
+  '.github/scripts/cancel-stale-vercel-previews.test.mjs',
+  '.github/scripts/vercel-prebuilt-deploy.sh',
+  'scripts/tests/test_vercel_prebuilt_deploy.py',
+];
+const AFFECTED_TEST_SELECTOR_MANIFEST = [
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 
 describe('automation-verify affected scope', () => {
@@ -314,6 +327,107 @@ describe('automation-verify affected scope', () => {
   ])('fails closed when the prerequisite train includes unknown peer %s', peer => {
     expect(
       buildAffectedTestPlan([...PREREQUISITE_TRAIN_MANIFEST, peer]).mode
+    ).toBe('full');
+  });
+
+  it('keeps the Vercel congestion-control diff on its focused cross-runtime suites', () => {
+    const plan = buildAffectedTestPlan(VERCEL_CONGESTION_CONTROL_MANIFEST);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.relatedFiles).toEqual([]);
+    expect(plan.selectedTests).toEqual([]);
+    expect(plan.rootVitestTests).toEqual([
+      '.github/scripts/cancel-stale-vercel-previews.test.mjs',
+    ]);
+    expect(plan.pythonTests).toEqual([
+      'scripts/tests/test_vercel_prebuilt_deploy.py',
+    ]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          'exec',
+          'vitest',
+          'run',
+          '--root',
+          '.',
+          '--config',
+          'apps/web/vitest.config.mts',
+          '.github/scripts/cancel-stale-vercel-previews.test.mjs',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+      [
+        'python3',
+        ['-m', 'pytest', 'scripts/tests/test_vercel_prebuilt_deploy.py', '-q'],
+      ],
+    ]);
+  });
+
+  it.each(
+    VERCEL_CONGESTION_CONTROL_MANIFEST
+  )('fails closed when the Vercel congestion-control input %s is standalone', input => {
+    expect(buildAffectedTestPlan([input]).mode).toBe('full');
+  });
+
+  it.each(
+    VERCEL_CONGESTION_CONTROL_MANIFEST
+  )('fails closed when the Vercel congestion-control diff is missing %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        VERCEL_CONGESTION_CONTROL_MANIFEST.filter(file => file !== missingInput)
+      ).mode
+    ).toBe('full');
+  });
+
+  it.each([
+    '.github/scripts/unknown-vercel-control.mjs',
+    'scripts/tests/test_unknown_vercel_control.py',
+  ])('fails closed when the Vercel congestion-control diff includes unknown peer %s', peer => {
+    expect(
+      buildAffectedTestPlan([...VERCEL_CONGESTION_CONTROL_MANIFEST, peer]).mode
+    ).toBe('full');
+  });
+
+  it('selects the selector regression for the exact selector implementation pair', () => {
+    const plan = buildAffectedTestPlan(AFFECTED_TEST_SELECTOR_MANIFEST);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          'exec',
+          'vitest',
+          '--root',
+          'scripts',
+          '--config',
+          'vitest.config.mts',
+          'run',
+          'lib/__tests__/automation-verify.test.mjs',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
+  });
+
+  it.each(
+    AFFECTED_TEST_SELECTOR_MANIFEST
+  )('fails closed when the affected-test selector input %s is standalone', input => {
+    expect(buildAffectedTestPlan([input]).mode).toBe('full');
+  });
+
+  it('fails closed when the affected-test selector diff includes an unknown peer', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...AFFECTED_TEST_SELECTOR_MANIFEST,
+        'scripts/lib/unknown-selector-helper.mjs',
+      ]).mode
     ).toBe('full');
   });
 
