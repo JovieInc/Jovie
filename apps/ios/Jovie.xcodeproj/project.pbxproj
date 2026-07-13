@@ -101,6 +101,7 @@
 		DA0F3A9E1C4B4B149B7D4C21 /* NativeSessionTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44B3D151E21A49C2876932A8 /* NativeSessionTokenStore.swift */; };
 		DA762182661489283A851F6B /* ScreenBrightnessManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178C37B20F46EAF919EB2031 /* ScreenBrightnessManagerTests.swift */; };
 		E26FB0F0CBAA2DE24B6BC572 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9924B177AFB753A4C23A4098 /* APIClient.swift */; };
+		49BA0DAF46944303A411D3C0 /* AuthTokenExchange.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBCC1BE3DF9E4B0785CD0D83 /* AuthTokenExchange.swift */; };
 		E6EA9EC85A52208BEFC20DF0 /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = 37321F1DC431FDA58D969E72 /* ClerkKitUI */; };
 		EBDA8137B767F16402C41C24 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EAFC467F76300BCFC2659F /* Configuration.swift */; };
 		EE4CBA88057592FAFCD7F926 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93DB506915B418D06E897A4 /* AppStateTests.swift */; };
@@ -178,6 +179,7 @@
 		989D4251AFCEB0A633337F2C /* JovieUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JovieUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		
 		9924B177AFB753A4C23A4098 /* APIClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		FBCC1BE3DF9E4B0785CD0D83 /* AuthTokenExchange.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthTokenExchange.swift; sourceTree = "<group>"; };
 		A0B10F000000000000000001 /* ObservabilityTypes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityTypes.swift; sourceTree = "<group>"; };
 		A0B10F000000000000000002 /* NoopObservabilityProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NoopObservabilityProvider.swift; sourceTree = "<group>"; };
 		A0B10F000000000000000003 /* ObservabilityRedactor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityRedactor.swift; sourceTree = "<group>"; };
@@ -468,6 +470,7 @@
 			children = (
 				A0J0V36380000000000000005 /* AudienceHighlightsRepository.swift */,
 				9924B177AFB753A4C23A4098 /* APIClient.swift */,
+				FBCC1BE3DF9E4B0785CD0D83 /* AuthTokenExchange.swift */,
 				A0J0V25490000000000000001 /* ChatCache.swift */,
 				A0J0V25490000000000000003 /* ChatRepository.swift */,
 				918FBCBCF600AA8C10191F60 /* MeCache.swift */,
@@ -787,6 +790,7 @@
 				A0B10F000000000000000032 /* MetricKitReporter.swift in Sources */,
 				A0J0V36380000000000000006 /* AudienceHighlightsRepository.swift in Sources */,
 				E26FB0F0CBAA2DE24B6BC572 /* APIClient.swift in Sources */,
+				49BA0DAF46944303A411D3C0 /* AuthTokenExchange.swift in Sources */,
 				A0J0V25490000000000000002 /* ChatCache.swift in Sources */,
 				A0J0V25490000000000000004 /* ChatRepository.swift in Sources */,
 				F8BC948A5A68297B746E217F /* MeCache.swift in Sources */,
