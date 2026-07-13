@@ -247,8 +247,8 @@ export function evaluatePerformanceConstraints({
     packageTelemetryPresent,
     packageTelemetrySamples,
     packageSharePassed:
-      (!requiresPackageTelemetry || packageTelemetryPresent) &&
-      packageViolations.length === 0,
+      !requiresPackageTelemetry ||
+      (packageTelemetryPresent && packageViolations.length === 0),
     packageViolations,
     memoryTelemetryPresent,
     memoryTelemetrySamples,

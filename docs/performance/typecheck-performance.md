@@ -32,7 +32,7 @@ Mean CPU usage was 2.11 core-equivalents for cold full, 1.81 for cached warm ful
 2. The web compiler parses 9,255 files, 716,066 TypeScript lines, and 674,505 declaration lines.
 3. CI forced Turbo execution for correctness but restored `.turbo`, so it paid roughly 39 seconds of cache transfer while receiving no task replay benefit. It did not restore `.tsbuildinfo`.
 4. Eight packages emitted incremental metadata outside Turbo's declared output, preventing reliable persistence.
-5. Eligible draft agent PRs can run both `agent-pr-verify-ready.yml` and canonical CI typechecks. This is documented but not changed here because agent-verification ownership is separate.
+5. Eligible draft agent PRs previously ran both `agent-pr-verify-ready.yml` and canonical CI typechecks on the same head.
 6. Direct source aliases and the `@jovie/ui` barrel widen invalidation, but they were no longer the highest-ROI change after native compilation.
 
 No final package exceeds 30% of summed package typecheck time; `@jovie/web` is largest at 22.9%.
@@ -48,6 +48,7 @@ No final package exceeds 30% of summed package typecheck time; `@jovie/web` is l
 - Add a reproducible benchmark harness with cold/warm/edit scenarios, deterministic restoration, P50/P95, variance, CPU, memory, diagnostics, per-package timing, cache-hit rate, JSON, and Markdown output.
 - Add a nightly rolling-baseline ratchet with 90-day artifacts.
 - Add an intentional-error safety probe covering application, shared/cross-package, test, and generated-client code.
+- Hand eligible draft agent PRs from the affected verifier to canonical CI through `ready_for_review`, so compiler/lint work is not duplicated.
 
 ## Rejected optimizations
 
@@ -76,7 +77,7 @@ Strictness, `skipLibCheck`, include coverage, and production exclusions were not
 - Fail immediately above 125% of an absolute target.
 - Fail if coefficient of variation exceeds 15%, memory exceeds 75% of the host/cgroup limit, an unjustified package exceeds 30% of summed package time, or required resource telemetry is missing.
 - Download up to ten prior 90-day artifacts and use the lower of the committed baseline and median historical P95 once at least three compatible reports exist. Rolling history may tighten the ratchet but can never normalize a regression; baseline increases require a reviewed config change.
-- Deduplicate history by commit and accept it only when OS, architecture, CPU count, memory class, Node major, and native/stable compiler versions match. The committed measurements are tagged `darwin-arm64`; a different hosted-runner profile bootstraps against absolute targets until it has compatible history.
+- Deduplicate history by commit and accept it only when OS, architecture, CPU model/count, memory class, Node major, native/stable compiler versions, lockfile, Turbo config, ratchet config, and scenario definitions match. The committed measurements are tagged `darwin-arm64`; a different hosted-runner profile bootstraps against absolute targets until it has compatible history.
 
 ## Reproduce
 
@@ -104,5 +105,4 @@ This estimate is conservative for local work because it counts only one typechec
 - The first stable-gate run without restored build info took 128.96 seconds; subsequent measured P95 was 10.52 seconds. The first cache-seeding run is a one-time exception to the 45-second CI target.
 - Multi-minute continuous local stress loops thermally throttled the laptop and are not used as ratchet baselines; controlled runs stay below 15% CV and hosted-runner history is the enforcement source.
 - CI final numbers above are local CI-equivalent measurements. The nightly workflow will establish hosted-runner rolling P50/P95 after its first three artifacts.
-- Draft-agent duplicate checking remains in `agent-pr-verify-ready.yml`; changing that workflow should be coordinated with agent verification ownership.
 - Project references and declaration boundaries remain the next lever if the 5-second leaf or 25-second wide-edit ratchets become insufficient.

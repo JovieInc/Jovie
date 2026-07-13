@@ -203,7 +203,7 @@ describe('typecheck performance aggregation and ratchet', () => {
     expect(
       evaluatePerformanceConstraints({
         coefficientOfVariation: 0.1,
-        packages: {},
+        packages: { cachedNoise: { share: 1 } },
         peakMemoryBytes: 500,
         memoryLimitBytes: 1000,
         targets,

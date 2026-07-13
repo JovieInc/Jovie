@@ -11,8 +11,8 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { availableParallelism, totalmem } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { availableParallelism, cpus, totalmem } from 'node:os';
+import { dirname, relative, resolve } from 'node:path';
 import process from 'node:process';
 import {
   installTrackedEditSignalHandlers,
@@ -39,6 +39,7 @@ const DEFAULT_OUTPUT = resolve(
   ROOT,
   'artifacts/typecheck-performance/latest.json'
 );
+const ARTIFACT_ROOT = resolve(ROOT, 'artifacts/typecheck-performance');
 let commandSequence = 0;
 let activeCommand = null;
 installTrackedEditSignalHandlers(process, {
@@ -227,10 +228,17 @@ function environmentProfile(memoryLimitBytes) {
     arch: process.arch,
     nodeMajor: Number(process.versions.node.split('.')[0]),
     cpus: availableParallelism(),
+    cpuModel: cpus()[0]?.model ?? 'unknown',
     memoryLimitGiB: Math.round(memoryLimitBytes / 1024 ** 3),
     nativeCompiler:
       webPackage.devDependencies?.['@typescript/native-preview'] ?? null,
     stableCompiler,
+    benchmarkDefinitionHash: createHash('sha256')
+      .update(JSON.stringify(SCENARIOS))
+      .update(readFileSync(CONFIG_PATH))
+      .update(readFileSync(resolve(ROOT, 'turbo.json')))
+      .update(readFileSync(resolve(ROOT, 'pnpm-lock.yaml')))
+      .digest('hex'),
   };
   return {
     ...profile,
@@ -578,6 +586,23 @@ async function main() {
 
   if (!outputPath.endsWith('.json')) {
     throw new Error('--output must end in .json');
+  }
+  const artifactRelativePath = relative(ARTIFACT_ROOT, outputPath);
+  if (
+    artifactRelativePath.startsWith('..') ||
+    resolve(ARTIFACT_ROOT, artifactRelativePath) !== outputPath
+  ) {
+    throw new Error('--output must be inside artifacts/typecheck-performance');
+  }
+  if (existsSync(outputPath)) {
+    try {
+      const existing = JSON.parse(readFileSync(outputPath, 'utf8'));
+      if (existing.schemaVersion !== 1 || !Array.isArray(existing.scenarios)) {
+        throw new Error('not a benchmark report');
+      }
+    } catch {
+      throw new Error('--output refuses to replace a non-benchmark JSON file');
+    }
   }
 
   if (

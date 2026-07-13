@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
@@ -30,6 +30,8 @@ const PROBES = [
 ];
 const edits = new Map();
 let restored = false;
+let activeCommand = null;
+const MAX_CAPTURED_OUTPUT_CHARACTERS = 100 * 1024 * 1024;
 
 function restore() {
   if (restored) return;
@@ -50,26 +52,72 @@ function restore() {
   }
 }
 
-function execute(command) {
-  const result = spawnSync(command[0], command.slice(1), {
-    cwd: ROOT,
-    encoding: 'utf8',
-    env: process.env,
-    maxBuffer: 100 * 1024 * 1024,
-  });
-  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-  return { result, output };
+function signalCommandTree(commandState, signal) {
+  try {
+    if (process.platform === 'win32') commandState.child.kill(signal);
+    else process.kill(-commandState.child.pid, signal);
+  } catch {
+    // The child may exit between the active-state check and signal delivery.
+  }
 }
 
-function runClean(label, command) {
-  const { result, output } = execute(command);
+async function terminateActiveCommand(signal) {
+  const commandState = activeCommand;
+  if (!commandState) return;
+  signalCommandTree(commandState, signal);
+  let timedOut = false;
+  await Promise.race([
+    commandState.completion.catch(() => {}),
+    new Promise(resolveTimeout => {
+      setTimeout(() => {
+        timedOut = true;
+        resolveTimeout();
+      }, 2000).unref();
+    }),
+  ]);
+  if (timedOut && activeCommand === commandState) {
+    signalCommandTree(commandState, 'SIGKILL');
+    await commandState.completion.catch(() => {});
+  }
+}
+
+async function execute(command) {
+  const child = spawn(command[0], command.slice(1), {
+    cwd: ROOT,
+    env: process.env,
+    detached: process.platform !== 'win32',
+  });
+  let output = '';
+  const capture = chunk => {
+    output = `${output}${chunk}`.slice(-MAX_CAPTURED_OUTPUT_CHARACTERS);
+  };
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', capture);
+  child.stderr.on('data', capture);
+  const completion = new Promise((resolveExit, reject) => {
+    child.once('error', reject);
+    child.once('close', code => resolveExit(code ?? 1));
+  });
+  const commandState = { child, completion };
+  activeCommand = commandState;
+  try {
+    const status = await completion;
+    return { result: { status }, output };
+  } finally {
+    if (activeCommand === commandState) activeCommand = null;
+  }
+}
+
+async function runClean(label, command) {
+  const { result, output } = await execute(command);
   if (result.status !== 0) {
     throw new Error(`${label} baseline is not clean\n${output.slice(-4000)}`);
   }
 }
 
-function runProbe(label, command) {
-  const { result, output } = execute(command);
+async function runProbe(label, command) {
+  const { result, output } = await execute(command);
   if (result.status === 0) {
     throw new Error(`${label} unexpectedly accepted intentional type errors`);
   }
@@ -93,31 +141,19 @@ function runProbe(label, command) {
   return output;
 }
 
-function main() {
-  process.once('SIGINT', () => {
-    restore();
-    process.exit(130);
-  });
-  process.once('SIGTERM', () => {
-    restore();
-    process.exit(143);
-  });
+async function main() {
+  for (const [signal, exitCode] of [
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+  ]) {
+    process.once(signal, async () => {
+      restore();
+      await terminateActiveCommand(signal);
+      process.exit(exitCode);
+    });
+  }
 
   try {
-    for (const probe of PROBES) {
-      const absolutePath = resolve(ROOT, probe.path);
-      const original = readFileSync(absolutePath, 'utf8');
-      const marker = `\nconst ${probe.symbol}: string = 42;\n`;
-      const mutated = `${original}${marker}`;
-      edits.set(absolutePath, {
-        original,
-        mutated,
-        marker,
-        expectedLine: original.split('\n').length + 1,
-      });
-      writeFileSync(absolutePath, mutated);
-    }
-
     const nativeCommand = [
       'pnpm',
       '--filter',
@@ -147,13 +183,25 @@ function main() {
       '--pretty',
       'false',
     ];
-    restore();
-    runClean('TS7 native', nativeCommand);
-    runClean('TS6 stable', stableCommand);
-    restored = false;
-    for (const [path, edit] of edits) writeFileSync(path, edit.mutated);
-    runProbe('TS7 native', nativeCommand);
-    runProbe('TS6 stable', stableCommand);
+    await runClean('TS7 native', nativeCommand);
+    await runClean('TS6 stable', stableCommand);
+
+    for (const probe of PROBES) {
+      const absolutePath = resolve(ROOT, probe.path);
+      const original = readFileSync(absolutePath, 'utf8');
+      const marker = `\nconst ${probe.symbol}: string = 42;\n`;
+      const mutated = `${original}${marker}`;
+      edits.set(absolutePath, {
+        original,
+        mutated,
+        marker,
+        expectedLine: original.split('\n').length + 1,
+      });
+      writeFileSync(absolutePath, mutated);
+    }
+
+    await runProbe('TS7 native', nativeCommand);
+    await runProbe('TS6 stable', stableCommand);
   } finally {
     restore();
   }
@@ -162,4 +210,7 @@ function main() {
   );
 }
 
-main();
+main().catch(error => {
+  console.error(error instanceof Error ? error.stack : error);
+  process.exitCode = 1;
+});
