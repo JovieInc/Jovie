@@ -33,19 +33,6 @@ describe('diagnoseCiFailure', () => {
     ).toBe('runner_host_pressure');
   });
 
-  it('classifies a checkout shutdown as the autoscaler idle-reap race', () => {
-    const diagnosis = diagnoseCiFailure(`
-      Checkout repository
-      Error: The runner has received a shutdown signal.
-    `);
-
-    expect(diagnosis).toMatchObject({
-      failureClass: 'runner_idle_reap_race',
-      rootCause: expect.stringContaining('stale idle snapshot'),
-      remediation: expect.stringContaining('freshly busy'),
-    });
-  });
-
   it('classifies the historical full-suite timeout as a broken profiler fixture', () => {
     const diagnosis = diagnoseCiFailure(`
       Test Performance Budgets

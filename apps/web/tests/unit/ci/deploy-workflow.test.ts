@@ -119,10 +119,10 @@ describe('CI test-performance path gate', () => {
     );
 
     expect(performanceJob).toContain(
-      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+      "if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (needs.ci-path-changes.outputs.skip == 'false' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_test_performance == 'true') }}"
     );
-    expect(performanceJob).toContain(
-      "github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_test_performance == 'true'"
+    expect(performanceJob).not.toContain(
+      "if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push'"
     );
     expect(performanceJob).toContain(
       "run_full_ci=${{ needs.ci-path-changes.outputs.run_test == 'true' || needs.ci-path-changes.outputs.run_test_performance == 'true' }}"

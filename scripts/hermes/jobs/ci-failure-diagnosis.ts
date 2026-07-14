@@ -1,6 +1,5 @@
 export type CiFailureClass =
   | 'bounded_source_scan_timeout'
-  | 'runner_idle_reap_race'
   | 'broken_profiler_fixture'
   | 'inconclusive_performance_timeout'
   | 'suite_wide_performance_regression'
@@ -22,14 +21,6 @@ const DIAGNOSES: ReadonlyArray<{
   readonly rootCause: string;
   readonly remediation: string;
 }> = [
-  {
-    failureClass: 'runner_idle_reap_race',
-    matches: log => /The runner has received a shutdown signal/i.test(log),
-    rootCause:
-      'The autoscaler selected a runner from a stale idle snapshot, work started before termination, and the stale-idle reap then shut the runner down during checkout (TOCTOU). This is not a code failure.',
-    remediation:
-      'Retry the exact failed head only after the controller proves the runner is freshly busy before reaping. Do not change PR code or classify the shutdown as flaky CI without that fresh-busy controller evidence.',
-  },
   {
     failureClass: 'inconclusive_performance_timeout',
     matches: log =>
