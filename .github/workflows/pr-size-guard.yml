@@ -47,6 +47,9 @@ jobs:
       - name: Enforce repository hygiene
         run: node scripts/repo-hygiene-guard.mjs --diff-base "${{ github.event.pull_request.base.sha }}"
 
+      - name: Enforce Agent Skill governance
+        run: node scripts/skill-governance-guard.mjs
+
       - name: Detect screenshot integrity changes
         id: screenshot-integrity
         run: |

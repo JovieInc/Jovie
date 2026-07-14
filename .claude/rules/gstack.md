@@ -110,15 +110,18 @@ gstack skill files are part of the agent control plane. Keep them fast, stable, 
 
 ## External Skill Governance
 
-Engineering agents may install third-party Agent Skills via the [`vercel-labs/skills`](https://github.com/vercel-labs/skills) CLI (`npx skills add | find | update`). The discovery skill itself is installed at `.claude/skills/find-skills/SKILL.md` and is the canonical entry point for "find me a skill that does X" workflows. Lockfile lives at `skills-lock.json` in the repo root.
+Engineering agents may install third-party Agent Skills via the [`vercel-labs/skills`](https://github.com/vercel-labs/skills) CLI (`npx skills add | find | update`). The Jovie-owned discovery fork at `.claude/skills/find-skills/SKILL.md` is the canonical entry point for "find me a skill that does X" workflows. It is intentionally not lock-managed, so `skills update` cannot replace Jovie's safety policy with the upstream global-install workflow. External skills remain pinned in `skills-lock.json` at the repo root.
 
-**Allowed sources** (install without further review):
+**Pre-approved external skills** (install only at the reviewed commit and path):
 
-- `anthropics/*`
-- `vercel-labs/*`
-- `microsoft/*`
-- Official first-party vendor skills (Stripe, Clerk, Sentry, Vercel, etc.)
+- `vercel-labs/ai` → `ai-sdk`
+- `vercel-labs/agent-skills` → `vercel-react-best-practices`
+- `vercel-labs/agent-skills` → `vercel-composition-patterns`
 - Jovie-owned private skills
+
+All other external packages, including other `vercel-labs/*`, Anthropic,
+Microsoft, and first-party vendor skills, remain review candidates rather than
+source-wide approvals.
 
 **Blocked by default** (require explicit human review before install):
 
@@ -127,11 +130,23 @@ Engineering agents may install third-party Agent Skills via the [`vercel-labs/sk
 - Skills requesting outbound network access
 - Skills that touch credentials, fan data, payments, or artist accounts
 
-**Pre-install checks** (per `find-skills` SKILL.md): inspect install count, source reputation, GitHub stars, and the Snyk/Socket risk badges shown by `skills add` before accepting.
+**Pre-install checks** (per `find-skills` SKILL.md): inspect install count, source reputation, GitHub stars, and the Snyk/Socket risk badges shown by `skills add` before accepting. Read every bundled executable, outbound network operation, credential instruction, and mutation surface. Never install a source without an exact `--skill` selector.
 
 **Telemetry**: every `npx skills` invocation must run with `DISABLE_TELEMETRY=1` and `DO_NOT_TRACK=1`. These are also set in `.claude/settings.json`'s `env` block, so any agent shell inherits them by default.
 
-**Install scope**: prefer project-scoped installs (`--agent claude-code`) so the new skill is reviewable in the PR diff. Avoid `--global`/`-g` for repo-relevant skills.
+**Install scope**: install project-scoped copies for both supported resolvers (`--agent claude-code codex`) so Claude and Codex execute the same reviewable instructions. Avoid `--global`/`-g` for repo-relevant skills.
+
+**CLI mutation safety**: treat `skills check` and `skills update` as writes. Do not run them during read-only analysis. Do not use `skills add <source> --help`; that form has performed a broad install in production CLI versions. Snapshot `git status --short` and `skills-lock.json` before every install/update, then inspect the diff and remove unexpected skills immediately.
+
+### Jovie Overrides for Installed Vercel Skills
+
+Jovie canon always wins over third-party guidance. Apply these overlays whenever the installed Vercel skills trigger:
+
+- **AI SDK**: inspect the versions already declared in `apps/web/package.json` and use the matching bundled docs/source. Do not install or upgrade `ai`, provider packages, or model IDs unless the task explicitly includes dependency work. Route application calls through `apps/web/lib/ai/sdk.ts` so leak guards remain active; preserve the existing gateway, model-selection, cost, and eval contracts.
+- **React performance**: use TanStack Query and Jovie's server contracts instead of introducing SWR. Require baseline and same-method remeasurement through `jovie-performance-hardening` for performance claims. Do not add inline hydration scripts or `suppressHydrationWarning` without satisfying CSP, hydration, and no-layout-shift tests. Cross-request caches must be tenant-safe and may not hold mutable request state.
+- **React composition**: treat boolean-prop guidance as an API-design heuristic, not a ban. Status, capability, accessibility, and controlled-state booleans remain valid. Use explicit variants or compound components only when they reduce invalid combinations or clarify a reusable public API. `DESIGN.md` and `design-canonical` remain authoritative for UI behavior and taste.
+
+The approved Vercel Labs allowlist is enforced by `pnpm run skill-governance:check`: `ai-sdk`, `vercel-react-best-practices`, and `vercel-composition-patterns`. Updating the allowlist requires reviewing the exact source and updating its guard tests in the same change.
 
 **Product-surface separation**: external Agent Skills are an engineering-time tool only. They MUST NOT be exposed to artists, fans, or any user-facing Jovie surface. Artist-facing AI workflows are built as Jovie product features and tracked in Linear, not installed from the open ecosystem.
 

@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **[internal] Governed Vercel agent skills:** Jovie now pins the reviewed AI SDK, React performance, and React composition skills; a Jovie-owned discovery workflow and CI/pre-commit guard reject OpenReview, broad or global installs, missing policy overlays, and malformed source pins.
 - **[internal] Repository artifact hygiene guardrails (JOV-4264):** CI and pre-commit checks reject recursive/generated paths, temporary files, root screenshots, unapproved binaries, oversized payloads, and repository-wide file/byte/binary budget overruns.
 - **[internal] Bounded artifact lifecycle helpers:** owned-output, atomic issue-output, run-retention, generated-artifact retention, performance-artifact retention, and local-runtime cleanup helpers now cover QA, AgentOS, Hermes, Design Lab, profile review, iOS performance, and screenshot producers with fail-closed symlink and race protections.
 - **[internal] Screenshot evidence is replace-in-place:** homepage, product, visual-regression, contrast, and profile captures write to stable ignored or catalog-owned paths; CI validates the catalog and public export budgets before merge.
