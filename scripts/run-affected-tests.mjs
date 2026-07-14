@@ -135,6 +135,14 @@ const PERSISTED_AUTH_FIXTURE_SCRIPT_TESTS = [
   'scripts/hermes/lib/__tests__/ci-failure-classifier.test.ts',
   'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
+const VISUAL_QA_DIFF_ARTIFACTS_SOURCE =
+  'apps/web/lib/agent-os/visual-qa/diff-artifacts.ts';
+const VISUAL_QA_DIFF_ARTIFACTS_TEST =
+  'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts';
+const VISUAL_QA_DIFF_ARTIFACTS_MANIFEST = new Set([
+  VISUAL_QA_DIFF_ARTIFACTS_SOURCE,
+  VISUAL_QA_DIFF_ARTIFACTS_TEST,
+]);
 const GTMQ_SOURCE_GATE_REAPER_MANIFEST = new Set([
   '.github/actions/setup-node-pnpm/action.yml',
   '.github/workflows/gtmq-source-authorization.yml',
@@ -222,6 +230,16 @@ export function buildAffectedTestPlan(changedFiles) {
     ) &&
     (affectedTestSelectorInputCount === 0 ||
       affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  const visualQaDiffArtifactsInputCount = files.filter(file =>
+    VISUAL_QA_DIFF_ARTIFACTS_MANIFEST.has(file)
+  ).length;
+  const isExactVisualQaSelectorRepair =
+    affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
+    visualQaDiffArtifactsInputCount ===
+      VISUAL_QA_DIFF_ARTIFACTS_MANIFEST.size &&
+    files.length ===
+      AFFECTED_TEST_SELECTOR_MANIFEST.size +
+        VISUAL_QA_DIFF_ARTIFACTS_MANIFEST.size;
   const gtmqSourceGateReaperInputCount = files.filter(file =>
     GTMQ_SOURCE_GATE_REAPER_MANIFEST.has(file)
   ).length;
@@ -307,6 +325,9 @@ export function buildAffectedTestPlan(changedFiles) {
   if (hasCiCancellationHealerChange) {
     mandatoryTests.push(...CI_CANCELLATION_HEALER_TESTS);
   }
+  if (files.includes(VISUAL_QA_DIFF_ARTIFACTS_SOURCE)) {
+    mandatoryTests.push(VISUAL_QA_DIFF_ARTIFACTS_TEST);
+  }
   if (isExactPrerequisiteTrain) {
     mandatoryTests.push(...PREREQUISITE_TRAIN_TESTS);
   }
@@ -329,6 +350,7 @@ export function buildAffectedTestPlan(changedFiles) {
   const scriptVitestTests = unique([
     ...(isExactAffectedTestSelector ||
     isExactGoldenPathSmokeContractRepair ||
+    isExactVisualQaSelectorRepair ||
     (isExactPersistedAuthFixtureRepair && affectedTestSelectorInputCount > 0)
       ? AFFECTED_TEST_SELECTOR_TESTS
       : []),
@@ -362,6 +384,7 @@ export function buildAffectedTestPlan(changedFiles) {
       PERSISTED_AUTH_FIXTURE_REPAIR_CORE.has(file)
     )
       return true;
+    if (file === VISUAL_QA_DIFF_ARTIFACTS_SOURCE) return true;
     if (isExactPrerequisiteTrain && PREREQUISITE_TRAIN_MANIFEST.has(file))
       return true;
     if (
@@ -401,13 +424,15 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactAffectedTestSelector &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactPersistedAuthFixtureRepair &&
+    !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactPersistedAuthFixtureRepair &&
-    !isExactAffectedTestSelector;
+    !isExactAffectedTestSelector &&
+    !isExactVisualQaSelectorRepair;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
     hasUnknownCiCancellationHealerPeer ||
