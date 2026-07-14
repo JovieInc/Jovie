@@ -4,14 +4,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$IOS_DIR/../.." && pwd)"
+RETENTION_SCRIPT="$REPO_ROOT/scripts/performance-artifact-retention.mjs"
 PROJECT_PATH="$IOS_DIR/Jovie.xcodeproj"
 SCHEME="Jovie"
 BUNDLE_ID="ie.jov.Jovie"
 OUTPUT_DIR="${IOS_SCREENSHOT_DIR:-$REPO_ROOT/artifacts/ios-screenshots}"
 DERIVED_DATA_PATH="${IOS_SCREENSHOT_DERIVED_DATA:-$REPO_ROOT/.build/ios-screenshots}"
 
-rm -rf "$OUTPUT_DIR"
-mkdir -p "$OUTPUT_DIR"
+node "$RETENTION_SCRIPT" reset ios-screenshots "$OUTPUT_DIR" \
+  --repo-root "$REPO_ROOT" --apply
 
 run_with_timeout() {
   local timeout_seconds="$1"
@@ -44,7 +45,8 @@ APP_PATH="$DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/Jovie.app"
 if [[ -d "$APP_PATH" && "${IOS_SCREENSHOT_REUSE_BUILD:-0}" == "1" ]]; then
   echo "Using existing built app at $APP_PATH"
 else
-  rm -rf "$DERIVED_DATA_PATH"
+  node "$RETENTION_SCRIPT" reset ios-screenshot-derived-data "$DERIVED_DATA_PATH" \
+    --repo-root "$REPO_ROOT" --apply
   run_with_timeout "${IOS_SCREENSHOT_BUILD_TIMEOUT:-300}" xcodebuild build \
     -project "$PROJECT_PATH" \
     -scheme "$SCHEME" \

@@ -12,6 +12,7 @@ import {
   type ResolvedPublicSurfaceSpec,
   resolvePublicSurfaceManifest,
 } from '@/tests/e2e/utils/public-surface-manifest';
+import { resetPublicRouteQaOutput } from './public-route-qa-output';
 
 type PublicQaStatus = 'pass' | 'fail';
 
@@ -46,16 +47,6 @@ try {
 } catch {
   console.error(`Invalid BASE_URL: ${BASE_URL}`);
   process.exit(1);
-}
-
-const outputRelativePath = path.relative(OUTPUT_BASE, OUTPUT_ROOT);
-if (
-  outputRelativePath.startsWith('..') ||
-  path.isAbsolute(outputRelativePath)
-) {
-  throw new Error(
-    'PUBLIC_ROUTE_QA_OUTPUT_DIR must stay within test-results/public-route-qa'
-  );
 }
 
 function buildAbsoluteUrl(baseUrl: string, resolvedPath: string) {
@@ -249,6 +240,7 @@ async function runSurfaceCheck(
 }
 
 async function main() {
+  await resetPublicRouteQaOutput(OUTPUT_BASE, OUTPUT_ROOT);
   const browser = await chromium.launch();
   let context: Awaited<ReturnType<typeof browser.newContext>> | undefined;
 
@@ -293,7 +285,6 @@ async function main() {
       }
     }
 
-    await mkdir(OUTPUT_ROOT, { recursive: true });
     const summary = {
       baseUrl: BASE_URL,
       checkedAt: new Date().toISOString(),

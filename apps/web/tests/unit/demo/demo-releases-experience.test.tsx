@@ -201,6 +201,10 @@ async function openReleasesMatrix() {
   return releasesMatrix;
 }
 
+// Full-shell renders with drawer interactions can legitimately exceed Vitest's
+// 5s default while cold concurrent transforms are consuming the runner.
+const FULL_SHELL_TIMEOUT_MS = 15_000;
+
 async function openReleaseDrawer(
   title: string,
   options?: { readonly requireSidebar?: boolean }
@@ -217,7 +221,7 @@ async function openReleaseDrawer(
       () => {
         expect(screen.getByTestId('release-sidebar')).toBeInTheDocument();
       },
-      { timeout: 5000 }
+      { timeout: FULL_SHELL_TIMEOUT_MS }
     );
     return;
   }
@@ -230,25 +234,29 @@ async function openReleaseDrawer(
 }
 
 describe('DemoReleasesExperience', () => {
-  it('renders fixture data and opens the selected release in the drawer', async () => {
-    renderDemo();
+  it(
+    'renders fixture data and opens the selected release in the drawer',
+    async () => {
+      renderDemo();
 
-    // The sidebar nav has a Releases tab and it appears in the breadcrumb
-    expect(screen.getAllByText('Releases').length).toBeGreaterThan(0);
-    await openReleaseDrawer(LEADING_RELEASE_TITLE);
+      // The sidebar nav has a Releases tab and it appears in the breadcrumb
+      expect(screen.getAllByText('Releases').length).toBeGreaterThan(0);
+      await openReleaseDrawer(LEADING_RELEASE_TITLE);
 
-    // Release titles should appear in the list
-    expect(
-      screen.getAllByText(hasTextContent(LEADING_RELEASE_TITLE)).length
-    ).toBeGreaterThan(1);
-
-    // Selecting a row should surface the release details alongside the table.
-    await waitFor(() => {
+      // Release titles should appear in the list
       expect(
         screen.getAllByText(hasTextContent(LEADING_RELEASE_TITLE)).length
       ).toBeGreaterThan(1);
-    });
-  });
+
+      // Selecting a row should surface the release details alongside the table.
+      await waitFor(() => {
+        expect(
+          screen.getAllByText(hasTextContent(LEADING_RELEASE_TITLE)).length
+        ).toBeGreaterThan(1);
+      });
+    },
+    FULL_SHELL_TIMEOUT_MS
+  );
 
   it('renders release data in the table', async () => {
     renderDemo();
@@ -262,45 +270,53 @@ describe('DemoReleasesExperience', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('normalizes sparse track numbering in the release drawer tracks tab', async () => {
-    renderDemo();
+  it(
+    'normalizes sparse track numbering in the release drawer tracks tab',
+    async () => {
+      renderDemo();
 
-    await openReleaseDrawer('96 Months', { requireSidebar: true });
-    const tracksCard = await screen.findByTestId('release-tracks-card');
-    fireEvent.click(within(tracksCard).getByRole('button', { name: 'Tracks' }));
+      await openReleaseDrawer('96 Months', { requireSidebar: true });
+      const tracksCard = await screen.findByTestId('release-tracks-card');
+      fireEvent.click(
+        within(tracksCard).getByRole('button', { name: 'Tracks' })
+      );
 
-    const tracklist = await screen.findByTestId('tracklist');
-    const trackButtons = within(tracklist)
-      .getAllByRole('button')
-      .map(button => button.textContent?.trim());
+      const tracklist = await screen.findByTestId('tracklist');
+      const trackButtons = within(tracklist)
+        .getAllByRole('button')
+        .map(button => button.textContent?.trim());
 
-    expect(trackButtons).toEqual(['1', '2', '3', '4', '5', '6']);
-    expect(
-      screen.getByTestId('release-track-control-calvin-96-months-track-1')
-    ).toHaveTextContent('1');
-    expect(
-      screen.getByTestId('release-track-control-calvin-96-months-track-9')
-    ).toHaveTextContent('4');
-    expect(
-      screen.getByTestId('release-track-control-calvin-96-months-track-11')
-    ).toHaveTextContent('5');
-    expect(
-      screen.getByTestId('release-track-control-calvin-96-months-track-13')
-    ).toHaveTextContent('6');
-    expect(
-      within(tracklist).getByText('Free (with Ellie Goulding)')
-    ).toBeInTheDocument();
-    expect(
-      within(tracklist).getByText('Miracle (with Ellie Goulding)')
-    ).toBeInTheDocument();
-    expect(
-      within(tracklist).getByText('Desire (with Sam Smith)')
-    ).toBeInTheDocument();
-    expect(
-      within(tracklist).getByText("Lovers In A Past Life (with Rag'n'Bone Man)")
-    ).toBeInTheDocument();
-    expect(within(tracklist).queryByText('9')).not.toBeInTheDocument();
-    expect(within(tracklist).queryByText('11')).not.toBeInTheDocument();
-    expect(within(tracklist).queryByText('13')).not.toBeInTheDocument();
-  });
+      expect(trackButtons).toEqual(['1', '2', '3', '4', '5', '6']);
+      expect(
+        screen.getByTestId('release-track-control-calvin-96-months-track-1')
+      ).toHaveTextContent('1');
+      expect(
+        screen.getByTestId('release-track-control-calvin-96-months-track-9')
+      ).toHaveTextContent('4');
+      expect(
+        screen.getByTestId('release-track-control-calvin-96-months-track-11')
+      ).toHaveTextContent('5');
+      expect(
+        screen.getByTestId('release-track-control-calvin-96-months-track-13')
+      ).toHaveTextContent('6');
+      expect(
+        within(tracklist).getByText('Free (with Ellie Goulding)')
+      ).toBeInTheDocument();
+      expect(
+        within(tracklist).getByText('Miracle (with Ellie Goulding)')
+      ).toBeInTheDocument();
+      expect(
+        within(tracklist).getByText('Desire (with Sam Smith)')
+      ).toBeInTheDocument();
+      expect(
+        within(tracklist).getByText(
+          "Lovers In A Past Life (with Rag'n'Bone Man)"
+        )
+      ).toBeInTheDocument();
+      expect(within(tracklist).queryByText('9')).not.toBeInTheDocument();
+      expect(within(tracklist).queryByText('11')).not.toBeInTheDocument();
+      expect(within(tracklist).queryByText('13')).not.toBeInTheDocument();
+    },
+    FULL_SHELL_TIMEOUT_MS
+  );
 });

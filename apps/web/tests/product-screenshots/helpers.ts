@@ -2,6 +2,7 @@
  * Shared helpers for product screenshot specs.
  */
 
+import { join, resolve } from 'node:path';
 import { Page } from '@playwright/test';
 
 export const TIMEOUTS = {
@@ -11,9 +12,18 @@ export const TIMEOUTS = {
   SETTLE: 3_000,
 } as const;
 
-export const CATALOG_OUTPUT_DIR = 'screenshot-catalog/current';
-export const PUBLIC_EXPORT_DIR = 'public/product-screenshots';
-export const OUTPUT_DIR = PUBLIC_EXPORT_DIR;
+const WEB_ROOT = resolve(import.meta.dirname, '../..');
+
+export const CATALOG_OUTPUT_DIR = join(
+  WEB_ROOT,
+  'screenshot-catalog',
+  'current'
+);
+export const PUBLIC_EXPORT_DIR = join(
+  WEB_ROOT,
+  'public',
+  'product-screenshots'
+);
 export const SCREENSHOT_CLOCK_ISO = '2026-04-15T16:00:00.000Z';
 
 /**

@@ -40,6 +40,8 @@
 		89B2D98342D65781B5E80A72 /* JovieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */; };
 		82B34E9D6204496286345E07 /* ClerkNetworkMiddleware.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6800CFABBE2A4946936C7C44 /* ClerkNetworkMiddleware.swift */; };
 		964DEFE0F4D4206832B6888E /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 969DB5F8041C9A004CDB5234 /* RootView.swift */; };
+		1B178328D9174F7D903FA1E3 /* LiveRootContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE7701B410E4EC0AF199EF8 /* LiveRootContainer.swift */; };
+		D4229B10537D487D93C634D4 /* LiveAuthBootstrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5E6FE6D208645ADBC8CB3C2 /* LiveAuthBootstrapper.swift */; };
 		36A99669D08546B2A5146BE9 /* UITestHarnessViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D65C5C4A874DD29736473D /* UITestHarnessViews.swift */; };
 		99FBB80FCDBD4660BE1B0DCC /* MobileChatPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25CADBED3F6B431494F2C0DF /* MobileChatPlaceholderView.swift */; };
 		A0B10F000000000000000006 /* ObservabilityTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000001 /* ObservabilityTypes.swift */; };
@@ -81,6 +83,7 @@
 		A0J0V2549000000000000000C /* ChatRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V2549000000000000000B /* ChatRepositoryTests.swift */; };
 		A0J0V2549000000000000000E /* MobileChatClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V2549000000000000000D /* MobileChatClientTests.swift */; };
 		A0J0V36070000000000000002 /* MobileChatContentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36070000000000000001 /* MobileChatContentParser.swift */; };
+		B2BC7DF78E734D30BFA781E5 /* MobileChatMerchParsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B09E09AD9F54D5490AB162A /* MobileChatMerchParsing.swift */; };
 		6250AA6B2FC2435BB97DDE7D /* MobileChatContentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DC5F646E5F24F72B0116997 /* MobileChatContentModels.swift */; };
 		A78C126A004D49228B357FB8 /* AvatarImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE51E1B31A94D91BE8FA87B /* AvatarImageCache.swift */; };
 		45227160A0834284B3D0B56D /* MobileChatLabels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30DC37856B5444494C3FB5D /* MobileChatLabels.swift */; };
@@ -176,6 +179,8 @@
 		95CA509F09ADCA8A54FCC85A /* Jovie.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jovie.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		969C5D08D3E71A2D9824375A /* Jovie-logo.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = "Jovie-logo.png"; sourceTree = "<group>"; };
 		969DB5F8041C9A004CDB5234 /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		FFE7701B410E4EC0AF199EF8 /* LiveRootContainer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveRootContainer.swift; sourceTree = "<group>"; };
+		B5E6FE6D208645ADBC8CB3C2 /* LiveAuthBootstrapper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveAuthBootstrapper.swift; sourceTree = "<group>"; };
 		15D65C5C4A874DD29736473D /* UITestHarnessViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UITestHarnessViews.swift; sourceTree = "<group>"; };
 		25CADBED3F6B431494F2C0DF /* MobileChatPlaceholderView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatPlaceholderView.swift; sourceTree = "<group>"; };
 		989D4251AFCEB0A633337F2C /* JovieUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JovieUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -220,6 +225,7 @@
 		A0J0V2549000000000000000B /* ChatRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatRepositoryTests.swift; sourceTree = "<group>"; };
 		A0J0V2549000000000000000D /* MobileChatClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatClientTests.swift; sourceTree = "<group>"; };
 		A0J0V36070000000000000001 /* MobileChatContentParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatContentParser.swift; sourceTree = "<group>"; };
+		6B09E09AD9F54D5490AB162A /* MobileChatMerchParsing.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatMerchParsing.swift; sourceTree = "<group>"; };
 		0DC5F646E5F24F72B0116997 /* MobileChatContentModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatContentModels.swift; sourceTree = "<group>"; };
 		5DE51E1B31A94D91BE8FA87B /* AvatarImageCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AvatarImageCache.swift; sourceTree = "<group>"; };
 		B30DC37856B5444494C3FB5D /* MobileChatLabels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatLabels.swift; sourceTree = "<group>"; };
@@ -481,6 +487,7 @@
 				28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */,
 				A0J0V25490000000000000005 /* MobileChatClient.swift */,
 				A0J0V36070000000000000001 /* MobileChatContentParser.swift */,
+				6B09E09AD9F54D5490AB162A /* MobileChatMerchParsing.swift */,
 				0DC5F646E5F24F72B0116997 /* MobileChatContentModels.swift */,
 				5DE51E1B31A94D91BE8FA87B /* AvatarImageCache.swift */,
 				B30DC37856B5444494C3FB5D /* MobileChatLabels.swift */,
@@ -580,6 +587,8 @@
 				DD30F57584F71E958D8C0514 /* LaunchMode.swift */,
 				2EBA07D5CBE04B0BBF053706 /* MobileAuthReturn.swift */,
 				969DB5F8041C9A004CDB5234 /* RootView.swift */,
+				FFE7701B410E4EC0AF199EF8 /* LiveRootContainer.swift */,
+				B5E6FE6D208645ADBC8CB3C2 /* LiveAuthBootstrapper.swift */,
 				15D65C5C4A874DD29736473D /* UITestHarnessViews.swift */,
 			);
 			name = App;
@@ -786,6 +795,8 @@
 				4CA1C477ECC6B7B40EA17787 /* LaunchMode.swift in Sources */,
 				61A81E78D0B448B6A68F45AD /* MobileAuthReturn.swift in Sources */,
 				964DEFE0F4D4206832B6888E /* RootView.swift in Sources */,
+				1B178328D9174F7D903FA1E3 /* LiveRootContainer.swift in Sources */,
+				D4229B10537D487D93C634D4 /* LiveAuthBootstrapper.swift in Sources */,
 				36A99669D08546B2A5146BE9 /* UITestHarnessViews.swift in Sources */,
 				A0B10F000000000000000006 /* ObservabilityTypes.swift in Sources */,
 				A0B10F000000000000000007 /* NoopObservabilityProvider.swift in Sources */,
@@ -805,6 +816,7 @@
 				A0J0V25490000000000000008 /* MobileChatModels.swift in Sources */,
 				A0GH13008000000000000002 /* VoiceCaptureService.swift in Sources */,
 				A0J0V36070000000000000002 /* MobileChatContentParser.swift in Sources */,
+				B2BC7DF78E734D30BFA781E5 /* MobileChatMerchParsing.swift in Sources */,
 				6250AA6B2FC2435BB97DDE7D /* MobileChatContentModels.swift in Sources */,
 				A78C126A004D49228B357FB8 /* AvatarImageCache.swift in Sources */,
 				45227160A0834284B3D0B56D /* MobileChatLabels.swift in Sources */,

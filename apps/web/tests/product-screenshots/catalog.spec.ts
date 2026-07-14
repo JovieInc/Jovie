@@ -1,12 +1,5 @@
-import {
-  copyFile,
-  mkdir,
-  readdir,
-  readFile,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
-import { join } from 'node:path';
+import { copyFile, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
 import {
@@ -22,6 +15,8 @@ import {
   isScreenshotManifestEntry,
   type ScreenshotManifestEntry,
 } from '../../lib/screenshots/types';
+import { pruneFixedOwnedOutputFiles } from '../../scripts/owned-output-path';
+import { replaceWithAtomicSibling } from './atomic-output';
 import {
   assertNoDevOverlays,
   CATALOG_OUTPUT_DIR,
@@ -44,10 +39,6 @@ const SCREENSHOT_FLAG_OVERRIDES = JSON.stringify({
 
 const MANIFEST_PATH = join(CATALOG_OUTPUT_DIR, 'manifest.json');
 
-async function ensureDirectory(path: string) {
-  await mkdir(path, { recursive: true });
-}
-
 async function readOptionalFile(path: string): Promise<Buffer | null> {
   try {
     return await readFile(path);
@@ -57,18 +48,6 @@ async function readOptionalFile(path: string): Promise<Buffer | null> {
     }
     throw error;
   }
-}
-
-async function removeOrphanFiles(
-  directory: string,
-  ownedFiles: ReadonlySet<string>
-) {
-  const files = await readdir(directory).catch(() => []);
-  await Promise.all(
-    files
-      .filter(file => !ownedFiles.has(file))
-      .map(file => rm(join(directory, file), { force: true, recursive: true }))
-  );
 }
 
 async function readManifestEntries() {
@@ -156,7 +135,10 @@ async function writeManifest(
     return;
   }
 
-  await writeFile(MANIFEST_PATH, nextManifest, 'utf8');
+  await replaceWithAtomicSibling(MANIFEST_PATH, async temporaryPath => {
+    await writeFile(temporaryPath, nextManifest, 'utf8');
+    return true;
+  });
 }
 
 async function captureCatalogImage(
@@ -164,29 +146,22 @@ async function captureCatalogImage(
   scenario: (typeof SCREENSHOT_SCENARIOS)[number],
   catalogPath: string
 ) {
-  const nextPath = join(CATALOG_OUTPUT_DIR, `${scenario.id}.next.png`);
+  return replaceWithAtomicSibling(catalogPath, async nextPath => {
+    if (scenario.captureTarget === 'locator' && scenario.captureSelector) {
+      await page.locator(scenario.captureSelector).first().screenshot({
+        path: nextPath,
+      });
+    } else {
+      await page.screenshot({
+        path: nextPath,
+        fullPage: scenario.fullPage,
+      });
+    }
 
-  if (scenario.captureTarget === 'locator' && scenario.captureSelector) {
-    await page.locator(scenario.captureSelector).first().screenshot({
-      path: nextPath,
-    });
-  } else {
-    await page.screenshot({
-      path: nextPath,
-      fullPage: scenario.fullPage,
-    });
-  }
-
-  const previousBuffer = await readOptionalFile(catalogPath);
-  const nextBuffer = await readFile(nextPath);
-  const changed = previousBuffer === null || !previousBuffer.equals(nextBuffer);
-
-  if (changed) {
-    await writeFile(catalogPath, nextBuffer);
-  }
-
-  await rm(nextPath, { force: true });
-  return changed;
+    const previousBuffer = await readOptionalFile(catalogPath);
+    const nextBuffer = await readFile(nextPath);
+    return previousBuffer === null || !previousBuffer.equals(nextBuffer);
+  });
 }
 
 async function syncPublicExport(catalogPath: string, publicExportPath: string) {
@@ -198,7 +173,10 @@ async function syncPublicExport(catalogPath: string, publicExportPath: string) {
     return;
   }
 
-  await copyFile(catalogPath, exportPath);
+  await replaceWithAtomicSibling(exportPath, async temporaryPath => {
+    await copyFile(catalogPath, temporaryPath);
+    return true;
+  });
 }
 
 async function assertNoShellInternalChrome(
@@ -352,27 +330,30 @@ test.describe('Screenshot Catalog', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeAll(async () => {
-    await ensureDirectory(CATALOG_OUTPUT_DIR);
-    await ensureDirectory(PUBLIC_EXPORT_DIR);
-
-    manifestEntriesById = await readManifestEntries();
-
-    await removeOrphanFiles(
+    await pruneFixedOwnedOutputFiles(
+      dirname(CATALOG_OUTPUT_DIR),
+      'current',
       CATALOG_OUTPUT_DIR,
+      'SCREENSHOT_CATALOG_OUTPUT_DIR',
       new Set(
         SCREENSHOT_SCENARIOS.map(scenario => `${scenario.id}.png`).concat(
           'manifest.json'
         )
       )
     );
-    await removeOrphanFiles(
+    await pruneFixedOwnedOutputFiles(
+      dirname(PUBLIC_EXPORT_DIR),
+      'product-screenshots',
       PUBLIC_EXPORT_DIR,
+      'PUBLIC_SCREENSHOT_EXPORT_DIR',
       new Set(
         SCREENSHOT_SCENARIOS.flatMap(scenario =>
           scenario.publicExportPath ? [scenario.publicExportPath] : []
         )
       )
     );
+
+    manifestEntriesById = await readManifestEntries();
 
     for (const id of [...manifestEntriesById.keys()]) {
       if (!SCREENSHOT_SCENARIOS.some(scenario => scenario.id === id)) {
