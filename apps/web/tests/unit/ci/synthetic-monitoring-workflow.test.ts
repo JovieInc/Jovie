@@ -9,6 +9,10 @@ const workflowPath = resolve(
   repoRoot,
   '.github/workflows/synthetic-monitoring.yml'
 );
+const agentTickWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/agent-tick.yml'
+);
 
 function getStepBlock(workflow: string, stepName: string): string {
   const lines = workflow.split('\n');
@@ -51,5 +55,25 @@ describe('synthetic monitoring workflow parser', () => {
     expect(workflow).not.toContain('public-profile-smoke-screenshots');
     expect(uploadStep).toContain('apps/web/test-results/');
     expect(uploadStep).toContain('retention-days: 30');
+  });
+
+  it('runs the required Better Auth account suite behind explicit production gates', () => {
+    for (const path of [workflowPath, agentTickWorkflowPath]) {
+      const workflow = readFileSync(path, 'utf8');
+      const canaryStep = getStepBlock(
+        workflow,
+        'Run Better Auth Production Account Canary'
+      );
+
+      expect(canaryStep).toContain("E2E_SYNTHETIC_MODE: 'true'");
+      expect(canaryStep).toContain("E2E_PROD_ACCOUNT_CANARY_ENABLED: 'true'");
+      expect(canaryStep).toContain('VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}');
+      expect(canaryStep).toContain(
+        'tests/e2e/synthetic-better-auth-account.spec.ts'
+      );
+      expect(workflow).toContain(
+        'SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-better-auth-account-results.json'
+      );
+    }
   });
 });

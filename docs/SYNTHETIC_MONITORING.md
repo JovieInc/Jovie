@@ -10,6 +10,7 @@ The production suite is split by responsibility:
 
 - `synthetic-auth-ui.spec.ts` validates that Google/Apple SSO buttons, the intentional email/identifier auth surface, and provider handoff initiation are healthy.
 - `synthetic-golden-path.spec.ts` validates the public front-door signup journey.
+- `synthetic-better-auth-account.spec.ts` creates one real production email-OTP identity, proves `/start`, session, and `ba_users` → `users` linkage, then transactionally removes the exact identity and verifies zero residue.
 - `onboarding-robot.full.spec.ts` validates app behavior after Clerk authentication: profile creation, dashboard load, public profile load, welcome-chat continuity, and exact cleanup.
 - `public-profile-smoke.spec.ts` validates the public profile rendering baseline.
 
@@ -43,6 +44,20 @@ Coverage:
 7. **Scoped cleanup** - removes only the exact robot user, generated handle/profile, and matching Clerk user id.
 
 The fast PR smoke, `onboarding-robot.smoke.spec.ts`, runs separately through the desktop smoke manifest and only verifies anonymous `/start` chat health plus event emission.
+
+### Better Auth Production Account Canary
+
+This required suite is the production identity receipt. Before account creation it resolves the latest Vercel production deployment, requires `READY`, and verifies that `/api/health/build-info` reports the same Git SHA. It then:
+
+1. Creates exactly `<base-local>+jovie-ba-prod-canary-<run-id>@<domain>` through the rendered Better Auth email form.
+2. Reads the real OTP through the bearer-protected Cloudflare Email Routing worker.
+3. Requires the browser to reach `/start` and `/api/auth/get-session` to return a user.
+4. Requires exactly one `ba_users` row linked to exactly one app `users` row by `users.better_auth_user_id`, with a durable `ba_sessions` row.
+5. Re-resolves Vercel and fails if the deployment ID or full SHA changed during the run.
+6. Deletes the exact app identity, verification, and Better Auth identity in one serializable transaction whose ownership/cardinality guard and row locks are inside the same statement; cascades remove its sessions/accounts. A post-cleanup query must report zero rows in every scoped table.
+7. Attaches a receipt containing the deployment ID/SHA and a SHA-256 email digest—never the email, OTP, session token, or database IDs.
+
+The workflow parser treats a missing, empty, or skipped required suite as failure. The production-account test itself is double-gated by `E2E_SYNTHETIC_MODE=true` and `E2E_PROD_ACCOUNT_CANARY_ENABLED=true`. An `afterEach` hook gets a separate cleanup budget when the test times out. Each healthy run also reconciles at most five identities older than 60 minutes, and only when the address matches the anchored canary namespace, the app row is Better-Auth-only, and no creator profile exists.
 
 ### Health Checks
 
@@ -138,6 +153,10 @@ E2E_PROD_MAILBOX_PROVIDER=gmail
 E2E_PROD_MAILBOX_CLIENT_ID=...
 E2E_PROD_MAILBOX_CLIENT_SECRET=...
 E2E_PROD_MAILBOX_REFRESH_TOKEN=...
+E2E_PROD_ACCOUNT_CANARY_ENABLED=true
+VERCEL_TOKEN=...
+VERCEL_ORG_ID=...
+VERCEL_PROJECT_ID=...
 ```
 
 The onboarding robot additionally requires `E2E_PROD_SIGNUP_EMAIL_BASE`, `CLERK_SECRET_KEY`, and `DATABASE_URL`. It does not require mailbox OTP settings because it signs in with a Clerk sign-in token instead of driving provider UI.
@@ -152,7 +171,7 @@ E2E_PROD_OTP_CHECK_TOKEN=...
 ```
 
 Cloudflare Email Routing should be configured on a dedicated e2e domain with a
-catch-all route to an Email Worker. The Worker parses Clerk verification emails,
+catch-all route to an Email Worker. The Worker parses auth verification emails,
 stores only short-lived OTP state for the addressed run, and exposes a
 bearer-protected `POST` endpoint. The synthetic canary calls
 `E2E_PROD_OTP_CHECK_URL` with:
@@ -172,7 +191,7 @@ The endpoint should return `404` or `204` while no fresh code is available, or
 
 ### GitHub Secrets
 
-The workflow reads runtime secrets through `DOPPLER_TOKEN_PRD`. Do not duplicate Turnstile or mailbox values as standalone GitHub repo secrets.
+The workflow reads application, database, and mailbox secrets through `DOPPLER_TOKEN_PRD`. The Better Auth account canary also reads the existing `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` GitHub secrets to bind its receipt to the active production deployment. Do not duplicate Turnstile or mailbox values as standalone GitHub repo secrets.
 
 ## GitHub Actions Workflow
 
@@ -198,7 +217,8 @@ The synthetic monitoring runs automatically via GitHub Actions:
 ### Account Strategy
 
 - Each test run creates a fresh user account
-- Email format: `<E2E_PROD_SIGNUP_EMAIL_BASE local>+<run-id>@<domain>`
+- Better Auth account-canary email format: `<base-local>+jovie-ba-prod-canary-<run-id>@<domain>`
+- Its cleanup guard accepts only that anchored namespace and requires zero `ba_users`, `users`, `ba_sessions`, `ba_accounts`, and `ba_verifications` residue
 - Accounts are tagged with Clerk public metadata `role=synthetic_production_canary`
 - The test deletes only the exact plus-addressed email created in that run
 - Onboarding robot accounts use the `+onboarding-robot-<run-id>` suffix and Clerk public metadata `role=synthetic_onboarding_robot`
