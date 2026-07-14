@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   bisectBatchFailure,
+  ciWorkflowHasMergeGroupTrigger,
   compareRatchetCounts,
   detectChangedFileOverlap,
   detectIssueOverlap,
@@ -376,6 +377,10 @@ describe('aggregate required checks', () => {
 
     expect(result.errors).toEqual([]);
     expect(result.ok).toBe(true);
+    expect(ciWorkflowHasMergeGroupTrigger(ciWorkflowYaml)).toBe(true);
+    expect(result.warnings).toContain(
+      'ci.yml declares inert merge_group compatibility; Graphite remains the active queue until the ruleset/backend changes'
+    );
     expect(parseRequiredStatusChecksFromYaml(branchProtectionYaml)).toEqual([
       'CI / PR Ready',
       'CI / Migration Guard',
