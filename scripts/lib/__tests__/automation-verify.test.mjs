@@ -82,6 +82,15 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = [
+  '.github/workflows/ci.yml',
+  'apps/web/scripts/test-performance-guard.ts',
+  'apps/web/scripts/test-performance-profiler.test.ts',
+  'apps/web/scripts/test-performance-profiler.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+];
+const PERFORMANCE_PROFILER_REPAIR_ANCHORS = [
   'apps/web/scripts/test-performance-guard.ts',
   'apps/web/scripts/test-performance-profiler.test.ts',
   'apps/web/scripts/test-performance-profiler.ts',
@@ -542,6 +551,7 @@ describe('automation-verify affected scope', () => {
     expect(plan.mode).toBe('selected');
     expect(plan.selectedTests).toEqual([
       'apps/web/scripts/test-performance-profiler.test.ts',
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
@@ -562,7 +572,7 @@ describe('automation-verify affected scope', () => {
   });
 
   it.each(
-    PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST
+    PERFORMANCE_PROFILER_REPAIR_ANCHORS
   )('fails closed when the profiler repair input %s is standalone', input => {
     expect(buildAffectedTestPlan([input]).mode).toBe('full');
   });

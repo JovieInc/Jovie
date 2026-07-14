@@ -67,6 +67,7 @@ jobs:
       skip: ${{ steps.graphite.outputs.skip || 'false' }}
       run_build: ${{ steps.detect.outputs.run_build || steps.graphite_skip.outputs.run_build || 'false' }}
       run_test: ${{ steps.detect.outputs.run_test || steps.graphite_skip.outputs.run_test || 'false' }}
+      run_test_performance: ${{ steps.detect.outputs.run_test_performance || steps.graphite_skip.outputs.run_test_performance || 'false' }}
       run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse || steps.graphite_skip.outputs.run_public_lighthouse || 'false' }}
       run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse || steps.graphite_skip.outputs.run_dashboard_lighthouse || 'false' }}
       run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse || steps.graphite_skip.outputs.run_onboarding_lighthouse || 'false' }}
@@ -104,7 +105,7 @@ jobs:
         if: steps.graphite.outputs.skip == 'true'
         run: |
           echo "Graphite CI optimizer requested skip — CI will be skipped."
-          for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+          for t in run_build run_test run_test_performance run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
             echo "$t=false" >> "$GITHUB_OUTPUT"
           done
 
@@ -137,7 +138,7 @@ jobs:
             CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD || true)
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
               echo "Empty changed-file list vs origin/${{ github.base_ref }} — no path triggers"
-              for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+              for t in run_build run_test run_test_performance run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
                 echo "$t=false" >> "$GITHUB_OUTPUT"
               done
               exit 0
@@ -145,7 +146,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_test_performance run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -155,6 +156,13 @@ jobs:
 
           FULL_CI_LABEL="${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}"
 
+          TEST_PERFORMANCE_PATTERN='^apps/web/scripts/test-performance-(guard\.ts|profiler(\.test)?\.ts)$'
+          if echo "$CHANGED_FILES" | grep -q -E "$TEST_PERFORMANCE_PATTERN"; then
+            echo "run_test_performance=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_test_performance=false" >> "$GITHUB_OUTPUT"
+          fi
+
           PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/)'
           PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/tests/eval/golden/.*|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
           if echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_INFRA_TRIGGER_PATTERN" &&
@@ -163,7 +171,7 @@ jobs:
             echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
             echo "run_promptfoo_evals=true" >> "$GITHUB_OUTPUT"
             echo "run_golden_eval_set=true" >> "$GITHUB_OUTPUT"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
+            for t in run_build run_test run_test_performance run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -184,7 +192,7 @@ jobs:
           if ! echo "$CHANGED_FILES" | grep -q -E '^\.github/' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_test_performance run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -311,6 +319,7 @@ jobs:
             echo "run_admin_lighthouse=false" >> "$GITHUB_OUTPUT"
             echo "run_chat_lighthouse=false" >> "$GITHUB_OUTPUT"
             echo "run_test=false" >> "$GITHUB_OUTPUT"
+            echo "run_test_performance=false" >> "$GITHUB_OUTPUT"
           fi
 
   ci-risk-classifier:
@@ -3730,9 +3739,9 @@ jobs:
   ci-test-performance:
     name: Test Performance Budgets
     needs: [ci-path-changes]
-    # Post-merge only: takes ~6.5 min and is not a merge gate.
-    # Running on PRs adds wall time without blocking merge.
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    # Main keeps the post-merge guard. Internal PRs run it only when the
+    # profiler, guard, or profiler regression itself changes.
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_test_performance == 'true')) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 12
     steps:
@@ -3743,7 +3752,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> "$GITHUB_OUTPUT"
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test == 'true' || needs.ci-path-changes.outputs.run_test_performance == 'true' }}" >> "$GITHUB_OUTPUT"
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'

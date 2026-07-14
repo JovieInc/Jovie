@@ -101,6 +101,15 @@ const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = new Set([
+  '.github/workflows/ci.yml',
+  'apps/web/scripts/test-performance-guard.ts',
+  'apps/web/scripts/test-performance-profiler.test.ts',
+  'apps/web/scripts/test-performance-profiler.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+]);
+const PERFORMANCE_PROFILER_REPAIR_ANCHORS = new Set([
   'apps/web/scripts/test-performance-guard.ts',
   'apps/web/scripts/test-performance-profiler.test.ts',
   'apps/web/scripts/test-performance-profiler.ts',
@@ -180,7 +189,7 @@ export function buildAffectedTestPlan(changedFiles) {
     affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
     files.length === AFFECTED_TEST_SELECTOR_MANIFEST.size;
   const performanceProfilerRepairInputCount = files.filter(file =>
-    PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.has(file)
+    PERFORMANCE_PROFILER_REPAIR_ANCHORS.has(file)
   ).length;
   const isExactPerformanceProfilerRepairPrimary =
     files.length === PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.size &&
