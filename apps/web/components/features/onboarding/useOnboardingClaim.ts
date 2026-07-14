@@ -105,7 +105,7 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
         return;
       }
 
-      if (body.claimed && body.claimed > 0) {
+      if ((body.claimed ?? 0) > 0 || body.alreadyClaimed) {
         markTriggerCompleted();
         claimedRef.current = true;
         setStatus('claimed');
@@ -121,26 +121,6 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
           });
         }
         // Hand off to the existing /onboarding/checkout flow.
-        router.replace(APP_ROUTES.ONBOARDING_CHECKOUT);
-        return;
-      }
-
-      if (body.alreadyClaimed) {
-        // Same user already claimed this transcript (typical retry case).
-        markTriggerCompleted();
-        claimedRef.current = true;
-        setStatus('claimed');
-        track(ONBOARDING_FUNNEL_EVENTS.AUTH_COMPLETED, {
-          surface: 'start_chat',
-        });
-        if (body.profile?.profileId) {
-          track(ONBOARDING_FUNNEL_EVENTS.PROFILE_CREATED, {
-            profile_id: body.profile.profileId,
-            handle: body.profile.handle ?? undefined,
-            method: 'chat_claim',
-            status: body.profile.status,
-          });
-        }
         router.replace(APP_ROUTES.ONBOARDING_CHECKOUT);
         return;
       }

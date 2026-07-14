@@ -774,6 +774,26 @@ function OnboardingMessageRegion({
   );
 }
 
+function resolveStarterPrompt(
+  intentId: string | undefined,
+  starterPrompt: string | undefined
+): string | null {
+  let nextPrompt: string | null = null;
+  if (intentId) {
+    const intent = readHomepageIntent(intentId);
+    nextPrompt = intent ? sanitizeHomepagePrompt(intent.finalPrompt) : null;
+    consumeHomepageIntent(intentId);
+  }
+  return (
+    nextPrompt || (starterPrompt ? sanitizeHomepagePrompt(starterPrompt) : null)
+  );
+}
+
+function automationBypassDataValue(value: boolean | null): string {
+  if (value === null) return 'pending';
+  return value ? 'true' : 'false';
+}
+
 export function OnboardingChat({
   intentId,
   onConversationActivity,
@@ -993,19 +1013,7 @@ export function OnboardingChat({
 
   useEffect(() => {
     if (hasInjectedStarterPromptRef.current) return;
-    let nextPrompt: string | null = null;
-
-    if (intentId) {
-      const intent = readHomepageIntent(intentId);
-      if (intent) {
-        nextPrompt = sanitizeHomepagePrompt(intent.finalPrompt);
-      }
-      consumeHomepageIntent(intentId);
-    }
-
-    if (!nextPrompt && starterPrompt) {
-      nextPrompt = sanitizeHomepagePrompt(starterPrompt);
-    }
+    const nextPrompt = resolveStarterPrompt(intentId, starterPrompt);
 
     if (nextPrompt) {
       setComposerInput(nextPrompt);
@@ -1177,13 +1185,7 @@ export function OnboardingChat({
       aria-label='Jovie Onboarding Chat'
       data-testid='onboarding-chat'
       data-interaction-ready={isComposerInitializing ? 'false' : 'true'}
-      data-automation-bypass={
-        localAutomationBypass === null
-          ? 'pending'
-          : localAutomationBypass
-            ? 'true'
-            : 'false'
-      }
+      data-automation-bypass={automationBypassDataValue(localAutomationBypass)}
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >
       {/* Scroll area (flex-1) — upper content morphs on first message */}
