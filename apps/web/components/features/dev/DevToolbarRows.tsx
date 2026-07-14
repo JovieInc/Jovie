@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import * as Switch from '@radix-ui/react-switch';
 import {
   type QueryClient,
@@ -42,11 +41,9 @@ function PlanToggleInner({
       <div className='flex items-center gap-0.5'>
         <span className='text-3xs text-quaternary-token mr-0.5'>Plan</span>
         {(['free', 'pro', 'max'] as const).map(plan => (
-          <Button
+          <button
             key={plan}
             type='button'
-            variant='ghost'
-            size='sm'
             disabled={switching}
             onClick={async () => {
               if (plan === currentPlan || switching) return;
@@ -66,7 +63,7 @@ function PlanToggleInner({
                 setSwitching(false);
               }
             }}
-            className={`h-auto px-1.5 py-0.5 rounded text-3xs transition-colors ${
+            className={`px-1.5 py-0.5 rounded text-3xs transition-colors ${
               plan === currentPlan
                 ? 'font-semibold text-accent bg-accent/10'
                 : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
@@ -75,7 +72,7 @@ function PlanToggleInner({
             aria-label={`Switch to ${plan} plan`}
           >
             {plan}
-          </Button>
+          </button>
         ))}
       </div>
     </>
@@ -97,22 +94,20 @@ export function OrphanOverrides({
           Orphans ({keys.length})
         </span>
         <div className='flex items-center gap-2'>
-          <Button
+          <button
             type='button'
-            variant='link'
             onClick={() => setExpanded(prev => !prev)}
-            className='h-auto text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
+            className='text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
           >
-            {expanded ? 'Hide' : 'Inspect'}
-          </Button>
-          <Button
+            {expanded ? 'hide' : 'inspect'}
+          </button>
+          <button
             type='button'
-            variant='link'
             onClick={onPurge}
-            className='h-auto text-3xs text-yellow-400 hover:text-yellow-300 underline transition-colors'
+            className='text-3xs text-yellow-400 hover:text-yellow-300 underline transition-colors'
           >
-            Purge
-          </Button>
+            purge
+          </button>
         </div>
       </div>
       {expanded && (
@@ -177,16 +172,14 @@ export function FlagRow({
         </span>
       )}
       {isOverridden && (
-        <Button
+        <button
           type='button'
-          variant='ghost'
-          size='icon'
           onClick={onClear}
           title='Remove override'
-          className='h-auto w-auto shrink-0 p-0 text-quaternary-token hover:bg-transparent hover:text-(--color-text-secondary) transition-colors'
+          className='shrink-0 text-quaternary-token hover:text-(--color-text-secondary) transition-colors'
         >
           <X size={10} />
-        </Button>
+        </button>
       )}
       {!isOverridden && (
         <span className='shrink-0 text-3xs text-quaternary-token'>
