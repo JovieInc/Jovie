@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { POST } from '@/app/api/deploy/promote/route';
+import { ServerFetchTimeoutError } from '@/lib/http/server-fetch';
 
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockRequireAdmin = vi.hoisted(() => vi.fn());
@@ -47,7 +49,6 @@ vi.mock('@/lib/utils/logger', () => ({
 describe('POST /api/deploy/promote', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
     vi.stubEnv('VERCEL_PRODUCTION_DEPLOY_HOOK', 'https://example.com/hook');
 
     mockAuth.mockResolvedValue({ userId: 'admin_123' });
@@ -76,7 +77,6 @@ describe('POST /api/deploy/promote', () => {
       reset: Date.now() + 60_000,
     });
 
-    const { POST } = await import('@/app/api/deploy/promote/route');
     const response = await POST();
 
     expect(response.status).toBe(503);
@@ -87,8 +87,6 @@ describe('POST /api/deploy/promote', () => {
   });
 
   it('returns 504 when the deploy hook times out', async () => {
-    const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
-
     mockServerFetch.mockRejectedValue(
       new ServerFetchTimeoutError(
         'timed out',
@@ -97,7 +95,6 @@ describe('POST /api/deploy/promote', () => {
       )
     );
 
-    const { POST } = await import('@/app/api/deploy/promote/route');
     const response = await POST();
 
     expect(response.status).toBe(504);
@@ -122,7 +119,6 @@ describe('POST /api/deploy/promote', () => {
       })
     );
 
-    const { POST } = await import('@/app/api/deploy/promote/route');
     const response = await POST();
 
     expect(response.status).toBe(200);
