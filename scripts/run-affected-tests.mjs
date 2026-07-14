@@ -100,6 +100,14 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const VISUAL_QA_DIFF_ARTIFACTS_SOURCE =
+  'apps/web/lib/agent-os/visual-qa/diff-artifacts.ts';
+const VISUAL_QA_DIFF_ARTIFACTS_TEST =
+  'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts';
+const VISUAL_QA_DIFF_ARTIFACTS_MANIFEST = new Set([
+  VISUAL_QA_DIFF_ARTIFACTS_SOURCE,
+  VISUAL_QA_DIFF_ARTIFACTS_TEST,
+]);
 const GTMQ_SOURCE_GATE_REAPER_MANIFEST = new Set([
   '.github/actions/setup-node-pnpm/action.yml',
   '.github/workflows/gtmq-source-authorization.yml',
@@ -162,6 +170,16 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactAffectedTestSelector =
     affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
     files.length === AFFECTED_TEST_SELECTOR_MANIFEST.size;
+  const visualQaDiffArtifactsInputCount = files.filter(file =>
+    VISUAL_QA_DIFF_ARTIFACTS_MANIFEST.has(file)
+  ).length;
+  const isExactVisualQaSelectorRepair =
+    affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
+    visualQaDiffArtifactsInputCount ===
+      VISUAL_QA_DIFF_ARTIFACTS_MANIFEST.size &&
+    files.length ===
+      AFFECTED_TEST_SELECTOR_MANIFEST.size +
+        VISUAL_QA_DIFF_ARTIFACTS_MANIFEST.size;
   const gtmqSourceGateReaperInputCount = files.filter(file =>
     GTMQ_SOURCE_GATE_REAPER_MANIFEST.has(file)
   ).length;
@@ -243,6 +261,9 @@ export function buildAffectedTestPlan(changedFiles) {
   if (hasCiCancellationHealerChange) {
     mandatoryTests.push(...CI_CANCELLATION_HEALER_TESTS);
   }
+  if (files.includes(VISUAL_QA_DIFF_ARTIFACTS_SOURCE)) {
+    mandatoryTests.push(VISUAL_QA_DIFF_ARTIFACTS_TEST);
+  }
   if (isExactPrerequisiteTrain) {
     mandatoryTests.push(...PREREQUISITE_TRAIN_TESTS);
   }
@@ -260,7 +281,9 @@ export function buildAffectedTestPlan(changedFiles) {
       : []),
   ]);
   const scriptVitestTests = unique([
-    ...(isExactAffectedTestSelector ? AFFECTED_TEST_SELECTOR_TESTS : []),
+    ...(isExactAffectedTestSelector || isExactVisualQaSelectorRepair
+      ? AFFECTED_TEST_SELECTOR_TESTS
+      : []),
     ...(isExactGtmqSourceGateReaper
       ? GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS
       : []),
@@ -275,6 +298,7 @@ export function buildAffectedTestPlan(changedFiles) {
     if (file.startsWith('apps/web/tests/eval/promptfoo/')) return true;
     if (isInvestorNoteIngestionInput(file)) return true;
     if (isCiCancellationHealerInput(file)) return true;
+    if (file === VISUAL_QA_DIFF_ARTIFACTS_SOURCE) return true;
     if (isExactPrerequisiteTrain && PREREQUISITE_TRAIN_MANIFEST.has(file))
       return true;
     if (
@@ -312,11 +336,13 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompleteAffectedTestSelector =
     affectedTestSelectorInputCount > 0 &&
     !isExactAffectedTestSelector &&
+    !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
-    !isExactAffectedTestSelector;
+    !isExactAffectedTestSelector &&
+    !isExactVisualQaSelectorRepair;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
     hasUnknownCiCancellationHealerPeer ||

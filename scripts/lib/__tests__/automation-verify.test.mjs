@@ -152,6 +152,39 @@ describe('automation-verify affected scope', () => {
     ]);
   });
 
+  it('maps Visual QA diff-artifact changes to the focused TOCTOU regression', () => {
+    const plan = buildAffectedTestPlan([
+      'apps/web/lib/agent-os/visual-qa/diff-artifacts.ts',
+      'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.relatedFiles).toHaveLength(2);
+    expect(plan.mandatoryTests).toEqual([
+      'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
+    ]);
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
+    ]);
+  });
+
+  it('keeps the selector plus Visual QA repair manifest on focused suites', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'apps/web/lib/agent-os/visual-qa/diff-artifacts.ts',
+      'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+  });
+
   it('maps deterministic Promptfoo changes to their contract tests', () => {
     const plan = buildAffectedTestPlan([
       'apps/web/scripts/run-deterministic-promptfoo-evals.sh',
