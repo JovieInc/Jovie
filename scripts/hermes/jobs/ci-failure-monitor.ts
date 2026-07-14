@@ -13,6 +13,11 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  classifyCiFailure,
+  classifyKnownCiFlake,
+  type KnownCiFlake,
+} from '../lib/ci-failure-classifier';
 import { ensureJovieRepoCwd } from '../lib/ensure-jovie-repo-cwd';
 import { gbrainLearn, gbrainSlug } from '../lib/gbrain';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
@@ -24,13 +29,6 @@ const JOB = 'ci-failure-monitor';
 const __filename = fileURLToPath(import.meta.url);
 const KNOWN_FLAKES_PATH = join(dirname(__filename), 'known-flakes.json');
 
-interface KnownFlake {
-  readonly id: string;
-  readonly workflow: string;
-  readonly pattern: string;
-  readonly note: string;
-}
-
 interface WorkflowRun {
   readonly databaseId: number;
   readonly displayTitle: string;
@@ -41,11 +39,11 @@ interface WorkflowRun {
   readonly createdAt: string;
 }
 
-function loadKnownFlakes(): ReadonlyArray<KnownFlake> {
+function loadKnownFlakes(): ReadonlyArray<KnownCiFlake> {
   if (!existsSync(KNOWN_FLAKES_PATH)) return [];
   try {
     const parsed = JSON.parse(readFileSync(KNOWN_FLAKES_PATH, 'utf8')) as {
-      readonly flakes: ReadonlyArray<KnownFlake>;
+      readonly flakes: ReadonlyArray<KnownCiFlake>;
     };
     return parsed.flakes;
   } catch {
@@ -85,33 +83,18 @@ function logsForRun(runId: number): string {
   }
 }
 
-function classifyAgainstKnown(
-  log: string,
-  workflowName: string,
-  flakes: ReadonlyArray<KnownFlake>
-): KnownFlake | null {
-  for (const flake of flakes) {
-    // A flake with workflow=='*' matches any workflow; otherwise the
-    // workflow name must match exactly. This prevents an Audio test flake
-    // signature from silencing an unrelated Build failure that happens to
-    // contain similar text.
-    if (flake.workflow !== '*' && flake.workflow !== workflowName) continue;
-    try {
-      if (new RegExp(flake.pattern, 'i').test(log)) return flake;
-    } catch {
-      // bad regex in known-flakes.json — skip
-    }
-  }
-  return null;
-}
-
 async function processFailure(
   run: WorkflowRun,
-  flakes: ReadonlyArray<KnownFlake>
+  flakes: ReadonlyArray<KnownCiFlake>
 ): Promise<void> {
   const log = logsForRun(run.databaseId);
-  const known = classifyAgainstKnown(log, run.workflowName, flakes);
+  const fixtureDiagnosis = classifyCiFailure(log);
   const diagnosis = diagnoseCiFailure(log);
+  const known = classifyKnownCiFlake(log, run.workflowName, flakes);
+  const failureClass =
+    fixtureDiagnosis?.classification ?? diagnosis.failureClass;
+  const rootCause = fixtureDiagnosis?.rootCause ?? diagnosis.rootCause;
+  const remediation = fixtureDiagnosis?.remediation ?? diagnosis.remediation;
 
   if (known) {
     logJobEvent({
@@ -123,18 +106,35 @@ async function processFailure(
     return;
   }
 
-  // Unknown failure — file Linear issue.
+  if (fixtureDiagnosis) {
+    logJobEvent({
+      job: JOB,
+      event: 'failure_diagnosed',
+      runId: run.databaseId,
+      diagnosisId: fixtureDiagnosis.id,
+      classification: fixtureDiagnosis.classification,
+      retryable: fixtureDiagnosis.retryable,
+    });
+  }
+
+  // Broken fixtures and unknown failures both require a tracked repair.
   const filed = await fileIssue({
-    title: `CI failure: ${run.workflowName} on main (run ${run.databaseId})`,
+    title: fixtureDiagnosis
+      ? `Broken E2E fixture: ${run.workflowName} on main (run ${run.databaseId})`
+      : `CI failure: ${run.workflowName} on main (run ${run.databaseId})`,
     description: buildFollowUpBody({
       source: `ci-failure-monitor`,
       sourceUrl: run.url,
-      followUp: `Workflow "${run.workflowName}" failed on main at ${run.createdAt}. Title: ${run.displayTitle}. Deterministic diagnosis: ${diagnosis.failureClass}. ${diagnosis.rootCause} Recommended remediation: ${diagnosis.remediation}`,
-      whyItMatters:
-        'Unclassified CI failures on main block deploys and erode trust in the merge gate.',
+      followUp: fixtureDiagnosis
+        ? `${rootCause} ${remediation}`
+        : `Workflow "${run.workflowName}" failed on main at ${run.createdAt}. Title: ${run.displayTitle}. Deterministic diagnosis: ${failureClass}. ${rootCause} Recommended remediation: ${remediation}`,
+      whyItMatters: fixtureDiagnosis
+        ? 'Retrying cannot repair an invalid persisted-actor boundary and only consumes runner capacity while downstream ready selectors time out.'
+        : 'Unclassified CI failures on main block deploys and erode trust in the merge gate.',
       classification: 'Required',
-      acceptanceCriteria:
-        'Either a fix is merged OR a new signature is added to known-flakes.json with a documented reason.',
+      acceptanceCriteria: fixtureDiagnosis
+        ? 'The E2E helper provisions a persisted actor, the synthetic-ID UUID regression is covered, and the failed check passes without retrying the broken fixture.'
+        : 'Either a fix is merged OR a new signature is added to known-flakes.json with a documented reason.',
     }),
     source: `ci-failure-monitor:${run.databaseId}`,
   });
@@ -143,7 +143,7 @@ async function processFailure(
     job: JOB,
     event: filed.success ? 'issue_filed' : 'file_failed',
     runId: run.databaseId,
-    failureClass: diagnosis.failureClass,
+    failureClass,
     identifier: filed.identifier,
     error: filed.error,
   });
@@ -154,11 +154,11 @@ async function processFailure(
   gbrainLearn({
     slug: `ci-failures/${gbrainSlug(run.workflowName)}`,
     title: `CI failure: ${run.workflowName} on main`,
-    body: `Workflow "${run.workflowName}" failed on main.\n\n- Latest run: ${run.databaseId} (${run.createdAt})\n- Title: ${run.displayTitle}\n- Failure class: ${diagnosis.failureClass}\n- Root cause: ${diagnosis.rootCause}\n- Remediation: ${diagnosis.remediation}\n- URL: ${run.url}\n- Linear: ${filed.identifier ?? 'not filed'}`,
+    body: `Workflow "${run.workflowName}" failed on main.\n\n- Latest run: ${run.databaseId} (${run.createdAt})\n- Title: ${run.displayTitle}\n- Diagnosis: ${fixtureDiagnosis?.id ?? failureClass}\n- Failure class: ${failureClass}\n- Retryable: ${fixtureDiagnosis?.retryable ?? 'unknown'}\n- Root cause: ${rootCause}\n- Remediation: ${remediation}\n- URL: ${run.url}\n- Linear: ${filed.identifier ?? 'not filed'}`,
     tags: [
       'type:ci-failure',
       `workflow:${gbrainSlug(run.workflowName)}`,
-      `failure-class:${diagnosis.failureClass}`,
+      `failure-class:${failureClass}`,
     ],
     type: 'ci-failure',
   });

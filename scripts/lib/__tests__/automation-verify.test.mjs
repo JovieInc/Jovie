@@ -81,6 +81,29 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const PERSISTED_AUTH_FIXTURE_REPAIR_CORE = [
+  'apps/web/app/api/dev/test-auth/session/route.ts',
+  'apps/web/lib/auth/dev-test-auth-identity.ts',
+  'apps/web/lib/auth/dev-test-auth.server.ts',
+  'apps/web/lib/auth/test-mode.ts',
+  'apps/web/lib/testing/test-user-provision.server.ts',
+  'apps/web/tests/helpers/auth.ts',
+  'apps/web/tests/unit/api/dev/test-auth-routes.test.ts',
+  'apps/web/tests/unit/app/hud-page.test.ts',
+  'apps/web/tests/unit/e2e/auth-helper.test.ts',
+  'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
+  'apps/web/tests/unit/lib/auth/test-mode.test.ts',
+  'apps/web/tests/unit/lib/testing/test-user-provision.server.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/jobs/ci-failure-monitor.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/hermes/lib/ci-failure-classifier.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-classifier.test.ts',
+];
+const PERSISTED_AUTH_FIXTURE_REPAIR_DIFF = [
+  ...PERSISTED_AUTH_FIXTURE_REPAIR_CORE,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
 const GTMQ_SOURCE_GATE_REAPER_MANIFEST = [
   '.github/actions/setup-node-pnpm/action.yml',
   '.github/workflows/gtmq-source-authorization.yml',
@@ -460,6 +483,26 @@ describe('automation-verify affected scope', () => {
           '2',
         ],
       ],
+    ]);
+  });
+
+  it('keeps persisted auth fixture repairs on focused non-retryable coverage', () => {
+    const plan = buildAffectedTestPlan(PERSISTED_AUTH_FIXTURE_REPAIR_DIFF);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/api/dev/test-auth-routes.test.ts',
+      'apps/web/tests/unit/app/hud-page.test.ts',
+      'apps/web/tests/unit/e2e/auth-helper.test.ts',
+      'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
+      'apps/web/tests/unit/lib/auth/test-mode.test.ts',
+      'apps/web/tests/unit/lib/testing/test-user-provision.server.test.ts',
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/hermes/lib/__tests__/ci-failure-classifier.test.ts',
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
     ]);
   });
 

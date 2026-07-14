@@ -23,6 +23,15 @@ describe('diagnoseCiFailure', () => {
     ).toBe('bounded_source_scan_timeout');
   });
 
+  it('classifies the HUD cold-import timeout as a broken test fixture', () => {
+    expect(
+      diagnoseCiFailure(`
+        FAIL tests/unit/app/hud-page.test.ts > /hud page auth > redirects kiosk bookmarks to /hud-tv
+        Error: Test timed out in 5000ms.
+      `).failureClass
+    ).toBe('test_fixture_import_timeout');
+  });
+
   it('keeps process exhaustion and host pressure as distinct failure classes', () => {
     expect(
       diagnoseCiFailure('ERR_WORKER_INIT_FAILED: spawnSync node EAGAIN')
