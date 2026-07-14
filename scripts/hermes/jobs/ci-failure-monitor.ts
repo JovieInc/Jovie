@@ -17,6 +17,7 @@ import { ensureJovieRepoCwd } from '../lib/ensure-jovie-repo-cwd';
 import { gbrainLearn, gbrainSlug } from '../lib/gbrain';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
 import { buildFollowUpBody, fileIssue } from '../lib/tracker-client';
+import { diagnoseCiFailure } from './ci-failure-diagnosis';
 
 const JOB = 'ci-failure-monitor';
 
@@ -110,6 +111,7 @@ async function processFailure(
 ): Promise<void> {
   const log = logsForRun(run.databaseId);
   const known = classifyAgainstKnown(log, run.workflowName, flakes);
+  const diagnosis = diagnoseCiFailure(log);
 
   if (known) {
     logJobEvent({
@@ -127,7 +129,7 @@ async function processFailure(
     description: buildFollowUpBody({
       source: `ci-failure-monitor`,
       sourceUrl: run.url,
-      followUp: `Workflow "${run.workflowName}" failed on main at ${run.createdAt}. Title: ${run.displayTitle}. Investigate root cause; if it's a known flake, add a signature to scripts/hermes/jobs/known-flakes.json so future runs auto-classify.`,
+      followUp: `Workflow "${run.workflowName}" failed on main at ${run.createdAt}. Title: ${run.displayTitle}. Deterministic diagnosis: ${diagnosis.failureClass}. ${diagnosis.rootCause} Recommended remediation: ${diagnosis.remediation}`,
       whyItMatters:
         'Unclassified CI failures on main block deploys and erode trust in the merge gate.',
       classification: 'Required',
@@ -141,6 +143,7 @@ async function processFailure(
     job: JOB,
     event: filed.success ? 'issue_filed' : 'file_failed',
     runId: run.databaseId,
+    failureClass: diagnosis.failureClass,
     identifier: filed.identifier,
     error: filed.error,
   });
@@ -151,8 +154,12 @@ async function processFailure(
   gbrainLearn({
     slug: `ci-failures/${gbrainSlug(run.workflowName)}`,
     title: `CI failure: ${run.workflowName} on main`,
-    body: `Workflow "${run.workflowName}" failed on main.\n\n- Latest run: ${run.databaseId} (${run.createdAt})\n- Title: ${run.displayTitle}\n- URL: ${run.url}\n- Linear: ${filed.identifier ?? 'not filed'}`,
-    tags: ['type:ci-failure', `workflow:${gbrainSlug(run.workflowName)}`],
+    body: `Workflow "${run.workflowName}" failed on main.\n\n- Latest run: ${run.databaseId} (${run.createdAt})\n- Title: ${run.displayTitle}\n- Failure class: ${diagnosis.failureClass}\n- Root cause: ${diagnosis.rootCause}\n- Remediation: ${diagnosis.remediation}\n- URL: ${run.url}\n- Linear: ${filed.identifier ?? 'not filed'}`,
+    tags: [
+      'type:ci-failure',
+      `workflow:${gbrainSlug(run.workflowName)}`,
+      `failure-class:${diagnosis.failureClass}`,
+    ],
     type: 'ci-failure',
   });
 }

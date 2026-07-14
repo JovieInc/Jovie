@@ -11,8 +11,9 @@
  *   - tests/unit/design-system/touch-target-ratchet.test.ts (merge gate)
  */
 
+import { spawnSync } from 'node:child_process';
 import type { Dirent } from 'node:fs';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export interface TouchTargetViolation {
@@ -24,6 +25,20 @@ export interface TouchTargetViolation {
 export const SCAN_DIRS = ['components', 'app'] as const;
 const EXTENSIONS = ['.tsx'];
 const SKIP_FRAGMENTS = ['.stories.', '.spec.', '.test.', '.storybook/'];
+const CANDIDATE_PATTERN = String.raw`(?:h|size)-(?:10(?:\.5)?|[0-9](?:\.5)?|\[(?:\d+(?:\.\d+)?)px\])`;
+const TRUSTED_RIPGREP_PATHS = [
+  '/usr/bin/rg',
+  '/usr/local/bin/rg',
+  '/opt/homebrew/bin/rg',
+] as const;
+
+export interface RipgrepResult {
+  readonly status: number | null;
+  readonly stdout: string;
+  readonly error?: Error;
+}
+
+export type RipgrepRunner = (scanRoot: string) => RipgrepResult;
 
 // Tailwind heights below 44px (h-11 = 2.75rem = 44px is the floor).
 const SUB_44_SCALE =
@@ -72,6 +87,92 @@ export function walkDir(dir: string, files: string[] = []): string[] {
     }
   }
   return files;
+}
+
+function walkAllSourceFiles(scanRoot: string): string[] {
+  const files: string[] = [];
+  for (const dir of SCAN_DIRS) walkDir(join(scanRoot, dir), files);
+  return files.sort((a, b) => a.localeCompare(b));
+}
+
+export function resolveTrustedRipgrepPath(
+  pathExists: (path: string) => boolean = existsSync
+): string | null {
+  return TRUSTED_RIPGREP_PATHS.find(pathExists) ?? null;
+}
+
+export function runRipgrep(
+  scanRoot: string,
+  resolveRipgrep: () => string | null = resolveTrustedRipgrepPath
+): RipgrepResult {
+  const ripgrepPath = resolveRipgrep();
+  if (!ripgrepPath) {
+    return {
+      status: null,
+      stdout: '',
+      error: new Error('No trusted ripgrep binary found'),
+    };
+  }
+
+  const result = spawnSync(
+    ripgrepPath,
+    [
+      '--files-with-matches',
+      '--sort',
+      'path',
+      '--no-messages',
+      '--no-ignore',
+      '--glob',
+      '*.tsx',
+      '--glob',
+      '!*.stories.*',
+      '--glob',
+      '!*.spec.*',
+      '--glob',
+      '!*.test.*',
+      '--glob',
+      '!**/.storybook/**',
+      '--glob',
+      '!**/node_modules/**',
+      '--glob',
+      '!**/.next/**',
+      '--regexp',
+      CANDIDATE_PATTERN,
+      ...SCAN_DIRS,
+    ],
+    {
+      cwd: scanRoot,
+      encoding: 'utf8',
+      maxBuffer: 5 * 1024 * 1024,
+      timeout: 10_000,
+    }
+  );
+  return {
+    status: result.status,
+    stdout: result.stdout ?? '',
+    error: result.error,
+  };
+}
+
+/**
+ * Use ripgrep to avoid opening every TSX file from JavaScript on a cold
+ * checkout. Exit 1 is ripgrep's successful "no matches" result. A missing or
+ * failed binary falls back to the complete Dirent walker so correctness never
+ * depends on the optimization being available.
+ */
+export function findTouchTargetSourceFiles(
+  scanRoot: string,
+  runner: RipgrepRunner = runRipgrep
+): string[] {
+  const result = runner(scanRoot);
+  if (result.status === 1) return [];
+  if (result.status !== 0) return walkAllSourceFiles(scanRoot);
+
+  return result.stdout
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map(file => join(scanRoot, file))
+    .sort((a, b) => a.localeCompare(b));
 }
 
 // ── JSX opening-tag extraction ──────────────────────────────────────────────
@@ -152,9 +253,11 @@ export function findViolationsInSource(
   return violations;
 }
 
-export function countViolations(scanRoot: string): TouchTargetViolation[] {
-  const files: string[] = [];
-  for (const dir of SCAN_DIRS) walkDir(join(scanRoot, dir), files);
+export function countViolations(
+  scanRoot: string,
+  runner?: RipgrepRunner
+): TouchTargetViolation[] {
+  const files = findTouchTargetSourceFiles(scanRoot, runner);
   const violations: TouchTargetViolation[] = [];
   for (const filePath of files) {
     let content: string;

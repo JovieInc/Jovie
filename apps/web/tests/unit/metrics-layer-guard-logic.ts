@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 /**
@@ -56,15 +56,18 @@ const RATE_DERIVATION_LEGACY = /\*\s*1000\s*\)\s*\/\s*10\b/g;
 
 function walk(dir: string, out: string[]): void {
   if (!existsSync(dir)) return;
-  for (const entry of readdirSync(dir)) {
-    if (SKIP_DIRS.has(entry)) continue;
-    const full = join(dir, entry);
-    const s = statSync(full);
-    if (s.isDirectory()) {
+  // Dirent already carries the file type from the directory read. Avoiding a
+  // separate statSync for every entry keeps this repository-wide guard bounded
+  // when the shared runner's filesystem is under load.
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (SKIP_DIRS.has(entry.name)) continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
       walk(full, out);
     } else if (
-      SOURCE_EXT.test(entry) &&
-      !/\.(test|spec|stories)\./.test(entry)
+      entry.isFile() &&
+      SOURCE_EXT.test(entry.name) &&
+      !/\.(test|spec|stories)\./.test(entry.name)
     ) {
       out.push(full);
     }
