@@ -44,6 +44,7 @@ const {
   providerLinks,
   tourDates,
   users,
+  waitlistSettings,
 } = schema;
 
 export function buildPublicReleaseApprovalSeedRow(
@@ -1540,6 +1541,58 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           }
         }
       }
+    }, seedRetryOptions);
+
+    await withSeedDatabaseRetry(async () => {
+      // Fresh ephemeral CI databases default `waitlist_settings.gate_enabled`
+      // to `true` (see lib/waitlist/settings.ts `ensureSettingsRow`). That
+      // blocks brand-new signups at account creation (lib/auth/gate.ts
+      // `checkWaitlistAccessInternal`) before they ever reach onboarding,
+      // which breaks E2E specs that drive the real signup flow
+      // (golden-path.spec.ts, shell-chat-v1*.spec.ts). Force the gate off
+      // for E2E runs. golden-path-waitlist-local.spec.ts is unaffected: it
+      // provisions its user via the test-auth-bypass session path (skips
+      // gate.ts entirely) and drives waitlist state via direct
+      // waitlist_entries writes, not this flag.
+      console.log('  Disabling waitlist gate for E2E...');
+      const nextDayUtc = new Date();
+      nextDayUtc.setUTCDate(nextDayUtc.getUTCDate() + 1);
+      nextDayUtc.setUTCHours(0, 0, 0, 0);
+
+      await db
+        .insert(waitlistSettings)
+        .values({
+          id: 1,
+          gateEnabled: false,
+          autoAcceptResetsAt: nextDayUtc,
+        })
+        .onConflictDoUpdate({
+          target: waitlistSettings.id,
+          set: { gateEnabled: false, updatedAt: new Date() },
+        });
+
+      // `isWaitlistGateEnabled()` layers a 30s Redis cache on top of the DB
+      // row (see lib/waitlist/settings.ts GATE_CACHE_KEY); invalidate it so
+      // a stale `true` value from a prior run against a shared Redis
+      // instance can't outlive this seed.
+      const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } = getSeedEnv();
+      if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+        try {
+          const redis = new Redis({
+            url: UPSTASH_REDIS_REST_URL,
+            token: UPSTASH_REDIS_REST_TOKEN,
+          });
+          await redis.del('waitlist:gate:enabled');
+          console.log('    ✓ Invalidated waitlist gate Redis cache');
+        } catch (error) {
+          console.warn(
+            '    ⚠ Failed to invalidate waitlist gate Redis cache:',
+            error
+          );
+        }
+      }
+
+      console.log('    ✓ Waitlist gate disabled for E2E');
     }, seedRetryOptions);
 
     console.log('✅ Test data seeding complete');
