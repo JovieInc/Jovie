@@ -6,9 +6,14 @@ import { describe, expect, it } from 'vitest';
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
 const workflowPath = resolve(repoRoot, '.github/workflows/ci.yml');
+const ciFastLanesPath = resolve(repoRoot, 'scripts/ci-fast-lanes.mjs');
 const canaryWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/canary-health-gate.yml'
+);
+const agentTickWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/agent-tick.yml'
 );
 
 function getStepBlock(workflow: string, stepName: string): string {
@@ -51,6 +56,35 @@ function getJobBlock(workflow: string, jobKey: string): string {
 }
 
 describe('deploy workflow Vercel env resolution', () => {
+  it('routes main deploy artifact builds to hosted capacity', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const buildJob = getJobBlock(workflow, 'ci-build-public');
+
+    expect(buildJob).toContain("github.ref == 'refs/heads/main'");
+    expect(buildJob).toContain("&& 'ubuntu-latest'");
+    expect(buildJob).toContain('|| vars.CI_FAST_RUNNER');
+  });
+
+  it('runs main deploy control jobs on hosted capacity', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    expect(getJobBlock(workflow, 'deploy-gate')).toContain(
+      'runs-on: ubuntu-latest'
+    );
+    expect(getJobBlock(workflow, 'deploy-staging')).toContain(
+      'runs-on: ubuntu-latest'
+    );
+    expect(getJobBlock(workflow, 'alias-staging')).toContain(
+      'runs-on: ubuntu-latest'
+    );
+    expect(getJobBlock(workflow, 'promote-production')).toContain(
+      'runs-on: ubuntu-latest'
+    );
+    expect(readFileSync(canaryWorkflowPath, 'utf8')).toContain(
+      'runs-on: ubuntu-latest'
+    );
+  });
+
   it('pins Vercel pull and build commands to the configured project', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const steps = [
@@ -61,14 +95,6 @@ describe('deploy workflow Vercel env resolution', () => {
       {
         command: 'vercel build',
         name: 'Build (PR preview)',
-      },
-      {
-        command: 'vercel pull',
-        name: 'Pull env (production)',
-      },
-      {
-        command: 'vercel build',
-        name: 'Build (preview target for staging verification)',
       },
     ];
 
@@ -87,6 +113,49 @@ describe('deploy workflow Vercel env resolution', () => {
       expect(step).toContain('"${scope_args[@]}"');
       expect(step).not.toContain('--scope ${{ secrets.VERCEL_ORG_ID }}');
     }
+
+    const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const configureStep = getStepBlock(
+      stagingJob,
+      'Configure staging deployment credentials'
+    );
+    const stagingSteps = [
+      {
+        command: 'vercel pull',
+        name: 'Pull env (staging preview)',
+      },
+      {
+        command: 'vercel build',
+        name: 'Build (preview target for staging verification)',
+      },
+    ];
+
+    expect(configureStep).toContain(
+      'VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}'
+    );
+    expect(configureStep).toContain(
+      'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
+    );
+    expect(configureStep).toContain(
+      'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}'
+    );
+    expect(configureStep).toContain('>> "$GITHUB_ENV"');
+
+    const queueReaperStep = getStepBlock(
+      stagingJob,
+      'Cancel stale Vercel preview deployments'
+    );
+    expect(queueReaperStep).toContain(
+      'node .github/scripts/cancel-stale-vercel-previews.mjs'
+    );
+
+    for (const { command, name } of stagingSteps) {
+      const step = getStepBlock(stagingJob, name);
+      expect(step).toContain(command);
+      expect(step).toContain('scope_args=()');
+      expect(step).toContain('scope_args=(--scope "$VERCEL_ORG_ID")');
+      expect(step).toContain('"${scope_args[@]}"');
+    }
   });
 
   it('scopes prebuilt Vercel deploys to the configured team', () => {
@@ -100,6 +169,37 @@ describe('deploy workflow Vercel env resolution', () => {
       'VERCEL_SCOPE_ARGS=(--scope "$VERCEL_ORG_ID")'
     );
     expect(deployScript).toContain('"${VERCEL_SCOPE_ARGS[@]}"');
+    expect(deployScript).toContain('.vercel/jovie-generated-public-files');
+    expect(deployScript).toContain('rm -f -- "$generated_file"');
+    expect(deployScript).toContain('VERCEL_FORCE_SOURCE_DEPLOY');
+  });
+
+  it('uses the Vercel source cache while prebuilt runtime closure is unhealthy', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const deployStep = getStepBlock(
+      workflow,
+      'Deploy (staging preview, prebuilt)'
+    );
+
+    expect(deployStep).toContain("VERCEL_FORCE_SOURCE_DEPLOY: 'true'");
+  });
+
+  it('packages generated public trace files and budgets remote fallback readiness', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const buildJob = getJobBlock(workflow, 'ci-build-public');
+    const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const readinessStep = getStepBlock(
+      stagingJob,
+      'Wait for staging deployment readiness'
+    );
+
+    expect(buildJob).toContain(
+      'cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt'
+    );
+    expect(buildJob).toContain('.vercel/jovie-generated-public-files');
+    expect(readinessStep).toContain('--timeout 20m');
+    expect(readinessStep).toContain('BUILDING|QUEUED|INITIALIZING)');
+    expect(readinessStep).toContain('handing off to retrying canary');
   });
 
   it('passes signup readiness keys into the staging preview runtime', () => {
@@ -129,62 +229,29 @@ describe('deploy workflow Vercel env resolution', () => {
     }
   });
 
-  it('syncs required signup readiness keys into the configured production Vercel project before pulling env', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
-    const syncStep = getStepBlock(
-      workflow,
-      'Sync required production env to Vercel project'
-    );
-    const pullStep = getStepBlock(workflow, 'Pull env (production)');
-    const syncIndex = workflow.indexOf(
-      '- name: Sync required production env to Vercel project'
-    );
-    const pullIndex = workflow.indexOf('- name: Pull env (production)');
-    const requiredKeys = [
-      'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
-      'CLERK_SECRET_KEY',
-      'CLERK_PUBLISHABLE_KEY_STAGING',
-      'CLERK_SECRET_KEY_STAGING',
-      'DATABASE_URL',
-      'SESSION_SECRET',
-      'AI_GATEWAY_API_KEY',
-      'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
-      'TURNSTILE_SECRET_KEY',
-    ];
-
-    expect(syncIndex).toBeGreaterThanOrEqual(0);
-    expect(pullIndex).toBeGreaterThan(syncIndex);
-    expect(syncStep).toContain('required_vercel_env=(');
-    expect(syncStep).toContain('vercel env rm "$key" production');
-    expect(syncStep).toContain('vercel env add "$key" production');
-    expect(syncStep).toContain('--value "${!key}"');
-    expect(syncStep).toContain('>/dev/null');
-    expect(syncStep).toContain('>/dev/null 2>&1 || true');
-    expect(syncStep).toContain('set +x');
-    expect(syncStep).toContain(
-      'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
-    );
-    expect(pullStep).toContain(
-      'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
-    );
-
-    for (const key of requiredKeys) {
-      expect(syncStep).toContain(key);
-      expect(syncStep).toContain(`${key}: \${{ secrets.${key} }}`);
-    }
-  });
-
-  it('checks production signup readiness against the deploy env instead of the pulled Vercel file', () => {
+  it('checks staging signup readiness against the deploy env before building the promotion artifact', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const readinessStep = getStepBlock(
       workflow,
-      'Check signup readiness (production deploy env)'
+      'Check signup readiness (staging deploy env)'
+    );
+    const buildStep = getStepBlock(
+      workflow,
+      'Build (preview target for staging verification)'
+    );
+    const readinessIndex = workflow.indexOf(
+      '- name: Check signup readiness (staging deploy env)'
+    );
+    const buildIndex = workflow.indexOf(
+      '- name: Build (preview target for staging verification)'
     );
 
-    expect(readinessStep).toContain('--target=prd');
+    expect(readinessIndex).toBeGreaterThanOrEqual(0);
+    expect(buildIndex).toBeGreaterThan(readinessIndex);
+    expect(readinessStep).toContain('--target=stg');
     expect(readinessStep).toContain('--source=env');
     expect(readinessStep).not.toContain('--source=vercel-file');
-    expect(readinessStep).not.toContain('.vercel/.env.production.local');
+    expect(buildStep).toContain('vercel build');
   });
 
   it('verifies production promotion through the canonical public alias', () => {
@@ -223,7 +290,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(promoteStep).toContain('"https://jov.ie/api/health/build-info"');
     expect(promoteStep).toContain('probe_labels=(');
     expect(promoteStep).toContain('"production-alias"');
-    expect(promoteStep).toContain('max_attempts=30');
+    expect(promoteStep).toContain('max_attempts=15');
     expect(promoteStep).toContain('URLs can return 401');
   });
 
@@ -291,7 +358,7 @@ describe('canary health gate workflow', () => {
       'value: ${{ jobs.canary-health-gate.outputs.verified_deployment_url }}'
     );
     expect(canaryStep).toContain('/api/health/build-info');
-    expect(canaryStep).toContain('local max_attempts=30');
+    expect(canaryStep).toContain('local max_attempts=15');
     expect(canaryStep).toContain(
       'CURL_TIMEOUT_ARGS=(--connect-timeout 5 --max-time 15)'
     );
@@ -364,8 +431,78 @@ describe('CI E2E smoke workflow', () => {
     expect(seedStep).toContain(
       "if: steps.check_changes.outputs.run_full_ci == 'true'"
     );
-    expect(seedStep).toContain('tests/seed-test-data.ts');
+    expect(seedStep).toContain('run seed:test-data');
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repoRoot, 'apps/web/package.json'), 'utf8')
+    ) as { scripts: Record<string, string> };
+    expect(packageJson.scripts['seed:test-data']).toContain(
+      'tests/seed-test-data.ts'
+    );
     expect(smokeJob).not.toContain('Export DATABASE_URL (main');
+  });
+
+  it('pins Better Auth to the local standalone origin for smoke and golden-path jobs', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const localOrigin = 'http://localhost:3100';
+    const sharedBuild = getStepBlock(
+      getJobBlock(workflow, 'ci-build-public'),
+      'Build app (public routes only — no secrets needed)'
+    );
+    const goldenPathJob = getJobBlock(workflow, 'ci-golden-path');
+    const extendedSmokeJob = getJobBlock(workflow, 'ci-smoke-required');
+
+    expect(sharedBuild).toContain(
+      `NEXT_PUBLIC_BETTER_AUTH_URL: ${localOrigin}`
+    );
+    expect(sharedBuild).toContain(`NEXT_PUBLIC_APP_URL: ${localOrigin}`);
+    expect(sharedBuild).toContain("NEXT_PUBLIC_E2E_MODE: '1'");
+    const goldenBuild = getStepBlock(
+      goldenPathJob,
+      'Build real-Clerk golden-path artifact'
+    );
+    expect(goldenBuild).toContain(
+      `NEXT_PUBLIC_BETTER_AUTH_URL: ${localOrigin}`
+    );
+    expect(goldenBuild).toContain(`NEXT_PUBLIC_APP_URL: ${localOrigin}`);
+    const extendedBuild = getStepBlock(
+      extendedSmokeJob,
+      'Extract or rebuild for smoke tests'
+    );
+    expect(extendedBuild).toContain(
+      `NEXT_PUBLIC_BETTER_AUTH_URL: ${localOrigin}`
+    );
+    expect(extendedBuild).toContain(`NEXT_PUBLIC_APP_URL: ${localOrigin}`);
+    expect(extendedBuild).toContain("NEXT_PUBLIC_E2E_MODE: '1'");
+
+    const standaloneSteps = [
+      getStepBlock(
+        getJobBlock(workflow, 'ci-e2e-smoke'),
+        'Run E2E Smoke (Chromium)'
+      ),
+      getStepBlock(goldenPathJob, 'Run Golden Path (Chromium, Better Auth)'),
+      getStepBlock(extendedSmokeJob, 'Run Required Smoke Tests'),
+    ];
+
+    for (const step of standaloneSteps) {
+      expect(step).toContain(`export BETTER_AUTH_URL=${localOrigin}`);
+      expect(step).toContain(
+        `export NEXT_PUBLIC_BETTER_AUTH_URL=${localOrigin}`
+      );
+      expect(step).toContain('export HOSTNAME=localhost');
+      expect(step).toContain(`export NEXT_PUBLIC_APP_URL=${localOrigin}`);
+      expect(step).toContain(`BETTER_AUTH_URL: ${localOrigin}`);
+      expect(step).toContain(`NEXT_PUBLIC_BETTER_AUTH_URL: ${localOrigin}`);
+      expect(step).toContain('SESSION_SECRET: ${{ secrets.SESSION_SECRET }}');
+    }
+
+    for (const step of [standaloneSteps[0], standaloneSteps[2]]) {
+      expect(step).toContain(
+        'export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"'
+      );
+      expect(step).toContain(
+        'export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"'
+      );
+    }
   });
 });
 
@@ -421,7 +558,7 @@ describe('CI public lighthouse workflow', () => {
     expect(seedStep).toContain('matrix.shard == 0');
     expect(waitStep).toContain('matrix.shard != 0');
     expect(waitStep).toContain('tests/wait-for-public-qa-seed.ts');
-    expect(seedStep).toContain('tests/seed-test-data.ts');
+    expect(seedStep).toContain('run seed:test-data');
     expect(exportStep).toContain(
       'steps.resolve-lighthouse-neon-db-url.outputs.database_url'
     );
@@ -443,26 +580,21 @@ describe('CI public lighthouse workflow', () => {
     const config = JSON.parse(readFileSync(configPath, 'utf8')) as {
       ci: {
         collect: {
-          puppeteerLaunchOptions?: {
-            args?: string[];
-            protocolTimeout?: number;
-          };
           settings?: {
+            chromeFlags?: string;
             skipAudits?: string[];
           };
         };
       };
     };
 
-    const launchOptions = config.ci.collect.puppeteerLaunchOptions;
-    expect(launchOptions?.args).toEqual(
-      expect.arrayContaining([
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-      ])
+    expect(config.ci.collect.settings?.chromeFlags).toContain('--no-sandbox');
+    expect(config.ci.collect.settings?.chromeFlags).toContain(
+      '--disable-setuid-sandbox'
     );
-    expect(launchOptions?.protocolTimeout).toBeGreaterThanOrEqual(120_000);
+    expect(config.ci.collect.settings?.chromeFlags).toContain(
+      '--disable-dev-shm-usage'
+    );
     expect(config.ci.collect.settings?.skipAudits).toContain('font-size');
   });
 });
@@ -519,7 +651,7 @@ describe('CI mobile overflow workflow', () => {
     expect(seedStep).toContain('matrix.width == 320');
     expect(waitStep).toContain('matrix.width != 320');
     expect(waitStep).toContain('tests/wait-for-public-qa-seed.ts');
-    expect(seedStep).toContain('tests/seed-test-data.ts');
+    expect(seedStep).toContain('run seed:test-data');
     expect(exportStep).toContain(
       'steps.resolve-mobile-overflow-neon-db-url.outputs.database_url'
     );
@@ -626,15 +758,15 @@ describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
     expect(cleanupWorkflow).toContain('startswith($base + "-")');
   });
 
-  it('runs scheduled branch cleanup every 30 minutes', () => {
-    const scheduledWorkflow = readFileSync(
-      resolve(repoRoot, '.github/workflows/neon-scheduled-cleanup.yml'),
-      'utf8'
-    );
+  it('runs Neon branch cleanup from the consolidated ten-minute agent tick', () => {
+    const agentTickWorkflow = readFileSync(agentTickWorkflowPath, 'utf8');
+    const cleanupJob = getJobBlock(agentTickWorkflow, 'neon-cleanup');
 
-    expect(scheduledWorkflow).toContain("cron: '*/30 * * * *'");
-    expect(scheduledWorkflow).toContain(
-      "minimum_branch_age_minutes: ${{ github.event.inputs.minimum_branch_age_minutes || '45' }}"
+    expect(agentTickWorkflow).toContain("cron: '*/10 * * * *'");
+    expect(cleanupJob).toContain('uses: ./.github/actions/neon-branch-cleanup');
+    expect(cleanupJob).toContain("minimum_branch_age_minutes: '45'");
+    expect(cleanupJob).toContain(
+      "protected_branches: 'main,development,preview,br-main,br-production'"
     );
   });
 
@@ -648,6 +780,19 @@ describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
       'dashboard|onboarding|admin|chat)-lighthouse-'
     );
     expect(cleanupAction).toContain('admin-smoke-[0-9]+-[0-9]+');
+  });
+});
+
+describe('ci-fast critical deploy contract', () => {
+  it('targets the web test directly so a zero-task Turbo run cannot pass', () => {
+    const ciFastLanes = readFileSync(ciFastLanesPath, 'utf8');
+    const command =
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts';
+
+    expect(ciFastLanes).toContain(command);
+    expect(command).not.toContain('turbo');
+    expect(command).not.toContain('--affected');
+    expect(command).not.toContain('--passWithNoTests');
   });
 });
 

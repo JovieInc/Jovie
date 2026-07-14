@@ -5,7 +5,10 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { buildSizeGuardOverrideCheckRun } from './lib/pr-size-guard-label-override.mjs';
+import {
+  buildSizeGuardOverrideCheckRun,
+  buildValidatedSizeGuardCheckRun,
+} from './lib/pr-size-guard-label-override.mjs';
 
 const headSha = process.env.HEAD_SHA ?? '';
 const label = process.env.LABEL ?? '';
@@ -17,7 +20,14 @@ if (!repository) {
   process.exit(1);
 }
 
-const payload = buildSizeGuardOverrideCheckRun({ headSha, label, runUrl });
+const validatedPolicy = process.env.VALIDATED_POLICY ?? '';
+const payload = validatedPolicy
+  ? buildValidatedSizeGuardCheckRun({
+      headSha,
+      policy: validatedPolicy,
+      runUrl,
+    })
+  : buildSizeGuardOverrideCheckRun({ headSha, label, runUrl });
 
 execFileSync('gh', ['api', `repos/${repository}/check-runs`, '--input', '-'], {
   input: JSON.stringify(payload),

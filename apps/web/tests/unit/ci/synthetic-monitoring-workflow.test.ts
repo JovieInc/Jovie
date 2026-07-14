@@ -42,4 +42,14 @@ describe('synthetic monitoring workflow parser', () => {
     expect(parseStep).toContain('formatGithubOutput');
     expect(parseStep).not.toContain('failed.length > 0 || skipped.length > 0');
   });
+
+  it('uploads public-profile screenshots only through the bounded test-results artifact', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const uploadStep = getStepBlock(workflow, 'Upload test results');
+
+    expect(workflow).not.toContain('Upload Public Profile Smoke Screenshots');
+    expect(workflow).not.toContain('public-profile-smoke-screenshots');
+    expect(uploadStep).toContain('apps/web/test-results/');
+    expect(uploadStep).toContain('retention-days: 30');
+  });
 });

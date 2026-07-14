@@ -21,6 +21,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _GH_RETRY = _REPO_ROOT / "scripts" / "lib" / "gh-retry.sh"
 _DRAIN_SCRIPT = _REPO_ROOT / "scripts" / "drain-pr-queue.sh"
 _WATCHDOG_SCRIPT = _REPO_ROOT / "scripts" / "merge-queue-watchdog.sh"
+_GTMQ_GUARD = _REPO_ROOT / "scripts" / "guard-gtmq-source-authorization.sh"
+_GTMQ_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "gtmq-source-authorization.yml"
 
 
 def _run_bash(script: str, *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -35,6 +37,38 @@ def _run_bash(script: str, *, env: dict[str, str] | None = None) -> subprocess.C
         capture_output=True,
         check=False,
     )
+
+
+def _drain_command(
+    tmp_path: Path,
+    *,
+    extra_env: str = "",
+    expected_gh: Path | None = None,
+) -> str:
+    fake_gh = tmp_path / "gh"
+    assert fake_gh.is_file(), f"test must create isolated gh fixture first: {fake_gh}"
+    expected = expected_gh or fake_gh
+    env_prefix = (
+        f'PATH="{tmp_path}:$PATH" '
+        f'DRAIN_EXPECT_GH="{expected}" '
+        'DRAIN_MUTATION_AUTHORIZATION=test-fixture '
+    )
+    if extra_env:
+        env_prefix += f"{extra_env} "
+    return f'{env_prefix}bash "{_DRAIN_SCRIPT}"'
+
+
+def _guard_command(tmp_path: Path, *args: str | int, extra_env: str = "") -> str:
+    fake_gh = tmp_path / "gh"
+    assert fake_gh.is_file(), f"test must create isolated gh fixture first: {fake_gh}"
+    env_prefix = (
+        f'PATH="{tmp_path}:$PATH" DRAIN_EXPECT_GH="{fake_gh}" '
+        'GTMQ_MUTATION_AUTHORIZATION=test-fixture '
+    )
+    if extra_env:
+        env_prefix += f"{extra_env} "
+    arguments = " ".join(str(arg) for arg in args)
+    return f'{env_prefix}bash "{_GTMQ_GUARD}" {arguments}'
 
 
 class TestGhRetryHelper:
@@ -164,6 +198,43 @@ class TestGhRetryHelper:
 
 
 class TestDrainPrQueueWiring:
+    def test_live_drain_refuses_before_calling_gh_when_fixture_path_mismatches(
+        self, tmp_path: Path
+    ) -> None:
+        called = tmp_path / "called"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            f"#!/usr/bin/env bash\ntouch '{called}'\nexit 99\n",
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                expected_gh=Path("/definitely/not/the/fixture"),
+            )
+        )
+
+        assert result.returncode == 2
+        assert "Refusing drain" in result.stderr
+        assert not called.exists(), "drain invoked gh before isolation preflight"
+
+    def test_live_mutation_tests_centralize_exact_fake_gh_preflight(self) -> None:
+        source = Path(__file__).read_text(encoding="utf-8")
+        helper_launches = [
+            line.strip()
+            for line in source.splitlines()
+            if line.strip().startswith("return f'{env_prefix}bash")
+        ]
+        assert helper_launches == [
+            "return f'{env_prefix}bash \"{_DRAIN_SCRIPT}\"'",
+            "return f'{env_prefix}bash \"{_GTMQ_GUARD}\" {arguments}'",
+        ]
+        assert 'DRAIN_EXPECT_GH="{fake_gh}"' in source
+        assert "DRAIN_MUTATION_AUTHORIZATION=test-fixture" in source
+        assert "GTMQ_MUTATION_AUTHORIZATION=test-fixture" in source
+
     def test_drain_script_avoids_bulk_status_rollup_and_uses_per_pr_checks(self) -> None:
         content = _DRAIN_SCRIPT.read_text(encoding="utf-8")
         assert 'source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"' in content
@@ -171,8 +242,9 @@ class TestDrainPrQueueWiring:
         assert "--limit 200" in content
         assert "statusCheckRollup" not in content
         assert "gh pr checks" in content
-        assert "--required" in content
+        assert "--json name,bucket,state,workflow,description,startedAt,completedAt" in content
         assert "--remove-label" in content
+        assert "DRAIN_MUTATION_AUTHORIZATION" in content
         assert "tim-approved" not in content
         assert "approved:taste" not in content
 
@@ -190,7 +262,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '["Typecheck"]'
+                  echo '[{"name":"Typecheck","bucket":"fail","state":"FAILURE"}]'
                   exit 1
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -202,7 +274,7 @@ JSON
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         result = _run_bash(
-            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+            _drain_command(tmp_path, extra_env="DRY_RUN=1")
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
@@ -220,13 +292,17 @@ JSON
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
                   cat <<'JSON'
-                [{"n":456,"t":"Taste approved PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-taste","L":["needs-human","approved:taste"],"fail":[]},{"n":789,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-789-human","L":["needs-human","merge-queue"],"fail":[]},{"n":101,"t":"Clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-101-clean","L":[],"fail":[]}]
+                [{"n":456,"t":"Taste approved PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-taste","L":["needs-human","approved:taste"],"fail":[]},{"n":789,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-789-human","L":["needs-human","merge-queue"],"fail":[]},{"n":102,"t":"Deferred PR","draft":false,"m":"MERGEABLE","head":"codex/jov-102-deferred","L":["queue-deferred","merge-queue"],"fail":[]},{"n":103,"t":"Draft PR","draft":true,"m":"MERGEABLE","head":"codex/jov-103-draft","L":["merge-queue"],"fail":[]},{"n":101,"t":"Clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-101-clean","L":[],"fail":[]}]
 JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
                   [[ "$3" == "101" ]]
-                  echo '[]'
+                  echo '[{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[]}'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -238,18 +314,506 @@ JSON
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         result = _run_bash(
-            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+            _drain_command(tmp_path, extra_env="DRY_RUN=1")
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "=== DEQUEUE (hard gates" in result.stdout
         assert "[dry-run] would -merge-queue on #789" in result.stdout
+        assert "[dry-run] would -merge-queue on #102" in result.stdout
+        assert "[dry-run] would -merge-queue on #103" in result.stdout
         assert "[dry-run] would +merge-queue on #101" in result.stdout
         assert "[dry-run] would +merge-queue on #456" not in result.stdout
         assert "[dry-run] would +merge-queue on #789" not in result.stdout
+        assert "[dry-run] would +merge-queue on #102" not in result.stdout
+        assert "[dry-run] would +merge-queue on #103" not in result.stdout
         assert "=== SURFACE (human decision; not touched) ===" in result.stdout
         assert "#456" in result.stdout
         assert "#789" in result.stdout
+
+
+class TestGraphiteEventAuthorizationGuard:
+    def test_workflow_covers_synthetic_and_source_events_with_minimum_permissions(self) -> None:
+        workflow = _GTMQ_WORKFLOW.read_text(encoding="utf-8")
+        assert "pull_request_target:" in workflow
+        for event_type in (
+            "opened",
+            "synchronize",
+            "reopened",
+            "closed",
+            "labeled",
+            "unlabeled",
+            "converted_to_draft",
+            "ready_for_review",
+        ):
+            assert event_type in workflow
+        assert (
+            "group: gtmq-source-authorization-${{ github.event.pull_request.number }}"
+            in workflow
+        )
+        assert "cancel-in-progress: false" in workflow
+        assert "contents: read" in workflow
+        assert "issues: write" in workflow
+        assert "pull-requests: write" in workflow
+        assert "ref: main" in workflow
+        assert "persist-credentials: false" in workflow
+        assert "guard-gtmq-source-authorization.sh" in workflow
+        assert '[[ "$EVENT_HEAD_REF" == gtmq_* ]]' in workflow
+        assert '--synthetic-event "$EVENT_PR_NUMBER"' in workflow
+        assert '--source-event "$EVENT_ACTION"' in workflow
+        assert "drain-pr-queue.sh" not in workflow
+
+    def test_opened_synthetic_with_revoked_source_is_closed_and_verified(
+        self, tmp_path: Path
+    ) -> None:
+        calls = tmp_path / "calls"
+        event_views = tmp_path / "event-views"
+        event_views.write_text("0", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2 $3" == "pr view 14328" ]]; then
+                  count=$(<"{event_views}")
+                  count=$((count + 1))
+                  echo "$count" >"{event_views}"
+                  if [[ "$count" == 1 ]]; then
+                    echo '{{"number":14328,"title":"Graphite batch","body":"https://github.com/JovieInc/Jovie/pull/14279","headRefName":"gtmq_14279","state":"OPEN"}}'
+                  else
+                    echo '{{"state":"CLOSED"}}'
+                  fi
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 14279" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"labels":[{{"name":"gated"}}]}}'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr close 14328" ]]; then
+                  echo "$*" >>"{calls}"
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(_guard_command(tmp_path, "--synthetic-event", 14328))
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "source #14279 is OPEN with hard gate(s): gated" in result.stdout
+        assert "closed unauthorized Graphite synthetic #14328" in result.stdout
+        assert "Durable guard: #14312" in calls.read_text(encoding="utf-8")
+
+    def test_active_synthetic_is_preserved(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2 $3" == "pr view 14330" ]]; then
+                  echo '{"number":14330,"title":"Active batch","body":"https://github.com/JovieInc/Jovie/pull/14280","headRefName":"gtmq_14280","state":"OPEN"}'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 14280" ]]; then
+                  echo '{"state":"OPEN","isDraft":false,"labels":[{"name":"merge-queue"}]}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr close" ]]; then
+                  exit 9
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(_guard_command(tmp_path, "--synthetic-event", 14330))
+
+        assert result.returncode == 0, result.stderr
+        assert "ACTIVE/PRESERVE" in result.stdout
+
+    def test_source_closed_event_rescans_and_closes_existing_synthetic(
+        self, tmp_path: Path
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2 $3" == "pr view 14279" ]]; then
+                  echo '{{"state":"CLOSED","isDraft":false,"labels":[]}}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"number":14328,"title":"Existing batch","body":"https://github.com/JovieInc/Jovie/pull/14279","headRefName":"gtmq_14279"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr close 14328" ]]; then
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 14328" ]]; then
+                  echo '{{"state":"CLOSED"}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(_guard_command(tmp_path, "--source-event", "closed"))
+
+        assert result.returncode == 0, result.stderr
+        assert "source #14279 is CLOSED" in result.stdout
+        assert "closed unauthorized Graphite synthetic #14328" in result.stdout
+
+    def test_terminal_synthetic_is_a_noop_and_event_lookup_failure_fails_closed(
+        self, tmp_path: Path
+    ) -> None:
+        lookup_views = tmp_path / "lookup-views"
+        lookup_views.write_text("0", encoding="utf-8")
+        closed = tmp_path / "closed"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2 $3" == "pr view 14328" ]]; then
+                  echo '{{"number":14328,"title":"Done","body":"","headRefName":"gtmq_14279","state":"CLOSED"}}'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 99999" ]]; then
+                  count=$(<"{lookup_views}")
+                  count=$((count + 1))
+                  echo "$count" >"{lookup_views}"
+                  if [[ "$count" == 1 ]]; then exit 1; fi
+                  echo '{{"state":"CLOSED"}}'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr close 99999" ]]; then
+                  touch "{closed}"
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr close" ]]; then
+                  exit 9
+                fi
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        terminal = _run_bash(_guard_command(tmp_path, "--synthetic-event", 14328))
+        lookup_failure = _run_bash(
+            _guard_command(
+                tmp_path,
+                "--synthetic-event",
+                99999,
+                extra_env="GH_RETRY_ATTEMPTS=1",
+            )
+        )
+
+        assert terminal.returncode == 0, terminal.stderr
+        assert "is terminal; no authorization mutation" in terminal.stdout
+        assert lookup_failure.returncode == 0, lookup_failure.stderr
+        assert "synthetic event lookup failed" in lookup_failure.stdout
+        assert "closed unauthorized Graphite synthetic #99999" in lookup_failure.stdout
+        assert closed.exists()
+
+    @pytest.mark.parametrize(
+        ("source_labels", "expected_reason"),
+        [
+            ('[{"name":"merge-queue"},{"name":"gated"}]', "hard gate(s): gated"),
+            ('[{"name":"merge-queue"},{"name":"hold"}]', "hard gate(s): hold"),
+            (
+                '[{"name":"merge-queue"},{"name":"needs-human"}]',
+                "hard gate(s): needs-human",
+            ),
+            (
+                '[{"name":"merge-queue"},{"name":"queue-deferred"}]',
+                "hard gate(s): queue-deferred",
+            ),
+            (
+                '[{"name":"merge-queue"},{"name":"needs-conflict-resolution"}]',
+                "hard gate(s): needs-conflict-resolution",
+            ),
+            (
+                '[{"name":"merge-queue"},{"name":"needs:taste"}]',
+                "hard gate(s): needs:taste",
+            ),
+            (
+                '[{"name":"merge-queue"},{"name":"needs-human-taste"}]',
+                "hard gate(s): needs-human-taste",
+            ),
+            (
+                '[{"name":"merge-queue"},{"name":"needs-human-review"}]',
+                "hard gate(s): needs-human-review",
+            ),
+            (
+                '[{"name":"merge-queue"},{"name":"human-review-required"}]',
+                "hard gate(s): human-review-required",
+            ),
+            (
+                '[{"name":"merge-queue"},{"name":"no-auto"}]',
+                "hard gate(s): no-auto",
+            ),
+            (
+                '[{"name":"merge-queue"},{"name":"taste"}]',
+                "hard gate(s): taste",
+            ),
+            ("[]", "no longer has merge-queue"),
+        ],
+    )
+    def test_gtmq_synthetic_closes_when_open_source_authorization_is_revoked(
+        self, tmp_path: Path, source_labels: str, expected_reason: str
+    ) -> None:
+        calls = tmp_path / "calls"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":14307,"t":"Graphite MQ for 14071","body":"https://app.graphite.com/github/pr/JovieInc/Jovie/14071","draft":true,"m":"MERGEABLE","ms":"UNSTABLE","head":"gtmq_14071","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 14071" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"labels":{source_labels}}}'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr close 14307" ]]; then
+                  echo "$*" >> "{calls}"
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 14307" ]]; then
+                  echo '{{"state":"CLOSED"}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(_drain_command(tmp_path))
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert expected_reason in result.stdout
+        assert "closed unauthorized Graphite synthetic #14307" in result.stdout
+        close_call = calls.read_text(encoding="utf-8")
+        assert "pr close 14307" in close_call
+        assert "Root cause: Graphite synthetic #14307" in close_call
+        assert "#14071 was re-gated and dequeued" in close_call
+
+    @pytest.mark.parametrize("source_state", ["CLOSED", "MERGED"])
+    def test_gtmq_synthetic_closes_when_source_is_terminal(
+        self, tmp_path: Path, source_state: str
+    ) -> None:
+        closed = tmp_path / "closed"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":14313,"t":"Orphan Graphite MQ","body":"https://github.com/JovieInc/Jovie/pull/14075","draft":true,"m":"MERGEABLE","ms":"CLEAN","head":"gtmq_14075","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 14075" ]]; then
+                  echo '{{"state":"{source_state}","isDraft":false,"labels":[]}}'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr close 14313" ]]; then
+                  touch "{closed}"
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 14313" ]]; then
+                  echo '{{"state":"CLOSED"}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(_drain_command(tmp_path))
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert (
+            f"source #14075 is {source_state} and no longer authorizes this synthetic"
+            in result.stdout
+        )
+        assert "closed unauthorized Graphite synthetic #14313" in result.stdout
+        assert closed.exists()
+
+    def test_gtmq_synthetic_preserves_only_explicitly_queued_ungated_open_source(
+        self, tmp_path: Path
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{"n":14308,"t":"Active Graphite MQ","body":"https://github.com/JovieInc/Jovie/pull/14072","draft":true,"m":"MERGEABLE","ms":"CLEAN","head":"gtmq_14072","L":[],"fail":[]}]'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 14072" ]]; then
+                  echo '{"state":"OPEN","isDraft":false,"labels":[{"name":"merge-queue"},{"name":"testing"}]}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr close" ]]; then
+                  echo "unexpected close mutation: $*" >&2
+                  exit 9
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(_drain_command(tmp_path))
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert (
+            "ACTIVE/PRESERVE (all open sources non-draft, explicitly queued, and ungated)"
+            in result.stdout
+        )
+        assert "Graphite synthetics closed: 0; active/preserved: 1" in result.stdout
+
+    def test_gtmq_synthetic_closes_when_source_is_draft(self, tmp_path: Path) -> None:
+        closed = tmp_path / "closed"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":14331,"t":"Draft-source batch","body":"https://github.com/JovieInc/Jovie/pull/14281","draft":true,"m":"MERGEABLE","ms":"CLEAN","head":"gtmq_14281","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 14281" ]]; then
+                  echo '{{"state":"OPEN","isDraft":true,"labels":[{{"name":"merge-queue"}}]}}'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr close 14331" ]]; then
+                  touch "{closed}"
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 14331" ]]; then
+                  echo '{{"state":"CLOSED"}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(_drain_command(tmp_path))
+
+        assert result.returncode == 0, result.stderr
+        assert "source #14281 is OPEN but is draft" in result.stdout
+        assert closed.exists()
+
+    def test_gtmq_synthetic_fails_closed_when_source_lookup_fails(
+        self, tmp_path: Path
+    ) -> None:
+        closed = tmp_path / "closed"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":14309,"t":"Unknown-source Graphite MQ","body":"https://app.graphite.com/github/pr/JovieInc/Jovie/14073","draft":true,"m":"MERGEABLE","ms":"CLEAN","head":"gtmq_14073","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 14073" ]]; then
+                  exit 1
+                fi
+                if [[ "$1 $2 $3" == "pr close 14309" ]]; then
+                  touch "{closed}"
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr view 14309" ]]; then
+                  echo '{{"state":"CLOSED"}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            _drain_command(tmp_path, extra_env="GH_RETRY_ATTEMPTS=1")
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "source #14073 lookup failed" in result.stdout
+        assert closed.exists()
+
+    def test_gtmq_synthetic_fails_closed_on_missing_source_metadata(
+        self, tmp_path: Path
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{"n":14311,"t":"Malformed Graphite MQ","body":"Graphite queue batch source #14074","draft":true,"m":"MERGEABLE","ms":"CLEAN","head":"gtmq_malformed","L":[],"fail":[]}]'
+                  exit 0
+                fi
+                if [[ "$1 $2 $3" == "pr close 14311" ]]; then exit 0; fi
+                if [[ "$1 $2 $3" == "pr view 14311" ]]; then
+                  echo '{"state":"CLOSED"}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(_drain_command(tmp_path))
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "missing or malformed source PR metadata" in result.stdout
+        assert "closed unauthorized Graphite synthetic #14311" in result.stdout
 
     def test_nonzero_checks_with_valid_json_do_not_abort_drain(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
@@ -265,8 +829,12 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[]'
+                  echo '[{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
                   exit 8
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[]}'
+                  exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
                 exit 2
@@ -277,7 +845,7 @@ JSON
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         result = _run_bash(
-            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+            _drain_command(tmp_path, extra_env="DRY_RUN=1")
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
@@ -307,7 +875,11 @@ JSON
                     echo "HTTP 504: We couldn't respond to your request in time." >&2
                     exit 1
                   fi
-                  echo '[]'
+                  echo '[{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[]}'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -318,14 +890,211 @@ JSON
         )
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-        result = _run_bash(
-            f'PATH="{tmp_path}:$PATH" GH_RETRY_BASE_DELAY=0 GH_RETRY_TEST_COUNTER="{counter}" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
-        )
+        result = _run_bash(_drain_command(tmp_path, extra_env=f'GH_RETRY_BASE_DELAY=0 GH_RETRY_TEST_COUNTER="{counter}" DRY_RUN=1'))
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "[dry-run] would +merge-queue on #654" in result.stdout
         assert "gh-retry" in result.stderr
         assert counter.read_text(encoding="utf-8").strip() == "2"
+
+    @pytest.mark.parametrize(
+        "refreshed_state",
+        [
+            '{"state":"OPEN","isDraft":true,"mergeable":"MERGEABLE","labels":[]}',
+            '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[{"name":"queue-deferred"}]}',
+        ],
+    )
+    def test_enroll_refuses_draft_or_deferred_state_from_fresh_read(
+        self, tmp_path: Path, refreshed_state: str
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":655,"t":"Held after snapshot","draft":false,"m":"MERGEABLE","head":"codex/jov-655-held","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{refreshed_state}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  echo "unexpected enrollment mutation: $*" >&2
+                  exit 9
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            _drain_command(tmp_path, extra_env="DRY_RUN=1")
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "eligibility changed; refusing enrollment for #655" in result.stdout
+        assert "[dry-run] would +merge-queue on #655" not in result.stdout
+
+    @pytest.mark.parametrize("edit_exit", [0, 1])
+    def test_held_dequeue_fails_when_removal_is_not_proven(
+        self, tmp_path: Path, edit_exit: int
+    ) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":656,"t":"Held and queued","draft":true,"m":"MERGEABLE","head":"codex/jov-656-held","L":["merge-queue"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  exit {edit_exit}
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"labels":[{{"name":"merge-queue"}}]}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(_drain_command(tmp_path))
+
+        assert result.returncode != 0
+        assert "Failed to prove held PR #656 is outside merge queue" in result.stderr
+
+    def test_enrollment_mutation_failure_is_terminal(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{"n":657,"t":"Clean candidate","draft":false,"m":"MERGEABLE","head":"codex/jov-657-clean","L":[],"fail":[]}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[]}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(_drain_command(tmp_path))
+
+        assert result.returncode != 0
+        assert "Failed to prove enrollment for #657" in result.stderr
+
+    @pytest.mark.parametrize(
+        ("second_read", "removal_exit", "expected_message"),
+        [
+            (
+                '{"state":"OPEN","isDraft":true,"mergeable":"MERGEABLE","labels":[{"name":"merge-queue"}]}',
+                0,
+                "enrollment verification failed",
+            ),
+            (
+                '{"state":"OPEN","isDraft":false,"mergeable":"CONFLICTING","labels":[{"name":"merge-queue"},{"name":"needs-conflict-resolution"}]}',
+                0,
+                "enrollment verification failed",
+            ),
+            ("READ_FAILURE", 0, "could not verify"),
+            (
+                "READ_FAILURE",
+                1,
+                "CRITICAL: could not prove failed enrollment was compensated",
+            ),
+        ],
+    )
+    def test_post_enrollment_failure_compensates_and_proves_absence(
+        self,
+        tmp_path: Path,
+        second_read: str,
+        removal_exit: int,
+        expected_message: str,
+    ) -> None:
+        read_count = tmp_path / "read-count"
+        edit_count = tmp_path / "edit-count"
+        read_count.write_text("0", encoding="utf-8")
+        edit_count.write_text("0", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":658,"t":"Racing candidate","draft":false,"m":"MERGEABLE","head":"codex/jov-658-race","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  count=$(cat '{read_count}')
+                  count=$((count + 1))
+                  echo "$count" > '{read_count}'
+                  if [[ "$count" -eq 1 ]]; then
+                    echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[]}}'
+                  elif [[ "$count" -eq 2 && '{second_read}' == 'READ_FAILURE' ]]; then
+                    exit 1
+                  elif [[ "$count" -eq 2 ]]; then
+                    echo '{second_read}'
+                  else
+                    echo '{{"labels":[]}}'
+                  fi
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  count=$(cat '{edit_count}')
+                  count=$((count + 1))
+                  echo "$count" > '{edit_count}'
+                  if [[ "$count" -eq 2 ]]; then exit {removal_exit}; fi
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(_drain_command(tmp_path))
+
+        assert result.returncode != 0
+        assert expected_message in result.stderr
+        assert edit_count.read_text(encoding="utf-8").strip() == "2"
 
     def test_queued_conflict_is_dequeued_and_labeled_for_resolution(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
@@ -349,7 +1118,7 @@ JSON
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         result = _run_bash(
-            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+            _drain_command(tmp_path, extra_env="DRY_RUN=1")
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
@@ -373,7 +1142,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '["PR Ready"]'
+                  echo '[{"name":"CI / PR Ready","bucket":"fail","state":"FAILURE"},{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
                   exit 1
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -385,18 +1154,18 @@ JSON
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         result = _run_bash(
-            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+            _drain_command(tmp_path, extra_env="DRY_RUN=1")
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "BLOCKED: 1" in result.stdout
         assert "[dry-run] would -merge-queue on #888" in result.stdout
-        assert "checks=PR Ready" in result.stdout
+        assert "checks=CI / PR Ready" in result.stdout
         assert "=== BLOCKED (red checks" in result.stdout
         assert "#888" in result.stdout
         assert "[dry-run] would +merge-queue on #888" not in result.stdout
 
-    def test_unstable_state_with_no_failures_stays_enrolled(
+    def test_unstable_state_with_missing_required_checks_is_dequeued(
         self, tmp_path: Path
     ) -> None:
         fake_gh = tmp_path / "gh"
@@ -424,15 +1193,16 @@ JSON
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         result = _run_bash(
-            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+            _drain_command(tmp_path, extra_env="DRY_RUN=1")
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "UNSTABLE: 1" in result.stdout
-        # 2026-06-22 stall fix: a MERGEABLE PR that is UNSTABLE/BLOCKED only because
-        # of a zombie cancelled/queued required-check (no TERMINAL failure) must NOT
-        # be dequeued. It stays enrolled and untouched so Graphite can land it.
-        assert "[dry-run] would -merge-queue on #889" not in result.stdout
+        # Queue enrollment requires positive proof that every required aggregate
+        # exists and succeeded. An empty check set must fail closed even when the
+        # GitHub mergeability snapshot still says MERGEABLE.
+        assert "[dry-run] would -merge-queue on #889" in result.stdout
+        assert "CI / PR Ready (missing)" in result.stdout
         assert "[dry-run] would +merge-queue on #889" not in result.stdout
 
     def test_drain_remediate_script_exists(self) -> None:
@@ -442,7 +1212,9 @@ JSON
         assert "listBlockedAgentPrs" in content
         assert "force-with-lease" in content
 
-    def test_gtmq_drafts_are_report_only_even_when_labeled(self, tmp_path: Path) -> None:
+    def test_gtmq_drafts_bypass_ordinary_label_mutations_but_fail_closed_without_sources(
+        self, tmp_path: Path
+    ) -> None:
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
             textwrap.dedent(
@@ -464,13 +1236,15 @@ JSON
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         result = _run_bash(
-            f'PATH="{tmp_path}:$PATH" DRY_RUN=1 bash "{_DRAIN_SCRIPT}"'
+            _drain_command(tmp_path, extra_env="DRY_RUN=1")
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "gtmq: 1" in result.stdout
-        assert "=== GRAPHITE MQ in-flight (leave) ===" in result.stdout
+        assert "=== GRAPHITE MQ source authorization ===" in result.stdout
         assert "#999" in result.stdout
+        assert "missing or malformed source PR metadata" in result.stdout
+        assert "[dry-run] would document root cause and close Graphite synthetic #999" in result.stdout
         assert "[dry-run] would -merge-queue on #999" not in result.stdout
         assert "[dry-run] would +needs-conflict-resolution on #999" not in result.stdout
 

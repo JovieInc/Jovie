@@ -17,8 +17,9 @@
 import { chromium, type Page } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resetOwnedOutputDirectory } from './owned-output-directory';
 
-const OUTPUT_DIR = path.join(__dirname, '../../linear-compare-output');
+const OUTPUT_ROOT = path.join(__dirname, '../../linear-compare-output');
 const TOKENS_OUTPUT = path.join(
   __dirname,
   '../../styles/linear-tokens.generated.css'
@@ -334,9 +335,7 @@ async function main() {
   console.log('🎨 Linear Token Extraction');
   console.log('==========================\n');
 
-  if (!fs.existsSync(OUTPUT_DIR)) {
-    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  }
+  const outputDirectory = resetOwnedOutputDirectory(OUTPUT_ROOT, 'tokens');
 
   const browser = await chromium.launch({ headless: HEADLESS });
   const allStyles: ExtractedStyles[] = [];
@@ -375,7 +374,7 @@ async function main() {
 
         // Take screenshot
         const screenshotPath = path.join(
-          OUTPUT_DIR,
+          outputDirectory,
           `linear-${linearPage.name}-${viewport.name}.png`
         );
         await page.screenshot({ path: screenshotPath, fullPage: false });
@@ -396,7 +395,7 @@ async function main() {
     console.log(`   ✓ Written to ${TOKENS_OUTPUT}`);
 
     // Save raw data
-    const jsonPath = path.join(OUTPUT_DIR, 'linear-extracted-styles.json');
+    const jsonPath = path.join(outputDirectory, 'linear-extracted-styles.json');
     fs.writeFileSync(
       jsonPath,
       JSON.stringify({ styles: allStyles, colors }, null, 2)

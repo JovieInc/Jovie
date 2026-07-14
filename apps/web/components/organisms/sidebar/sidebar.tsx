@@ -68,10 +68,14 @@ export const Sidebar = React.forwardRef<
           </SheetContent>
         </Sheet>
 
-        {/* Desktop Sidebar - always in tree so SSR and first client render match. */}
+        {/* Desktop Sidebar - always in tree so SSR and first client render match.
+            `h-full` is load-bearing: the peer is not itself a flex child of the
+            app-shell body (it sits inside app-shell-sidebar-mount), so without
+            an explicit height the inner `h-full flex-col` collapses to content
+            size and footer `mt-auto` has nothing to push against (JOV-3960). */}
         <div
           ref={ref}
-          className='group peer max-lg:hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:z-10'
+          className='group peer max-lg:hidden h-full min-h-0 shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:z-10'
           data-state={state}
           data-collapsible={state === 'closed' ? collapsible : ''}
           data-variant={variant}

@@ -39,6 +39,7 @@ interface AxeViolationSummary {
   readonly impact: string | null;
   readonly help: string;
   readonly nodes: number;
+  readonly sampleNodes: readonly string[];
 }
 
 function summarizeViolations(
@@ -49,6 +50,14 @@ function summarizeViolations(
     impact: v.impact ?? null,
     help: v.help,
     nodes: v.nodes.length,
+    // First offending selectors + failure text so a red CI log is actionable
+    // without downloading artifacts.
+    sampleNodes: v.nodes
+      .slice(0, 5)
+      .map(
+        n =>
+          `${n.target.join(' ')} — ${(n.failureSummary ?? '').split('\n').slice(0, 2).join(' ')}`
+      ),
   }));
 }
 

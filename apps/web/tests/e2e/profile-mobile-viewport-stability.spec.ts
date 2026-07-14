@@ -1,4 +1,3 @@
-import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import {
   expect,
@@ -7,6 +6,7 @@ import {
   type TestInfo,
   test,
 } from '@playwright/test';
+import { resetOwnedOutputDirectory } from '../../scripts/owned-output-path';
 import { expectNoDocumentOverflow } from './utils/mobile-overflow';
 import {
   MOBILE_PROFILE_VIEWPORTS,
@@ -26,6 +26,26 @@ test.use({
   storageState: { cookies: [], origins: [] },
 });
 test.describe.configure({ mode: 'serial' });
+
+const WEB_ROOT = process.cwd().endsWith('/apps/web')
+  ? process.cwd()
+  : path.resolve(process.cwd(), 'apps/web');
+const PROFILE_MOBILE_OUTPUT_BASE = path.resolve(WEB_ROOT, '../../.context');
+const PROFILE_MOBILE_OUTPUT_SEGMENT = 'profile-mobile-qa';
+const PROFILE_MOBILE_OUTPUT_ROOT = path.join(
+  PROFILE_MOBILE_OUTPUT_BASE,
+  PROFILE_MOBILE_OUTPUT_SEGMENT
+);
+
+test.beforeAll(async () => {
+  if (process.env.PROFILE_MOBILE_SCREENSHOTS !== '1') return;
+
+  await resetOwnedOutputDirectory(
+    PROFILE_MOBILE_OUTPUT_BASE,
+    PROFILE_MOBILE_OUTPUT_SEGMENT,
+    'PROFILE_MOBILE_SCREENSHOTS'
+  );
+});
 
 type MobileProfileScreen = {
   readonly id: string;
@@ -481,12 +501,10 @@ async function maybeCaptureScreenshot(
 ) {
   if (process.env.PROFILE_MOBILE_SCREENSHOTS !== '1') return;
 
-  const outputDir = path.resolve(
-    process.cwd(),
-    '../../.context/profile-mobile-qa'
+  const filePath = path.join(
+    PROFILE_MOBILE_OUTPUT_ROOT,
+    `${viewport.id}-${screenId}.png`
   );
-  await mkdir(outputDir, { recursive: true });
-  const filePath = path.join(outputDir, `${viewport.id}-${screenId}.png`);
 
   await page.screenshot({
     path: filePath,

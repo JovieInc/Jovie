@@ -5291,10 +5291,20 @@ function evaluateSkillRegistryInventory(vars: EvalVars) {
       .filter(skill => skill.kind !== 'tool' && !skill.promptPath)
       .map(skill => skill.id),
     missingInputSchemaPathToolIds: skillSummaries
-      .filter(skill => skill.kind === 'tool' && !skill.inputSchemaZodPath)
+      .filter(
+        skill =>
+          skill.kind === 'tool' &&
+          skill.metadataSurface === 'chat' &&
+          !skill.inputSchemaZodPath
+      )
       .map(skill => skill.id),
     missingOutputSchemaPathToolIds: skillSummaries
-      .filter(skill => skill.kind === 'tool' && !skill.outputSchemaZodPath)
+      .filter(
+        skill =>
+          skill.kind === 'tool' &&
+          skill.metadataSurface === 'chat' &&
+          !skill.outputSchemaZodPath
+      )
       .map(skill => skill.id),
     missingPathFileSkillIds: skillSummaries
       .filter(skill => {
@@ -5302,8 +5312,9 @@ function evaluateSkillRegistryInventory(vars: EvalVars) {
           return !skill.promptPathExists;
         }
 
-        return !(
-          skill.inputSchemaZodPathExists && skill.outputSchemaZodPathExists
+        return (
+          skill.metadataSurface === 'chat' &&
+          !(skill.inputSchemaZodPathExists && skill.outputSchemaZodPathExists)
         );
       })
       .map(skill => skill.id),
@@ -7462,6 +7473,8 @@ function evaluateSkillCatalogSyncContract(vars: EvalVars) {
             description: skill.description ?? null,
             kind: skill.kind,
             version: skill.version,
+            lifecycle: skill.lifecycle ?? 'ga',
+            activeVersion: skill.activeVersion ?? skill.version,
             entitlementRequired: skill.entitlement ?? null,
             model: skill.model ?? null,
             promptPath: skill.promptPath ?? null,
@@ -7476,15 +7489,18 @@ function evaluateSkillCatalogSyncContract(vars: EvalVars) {
             'version',
             'entitlementRequired',
             'model',
-            'inputSchemaZodPath',
-            'outputSchemaZodPath',
             'metadata',
+            ...(requiresChatToolArtifactCoverage(skill)
+              ? ['inputSchemaZodPath', 'outputSchemaZodPath']
+              : []),
           ]
         : [
             'id',
             'name',
             'kind',
             'version',
+            'lifecycle',
+            'activeVersion',
             'entitlementRequired',
             'model',
             'promptPath',

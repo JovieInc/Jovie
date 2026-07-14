@@ -5,7 +5,7 @@
  * This is the single source of truth for profile queries.
  */
 
-import { and, eq, inArray, ne, or } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, ne, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { getPressPhotosByProfileId } from '@/lib/db/queries/press-photos';
@@ -716,7 +716,13 @@ export async function isClaimTokenValid(
           eq(creatorProfiles.claimToken, claimToken)
         ),
         eq(creatorProfiles.isPublic, true),
-        eq(creatorProfiles.isClaimed, false)
+        eq(creatorProfiles.isClaimed, false),
+        // Expired claim tokens must not resolve. NULL expiry is tolerated for
+        // legacy invites issued before expiry stamping (migration 0039).
+        or(
+          isNull(creatorProfiles.claimTokenExpiresAt),
+          gt(creatorProfiles.claimTokenExpiresAt, new Date())
+        )
       )
     )
     .limit(1);
@@ -746,7 +752,13 @@ export async function lookupUsernameByClaimToken(
           eq(creatorProfiles.claimToken, claimToken)
         ),
         eq(creatorProfiles.isPublic, true),
-        eq(creatorProfiles.isClaimed, false)
+        eq(creatorProfiles.isClaimed, false),
+        // Expired claim tokens must not resolve. NULL expiry is tolerated for
+        // legacy invites issued before expiry stamping (migration 0039).
+        or(
+          isNull(creatorProfiles.claimTokenExpiresAt),
+          gt(creatorProfiles.claimTokenExpiresAt, new Date())
+        )
       )
     )
     .limit(1);

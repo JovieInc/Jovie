@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { resetOwnedOutputDirectorySync } from '../../../scripts/owned-output-path';
 
 export interface ContrastNode {
   readonly selector: string;
@@ -342,10 +343,12 @@ export function getScreenshotRelativePath(
   return `contrast-screenshots/${slugifyRouteForScreenshot(route)}--${theme}.png`;
 }
 
-export function ensureScreenshotDirectory(outputDir: string): string {
-  const screenshotDir = join(outputDir, 'contrast-screenshots');
-  mkdirSync(screenshotDir, { recursive: true });
-  return screenshotDir;
+export function resetContrastScreenshotDirectory(outputDir: string): string {
+  return resetOwnedOutputDirectorySync(
+    outputDir,
+    'contrast-screenshots',
+    'CONTRAST_INVENTORY_OUTPUT_DIR'
+  );
 }
 
 export function getScreenshotAbsolutePath(

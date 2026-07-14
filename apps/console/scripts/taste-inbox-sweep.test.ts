@@ -1,6 +1,15 @@
-import { readFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockFetchTasteInbox = vi.fn();
@@ -25,14 +34,13 @@ vi.mock('../lib/screenshots', () => ({
     mockCaptureScreenshotForTarget(...args),
 }));
 
-const CONSOLE_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..'
-);
-const INDEX_PATH = path.join(CONSOLE_ROOT, 'public/taste-inbox/index.html');
-
 describe('taste-inbox sweep', () => {
-  beforeEach(() => {
+  let testPublicDir: string;
+
+  beforeEach(async () => {
+    testPublicDir = await mkdtemp(
+      path.join(await realpath(os.tmpdir()), 'taste-inbox-sweep-')
+    );
     mockFetchTasteInbox.mockReset();
     mockFetchFactoryHealthMetrics.mockReset();
     mockCaptureScreenshotForTarget.mockReset();
@@ -83,7 +91,8 @@ describe('taste-inbox sweep', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await rm(testPublicDir, { recursive: true, force: true });
     vi.resetModules();
   });
 
@@ -119,19 +128,27 @@ describe('taste-inbox sweep', () => {
       ],
     });
 
+    const screenshotDir = path.join(testPublicDir, 'screenshots');
+    await mkdir(path.join(screenshotDir, 'keep-directory.png'), {
+      recursive: true,
+    });
+    await Promise.all([
+      writeFile(path.join(screenshotDir, 'JOV-10.png'), 'current'),
+      writeFile(path.join(screenshotDir, 'JOV-9.png'), 'stale'),
+      writeFile(path.join(screenshotDir, 'notes.txt'), 'keep'),
+      symlink('JOV-9.png', path.join(screenshotDir, 'linked.png')),
+    ]);
+
     mockCaptureScreenshotForTarget.mockResolvedValue({
       ok: true,
-      outputPath: path.join(
-        CONSOLE_ROOT,
-        'public/taste-inbox/screenshots/JOV-10.png'
-      ),
+      outputPath: path.join(screenshotDir, 'JOV-10.png'),
       publicPath: 'JOV-10.png',
     });
 
     const { runTasteInboxSweep } = await import('./taste-inbox-sweep');
-    await runTasteInboxSweep();
+    await runTasteInboxSweep({ publicDir: testPublicDir });
 
-    const html = await readFile(INDEX_PATH, 'utf8');
+    const html = await readFile(path.join(testPublicDir, 'index.html'), 'utf8');
     expect(html).toContain('JOV-10');
     expect(html).toContain('JOV-11');
     expect(html).toContain('screenshots/JOV-10.png');
@@ -140,5 +157,127 @@ describe('taste-inbox sweep', () => {
     expect(html).not.toContain('bug');
     expect(mockCaptureScreenshotForTarget).toHaveBeenCalledTimes(1);
     expect(mockFetchFactoryHealthMetrics).toHaveBeenCalledTimes(1);
+    await expect(
+      readFile(path.join(screenshotDir, 'JOV-9.png'))
+    ).rejects.toThrow();
+    await expect(
+      readFile(path.join(screenshotDir, 'JOV-10.png'), 'utf8')
+    ).resolves.toBe('current');
+    await expect(
+      readFile(path.join(screenshotDir, 'notes.txt'), 'utf8')
+    ).resolves.toBe('keep');
+    await expect(
+      lstat(path.join(screenshotDir, 'linked.png'))
+    ).resolves.toMatchObject({});
+    await expect(
+      lstat(path.join(screenshotDir, 'keep-directory.png'))
+    ).resolves.toMatchObject({});
+  });
+
+  it.each([
+    {
+      available: false,
+      captureOk: true,
+      description: 'Capture: web https://staging.jov.ie/',
+      expectedCaptureCalls: 0,
+      name: 'Linear is unavailable',
+    },
+    {
+      available: true,
+      captureOk: false,
+      description: 'Capture: web https://staging.jov.ie/',
+      expectedCaptureCalls: 1,
+      name: 'a current capture fails',
+    },
+    {
+      available: true,
+      captureOk: true,
+      description: 'Needs a taste call but has no valid Capture target.',
+      expectedCaptureCalls: 0,
+      name: 'a current issue has a missing or invalid Capture target',
+    },
+  ])('preserves existing screenshots when $name', async scenario => {
+    const screenshotDir = path.join(testPublicDir, 'screenshots');
+    await mkdir(screenshotDir, { recursive: true });
+    await writeFile(path.join(screenshotDir, 'JOV-OLD.png'), 'last-known-good');
+
+    mockFetchTasteInbox.mockResolvedValue({
+      available: scenario.available,
+      fetchedAt: '2026-06-20T12:00:00.000Z',
+      issues: scenario.available
+        ? [
+            {
+              id: '1',
+              identifier: 'JOV-10',
+              title: 'Hero accent',
+              url: 'https://linear.app/jovie/issue/JOV-10',
+              label: 'needs:taste',
+              priority: 2,
+              priorityLabel: 'High',
+              createdAt: '2026-06-10T12:00:00Z',
+              description: scenario.description,
+              blockingReason: scenario.description,
+            },
+          ]
+        : [],
+    });
+    mockCaptureScreenshotForTarget.mockResolvedValue({
+      ok: scenario.captureOk,
+      outputPath: path.join(screenshotDir, 'JOV-10.png'),
+      publicPath: 'JOV-10.png',
+      error: scenario.captureOk ? undefined : 'capture unavailable',
+    });
+
+    const { runTasteInboxSweep } = await import('./taste-inbox-sweep');
+    await runTasteInboxSweep({ publicDir: testPublicDir });
+
+    await expect(
+      readFile(path.join(screenshotDir, 'JOV-OLD.png'), 'utf8')
+    ).resolves.toBe('last-known-good');
+    expect(mockCaptureScreenshotForTarget).toHaveBeenCalledTimes(
+      scenario.expectedCaptureCalls
+    );
+  });
+
+  it.each([
+    { ancestor: false, dangling: false, name: 'live publicDir symlink' },
+    { ancestor: false, dangling: true, name: 'dangling publicDir symlink' },
+    { ancestor: true, dangling: false, name: 'live ancestor symlink' },
+    { ancestor: true, dangling: true, name: 'dangling ancestor symlink' },
+  ])('refuses a $name without deleting outside files', async scenario => {
+    const lexicalRoot = path.join(testPublicDir, 'lexical');
+    const outsideRoot = path.join(testPublicDir, 'outside');
+    const outsidePublicDir = scenario.ancestor
+      ? path.join(outsideRoot, 'taste-inbox')
+      : outsideRoot;
+    const outsideScreenshotDir = path.join(outsidePublicDir, 'screenshots');
+    const outsideSentinel = path.join(outsideScreenshotDir, 'JOV-OLD.png');
+    await Promise.all([
+      mkdir(lexicalRoot),
+      mkdir(outsideScreenshotDir, { recursive: true }),
+    ]);
+    await writeFile(outsideSentinel, 'keep');
+
+    const linkedPath = path.join(
+      lexicalRoot,
+      scenario.ancestor ? 'public' : 'taste-inbox'
+    );
+    await symlink(
+      scenario.dangling ? path.join(testPublicDir, 'missing') : outsideRoot,
+      linkedPath,
+      'dir'
+    );
+    const publicDir = scenario.ancestor
+      ? path.join(linkedPath, 'taste-inbox')
+      : linkedPath;
+    const screenshotDir = path.join(publicDir, 'screenshots');
+
+    const { pruneUnreferencedTasteScreenshots } = await import(
+      './taste-inbox-sweep'
+    );
+    await expect(
+      pruneUnreferencedTasteScreenshots(screenshotDir, new Set())
+    ).rejects.toThrow('publicDir must be a real canonical directory');
+    await expect(readFile(outsideSentinel, 'utf8')).resolves.toBe('keep');
   });
 });

@@ -80,14 +80,14 @@ export const MarketingBriefSchema = z.object({
       phoneProfileAsset: z.boolean().default(false),
       videoAsset: z.boolean().default(false),
     })
-    .default({}),
+    .prefault({}),
   brandConstraints: z
     .object({
       darkOnly: z.literal(true).default(true), // charter delta #9 — always dark
       fullyStatic: z.literal(true).default(true), // .claude/rules/ui.md — always static
       waitlistEnabled: z.boolean().default(false), // gates waitlist recipe + homepage CTAs
     })
-    .default({}),
+    .prefault({}),
 });
 export type MarketingBrief = z.infer<typeof MarketingBriefSchema>;
 

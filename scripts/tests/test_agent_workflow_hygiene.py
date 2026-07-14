@@ -1,4 +1,5 @@
 """Regression tests for self-hosted agent workflow hygiene."""
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -41,6 +42,63 @@ def _job_block(workflow: str, job_name: str) -> str:
     return "\n".join(lines)
 
 
+def _step_block(workflow: str, step_name: str) -> str:
+    """Return one workflow step using its six-space YAML boundary."""
+    content = (WORKFLOWS / workflow).read_text(encoding="utf-8")
+    marker = f"      - name: {step_name}\n"
+    assert marker in content, f"{workflow}: missing step {step_name}"
+    remainder = content.split(marker, 1)[1]
+    return remainder.split("\n      - name:", 1)[0]
+
+
+def _sparse_checkout_paths(step_block: str) -> set[str]:
+    """Return the literal paths from an actions/checkout sparse list."""
+    marker = "          sparse-checkout: |\n"
+    assert marker in step_block, "missing sparse-checkout list"
+    paths: set[str] = set()
+    for line in step_block.split(marker, 1)[1].splitlines():
+        if not line.startswith("            "):
+            break
+        paths.add(line.strip())
+    return paths
+
+
+LOCAL_IMPORT_RE = re.compile(
+    r"(?:from\s+|import\s*(?:\(\s*)?)[\"'](\.{1,2}/[^\"']+)[\"']"
+)
+LOCAL_RESOURCE_RE = re.compile(
+    r"new URL\([\"'](\.{1,2}/[^\"']+)[\"'],\s*import\.meta\.url\)"
+)
+
+
+def _assert_local_runtime_closure(materialized: set[str], entrypoint: str) -> None:
+    """Fail when materialized ESM references an omitted local dependency."""
+    pending = [entrypoint]
+    visited: set[str] = set()
+
+    while pending:
+        relative_path = pending.pop()
+        if relative_path in visited:
+            continue
+        visited.add(relative_path)
+        source_path = REPO_ROOT / relative_path
+        source = source_path.read_text(encoding="utf-8")
+
+        def assert_materialized(local_path: str) -> str:
+            dependency = (source_path.parent / local_path).resolve()
+            dependency_relative = dependency.relative_to(REPO_ROOT).as_posix()
+            assert dependency_relative in materialized, (
+                f"{relative_path} references {dependency_relative}, but the workflow "
+                "sparse checkout does not materialize it"
+            )
+            return dependency_relative
+
+        for import_path in LOCAL_IMPORT_RE.findall(source):
+            pending.append(assert_materialized(import_path))
+        for resource_path in LOCAL_RESOURCE_RE.findall(source):
+            assert_materialized(resource_path)
+
+
 def test_agent_hot_paths_do_not_run_repo_tests() -> None:
     """Fleet scans must not fail on a contaminated sparse self-hosted checkout."""
     for workflow_name in HOT_PATH_WORKFLOWS:
@@ -57,6 +115,16 @@ def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
     ):
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "run: corepack enable" not in content, workflow_name
+
+
+def test_trigger_guard_materializes_systemic_detector_import_closure() -> None:
+    """The detector must not fail before it can classify a systemic failure."""
+    step = _step_block("agent-pipeline.yml", "Checkout systemic detector")
+    materialized = _sparse_checkout_paths(step)
+    entrypoint = "scripts/lib/detect-systemic-failures.mjs"
+
+    assert entrypoint in materialized
+    _assert_local_runtime_closure(materialized, entrypoint)
 
 
 def test_self_hosted_gate_jobs_materialize_full_checkout() -> None:
@@ -105,3 +173,11 @@ def test_auto_pr_compares_trigger_branch_without_executing_its_checkout() -> Non
     assert 'git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"' in block
     assert 'git diff --name-only "origin/main...origin/$BRANCH"' in block
     assert "origin/main...HEAD" not in block
+
+
+def test_claude_review_uses_hosted_bun_prerequisites() -> None:
+    """setup-bun must not land on self-hosted images missing unzip."""
+    block = _job_block("claude-review.yml", "review")
+    assert "runs-on: ubuntu-latest" in block
+    assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block
+    assert "uses: oven-sh/setup-bun@" in block

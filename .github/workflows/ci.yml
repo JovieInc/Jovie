@@ -479,6 +479,8 @@ jobs:
     # (build / Lighthouse / e2e / preview) stay separate.
     needs: [ci-path-changes]
     runs-on: ubuntu-latest
+    # Setup/DB work (~2m) + accepted source deploy (up to 10m) + readiness
+    # verification (up to 9m) must fit without the job canceling a healthy build.
     timeout-minutes: 25
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     env:
@@ -510,7 +512,7 @@ jobs:
           # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
           # desktop-release-guard / version-fanout-guard on PRs.
           git fetch origin "${{ github.base_ref }}" --no-tags
-          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|scripts/lib/(ci-|merge-queue)|scripts/ci-)'; then
+          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|scripts/lib/(ci-|merge-queue)|scripts/ci-|scripts/tests/test_vercel_prebuilt_deploy\.py)'; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -518,12 +520,12 @@ jobs:
       - name: Install actionlint (structural)
         if: steps.structural.outputs.skip != 'true'
         uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
-      - name: Set up Python (structural drain tests)
+      - name: Set up Python (structural regression tests)
         if: steps.structural.outputs.skip != 'true'
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
-      - name: Install pytest (structural drain tests)
+      - name: Install pytest (structural regression tests)
         if: steps.structural.outputs.skip != 'true'
         run: pip install pytest --quiet
       - name: Run ci-fast lanes
@@ -882,7 +884,9 @@ jobs:
     # On main push: always runs for full coverage + JOV-4087 vercel deploy artifact.
     # Fork PRs are excluded (no secrets) — skipped via fork-pr-gate.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Production deploy artifacts must not wait behind the saturated fixed PR
+    # runner. Keep PR builds on jovie-fixed; route main to hosted capacity.
+    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'ubuntu-latest' || vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     outputs:
       has_artifact: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -951,11 +955,14 @@ jobs:
         run: pnpm turbo build --filter=@jovie/web
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_APP_URL: http://localhost:3100
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
           # This shared artifact feeds bypass-based smoke/mobile evidence. The
           # real-Clerk golden path builds its own artifact below so these public
           # compile-time flags cannot leak into that lane.
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -1031,6 +1038,12 @@ jobs:
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
             scope_args=(--scope "$VERCEL_ORG_ID")
           fi
+          # `vercel build` replaces the standalone tree. Snapshot the traced
+          # runtime first, then restore it at the repo-relative paths recorded
+          # in the generated function configs.
+          test -d apps/web/.next/standalone/apps/web/.next/node_modules
+          tar -czf /tmp/vercel-runtime-node-modules.tar.gz \
+            -C apps/web/.next/standalone/apps/web/.next node_modules
           # Do NOT inherit NEXT_PUBLIC_CLERK_MOCK from the turbo build step —
           # deploy artifact must match staging preview compile flags.
           for i in {1..3}; do
@@ -1042,20 +1055,48 @@ jobs:
             sleep 10
             if [ $i -eq 3 ]; then exit 1; fi
           done
-          # Next/Vercel edge functions keep file-trace references to generated
-          # WASM/font chunks under .next/server/edge. Preserve those 16 MB of
-          # targets with the reusable output so a later runner can deploy the
-          # prebuilt artifact without the full ~384 MB .next archive.
-          test -d apps/web/.next/server/edge
+          # Generated function configs reference chunks across the complete
+          # Next server tree, not only edge assets. Preserve that trace root so
+          # the prebuilt upload is closed over every generated server file.
+          test -d apps/web/.next/server/chunks
+          rm -rf apps/web/.next/node_modules
+          tar -xzf /tmp/vercel-runtime-node-modules.tar.gz -C apps/web/.next
+          find apps/web/.next/node_modules -maxdepth 1 -type d \
+            -name 'import-in-the-middle-*' -print -quit | grep -q .
+          # Vercel's function trace references the generated robots response at
+          # its public-file path even though the source route is app/robots.ts.
+          # Materialize it only inside the deploy artifact; the deploy helper
+          # removes generated public files before any source fallback.
+          test -f apps/web/.next/server/app/robots.txt.body
+          cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt
+          printf '%s\n' 'apps/web/public/robots.txt' \
+            > .vercel/jovie-generated-public-files
           tar -czf /tmp/vercel-build-output.tar.gz -C . \
             .vercel/output \
-            apps/web/.next/server/edge
+            .vercel/jovie-generated-public-files \
+            apps/web/public/robots.txt \
+            apps/web/.next/BUILD_ID \
+            apps/web/.next/app-path-routes-manifest.json \
+            apps/web/.next/build-manifest.json \
+            apps/web/.next/package.json \
+            apps/web/.next/prerender-manifest.json \
+            apps/web/.next/required-server-files.json \
+            apps/web/.next/server \
+            apps/web/.next/node_modules
           tar -tzf /tmp/vercel-build-output.tar.gz \
-            apps/web/.next/server/edge >/dev/null
+            apps/web/.next/package.json >/dev/null
+          tar -tzf /tmp/vercel-build-output.tar.gz \
+            apps/web/.next/server/chunks >/dev/null
+          tar -tzf /tmp/vercel-build-output.tar.gz \
+            apps/web/.next/node_modules >/dev/null
+          tar -tzf /tmp/vercel-build-output.tar.gz \
+            apps/web/public/robots.txt >/dev/null
           echo "vercel_artifact=true" >> "$GITHUB_OUTPUT"
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -3004,6 +3045,8 @@ jobs:
           export AI_GATEWAY_API_KEY="smoke-preview-ai-gateway-key"
           export E2E_SKIP_WARMUP=1
           export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
+          export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
+          export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
           # Arms the onboarding LLM-failure fallback spec; matches playwright.config.smoke.ts
           export CHAT_LLM_FAILURE_INJECTION=1
           # GHA sets HOSTNAME to the runner machine name; Next standalone uses it for
@@ -3011,6 +3054,8 @@ jobs:
           # hosts, which breaks claim flows and test-auth trusted-host checks.
           export HOSTNAME=localhost
           export NEXT_PUBLIC_APP_URL=http://localhost:3100
+          export BETTER_AUTH_URL=http://localhost:3100
+          export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100
 
           PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
@@ -3034,9 +3079,14 @@ jobs:
           CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
+          BETTER_AUTH_URL: http://localhost:3100
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Upload Playwright Artifacts on Failure
         if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
@@ -3147,6 +3197,8 @@ jobs:
         run: pnpm turbo build --filter=@jovie/web --force
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_APP_URL: http://localhost:3100
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -3175,11 +3227,14 @@ jobs:
           # canonical +e2e test address; production hard-blocks this switch.
           export E2E_TEST_MODE=1
           export NEXT_PUBLIC_APP_URL=http://localhost:3100
+          export BETTER_AUTH_URL=http://localhost:3100
+          export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100
           # GHA HOSTNAME is the runner machine name; pin loopback so BA redirects
           # and form origin checks stay on localhost:3100.
           export HOSTNAME=localhost
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
+          export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
           export SPOTIFY_CLIENT_ID="${{ secrets.SPOTIFY_CLIENT_ID }}"
           export SPOTIFY_CLIENT_SECRET="${{ secrets.SPOTIFY_CLIENT_SECRET }}"
@@ -3212,8 +3267,11 @@ jobs:
           # UPSTASH_* is optional; the spec degrades to the in-memory limiter.
           DATABASE_URL: ${{ env.DATABASE_URL }}
           E2E_TEST_MODE: '1'
+          BETTER_AUTH_URL: http://localhost:3100
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
@@ -3810,6 +3868,19 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
 
+      - name: Wait for PR preview readiness
+        timeout-minutes: 9
+        run: |
+          ./node_modules/.bin/vercel inspect "${{ steps.pr_deploy.outputs.deployment_url }}" \
+            --wait \
+            --timeout 8m \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
   # PR Lighthouse runs as a path-gated preview-evidence lane with stricter thresholds (0.75 perf, 0.85 a11y).
   # Original removal was due to 0.5 thresholds being too relaxed. Updated .lighthouserc.pr.json fixes this.
   # Production Lighthouse (in ci-build job) has even stricter thresholds (0.8 perf, 0.95 a11y).
@@ -4376,6 +4447,8 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_APP_URL: http://localhost:3100
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
           # Keep rebuild fallback equivalent to the shared ci-build artifact.
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
           # NEXT_PUBLIC_* must be present at build time for standalone smoke runs.
@@ -4396,10 +4469,17 @@ jobs:
           export DATABASE_URL="${{ env.DATABASE_URL }}"
           export NODE_ENV=test
           export VERCEL_ENV=development
+          export HOSTNAME=localhost
+          export NEXT_PUBLIC_APP_URL=http://localhost:3100
+          export BETTER_AUTH_URL=http://localhost:3100
+          export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
           export NEXT_PUBLIC_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
           export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
+          export SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
+          export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
+          export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
           export NEXT_PUBLIC_E2E_MODE=1
           export NEXT_DISABLE_TOOLBAR=1
           export NEXT_PUBLIC_CLERK_MOCK=1
@@ -4438,10 +4518,15 @@ jobs:
           exit $EXIT_CODE
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
+          BETTER_AUTH_URL: http://localhost:3100
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
           TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_DISABLE_TOOLBAR: '1'
           NEXT_PUBLIC_CLERK_MOCK: '1'
@@ -4538,7 +4623,7 @@ jobs:
     name: Deploy Gate (HEAD-only)
     needs: [ci-path-changes, ci-build-public]
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
       is_head: ${{ steps.check.outputs.is_head }}
@@ -4571,8 +4656,8 @@ jobs:
     # Intermediate commits (not main HEAD at gate time) skip so they don't
     # saturate the production-deploy concurrency slot.
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() && needs.deploy-gate.outputs.is_head == 'true' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
     # Deploy concurrency: serialize main deploys instead of cancelling them.
     # Cancelling in-progress main deploys during merge bursts can starve
     # production promotion and leave main without a completed deploy run.
@@ -4592,6 +4677,7 @@ jobs:
       # so no drift warning fires. This is acceptable — the cancelled deploy didn't ship.
       schema_drift: ${{ steps.verify.outcome == 'failure' }}
       deploy_url: ${{ steps.deploy.outputs.deploy_url }}
+      deploy_url_b64: ${{ steps.encode_deploy_url.outputs.deploy_url_b64 }}
     environment:
       name: Staging – jovie
       url: https://staging.jov.ie
@@ -4631,6 +4717,8 @@ jobs:
             echo "::error::Missing required staging deployment credentials: ${missing[*]}"
             exit 1
           fi
+      - name: Cancel stale Vercel preview deployments
+        run: node .github/scripts/cancel-stale-vercel-previews.mjs
       - name: DB safety check (staging preflight)
         id: preflight
         run: pnpm --filter=@jovie/web exec tsx scripts/drizzle-migrate-preflight.ts
@@ -4729,6 +4817,8 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
       - name: Package build output for provenance attestation
         run: |
           set -euo pipefail
@@ -4791,16 +4881,53 @@ jobs:
             if [ $i -eq 3 ]; then exit 1; fi
           done
         env:
-          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
-          CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
+          # The restored prebuilt artifact uploads but its function runtime is
+          # not healthy. Use Vercel's source-build cache until the artifact is
+          # proven runtime-closed by canary.
+          VERCEL_FORCE_SOURCE_DEPLOY: 'true'
+          # The closed staging artifact contains more than Vercel's 15k plain
+          # upload limit. Give the archive path the full prebuilt budget.
+          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'false'
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
 
-      - name: Alias preview to staging.jov.ie
-        timeout-minutes: 3
+      - name: Wait for staging deployment readiness
+        timeout-minutes: 21
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
         run: |
-          ./node_modules/.bin/vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"
+          inspect_wait_status=0
+          ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
+            --wait \
+            --timeout 20m \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID" || inspect_wait_status=$?
+          deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
+            --format=json \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID")"
+          deployment_state="$(jq -r '(.readyState // .state // .status // "unknown") | ascii_upcase' \
+            <<<"$deployment_json")"
+          echo "Current deployment state: $deployment_state"
+          case "$deployment_state" in
+            READY)
+              ;;
+            BUILDING|QUEUED|INITIALIZING)
+              echo "::warning::Vercel is still $deployment_state after readiness wait (status $inspect_wait_status); handing off to retrying canary."
+              ;;
+            *)
+              echo "::error::Vercel deployment entered terminal state $deployment_state."
+              exit 1
+              ;;
+          esac
+
+      - name: Encode deployment URL for downstream jobs
+        id: encode_deploy_url
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
+        run: |
+          printf 'deploy_url_b64=%s\n' "$(printf '%s' "$DEPLOYMENT_URL" | base64 | tr -d '\n')" \
+            >> "$GITHUB_OUTPUT"
 
   canary-health-gate:
     name: Canary Health Gate (staging)
@@ -4815,7 +4942,7 @@ jobs:
       # shared staging alias. Merge-queue traffic can retarget staging.jov.ie
       # while this gate is still retrying, which produces false negatives even
       # when the freshly deployed preview is healthy.
-      deployment_url: ${{ needs.deploy-staging.outputs.deploy_url }}
+      deployment_url_b64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
       commit_sha: ${{ github.sha }}
       fallback_health_url: /api/health
     secrets:
@@ -4824,11 +4951,36 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-  promote-production:
-    name: Promote to Production
+  alias-staging:
+    name: Alias verified preview to staging.jov.ie
     needs: [deploy-staging, canary-health-gate]
     if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Alias verified deployment
+        env:
+          DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
+          test -n "$deployment_url"
+          ./node_modules/.bin/vercel alias set "$deployment_url" staging.jov.ie \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID"
+
+  promote-production:
+    name: Promote to Production
+    needs: [deploy-staging, canary-health-gate, alias-staging]
+    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
       group: production-deploy
