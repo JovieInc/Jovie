@@ -1068,6 +1068,7 @@ function secondsBetween(start, end) {
 export function parseMergeQueueTimeline(events, options = {}) {
   const queuedAt = [];
   const dequeued = [];
+  const queueTransitions = [];
   const telemetry = [];
   const conflictComments = [];
   const ciComments = [];
@@ -1077,6 +1078,7 @@ export function parseMergeQueueTimeline(events, options = {}) {
   for (const event of events ?? []) {
     if (event.event === 'labeled' && event.label?.name === MERGE_QUEUE_LABEL) {
       queuedAt.push(event.created_at);
+      queueTransitions.push({ type: 'queued', at: event.created_at });
     }
     if (
       event.event === 'unlabeled' &&
@@ -1086,6 +1088,7 @@ export function parseMergeQueueTimeline(events, options = {}) {
         at: event.created_at,
         actor: event.actor?.login ?? null,
       });
+      queueTransitions.push({ type: 'dequeued', at: event.created_at });
     }
     if (event.event === 'ready_for_review') {
       readyForReviewAt.push(event.created_at);
@@ -1130,13 +1133,50 @@ export function parseMergeQueueTimeline(events, options = {}) {
   const lastReadyForReviewAt =
     readyForReviewAt.at(-1) ?? options.prCreatedAt ?? null;
 
+  // Sum only intervals where the merge-queue label was actually present. This
+  // keeps dequeue/requeue gaps out of runner-fleet queue pressure telemetry.
+  let activeQueueStart = null;
+  let activeQueuedSeconds = 0;
+  for (const transition of queueTransitions) {
+    if (
+      mergedAt &&
+      new Date(transition.at).getTime() >= new Date(mergedAt).getTime()
+    ) {
+      continue;
+    }
+    if (transition.type === 'queued' && activeQueueStart === null) {
+      activeQueueStart = transition.at;
+    } else if (transition.type === 'dequeued' && activeQueueStart !== null) {
+      const interval = secondsBetween(activeQueueStart, transition.at);
+      if (Number.isFinite(interval) && interval > 0) {
+        activeQueuedSeconds += interval;
+      }
+      activeQueueStart = null;
+    }
+  }
+  if (activeQueueStart !== null && mergedAt) {
+    const interval = secondsBetween(activeQueueStart, mergedAt);
+    if (Number.isFinite(interval) && interval > 0) {
+      activeQueuedSeconds += interval;
+    }
+  }
+
+  const firstEnqueueToMergedSeconds = secondsBetween(firstQueuedAt, mergedAt);
+  const lastEnqueueToMergedSeconds = secondsBetween(lastQueuedAt, mergedAt);
+  const fleetLeadTimeSeconds = secondsBetween(lastReadyForReviewAt, mergedAt);
+
   return {
     queuedAt,
     mergedAt,
     readyForReviewAt,
-    queuedToMergedSeconds: secondsBetween(firstQueuedAt, mergedAt),
-    lastQueuedToMergedSeconds: secondsBetween(lastQueuedAt, mergedAt),
-    readyToMergedSeconds: secondsBetween(lastReadyForReviewAt, mergedAt),
+    firstEnqueueToMergedSeconds,
+    lastEnqueueToMergedSeconds,
+    activeQueuedSeconds: firstQueuedAt ? activeQueuedSeconds : null,
+    fleetLeadTimeSeconds,
+    // Schema-v1 compatibility aliases. Keep for one metrics transition window.
+    queuedToMergedSeconds: firstEnqueueToMergedSeconds,
+    lastQueuedToMergedSeconds: lastEnqueueToMergedSeconds,
+    readyToMergedSeconds: fleetLeadTimeSeconds,
     requeueCount: Math.max(0, queuedAt.length - 1),
     conflictEvictions: conflictComments.length,
     ciEvictions: ciComments.length,

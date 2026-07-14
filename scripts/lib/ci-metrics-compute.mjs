@@ -16,14 +16,31 @@ import {
   computeElapsedSeconds,
   computePercentile,
 } from './ci-duration-ratchet.mjs';
+import {
+  GRAPHITE_QUEUE_POLICY,
+  REQUIRED_MERGE_STATUSES,
+} from './merge-queue-guard.mjs';
 
-export const CI_METRICS_SCHEMA_VERSION = 1;
+// The merge-queue hot path intentionally tracks only the statuses Graphite
+// waits on directly. CI metrics must mirror the complete active main ruleset,
+// which also requires the independent PR Size Guard workflow.
+export const CI_METRICS_REQUIRED_STATUSES = Object.freeze([
+  ...REQUIRED_MERGE_STATUSES,
+  'PR Size Guard',
+]);
 
-/** Ready→merged merge-time targets (docs/PR_FLOW.md, gbrain ci-metrics/latest). */
-export const READY_TO_MERGE_P50_TARGET_SECONDS = 600; // 10m
-export const READY_TO_MERGE_P95_TARGET_SECONDS = 900; // 15m
-/** Minimum ready→merged samples before a throughput verdict is actionable. */
-export const MIN_READY_TO_MERGE_SAMPLES = 10;
+export const CI_METRICS_SCHEMA_VERSION = 2;
+
+/** Fleet lead-time targets (ready-for-review/open → merged). */
+export const FLEET_LEAD_TIME_P50_TARGET_SECONDS = 600; // 10m
+export const FLEET_LEAD_TIME_P95_TARGET_SECONDS = 900; // 15m
+export const MIN_FLEET_LEAD_TIME_SAMPLES = 10;
+// Schema-v1 compatibility aliases. Keep for one metrics transition window.
+export const READY_TO_MERGE_P50_TARGET_SECONDS =
+  FLEET_LEAD_TIME_P50_TARGET_SECONDS;
+export const READY_TO_MERGE_P95_TARGET_SECONDS =
+  FLEET_LEAD_TIME_P95_TARGET_SECONDS;
+export const MIN_READY_TO_MERGE_SAMPLES = MIN_FLEET_LEAD_TIME_SAMPLES;
 
 /** {p50,p75,p95} of an array (0s when empty). */
 export function percentilesOf(values) {
@@ -35,8 +52,8 @@ export function percentilesOf(values) {
 }
 
 /**
- * Wall-clock seconds for every completed run (any conclusion). This is the
- * slot-hours basis: failed/cancelled runs still burn runner slots.
+ * Legacy workflow wall-clock seconds for every completed run (any conclusion).
+ * This is retained for schema-v1 compatibility; runner job time is authoritative.
  */
 export function completedDurationsSeconds(runs) {
   return (runs ?? [])
@@ -78,7 +95,7 @@ export function flakyRerunRate(runs) {
   return reran / list.length;
 }
 
-/** Total CI runner wall-clock hours across all completed runs (a slot-hours proxy). */
+/** Legacy workflow wall-clock hours; retained for schema-v1 compatibility. */
 export function ciRunHours(runs) {
   const totalSeconds = completedDurationsSeconds(runs).reduce(
     (a, b) => a + b,
@@ -114,20 +131,283 @@ export function mergedThroughput(prs) {
 /** Queue-wait seconds from parseMergeQueueTimeline results (queuedToMergedSeconds). */
 export function queueWaitSeconds(timelineResults) {
   return (timelineResults ?? [])
-    .map(t => t && t.queuedToMergedSeconds)
+    .map(t => t && (t.firstEnqueueToMergedSeconds ?? t.queuedToMergedSeconds))
+    .filter(s => Number.isFinite(s) && s > 0);
+}
+
+export function lastEnqueueToMergeSeconds(timelineResults) {
+  return (timelineResults ?? [])
+    .map(
+      t => t && (t.lastEnqueueToMergedSeconds ?? t.lastQueuedToMergedSeconds)
+    )
+    .filter(s => Number.isFinite(s) && s > 0);
+}
+
+export function activeQueuedSeconds(timelineResults) {
+  return (timelineResults ?? [])
+    .map(t => t && t.activeQueuedSeconds)
     .filter(s => Number.isFinite(s) && s > 0);
 }
 
 /**
- * Ready→merged seconds from parseMergeQueueTimeline results
- * (readyToMergedSeconds). Tracks the ready→merged p50<10m / p95<15m target —
+ * Fleet lead-time seconds from parseMergeQueueTimeline results, preferring the
+ * schema-v2 field with the schema-v1 readyToMergedSeconds fallback. Tracks the
+ * ready→merged p50<10m / p95<15m target —
  * separate from queueWaitSeconds (merge-queue-label→merged), since a PR can
  * sit ready-for-review for a while before ever being queued.
  */
-export function readyToMergeSeconds(timelineResults) {
+export function fleetLeadTimeSeconds(timelineResults) {
   return (timelineResults ?? [])
-    .map(t => t && t.readyToMergedSeconds)
+    .map(t => t && (t.fleetLeadTimeSeconds ?? t.readyToMergedSeconds))
     .filter(s => Number.isFinite(s) && s > 0);
+}
+
+/** Schema-v1 compatibility alias for fleetLeadTimeSeconds. */
+export function readyToMergeSeconds(timelineResults) {
+  return fleetLeadTimeSeconds(timelineResults);
+}
+
+const TERMINAL_FAILURE_CONCLUSIONS = new Set([
+  'failure',
+  'error',
+  'timed_out',
+  'action_required',
+  'startup_failure',
+]);
+const REQUIRED_CHECK_TERMINAL_CONCLUSIONS = new Set([
+  'success',
+  'failure',
+  'cancelled',
+  'timed_out',
+  'action_required',
+  'startup_failure',
+  'neutral',
+]);
+const INCOMPLETE_CHECK_CACHE_HOURS = 24;
+const NON_GREEN_CHECK_RETRY_HOURS = 6;
+const GREEN_CHECK_REFRESH_HOURS = 24;
+
+function positiveElapsedSeconds(start, end) {
+  if (!start || !end) return null;
+  const seconds = computeElapsedSeconds(start, end);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
+function nonNegativeElapsedSeconds(start, end) {
+  if (!start || !end) return null;
+  const startMs = new Date(start).getTime();
+  const endMs = new Date(end).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
+    return null;
+  }
+  return (endMs - startMs) / 1000;
+}
+
+function isSelfHostedJob(job) {
+  const labels = (job?.labels ?? []).map(label => String(label).toLowerCase());
+  return labels.includes('self-hosted') || labels.includes('jovie-runner');
+}
+
+export function latestRequiredChecks(checks) {
+  const latest = new Map();
+  for (const check of checks ?? []) {
+    if (!CI_METRICS_REQUIRED_STATUSES.includes(check?.name)) continue;
+    const previous = latest.get(check.name);
+    // GitHub's monotonic check-run id is authoritative when both executions
+    // expose one. Timestamps are only a fallback for missing/equal ids; an
+    // older execution may start or finish after a newer pending check exists.
+    const id = typeof check?.id === 'number' ? check.id : null;
+    const previousId = typeof previous?.id === 'number' ? previous.id : null;
+    const idsDecide =
+      Number.isFinite(id) && Number.isFinite(previousId) && id !== previousId;
+    const timestamp = Date.parse(
+      check?.started_at ?? check?.completed_at ?? ''
+    );
+    const previousTimestamp = Date.parse(
+      previous?.started_at ?? previous?.completed_at ?? ''
+    );
+    const timestampDecides =
+      !Number.isFinite(previousTimestamp) || timestamp >= previousTimestamp;
+    if (!previous || (idsDecide ? id > previousId : timestampDecides)) {
+      latest.set(check.name, check);
+    }
+  }
+  return CI_METRICS_REQUIRED_STATUSES.map(name => latest.get(name)).filter(
+    Boolean
+  );
+}
+
+export function hasCompleteRequiredChecks(checks) {
+  const latest = latestRequiredChecks(checks);
+  return (
+    latest.length === CI_METRICS_REQUIRED_STATUSES.length &&
+    latest.every(check =>
+      REQUIRED_CHECK_TERMINAL_CONCLUSIONS.has(check?.conclusion)
+    )
+  );
+}
+
+export function hasGreenRequiredChecks(checks) {
+  const latest = latestRequiredChecks(checks);
+  return (
+    latest.length === CI_METRICS_REQUIRED_STATUSES.length &&
+    latest.every(check => check?.conclusion === 'success')
+  );
+}
+
+export function shouldReuseJobCache(run, cached) {
+  return Boolean(cached && cached.updatedAt === run?.updated_at);
+}
+
+export function shouldReuseRequiredChecksCache(run, cached, now = new Date()) {
+  if (!cached) return false;
+  // Check runs are scoped to the commit SHA, not to one ci.yml workflow run.
+  // Several PR events can produce runs for the same SHA with different
+  // updated_at values; tying this cache to run.updated_at causes every sibling
+  // run to invalidate and refetch the same commit checks.
+  const fetchedAt = new Date(cached.fetchedAt).getTime();
+  const sinceFetchHours = (now.getTime() - fetchedAt) / 3_600_000;
+  if (cached.green) {
+    return (
+      Number.isFinite(sinceFetchHours) &&
+      sinceFetchHours >= 0 &&
+      sinceFetchHours < GREEN_CHECK_REFRESH_HOURS
+    );
+  }
+  // Terminal red is not stable: Fork PR Gate is a separate workflow and may
+  // rerun without changing the sampled ci.yml run's updated_at.
+  const createdAt = new Date(run?.created_at).getTime();
+  const ageHours = (now.getTime() - createdAt) / 3_600_000;
+  const retryHours =
+    Number.isFinite(ageHours) && ageHours >= INCOMPLETE_CHECK_CACHE_HOURS
+      ? GREEN_CHECK_REFRESH_HOURS
+      : NON_GREEN_CHECK_RETRY_HOURS;
+  return (
+    Number.isFinite(sinceFetchHours) &&
+    sinceFetchHours >= 0 &&
+    sinceFetchHours < retryHours
+  );
+}
+
+/**
+ * Shared budget for bounded GitHub detail hydration. `tryConsume` is checked
+ * immediately before each request, so a cold cache makes incremental progress
+ * without turning one Hermes tick into hundreds of sequential API calls.
+ */
+export function createApiRequestBudget({
+  maxRequests = 24,
+  maxElapsedMs = 4 * 60 * 1000,
+  now = () => Date.now(),
+} = {}) {
+  const startedAt = now();
+  let used = 0;
+  return {
+    tryConsume(reservedRequests = 0) {
+      const reserve = Math.max(
+        0,
+        Math.min(maxRequests, Number(reservedRequests) || 0)
+      );
+      if (used >= maxRequests - reserve || now() - startedAt >= maxElapsedMs)
+        return false;
+      used += 1;
+      return true;
+    },
+    get used() {
+      return used;
+    },
+  };
+}
+
+/** Aggregate job-level runner consumption and gate diagnostics per sampled run. */
+export function summarizeJobMetrics(runJobs) {
+  let hostedSeconds = 0;
+  let selfHostedSeconds = 0;
+  let cancellationWasteSeconds = 0;
+  const jobStartDelays = [];
+  const firstTerminalFailures = [];
+  const requiredGreen = [];
+
+  for (const sample of runJobs ?? []) {
+    const jobs = (sample?.jobs ?? []).filter(
+      job => job?.conclusion !== 'skipped'
+    );
+    const terminalFailureCompletions = [];
+
+    for (const job of jobs) {
+      const duration = positiveElapsedSeconds(
+        job?.started_at,
+        job?.completed_at
+      );
+      if (duration !== null) {
+        if (isSelfHostedJob(job)) selfHostedSeconds += duration;
+        else hostedSeconds += duration;
+        if (
+          sample?.runConclusion === 'cancelled' ||
+          job?.conclusion === 'cancelled'
+        ) {
+          cancellationWasteSeconds += duration;
+        }
+      }
+
+      const startDelay = nonNegativeElapsedSeconds(
+        sample?.runCreatedAt,
+        job?.started_at
+      );
+      if (startDelay !== null) jobStartDelays.push(startDelay);
+
+      if (
+        TERMINAL_FAILURE_CONCLUSIONS.has(job?.conclusion) &&
+        job?.completed_at
+      ) {
+        terminalFailureCompletions.push(job.completed_at);
+      }
+    }
+
+    const firstFailureAt = terminalFailureCompletions.sort()[0];
+    const firstFailure = positiveElapsedSeconds(
+      sample?.runCreatedAt,
+      firstFailureAt
+    );
+    if (firstFailure !== null) firstTerminalFailures.push(firstFailure);
+
+    const requiredChecks = latestRequiredChecks(sample?.requiredChecks);
+    if (
+      hasCompleteRequiredChecks(requiredChecks) &&
+      requiredChecks.every(
+        check => check?.conclusion === 'success' && check?.completed_at
+      )
+    ) {
+      const requiredGreenAt = requiredChecks
+        .map(check => check.completed_at)
+        .sort()
+        .at(-1);
+      const elapsed = positiveElapsedSeconds(
+        sample?.runCreatedAt,
+        requiredGreenAt
+      );
+      if (elapsed !== null) requiredGreen.push(elapsed);
+    }
+  }
+
+  return {
+    runnerSeconds: { hosted: hostedSeconds, selfHosted: selfHostedSeconds },
+    cancellationWasteSeconds,
+    jobStartDelaySeconds: percentilesOf(jobStartDelays),
+    timeToFirstTerminalFailureSeconds: percentilesOf(firstTerminalFailures),
+    timeToRequiredGreenSeconds: percentilesOf(requiredGreen),
+    sampleSizes: {
+      jobs: (runJobs ?? []).reduce(
+        (count, sample) =>
+          count +
+          (sample?.jobs ?? []).filter(job => job?.conclusion !== 'skipped')
+            .length,
+        0
+      ),
+      jobStartDelay: jobStartDelays.length,
+      firstTerminalFailure: firstTerminalFailures.length,
+      requiredGreen: requiredGreen.length,
+    },
+  };
 }
 
 /**
@@ -142,9 +422,19 @@ export function evaluateMergeQueueThroughput(metrics, options = {}) {
   const now = options.now ?? new Date();
   const eligibleAfter =
     options.eligibleAfter ?? new Date('2026-07-09T00:00:00Z');
-  const sampleCount = metrics?.sampleSizes?.readyToMerge ?? 0;
-  const p50 = metrics?.latency?.readyToMergeSeconds?.p50 ?? 0;
-  const p95 = metrics?.latency?.readyToMergeSeconds?.p95 ?? 0;
+  const sampleCount =
+    metrics?.sampleSizes?.fleetLeadTime ??
+    metrics?.sampleSizes?.readyToMerge ??
+    0;
+  const fleetLead =
+    metrics?.latency?.fleetLeadTimeSeconds ??
+    metrics?.latency?.readyToMergeSeconds;
+  const p50 = fleetLead?.p50 ?? 0;
+  const p95 = fleetLead?.p95 ?? 0;
+  const queuePolicy = {
+    maxQueueDepth: GRAPHITE_QUEUE_POLICY.maxQueueDepth,
+    parallelBatchSize: GRAPHITE_QUEUE_POLICY.parallelBatchSize,
+  };
 
   if (now < eligibleAfter) {
     return {
@@ -158,13 +448,14 @@ export function evaluateMergeQueueThroughput(metrics, options = {}) {
         p95Seconds: READY_TO_MERGE_P95_TARGET_SECONDS,
       },
       action: 'wait_for_evaluation_window',
+      queuePolicy,
     };
   }
 
   if (sampleCount < MIN_READY_TO_MERGE_SAMPLES) {
     return {
       status: 'insufficient_data',
-      reason: `Need >=${MIN_READY_TO_MERGE_SAMPLES} ready→merged samples (have ${sampleCount})`,
+      reason: `Need >=${MIN_READY_TO_MERGE_SAMPLES} fleet lead-time samples (have ${sampleCount})`,
       sampleCount,
       p50Seconds: p50,
       p95Seconds: p95,
@@ -173,6 +464,7 @@ export function evaluateMergeQueueThroughput(metrics, options = {}) {
         p95Seconds: READY_TO_MERGE_P95_TARGET_SECONDS,
       },
       action: 'collect_more_samples',
+      queuePolicy,
     };
   }
 
@@ -182,7 +474,7 @@ export function evaluateMergeQueueThroughput(metrics, options = {}) {
   if (p50OnTarget && p95OnTarget) {
     return {
       status: 'on_target',
-      reason: 'Ready→merged p50 and p95 are within targets',
+      reason: 'Fleet lead-time p50 and p95 are within targets',
       sampleCount,
       p50Seconds: p50,
       p95Seconds: p95,
@@ -191,12 +483,19 @@ export function evaluateMergeQueueThroughput(metrics, options = {}) {
         p95Seconds: READY_TO_MERGE_P95_TARGET_SECONDS,
       },
       action: 'close_follow_up',
+      queuePolicy,
     };
   }
 
   const actions = [];
   if (!p95OnTarget) {
-    actions.push('raise_max_queue_depth_12_to_16');
+    if (GRAPHITE_QUEUE_POLICY.maxQueueDepth < 16) {
+      actions.push(
+        `raise_max_queue_depth_${GRAPHITE_QUEUE_POLICY.maxQueueDepth}_to_16`
+      );
+    } else {
+      actions.push('investigate_runner_capacity_and_queue_churn');
+    }
   }
   if (!p50OnTarget) {
     actions.push('tune_unit_test_shards');
@@ -206,8 +505,8 @@ export function evaluateMergeQueueThroughput(metrics, options = {}) {
     status: 'off_target',
     reason:
       p95 > READY_TO_MERGE_P95_TARGET_SECONDS
-        ? `Ready→merged p95 ${Math.round(p95 / 60)}m exceeds ${READY_TO_MERGE_P95_TARGET_SECONDS / 60}m target`
-        : `Ready→merged p50 ${Math.round(p50 / 60)}m exceeds ${READY_TO_MERGE_P50_TARGET_SECONDS / 60}m target`,
+        ? `Fleet lead-time p95 ${Math.round(p95 / 60)}m exceeds ${READY_TO_MERGE_P95_TARGET_SECONDS / 60}m target`
+        : `Fleet lead-time p50 ${Math.round(p50 / 60)}m exceeds ${READY_TO_MERGE_P50_TARGET_SECONDS / 60}m target`,
     sampleCount,
     p50Seconds: p50,
     p95Seconds: p95,
@@ -216,19 +515,62 @@ export function evaluateMergeQueueThroughput(metrics, options = {}) {
       p95Seconds: READY_TO_MERGE_P95_TARGET_SECONDS,
     },
     action: actions.join(';'),
+    queuePolicy,
   };
 }
 
-export function summarizeCiMetrics({ ts, runs, prs, timelineResults }) {
+export function summarizeCiMetrics({
+  ts,
+  runs,
+  prs,
+  timelineResults,
+  runJobs = [],
+  hydration,
+}) {
   const gate = gateDurationsSeconds(runs);
   const fullMerge = fullMergeTimesSeconds(prs);
   const queueWaits = queueWaitSeconds(timelineResults);
-  const readyToMerge = readyToMergeSeconds(timelineResults);
+  const lastEnqueueToMerge = lastEnqueueToMergeSeconds(timelineResults);
+  const activeQueued = activeQueuedSeconds(timelineResults);
+  const fleetLeadTime = fleetLeadTimeSeconds(timelineResults);
+  const jobMetrics = summarizeJobMetrics(runJobs);
   const { mergedPrsPerDay, spanDays, mergedCount } = mergedThroughput(prs);
+  const hydrationCoverage = {
+    runJobs: {
+      covered: hydration?.runJobs?.covered ?? runJobs.length,
+      total: hydration?.runJobs?.total ?? runJobs.length,
+    },
+    requiredChecks: {
+      covered: hydration?.requiredChecks?.covered ?? runJobs.length,
+      total: hydration?.requiredChecks?.total ?? runJobs.length,
+    },
+    timelines: {
+      covered: hydration?.timelines?.covered ?? timelineResults?.length ?? 0,
+      total: hydration?.timelines?.total ?? timelineResults?.length ?? 0,
+    },
+  };
+  const hydrationComplete = Object.values(hydrationCoverage).every(
+    coverage => coverage.covered >= coverage.total
+  );
+  const evaluatedVerdict = evaluateMergeQueueThroughput(
+    {
+      latency: {
+        fleetLeadTimeSeconds: percentilesOf(fleetLeadTime),
+      },
+      sampleSizes: { fleetLeadTime: fleetLeadTime.length },
+    },
+    // Keep verdict deterministic: callers pass `ts` so wall-clock Date.now
+    // cannot flip evaluation-window status between test and job runs.
+    { now: ts ? new Date(ts) : new Date() }
+  );
 
   return {
     schemaVersion: CI_METRICS_SCHEMA_VERSION,
     ts,
+    hydration: {
+      complete: hydrationComplete,
+      ...hydrationCoverage,
+    },
     window: {
       mergedPrs: (prs ?? []).length,
       ciRuns: (runs ?? []).length,
@@ -243,30 +585,42 @@ export function summarizeCiMetrics({ ts, runs, prs, timelineResults }) {
           : null,
       flakyRerunRate: Number(flakyRerunRate(runs).toFixed(4)),
       queueWaitSeconds: percentilesOf(queueWaits),
+      runnerJobSeconds: jobMetrics.runnerSeconds,
+      cancellationWasteSeconds: jobMetrics.cancellationWasteSeconds,
     },
     // SECONDARY: latency diagnostics.
     latency: {
       gateWallclockSeconds: percentilesOf(gate),
       fullMergeTimeSeconds: percentilesOf(fullMerge),
       // Tracks the ready→merged p50<10m / p95<15m target.
-      readyToMergeSeconds: percentilesOf(readyToMerge),
+      readyToMergeSeconds: percentilesOf(fleetLeadTime),
+      fleetLeadTimeSeconds: percentilesOf(fleetLeadTime),
+      firstEnqueueLeadSeconds: percentilesOf(queueWaits),
+      lastEnqueueToMergeSeconds: percentilesOf(lastEnqueueToMerge),
+      activeQueuedSeconds: percentilesOf(activeQueued),
+      jobStartDelaySeconds: jobMetrics.jobStartDelaySeconds,
+      timeToFirstTerminalFailureSeconds:
+        jobMetrics.timeToFirstTerminalFailureSeconds,
+      timeToRequiredGreenSeconds: jobMetrics.timeToRequiredGreenSeconds,
     },
     sampleSizes: {
       gate: gate.length,
       fullMerge: fullMerge.length,
       queueWait: queueWaits.length,
-      readyToMerge: readyToMerge.length,
+      readyToMerge: fleetLeadTime.length,
+      fleetLeadTime: fleetLeadTime.length,
+      firstEnqueueLead: queueWaits.length,
+      lastEnqueueToMerge: lastEnqueueToMerge.length,
+      activeQueued: activeQueued.length,
+      ...jobMetrics.sampleSizes,
     },
-    throughputVerdict: evaluateMergeQueueThroughput(
-      {
-        latency: {
-          readyToMergeSeconds: percentilesOf(readyToMerge),
+    throughputVerdict: hydrationComplete
+      ? evaluatedVerdict
+      : {
+          ...evaluatedVerdict,
+          status: 'insufficient_data',
+          reason: 'API hydration incomplete; snapshot is non-authoritative',
+          action: 'hydrate_remaining_api_samples',
         },
-        sampleSizes: { readyToMerge: readyToMerge.length },
-      },
-      // Keep verdict deterministic: callers pass `ts` so wall-clock Date.now
-      // cannot flip evaluation-window status between test and job runs.
-      { now: ts ? new Date(ts) : new Date() }
-    ),
   };
 }

@@ -49,6 +49,11 @@ export interface PipelineScoreboard {
       readonly p50: number;
       readonly p95: number;
     };
+    readonly timeToMergeAvailable?: boolean;
+    readonly timeToMergeUnavailableReason?:
+      | 'partial_hydration'
+      | 'no_samples'
+      | 'unavailable';
   };
   readonly gates: {
     readonly tasteLabeledPrsWeek: number;
@@ -79,6 +84,12 @@ export interface PipelineScoreboardInput {
   readonly previous?: PipelineScoreboard | null;
   readonly jobLogEntries?: ReadonlyArray<JobLogEntry>;
   readonly ciMetrics?: {
+    readonly hydration?: {
+      readonly complete?: boolean;
+    };
+    readonly sampleSizes?: {
+      readonly fleetLeadTime?: number;
+    };
     readonly throughput?: {
       readonly queueWaitSeconds?: {
         readonly p50?: number;
@@ -86,6 +97,10 @@ export interface PipelineScoreboardInput {
       };
     };
     readonly latency?: {
+      readonly fleetLeadTimeSeconds?: {
+        readonly p50?: number;
+        readonly p95?: number;
+      };
       readonly readyToMergeSeconds?: {
         readonly p50?: number;
         readonly p95?: number;
@@ -201,13 +216,25 @@ function isCiMetricsSnapshot(
   if (!isRecord(value)) return false;
   const throughput = value.throughput;
   const latency = value.latency;
+  const hydration = value.hydration;
+  const sampleSizes = value.sampleSizes;
   return (
+    (hydration === undefined ||
+      (isRecord(hydration) &&
+        (hydration.complete === undefined ||
+          typeof hydration.complete === 'boolean'))) &&
+    (sampleSizes === undefined ||
+      (isRecord(sampleSizes) &&
+        (sampleSizes.fleetLeadTime === undefined ||
+          typeof sampleSizes.fleetLeadTime === 'number'))) &&
     (throughput === undefined ||
       (isRecord(throughput) &&
         (throughput.queueWaitSeconds === undefined ||
           isPercentileRecord(throughput.queueWaitSeconds)))) &&
     (latency === undefined ||
       (isRecord(latency) &&
+        (latency.fleetLeadTimeSeconds === undefined ||
+          isPercentileRecord(latency.fleetLeadTimeSeconds)) &&
         (latency.readyToMergeSeconds === undefined ||
           isPercentileRecord(latency.readyToMergeSeconds))))
   );
@@ -346,7 +373,22 @@ export function buildPipelineScoreboard(
   const mqAttempts = input.mergedPrs?.filter(pr =>
     labelList(pr.labels).includes('merge-queue')
   ).length;
-  const readyToMerge = input.ciMetrics?.latency?.readyToMergeSeconds;
+  const schemaV2FleetLeadTime = input.ciMetrics?.latency?.fleetLeadTimeSeconds;
+  const fleetLeadTime =
+    schemaV2FleetLeadTime ?? input.ciMetrics?.latency?.readyToMergeSeconds;
+  const timeToMergeAvailable =
+    input.ciMetrics?.hydration?.complete !== false &&
+    fleetLeadTime !== undefined &&
+    (schemaV2FleetLeadTime === undefined ||
+      (input.ciMetrics?.sampleSizes?.fleetLeadTime ?? 0) > 0);
+  const timeToMergeUnavailableReason = timeToMergeAvailable
+    ? undefined
+    : input.ciMetrics?.hydration?.complete === false
+      ? 'partial_hydration'
+      : schemaV2FleetLeadTime !== undefined &&
+          (input.ciMetrics?.sampleSizes?.fleetLeadTime ?? 0) <= 0
+        ? 'no_samples'
+        : 'unavailable';
   const gateEntries = shipperEntries;
 
   const scoreboard: PipelineScoreboard = {
@@ -377,9 +419,11 @@ export function buildPipelineScoreboard(
           ? Number((mqAttempts / merges).toFixed(2))
           : null,
       timeToMergeSeconds: {
-        p50: readyToMerge?.p50 ?? 0,
-        p95: readyToMerge?.p95 ?? 0,
+        p50: timeToMergeAvailable ? (fleetLeadTime.p50 ?? 0) : 0,
+        p95: timeToMergeAvailable ? (fleetLeadTime.p95 ?? 0) : 0,
       },
+      timeToMergeAvailable,
+      timeToMergeUnavailableReason,
     },
     gates: {
       tasteLabeledPrsWeek:
@@ -433,12 +477,20 @@ export function renderPipelineScoreboard(
   const failureText = Object.entries(scoreboard.shipper.failuresByCategory)
     .map(([key, value]) => `${key}:${value}`)
     .join(', ');
+  const timeToMergeText =
+    scoreboard.queue.timeToMergeAvailable !== false
+      ? `p50 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p50)} / p95 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p95)}`
+      : scoreboard.queue.timeToMergeUnavailableReason === 'partial_hydration'
+        ? 'n/a (partial hydration)'
+        : scoreboard.queue.timeToMergeUnavailableReason === 'no_samples'
+          ? 'n/a (no samples)'
+          : 'n/a';
   return [
     `Pipeline scoreboard (${scoreboard.window.since.slice(0, 10)} UTC)`,
     `Funnel: ready ${scoreboard.funnel.ready} (${signed(scoreboard.funnel.deltas.ready)}) · claimed ${scoreboard.funnel.claimed} (${signed(scoreboard.funnel.deltas.claimed)}) · in-progress ${scoreboard.funnel.inProgress} (${signed(scoreboard.funnel.deltas.inProgress)}) · blocked ${scoreboard.funnel.blocked} (${signed(scoreboard.funnel.deltas.blocked)})`,
     `Shipper: claims ${scoreboard.shipper.claims} · ships ${scoreboard.shipper.ships} · retries ${scoreboard.shipper.retriesUsed} · cost/ship $${scoreboard.shipper.costPerShippedIssueUsd ?? 0}`,
     `Failures: ${failureText || 'none'}`,
-    `Queue: merges ${scoreboard.queue.merges} · MQ attempts/merge ${scoreboard.queue.mqAttemptsPerMerge ?? 'n/a'} · time-to-merge p50 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p50)} / p95 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p95)}`,
+    `Queue: merges ${scoreboard.queue.merges} · MQ attempts/merge ${scoreboard.queue.mqAttemptsPerMerge ?? 'n/a'} · time-to-merge ${timeToMergeText}`,
     `Gates: taste-labeled PRs/week ${scoreboard.gates.tasteLabeledPrsWeek} · autofix interventions ${scoreboard.gates.autofixInterventions}`,
     scoreboard.alarms.length
       ? `Alarms: ${scoreboard.alarms.map(alarm => alarm.message).join(' ')}`

@@ -325,6 +325,66 @@ describe('pipeline scoreboard compute', () => {
     expect(body).toContain('Queue: merges 1');
     expect(body).toContain('time-to-merge p50 10m / p95 15m');
   });
+
+  it('prefers schema-v2 fleet lead time over the schema-v1 fallback', () => {
+    const scoreboard = buildPipelineScoreboard({
+      ts: '2026-07-03T00:00:00.000Z',
+      window,
+      issues: [],
+      ciMetrics: {
+        hydration: { complete: true },
+        sampleSizes: { fleetLeadTime: 2 },
+        latency: {
+          fleetLeadTimeSeconds: { p50: 120, p95: 240 },
+          readyToMergeSeconds: { p50: 600, p95: 900 },
+        },
+      },
+    });
+
+    expect(scoreboard.queue.timeToMergeSeconds).toEqual({ p50: 120, p95: 240 });
+    expect(scoreboard.queue.timeToMergeAvailable).toBe(true);
+  });
+
+  it('marks schema-v2 fleet lead time unavailable when no samples exist', () => {
+    const scoreboard = buildPipelineScoreboard({
+      ts: '2026-07-03T00:00:00.000Z',
+      window,
+      issues: [],
+      ciMetrics: {
+        hydration: { complete: true },
+        sampleSizes: { fleetLeadTime: 0 },
+        latency: { fleetLeadTimeSeconds: { p50: 120, p95: 240 } },
+      },
+    });
+
+    expect(scoreboard.queue.timeToMergeSeconds).toEqual({ p50: 0, p95: 0 });
+    expect(scoreboard.queue.timeToMergeAvailable).toBe(false);
+    expect(scoreboard.queue.timeToMergeUnavailableReason).toBe('no_samples');
+    expect(renderPipelineScoreboard(scoreboard)).toContain(
+      'time-to-merge n/a (no samples)'
+    );
+  });
+
+  it('suppresses queue latency from a partially hydrated snapshot', () => {
+    const scoreboard = buildPipelineScoreboard({
+      ts: '2026-07-03T00:00:00.000Z',
+      window,
+      issues: [],
+      ciMetrics: {
+        hydration: { complete: false },
+        latency: { fleetLeadTimeSeconds: { p50: 120, p95: 240 } },
+      },
+    });
+
+    expect(scoreboard.queue.timeToMergeSeconds).toEqual({ p50: 0, p95: 0 });
+    expect(scoreboard.queue.timeToMergeAvailable).toBe(false);
+    expect(scoreboard.queue.timeToMergeUnavailableReason).toBe(
+      'partial_hydration'
+    );
+    expect(renderPipelineScoreboard(scoreboard)).toContain(
+      'time-to-merge n/a (partial hydration)'
+    );
+  });
 });
 
 describe('pipeline scoreboard digest and schedule wiring', () => {

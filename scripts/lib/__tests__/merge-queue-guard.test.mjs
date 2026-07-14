@@ -496,6 +496,9 @@ describe('merge queue telemetry parser', () => {
     ]);
 
     expect(metrics.queuedToMergedSeconds).toBe(5400);
+    expect(metrics.firstEnqueueToMergedSeconds).toBe(5400);
+    expect(metrics.lastEnqueueToMergedSeconds).toBe(1800);
+    expect(metrics.activeQueuedSeconds).toBe(3660);
     expect(metrics.requeueCount).toBe(1);
     expect(metrics.conflictEvictions).toBe(1);
     expect(metrics.ciEvictions).toBe(1);
@@ -521,6 +524,7 @@ describe('merge queue telemetry parser', () => {
     ]);
 
     expect(metrics.readyForReviewAt).toEqual(['2026-06-20T01:00:00Z']);
+    expect(metrics.fleetLeadTimeSeconds).toBe(600);
     expect(metrics.readyToMergedSeconds).toBe(600);
   });
 
@@ -548,5 +552,35 @@ describe('merge queue telemetry parser', () => {
     ]);
 
     expect(metrics.readyToMergedSeconds).toBeNull();
+  });
+
+  it('reports no queue duration for a PR that was never queued', () => {
+    const metrics = parseMergeQueueTimeline(
+      [{ event: 'merged', created_at: '2026-06-20T01:10:00Z' }],
+      { prCreatedAt: '2026-06-20T01:00:00Z' }
+    );
+
+    expect(metrics.firstEnqueueToMergedSeconds).toBeNull();
+    expect(metrics.lastEnqueueToMergedSeconds).toBeNull();
+    expect(metrics.activeQueuedSeconds).toBeNull();
+    expect(metrics.fleetLeadTimeSeconds).toBe(600);
+  });
+
+  it('caps active queue time at merge when cleanup unlabeled arrives later', () => {
+    const metrics = parseMergeQueueTimeline([
+      {
+        event: 'labeled',
+        label: { name: 'merge-queue' },
+        created_at: '2026-06-20T01:00:00Z',
+      },
+      { event: 'merged', created_at: '2026-06-20T01:10:00Z' },
+      {
+        event: 'unlabeled',
+        label: { name: 'merge-queue' },
+        created_at: '2026-06-20T01:15:00Z',
+      },
+    ]);
+
+    expect(metrics.activeQueuedSeconds).toBe(600);
   });
 });

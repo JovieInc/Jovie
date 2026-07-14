@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  activeQueuedSeconds,
+  CI_METRICS_REQUIRED_STATUSES,
   CI_METRICS_SCHEMA_VERSION,
   ciRunHours,
   completedDurationsSeconds,
+  createApiRequestBudget,
   evaluateMergeQueueThroughput,
   flakyRerunRate,
+  fleetLeadTimeSeconds,
   fullMergeTimesSeconds,
   gateDurationsSeconds,
+  hasCompleteRequiredChecks,
+  hasGreenRequiredChecks,
+  lastEnqueueToMergeSeconds,
   MIN_READY_TO_MERGE_SAMPLES,
   mergedThroughput,
   percentilesOf,
@@ -14,7 +21,10 @@ import {
   READY_TO_MERGE_P50_TARGET_SECONDS,
   READY_TO_MERGE_P95_TARGET_SECONDS,
   readyToMergeSeconds,
+  shouldReuseJobCache,
+  shouldReuseRequiredChecksCache,
   summarizeCiMetrics,
+  summarizeJobMetrics,
 } from '../ci-metrics-compute.mjs';
 
 const run = (
@@ -155,18 +165,376 @@ describe('queueWaitSeconds', () => {
 });
 
 describe('readyToMergeSeconds', () => {
-  it('extracts positive readyToMergedSeconds', () => {
+  it('keeps the v1 helper as an alias for fleet lead time', () => {
     const tl = [
       { readyToMergedSeconds: 300 },
       { readyToMergedSeconds: null },
       { readyToMergedSeconds: 0 },
       { readyToMergedSeconds: 900 },
     ];
+    expect(fleetLeadTimeSeconds(tl)).toEqual([300, 900]);
     expect(readyToMergeSeconds(tl)).toEqual([300, 900]);
   });
 
   it('returns [] for nullish input', () => {
     expect(readyToMergeSeconds(undefined)).toEqual([]);
+  });
+});
+
+describe('queue interval metrics', () => {
+  it('extracts first, last, and active queue durations independently', () => {
+    const timelines = [
+      {
+        firstEnqueueToMergedSeconds: 5400,
+        lastEnqueueToMergedSeconds: 1800,
+        activeQueuedSeconds: 3660,
+      },
+      {
+        firstEnqueueToMergedSeconds: null,
+        lastEnqueueToMergedSeconds: null,
+        activeQueuedSeconds: null,
+      },
+    ];
+
+    expect(queueWaitSeconds(timelines)).toEqual([5400]);
+    expect(lastEnqueueToMergeSeconds(timelines)).toEqual([1800]);
+    expect(activeQueuedSeconds(timelines)).toEqual([3660]);
+  });
+});
+
+const greenChecks = completedAt =>
+  CI_METRICS_REQUIRED_STATUSES.map(name => ({
+    name,
+    completed_at: completedAt,
+    conclusion: 'success',
+  }));
+
+describe('summarizeJobMetrics', () => {
+  it('reports runner classes, waste, failures, required green, and skips', () => {
+    const out = summarizeJobMetrics([
+      {
+        runCreatedAt: '2026-07-10T10:00:00Z',
+        runConclusion: 'failure',
+        requiredChecks: greenChecks('2026-07-10T10:07:00Z'),
+        jobs: [
+          {
+            labels: ['ubuntu-latest'],
+            started_at: '2026-07-10T10:00:20Z',
+            completed_at: '2026-07-10T10:05:20Z',
+            conclusion: 'cancelled',
+          },
+          {
+            labels: ['self-hosted'],
+            started_at: '2026-07-10T10:00:40Z',
+            completed_at: '2026-07-10T10:02:40Z',
+            conclusion: 'failure',
+          },
+          {
+            labels: ['ubuntu-latest'],
+            started_at: '2026-07-10T10:05:20Z',
+            completed_at: '2026-07-10T10:06:00Z',
+            conclusion: 'success',
+          },
+          {
+            labels: ['ubuntu-latest'],
+            started_at: '2026-07-10T10:05:00Z',
+            completed_at: '2026-07-10T10:05:30Z',
+            conclusion: 'skipped',
+          },
+        ],
+      },
+      {
+        runCreatedAt: '2026-07-10T12:00:00Z',
+        runConclusion: 'cancelled',
+        jobs: [
+          {
+            labels: ['self-hosted'],
+            started_at: '2026-07-10T12:01:00Z',
+            completed_at: '2026-07-10T12:02:00Z',
+            conclusion: 'success',
+          },
+        ],
+      },
+    ]);
+
+    expect(out.runnerSeconds).toEqual({ hosted: 340, selfHosted: 180 });
+    expect(out.cancellationWasteSeconds).toBe(360);
+    expect(out.timeToFirstTerminalFailureSeconds.p50).toBe(160);
+    expect(out.timeToRequiredGreenSeconds.p50).toBe(420);
+    expect(out.sampleSizes.jobs).toBe(4);
+  });
+
+  it('ignores missing and negative timestamps', () => {
+    const out = summarizeJobMetrics([
+      {
+        runCreatedAt: '2026-07-10T11:00:00Z',
+        jobs: [
+          { conclusion: 'skipped', started_at: null, completed_at: null },
+          {
+            labels: ['self-hosted'],
+            started_at: '2026-07-10T10:59:00Z',
+            completed_at: '2026-07-10T10:58:00Z',
+            conclusion: 'success',
+          },
+        ],
+      },
+    ]);
+    expect(out.runnerSeconds).toEqual({ hosted: 0, selfHosted: 0 });
+    expect(out.sampleSizes.jobStartDelay).toBe(0);
+  });
+
+  it('counts an immediate job start as a zero-second delay sample', () => {
+    const out = summarizeJobMetrics([
+      {
+        runCreatedAt: '2026-07-10T11:00:00Z',
+        jobs: [
+          {
+            labels: ['ubuntu-latest'],
+            started_at: '2026-07-10T11:00:00Z',
+            completed_at: '2026-07-10T11:01:00Z',
+            conclusion: 'success',
+          },
+        ],
+      },
+    ]);
+
+    expect(out.jobStartDelaySeconds.p50).toBe(0);
+    expect(out.sampleSizes.jobStartDelay).toBe(1);
+  });
+});
+
+describe('CI metrics API cache policy', () => {
+  const now = new Date('2026-07-11T12:00:00Z');
+  const run = {
+    created_at: '2026-07-11T10:00:00Z',
+    updated_at: '2026-07-11T11:00:00Z',
+  };
+  const cache = (green, fetchedAt) => ({
+    green,
+    fetchedAt,
+  });
+
+  it('keys jobs by updated_at and bounds required-check refreshes', () => {
+    expect(shouldReuseJobCache(run, { updatedAt: run.updated_at })).toBe(true);
+    expect(shouldReuseJobCache(run, { updatedAt: 'changed' })).toBe(false);
+    expect(
+      shouldReuseRequiredChecksCache(
+        run,
+        cache(true, '2026-07-11T11:00:00Z'),
+        now
+      )
+    ).toBe(true);
+    expect(
+      shouldReuseRequiredChecksCache(
+        run,
+        cache(false, '2026-07-11T08:00:00Z'),
+        now
+      )
+    ).toBe(true);
+    expect(
+      shouldReuseRequiredChecksCache(
+        run,
+        cache(false, '2026-07-11T05:00:00Z'),
+        now
+      )
+    ).toBe(false);
+    expect(
+      shouldReuseRequiredChecksCache(
+        { ...run, created_at: '2026-07-09T10:00:00Z' },
+        cache(false, '2026-07-09T11:00:00Z'),
+        now
+      )
+    ).toBe(false);
+  });
+
+  it('refreshes green and old non-green caches at the 24-hour boundary', () => {
+    const oldRun = { ...run, created_at: '2026-07-09T10:00:00Z' };
+    for (const green of [true, false]) {
+      expect(
+        shouldReuseRequiredChecksCache(
+          oldRun,
+          cache(green, '2026-07-10T12:00:01Z'),
+          now
+        )
+      ).toBe(true);
+      expect(
+        shouldReuseRequiredChecksCache(
+          oldRun,
+          cache(green, '2026-07-10T12:00:00Z'),
+          now
+        )
+      ).toBe(false);
+    }
+  });
+
+  it('refreshes terminal red and then reuses rerun-success checks', () => {
+    const failed = greenChecks(now.toISOString());
+    failed[0] = { ...failed[0], conclusion: 'failure' };
+    expect(hasCompleteRequiredChecks(failed)).toBe(true);
+    expect(hasGreenRequiredChecks(failed)).toBe(false);
+    expect(
+      shouldReuseRequiredChecksCache(
+        run,
+        cache(false, '2026-07-11T04:00:00Z'),
+        now
+      )
+    ).toBe(false);
+    expect(hasGreenRequiredChecks(greenChecks(now.toISOString()))).toBe(true);
+    expect(
+      shouldReuseRequiredChecksCache(run, cache(true, now.toISOString()), now)
+    ).toBe(true);
+  });
+
+  it.each([
+    'missing',
+    'pending',
+    'failed',
+  ])('does not report required green when PR Size Guard is %s', state => {
+    const checks = greenChecks(now.toISOString()).filter(
+      check => !(state === 'missing' && check.name === 'PR Size Guard')
+    );
+    if (state !== 'missing') {
+      const index = checks.findIndex(check => check.name === 'PR Size Guard');
+      checks[index] = {
+        ...checks[index],
+        conclusion: state === 'pending' ? null : 'failure',
+      };
+    }
+
+    expect(hasCompleteRequiredChecks(checks)).toBe(state === 'failed');
+    expect(hasGreenRequiredChecks(checks)).toBe(false);
+    expect(
+      summarizeJobMetrics([
+        {
+          runCreatedAt: '2026-07-11T10:00:00Z',
+          requiredChecks: checks,
+          jobs: [],
+        },
+      ]).sampleSizes.requiredGreen
+    ).toBe(0);
+  });
+
+  it('reuses one SHA-scoped check fetch across runs with different updated_at values', () => {
+    const fetched = cache(true, now.toISOString());
+    expect(
+      shouldReuseRequiredChecksCache(
+        { ...run, updated_at: '2026-07-11T11:30:00Z' },
+        fetched,
+        now
+      )
+    ).toBe(true);
+  });
+
+  it('treats a newer skipped execution as authoritative over older success', () => {
+    const checks = greenChecks('2026-07-11T10:00:00Z');
+    checks.push({
+      name: 'PR Ready',
+      completed_at: '2026-07-11T11:00:00Z',
+      conclusion: 'skipped',
+    });
+
+    expect(hasCompleteRequiredChecks(checks)).toBe(false);
+    expect(hasGreenRequiredChecks(checks)).toBe(false);
+  });
+
+  it('keeps a newer pending execution authoritative when an older success finishes later', () => {
+    const checks = greenChecks('2026-07-11T11:10:00Z');
+    const ready = checks.findIndex(check => check.name === 'PR Ready');
+    checks[ready] = {
+      ...checks[ready],
+      id: 100,
+      started_at: '2026-07-11T10:00:00Z',
+      completed_at: '2026-07-11T11:10:00Z',
+    };
+    checks.push({
+      id: 101,
+      name: 'PR Ready',
+      started_at: '2026-07-11T11:00:00Z',
+      completed_at: null,
+      conclusion: null,
+    });
+
+    expect(hasCompleteRequiredChecks(checks)).toBe(false);
+    expect(hasGreenRequiredChecks(checks)).toBe(false);
+  });
+
+  it('uses check-run id over start time when executions overlap', () => {
+    const checks = greenChecks('2026-07-11T11:20:00Z');
+    const ready = checks.findIndex(check => check.name === 'PR Ready');
+    checks[ready] = {
+      ...checks[ready],
+      id: 100,
+      started_at: '2026-07-11T11:00:00Z',
+      completed_at: '2026-07-11T11:20:00Z',
+    };
+    checks.push({
+      id: 101,
+      name: 'PR Ready',
+      started_at: '2026-07-11T10:55:00Z',
+      completed_at: null,
+      conclusion: null,
+    });
+
+    expect(hasCompleteRequiredChecks(checks)).toBe(false);
+    expect(hasGreenRequiredChecks(checks)).toBe(false);
+  });
+
+  it('uses check-run id when the newer queued execution has no timestamps', () => {
+    const checks = greenChecks('2026-07-11T11:20:00Z');
+    const ready = checks.findIndex(check => check.name === 'PR Ready');
+    checks[ready] = { ...checks[ready], id: 100 };
+    checks.push({
+      id: 101,
+      name: 'PR Ready',
+      started_at: null,
+      completed_at: null,
+      conclusion: null,
+    });
+
+    expect(hasCompleteRequiredChecks(checks)).toBe(false);
+    expect(hasGreenRequiredChecks(checks)).toBe(false);
+  });
+});
+
+describe('CI metrics API request budget', () => {
+  it('caps cold-cache request fanout and stops at the elapsed deadline', () => {
+    let nowMs = 1_000;
+    const byCount = createApiRequestBudget({
+      maxRequests: 2,
+      maxElapsedMs: 10_000,
+      now: () => nowMs,
+    });
+    expect(byCount.tryConsume()).toBe(true);
+    expect(byCount.tryConsume()).toBe(true);
+    expect(byCount.tryConsume()).toBe(false);
+    expect(byCount.used).toBe(2);
+
+    const byTime = createApiRequestBudget({
+      maxRequests: 10,
+      maxElapsedMs: 500,
+      now: () => nowMs,
+    });
+    expect(byTime.tryConsume()).toBe(true);
+    nowMs += 500;
+    expect(byTime.tryConsume()).toBe(false);
+    expect(byTime.used).toBe(1);
+  });
+
+  it('reserves requests for later hydration without exceeding the global cap', () => {
+    const budget = createApiRequestBudget({
+      maxRequests: 4,
+      maxElapsedMs: 10_000,
+    });
+
+    expect(budget.tryConsume(2)).toBe(true);
+    expect(budget.tryConsume(2)).toBe(true);
+    expect(budget.tryConsume(2)).toBe(false);
+    expect(budget.used).toBe(2);
+
+    expect(budget.tryConsume()).toBe(true);
+    expect(budget.tryConsume()).toBe(true);
+    expect(budget.tryConsume()).toBe(false);
+    expect(budget.used).toBe(4);
   });
 });
 
@@ -228,7 +596,7 @@ describe('evaluateMergeQueueThroughput', () => {
     expect(verdict.action).toBe('close_follow_up');
   });
 
-  it('recommends raising max queue depth when p95 is off target', () => {
+  it('does not recommend a queue depth that is already active', () => {
     const verdict = evaluateMergeQueueThroughput(
       metricsFixture({
         latency: {
@@ -242,7 +610,11 @@ describe('evaluateMergeQueueThroughput', () => {
       { now: afterEvalWindow }
     );
     expect(verdict.status).toBe('off_target');
-    expect(verdict.action).toContain('raise_max_queue_depth_12_to_16');
+    expect(verdict.action).toContain(
+      'investigate_runner_capacity_and_queue_churn'
+    );
+    expect(verdict.action).not.toContain('raise_max_queue_depth_12_to_16');
+    expect(verdict.queuePolicy.maxQueueDepth).toBe(16);
   });
 });
 
@@ -257,8 +629,18 @@ describe('summarizeCiMetrics', () => {
       { createdAt: '2026-06-19T10:00:00Z', mergedAt: '2026-06-19T12:00:00Z' }, // 7200
     ];
     const timelineResults = [
-      { queuedToMergedSeconds: 240, readyToMergedSeconds: 500 },
-      { queuedToMergedSeconds: 480, readyToMergedSeconds: 700 },
+      {
+        queuedToMergedSeconds: 240,
+        lastEnqueueToMergedSeconds: 180,
+        activeQueuedSeconds: 200,
+        readyToMergedSeconds: 500,
+      },
+      {
+        queuedToMergedSeconds: 480,
+        lastEnqueueToMergedSeconds: 300,
+        activeQueuedSeconds: 420,
+        readyToMergedSeconds: 700,
+      },
     ];
     const out = summarizeCiMetrics({
       ts: '2026-06-19T13:00:00Z',
@@ -267,7 +649,9 @@ describe('summarizeCiMetrics', () => {
       timelineResults,
     });
 
+    expect(CI_METRICS_SCHEMA_VERSION).toBe(2);
     expect(out.schemaVersion).toBe(CI_METRICS_SCHEMA_VERSION);
+    expect(out.hydration.complete).toBe(true);
     expect(out.ts).toBe('2026-06-19T13:00:00Z');
     // span = 25h = 1.042d; p50 of two values is the lower (nearest-rank).
     expect(out.window).toEqual({ mergedPrs: 2, ciRuns: 2, spanDays: 1.042 });
@@ -290,13 +674,72 @@ describe('summarizeCiMetrics', () => {
       p75: 700,
       p95: 700,
     });
-    expect(out.sampleSizes).toEqual({
+    expect(out.latency.fleetLeadTimeSeconds).toEqual(
+      out.latency.readyToMergeSeconds
+    );
+    expect(out.latency.lastEnqueueToMergeSeconds.p95).toBe(300);
+    expect(out.latency.activeQueuedSeconds.p95).toBe(420);
+    expect(out.sampleSizes).toMatchObject({
       gate: 2,
       fullMerge: 2,
       queueWait: 2,
       readyToMerge: 2,
+      fleetLeadTime: 2,
+      firstEnqueueLead: 2,
+      lastEnqueueToMerge: 2,
+      activeQueued: 2,
     });
     expect(out.throughputVerdict.status).toBe('defer');
     expect(out.throughputVerdict.action).toBe('wait_for_evaluation_window');
+  });
+
+  it('marks a cold snapshot partial and prevents an authoritative verdict', () => {
+    const out = summarizeCiMetrics({
+      ts: '2026-07-10T12:00:00Z',
+      runs: [],
+      prs: [],
+      timelineResults: [],
+      hydration: {
+        runJobs: { covered: 0, total: 100 },
+        requiredChecks: { covered: 0, total: 90 },
+        timelines: { covered: 0, total: 50 },
+      },
+    });
+
+    expect(out.hydration.complete).toBe(false);
+    expect(out.hydration.timelines).toEqual({ covered: 0, total: 50 });
+    expect(out.throughputVerdict.status).toBe('insufficient_data');
+    expect(out.throughputVerdict.action).toBe('hydrate_remaining_api_samples');
+  });
+
+  it('keeps a data-rich partial snapshot non-authoritative until coverage is complete', () => {
+    const timelineResults = Array.from({ length: 10 }, () => ({
+      readyToMergedSeconds: 300,
+    }));
+    const base = {
+      ts: '2026-07-10T12:00:00Z',
+      runs: [],
+      prs: [],
+      timelineResults,
+      hydration: {
+        runJobs: { covered: 0, total: 0 },
+        requiredChecks: { covered: 0, total: 0 },
+        timelines: { covered: 9, total: 10 },
+      },
+    };
+
+    const partial = summarizeCiMetrics(base);
+    expect(partial.throughputVerdict.status).toBe('insufficient_data');
+
+    const complete = summarizeCiMetrics({
+      ...base,
+      hydration: {
+        ...base.hydration,
+        timelines: { covered: 10, total: 10 },
+      },
+    });
+    expect(complete.hydration.complete).toBe(true);
+    expect(complete.throughputVerdict.status).toBe('on_target');
+    expect(complete.throughputVerdict.action).toBe('close_follow_up');
   });
 });
