@@ -60,6 +60,64 @@ describe('Admin Waitlist Approve API', () => {
     mockEnqueueWaitlistApprovalInviteEmail.mockResolvedValue('job-1');
   });
 
+  it('returns 401 when the caller is not authenticated', async () => {
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      userId: null,
+      email: null,
+      isAuthenticated: false,
+      isAdmin: false,
+      isPro: false,
+      hasAdvancedFeatures: false,
+      canRemoveBranding: false,
+    });
+
+    const response = await POST(
+      new Request('http://localhost/app/admin/waitlist/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entryId: '11111111-1111-4111-8111-111111111111',
+        }),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data).toEqual({ success: false, error: 'Unauthorized' });
+    expect(mockWithSystemIngestionSession).not.toHaveBeenCalled();
+    expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
+    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when the caller is authenticated but not an admin', async () => {
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      userId: 'user_123',
+      email: 'user@example.com',
+      isAuthenticated: true,
+      isAdmin: false,
+      isPro: false,
+      hasAdvancedFeatures: false,
+      canRemoveBranding: false,
+    });
+
+    const response = await POST(
+      new Request('http://localhost/app/admin/waitlist/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entryId: '22222222-2222-4222-8222-222222222222',
+        }),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data).toEqual({ success: false, error: 'Forbidden' });
+    expect(mockWithSystemIngestionSession).not.toHaveBeenCalled();
+    expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
+    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
+  });
+
   it('rejects concurrent approvals after the entry is processed', async () => {
     const entryId = '11111111-1111-4111-8111-111111111111';
 
