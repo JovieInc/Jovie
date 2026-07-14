@@ -98,6 +98,14 @@ run_deploy() {
     done < ".vercel/jovie-generated-public-files"
   fi
 
+  if [ -n "${VERCEL_GIT_COMMIT_SHA:-}" ]; then
+    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" \
+      --build-env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}" \
+      --env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}" \
+      --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
+    return
+  fi
+
   "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
 }
 
