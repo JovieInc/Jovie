@@ -17,6 +17,7 @@ import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-b
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -443,7 +444,10 @@ export function UnifiedSidebar({
       </SidebarContent>
 
       {isRouteSidebar ? null : (
-        <div className='mt-auto shrink-0'>
+        // SidebarFooter is shrink-0; with the restored full-height flex chain
+        // (sidebar peer + shell mount both h-full), SidebarContent's flex-1
+        // absorbs free space so Settings + Now Playing + banners pin bottom.
+        <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
           {/* Bottom Settings button opens the existing user menu via UserButton.
               Uses Sidebar atoms for native feel (icon + label, tooltip in icon mode).
               Placed above Now Playing / audio area. */}
@@ -473,7 +477,7 @@ export function UnifiedSidebar({
           ) : (
             <SidebarInstallBanner />
           )}
-        </div>
+        </SidebarFooter>
       )}
     </Sidebar>
   );

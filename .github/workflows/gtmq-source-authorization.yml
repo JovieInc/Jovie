@@ -1,0 +1,53 @@
+name: Graphite Synthetic Source Authorization
+
+on:
+  pull_request_target:
+    types:
+      [
+        opened,
+        synchronize,
+        reopened,
+        closed,
+        labeled,
+        unlabeled,
+        converted_to_draft,
+        ready_for_review,
+      ]
+
+concurrency:
+  group: gtmq-source-authorization-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  authorize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout trusted authorization policy
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Validate Graphite synthetic source authorization
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          GH_RETRY_ATTEMPTS: 8
+          GH_RETRY_MAX_DELAY: 60
+          GTMQ_MUTATION_AUTHORIZATION: gtmq-source-authorization-workflow
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          EVENT_ACTION: ${{ github.event.action }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_HEAD_REF" == gtmq_* ]]; then
+            bash scripts/guard-gtmq-source-authorization.sh \
+              --synthetic-event "$EVENT_PR_NUMBER"
+          else
+            bash scripts/guard-gtmq-source-authorization.sh \
+              --source-event "$EVENT_ACTION"
+          fi

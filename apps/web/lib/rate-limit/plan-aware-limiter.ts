@@ -39,6 +39,9 @@ function normalizePlan(plan: PlanInput): PlanId {
   const normalized = plan.toLowerCase();
   if (normalized === 'founding') return 'pro';
   if (normalized === 'growth') return 'max';
+  // Trial is a Pro-level experience while active; expired trials reach the
+  // limiter already normalized to 'free' by the entitlements layer.
+  if (normalized === 'trial') return 'pro';
   return isPlanId(normalized) ? normalized : 'free';
 }
 

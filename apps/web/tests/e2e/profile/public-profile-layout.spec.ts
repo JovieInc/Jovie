@@ -1,6 +1,9 @@
-import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
+import {
+  resetOwnedOutputDirectory,
+  resolveFixedOwnedOutputDirectory,
+} from '../../../scripts/owned-output-path';
 import { installPublicRouteMocks } from '../utils/public-surface-helpers';
 import { waitForHydration } from '../utils/smoke-test-utils';
 
@@ -15,9 +18,17 @@ const PROFILE_HANDLE =
   process.env.PUBLIC_PROFILE_LAYOUT_HANDLE?.trim() || 'tim';
 const APPROVAL_SCREENSHOTS =
   process.env.PROFILE_LAYOUT_APPROVAL_SCREENSHOTS === '1';
-const APPROVAL_SCREENSHOT_DIR =
+const CONFIGURED_APPROVAL_SCREENSHOT_DIR =
   process.env.PROFILE_LAYOUT_APPROVAL_DIR?.trim() ||
   '.context/public-profile-layout-approval';
+const APPROVAL_OUTPUT_BASE = path.join(repoRoot(), '.context');
+const APPROVAL_OUTPUT_SEGMENT = 'public-profile-layout-approval';
+const APPROVAL_SCREENSHOT_DIR = resolveFixedOwnedOutputDirectory(
+  APPROVAL_OUTPUT_BASE,
+  APPROVAL_OUTPUT_SEGMENT,
+  path.resolve(repoRoot(), CONFIGURED_APPROVAL_SCREENSHOT_DIR),
+  'PROFILE_LAYOUT_APPROVAL_DIR'
+);
 const VIEWPORTS: readonly LayoutViewport[] = [
   { id: '320x568', width: 320, height: 568, isMobile: true },
   { id: '360x740', width: 360, height: 740, isMobile: true },
@@ -96,10 +107,8 @@ async function prepareProfilePage(page: Page, viewport: LayoutViewport) {
 async function saveApprovalScreenshot(page: Page, viewport: LayoutViewport) {
   if (!APPROVAL_SCREENSHOTS) return;
 
-  const outputDir = path.resolve(repoRoot(), APPROVAL_SCREENSHOT_DIR);
-  await mkdir(outputDir, { recursive: true });
   await page.screenshot({
-    path: path.join(outputDir, `${viewport.id}.png`),
+    path: path.join(APPROVAL_SCREENSHOT_DIR, `${viewport.id}.png`),
     fullPage: false,
   });
 }
@@ -269,7 +278,20 @@ async function collectLayoutMetrics(page: Page) {
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Public profile /tim layout hardening @regression', () => {
+  test.describe.configure({
+    mode: APPROVAL_SCREENSHOTS ? 'serial' : 'default',
+  });
   test.setTimeout(180_000);
+
+  test.beforeAll(async () => {
+    if (!APPROVAL_SCREENSHOTS) return;
+
+    await resetOwnedOutputDirectory(
+      APPROVAL_OUTPUT_BASE,
+      APPROVAL_OUTPUT_SEGMENT,
+      'PROFILE_LAYOUT_APPROVAL_DIR'
+    );
+  });
 
   for (const viewport of VIEWPORTS) {
     test(`${viewport.id} has no layout collisions`, async ({ page }) => {

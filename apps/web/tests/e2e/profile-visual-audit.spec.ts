@@ -1,5 +1,9 @@
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import {
+  resetOwnedOutputDirectory,
+  resolveOwnedOutputDirectory,
+} from '../../scripts/owned-output-path';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
 
@@ -129,6 +133,13 @@ const ACTIVE_BREAKPOINTS: readonly BreakpointConfig[] = FAST_ITERATION
         breakpoint.name === 'mobile' || breakpoint.name === 'desktop'
     )
   : BREAKPOINTS;
+const EXPECTED_AUDIT_CAPTURE_COUNT = ACTIVE_PROFILE_CASES.reduce(
+  (total, routeCase) =>
+    total +
+    routeCase.shells.length * ACTIVE_THEMES.length * ACTIVE_BREAKPOINTS.length,
+  0
+);
+let completedAuditCaptureCount = 0;
 
 const DEV_OVERLAY_SELECTORS = [
   '[data-sonner-toaster]',
@@ -150,7 +161,11 @@ const WEB_ROOT = process.cwd().endsWith('/apps/web')
   : path.resolve(process.cwd(), 'apps/web');
 const REPO_ROOT = path.resolve(WEB_ROOT, '..', '..');
 const cycleName = process.env.PROFILE_AUDIT_CYCLE ?? 'cycle-01';
-const cycleDir = path.join(REPO_ROOT, '.context/profile-audit', cycleName);
+const cycleDir = resolveOwnedOutputDirectory(
+  path.join(REPO_ROOT, '.context/profile-audit'),
+  cycleName,
+  'PROFILE_AUDIT_CYCLE'
+);
 
 function withShellVariant(routePath: string, shell: ShellVariant): string {
   if (shell === 'legacy') {
@@ -357,8 +372,12 @@ test.describe('Public profile visual audit @smoke', () => {
   test.describe.configure({ mode: 'serial' });
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test.beforeAll(() => {
-    mkdirSync(cycleDir, { recursive: true });
+  test.beforeAll(async () => {
+    await resetOwnedOutputDirectory(
+      path.dirname(cycleDir),
+      path.basename(cycleDir),
+      'PROFILE_AUDIT_CYCLE'
+    );
     writeFileSync(
       path.join(cycleDir, 'manifest.json'),
       JSON.stringify(
@@ -387,6 +406,17 @@ test.describe('Public profile visual audit @smoke', () => {
         null,
         2
       )
+    );
+  });
+
+  test.afterAll(() => {
+    if (completedAuditCaptureCount !== EXPECTED_AUDIT_CAPTURE_COUNT) return;
+    writeFileSync(
+      path.join(cycleDir, 'complete.json'),
+      `${JSON.stringify({
+        completedAt: new Date().toISOString(),
+        captureCount: completedAuditCaptureCount,
+      })}\n`
     );
   });
 
@@ -460,6 +490,7 @@ test.describe('Public profile visual audit @smoke', () => {
               ),
               contentType: 'application/json',
             });
+            completedAuditCaptureCount += 1;
           });
         }
       }

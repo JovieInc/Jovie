@@ -20,11 +20,13 @@
 import { chromium, type Page } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resetOwnedOutputDirectory } from './owned-output-directory';
 
 const LINEAR_AUTH = path.join(__dirname, '../../auth-linear.json');
 // Use the E2E auth file which has proper Clerk testing tokens
 const OURS_AUTH = path.join(__dirname, '../../tests/.auth/user.json');
-const OUTPUT_DIR = path.join(__dirname, '../../linear-compare-output');
+const OUTPUT_ROOT = path.join(__dirname, '../../linear-compare-output');
+let outputDirectory: string;
 const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://localhost:3100'; // Match E2E port
 const HEADLESS = process.env.HEADLESS !== 'false'; // Set HEADLESS=false to debug
 
@@ -318,11 +320,6 @@ function generateReport(result: ComparisonResult): string {
 async function runComparison(
   mode: 'light' | 'dark'
 ): Promise<ComparisonResult> {
-  // Ensure output directory exists
-  if (!fs.existsSync(OUTPUT_DIR)) {
-    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  }
-
   // Check for auth files
   if (!fs.existsSync(LINEAR_AUTH)) {
     throw new Error(
@@ -363,7 +360,7 @@ async function runComparison(
   await waitForFonts(linearPage);
 
   const linearScreenshot = path.join(
-    OUTPUT_DIR,
+    outputDirectory,
     `linear-${mode}-${timestamp}.png`
   );
   await linearPage.screenshot({ path: linearScreenshot, fullPage: false });
@@ -407,7 +404,10 @@ async function runComparison(
   await disableAnimations(oursPage);
   await waitForFonts(oursPage);
 
-  const oursScreenshot = path.join(OUTPUT_DIR, `ours-${mode}-${timestamp}.png`);
+  const oursScreenshot = path.join(
+    outputDirectory,
+    `ours-${mode}-${timestamp}.png`
+  );
   await oursPage.screenshot({ path: oursScreenshot, fullPage: false });
 
   // Debug: print page title and URL
@@ -439,6 +439,8 @@ async function runComparison(
 }
 
 async function main() {
+  outputDirectory = resetOwnedOutputDirectory(OUTPUT_ROOT, 'dashboards');
+
   console.log('🔍 Linear vs Our Dashboard Comparison');
   console.log('=====================================\n');
 
@@ -468,11 +470,11 @@ async function main() {
     const darkReport = generateReport(darkResult);
 
     const lightReportPath = path.join(
-      OUTPUT_DIR,
+      outputDirectory,
       `report-light-${lightResult.timestamp}.md`
     );
     const darkReportPath = path.join(
-      OUTPUT_DIR,
+      outputDirectory,
       `report-dark-${darkResult.timestamp}.md`
     );
 
@@ -484,7 +486,7 @@ async function main() {
     console.log(`   Light: ${lightReportPath}`);
     console.log(`   Dark: ${darkReportPath}`);
 
-    console.log(`\n📸 Screenshots saved to: ${OUTPUT_DIR}`);
+    console.log(`\n📸 Screenshots saved to: ${outputDirectory}`);
 
     // Print summary
     console.log(`\n📊 Summary:`);
@@ -497,7 +499,7 @@ async function main() {
       dark: darkResult,
     };
     const jsonPath = path.join(
-      OUTPUT_DIR,
+      outputDirectory,
       `results-${lightResult.timestamp}.json`
     );
     fs.writeFileSync(jsonPath, JSON.stringify(fullResults, null, 2));

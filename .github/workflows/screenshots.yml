@@ -100,6 +100,9 @@ jobs:
         env:
           BASE_URL: http://localhost:3000
 
+      - name: Verify screenshot catalog integrity and budgets
+        run: pnpm exec tsx scripts/check-screenshot-catalog.ts
+
       - name: Check for changes
         id: diff
         working-directory: .

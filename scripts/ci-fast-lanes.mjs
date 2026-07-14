@@ -215,9 +215,14 @@ function runStructural() {
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
     'pnpm doc:freshness:check',
     'node .github/scripts/quarantine-ledger.mjs validate',
+    // CI workflow changes live at the repo root, so Turbo --affected can select
+    // only the root package and return success after running zero web tests.
+    // Target Vitest directly so the deploy contract always executes and fails
+    // closed when the file cannot be resolved or contains no tests.
+    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
-    // Optional: drain regression tests need pytest; soft-skip if unavailable.
-    'if command -v pytest >/dev/null 2>&1; then pytest scripts/tests/test_gh_retry.py -v; elif python3 -c "import pytest" 2>/dev/null; then python3 -m pytest scripts/tests/test_gh_retry.py -v; else echo "pytest not installed — skip drain regression"; fi',
+    // Optional: structural regression tests need pytest; soft-skip if unavailable.
+    'if command -v pytest >/dev/null 2>&1; then pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py -v; elif python3 -c "import pytest" 2>/dev/null; then python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py -v; else echo "pytest not installed — skip structural regressions"; fi',
   ];
 
   let combined = '';

@@ -102,7 +102,7 @@ export function SmartLinkAudioPreview({
           aria-pressed={isPlaying}
           aria-busy={isLoading || undefined}
           disabled={isLoading}
-          className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/90 text-black transition-colors duration-fast hover:bg-white active:scale-[var(--scale-press)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 disabled:opacity-70 motion-reduce:active:scale-100'
+          className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/90 text-black dark:text-black transition-colors duration-fast hover:bg-white active:scale-[var(--scale-press)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 disabled:opacity-70 motion-reduce:active:scale-100'
         >
           {isLoading ? (
             <Loader2

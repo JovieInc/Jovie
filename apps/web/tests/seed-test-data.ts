@@ -14,6 +14,7 @@ import { Redis } from '@upstash/redis';
 import { and, eq, not } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import { deriveConfirmationStatus } from '@/lib/events/confirmation-status';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import {
   E2E_PREBUILT_CLAIM_TOKEN,
@@ -733,6 +734,9 @@ async function seedTourDatesForProfile(
   const values = TEST_TOUR_DATES.map(td => ({
     profileId,
     externalId: td.externalId,
+    // confirmation_status is NOT NULL with no default (trust gate) — derive
+    // it the same way the app's insertEvent helper does.
+    confirmationStatus: deriveConfirmationStatus(td.provider),
     title: td.title,
     venueName: td.venueName,
     city: td.city,

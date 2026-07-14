@@ -207,7 +207,9 @@ humanOptIn: { prUrl: string, date: string }
 ```
 The PR URL is the approval artifact (per post-2026-07-06 autonomy doctrine —
 approval artifact = PR/Linear, not a pre-merge human). First use goes through
-taste feedback, then the variant/section can promote to `status: 'active'`.
+taste feedback, then a variant can promote to `status: 'active'`. Missing
+section types follow `DESIGN_GAPS.md` and enter production only as approved
+registry sections.
 
 ## When the spec version bumps
 
@@ -233,4 +235,6 @@ are reverse-engineered FROM code, not the reverse.
 - `SECTION_CATALOG.md` — per-section rationale + exemplar.
 - `RECIPE_CATALOG.md` — per-recipe rationale + arc + decision tree.
 - `COMPOSITION_RULES.md` — composition-rule rationale (7 laws + page-class rules).
+- `DESIGN_GAPS.md` — proposed-section review, conversion workflow, migration matrix.
+- `MODEL_USAGE.md` — model-role and cost evidence ledger.
 - `AGENT_GUIDE.md` (this file) — sole entrypoint.

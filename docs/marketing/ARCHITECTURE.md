@@ -207,9 +207,10 @@ Spec-doc version drift fails Structural Contract doc-freshness (E13).
 | **minor** | Add a section, recipe, or variant; add a route mapping. Backward-compatible. |
 | **major** | Remove or deprecate a section/recipe/variant; change a chooseWhen predicate; reorder a recipe's sectionOrder. Requires lifecycle fields (`status: 'deprecated'`, `deprecatedSince`, `replacedBy`) + canon precedence update. |
 
-Section/variant lifecycle: `status: 'active' | 'deprecated' | 'removed'`.
-`deprecated` requires `deprecatedSince` + `replacedBy` (must reference an active
-id, test-asserted). `removed` usage = hard fail naming `replacedBy`.
+Production section lifecycle: `status: 'approved' | 'deprecated' | 'removed'`.
+Variant maturity remains `active | unproven | deprecated | removed`.
+`deprecated` requires `deprecatedSince` + `replacedBy` (the replacement must be
+approved for sections or active for variants). `removed` usage is a hard fail.
 
 Two ratchets (decrease-only baselines):
 - **Exemption ratchet**: unsanctioned exemptions (missing `linearId`/`approvedBy`/`prUrl`) must not increase. Baseline: 0.
@@ -247,7 +248,9 @@ and ui.md. Stays-rows are referenced, not duplicated.
 
 Adding a new section/recipe/variant:
 1. Add to the registry (`sections.ts` or `recipes.ts`) with a kebab-case id.
-2. Declare `status: 'unproven'` if no shipped exemplar; first use requires `humanOptIn` (DX2).
+2. New production sections enter through a `ProposedSectionRecord`; only add the
+   section registry entry after approval. New variants without a shipped
+   exemplar use `status: 'unproven'` and require `humanOptIn` (DX2).
 3. Add a golden-fixture brief that exercises the new path (determinism regression-tested forever).
 4. Bump `MARKETING_SPEC_VERSION` (minor for addition).
 5. Add the docs anchor (`#section-{id}` or `#recipe-{id}`) — manifest gate asserts parity.
@@ -256,6 +259,8 @@ Adding a new section/recipe/variant:
 Adding a new route:
 1. Add to `routeManifest.ts` with `recipeId` or sanctioned `exempt` (DX2: `linearId` + `approvedBy` + `prUrl`).
 2. If exempt and unsanctioned, the exemption ratchet fails — must carry all three fields.
+3. Add ordered `renderedSections`. Production bindings must resolve to approved
+   sections; a non-composable exemption records an empty list and its reason.
 
 ## 13. Migration strategy
 

@@ -22,11 +22,7 @@ vi.mock('@/lib/db/schema/tour', () => ({
   },
 }));
 
-import {
-  bulkInsertSyncedEvents,
-  deriveConfirmationStatus,
-  insertEvent,
-} from '@/lib/events/insert';
+import { bulkInsertSyncedEvents, insertEvent } from '@/lib/events/insert';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -37,18 +33,6 @@ beforeEach(() => {
     onConflictDoUpdate: mockOnConflictDoUpdate,
   });
   mockDbInsert.mockReturnValue({ values: mockValues });
-});
-
-describe('deriveConfirmationStatus', () => {
-  it('returns confirmed for manual creator entries', () => {
-    expect(deriveConfirmationStatus('manual')).toBe('confirmed');
-  });
-
-  it('returns pending for every synced provider', () => {
-    expect(deriveConfirmationStatus('bandsintown')).toBe('pending');
-    expect(deriveConfirmationStatus('songkick')).toBe('pending');
-    expect(deriveConfirmationStatus('admin_import')).toBe('pending');
-  });
 });
 
 describe('insertEvent', () => {

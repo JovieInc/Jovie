@@ -189,6 +189,25 @@ describe('plan-aware-limiter.ts', () => {
       expect(mockLimit).toHaveBeenCalledWith('user-1');
     });
 
+    it('normalizes trial to pro config (active reverse-trial users get Pro limits)', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult({ limit: 100 }));
+
+      const { createPlanAwareRateLimiter } = await import(
+        '@/lib/rate-limit/plan-aware-limiter'
+      );
+
+      const limiter = createPlanAwareRateLimiter({
+        configs: {
+          free: freeConfig,
+          pro: proConfig,
+        },
+      });
+
+      const result = await limiter.limit('user-1', 'trial');
+      expect(result.success).toBe(true);
+      expect(limiter.getConfigForPlan('trial')).toEqual(proConfig);
+    });
+
     it('normalizes founding to pro config', async () => {
       mockLimit.mockResolvedValue(makeAllowedResult({ limit: 100 }));
 

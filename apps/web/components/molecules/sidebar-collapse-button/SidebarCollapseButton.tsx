@@ -25,7 +25,9 @@ export function SidebarCollapseButton({
         onClick={toggleSidebar}
         aria-label={label}
         className={cn(
-          'inline-flex h-7 w-7 items-center justify-center rounded-md border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_86%,transparent)] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+          // System B icon chrome: borderless circle, transparent idle, soft hover fill.
+          // Matches ArtistProfileRailToggle — founder directive JOV-3959.
+          'inline-flex h-7 w-7 items-center justify-center rounded-full border-0 bg-transparent text-secondary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
           className
         )}
       >
