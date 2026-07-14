@@ -14,10 +14,10 @@ import {
   buildSelectorIndex,
   type ContrastInventory,
   type ContrastViolationRecord,
-  ensureScreenshotDirectory,
   extractContrastData,
   getScreenshotAbsolutePath,
   getScreenshotRelativePath,
+  resetContrastScreenshotDirectory,
   writeContrastInventoryArtifacts,
 } from './utils/contrast-inventory';
 import { installPublicRouteMocks } from './utils/public-surface-helpers';
@@ -91,7 +91,7 @@ test.describe('Contrast Inventory Sweep — JOV-#11028', () => {
   test.setTimeout(300_000);
 
   test.beforeAll(() => {
-    ensureScreenshotDirectory(OUTPUT_DIR);
+    resetContrastScreenshotDirectory(OUTPUT_DIR);
   });
 
   test.describe('Public routes (unauthenticated)', () => {

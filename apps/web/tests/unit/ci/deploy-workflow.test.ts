@@ -440,6 +440,70 @@ describe('CI E2E smoke workflow', () => {
     );
     expect(smokeJob).not.toContain('Export DATABASE_URL (main');
   });
+
+  it('pins Better Auth to the local standalone origin for smoke and golden-path jobs', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const localOrigin = 'http://localhost:3100';
+    const sharedBuild = getStepBlock(
+      getJobBlock(workflow, 'ci-build-public'),
+      'Build app (public routes only — no secrets needed)'
+    );
+    const goldenPathJob = getJobBlock(workflow, 'ci-golden-path');
+    const extendedSmokeJob = getJobBlock(workflow, 'ci-smoke-required');
+
+    expect(sharedBuild).toContain(
+      `NEXT_PUBLIC_BETTER_AUTH_URL: ${localOrigin}`
+    );
+    expect(sharedBuild).toContain(`NEXT_PUBLIC_APP_URL: ${localOrigin}`);
+    expect(sharedBuild).toContain("NEXT_PUBLIC_E2E_MODE: '1'");
+    const goldenBuild = getStepBlock(
+      goldenPathJob,
+      'Build real-Clerk golden-path artifact'
+    );
+    expect(goldenBuild).toContain(
+      `NEXT_PUBLIC_BETTER_AUTH_URL: ${localOrigin}`
+    );
+    expect(goldenBuild).toContain(`NEXT_PUBLIC_APP_URL: ${localOrigin}`);
+    const extendedBuild = getStepBlock(
+      extendedSmokeJob,
+      'Extract or rebuild for smoke tests'
+    );
+    expect(extendedBuild).toContain(
+      `NEXT_PUBLIC_BETTER_AUTH_URL: ${localOrigin}`
+    );
+    expect(extendedBuild).toContain(`NEXT_PUBLIC_APP_URL: ${localOrigin}`);
+    expect(extendedBuild).toContain("NEXT_PUBLIC_E2E_MODE: '1'");
+
+    const standaloneSteps = [
+      getStepBlock(
+        getJobBlock(workflow, 'ci-e2e-smoke'),
+        'Run E2E Smoke (Chromium)'
+      ),
+      getStepBlock(goldenPathJob, 'Run Golden Path (Chromium, Better Auth)'),
+      getStepBlock(extendedSmokeJob, 'Run Required Smoke Tests'),
+    ];
+
+    for (const step of standaloneSteps) {
+      expect(step).toContain(`export BETTER_AUTH_URL=${localOrigin}`);
+      expect(step).toContain(
+        `export NEXT_PUBLIC_BETTER_AUTH_URL=${localOrigin}`
+      );
+      expect(step).toContain('export HOSTNAME=localhost');
+      expect(step).toContain(`export NEXT_PUBLIC_APP_URL=${localOrigin}`);
+      expect(step).toContain(`BETTER_AUTH_URL: ${localOrigin}`);
+      expect(step).toContain(`NEXT_PUBLIC_BETTER_AUTH_URL: ${localOrigin}`);
+      expect(step).toContain('SESSION_SECRET: ${{ secrets.SESSION_SECRET }}');
+    }
+
+    for (const step of [standaloneSteps[0], standaloneSteps[2]]) {
+      expect(step).toContain(
+        'export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"'
+      );
+      expect(step).toContain(
+        'export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"'
+      );
+    }
+  });
 });
 
 describe('CI public lighthouse workflow', () => {

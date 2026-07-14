@@ -15,6 +15,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **[internal] Repository artifact hygiene guardrails (JOV-4264):** CI and pre-commit checks reject recursive/generated paths, temporary files, root screenshots, unapproved binaries, oversized payloads, and repository-wide file/byte/binary budget overruns.
+- **[internal] Bounded artifact lifecycle helpers:** owned-output, atomic issue-output, run-retention, generated-artifact retention, performance-artifact retention, and local-runtime cleanup helpers now cover QA, AgentOS, Hermes, Design Lab, profile review, iOS performance, and screenshot producers with fail-closed symlink and race protections.
+- **[internal] Screenshot evidence is replace-in-place:** homepage, product, visual-regression, contrast, and profile captures write to stable ignored or catalog-owned paths; CI validates the catalog and public export budgets before merge.
+- **[internal] Local cleanup is safe and measured:** setup and Codex cleanup prune only stale, oversized, inactive, repo-owned caches and worktree dependencies while preserving active, dirty, locked, external, or symlinked data.
+- Obsolete root screenshots, stale product-screenshot specs, superseded visual baselines, and the accidentally tracked Vitest cache result.
 - [internal] **Governed marketing section proposals:** the marketing registry now records route-recipe evidence and explicit design gaps, while the admin Design Lab provides desktop/mobile proposal review, comments, approval states, implementation evidence, and auditable model-usage metadata.
 - **Homepage labels now meet WCAG AA contrast:** the distributor trust-strip and closed-loop labels use the readable tertiary text token instead of the low-contrast quaternary token.
 - [internal] **Design-system drift ratchet tightened 3044→2609 (JOV-4211)**: converted 29 exact-match typography arbitraries to tokens across 18 dashboard/admin/organism/molecule files (`leading-[16px]`→`leading-4`, `tracking-[-0.01em]`→`tracking-tight`, `tracking-[-0.02em]`→`tracking-tighter`, `tracking-[0.01em]`→`tracking-wide`) and re-measured the baseline to the true count, removing ~406 counts of stale regression headroom.

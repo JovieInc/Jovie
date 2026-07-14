@@ -8,6 +8,7 @@ import {
   buildRunId,
   ensureOvernightPaths,
   ensureRunDirectory,
+  getRunDirectory,
   readIssueQueue,
   readState,
   shouldStop,
@@ -51,6 +52,19 @@ describe('overnight-qa ledger', () => {
   it('builds run ids without colon separators or milliseconds', () => {
     expect(buildRunId(new Date('2026-04-04T23:10:00.000Z'))).toBe(
       '2026-04-04T23-10-00Z'
+    );
+  });
+
+  it.each([
+    '../escape',
+    'nested/run',
+    'nested\\run',
+    '/tmp/escape',
+    '.',
+  ])('rejects hostile run id %s before joining the run root', runId => {
+    const paths = createPaths('/tmp/overnight-qa-safe-root');
+    expect(() => getRunDirectory(runId, paths)).toThrow(
+      /single safe path segment/
     );
   });
 

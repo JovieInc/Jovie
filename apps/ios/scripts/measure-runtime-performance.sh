@@ -3,13 +3,38 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-RESULTS_DIR="${JOVIE_IOS_RUNTIME_RESULTS_DIR:-$PROJECT_ROOT/artifacts/ios-test-results/runtime-performance}"
+RETENTION_SCRIPT="$PROJECT_ROOT/scripts/performance-artifact-retention.mjs"
+DEFAULT_RESULTS_DIR="$PROJECT_ROOT/artifacts/ios-test-results/runtime-performance"
+RESULTS_DIR="${JOVIE_IOS_RUNTIME_RESULTS_DIR:-$DEFAULT_RESULTS_DIR}"
 TIMESTAMP="$(date +%Y.%m.%d_%H-%M-%S%z)"
-RESULT_BUNDLE="$RESULTS_DIR/Test-Jovie-runtime-performance-$TIMESTAMP.xcresult"
-LOG_PATH="$RESULTS_DIR/Test-Jovie-runtime-performance-$TIMESTAMP.log"
-SUMMARY_PATH="$RESULTS_DIR/Test-Jovie-runtime-performance-$TIMESTAMP-summary.md"
+RUN_DIR="$RESULTS_DIR/Test-Jovie-runtime-performance-$TIMESTAMP"
+RESULT_BUNDLE="$RUN_DIR/Test-Jovie-runtime-performance.xcresult"
+LOG_PATH="$RUN_DIR/xcodebuild.log"
+SUMMARY_PATH="$RUN_DIR/summary.md"
 
-mkdir -p "$RESULTS_DIR"
+if [[ "$RESULTS_DIR" == "$DEFAULT_RESULTS_DIR" ]]; then
+  node "$RETENTION_SCRIPT" retain ios-runtime --repo-root "$PROJECT_ROOT" --apply
+fi
+
+mkdir -p "$RUN_DIR"
+: >"$RUN_DIR/.jovie-run-in-progress"
+
+finalize_run() {
+  local status=$?
+  rm -f "$RUN_DIR/.jovie-run-in-progress"
+  if [[ "$status" -eq 0 ]]; then
+    : >"$RUN_DIR/.jovie-run-completed"
+    if [[ "$RESULTS_DIR" == "$DEFAULT_RESULTS_DIR" ]] &&
+      ! node "$RETENTION_SCRIPT" retain ios-runtime --repo-root "$PROJECT_ROOT" --apply; then
+      status=1
+    fi
+  else
+    : >"$RUN_DIR/.jovie-run-failed"
+  fi
+  trap - EXIT
+  exit "$status"
+}
+trap finalize_run EXIT
 
 export JOVIE_IOS_RUNTIME_PERFORMANCE=1
 export JOVIE_IOS_RUNTIME_TIMEOUT_SECONDS="${JOVIE_IOS_RUNTIME_TIMEOUT_SECONDS:-3}"

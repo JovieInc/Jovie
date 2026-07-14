@@ -471,6 +471,23 @@ export function buildSelectedTestCommands(plan, maxWorkers) {
   return commands;
 }
 
+export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
+  return Array.from({ length: shardCount }, (_, index) => [
+    'pnpm',
+    [
+      '--filter',
+      '@jovie/web',
+      'exec',
+      'vitest',
+      'run',
+      '--shard',
+      `${index + 1}/${shardCount}`,
+      '--maxWorkers',
+      maxWorkers,
+    ],
+  ]);
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const base = argValue(args, '--base', 'origin/main');
@@ -486,7 +503,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   if (plan.mode === 'none') process.exit(0);
   if (plan.mode === 'full') {
-    await runCommand('pnpm', ['--filter', '@jovie/web', 'run', 'test']);
+    // A single Vitest process retains enough module/reporting state across the
+    // 2k-file web suite to trigger host memory pressure near teardown. Run
+    // deterministic sequential shards so each process releases memory before
+    // the next shard starts while preserving complete full-suite coverage.
+    await runCommands(buildFullSuiteCommands(maxWorkers));
   }
 
   await runCommands(buildSelectedTestCommands(plan, maxWorkers));

@@ -118,6 +118,27 @@ doppler.yaml
 
 # Screenshot pipeline artifacts
 ideation/screenshots/
+/apps/web/audit-screenshots/
+
+# Generated audit and debt reports
+/.kandan/
+/.tech-debt/
+/TECH_DEBT_REGISTRY.md
+/.context/profile-mock-diff/
+/.context/profile-review-matrix/
+/.context/profile-audit/
+/.context/profile-mobile-qa/
+/.context/public-profile-layout-approval/
+/.context/outputs/
+/.context/perf/
+/.context/overnight-qa/
+/.context/qa/releases-dashboard/
+/.context/loop-logs/
+/coordination/
+/inbox/
+/screenshots/
+/temp/
+/tmp/
 
 # npm lockfiles (pnpm monorepo uses pnpm-lock.yaml)
 package-lock.json
@@ -143,7 +164,7 @@ output/
 .claude/scheduled_tasks.lock
 
 # QA swarm runtime artifacts (findings, remediation manifests, Eve queue)
-.context/qa-swarm/
+/.context/qa-swarm/
 
 # Journey scout reports + evidence (Production Journey Auditor)
 .context/journey-scout/

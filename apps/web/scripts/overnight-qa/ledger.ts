@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveOwnedOutputDirectory } from '../owned-output-path';
 import type {
   OvernightIssue,
   OvernightPaths,
@@ -56,7 +57,11 @@ export async function ensureOvernightPaths(paths = getOvernightPaths()) {
 }
 
 export function getRunDirectory(runId: string, paths = getOvernightPaths()) {
-  return resolve(paths.runsRoot, runId);
+  return resolveOwnedOutputDirectory(
+    paths.runsRoot,
+    runId,
+    'OVERNIGHT_QA_RUN_ID'
+  );
 }
 
 export async function ensureRunDirectory(
