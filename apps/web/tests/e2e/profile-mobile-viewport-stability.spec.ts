@@ -569,6 +569,7 @@ type ReleaseCardLayout = {
   readonly artwork: {
     readonly width: number;
     readonly height: number;
+    readonly contentWidth: number;
   } | null;
   readonly title: {
     readonly top: number;
@@ -619,7 +620,12 @@ async function collectMockHomeReleaseCardLayout(
 
     return {
       card: rect(card),
-      artwork: artwork ? rect(artwork) : null,
+      artwork: artwork
+        ? {
+            ...rect(artwork),
+            contentWidth: artwork.parentElement?.clientWidth ?? 0,
+          }
+        : null,
       title: title ? rect(title) : null,
       hero: hero ? rect(hero) : null,
       cover: cover
@@ -681,9 +687,12 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
       }
 
       expect(
-        layout.artwork?.width ?? 0,
-        `${viewport.label} bento artwork should fill the card width`
-      ).toBeGreaterThanOrEqual(layout.card.width - 2);
+        Math.abs(
+          (layout.artwork?.width ?? 0) -
+            (layout.artwork?.contentWidth ?? Number.POSITIVE_INFINITY)
+        ),
+        `${viewport.label} bento artwork should fill its padded content box`
+      ).toBeLessThanOrEqual(2);
 
       if (layout.title) {
         expect(
