@@ -1,0 +1,24 @@
+{
+  "unavailable": {
+    "deepseek-v4-flash": {
+      "reason": "executable_missing",
+      "observed_at": 1783748925.9149685,
+      "cooldown_until": 1783750725.9149685
+    },
+    "grok-composer-2.5-fast": {
+      "reason": "executable_missing",
+      "observed_at": 1783748925.9175668,
+      "cooldown_until": 1783750725.9175668
+    },
+    "claude": {
+      "reason": "executable_missing",
+      "observed_at": 1783748925.9182677,
+      "cooldown_until": 1783752525.9182677
+    }
+  },
+  "cooldowns": {
+    "deepseek-v4-flash": 1783750725.9149685,
+    "grok-composer-2.5-fast": 1783750725.9175668,
+    "claude": 1783752525.9182677
+  }
+}
