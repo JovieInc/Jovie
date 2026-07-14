@@ -1095,6 +1095,7 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -4817,6 +4818,7 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
       - name: Package build output for provenance attestation
@@ -4885,6 +4887,7 @@ jobs:
           # not healthy. Use Vercel's source-build cache until the artifact is
           # proven runtime-closed by canary.
           VERCEL_FORCE_SOURCE_DEPLOY: 'true'
+          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
           # The closed staging artifact contains more than Vercel's 15k plain
           # upload limit. Give the archive path the full prebuilt budget.
           VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'false'

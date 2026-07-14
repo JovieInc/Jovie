@@ -85,6 +85,38 @@ describe('deploy workflow Vercel env resolution', () => {
     );
   });
 
+  it('passes the exact GitHub SHA into every external Vercel build and source deploy', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const buildShaEnv = 'VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}';
+    const buildJob = getJobBlock(workflow, 'ci-build-public');
+    const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const deployStep = getStepBlock(
+      stagingJob,
+      'Deploy (staging preview, prebuilt)'
+    );
+    const deployScript = readFileSync(
+      resolve(repoRoot, '.github/scripts/vercel-prebuilt-deploy.sh'),
+      'utf8'
+    );
+
+    expect(getStepBlock(buildJob, 'Vercel build (deploy artifact)')).toContain(
+      buildShaEnv
+    );
+    expect(
+      getStepBlock(
+        stagingJob,
+        'Build (preview target for staging verification)'
+      )
+    ).toContain(buildShaEnv);
+    expect(deployStep).toContain(buildShaEnv);
+    expect(deployScript).toContain(
+      '--build-env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}"'
+    );
+    expect(deployScript).toContain(
+      '--env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}"'
+    );
+  });
+
   it('pins Vercel pull and build commands to the configured project', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const steps = [

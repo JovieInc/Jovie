@@ -108,6 +108,7 @@ echo "https://jovie-source-fallback.vercel.app"
             "VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS": "1",
             "VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS": "5",
             "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
+            "VERCEL_GIT_COMMIT_SHA": "0123456789abcdef",
             "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
         }
     )
@@ -132,6 +133,8 @@ echo "https://jovie-source-fallback.vercel.app"
     assert len(calls) == 2
     assert "--prebuilt --archive=tgz" in calls[0]
     assert "--prebuilt" not in calls[1]
+    assert "--build-env VERCEL_GIT_COMMIT_SHA=0123456789abcdef" in calls[1]
+    assert "--env VERCEL_GIT_COMMIT_SHA=0123456789abcdef" in calls[1]
 
 
 def test_failed_prebuilt_with_url_still_falls_back_to_source(tmp_path: Path) -> None:
