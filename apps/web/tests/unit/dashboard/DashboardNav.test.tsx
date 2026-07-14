@@ -128,7 +128,8 @@ describe('DashboardNav', () => {
     });
 
     const newThreadLink = getByRole('link', { name: 'New Chat' });
-    expect(newThreadLink.className).toContain('text-sidebar-muted/80');
+    expect(newThreadLink.className).toContain('text-sidebar-item-foreground');
+    expect(newThreadLink.className).not.toContain('text-sidebar-muted/80');
     expect(newThreadLink.className).not.toContain(
       'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)]'
     );

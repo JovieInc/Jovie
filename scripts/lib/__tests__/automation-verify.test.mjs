@@ -81,6 +81,17 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const AUTHENTICATED_A11Y_REPAIR_CORE = [
+  'apps/web/components/jovie/components/ChatInput.tsx',
+  'apps/web/components/organisms/SharedCommandPalette.tsx',
+  'apps/web/components/shell/SidebarNavItem.tsx',
+  'apps/web/styles/design-system.css',
+  'apps/web/tests/e2e/chat-axe.spec.ts',
+  'apps/web/tests/unit/chat/ChatInput.aria.test.tsx',
+  'apps/web/tests/unit/chat/chat-composer-system-b-style-guard.test.ts',
+  'apps/web/tests/unit/dashboard/DashboardNav.test.tsx',
+  'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
+];
 const GTMQ_SOURCE_GATE_REAPER_MANIFEST = [
   '.github/actions/setup-node-pnpm/action.yml',
   '.github/workflows/gtmq-source-authorization.yml',
@@ -460,6 +471,25 @@ describe('automation-verify affected scope', () => {
           '2',
         ],
       ],
+    ]);
+  });
+
+  it('keeps the authenticated accessibility repair on focused unit coverage', () => {
+    const plan = buildAffectedTestPlan([
+      ...AUTHENTICATED_A11Y_REPAIR_CORE,
+      ...AFFECTED_TEST_SELECTOR_MANIFEST,
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/chat/ChatInput.aria.test.tsx',
+      'apps/web/tests/unit/chat/chat-composer-system-b-style-guard.test.ts',
+      'apps/web/tests/unit/dashboard/DashboardNav.test.tsx',
+      'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
     ]);
   });
 

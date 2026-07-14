@@ -100,6 +100,17 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
+  'apps/web/components/jovie/components/ChatInput.tsx',
+  'apps/web/components/organisms/SharedCommandPalette.tsx',
+  'apps/web/components/shell/SidebarNavItem.tsx',
+  'apps/web/styles/design-system.css',
+  'apps/web/tests/e2e/chat-axe.spec.ts',
+  'apps/web/tests/unit/chat/ChatInput.aria.test.tsx',
+  'apps/web/tests/unit/chat/chat-composer-system-b-style-guard.test.ts',
+  'apps/web/tests/unit/dashboard/DashboardNav.test.tsx',
+  'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
+]);
 const GTMQ_SOURCE_GATE_REAPER_MANIFEST = new Set([
   '.github/actions/setup-node-pnpm/action.yml',
   '.github/workflows/gtmq-source-authorization.yml',
@@ -162,6 +173,18 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactAffectedTestSelector =
     affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
     files.length === AFFECTED_TEST_SELECTOR_MANIFEST.size;
+  const authenticatedA11yRepairInputCount = files.filter(file =>
+    AUTHENTICATED_A11Y_REPAIR_CORE.has(file)
+  ).length;
+  const isExactAuthenticatedA11yRepair =
+    authenticatedA11yRepairInputCount === AUTHENTICATED_A11Y_REPAIR_CORE.size &&
+    files.every(
+      file =>
+        AUTHENTICATED_A11Y_REPAIR_CORE.has(file) ||
+        AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+    ) &&
+    (affectedTestSelectorInputCount === 0 ||
+      affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
   const gtmqSourceGateReaperInputCount = files.filter(file =>
     GTMQ_SOURCE_GATE_REAPER_MANIFEST.has(file)
   ).length;
@@ -177,8 +200,10 @@ export function buildAffectedTestPlan(changedFiles) {
     file =>
       /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file) &&
       !(
-        isExactPrerequisiteTrain &&
-        PREREQUISITE_TRAIN_PLAYWRIGHT_SPECS.has(file)
+        (isExactPrerequisiteTrain &&
+          PREREQUISITE_TRAIN_PLAYWRIGHT_SPECS.has(file)) ||
+        (isExactAuthenticatedA11yRepair &&
+          file === 'apps/web/tests/e2e/chat-axe.spec.ts')
       )
   );
   const mandatoryTests = [];
@@ -260,7 +285,10 @@ export function buildAffectedTestPlan(changedFiles) {
       : []),
   ]);
   const scriptVitestTests = unique([
-    ...(isExactAffectedTestSelector ? AFFECTED_TEST_SELECTOR_TESTS : []),
+    ...(isExactAffectedTestSelector ||
+    (isExactAuthenticatedA11yRepair && affectedTestSelectorInputCount > 0)
+      ? AFFECTED_TEST_SELECTOR_TESTS
+      : []),
     ...(isExactGtmqSourceGateReaper
       ? GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS
       : []),
@@ -276,6 +304,11 @@ export function buildAffectedTestPlan(changedFiles) {
     if (isInvestorNoteIngestionInput(file)) return true;
     if (isCiCancellationHealerInput(file)) return true;
     if (isExactPrerequisiteTrain && PREREQUISITE_TRAIN_MANIFEST.has(file))
+      return true;
+    if (
+      isExactAuthenticatedA11yRepair &&
+      AUTHENTICATED_A11Y_REPAIR_CORE.has(file)
+    )
       return true;
     if (
       hasSeedConfirmationChange &&
@@ -302,7 +335,9 @@ export function buildAffectedTestPlan(changedFiles) {
     files.includes(CI_CANCELLATION_HEALER_COMPANION) &&
     !hasCiCancellationHealerChange;
   const hasIncompletePrerequisiteTrain =
-    prerequisiteTrainCornerCount > 0 && !hasPrerequisiteTrainCorners;
+    prerequisiteTrainCornerCount > 0 &&
+    !hasPrerequisiteTrainCorners &&
+    !isExactAuthenticatedA11yRepair;
   const hasStandalonePrerequisiteGlobal =
     files.length === 1 && PREREQUISITE_TRAIN_STANDALONE_GLOBALS.has(files[0]);
   const hasUnknownPrerequisiteTrainPeer =
@@ -312,10 +347,12 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompleteAffectedTestSelector =
     affectedTestSelectorInputCount > 0 &&
     !isExactAffectedTestSelector &&
+    !isExactAuthenticatedA11yRepair &&
     !isExactGtmqSourceGateReaper;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
+    !isExactAuthenticatedA11yRepair &&
     !isExactAffectedTestSelector;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
@@ -341,6 +378,7 @@ export function buildAffectedTestPlan(changedFiles) {
             isExactPrerequisiteTrain ||
             isExactVercelCongestionControl ||
             isExactAffectedTestSelector ||
+            isExactAuthenticatedA11yRepair ||
             isExactGtmqSourceGateReaper)
         ? 'selected'
         : relatedFiles.length === 0
