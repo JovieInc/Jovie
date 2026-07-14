@@ -380,6 +380,60 @@ describe('Waitlist API', { timeout: 20_000 }, () => {
       expect(mockDbTransaction).not.toHaveBeenCalled();
     });
 
+    it('returns 503 with Retry-After when the waitlist table does not exist', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockDoesTableExist.mockResolvedValue(false);
+
+      const { POST } = await routeModulePromise;
+      const request = new Request('http://localhost/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryGoal: 'streams',
+          primarySocialUrl: 'https://instagram.com/test',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Retry-After')).toBeTruthy();
+      expect(data.success).toBe(false);
+      expect(data.code).toBe('waitlist_table_missing');
+      expect(mockCurrentUser).not.toHaveBeenCalled();
+      expect(mockDbTransaction).not.toHaveBeenCalled();
+      expect(mockDbInsert).not.toHaveBeenCalled();
+    });
+
+    it('fails closed with 503 when checking waitlist table existence throws', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockDoesTableExist.mockRejectedValue(
+        new Error('connection terminated unexpectedly')
+      );
+
+      const { POST } = await routeModulePromise;
+      const request = new Request('http://localhost/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryGoal: 'streams',
+          primarySocialUrl: 'https://instagram.com/test',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Retry-After')).toBeTruthy();
+      expect(data.success).toBe(false);
+      expect(data.code).toBe('waitlist_table_missing');
+      expect(mockCurrentUser).not.toHaveBeenCalled();
+      expect(mockDbTransaction).not.toHaveBeenCalled();
+      expect(mockDbInsert).not.toHaveBeenCalled();
+    });
+
     it('rejects submissions when Better Auth user has no primary email', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({

@@ -8,7 +8,7 @@ import {
 } from './autonomy.mjs';
 import { persistGbrainFinding } from './gbrain.mjs';
 import { buildEnrichedIssueBody, fileLinearIssue } from './linear.mjs';
-import { getQaSwarmPaths } from './paths.mjs';
+import { getQaSwarmPaths, resolveQaSwarmRunDirectory } from './paths.mjs';
 import { getRecipe } from './registry.mjs';
 import { assertFindings } from './types.mjs';
 
@@ -28,8 +28,8 @@ export async function proposeQaSwarmFindings(input) {
   const eveEnabled = input.eveEnabled ?? false;
   const dryRun = input.dryRun ?? false;
 
+  const runDir = resolveQaSwarmRunDirectory(runId, paths);
   mkdirSync(paths.runsRoot, { recursive: true });
-  const runDir = path.join(paths.runsRoot, runId);
   mkdirSync(runDir, { recursive: true });
 
   /** @type {Array<Record<string, unknown>>} */

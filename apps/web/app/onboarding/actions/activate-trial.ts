@@ -11,7 +11,7 @@
 
 import 'server-only';
 
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -33,8 +33,9 @@ export async function activateTrial(appUserId: string): Promise<boolean> {
       now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
     );
 
-    // Only activate for users on 'free' plan who haven't had a trial before.
-    // The WHERE clause prevents double-activation and respects existing paid users.
+    // Null plans are legacy free rows unless the legacy paid flag is true.
+    // This mirrors normalizeBillingPlan, which treats isPro=true as paid even
+    // when the raw plan is null or otherwise non-paid.
     const result = await db
       .update(users)
       .set({
@@ -46,7 +47,8 @@ export async function activateTrial(appUserId: string): Promise<boolean> {
       .where(
         and(
           eq(users.id, appUserId),
-          eq(users.plan, 'free'),
+          or(eq(users.plan, 'free'), isNull(users.plan)),
+          or(eq(users.isPro, false), isNull(users.isPro)),
           isNull(users.trialStartedAt),
           isNull(users.trialEndsAt)
         )
@@ -54,9 +56,19 @@ export async function activateTrial(appUserId: string): Promise<boolean> {
       .returning({ id: users.id, plan: users.plan });
 
     if (result.length === 0) {
-      logger.warn('Trial activation skipped: user ineligible or not found', {
-        appUserId,
-      });
+      // Distinguish "user missing" (data-integrity warning) from the normal
+      // skip path (paid plan or prior trial — e.g. re-running onboarding).
+      const [existing] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, appUserId))
+        .limit(1);
+
+      if (!existing) {
+        logger.warn('Trial activation: user not found', { appUserId });
+      } else {
+        logger.info('Trial activation skipped: not eligible', { appUserId });
+      }
       return false;
     }
 

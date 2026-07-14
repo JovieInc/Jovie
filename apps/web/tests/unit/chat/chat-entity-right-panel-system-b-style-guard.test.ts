@@ -60,6 +60,15 @@ describe('chat entity right panel System B style guard', () => {
     expect(panelCss).toContain('var(--color-border-subtle)');
     expect(panelCss).toContain('var(--color-bg-surface-1)');
     expect(panelCss).toContain('var(--shadow-card)');
+    // Profile preview host is a full-height containment shell (JOV-3958) —
+    // decorative card border/shadow must not wrap ProfileContactSidebar.
+    const previewHostCss = panelCss?.match(
+      /:where\(\.system-b-chat-profile-preview-card\)\s*\{[^}]*\}/
+    )?.[0];
+    expect(previewHostCss).toBeDefined();
+    expect(previewHostCss).toContain('height: 100%');
+    expect(previewHostCss).not.toContain('box-shadow');
+    expect(previewHostCss).not.toContain('border:');
     expect(panelCss).not.toMatch(/--linear-/);
     expect(panelCss).not.toMatch(/\b(?:bg|text|border)-cyan-/);
     expect(panelCss).not.toMatch(/#[0-9a-f]{3,8}\b/i);

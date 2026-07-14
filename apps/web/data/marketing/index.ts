@@ -35,6 +35,16 @@ export {
   resolveComposition,
 } from './composition';
 export type {
+  GrayscaleWireframeSpec,
+  ModelUsageEstimate,
+  ProposedSectionComment,
+  ProposedSectionId,
+  ProposedSectionRecord,
+  ProposedSectionStatus,
+  RegistryTaskContract,
+} from './designGaps';
+export { getProposedSection, PROPOSED_SECTIONS } from './designGaps';
+export type {
   ArcBeat,
   CtaCadence,
   MarketingRecipe,
@@ -49,11 +59,15 @@ export {
   MARKETING_RECIPE_IDS,
   MARKETING_RECIPES,
 } from './recipes';
-export type { RouteManifestEntry } from './routeManifest';
+export type {
+  RouteManifestEntry,
+  RouteRecipeParityReport,
+} from './routeManifest';
 export {
   DEPRECATION_RATCHET_BASELINE,
   EXEMPTION_RATCHET_BASELINE,
   getRouteManifestEntry,
+  getRouteRecipeParity,
   isExempt,
   isRecipeRoute,
   MARKETING_ROUTE_MANIFEST,

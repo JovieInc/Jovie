@@ -20,6 +20,9 @@ done
 export PROMPTFOO_DISABLE_TELEMETRY=1
 export PROMPTFOO_DISABLE_UPDATE=1
 export PROMPTFOO_NO_TESTCASE_ASSERT_WARNING=1
+# Promptfoo's interactive logger can race its file transport during teardown in
+# agent PTYs (`ERR_STREAM_WRITE_AFTER_END`). Pipe both output streams through a
+# plain sink so local agent runs take the same non-interactive output path as CI.
 
 # Register the server-only shim before Promptfoo loads jovie-chat-provider.ts.
 # lib/ai/sdk.ts imports `server-only`; without preload, validate/eval fail in CI.
@@ -54,7 +57,7 @@ case "$mode" in
       --no-cache \
       --no-share \
       --no-write \
-      --no-table
+      --no-table 2>&1 | cat
     ;;
   *)
     echo "Usage: $0 [validate|eval]" >&2

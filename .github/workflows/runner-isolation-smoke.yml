@@ -1,0 +1,44 @@
+name: Runner Isolation Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/jov-4248-isolated-runner-validation
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runner-isolation-smoke
+  cancel-in-progress: false
+
+jobs:
+  unit-shard:
+    name: Isolated Unit Tests (1/5)
+    runs-on: [self-hosted, Linux, X64, "${{ 'jovie-eph-isolation' }}"]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Load quarantined unit tests
+        id: quarantine
+        run: node .github/scripts/quarantine-ledger.mjs emit-github-output
+
+      - name: Run representative unit shard
+        env:
+          NODE_OPTIONS: --max-old-space-size=3072
+        run: |
+          pnpm turbo test:fast --filter=@jovie/web -- \
+            --pool=forks \
+            --maxWorkers=3 \
+            --retry=${{ steps.quarantine.outputs.unit_default_retries }} \
+            --shard=1/5 \
+            ${{ steps.quarantine.outputs.unit_excludes }} \
+            --outputFile=test-report.runner-isolation.1-5.junit.xml

@@ -1,0 +1,81 @@
+name: Fixed Runner Canary
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fixed-runner-canary
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    name: Validate fixed runner
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 20
+    steps:
+      - name: Record runner identity
+        run: |
+          echo "runner_name=$RUNNER_NAME"
+          echo "runner_os=$RUNNER_OS"
+          echo "runner_arch=$RUNNER_ARCH"
+
+      - name: Checkout main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate workspace and disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .github/actions/setup-node-pnpm/action.yml
+          test -f .github/actions/resolve-neon-database-url/action.yml
+          test -f .github/scripts/quarantine-ledger.mjs
+
+          minimum_kb=$((15 * 1024 * 1024))
+          for path in "$RUNNER_TEMP" "$GITHUB_WORKSPACE"; do
+            available_kb=$(df -Pk "$path" | awk 'NR == 2 { print $4 }')
+            if [[ ! "$available_kb" =~ ^[0-9]+$ ]] || ((available_kb < minimum_kb)); then
+              echo "::error::Insufficient disk at $path: ${available_kb:-unknown} KiB available; ${minimum_kb} KiB required."
+              exit 1
+            fi
+            echo "Disk at $path: ${available_kb} KiB available."
+          done
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Validate toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const [major, minor] = process.versions.node.split('.').map(Number); if (major !== 22 || minor < 13) { throw new Error('Expected Node >=22.13 <23, got ' + process.versions.node); }"
+          test "$(pnpm --version)" = "9.15.4"
+          node --version
+          pnpm --version
+
+      - name: Load quarantined unit tests
+        id: quarantine
+        run: node .github/scripts/quarantine-ledger.mjs emit-github-output
+
+      - name: Run representative unit shard
+        env:
+          NODE_OPTIONS: --max-old-space-size=3072
+        run: |
+          pnpm turbo test:fast --filter=@jovie/web -- \
+            --pool=forks \
+            --maxWorkers=2 \
+            --retry=${{ steps.quarantine.outputs.unit_default_retries }} \
+            --shard=1/5 \
+            ${{ steps.quarantine.outputs.unit_excludes }}
+
+      - name: Record final disk
+        if: always()
+        run: |
+          df -h "$RUNNER_TEMP"
+          df -h "$GITHUB_WORKSPACE"

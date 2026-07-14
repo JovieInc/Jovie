@@ -7,7 +7,7 @@ const CUSTOMER_FACING_COPY_FILES = [
   'components/features/auth/AuthUnavailableCard.tsx',
   'app/desktop-auth/page.tsx',
   'app/(auth)/auth/native-complete/page.tsx',
-  'components/features/dashboard/organisms/account-settings/SessionManagementCard.tsx',
+  'components/features/dashboard/organisms/account-settings/AccountSettingsSection.tsx',
   'components/features/dashboard/organisms/account-settings/utils.ts',
   '../desktop/src/main.ts',
 ] as const;

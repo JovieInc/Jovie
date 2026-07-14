@@ -9,7 +9,12 @@
 #   - run `gh pr merge` (branch protection lets only the Graphite app push to
 #     main; Graphite rebase-merges enrolled PRs server-side)
 #   - retarget to integration/loop-* (agents ship straight to main now)
-#   - close PRs (surfaced for a human instead — see the SURFACE bucket)
+#   - close ordinary PRs (surfaced for a human instead — see the SURFACE bucket)
+#
+# Graphite synthetic drafts are different: their generated `gtmq_*` branch can
+# still land after a source PR's queue authorization is withdrawn. The
+# synthetic-source guard below closes those generated drafts unless every open
+# source remains explicitly `merge-queue` enrolled and free of hard gates.
 #
 # Buckets that need code work (CONFLICT / BLOCKED) are printed for the
 # /drain command to fan out per-PR worktree agents (cheap model for mechanical
@@ -17,14 +22,33 @@
 #
 # Env:
 #   DRY_RUN=1   classify and print only; apply no labels
+#   DRAIN_MUTATION_AUTHORIZATION  required for every live mutation run
+#   DRAIN_EXPECT_GH  optional exact gh path assertion used by test fixtures
 #   DRAIN_MAX_SECONDS  hard wall-clock budget between GitHub calls (default 900)
 set -euo pipefail
+
+DRY_RUN="${DRY_RUN:-0}"
+if [[ "$DRY_RUN" != "1" ]]; then
+  case "${DRAIN_MUTATION_AUTHORIZATION:-}" in
+    merge-queue-autoenroll | test-fixture) ;;
+    *)
+      echo "::error::Refusing live drain without recognized DRAIN_MUTATION_AUTHORIZATION" >&2
+      exit 2
+      ;;
+  esac
+fi
+if [[ -n "${DRAIN_EXPECT_GH:-}" ]]; then
+  resolved_gh="$(command -v gh || true)"
+  if [[ "$resolved_gh" != "$DRAIN_EXPECT_GH" ]]; then
+    echo "::error::Refusing drain: expected gh at $DRAIN_EXPECT_GH, resolved ${resolved_gh:-missing}" >&2
+    exit 2
+  fi
+fi
 
 # shellcheck source=./scripts/lib/gh-retry.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 
 REPO="${REPO:-JovieInc/Jovie}"
-DRY_RUN="${DRY_RUN:-0}"
 DRAIN_MAX_SECONDS="${DRAIN_MAX_SECONDS:-900}"
 DRAIN_STARTED_AT="$SECONDS"
 
@@ -52,44 +76,121 @@ unlabel() {  # unlabel <num> <label>
     && echo "    -$2 on #$1" || echo "    !! failed to remove $2 on #$1"
 }
 
+# The queue snapshot can be stale by the time enrollment begins. Re-read the
+# authoritative PR state immediately before mutation so a draft conversion or
+# a queue-deferred hold cannot be overwritten by this controller.
+enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
+  local n="$1" current
+  if ! current="$(gh_retry pr view "$n" -R "$REPO" \
+    --json state,isDraft,mergeable,labels 2>/dev/null)"; then
+    echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
+    return 1
+  fi
+  if ! jq -e '
+    .state == "OPEN"
+    and (.isDraft | not)
+    and .mergeable == "MERGEABLE"
+    and ([.labels[].name] | any(
+      . == "needs-human" or . == "hold" or . == "gated"
+      or . == "queue-deferred" or . == "needs-conflict-resolution"
+      or . == "merge-queue" or . == "fast"
+    ) | not)
+  ' <<<"$current" >/dev/null; then
+    echo "    ⏸ eligibility changed; refusing enrollment for #$n"
+    return 2
+  fi
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would +merge-queue on #$n"
+    return 0
+  fi
+  if ! gh_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
+    echo "    !! failed to add merge-queue on #$n" >&2
+    return 1
+  fi
+  if ! current="$(gh_retry pr view "$n" -R "$REPO" \
+    --json state,isDraft,mergeable,labels 2>/dev/null)"; then
+    echo "    !! could not verify #$n after enrollment" >&2
+    if ! remove_held_queue_label_strict "$n"; then
+      echo "    !! CRITICAL: could not prove failed enrollment was compensated for #$n" >&2
+    fi
+    return 1
+  fi
+  if jq -e '
+    .state == "OPEN"
+    and (.isDraft | not)
+    and .mergeable == "MERGEABLE"
+    and ([.labels[].name] | index("merge-queue"))
+    and ([.labels[].name] | any(
+      . == "needs-human" or . == "hold" or . == "gated"
+      or . == "queue-deferred" or . == "needs-conflict-resolution"
+      or . == "fast"
+    ) | not)
+  ' <<<"$current" >/dev/null; then
+    echo "    +merge-queue on #$n"
+    return 0
+  fi
+  echo "    !! enrollment verification failed for #$n" >&2
+  if ! remove_held_queue_label_strict "$n"; then
+    echo "    !! CRITICAL: could not prove failed enrollment was compensated for #$n" >&2
+  fi
+  return 1
+}
+
+remove_held_queue_label_strict() {  # remove_held_queue_label_strict <num>
+  local n="$1" current
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would -merge-queue on #$n"
+    return 0
+  fi
+  if ! gh_retry pr edit "$n" -R "$REPO" --remove-label merge-queue >/dev/null; then
+    echo "    !! failed to remove merge-queue hold violation from #$n" >&2
+    return 1
+  fi
+  if ! current="$(gh_retry pr view "$n" -R "$REPO" --json labels 2>/dev/null)"; then
+    echo "    !! could not verify merge-queue removal for held PR #$n" >&2
+    return 1
+  fi
+  if jq -e '([.labels[].name] | index("merge-queue")) == null' \
+    <<<"$current" >/dev/null; then
+    echo "    -merge-queue on #$n"
+    return 0
+  fi
+  echo "    !! held PR #$n still has merge-queue after removal" >&2
+  return 1
+}
+
 check_failures_for_pr() {  # check_failures_for_pr <num>
   local n="$1"
   local attempts="${GH_RETRY_ATTEMPTS:-5}"
   local base_delay="${GH_RETRY_BASE_DELAY:-2}"
   local max_delay="${GH_RETRY_MAX_DELAY:-30}"
   local attempt=1
-  local out_file err_file err delay
+  local raw_file out_file err_file err delay
+  raw_file="$(mktemp)"
   out_file="$(mktemp)"
   err_file="$(mktemp)"
 
-  # TERMINAL failures only. Pending/queued/in-progress mean CI isn't done yet, and
-  # `cancelled` is almost always a zombie left by `concurrency: cancel-in-progress`
-  # (a superseded run) — none of those are real failures. Counting them as failures
-  # is what made the drain loop dequeue green PRs every 20 min and starve the queue
-  # for 6h on 2026-06-22. Only FAILURE/ERROR/TIMED_OUT/ACTION_REQUIRED count.
-  local jq_filter='[
-    .[]
-    | select(
-        ((.bucket // "") | test("^fail$"; "i"))
-        or ((.state // "") | test("^(FAILURE|ERROR|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE)$"; "i"))
-      )
-    | select(((.name // "") | test("advisory|Preview Deploy|Slop Gate|Open PR|Secret Scanning|Verify Draft|E2E Smoke"; "i")) | not)
-    | (.name // .workflow // .description // "unnamed check")
-  ]'
-
+  # Positive readiness proof: all required aggregate contexts must exist and
+  # succeed, and any present canonical merge-gate leaf must be complete. A
+  # pending gate is not a failure, but it is not permission to enqueue either.
   while [[ "$attempt" -le "$attempts" ]]; do
+    : >"$raw_file"
     : >"$out_file"
     : >"$err_file"
-    if gh pr checks "$n" -R "$REPO" --required --json name,bucket,state,workflow,description --jq "$jq_filter" >"$out_file" 2>"$err_file"; then
-      if jq -e 'type == "array"' "$out_file" >/dev/null 2>&1; then
+    if gh pr checks "$n" -R "$REPO" --json name,bucket,state,workflow,description,startedAt,completedAt >"$raw_file" 2>"$err_file"; then
+      if jq -e 'type == "array"' "$raw_file" >/dev/null 2>&1 \
+        && node "$(dirname "${BASH_SOURCE[0]}")/lib/pr-check-failures.mjs" \
+          --classify-queue <"$raw_file" >"$out_file"; then
         cat "$out_file"
-        rm -f "$out_file" "$err_file"
+        rm -f "$raw_file" "$out_file" "$err_file"
         return 0
       fi
-    elif jq -e 'type == "array"' "$out_file" >/dev/null 2>&1; then
+    elif jq -e 'type == "array"' "$raw_file" >/dev/null 2>&1 \
+      && node "$(dirname "${BASH_SOURCE[0]}")/lib/pr-check-failures.mjs" \
+        --classify-queue <"$raw_file" >"$out_file"; then
       # `gh pr checks` exits 8 when checks are pending, even with valid JSON.
       cat "$out_file"
-      rm -f "$out_file" "$err_file"
+      rm -f "$raw_file" "$out_file" "$err_file"
       return 0
     fi
 
@@ -97,7 +198,7 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
     if [[ "$attempt" -eq "$attempts" ]] || ! gh_retry_is_transient_error "$err"; then
       [[ -n "$err" ]] && echo "  !! could not read required checks for #$n: $err" >&2
       jq -cn --arg reason "required check status unavailable" '[$reason]'
-      rm -f "$out_file" "$err_file"
+      rm -f "$raw_file" "$out_file" "$err_file"
       return 0
     fi
 
@@ -108,12 +209,12 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
     attempt=$((attempt + 1))
   done
 
-  rm -f "$out_file" "$err_file"
+  rm -f "$raw_file" "$out_file" "$err_file"
   jq -cn --arg reason "required check status unavailable" '[$reason]'
 }
 
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-  --json number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName --jq '
+  --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName --jq '
   [ .[] | {
     n: .number,
     t: (.title[0:48]),
@@ -121,9 +222,19 @@ SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
     m: .mergeable,
     ms: (.mergeStateStatus // "UNKNOWN"),
     head: .headRefName,
+    body: (.body // ""),
     L: [.labels[].name],
     fail: []
   } ]')"
+
+# --- Graphite MQ synthetic authorization: fail closed before expensive checks ---
+# A source can be dequeued or gated after Graphite has already materialized a
+# speculative gtmq branch. Removing the source label alone does not reliably
+# cancel that generated branch, so re-check each source and close the synthetic
+# before this run spends its budget on checks or mutates ordinary enrollment.
+echo "=== GRAPHITE MQ source authorization ==="
+printf '%s\n' "$SNAP" | GTMQ_MUTATION_AUTHORIZATION=drain-snapshot \
+  bash "$(dirname "${BASH_SOURCE[0]}")/guard-gtmq-source-authorization.sh" --snapshot
 
 ENRICHED="[]"
 while IFS= read -r pr; do
@@ -134,7 +245,7 @@ while IFS= read -r pr; do
     (.draft | not)
     and (.m == "MERGEABLE")
     and ((.head | startswith("gtmq_")) | not)
-    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
+    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "fast")) | not)
   ' <<<"$pr" >/dev/null; then
     fail="$(check_failures_for_pr "$n")"
   fi
@@ -152,7 +263,7 @@ echo "=== QUEUE SUMMARY ==="
 echo "$SNAP" | jq -r '
   def labels: (.L // []);
   def queued: labels | index("merge-queue");
-  def hard_gated: labels | any(. == "needs-human" or . == "hold" or . == "gated");
+  def hard_gated: labels | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred");
   [
     "  CLEAN: " + ([.[] | select(queued and (.ms // "") == "CLEAN")] | length | tostring),
     "  UNSTABLE: " + ([.[] | select(queued and (.ms // "") == "UNSTABLE")] | length | tostring),
@@ -164,15 +275,17 @@ echo "$SNAP" | jq -r '
 
 # --- DEQUEUE: hard-gated PRs must not occupy Graphite queue slots ---
 echo "=== DEQUEUE (hard gates → -merge-queue) ==="
-echo "$SNAP" | jq -c '.[]
-  | select([.L[]] | index("merge-queue"))
-  | select((.head|startswith("gtmq_"))|not)
-  | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated"))' \
-| while read -r pr; do
+while read -r pr; do
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     echo "  #$n  $t"
-    unlabel "$n" merge-queue
-  done
+    if ! remove_held_queue_label_strict "$n"; then
+      echo "::error::Failed to prove held PR #$n is outside merge queue" >&2
+      exit 1
+    fi
+  done < <(echo "$SNAP" | jq -c '.[]
+  | select([.L[]] | index("merge-queue"))
+  | select((.head|startswith("gtmq_"))|not)
+  | select(.draft or ([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred")))')
 
 # --- DEQUEUE: only GENUINELY un-mergeable PRs (conflict or real failing checks) ---
 # Do NOT dequeue on mergeStateStatus alone. A MERGEABLE PR flickers to BLOCKED
@@ -190,7 +303,7 @@ echo "=== DEQUEUE (conflict / failing → -merge-queue) ==="
 echo "$SNAP" | jq -c '.[]
   | select([.L[]] | index("merge-queue"))
   | select((.head|startswith("gtmq_"))|not)
-  | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated")) | not)
+  | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred")) | not)
   | select(
       ([.L[]] | any(.=="needs-conflict-resolution"))
       or (.m == "CONFLICTING")
@@ -235,13 +348,23 @@ while read -r pr; do
   fi
   ENROLLED_THIS_RUN=$((ENROLLED_THIS_RUN + 1))
   echo "  #$n  $t"
-  label "$n" merge-queue
+  if enroll_if_still_eligible "$n"; then
+    :
+  else
+    enroll_result=$?
+    ENROLLED_THIS_RUN=$((ENROLLED_THIS_RUN - 1))
+    if [[ "$enroll_result" -eq 2 ]]; then
+      continue
+    fi
+    echo "::error::Failed to prove enrollment for #$n" >&2
+    exit 1
+  fi
 done < <(echo "$SNAP" | jq -c '.[]
   | select(.draft|not)
   | select(.m=="MERGEABLE")
   | select(.fail|length==0)
   | select((.head|startswith("gtmq_"))|not)
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="needs-conflict-resolution" or .=="merge-queue" or .=="fast") | not)')
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or .=="needs-conflict-resolution" or .=="merge-queue" or .=="fast") | not)')
 
 # --- CONFLICT: needs rebase (agent branches only) → label + hand to fix agent ---
 echo "=== CONFLICT (needs rebase → fix agent) ==="
@@ -249,30 +372,26 @@ echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
   | select((.head|startswith("gtmq_"))|not)
   | select(.head|test($re))
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated") | not)
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred") | not)
   | "  #\(.n)  \(.t)  [\(.head)]"'
 echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
   | select((.head|startswith("gtmq_"))|not)
   | select(.head|test($re))
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated") | not) | .n' \
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred") | not) | .n' \
 | while read -r n; do [[ -n "$n" ]] && label "$n" needs-conflict-resolution; done
 
 # --- BLOCKED: mergeable but red checks → hand to fix agent ---
 echo "=== BLOCKED (red checks → fix agent) ==="
 echo "$SNAP" | jq -r '.[]
   | select(.draft|not) | select(.m=="MERGEABLE") | select(.fail|length>0)
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated") | not)
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred") | not)
   | "  #\(.n)  \(.t)  ✗ \(.fail|join(", "))"'
 
 # --- SURFACE: human-gated / superseded → report only, never auto-close ---
 echo "=== SURFACE (human decision; not touched) ==="
 echo "$SNAP" | jq -r '.[]
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated"))
+  | select(.draft or ([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred")))
   | "  #\(.n)  \(.t)  {\(.L|join(","))}"'
-
-# --- Graphite MQ working drafts (the queue itself; leave alone) ---
-echo "=== GRAPHITE MQ in-flight (leave) ==="
-echo "$SNAP" | jq -r '.[] | select(.head|startswith("gtmq_")) | "  #\(.n)  \(.t)"'
 
 echo "=== done (DRY_RUN=$DRY_RUN) ==="

@@ -308,7 +308,7 @@ The helper now prefers the local dev auth route on loopback/private hosts and on
 | `⚠ Skipping: E2E_CLERK_USER_USERNAME not configured` | Missing Doppler env var | Run with `pnpm run test:web:e2e` or another pinned wrapper |
 | `⚠ Skipping: Clerk testing setup was not successful` | `clerkSetup()` failed | Check `CLERK_SECRET_KEY` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` are real keys |
 | Screenshots show login screen | Auth guard skipping tests | Ensure `E2E_CLERK_USER_USERNAME` contains `+clerk_test` |
-| `audience-crm.png` missing | Auth guard skipped `audience.spec.ts` | Same as above — fix the auth guard |
+| Product screenshot missing | Catalog scenario failed or its registry export was removed | Run `pnpm --filter web screenshots:capture` and inspect the failing `catalog.spec.ts` scenario |
 | `CLERK_SETUP_FAILED` | Real Clerk keys not in env | Run via Doppler, not bare `pnpm` |
 | `Failed to load Clerk JS` on localhost | Clerk proxy forces HTTPS, localhost has no SSL | The app now auto-disables the Clerk proxy on insecure local/private HTTP origins. If you are reusing an already-running dev server, restart it so the new runtime path is active. You can still force the old behavior with `NEXT_PUBLIC_CLERK_PROXY_DISABLED=1` when needed for test pipelines. |
 | Local `/browse` still looks signed out | Dev server was not started in browse mode | Restart with `pnpm run dev:web:browse` |

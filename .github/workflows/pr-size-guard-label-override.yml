@@ -11,12 +11,16 @@ name: PR Size Guard Label Override
 # API only — it cannot cancel the real size-computation job.
 
 on:
-  pull_request:
+  # Use the default-branch workflow definition so old PR heads can receive a
+  # newly shipped label policy. All executable code remains pinned to the
+  # immutable workflow SHA below; no PR-head code runs with checks:write.
+  pull_request_target:
     types: [labeled]
 
 permissions:
   contents: read
   checks: write
+  pull-requests: read
 
 concurrency:
   group: pr-size-label-override-${{ github.event.pull_request.number }}
@@ -27,23 +31,76 @@ jobs:
     name: PR Size Guard Label Override
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 2
-    if: >-
-      github.event.pull_request.user.login != 'dependabot[bot]' &&
-      github.event.pull_request.head.ref != 'screenshots/auto-update' &&
-      (
-        github.event.label.name == 'big-pr' ||
-        github.event.label.name == 'codemod'
-      )
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.head.ref != 'screenshots/auto-update' &&
+          (
+            github.event.label.name == 'big-pr' ||
+            github.event.label.name == 'codemod' ||
+            github.event.label.name == 'integration-train'
+          )
         with:
+          # This job has checks:write. Execute policy code only from the
+          # exact trusted commit that supplied this workflow, never from a
+          # stale PR base or PR-controlled head.
+          ref: ${{ github.workflow_sha }}
           fetch-depth: 1
+          persist-credentials: false
+
+      - name: Recompute and validate bounded integration train
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.head.ref != 'screenshots/auto-update' &&
+          github.event.label.name == 'integration-train'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
+          MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
+        run: |
+          set -euo pipefail
+          EXCLUDE='pnpm-lock\.yaml|package-lock\.json|yarn\.lock|\.lock$|/generated/|\.gen\.|__snapshots__/|\.snap$|\.svg$|\.po$|/dist/|/build/|\.min\.|drizzle/migrations/meta/'
+          api_error="$RUNNER_TEMP/pr-size-guard-api.err"
+          rows=''
+          for attempt in 1 2 3; do
+            if rows=$(gh api --paginate \
+              "repos/$REPO/pulls/$PR/files?per_page=100" \
+              --jq '.[] | "\(.additions+.deletions)\t\(.filename)"' \
+              2>"$api_error"); then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]] || ! grep -qiE \
+              'rate limit|HTTP 403|HTTP 429|HTTP 5[0-9][0-9]' "$api_error"; then
+              cat "$api_error" >&2
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+          counted=$(printf '%s\n' "$rows" | grep -vE "$EXCLUDE" || true)
+          lines=$(printf '%s\n' "$counted" | awk -F'\t' '{s+=$1} END{print s+0}')
+          files=$(printf '%s\n' "$counted" | grep -c . || true)
+          PR_LINES="$lines" PR_FILES="$files" \
+            node scripts/lib/pr-size-guard-policy.mjs
 
       - name: Post passing PR Size Guard check
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.head.ref != 'screenshots/auto-update' &&
+          (
+            github.event.label.name == 'big-pr' ||
+            github.event.label.name == 'codemod' ||
+            github.event.label.name == 'integration-train'
+          )
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           LABEL: ${{ github.event.label.name }}
+          VALIDATED_POLICY: ${{ github.event.label.name == 'integration-train' && 'integration-train' || '' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/pr-size-guard-label-override.mjs

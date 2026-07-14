@@ -75,6 +75,10 @@ export default defineConfig({
 
     // Exclude slow test categories
     exclude: [
+      // These suites use Node's built-in test runner and are exercised by the
+      // repository's Node test lane, not Vitest's browser-oriented pipeline.
+      'scripts/atomic-issue-output.test.mjs',
+      'scripts/design-verify-output.test.mjs',
       'tests/e2e/**',
       'tests/eval/**',
       'tests/audit/**',
@@ -100,9 +104,11 @@ export default defineConfig({
     maxConcurrency: isCI ? 1 : undefined,
 
     // Timeouts
-    testTimeout: 5000,
-    hookTimeout: 5000,
-    teardownTimeout: 5000,
+    // Serial CI runs trade fan-out for determinism, so allow the same bounded
+    // headroom as changed-suite runs while preserving fast local feedback.
+    testTimeout: isCI ? 12_000 : 5000,
+    hookTimeout: isCI ? 12_000 : 5000,
+    teardownTimeout: isCI ? 12_000 : 5000,
 
     ...changedSuiteStabilityConfig,
 

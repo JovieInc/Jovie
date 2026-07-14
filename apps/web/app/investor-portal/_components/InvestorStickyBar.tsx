@@ -50,6 +50,7 @@ export function InvestorStickyBar({
         <div className='flex w-full gap-3 sm:w-auto'>
           {investUrl && (
             <a
+              data-pitch-event='invest_cta_clicked'
               href={investUrl}
               target='_blank'
               rel='noopener noreferrer'
@@ -65,6 +66,7 @@ export function InvestorStickyBar({
           )}
           {bookCallUrl && (
             <a
+              data-pitch-event='meeting_cta_clicked'
               href={bookCallUrl}
               target='_blank'
               rel='noopener noreferrer'

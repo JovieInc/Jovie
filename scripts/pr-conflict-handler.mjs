@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { fetchOpenPrsRest } from './lib/github-open-prs-rest.mjs';
 import {
   buildPlan,
   DEFAULT_BLOCKED_LABEL,
@@ -159,58 +160,21 @@ async function ghJson(args, { retries = 3 } = {}) {
 }
 
 async function fetchOpenPrs(options) {
-  const fields = [
-    'number',
-    'title',
-    'url',
-    'author',
-    'createdAt',
-    'updatedAt',
-    'isDraft',
-    'mergeable',
-    'mergeStateStatus',
-    'baseRefName',
-    'headRefName',
-    'headRepository',
-    'headRepositoryOwner',
-    'isCrossRepository',
-    'labels',
-    'changedFiles',
-    'additions',
-    'deletions',
-    'maintainerCanModify',
-  ];
-  const listArgs = [
-    'pr',
-    'list',
-    '--repo',
-    options.repo,
-    '--state',
-    'open',
-    '--limit',
-    String(options.limit),
-    '--json',
-  ];
-  try {
-    return {
-      prs: await ghJson([
-        ...listArgs,
-        [...fields, 'statusCheckRollup'].join(','),
-      ]),
-      degradedChecks: false,
-    };
-  } catch (error) {
-    // statusCheckRollup is by far the heaviest field in this query — at
-    // blitz-scale open-PR counts the combined GraphQL query fails while the
-    // same query without rollups succeeds (#13347). Fall back to a degraded
-    // fetch so the handler keeps classifying from mergeable/mergeStateStatus
-    // instead of dying on every run.
-    console.error(
-      `[degraded] bulk PR fetch with statusCheckRollup failed (${error.message}); retrying without check rollups`
-    );
-    const prs = await ghJson([...listArgs, fields.join(',')]);
-    return { prs, degradedChecks: true };
-  }
+  const request = endpoint =>
+    ghJson([
+      'api',
+      '--method',
+      'GET',
+      '-H',
+      'Accept: application/vnd.github+json',
+      endpoint,
+    ]);
+  const prs = await fetchOpenPrsRest({
+    repo: options.repo,
+    limit: options.limit,
+    request,
+  });
+  return { prs, degradedChecks: false };
 }
 
 async function ensureLabel(repo, label, color, description) {

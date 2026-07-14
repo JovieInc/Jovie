@@ -11,6 +11,10 @@ import { cleanup, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import {
+  getCategoryCounts,
+  ProfileLinkList,
+} from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList';
 import { expectNoBrokenStrings } from '../../helpers/broken-string-scan';
 
 vi.mock('@/components/atoms/SocialIcon', () => ({
@@ -81,10 +85,6 @@ describe('ProfileLinkList — render-layer dedupe and label fallback', () => {
   afterEach(() => cleanup());
 
   it('collapses three identical YouTube rows into one row', async () => {
-    const { ProfileLinkList } = await import(
-      '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
-    );
-
     // Exact reproduction of the production screenshot data.
     const links: PreviewPanelLink[] = [
       makeLink({
@@ -112,10 +112,6 @@ describe('ProfileLinkList — render-layer dedupe and label fallback', () => {
   });
 
   it('keeps multiple legitimate YouTube channels with distinct URLs', async () => {
-    const { ProfileLinkList } = await import(
-      '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
-    );
-
     const links: PreviewPanelLink[] = [
       makeLink({
         id: '1',
@@ -135,10 +131,6 @@ describe('ProfileLinkList — render-layer dedupe and label fallback', () => {
   });
 
   it('falls back to a hostname (not the platform name) when no handle is extractable', async () => {
-    const { ProfileLinkList } = await import(
-      '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
-    );
-
     // YouTube URL with no @handle segment — extractHandleFromUrl returns null.
     const links: PreviewPanelLink[] = [
       makeLink({
@@ -162,10 +154,6 @@ describe('ProfileLinkList — render-layer dedupe and label fallback', () => {
   });
 
   it('renders multiple platforms with no duplicates after a noisy fixture (regression)', async () => {
-    const { ProfileLinkList, getCategoryCounts } = await import(
-      '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
-    );
-
     // Recreates the production screenshot exactly: Instagram + TikTok +
     // YouTube × 3 (two dupes + one malformed handle-less URL).
     const links: PreviewPanelLink[] = [

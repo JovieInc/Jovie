@@ -1,4 +1,4 @@
 #!/usr/bin/env sh
 set -e  # Required: ensures pre-push-gate.sh failure actually blocks pushes
 
-bash scripts/hooks/pre-push-gate.sh lint
+bash scripts/hooks/pre-push-gate.sh affected

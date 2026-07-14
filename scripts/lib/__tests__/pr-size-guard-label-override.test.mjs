@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildSizeGuardOverrideCheckRun,
+  buildValidatedSizeGuardCheckRun,
   isSizeGuardOptOutLabel,
   PR_SIZE_GUARD_CHECK_NAME,
   SIZE_GUARD_OPT_OUT_LABELS,
@@ -60,9 +61,36 @@ describe('pr-size-guard label override helpers', () => {
       })
     ).toThrow(/headSha is required/);
   });
+
+  it('builds a success check only for a recomputed integration-train policy', () => {
+    const payload = buildValidatedSizeGuardCheckRun({
+      headSha: 'abc123def456',
+      policy: 'integration-train',
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/2',
+    });
+    expect(payload.conclusion).toBe('success');
+    expect(payload.output.title).toContain('integration train');
+    expect(() =>
+      buildValidatedSizeGuardCheckRun({
+        headSha: 'abc',
+        policy: 'big-pr',
+        runUrl: '',
+      })
+    ).toThrow(/unsupported validated policy/);
+  });
 });
 
 describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => {
+  it('counts files through paginated REST with bounded transient retry', () => {
+    const workflow = readFileSync(SIZE_GUARD_WORKFLOW, 'utf8');
+
+    expect(workflow).toContain('gh api --paginate \\');
+    expect(workflow).toContain('"repos/$REPO/pulls/$PR/files?per_page=100"');
+    expect(workflow).toContain('for attempt in 1 2 3; do');
+    expect(workflow).toContain('HTTP 403|HTTP 429|HTTP 5[0-9][0-9]');
+    expect(workflow).not.toContain('gh pr view "$PR" -R "$REPO" --json files');
+  });
+
   it('keeps the primary size guard off labeled events', () => {
     const workflow = readFileSync(SIZE_GUARD_WORKFLOW, 'utf8');
 
@@ -78,10 +106,23 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
   it('uses a separate labeled workflow that posts a PR Size Guard check override', () => {
     const workflow = readFileSync(OVERRIDE_WORKFLOW, 'utf8');
 
+    expect(workflow).toContain('pull_request_target:');
+    expect(workflow).not.toMatch(/^\s+pull_request:\s*$/m);
     expect(workflow).toContain('types: [labeled]');
     expect(workflow).toContain("github.event.label.name == 'big-pr'");
     expect(workflow).toContain("github.event.label.name == 'codemod'");
+    expect(workflow).toContain(
+      "github.event.label.name == 'integration-train'"
+    );
+    expect(workflow).toContain('node scripts/lib/pr-size-guard-policy.mjs');
     expect(workflow).toContain('checks: write');
+    expect(workflow).toContain(
+      'ref: ${{ github.event.pull_request.base.sha }}'
+    );
+    expect(workflow).toContain('persist-credentials: false');
+    expect(workflow).not.toContain(
+      'ref: ${{ github.event.pull_request.head.sha }}'
+    );
     expect(workflow).toContain(
       'group: pr-size-label-override-${{ github.event.pull_request.number }}'
     );
@@ -91,5 +132,31 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
     );
     expect(workflow).toContain('node scripts/pr-size-guard-label-override.mjs');
     expect(workflow).toContain('JOV-3580');
+  });
+
+  it('does not skip the job before supported-label step conditions can run', () => {
+    const workflow = readFileSync(OVERRIDE_WORKFLOW, 'utf8');
+    const jobHeader = workflow.slice(
+      workflow.indexOf('  override:'),
+      workflow.indexOf('    steps:')
+    );
+    const privilegedSteps = workflow.slice(workflow.indexOf('    steps:'));
+
+    // GitHub skipped the entire job for an integration-train labeled event in
+    // runs 29210018465 and 29210083985. Keep the job schedulable, then gate
+    // every privileged step on the exact supported labels instead.
+    expect(jobHeader).not.toMatch(/^\s+if:/m);
+    expect(
+      privilegedSteps.match(/github\.event\.label\.name == 'big-pr'/g)
+    ).toHaveLength(2);
+    expect(
+      privilegedSteps.match(/github\.event\.label\.name == 'codemod'/g)
+    ).toHaveLength(2);
+    expect(
+      privilegedSteps.match(
+        /github\.event\.label\.name == 'integration-train'/g
+      )
+    ).toHaveLength(4);
+    expect(privilegedSteps.match(/^\s+if:/gm)).toHaveLength(3);
   });
 });
