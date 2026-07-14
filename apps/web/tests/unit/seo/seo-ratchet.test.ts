@@ -15,6 +15,14 @@ import {
   validateSourceJsonLd,
   validateSourceMetadataPatterns,
 } from '@/lib/seo/ratchet';
+import * as homeRoute from '../../../app/(home)/page';
+import * as aboutRoute from '../../../app/(marketing)/about/page';
+import * as artistProfilesRoute from '../../../app/(marketing)/artist-profiles/page';
+import * as blogRoute from '../../../app/(marketing)/blog/page';
+import * as changelogRoute from '../../../app/(marketing)/changelog/page';
+import * as downloadRoute from '../../../app/(marketing)/download/page';
+import * as pricingRoute from '../../../app/(marketing)/pricing/layout';
+import * as supportRoute from '../../../app/(marketing)/support/page';
 
 const baseline = loadSeoRatchetBaseline();
 
@@ -24,36 +32,34 @@ type RouteModule = {
 };
 
 async function loadRouteMetadata(
-  importFn: () => Promise<RouteModule>
+  routeModule: RouteModule
 ): Promise<Metadata | undefined> {
-  const mod = await importFn();
-  if (mod.metadata) return mod.metadata;
-  if (mod.generateMetadata) return mod.generateMetadata();
+  if (routeModule.metadata) return routeModule.metadata;
+  if (routeModule.generateMetadata) return routeModule.generateMetadata();
   return undefined;
 }
 
-const ROUTE_IMPORTERS: Record<string, () => Promise<RouteModule>> = {
-  '/': () => import('../../../app/(home)/page'),
-  '/about': () => import('../../../app/(marketing)/about/page'),
-  '/pricing': () => import('../../../app/(marketing)/pricing/layout'),
-  '/support': () => import('../../../app/(marketing)/support/page'),
-  '/artist-profiles': () =>
-    import('../../../app/(marketing)/artist-profiles/page'),
-  '/download': () => import('../../../app/(marketing)/download/page'),
-  '/blog': () => import('../../../app/(marketing)/blog/page'),
-  '/changelog': () => import('../../../app/(marketing)/changelog/page'),
+const ROUTE_MODULES: Record<string, RouteModule> = {
+  '/': homeRoute,
+  '/about': aboutRoute,
+  '/pricing': pricingRoute,
+  '/support': supportRoute,
+  '/artist-profiles': artistProfilesRoute,
+  '/download': downloadRoute,
+  '/blog': blogRoute,
+  '/changelog': changelogRoute,
 };
 
 describe('SEO ratchet — baseline routes must never lose required tags (JOV-11044)', () => {
   for (const entry of baseline.routes) {
     it(`${entry.path} metadata matches baseline: ${entry.required.join(', ')}`, async () => {
-      const importFn = ROUTE_IMPORTERS[entry.path];
+      const routeModule = ROUTE_MODULES[entry.path];
       expect(
-        importFn,
-        `Missing ROUTE_IMPORTERS entry for ${entry.path}`
+        routeModule,
+        `Missing ROUTE_MODULES entry for ${entry.path}`
       ).toBeDefined();
 
-      const metadata = await loadRouteMetadata(importFn!);
+      const metadata = await loadRouteMetadata(routeModule!);
       const issues = validateRouteMetadata(
         metadata,
         entry.required,
