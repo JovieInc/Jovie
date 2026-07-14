@@ -73,3 +73,4 @@ jobs:
           name: ios-screenshots
           path: artifacts/ios-screenshots/*.png
           if-no-files-found: error
+          retention-days: 5

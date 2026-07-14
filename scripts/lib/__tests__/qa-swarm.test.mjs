@@ -150,6 +150,40 @@ describe('qa-swarm autonomy', () => {
 });
 
 describe('qa-swarm propose pipeline', () => {
+  it.each([
+    '../escape',
+    'nested/run',
+    'nested\\run',
+    '/tmp/escape',
+    '.',
+  ])('rejects hostile run id %s before creating run artifacts', async runId => {
+    const { repoRoot, restore } = makeTempRepo();
+
+    try {
+      await expect(
+        proposeQaSwarmFindings({
+          recipeId: 'diff-review',
+          runId,
+          dryRun: true,
+          findings: [
+            {
+              id: 'hostile-run-id',
+              recipeId: 'diff-review',
+              title: 'Hostile run id',
+              summary: 'Must be rejected before filesystem writes.',
+              priority: 'P1',
+              kind: 'objective',
+              evidencePaths: [],
+            },
+          ],
+        })
+      ).rejects.toThrow(/one safe path segment/);
+      expect(existsSync(path.join(repoRoot, '.context'))).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
   it('persists gbrain pages, remediation manifests, and eve queue entries', async () => {
     const { repoRoot, restore } = makeTempRepo();
 

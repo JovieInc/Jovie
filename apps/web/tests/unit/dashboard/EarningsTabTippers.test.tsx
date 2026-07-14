@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { EarningsTab } from '@/components/features/dashboard/organisms/EarningsTab';
 
 // Mock the queries
 const mockEarningsQuery = vi.fn();
@@ -57,13 +58,6 @@ function renderWithProviders(ui: ReactElement) {
   );
 }
 
-async function getEarningsTab() {
-  const { EarningsTab } = await import(
-    '@/components/features/dashboard/organisms/EarningsTab'
-  );
-  return EarningsTab;
-}
-
 describe('EarningsTab - Tippers Table', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -99,7 +93,6 @@ describe('EarningsTab - Tippers Table', () => {
       isLoading: false,
     });
 
-    const EarningsTab = await getEarningsTab();
     renderWithProviders(<EarningsTab />);
 
     // Check tipper names (unique to the table)
@@ -125,7 +118,6 @@ describe('EarningsTab - Tippers Table', () => {
       isLoading: false,
     });
 
-    const EarningsTab = await getEarningsTab();
     renderWithProviders(<EarningsTab />);
 
     expect(
@@ -139,7 +131,6 @@ describe('EarningsTab - Tippers Table', () => {
       isLoading: true,
     });
 
-    const EarningsTab = await getEarningsTab();
     renderWithProviders(<EarningsTab />);
 
     // The UnifiedTable should show skeleton loading
@@ -165,7 +156,6 @@ describe('EarningsTab - Tippers Table', () => {
       isLoading: false,
     });
 
-    const EarningsTab = await getEarningsTab();
     renderWithProviders(<EarningsTab />);
 
     // $1.50 appears in stats (total revenue, average tip) and in the tippers table

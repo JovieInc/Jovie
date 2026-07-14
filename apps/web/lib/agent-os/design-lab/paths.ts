@@ -20,6 +20,12 @@ export const DESIGN_LAB_DISPATCH_SEGMENTS = [
   'design-lab',
   'dispatches',
 ] as const;
+export const DESIGN_LAB_ARTIFACT_SEGMENTS = [
+  'agentos',
+  'runs',
+  'design-lab',
+  'artifacts',
+] as const;
 
 export function getDesignLabRootDirectory(): string {
   return resolveMonorepoPath(...DESIGN_LAB_ROOT_SEGMENTS);
@@ -31,6 +37,20 @@ export function getDesignTasteMemoryPath(): string {
 
 export function getDesignLabDispatchDirectory(): string {
   return resolveMonorepoPath(...DESIGN_LAB_DISPATCH_SEGMENTS);
+}
+
+export function getDesignLabArtifactDirectory(): string {
+  return resolveMonorepoPath(...DESIGN_LAB_ARTIFACT_SEGMENTS);
+}
+
+export function resolveDesignLabArtifactRunDirectory(
+  dispatchId: string
+): string {
+  const safeDispatchId = dispatchId.trim();
+  if (!/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(safeDispatchId)) {
+    throw new Error(`Invalid design dispatch id: ${dispatchId}`);
+  }
+  return validatePathTraversal(safeDispatchId, getDesignLabArtifactDirectory());
 }
 
 export function resolveDesignProposalDayDirectory(dayBucket: string): string {

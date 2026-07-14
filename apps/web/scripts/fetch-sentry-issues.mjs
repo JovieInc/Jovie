@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { join } from 'path';
+import { writeIssueOutputAtomic } from './atomic-issue-output.mjs';
 
 const SENTRY_ORG = 'jovie';
 const SENTRY_API = 'https://sentry.io/api/0';
@@ -130,24 +131,12 @@ async function main() {
     // Sort by event count (impact)
     allIssues.sort((a, b) => b.eventCount - a.eventCount);
 
-    // Save to file
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const outputPath = join(
-      process.cwd(),
-      'apps/web/.issues',
-      `sentry-issues-${timestamp}.json`
+    // Replace the stable snapshot atomically.
+    const outputPath = writeIssueOutputAtomic(
+      'sentry-issues-latest.json',
+      JSON.stringify(allIssues, null, 2)
     );
-    writeFileSync(outputPath, JSON.stringify(allIssues, null, 2));
     console.log(`\n💾 Saved to: ${outputPath}`);
-
-    // Also save to a "latest" file for easy access
-    const latestPath = join(
-      process.cwd(),
-      'apps/web/.issues',
-      'sentry-issues-latest.json'
-    );
-    writeFileSync(latestPath, JSON.stringify(allIssues, null, 2));
-    console.log(`💾 Latest: ${latestPath}`);
 
     // Print top 10 issues
     console.log('\n🔥 Top 10 issues by event count:');

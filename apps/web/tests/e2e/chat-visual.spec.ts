@@ -4,7 +4,7 @@
  * Captures the composer surface (`[data-testid="chat-composer-surface"]`)
  * in three canonical states: empty, typing, and root picker open.
  *
- * Baselines live in `tests/e2e/chat-visual.spec.ts-snapshots/` (per the
+ * Baselines live in `tests/e2e/__snapshots__/chat-visual.spec.ts/` (per the
  * `snapshotPathTemplate` in `playwright.config.ts`). Generate / refresh
  * with `--update-snapshots`.
  *

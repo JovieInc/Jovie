@@ -4,17 +4,43 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$IOS_DIR/../.." && pwd)"
+RETENTION_SCRIPT="$REPO_ROOT/scripts/performance-artifact-retention.mjs"
 PROJECT_PATH="$IOS_DIR/Jovie.xcodeproj"
 SCHEME="Jovie"
 BUNDLE_ID="ie.jov.Jovie"
 CODE_SIGNING_ALLOWED_VALUE="${CODE_SIGNING_ALLOWED:-YES}"
-RESULTS_DIR="${JOVIE_IOS_MEMORY_RESULTS_DIR:-$REPO_ROOT/artifacts/ios-test-results/memory-baseline}"
+DEFAULT_RESULTS_DIR="$REPO_ROOT/artifacts/ios-test-results/memory-baseline"
+RESULTS_DIR="${JOVIE_IOS_MEMORY_RESULTS_DIR:-$DEFAULT_RESULTS_DIR}"
 DERIVED_DATA_PATH="${JOVIE_IOS_MEMORY_DERIVED_DATA:-$REPO_ROOT/.build/ios-memory-baseline}"
 LAUNCH_ARGUMENTS="${JOVIE_IOS_MEMORY_LAUNCH_ARGUMENTS:--ui-testing-ready}"
 SETTLE_SECONDS="${JOVIE_IOS_MEMORY_SETTLE_SECONDS:-5}"
 TIMESTAMP="$(date +%Y.%m.%d_%H-%M-%S-%z)"
 RUN_DIR="$RESULTS_DIR/Jovie-memory-baseline-$TIMESTAMP"
 REQUIRE_MEMGRAPH="${JOVIE_IOS_MEMORY_REQUIRE_MEMGRAPH:-0}"
+
+if [[ "$RESULTS_DIR" == "$DEFAULT_RESULTS_DIR" ]]; then
+  node "$RETENTION_SCRIPT" retain ios-memory --repo-root "$REPO_ROOT" --apply
+fi
+
+mkdir -p "$RUN_DIR"
+: >"$RUN_DIR/.jovie-run-in-progress"
+
+finalize_run() {
+  local status=$?
+  rm -f "$RUN_DIR/.jovie-run-in-progress"
+  if [[ "$status" -eq 0 ]]; then
+    : >"$RUN_DIR/.jovie-run-completed"
+    if [[ "$RESULTS_DIR" == "$DEFAULT_RESULTS_DIR" ]] &&
+      ! node "$RETENTION_SCRIPT" retain ios-memory --repo-root "$REPO_ROOT" --apply; then
+      status=1
+    fi
+  else
+    : >"$RUN_DIR/.jovie-run-failed"
+  fi
+  trap - EXIT
+  exit "$status"
+}
+trap finalize_run EXIT
 
 run_with_timeout() {
   local timeout_seconds="$1"
@@ -245,8 +271,6 @@ render_summary() {
   } >"$SUMMARY_PATH"
 }
 
-mkdir -p "$RUN_DIR"
-
 "$SCRIPT_DIR/ensure-configuration.sh"
 
 CURRENT_GIT_HEAD="$(git -C "$REPO_ROOT" rev-parse HEAD)"
@@ -258,7 +282,8 @@ if [[ -d "$APP_PATH" &&
   "$(cat "$BUILD_STAMP_PATH")" == "$CURRENT_GIT_HEAD" ]]; then
   echo "Using existing built app at $APP_PATH"
 else
-  rm -rf "$DERIVED_DATA_PATH"
+  node "$RETENTION_SCRIPT" reset ios-memory-derived-data "$DERIVED_DATA_PATH" \
+    --repo-root "$REPO_ROOT" --apply
   if ! run_with_timeout "${JOVIE_IOS_MEMORY_BUILD_TIMEOUT:-300}" xcodebuild build \
     -project "$PROJECT_PATH" \
     -scheme "$SCHEME" \

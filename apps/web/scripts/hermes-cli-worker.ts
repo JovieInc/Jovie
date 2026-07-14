@@ -1,22 +1,33 @@
 #!/usr/bin/env tsx
 
-import { spawnSync } from 'node:child_process';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
+import {
+  assertOwnedTreeBudget,
+  DESIGN_LAB_ARTIFACT_BUDGET,
+  ensureOwnedTreeRoot,
+  type TreeBudget,
+} from '../lib/agent-os/artifact-budget';
 import { normalizeHermesAllowedPaths } from '../lib/hermes/allowed-paths';
 import type { HermesCliRuntime, HermesDispatchPayload } from '../types/ai-ops';
 
-interface RuntimeCommand {
+export interface RuntimeCommand {
   readonly executable: string;
   readonly args: readonly string[];
   readonly stdin: string | null;
 }
 
-interface WorkerRunOptions {
+export interface WorkerRunOptions {
   readonly payload: HermesDispatchPayload;
   readonly workspace: string;
   readonly dryRun?: boolean;
+  readonly designLabArtifactBudget?: TreeBudget;
+  readonly monitorIntervalMs?: number;
+  readonly runtimeAvailableCheck?: (executable: string) => boolean;
+  readonly runtimeCommand?: RuntimeCommand;
 }
 
 interface CliArgs {
@@ -38,6 +49,47 @@ const VALID_RUNTIMES = new Set<HermesCliRuntime>([
   'ruflo',
 ]);
 const DEFAULT_ALLOWED_PATHS = ['apps/web', 'scripts', '.github/workflows'];
+const DESIGN_LAB_BUDGET_FAILURE_EXIT_CODE = 78;
+const DESIGN_LAB_MONITOR_INTERVAL_MS = 500;
+const DESIGN_LAB_RUN_ID_PATTERN =
+  /^design-lab-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const DESIGN_LAB_MARKER_PATTERN =
+  /agentos\/runs\/design-lab\/artifacts\/(design-lab-[0-9a-f-]+)\/complete\.json LAST/g;
+
+export interface DesignLabArtifactMonitor {
+  readonly artifactRoot: string;
+  readonly runDirectory: string;
+  readonly runId: string;
+}
+
+export function resolveDesignLabArtifactMonitor(
+  payload: HermesDispatchPayload,
+  workspace: string
+): DesignLabArtifactMonitor | null {
+  const matches = [...payload.prompt.matchAll(DESIGN_LAB_MARKER_PATTERN)];
+  if (matches.length === 0) return null;
+  if (matches.length !== 1) {
+    throw new Error(
+      'Design Lab payload must name exactly one artifact marker.'
+    );
+  }
+  const runId = matches[0]?.[1] ?? '';
+  if (!DESIGN_LAB_RUN_ID_PATTERN.test(runId)) {
+    throw new Error(`Invalid Design Lab artifact run id: ${runId}`);
+  }
+  const artifactRoot = resolve(
+    workspace,
+    'agentos',
+    'runs',
+    'design-lab',
+    'artifacts'
+  );
+  return {
+    artifactRoot,
+    runDirectory: resolve(artifactRoot, runId),
+    runId,
+  };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -205,13 +257,87 @@ export function runtimeAvailable(executable: string): boolean {
   return result.status === 0;
 }
 
-export function runHermesCliWorker({
+function waitForChild(child: ChildProcess): Promise<number> {
+  return new Promise(resolveStatus => {
+    child.once('error', () => resolveStatus(127));
+    child.once('close', code => resolveStatus(code ?? 1));
+  });
+}
+
+function signalProcessGroup(pid: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-pid, signal);
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !('code' in error) ||
+      (error as NodeJS.ErrnoException).code !== 'ESRCH'
+    ) {
+      throw error;
+    }
+  }
+}
+
+function processGroupHasActiveMembers(processGroupId: number): boolean {
+  const result = spawnSync('ps', ['-axo', 'pid=,pgid=,stat='], {
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `Unable to inspect Design Lab process group ${processGroupId}`
+    );
+  }
+
+  return result.stdout.split('\n').some(line => {
+    const [pidText, groupText, state = ''] = line.trim().split(/\s+/u);
+    const pid = Number(pidText);
+    const group = Number(groupText);
+    return (
+      Number.isSafeInteger(pid) &&
+      pid > 0 &&
+      group === processGroupId &&
+      !state.startsWith('Z')
+    );
+  });
+}
+
+async function waitForProcessGroupExit(
+  processGroupId: number,
+  timeoutMs: number
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (processGroupHasActiveMembers(processGroupId)) {
+    if (Date.now() >= deadline) return false;
+    await delay(25);
+  }
+  return true;
+}
+
+async function terminateDesignLabProcessGroup(
+  processGroupId: number
+): Promise<void> {
+  if (!processGroupHasActiveMembers(processGroupId)) return;
+  signalProcessGroup(processGroupId, 'SIGTERM');
+  if (await waitForProcessGroupExit(processGroupId, 2_000)) return;
+  // The original group has remained continuously active. Re-check membership
+  // immediately before escalation so a vanished PGID is never signaled later.
+  if (!processGroupHasActiveMembers(processGroupId)) return;
+  signalProcessGroup(processGroupId, 'SIGKILL');
+  await waitForProcessGroupExit(processGroupId, 2_000);
+}
+
+export async function runHermesCliWorker({
   payload,
   workspace,
   dryRun,
-}: WorkerRunOptions): number {
+  designLabArtifactBudget = DESIGN_LAB_ARTIFACT_BUDGET,
+  monitorIntervalMs = DESIGN_LAB_MONITOR_INTERVAL_MS,
+  runtimeAvailableCheck = runtimeAvailable,
+  runtimeCommand,
+}: WorkerRunOptions): Promise<number> {
   const prompt = buildHermesWorkerPrompt(payload);
-  const command = buildRuntimeCommand(payload.runtime, prompt, workspace);
+  const command =
+    runtimeCommand ?? buildRuntimeCommand(payload.runtime, prompt, workspace);
   const effectiveDryRun = dryRun === true || payload.dryRun;
 
   if (effectiveDryRun) {
@@ -232,26 +358,104 @@ export function runHermesCliWorker({
     return 0;
   }
 
-  if (!runtimeAvailable(command.executable)) {
+  if (!runtimeAvailableCheck(command.executable)) {
     console.error(
       `Hermes runtime '${payload.runtime}' requires '${command.executable}' on PATH.`
     );
     return 127;
   }
 
-  const result = spawnSync(command.executable, [...command.args], {
+  const designLabMonitor = resolveDesignLabArtifactMonitor(payload, workspace);
+  if (designLabMonitor && process.platform === 'win32') {
+    console.error(
+      'Design Lab Hermes jobs require POSIX process-group termination for artifact budget enforcement.'
+    );
+    return DESIGN_LAB_BUDGET_FAILURE_EXIT_CODE;
+  }
+  if (designLabMonitor) {
+    try {
+      await ensureOwnedTreeRoot(designLabMonitor.artifactRoot);
+      await assertOwnedTreeBudget(
+        designLabMonitor.artifactRoot,
+        designLabArtifactBudget
+      );
+    } catch (error) {
+      console.error(
+        `Design Lab artifact budget rejected before worker start: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return DESIGN_LAB_BUDGET_FAILURE_EXIT_CODE;
+    }
+  }
+
+  const child = spawn(command.executable, [...command.args], {
     cwd: workspace,
+    detached: designLabMonitor !== null,
     env: {
       ...process.env,
       JOVIE_AGENT_PROFILE: 'coder',
       HERMES_DISPATCH_ID: payload.dispatchId,
       HERMES_SOURCE_URL: payload.sourceUrl ?? '',
     },
-    input: command.stdin ?? undefined,
     stdio: command.stdin ? ['pipe', 'inherit', 'inherit'] : 'inherit',
   });
+  if (command.stdin) child.stdin?.end(command.stdin);
+  const childExited = waitForChild(child);
 
-  return result.status ?? 1;
+  if (!designLabMonitor) return childExited;
+  const processGroupId = child.pid;
+  if (!processGroupId) {
+    await childExited;
+    console.error('Design Lab worker did not expose a process group id.');
+    return DESIGN_LAB_BUDGET_FAILURE_EXIT_CODE;
+  }
+
+  let status: number | null = null;
+  while (true) {
+    if (status === null) {
+      const outcome = await Promise.race([
+        childExited.then(exitStatus => ({
+          kind: 'exit' as const,
+          status: exitStatus,
+        })),
+        delay(monitorIntervalMs).then(() => ({ kind: 'poll' as const })),
+      ]);
+      if (outcome.kind === 'exit') status = outcome.status;
+    } else {
+      await delay(monitorIntervalMs);
+    }
+
+    try {
+      if (status !== null && !processGroupHasActiveMembers(processGroupId)) {
+        break;
+      }
+      await assertOwnedTreeBudget(
+        designLabMonitor.artifactRoot,
+        designLabArtifactBudget,
+        { requireStableSnapshot: false }
+      );
+    } catch (error) {
+      console.error(
+        `Design Lab artifact budget exceeded during worker execution: ${error instanceof Error ? error.message : String(error)}`
+      );
+      await terminateDesignLabProcessGroup(processGroupId);
+      return DESIGN_LAB_BUDGET_FAILURE_EXIT_CODE;
+    }
+  }
+
+  status ??= await childExited;
+  try {
+    await assertOwnedTreeBudget(
+      designLabMonitor.artifactRoot,
+      designLabArtifactBudget
+    );
+  } catch (error) {
+    console.error(
+      `Design Lab artifact budget exceeded after worker execution: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return DESIGN_LAB_BUDGET_FAILURE_EXIT_CODE;
+  }
+
+  return status;
 }
 
 function parseArgs(argv: readonly string[]): CliArgs {
@@ -303,11 +507,11 @@ function readPayload(args: CliArgs): HermesDispatchPayload {
   return parseHermesPayload(JSON.parse(args.payloadJson));
 }
 
-function main(): void {
+async function main(): Promise<void> {
   try {
     const args = parseArgs(process.argv.slice(2));
     const payload = readPayload(args);
-    process.exitCode = runHermesCliWorker({
+    process.exitCode = await runHermesCliWorker({
       payload,
       workspace: args.workspace,
       dryRun: args.dryRun,
@@ -319,5 +523,5 @@ function main(): void {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  main();
+  void main();
 }

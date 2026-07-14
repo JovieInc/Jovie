@@ -2,6 +2,7 @@ import { createServer } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { GuardSummary } from './performance-budgets-guard';
 import {
+  buildArtifactCompletionState,
   buildOvernightState,
   buildRouteQueue,
   findFreePort,
@@ -183,6 +184,20 @@ function createSummary(): GuardSummary {
 }
 
 describe('performance overnight controller helpers', () => {
+  it('writes only terminal completion states for retention', () => {
+    const failed = createSummary();
+    expect(buildArtifactCompletionState(failed)).toEqual({
+      completedAt: failed.checkedAt,
+      status: 'stalled',
+    });
+    expect(buildArtifactCompletionState({ ...failed, status: 'pass' })).toEqual(
+      {
+        completedAt: failed.checkedAt,
+        status: 'completed',
+      }
+    );
+  });
+
   it('ranks failing routes by workflow group priority, then overshoot, then id', () => {
     const queue = buildRouteQueue(createSummary());
 

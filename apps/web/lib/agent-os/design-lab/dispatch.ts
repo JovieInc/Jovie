@@ -2,17 +2,63 @@ import 'server-only';
 
 import { promises as fs } from 'node:fs';
 import {
+  assertOwnedTreeBudget,
+  DESIGN_LAB_ARTIFACT_BUDGET,
+  ensureOwnedTreeRoot,
+} from '@/lib/agent-os/artifact-budget';
+import {
+  retainCompletedRunDirectories,
+  retainRegularFiles,
+  writeTextFileAtomic,
+} from '@/lib/agent-os/run-retention';
+import {
   dispatchHermesWorker,
   getHermesDispatchAvailability,
   HermesDispatchConfigurationError,
 } from '@/lib/hermes/dispatch';
 import { logger } from '@/lib/utils/logger';
 import {
+  getDesignLabArtifactDirectory,
   getDesignLabDispatchDirectory,
   resolveDesignDispatchFilePath,
+  resolveDesignLabArtifactRunDirectory,
 } from './paths';
 import { readDesignTasteMemoryExcerpt } from './taste-memory';
 import type { DesignLabDispatchPayload, DesignProposal } from './types';
+
+const DESIGN_LAB_DISPATCH_LIMIT = 100;
+const DESIGN_LAB_DISPATCH_MAX_BYTES = 32 * 1024;
+const DESIGN_LAB_ARTIFACT_COMPLETED_LIMIT = 14;
+const DESIGN_LAB_ARTIFACT_STALE_MS = 7 * 24 * 60 * 60 * 1000;
+async function enforceArtifactLifecycle(dispatchId: string): Promise<void> {
+  const artifactRoot = getDesignLabArtifactDirectory();
+  const runDirectory = resolveDesignLabArtifactRunDirectory(dispatchId);
+  await ensureOwnedTreeRoot(artifactRoot);
+  await retainCompletedRunDirectories({
+    completionMarker: 'complete.json',
+    currentRunId: dispatchId,
+    keepCompleted: DESIGN_LAB_ARTIFACT_COMPLETED_LIMIT,
+    root: artifactRoot,
+    staleIncompleteMs: DESIGN_LAB_ARTIFACT_STALE_MS,
+  });
+  await assertOwnedTreeBudget(artifactRoot, DESIGN_LAB_ARTIFACT_BUDGET);
+
+  await fs.mkdir(runDirectory);
+  try {
+    // Include the newly reserved directory in the budget. If this crosses a
+    // boundary, rmdir removes only our still-empty reservation. A raced writer
+    // makes rmdir fail closed instead of recursively deleting its output.
+    await assertOwnedTreeBudget(artifactRoot, DESIGN_LAB_ARTIFACT_BUDGET);
+  } catch (error) {
+    await fs.rmdir(runDirectory).catch(cleanupError => {
+      throw new AggregateError(
+        [error, cleanupError],
+        `Design Lab lifecycle rejected and could not release ${dispatchId}`
+      );
+    });
+    throw error;
+  }
+}
 
 function buildDispatchPrompt(payload: DesignLabDispatchPayload): string {
   const notesBlock = payload.amendmentNotes
@@ -30,7 +76,9 @@ function buildDispatchPrompt(payload: DesignLabDispatchPayload): string {
     `Proposal:\n${payload.proposalText.trim()}`,
     notesBlock,
     tasteBlock,
-    'Store the resulting HTML artifact under agentos/runs/design-lab/ and link it back to the Linear issue.',
+    `Store every binary or built output under agentos/runs/design-lab/artifacts/${payload.dispatchId}/ and nowhere else.`,
+    `After every output is durably written, write agentos/runs/design-lab/artifacts/${payload.dispatchId}/complete.json LAST with exactly {"status":"completed","runId":"${payload.dispatchId}"}.`,
+    'Link the completed artifact back to the Linear issue.',
   ]
     .filter(part => part.length > 0)
     .join('\n\n');
@@ -58,13 +106,22 @@ export async function triggerDesignLabDispatch(params: {
     requestedBy: params.requestedBy,
   };
 
+  await enforceArtifactLifecycle(dispatchId);
+
   const dispatchDirectory = getDesignLabDispatchDirectory();
   await fs.mkdir(dispatchDirectory, { recursive: true });
-  await fs.writeFile(
-    resolveDesignDispatchFilePath(dispatchId),
+  const dispatchPath = resolveDesignDispatchFilePath(dispatchId);
+  await writeTextFileAtomic(
+    dispatchPath,
     `${JSON.stringify(payload, null, 2)}\n`,
-    'utf8'
+    DESIGN_LAB_DISPATCH_MAX_BYTES
   );
+  await retainRegularFiles({
+    currentFile: dispatchPath,
+    fileNamePattern: /^design-lab-[a-f0-9-]{36}\.json$/,
+    keep: DESIGN_LAB_DISPATCH_LIMIT,
+    root: dispatchDirectory,
+  });
 
   const availability = getHermesDispatchAvailability();
   if (!availability.available) {

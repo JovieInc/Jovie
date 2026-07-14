@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test';
  *   threshold: 0.2
  *   animations: 'disabled'
  *
- * Baselines stored in tests/e2e/visual-regression.spec.ts-snapshots/
+ * Baselines stored in tests/e2e/__snapshots__/visual-regression.spec.ts/
  *
  * Run: doppler run -- pnpm test:e2e tests/e2e/visual-regression.spec.ts
  * Update baselines: doppler run -- pnpm test:e2e tests/e2e/visual-regression.spec.ts --update-snapshots

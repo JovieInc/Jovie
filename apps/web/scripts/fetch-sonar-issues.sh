@@ -3,10 +3,6 @@
 set -e
 
 OUTPUT_DIR="apps/web/.issues"
-mkdir -p "$OUTPUT_DIR"
-
-TIMESTAMP=$(date +%Y-%m-%dT%H-%M-%S)
-OUTPUT_FILE="$OUTPUT_DIR/sonar-issues-$TIMESTAMP.json"
 LATEST_FILE="$OUTPUT_DIR/sonar-issues-latest.json"
 
 echo "🔍 Fetching SonarCloud issues..."
@@ -30,13 +26,10 @@ done
 
 echo "✅ Fetched $(echo "$ALL_ISSUES" | jq 'length') issues"
 
-# Save to file
-echo "$ALL_ISSUES" | jq '.' > "$OUTPUT_FILE"
-echo "💾 Saved to: $OUTPUT_FILE"
-
-# Create latest symlink
-cp "$OUTPUT_FILE" "$LATEST_FILE"
-echo "💾 Latest: $LATEST_FILE"
+# Replace the stable snapshot atomically. The helper owns temp-file cleanup.
+echo "$ALL_ISSUES" | jq '.' | \
+  node apps/web/scripts/atomic-issue-output.mjs sonar-issues-latest.json >/dev/null
+echo "💾 Saved to: $LATEST_FILE"
 
 # Print summary by severity
 echo ""

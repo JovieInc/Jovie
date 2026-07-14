@@ -1,3 +1,5 @@
+const { mkdir } = require('node:fs/promises');
+const { dirname, resolve } = require('node:path');
 const puppeteer = require('puppeteer');
 
 async function testHomepage() {
@@ -93,8 +95,10 @@ async function testHomepage() {
     console.log(`   - Total sections: ${sections.hasSections}`);
 
     // Take screenshot
-    const screenshotPath =
-      '/Users/timwhite/Documents/GitHub/TBF/Jovie/homepage-test-screenshot.png';
+    const screenshotPath = resolve(
+      'test-results/homepage/homepage-test-screenshot.png'
+    );
+    await mkdir(dirname(screenshotPath), { recursive: true });
     await page.screenshot({
       path: screenshotPath,
       fullPage: true,

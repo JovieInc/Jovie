@@ -1,4 +1,9 @@
+import { join } from 'node:path';
 import { chromium } from 'playwright';
+import {
+  DESIGN_VERIFY_OUTPUT_DIR,
+  resetDesignVerifyOutputDirectory,
+} from './design-verify-output.mjs';
 
 const CARBON_PALETTE = {
   '--linear-bg-page': '#06070a',
@@ -48,6 +53,8 @@ async function getTokensFromMain(page) {
   }, Object.keys(CARBON_PALETTE));
 }
 
+await resetDesignVerifyOutputDirectory();
+
 const browser = await chromium.launch();
 const context = await browser.newContext({
   viewport: { width: 1440, height: 900 },
@@ -64,7 +71,7 @@ await page.goto('http://localhost:3100/exp/shell-v1', {
 const shellTokens = await getTokensFromMain(page);
 console.log(JSON.stringify(shellTokens, null, 2));
 await page.screenshot({
-  path: '/tmp/design-verify/shell-v1.png',
+  path: join(DESIGN_VERIFY_OUTPUT_DIR, 'shell-v1.png'),
   fullPage: false,
 });
 
@@ -87,7 +94,7 @@ console.log('--- /app/dashboard/earnings ---');
 const dashTokens = await getTokensFromMain(page);
 console.log(JSON.stringify(dashTokens, null, 2));
 await page.screenshot({
-  path: '/tmp/design-verify/app-dashboard.png',
+  path: join(DESIGN_VERIFY_OUTPUT_DIR, 'app-dashboard.png'),
   fullPage: false,
 });
 
@@ -105,7 +112,7 @@ await page
 const relTokens = await getTokensFromMain(page);
 console.log(JSON.stringify(relTokens, null, 2));
 await page.screenshot({
-  path: '/tmp/design-verify/app-releases.png',
+  path: join(DESIGN_VERIFY_OUTPUT_DIR, 'app-releases.png'),
   fullPage: false,
 });
 

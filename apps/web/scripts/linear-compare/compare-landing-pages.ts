@@ -12,8 +12,10 @@
 import { chromium, type Page } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resetOwnedOutputDirectory } from './owned-output-directory';
 
-const OUTPUT_DIR = path.join(__dirname, '../../linear-compare-output');
+const OUTPUT_ROOT = path.join(__dirname, '../../linear-compare-output');
+let outputDirectory: string;
 const OUR_URL = process.env.OUR_URL || 'http://localhost:3100';
 const HEADLESS = process.env.HEADLESS !== 'false';
 
@@ -301,10 +303,6 @@ function generateReport(result: ComparisonResult): string {
 async function runComparison(
   mode: 'light' | 'dark'
 ): Promise<ComparisonResult> {
-  if (!fs.existsSync(OUTPUT_DIR)) {
-    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  }
-
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
   console.log(`\n📊 Running landing page comparison (${mode} mode)...`);
@@ -331,7 +329,7 @@ async function runComparison(
   await waitForFonts(linearPage);
 
   const linearScreenshot = path.join(
-    OUTPUT_DIR,
+    outputDirectory,
     `landing-linear-${mode}-${timestamp}.png`
   );
   await linearPage.screenshot({
@@ -370,7 +368,7 @@ async function runComparison(
   await waitForFonts(oursPage);
 
   const oursScreenshot = path.join(
-    OUTPUT_DIR,
+    outputDirectory,
     `landing-ours-${mode}-${timestamp}.png`
   );
   await oursPage.screenshot({
@@ -409,6 +407,8 @@ async function runComparison(
 }
 
 async function main() {
+  outputDirectory = resetOwnedOutputDirectory(OUTPUT_ROOT, 'landing-pages');
+
   console.log('🔍 Linear vs Our Landing Page Comparison');
   console.log('========================================\n');
 
@@ -435,11 +435,11 @@ async function main() {
     const darkReport = generateReport(darkResult);
 
     const lightReportPath = path.join(
-      OUTPUT_DIR,
+      outputDirectory,
       `landing-report-light-${lightResult.timestamp}.md`
     );
     const darkReportPath = path.join(
-      OUTPUT_DIR,
+      outputDirectory,
       `landing-report-dark-${darkResult.timestamp}.md`
     );
 
@@ -451,7 +451,7 @@ async function main() {
     console.log(`   Light: ${lightReportPath}`);
     console.log(`   Dark: ${darkReportPath}`);
 
-    console.log(`\n📸 Screenshots saved to: ${OUTPUT_DIR}`);
+    console.log(`\n📸 Screenshots saved to: ${outputDirectory}`);
 
     console.log(`\n📊 Summary:`);
     console.log(`   Light mode mismatches: ${lightResult.mismatches.length}`);
@@ -462,7 +462,7 @@ async function main() {
       dark: darkResult,
     };
     const jsonPath = path.join(
-      OUTPUT_DIR,
+      outputDirectory,
       `landing-results-${lightResult.timestamp}.json`
     );
     fs.writeFileSync(jsonPath, JSON.stringify(fullResults, null, 2));

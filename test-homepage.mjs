@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { mkdir } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import puppeteer from 'puppeteer';
 
 async function testHomepage() {
@@ -94,8 +96,10 @@ async function testHomepage() {
     console.log(`   - Total sections: ${sections.hasSections}`);
 
     // Take screenshot
-    const screenshotPath =
-      '/Users/timwhite/Documents/GitHub/TBF/Jovie/homepage-test-screenshot.png';
+    const screenshotPath = resolve(
+      'test-results/homepage/homepage-test-screenshot.png'
+    );
+    await mkdir(dirname(screenshotPath), { recursive: true });
     await page.screenshot({
       path: screenshotPath,
       fullPage: true,

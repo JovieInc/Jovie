@@ -19,6 +19,10 @@ import {
 import { resolveAppPath } from '../lib/filesystem-paths';
 import { getInvestorManifest } from '../lib/investors/manifest';
 import {
+  resetOwnedOutputDirectory,
+  resolveOwnedOutputDirectory,
+} from './owned-output-path';
+import {
   resolveChatConversationPerfPath,
   resolveReleaseTasksPerfPath,
   resolveSeededPublicCatchAllPath,
@@ -71,7 +75,12 @@ interface TestAuthAvailability {
 
 const APP_DIR = resolveAppPath('app');
 const OUTPUT_SEGMENT = process.env.ROUTE_QA_OUTPUT_DIR?.trim() || 'latest';
-const OUTPUT_ROOT = resolveAppPath('test-results', 'route-qa', OUTPUT_SEGMENT);
+const OUTPUT_BASE = resolveAppPath('test-results', 'route-qa');
+const OUTPUT_ROOT = resolveOwnedOutputDirectory(
+  OUTPUT_BASE,
+  OUTPUT_SEGMENT,
+  'ROUTE_QA_OUTPUT_DIR'
+);
 const SCREENSHOT_DIR = path.join(OUTPUT_ROOT, 'screenshots');
 const BASE_URL =
   process.env.ROUTE_QA_BASE_URL?.trim() || 'http://localhost:3000';
@@ -1121,8 +1130,11 @@ async function flushStandardStreams() {
 }
 
 async function main() {
-  await fs.rm(OUTPUT_ROOT, { recursive: true, force: true });
-  await fs.mkdir(OUTPUT_ROOT, { recursive: true });
+  await resetOwnedOutputDirectory(
+    OUTPUT_BASE,
+    OUTPUT_SEGMENT,
+    'ROUTE_QA_OUTPUT_DIR'
+  );
   const authAvailability = await getTestAuthAvailability();
   const routeCases = applyAuthAvailability(
     await buildRouteMatrix(),

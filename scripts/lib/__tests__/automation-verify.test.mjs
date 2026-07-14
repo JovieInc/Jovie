@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildAffectedTestPlan,
+  buildFullSuiteCommands,
   buildSelectedTestCommands,
 } from '../../run-affected-tests.mjs';
 
@@ -339,6 +340,41 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([...PREREQUISITE_TRAIN_MANIFEST, peer]).mode
     ).toBe('full');
+  });
+
+  it('splits the full web suite into sequential bounded-memory shards', () => {
+    const commands = buildFullSuiteCommands('2', 2);
+
+    expect(commands).toEqual([
+      [
+        'pnpm',
+        [
+          '--filter',
+          '@jovie/web',
+          'exec',
+          'vitest',
+          'run',
+          '--shard',
+          '1/2',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+      [
+        'pnpm',
+        [
+          '--filter',
+          '@jovie/web',
+          'exec',
+          'vitest',
+          'run',
+          '--shard',
+          '2/2',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
   });
 
   it('keeps the Vercel congestion-control diff on its focused cross-runtime suites', () => {

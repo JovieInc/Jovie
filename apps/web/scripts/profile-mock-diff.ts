@@ -7,6 +7,10 @@ import {
   PROFILE_MOCK_HOME_APPROVAL_CAPTURES,
   type ProfileMockCropRect,
 } from '../lib/profile/mock-home-diff-manifest';
+import {
+  resetOwnedOutputDirectory,
+  resolveOwnedOutputDirectory,
+} from './owned-output-path';
 
 interface CliOptions {
   readonly baseUrl: string;
@@ -73,9 +77,10 @@ function resolveOutputPaths(cycle: string) {
     ? process.cwd()
     : path.resolve(process.cwd(), 'apps/web');
   const repoRoot = path.resolve(webRoot, '..', '..');
-  const cycleRoot = path.resolve(
-    repoRoot,
-    `.context/profile-mock-diff/${cycle}`
+  const cycleRoot = resolveOwnedOutputDirectory(
+    path.join(repoRoot, '.context/profile-mock-diff'),
+    cycle,
+    'PROFILE_MOCK_DIFF_CYCLE'
   );
 
   return {
@@ -231,8 +236,13 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const outputPaths = resolveOutputPaths(options.cycle);
 
+  await resetOwnedOutputDirectory(
+    path.dirname(outputPaths.cycleRoot),
+    path.basename(outputPaths.cycleRoot),
+    'PROFILE_MOCK_DIFF_CYCLE'
+  );
+
   await Promise.all([
-    mkdir(outputPaths.cycleRoot, { recursive: true }),
     mkdir(outputPaths.approvalRoot, { recursive: true }),
     mkdir(outputPaths.targetRoot, { recursive: true }),
   ]);

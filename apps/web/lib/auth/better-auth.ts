@@ -17,7 +17,10 @@ import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { generateAppleClientSecret } from './apple-client-secret';
 import { provisionAppUser } from './provision';
+import { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
 import { secondaryStorage } from './secondary-storage';
+
+export { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
 
 /**
  * Better Auth server instance (Clerk → Better Auth migration; see
@@ -46,17 +49,6 @@ export function isDeterministicTestOtpEmail(email: string): boolean {
     TEST_OTP_EMAIL_PATTERN.test(email)
   );
 }
-
-/**
- * Durable rate limits for the new public auth endpoints (plan eng row 28).
- * Windows are seconds. Stored via secondary storage (Redis) — never
- * in-memory in production (security.md).
- */
-export const AUTH_RATE_LIMIT_RULES = {
-  '/sign-in/social': { window: 60, max: 10 },
-  '/email-otp/send-verification-otp': { window: 60, max: 3 },
-  '/one-time-token/verify': { window: 60, max: 10 },
-} as const;
 
 /**
  * Trusted origins: production + staging + local dev + native deep-link

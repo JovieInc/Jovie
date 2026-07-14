@@ -35,16 +35,46 @@ jobs:
   size:
     name: PR Size Guard
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 3
-    # Skip automated dependency / screenshot PRs — lockfile & asset churn is expected.
-    if: >-
-      github.event.pull_request.user.login != 'dependabot[bot]' &&
-      github.event.pull_request.head.ref != 'screenshots/auto-update'
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
+
+      - name: Fetch PR base
+        run: git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+
+      - name: Enforce repository hygiene
+        run: node scripts/repo-hygiene-guard.mjs --diff-base "${{ github.event.pull_request.base.sha }}"
+
+      - name: Detect screenshot integrity changes
+        id: screenshot-integrity
+        run: |
+          if git diff --quiet "${{ github.event.pull_request.base.sha }}" HEAD -- \
+            apps/web/lib/screenshots/ \
+            apps/web/screenshot-catalog/current/ \
+            apps/web/public/product-screenshots/ \
+            'apps/web/scripts/check-screenshot-catalog*.ts'; then
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node and pnpm for screenshot integrity
+        if: steps.screenshot-integrity.outputs.required == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Enforce screenshot catalog integrity
+        if: steps.screenshot-integrity.outputs.required == 'true'
+        working-directory: apps/web
+        run: pnpm exec tsx scripts/check-screenshot-catalog.ts
+
       - name: Enforce size cap
+        # Lockfile and generated screenshot churn skip line-count review, but the
+        # repository-hygiene byte/path gate above still applies.
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.head.ref != 'screenshots/auto-update'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}

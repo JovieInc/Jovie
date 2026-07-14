@@ -454,6 +454,13 @@ export function buildOvernightState(options: {
   };
 }
 
+export function buildArtifactCompletionState(summary: GuardSummary) {
+  return {
+    completedAt: summary.checkedAt,
+    status: summary.status === 'pass' ? 'completed' : 'stalled',
+  } as const;
+}
+
 function bootstrapAuthState(
   artifactDir: string,
   baseUrl: string,
@@ -565,6 +572,10 @@ async function main() {
     });
 
     writeJsonFile(overnightStatePath, state);
+    writeJsonFile(
+      resolve(artifactDir, 'state.json'),
+      buildArtifactCompletionState(summary)
+    );
     writeOutput(options, state);
 
     if (summary.status === 'fail') {

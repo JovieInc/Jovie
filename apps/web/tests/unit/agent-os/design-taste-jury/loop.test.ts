@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,6 +18,15 @@ vi.mock('@/lib/agent-os/design-taste-jury/paths', async () => {
       path.join(tempRoot, 'agentos', 'memory', 'design-taste.md'),
     getDesignTasteJuryRootDirectory: () =>
       path.join(tempRoot, 'agentos', 'runs', 'design-taste-jury'),
+    resolveDesignTasteJuryCompletionPath: (runId: string) =>
+      path.join(
+        tempRoot,
+        'agentos',
+        'runs',
+        'design-taste-jury',
+        runId,
+        'complete.json'
+      ),
     resolveDesignTasteJuryRunDirectory: (runId: string) =>
       path.join(tempRoot, 'agentos', 'runs', 'design-taste-jury', runId),
     resolveDesignTasteJuryManifestPath: (runId: string) =>
@@ -46,8 +55,9 @@ describe('runDesignTasteJuryLoop', () => {
     tempRoot = await mkdtemp(path.join(os.tmpdir(), 'design-taste-jury-'));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.resetModules();
+    await rm(tempRoot, { recursive: true, force: true });
   });
 
   it('persists a manifest with surgical capture and issue filings', async () => {
@@ -72,5 +82,49 @@ describe('runDesignTasteJuryLoop', () => {
     };
 
     expect(manifest.capturePlan.skipped).toContain('marketing-home-desktop');
+    const completion = JSON.parse(
+      await readFile(
+        path.join(
+          tempRoot,
+          'agentos',
+          'runs',
+          'design-taste-jury',
+          'loop-run-1',
+          'complete.json'
+        ),
+        'utf8'
+      )
+    ) as { readonly runId: string; readonly status: string };
+    expect(completion).toEqual(
+      expect.objectContaining({ runId: 'loop-run-1', status: 'completed' })
+    );
+  });
+
+  it('does not mark a run complete when an output write fails', async () => {
+    const runDirectory = path.join(
+      tempRoot,
+      'agentos',
+      'runs',
+      'design-taste-jury',
+      'failed-run'
+    );
+    await mkdir(path.join(runDirectory, 'issue-filings.json'), {
+      recursive: true,
+    });
+    const { runDesignTasteJuryLoop } = await import(
+      '@/lib/agent-os/design-taste-jury/loop'
+    );
+
+    await expect(
+      runDesignTasteJuryLoop({
+        runId: 'failed-run',
+        changedFiles: [
+          'apps/web/features/dashboard/insights/InsightsPanelView.tsx',
+        ],
+      })
+    ).rejects.toThrow();
+    await expect(
+      lstat(path.join(runDirectory, 'complete.json'))
+    ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });
