@@ -119,6 +119,22 @@ async function ensureDbUser(betterAuthUserId: string) {
     SET user_status = 'waitlist_approved', updated_at = NOW()
     WHERE better_auth_user_id = ${betterAuthUserId}
   `;
+
+  // The OTP redirect reads and caches the pending status before this direct
+  // fixture update. Clear that entry before mounting /start so the proxy sees
+  // the approved user and allows the onboarding claim hook to run.
+  const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (redisUrl && redisToken) {
+    try {
+      await fetch(
+        `${redisUrl}/del/${encodeURIComponent(`proxy:user-state:${betterAuthUserId}`)}`,
+        { headers: { Authorization: `Bearer ${redisToken}` } }
+      );
+    } catch {
+      console.warn('WARN: Failed to invalidate proxy user-state cache');
+    }
+  }
 }
 
 /**
@@ -251,21 +267,7 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
   await expect(page.locator('[data-auth-email-code-step="code"]')).toBeVisible({
     timeout: 30_000,
   });
-  const claimResponsePromise = page.waitForResponse(
-    response =>
-      response.request().method() === 'POST' &&
-      new URL(response.url()).pathname === '/api/onboarding/claim',
-    { timeout: 30_000 }
-  );
   await page.getByLabel('Digit 1 of 6').pressSequentially('424242');
-  const claimResponse = await claimResponsePromise;
-  expect(claimResponse.status()).toBe(200);
-  const claimPayload = (await claimResponse.json()) as {
-    claimed?: number;
-    conversationId?: string;
-  };
-  await page.waitForURL(/\/(start|onboarding)/, { timeout: 30_000 });
-  await page.waitForLoadState('domcontentloaded');
 
   const sessionHandle = await page.waitForFunction(
     async () => {
@@ -286,6 +288,24 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const betterAuthUserId = await sessionHandle.jsonValue<string>();
 
   await ensureDbUser(betterAuthUserId);
+
+  const claimResponsePromise = page.waitForResponse(
+    response =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/onboarding/claim',
+    { timeout: 30_000 }
+  );
+  await page.goto('/start', {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  });
+  const claimResponse = await claimResponsePromise;
+  expect(claimResponse.status()).toBe(200);
+  const claimPayload = (await claimResponse.json()) as {
+    claimed?: number;
+    conversationId?: string;
+  };
+
   return { email, betterAuthUserId, claimPayload };
 }
 
