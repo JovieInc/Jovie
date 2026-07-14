@@ -30,34 +30,38 @@ import { track } from '@/lib/analytics';
 import { useAppFlag } from '@/lib/flags/client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { cn } from '@/lib/utils';
-import {
-  ChatProposeCheckoutCard,
-  type CheckoutCardPayload,
-} from './ChatProposeCheckoutCard';
-import {
-  ChatProposeNextStepCard,
-  type NextStepCardPayload,
-} from './ChatProposeNextStepCard';
+import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
+import { ChatProposeNextStepCard } from './ChatProposeNextStepCard';
 import { OnboardingChatEmptyIntro } from './OnboardingChatEmptyIntro';
-import type {
-  OnboardingProfileArtist,
-  OnboardingProfileBuilderState,
-} from './OnboardingProfileRail';
+import type { OnboardingProfileBuilderState } from './OnboardingProfileRail';
 import { OnboardingProfileRail } from './OnboardingProfileRail';
 import {
-  type ArtistConfirmedOutput,
-  type ArtistPickerOutput,
-  type HandleCheckOutput,
   OnboardingArtistConfirmedCard,
   type OnboardingArtistSelection,
   OnboardingHandleCheckCard,
   OnboardingSocialLinkCard,
   OnboardingSpotifyArtistPickerCard,
-  type SocialLinkOutput,
   useArtistSelectionMessage,
 } from './OnboardingToolArtifacts';
 import type { OnboardingTurnstileStatus } from './OnboardingTurnstile';
 import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomationBypass';
+import {
+  deriveProfileBuilderState,
+  findLastAssistantMessageId,
+  getInputQuery,
+  getMessageText,
+  getOnboardingErrorMessage,
+  getToolName,
+  getToolParts,
+  isArtistConfirmedOutput,
+  isArtistPickerOutput,
+  isCheckoutPayload,
+  isHandleCheckOutput,
+  isNextStepPayload,
+  isSocialLinkOutput,
+  THINKING_PLACEHOLDER_ID,
+  type ToolPart,
+} from './onboardingChatHelpers';
 
 /**
  * Anonymous onboarding chat client (JOV-2132 PR 3).
@@ -93,30 +97,9 @@ interface OnboardingChatProps {
   readonly starterPrompt?: string;
 }
 
-/** Pull the user-visible text out of a UIMessage's parts. */
-const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 const BLOCKED_TURNSTILE_TOKEN_STATUSES: ReadonlySet<
   OnboardingTurnstileStatus | undefined
 > = new Set(['expired', 'timeout', 'error', 'unsupported', 'unconfigured']);
-
-function getMessageText(message: UIMessage): string {
-  return (message.parts ?? [])
-    .filter(
-      (p): p is { type: 'text'; text: string } =>
-        p.type === 'text' && typeof p.text === 'string'
-    )
-    .map(p => p.text)
-    .join('');
-}
-
-type ToolPart = MessagePart & {
-  readonly type: string;
-  readonly toolName?: string;
-  readonly toolCallId?: string;
-  readonly input?: unknown;
-  readonly output?: unknown;
-  readonly state?: string;
-};
 
 type OnboardingToolRendererArgs = {
   readonly part: ToolPart;
@@ -130,197 +113,6 @@ type OnboardingToolRendererArgs = {
 type OnboardingToolRenderer = (
   args: OnboardingToolRendererArgs
 ) => ReactNode | null;
-
-function isToolPart(part: unknown): part is ToolPart {
-  if (!part || typeof part !== 'object') return false;
-  const type = (part as { type?: unknown }).type;
-  return (
-    type === 'dynamic-tool' ||
-    (typeof type === 'string' && type.startsWith('tool-'))
-  );
-}
-
-function getToolName(part: ToolPart): string {
-  if (part.toolName) return part.toolName;
-  // Convention: AI SDK emits parts of type `tool-<name>` when output is present.
-  return part.type.startsWith('tool-')
-    ? part.type.slice('tool-'.length)
-    : part.type;
-}
-
-/**
- * Extract tool parts from a message. Returns the structured parts (not text)
- * so the renderer can decide between rich cards (proposeNextStep,
- * proposeCheckout) and the chip fallback for the rest.
- */
-function getToolParts(message: UIMessage): readonly ToolPart[] {
-  return ((message.parts ?? []) as readonly MessagePart[]).filter(isToolPart);
-}
-
-interface ToolOutputWithAction {
-  readonly action?: string;
-}
-
-function isNextStepPayload(output: unknown): output is NextStepCardPayload {
-  return (
-    typeof output === 'object' &&
-    output !== null &&
-    (output as ToolOutputWithAction).action === 'propose_next_step'
-  );
-}
-
-function isCheckoutPayload(output: unknown): output is CheckoutCardPayload {
-  return (
-    typeof output === 'object' &&
-    output !== null &&
-    (output as ToolOutputWithAction).action === 'propose_checkout'
-  );
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function isArtistPickerOutput(output: unknown): output is ArtistPickerOutput {
-  return asRecord(output)?.action === 'open_artist_picker';
-}
-
-function isArtistConfirmedOutput(
-  output: unknown
-): output is ArtistConfirmedOutput {
-  return asRecord(output)?.action === 'spotify_artist_confirmed';
-}
-
-function isHandleCheckOutput(output: unknown): output is HandleCheckOutput {
-  return asRecord(output)?.action === 'check_handle';
-}
-
-function isSocialLinkOutput(output: unknown): output is SocialLinkOutput {
-  return asRecord(output)?.action === 'propose_social_link';
-}
-
-function getInputQuery(part: ToolPart): string | null {
-  const input = asRecord(part.input);
-  return typeof input?.query === 'string' ? input.query : null;
-}
-
-function findLastAssistantMessageId(messages: readonly UIMessage[]) {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i];
-    if (
-      message.role === 'assistant' &&
-      message.id !== THINKING_PLACEHOLDER_ID
-    ) {
-      return message.id;
-    }
-  }
-  return null;
-}
-
-function getOnboardingErrorMessage(message: string): string {
-  if (/authentication service is initializing/i.test(message)) {
-    return 'Jovie is still connecting. Try again in a moment.';
-  }
-  return message;
-}
-
-function artistFromSelection(
-  artist: OnboardingArtistSelection | null
-): OnboardingProfileArtist | null {
-  if (!artist) return null;
-  return {
-    id: artist.id,
-    name: artist.name,
-    url: artist.url,
-    imageUrl: artist.imageUrl ?? null,
-    followers: artist.followers ?? null,
-    popularity: artist.popularity ?? null,
-    genres: [],
-    dspMatches: [
-      {
-        id: 'spotify',
-        label: 'Spotify',
-        platform: 'spotify',
-        url: artist.url,
-      },
-    ],
-  };
-}
-
-function artistFromConfirmedOutput(
-  output: ArtistConfirmedOutput
-): OnboardingProfileArtist | null {
-  const artist = output.artist;
-  if (!artist) return null;
-  return {
-    id: artist.id,
-    name: artist.name,
-    url: artist.url,
-    imageUrl: artist.imageUrl ?? null,
-    followers: artist.followers ?? null,
-    popularity: artist.popularity ?? null,
-    genres: artist.genres ?? [],
-    dspMatches: [
-      {
-        id: 'spotify',
-        label: 'Spotify',
-        platform: 'spotify',
-        url: artist.url,
-      },
-      ...(artist.dspMatches ?? []),
-    ],
-  };
-}
-
-function cleanHandle(handle: string | undefined): string | null {
-  const cleaned = handle?.replace(/^@/, '').trim().toLowerCase();
-  return cleaned || null;
-}
-
-function deriveProfileBuilderState({
-  handleDraft,
-  messages,
-  selectedArtist,
-}: {
-  readonly handleDraft: string | null;
-  readonly messages: readonly UIMessage[];
-  readonly selectedArtist: OnboardingArtistSelection | null;
-}): OnboardingProfileBuilderState {
-  let artist = artistFromSelection(selectedArtist);
-  let artistConfirmed = false;
-  let handle: string | null = null;
-  const socialLinks: string[] = [];
-
-  for (const message of messages) {
-    for (const part of getToolParts(message)) {
-      const output = part.output;
-
-      if (isArtistConfirmedOutput(output)) {
-        const confirmedArtist = artistFromConfirmedOutput(output);
-        artist = confirmedArtist ?? artist;
-        artistConfirmed =
-          Boolean(confirmedArtist) || Boolean(output.spotifyArtistId);
-      }
-
-      if (isHandleCheckOutput(output)) {
-        handle = cleanHandle(output.handle) ?? handle;
-      }
-
-      if (isSocialLinkOutput(output) && output.url) {
-        socialLinks.push(output.url);
-      }
-    }
-  }
-
-  return {
-    artist,
-    artistConfirmed,
-    handle: handleDraft == null ? handle : cleanHandle(handleDraft),
-    socialLinks,
-  };
-}
 
 const renderSearchSpotifyArtist: OnboardingToolRenderer = ({
   part,
