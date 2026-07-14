@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,6 +54,29 @@ function getJobBlock(workflow: string, jobKey: string): string {
   }
 
   return block.join('\n');
+}
+
+function previewRobotsPolicyValid(
+  workflow: string,
+  robotsBody: string
+): boolean {
+  const step = getStepBlock(workflow, 'Canary health check');
+  const start = step.indexOf('preview_robots_policy_valid() {');
+  const end = step.indexOf('\n\n          if ! printf', start);
+  expect(start).toBeGreaterThan(0);
+  expect(end).toBeGreaterThan(start);
+  const source = step
+    .slice(start, end)
+    .split('\n')
+    .map(line => line.replace(/^ {10}/, ''))
+    .join('\n');
+
+  return (
+    spawnSync('bash', ['-c', `${source}\npreview_robots_policy_valid`], {
+      input: robotsBody,
+      encoding: 'utf8',
+    }).status === 0
+  );
 }
 
 describe('deploy workflow Vercel env resolution', () => {
@@ -346,6 +370,48 @@ describe('deploy workflow Vercel env resolution', () => {
 });
 
 describe('canary health gate workflow', () => {
+  it('accepts a wildcard block for a raw preview', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+    const canaryStep = getStepBlock(workflow, 'Canary health check');
+
+    expect(
+      previewRobotsPolicyValid(workflow, 'User-agent: *\nDisallow: /')
+    ).toBe(true);
+    expect(canaryStep).toContain(
+      `if ! printf '%s\\n' "$robots_body" | preview_robots_policy_valid; then`
+    );
+  });
+
+  it('rejects a block that only belongs to an unrelated crawler group', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+
+    expect(
+      previewRobotsPolicyValid(
+        workflow,
+        'User-agent: *\nDisallow:\n\nUser-agent: BadBot\nDisallow: /'
+      )
+    ).toBe(false);
+  });
+
+  it('rejects a wildcard root allow on a raw preview', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+
+    expect(
+      previewRobotsPolicyValid(workflow, 'User-agent: *\nDisallow: /\nAllow: /')
+    ).toBe(false);
+  });
+
+  it('rejects a sitemap advertised by a raw preview', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+
+    expect(
+      previewRobotsPolicyValid(
+        workflow,
+        'User-agent: *\nDisallow: /\nSitemap: https://preview.example/sitemap.xml'
+      )
+    ).toBe(false);
+  });
+
   it('fails closed when the automation bypass secret is missing', () => {
     const workflow = readFileSync(canaryWorkflowPath, 'utf8');
     const canaryStep = getStepBlock(workflow, 'Canary health check');
