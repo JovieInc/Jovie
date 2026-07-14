@@ -7,6 +7,7 @@ const {
   mockBuildDevTestAuthCookieDescriptors,
   mockCreateStoredNativeExchangeCode,
   mockEnsureDevTestAuthActor,
+  mockEnsureExistingDevTestAuthActor,
   mockEnsureLiveDevTestAuthActor,
   mockGetCachedDevTestAuthSession,
   mockGetDevTestAuthAvailability,
@@ -21,6 +22,7 @@ const {
   mockBuildDevTestAuthCookieDescriptors: vi.fn(),
   mockCreateStoredNativeExchangeCode: vi.fn(),
   mockEnsureDevTestAuthActor: vi.fn(),
+  mockEnsureExistingDevTestAuthActor: vi.fn(),
   mockEnsureLiveDevTestAuthActor: vi.fn(),
   mockGetCachedDevTestAuthSession: vi.fn(),
   mockGetDevTestAuthAvailability: vi.fn(),
@@ -45,6 +47,7 @@ vi.mock('@/lib/auth/dev-test-auth.server', () => ({
     '__e2e_test_persona',
   ],
   ensureDevTestAuthActor: mockEnsureDevTestAuthActor,
+  ensureExistingDevTestAuthActor: mockEnsureExistingDevTestAuthActor,
   ensureLiveDevTestAuthActor: mockEnsureLiveDevTestAuthActor,
   getCachedDevTestAuthSession: mockGetCachedDevTestAuthSession,
   getDevTestAuthAvailability: mockGetDevTestAuthAvailability,
@@ -113,6 +116,15 @@ describe('dev test-auth routes', () => {
       fullName: 'Browse Test User',
       isAdmin: false,
       profilePath: '/browse-test-user',
+    });
+    mockEnsureExistingDevTestAuthActor.mockResolvedValue({
+      persona: 'creator',
+      clerkUserId: 'ba-real-user',
+      email: 'existing@test.jovie.com',
+      username: 'existing-user',
+      fullName: 'Existing User',
+      isAdmin: false,
+      profilePath: '/existing-user',
     });
     mockEnsureLiveDevTestAuthActor.mockResolvedValue({
       persona: 'creator',
@@ -229,6 +241,48 @@ describe('dev test-auth routes', () => {
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_mode');
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_user_id');
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona');
+  });
+
+  it('validates an existing persisted actor before setting auth cookies', async () => {
+    const { POST } = await import('@/app/api/dev/test-auth/session/route');
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/dev/test-auth/session', {
+        method: 'POST',
+        body: JSON.stringify({
+          persona: 'creator',
+          existingUserId: 'ba-real-user',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEnsureExistingDevTestAuthActor).toHaveBeenCalledWith(
+      'ba-real-user',
+      'creator'
+    );
+    expect(mockEnsureDevTestAuthActor).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when an existing actor is not persisted', async () => {
+    mockEnsureExistingDevTestAuthActor.mockResolvedValueOnce(null);
+    const { POST } = await import('@/app/api/dev/test-auth/session/route');
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/dev/test-auth/session', {
+        method: 'POST',
+        body: JSON.stringify({
+          persona: 'creator',
+          existingUserId: 'synthetic-user',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Unknown Better Auth test user',
+    });
   });
 
   it('accepts POST /session when the URL host is the server bind address but the request host is loopback', async () => {

@@ -5,6 +5,7 @@ export type CiFailureClass =
   | 'suite_wide_performance_regression'
   | 'broad_test_performance_regression'
   | 'isolated_stuck_test_regression'
+  | 'test_fixture_import_timeout'
   | 'runner_process_exhaustion'
   | 'runner_host_pressure'
   | 'unknown';
@@ -89,6 +90,16 @@ const DIAGNOSES: ReadonlyArray<{
       'A repository-wide source ratchet exceeded its bounded test timeout while scanning the source tree.',
     remediation:
       'Inspect the ratchet scanner for unbounded per-file filesystem work; do not classify this as runner EAGAIN or increase the test timeout.',
+  },
+  {
+    failureClass: 'test_fixture_import_timeout',
+    matches: log =>
+      /FAIL\s+tests\/unit\/app\/hud-page\.test\.ts/i.test(log) &&
+      /Error:\s*Test timed out in 5000ms/i.test(log),
+    rootCause:
+      'The HUD page test counted its cold dynamic module transform and import against the per-test timeout after resetting the module graph.',
+    remediation:
+      'Hoist the mocked HUD page import outside the timed test bodies and avoid resetting modules when the assertions do not require a fresh module graph.',
   },
   {
     failureClass: 'runner_process_exhaustion',
