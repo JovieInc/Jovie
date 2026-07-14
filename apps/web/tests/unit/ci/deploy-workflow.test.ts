@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,6 +54,25 @@ function getJobBlock(workflow: string, jobKey: string): string {
   }
 
   return block.join('\n');
+}
+
+function robotsGloballyBlocked(workflow: string, robotsBody: string): boolean {
+  const step = getStepBlock(workflow, 'Canary health check');
+  const start = step.indexOf('robots_globally_blocked() {');
+  const end = step.indexOf('\n\n          if printf', start);
+  expect(start).toBeGreaterThan(0);
+  expect(end).toBeGreaterThan(start);
+  const source = step
+    .slice(start, end)
+    .split('\n')
+    .map(line => line.replace(/^ {10}/, ''))
+    .join('\n');
+  return (
+    spawnSync('bash', ['-c', `${source}\nrobots_globally_blocked`], {
+      input: robotsBody,
+      encoding: 'utf8',
+    }).status === 0
+  );
 }
 
 describe('deploy workflow Vercel env resolution', () => {
@@ -314,6 +334,21 @@ describe('deploy workflow Vercel env resolution', () => {
 });
 
 describe('canary health gate workflow', () => {
+  it('associates production crawl rules with the wildcard group', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+    expect(robotsGloballyBlocked(workflow, 'User-agent: *\nDisallow: /')).toBe(
+      true
+    );
+    expect(
+      robotsGloballyBlocked(
+        workflow,
+        'User-agent: *\nDisallow:\n\nUser-agent: BadBot\nDisallow: /'
+      )
+    ).toBe(false);
+    expect(
+      robotsGloballyBlocked(workflow, 'User-agent: *\nDisallow: /\nAllow: /')
+    ).toBe(false);
+  });
   it('fails closed when the automation bypass secret is missing', () => {
     const workflow = readFileSync(canaryWorkflowPath, 'utf8');
     const canaryStep = getStepBlock(workflow, 'Canary health check');

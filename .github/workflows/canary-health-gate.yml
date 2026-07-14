@@ -421,7 +421,32 @@ jobs:
           robots_body=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${robots_url}$( [[ "$robots_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
           sitemap_body=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${sitemap_url}$( [[ "$sitemap_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
 
-          if echo "$robots_body" | grep -Eiq '^[[:space:]]*user-agent:[[:space:]]*\*[[:space:]]*$' && echo "$robots_body" | grep -Eiq '^[[:space:]]*disallow:[[:space:]]*/[[:space:]]*$' && ! echo "$robots_body" | grep -Eiq '^[[:space:]]*allow:[[:space:]]*/[[:space:]]*$'; then
+          robots_globally_blocked() {
+            awk '
+              function trim(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+              BEGIN { wildcard_group = 0; group_has_rules = 0; wildcard_disallow = 0; root_allow = 0 }
+              {
+                line = $0; sub(/\r$/, "", line); line = trim(line)
+                if (line == "" || substr(line, 1, 1) == "#") next
+                separator = index(line, ":"); if (separator == 0) next
+                directive = tolower(trim(substr(line, 1, separator - 1)))
+                value = trim(substr(line, separator + 1))
+                if (directive == "user-agent") {
+                  if (group_has_rules) { wildcard_group = 0; group_has_rules = 0 }
+                  if (tolower(value) == "*") wildcard_group = 1
+                  next
+                }
+                if (directive == "allow" || directive == "disallow") {
+                  group_has_rules = 1
+                  if (wildcard_group && directive == "allow" && value == "/") root_allow = 1
+                  if (wildcard_group && directive == "disallow" && value == "/") wildcard_disallow = 1
+                }
+              }
+              END { exit(wildcard_disallow && !root_allow ? 0 : 1) }
+            '
+          }
+
+          if printf '%s\n' "$robots_body" | robots_globally_blocked; then
             echo "❌ Canary failed: robots.txt globally blocks all crawlers with Disallow: /"
             echo "canary_status=failed_seo_robots" >> "$GITHUB_OUTPUT"
             exit 1
