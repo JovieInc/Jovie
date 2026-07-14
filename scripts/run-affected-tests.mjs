@@ -100,6 +100,23 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = new Set([
+  'apps/web/scripts/test-performance-guard.ts',
+  'apps/web/scripts/test-performance-profiler.test.ts',
+  'apps/web/scripts/test-performance-profiler.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+]);
+const PERFORMANCE_PROFILER_REPAIR_MANIFEST = new Set([
+  ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const PERFORMANCE_PROFILER_REPAIR_WEB_TESTS = [
+  'apps/web/scripts/test-performance-profiler.test.ts',
+];
+const PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS = [
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+];
 const GTMQ_SOURCE_GATE_REAPER_MANIFEST = new Set([
   '.github/actions/setup-node-pnpm/action.yml',
   '.github/workflows/gtmq-source-authorization.yml',
@@ -162,6 +179,18 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactAffectedTestSelector =
     affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
     files.length === AFFECTED_TEST_SELECTOR_MANIFEST.size;
+  const performanceProfilerRepairInputCount = files.filter(file =>
+    PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.has(file)
+  ).length;
+  const isExactPerformanceProfilerRepairPrimary =
+    files.length === PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.size &&
+    files.every(file => PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.has(file));
+  const isExactPerformanceProfilerRepairWithSelector =
+    files.length === PERFORMANCE_PROFILER_REPAIR_MANIFEST.size &&
+    files.every(file => PERFORMANCE_PROFILER_REPAIR_MANIFEST.has(file));
+  const isExactPerformanceProfilerRepair =
+    isExactPerformanceProfilerRepairPrimary ||
+    isExactPerformanceProfilerRepairWithSelector;
   const gtmqSourceGateReaperInputCount = files.filter(file =>
     GTMQ_SOURCE_GATE_REAPER_MANIFEST.has(file)
   ).length;
@@ -246,6 +275,9 @@ export function buildAffectedTestPlan(changedFiles) {
   if (isExactPrerequisiteTrain) {
     mandatoryTests.push(...PREREQUISITE_TRAIN_TESTS);
   }
+  if (isExactPerformanceProfilerRepair) {
+    mandatoryTests.push(...PERFORMANCE_PROFILER_REPAIR_WEB_TESTS);
+  }
 
   const selectedTests = unique([...directTests, ...mandatoryTests]);
   const rootVitestTests = isExactVercelCongestionControl
@@ -260,7 +292,13 @@ export function buildAffectedTestPlan(changedFiles) {
       : []),
   ]);
   const scriptVitestTests = unique([
-    ...(isExactAffectedTestSelector ? AFFECTED_TEST_SELECTOR_TESTS : []),
+    ...(isExactPerformanceProfilerRepair
+      ? PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS
+      : []),
+    ...(isExactPerformanceProfilerRepairWithSelector ||
+    isExactAffectedTestSelector
+      ? AFFECTED_TEST_SELECTOR_TESTS
+      : []),
     ...(isExactGtmqSourceGateReaper
       ? GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS
       : []),
@@ -276,6 +314,11 @@ export function buildAffectedTestPlan(changedFiles) {
     if (isInvestorNoteIngestionInput(file)) return true;
     if (isCiCancellationHealerInput(file)) return true;
     if (isExactPrerequisiteTrain && PREREQUISITE_TRAIN_MANIFEST.has(file))
+      return true;
+    if (
+      isExactPerformanceProfilerRepair &&
+      PERFORMANCE_PROFILER_REPAIR_MANIFEST.has(file)
+    )
       return true;
     if (
       hasSeedConfirmationChange &&
@@ -312,11 +355,16 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompleteAffectedTestSelector =
     affectedTestSelectorInputCount > 0 &&
     !isExactAffectedTestSelector &&
+    !isExactPerformanceProfilerRepairWithSelector &&
     !isExactGtmqSourceGateReaper;
+  const hasIncompletePerformanceProfilerRepair =
+    performanceProfilerRepairInputCount > 0 &&
+    !isExactPerformanceProfilerRepair;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
-    !isExactAffectedTestSelector;
+    !isExactAffectedTestSelector &&
+    !isExactPerformanceProfilerRepairWithSelector;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
     hasUnknownCiCancellationHealerPeer ||
@@ -326,6 +374,7 @@ export function buildAffectedTestPlan(changedFiles) {
     hasUnknownPrerequisiteTrainPeer ||
     hasIncompleteVercelCongestionControl ||
     hasIncompleteAffectedTestSelector ||
+    hasIncompletePerformanceProfilerRepair ||
     hasIncompleteGtmqSourceGateReaper;
   const hasSelectedTests =
     selectedTests.length > 0 ||
@@ -341,6 +390,7 @@ export function buildAffectedTestPlan(changedFiles) {
             isExactPrerequisiteTrain ||
             isExactVercelCongestionControl ||
             isExactAffectedTestSelector ||
+            isExactPerformanceProfilerRepair ||
             isExactGtmqSourceGateReaper)
         ? 'selected'
         : relatedFiles.length === 0

@@ -1,5 +1,11 @@
 export type CiFailureClass =
   | 'bounded_source_scan_timeout'
+  | 'runner_idle_reap_race'
+  | 'broken_profiler_fixture'
+  | 'inconclusive_performance_timeout'
+  | 'suite_wide_performance_regression'
+  | 'broad_test_performance_regression'
+  | 'isolated_stuck_test_regression'
   | 'runner_process_exhaustion'
   | 'runner_host_pressure'
   | 'unknown';
@@ -16,6 +22,72 @@ const DIAGNOSES: ReadonlyArray<{
   readonly rootCause: string;
   readonly remediation: string;
 }> = [
+  {
+    failureClass: 'runner_idle_reap_race',
+    matches: log => /The runner has received a shutdown signal/i.test(log),
+    rootCause:
+      'The autoscaler selected a runner from a stale idle snapshot, work started before termination, and the stale-idle reap then shut the runner down during checkout (TOCTOU). This is not a code failure.',
+    remediation:
+      'Retry the exact failed head only after the controller proves the runner is freshly busy before reaping. Do not change PR code or classify the shutdown as flaky CI without that fresh-busy controller evidence.',
+  },
+  {
+    failureClass: 'inconclusive_performance_timeout',
+    matches: log =>
+      /Test Performance Budgets/i.test(log) &&
+      /Test suite failed:[\s\S]*signal=SIGTERM[\s\S]*(?:ETIMEDOUT|suite exceeded \d+ms)[\s\S]*classification=inconclusive-performance-timeout/i.test(
+        log
+      ),
+    rootCause:
+      'The bounded profiler timed out before producing complete Vitest evidence. The timeout alone cannot distinguish a real performance regression from runner or runtime drift, so it is not safe to retry or ignore without measurement.',
+    remediation:
+      'Run the exact representative suite printed after `remediation=` in the failed log. A repeatable slowdown indicates suite/test regression; a clean rerun points to runner/runtime drift. Do not change the 60s budget or retry blindly.',
+  },
+  {
+    failureClass: 'broken_profiler_fixture',
+    matches: log =>
+      /Test Performance Budgets/i.test(log) &&
+      /Test suite failed:[\s\S]*signal=SIGTERM[\s\S]*(?:ETIMEDOUT|suite exceeded 420000ms)/i.test(
+        log
+      ),
+    rootCause:
+      'The legacy profiler re-ran the entire ~1,900-file fast suite serially behind a fixed 420s timeout. Earlier runs converted that partial timeout output into false-green baselines; fail-closed behavior exposed the broken profiler fixture.',
+    remediation:
+      'Run the exact representative suite emitted by the bounded profiler and restore the 60s budget without raising it or retrying blindly.',
+  },
+  {
+    failureClass: 'suite_wide_performance_regression',
+    matches: log =>
+      /Test Performance Budgets/i.test(log) &&
+      /Total test duration \([^)]*ms\) exceeds threshold \(60000ms\)|Suite "full" duration \([^)]*ms\) exceeds budget \(60000ms\)/i.test(
+        log
+      ),
+    rootCause:
+      'The bounded representative suite completed with credible evidence but exceeded its 60s total-duration budget, indicating suite-wide execution or setup drift.',
+    remediation:
+      'Run the exact representative suite and profiler command from the job, identify the suite-wide setup or execution increase, and restore the 60s budget without raising it.',
+  },
+  {
+    failureClass: 'broad_test_performance_regression',
+    matches: log =>
+      /Test Performance Budgets/i.test(log) &&
+      /P95 test duration \([^)]*ms\) exceeds threshold \(200ms\)/i.test(log),
+    rootCause:
+      'At least five percent of the representative assertions exceeded the 200ms distribution target, so the slowdown is broad rather than an isolated scheduler outlier.',
+    remediation:
+      'Use the profiler slow-test report to optimize the recurring slow tail and restore p95 below 200ms; do not weaken the p95 target or treat the run as a single-test flake.',
+  },
+  {
+    failureClass: 'isolated_stuck_test_regression',
+    matches: log =>
+      /Test Performance Budgets/i.test(log) &&
+      /Max individual test duration \([^)]*ms\) exceeds threshold \(2000ms\):/i.test(
+        log
+      ),
+    rootCause:
+      'A named assertion exceeded the 2s absolute ceiling (10x the 200ms p95 target), which filters measured cap-10 scheduler noise while still detecting an isolated stuck test.',
+    remediation:
+      'Rerun and optimize the named assertion. Keep the 2s max ceiling and the 200ms p95 target unchanged; do not retry blindly or classify the isolated stall as harmless runner noise.',
+  },
   {
     failureClass: 'bounded_source_scan_timeout',
     matches: log =>
