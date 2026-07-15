@@ -51,7 +51,7 @@ Graphite and branch protection must wait on **aggregate** contexts only — neve
 | `Fork PR Gate` | Blocks unreviewed fork PRs (auto-passes for agents + team) |
 | `PR Size Guard` | Caps PR size (800 lines / 40 files); `big-pr` is mechanical-only. A documented `integration-train` may use the bounded 2500-line / 60-file policy. |
 
-**Queue CI is the PR's own CI.** Graphite runs on every PR directly (not draft-batch mode), so `gtmq_*` batch branches are never created and the former slim-lane `if:` conditions were removed from `ci.yml` (#13610). Graphite does not use GitHub `merge_group` events. If batching mode is ever re-enabled, the slim-lane conditions must be restored with it — see `docs/PR_FLOW.md` §2 and the 2026-06-22 post-mortem.
+**Queue CI is the PR's own CI while Graphite remains active.** Graphite runs on every PR directly (not draft-batch mode), so `gtmq_*` batch branches are never created. `ci.yml` also accepts GitHub's `merge_group` event and validates the synthetic combined head, but that path is inert until the live ruleset enables the native queue. Supporting the event before cutover prevents a required-check bootstrap gap; it does not change the active queue backend. See `docs/PR_FLOW.md` §2 and the 2026-06-22 post-mortem.
 
 ### Graphite dashboard (`app.graphite.com/settings/merge-queue`) — OWL/human verify
 

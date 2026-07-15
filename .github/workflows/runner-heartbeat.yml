@@ -1,0 +1,25 @@
+name: Runner Heartbeat
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runner-heartbeat
+  # A saturated/offline pool retains only the newest queued probe. The hosted
+  # observer treats queued/in-progress or stale success as down; its separate
+  # two-check debounce prevents a single busy interval from flipping routing.
+  cancel-in-progress: true
+
+jobs:
+  heartbeat:
+    name: Self-hosted runner heartbeat
+    runs-on: jovie-runner
+    timeout-minutes: 2
+    steps:
+      - name: Record heartbeat
+        run: echo "Self-hosted heartbeat from $RUNNER_NAME"

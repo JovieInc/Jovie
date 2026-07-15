@@ -486,8 +486,12 @@ jobs:
   # --------------------------------------------------------------------------
   runner-health:
     name: Runner Health
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # This monitor must remain runnable when the self-hosted pool is offline.
+    runs-on: ubuntu-latest
     timeout-minutes: 2
+    concurrency:
+      group: runner-health-routing
+      cancel-in-progress: false
     permissions:
       contents: read
       actions: write
@@ -496,61 +500,49 @@ jobs:
       TARGET_VARIABLE: CI_FAST_RUNNER
       OFFLINE_TARGET: ubuntu-latest
       ONLINE_TARGET: jovie-runner
+      # Two missed 10-minute heartbeats indicate either outage or saturation.
+      # The routing debounce requires that signal on two observer ticks.
+      HEARTBEAT_MAX_AGE_SECONDS: '1500'
 
     steps:
-      - name: Detect self-hosted runner label drift
-        run: |
-          set -euo pipefail
-          OFFENDERS=$(gh api repos/JovieInc/Jovie/actions/runners --jq \
-            '[.runners[] | select([.labels[].name] | any(. == "ubuntu-latest" or . == "macos-latest" or . == "windows-latest")) | {name: .name, labels: [.labels[].name]}]')
-          COUNT=$(echo "$OFFENDERS" | jq length)
-          if [ "$COUNT" -gt 0 ]; then
-            DETAIL=$(echo "$OFFENDERS" | jq -r '[.[] | "\(.name) [\(.labels | join(","))]"] | join("; ")')
-            echo "::error::Runner label drift: $COUNT runner(s) with forbidden labels: $DETAIL"
-            exit 1
-          fi
-          echo "OK: no runner label drift detected."
+      - name: Checkout main policy code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Mint Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
       - name: Query runner status
         id: runners
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          set -euo pipefail
-          RUNNERS=$(gh api repos/JovieInc/Jovie/actions/runners --jq \
-            '[.runners[] | select(.labels[].name == "jovie-runner") | {name: .name, status: .status, busy: .busy}]')
-          TOTAL=$(echo "$RUNNERS" | jq length)
-          ONLINE=$(echo "$RUNNERS" | jq '[.[] | select(.status == "online")] | length')
-          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
-          echo "online=$ONLINE" >> "$GITHUB_OUTPUT"
-          if [ "$ONLINE" -eq 0 ]; then echo "health=down" >> "$GITHUB_OUTPUT"
-          elif [ "$ONLINE" -ge 1 ]; then echo "health=up" >> "$GITHUB_OUTPUT"; fi
+          .github/scripts/query-runner-heartbeat.sh
 
       - name: Flip to GitHub-hosted fallback if runners are down
         if: steps.runners.outputs.health == 'down'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          RUNNER_HEALTH: down
         run: |
-          set -euo pipefail
-          CURRENT=$(gh api repos/JovieInc/Jovie/actions/variables/CI_FAST_RUNNER --jq '.value' 2>/dev/null || echo "")
-          if [ "$CURRENT" = "ubuntu-latest" ]; then echo "Already on fallback."; exit 0; fi
-          CONSECUTIVE_FILE="${{ runner.temp }}/runner-down-count"
-          COUNT=0; [ -f "$CONSECUTIVE_FILE" ] && COUNT=$(cat "$CONSECUTIVE_FILE")
-          COUNT=$((COUNT + 1)); echo "$COUNT" > "$CONSECUTIVE_FILE"
-          FLAP_THRESHOLD=2
-          if [ "$COUNT" -lt "$FLAP_THRESHOLD" ]; then echo "First detection. Need $((FLAP_THRESHOLD - COUNT)) more."; exit 0; fi
-          echo "Runners offline for $COUNT consecutive checks. Flipping CI_FAST_RUNNER → ubuntu-latest..."
-          gh api -X PATCH repos/JovieInc/Jovie/actions/variables/CI_FAST_RUNNER -f name=CI_FAST_RUNNER -f value=ubuntu-latest
+          .github/scripts/update-runner-routing.sh
 
       - name: Restore self-hosted runners when they come back
         if: steps.runners.outputs.health == 'up'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          RUNNER_HEALTH: up
         run: |
-          set -euo pipefail
-          CURRENT=$(gh api repos/JovieInc/Jovie/actions/variables/CI_FAST_RUNNER --jq '.value' 2>/dev/null || echo "")
-          if [ "$CURRENT" = "jovie-runner" ]; then echo "Already on self-hosted."; exit 0; fi
-          CONSECUTIVE_FILE="${{ runner.temp }}/runner-up-count"
-          COUNT=0; [ -f "$CONSECUTIVE_FILE" ] && COUNT=$(cat "$CONSECUTIVE_FILE")
-          COUNT=$((COUNT + 1)); echo "$COUNT" > "$CONSECUTIVE_FILE"
-          FLAP_THRESHOLD=2
-          if [ "$COUNT" -lt "$FLAP_THRESHOLD" ]; then echo "First recovery check. Need $((FLAP_THRESHOLD - COUNT)) more."; exit 0; fi
-          echo "Runners back for $COUNT consecutive checks. Restoring CI_FAST_RUNNER → jovie-runner..."
-          gh api -X PATCH repos/JovieInc/Jovie/actions/variables/CI_FAST_RUNNER -f name=CI_FAST_RUNNER -f value=jovie-runner
+          .github/scripts/update-runner-routing.sh
 
   # --------------------------------------------------------------------------
   # JOB: synthetic-monitoring
@@ -650,6 +642,24 @@ jobs:
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-legacy-otp-results.json
         run: |
           doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-legacy-otp.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-legacy-otp
+        continue-on-error: true
+
+      - name: Run Better Auth Production Account Canary
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          BASE_URL: https://jov.ie
+          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
+          E2E_SKIP_WEB_SERVER: '1'
+          E2E_SYNTHETIC_MODE: 'true'
+          E2E_PROD_ACCOUNT_CANARY_ENABLED: 'true'
+          E2E_ENVIRONMENT: production
+          SYNTHETIC_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-better-auth-account-results.json
+        run: |
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-better-auth-account.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-better-auth-account
         continue-on-error: true
 
       - name: Run Public Profile Smoke Test

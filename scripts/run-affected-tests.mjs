@@ -100,6 +100,41 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const GOLDEN_PATH_SMOKE_CONTRACT_CORE = new Set([
+  'apps/web/tests/e2e/golden-path.spec.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+]);
+const GOLDEN_PATH_SMOKE_CONTRACT_TESTS = [
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+];
+const GOLDEN_PATH_SMOKE_CONTRACT_SCRIPT_TESTS = [
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+];
+const PERSISTED_AUTH_FIXTURE_REPAIR_CORE = new Set([
+  'apps/web/app/api/dev/test-auth/session/route.ts',
+  'apps/web/lib/auth/dev-test-auth-identity.ts',
+  'apps/web/lib/auth/dev-test-auth.server.ts',
+  'apps/web/lib/auth/test-mode.ts',
+  'apps/web/lib/testing/test-user-provision.server.ts',
+  'apps/web/tests/helpers/auth.ts',
+  'apps/web/tests/unit/api/dev/test-auth-routes.test.ts',
+  'apps/web/tests/unit/app/hud-page.test.ts',
+  'apps/web/tests/unit/e2e/auth-helper.test.ts',
+  'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
+  'apps/web/tests/unit/lib/auth/test-mode.test.ts',
+  'apps/web/tests/unit/lib/testing/test-user-provision.server.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/jobs/ci-failure-monitor.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/hermes/lib/ci-failure-classifier.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-classifier.test.ts',
+]);
+const PERSISTED_AUTH_FIXTURE_SCRIPT_TESTS = [
+  'scripts/hermes/lib/__tests__/ci-failure-classifier.test.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+];
 const GTMQ_SOURCE_GATE_REAPER_MANIFEST = new Set([
   '.github/actions/setup-node-pnpm/action.yml',
   '.github/workflows/gtmq-source-authorization.yml',
@@ -162,6 +197,31 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactAffectedTestSelector =
     affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
     files.length === AFFECTED_TEST_SELECTOR_MANIFEST.size;
+  const goldenPathSmokeContractInputCount = files.filter(file =>
+    GOLDEN_PATH_SMOKE_CONTRACT_CORE.has(file)
+  ).length;
+  const isExactGoldenPathSmokeContractRepair =
+    goldenPathSmokeContractInputCount ===
+      GOLDEN_PATH_SMOKE_CONTRACT_CORE.size &&
+    files.every(
+      file =>
+        GOLDEN_PATH_SMOKE_CONTRACT_CORE.has(file) ||
+        AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+    ) &&
+    affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size;
+  const persistedAuthFixtureInputCount = files.filter(file =>
+    PERSISTED_AUTH_FIXTURE_REPAIR_CORE.has(file)
+  ).length;
+  const isExactPersistedAuthFixtureRepair =
+    persistedAuthFixtureInputCount ===
+      PERSISTED_AUTH_FIXTURE_REPAIR_CORE.size &&
+    files.every(
+      file =>
+        PERSISTED_AUTH_FIXTURE_REPAIR_CORE.has(file) ||
+        AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+    ) &&
+    (affectedTestSelectorInputCount === 0 ||
+      affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
   const gtmqSourceGateReaperInputCount = files.filter(file =>
     GTMQ_SOURCE_GATE_REAPER_MANIFEST.has(file)
   ).length;
@@ -179,6 +239,10 @@ export function buildAffectedTestPlan(changedFiles) {
       !(
         isExactPrerequisiteTrain &&
         PREREQUISITE_TRAIN_PLAYWRIGHT_SPECS.has(file)
+      ) &&
+      !(
+        isExactGoldenPathSmokeContractRepair &&
+        file === 'apps/web/tests/e2e/golden-path.spec.ts'
       )
   );
   const mandatoryTests = [];
@@ -246,6 +310,9 @@ export function buildAffectedTestPlan(changedFiles) {
   if (isExactPrerequisiteTrain) {
     mandatoryTests.push(...PREREQUISITE_TRAIN_TESTS);
   }
+  if (isExactGoldenPathSmokeContractRepair) {
+    mandatoryTests.push(...GOLDEN_PATH_SMOKE_CONTRACT_TESTS);
+  }
 
   const selectedTests = unique([...directTests, ...mandatoryTests]);
   const rootVitestTests = isExactVercelCongestionControl
@@ -260,7 +327,17 @@ export function buildAffectedTestPlan(changedFiles) {
       : []),
   ]);
   const scriptVitestTests = unique([
-    ...(isExactAffectedTestSelector ? AFFECTED_TEST_SELECTOR_TESTS : []),
+    ...(isExactAffectedTestSelector ||
+    isExactGoldenPathSmokeContractRepair ||
+    (isExactPersistedAuthFixtureRepair && affectedTestSelectorInputCount > 0)
+      ? AFFECTED_TEST_SELECTOR_TESTS
+      : []),
+    ...(isExactGoldenPathSmokeContractRepair
+      ? GOLDEN_PATH_SMOKE_CONTRACT_SCRIPT_TESTS
+      : []),
+    ...(isExactPersistedAuthFixtureRepair
+      ? PERSISTED_AUTH_FIXTURE_SCRIPT_TESTS
+      : []),
     ...(isExactGtmqSourceGateReaper
       ? GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS
       : []),
@@ -275,6 +352,16 @@ export function buildAffectedTestPlan(changedFiles) {
     if (file.startsWith('apps/web/tests/eval/promptfoo/')) return true;
     if (isInvestorNoteIngestionInput(file)) return true;
     if (isCiCancellationHealerInput(file)) return true;
+    if (
+      isExactGoldenPathSmokeContractRepair &&
+      GOLDEN_PATH_SMOKE_CONTRACT_CORE.has(file)
+    )
+      return true;
+    if (
+      isExactPersistedAuthFixtureRepair &&
+      PERSISTED_AUTH_FIXTURE_REPAIR_CORE.has(file)
+    )
+      return true;
     if (isExactPrerequisiteTrain && PREREQUISITE_TRAIN_MANIFEST.has(file))
       return true;
     if (
@@ -312,10 +399,14 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompleteAffectedTestSelector =
     affectedTestSelectorInputCount > 0 &&
     !isExactAffectedTestSelector &&
+    !isExactGoldenPathSmokeContractRepair &&
+    !isExactPersistedAuthFixtureRepair &&
     !isExactGtmqSourceGateReaper;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
+    !isExactGoldenPathSmokeContractRepair &&
+    !isExactPersistedAuthFixtureRepair &&
     !isExactAffectedTestSelector;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
@@ -341,6 +432,8 @@ export function buildAffectedTestPlan(changedFiles) {
             isExactPrerequisiteTrain ||
             isExactVercelCongestionControl ||
             isExactAffectedTestSelector ||
+            isExactGoldenPathSmokeContractRepair ||
+            isExactPersistedAuthFixtureRepair ||
             isExactGtmqSourceGateReaper)
         ? 'selected'
         : relatedFiles.length === 0

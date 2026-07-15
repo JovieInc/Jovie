@@ -1,4 +1,12 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -79,5 +87,33 @@ describe('canonical metrics layer guard', () => {
     }
 
     expect(failures, failures.join('\n')).toEqual([]);
+  });
+
+  it('walks source directories without treating test files as violations', () => {
+    const webRoot = mkdtempSync(join(tmpdir(), 'metrics-layer-guard-'));
+
+    try {
+      mkdirSync(join(webRoot, 'app', 'nested'), { recursive: true });
+      mkdirSync(join(webRoot, 'components'), { recursive: true });
+      mkdirSync(join(webRoot, 'lib', 'analytics'), { recursive: true });
+      writeFileSync(
+        join(webRoot, 'app', 'nested', 'route.ts'),
+        'const raw = click_events; const rate = (clicks / views) * 100;\n'
+      );
+      writeFileSync(
+        join(webRoot, 'components', 'ignored.test.tsx'),
+        'const raw = click_events;\n'
+      );
+      writeFileSync(
+        join(webRoot, 'lib', 'analytics', 'metrics.ts'),
+        'const raw = click_events; const rate = (clicks / views) * 100;\n'
+      );
+
+      expect(countMetricsLayerViolations(webRoot)).toEqual({
+        'app/nested/route.ts': { tables: 1, rates: 1 },
+      });
+    } finally {
+      rmSync(webRoot, { recursive: true, force: true });
+    }
   });
 });

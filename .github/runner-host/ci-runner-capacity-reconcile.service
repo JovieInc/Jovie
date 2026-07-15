@@ -1,0 +1,13 @@
+[Unit]
+Description=Reconcile and diagnose Jovie CI runner process capacity
+After=ci-runner-autoscaler.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/libexec/jovie-runner-host/reconcile-capacity.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict

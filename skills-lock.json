@@ -1,11 +1,90 @@
 {
   "version": 1,
+  "codexSkills": [
+    "ai-sdk",
+    "find-skills",
+    "gstack",
+    "nightly-test-agent",
+    "vercel-composition-patterns",
+    "vercel-react-best-practices"
+  ],
+  "ownedSkills": [
+    "auth-console-sync",
+    "autoplan",
+    "benchmark",
+    "benchmark-models",
+    "browse",
+    "canary",
+    "careful",
+    "checkpoint",
+    "clerk-cli",
+    "codex",
+    "connect-chrome",
+    "context-restore",
+    "context-save",
+    "cso",
+    "design-canonical",
+    "design-consultation",
+    "design-html",
+    "design-review",
+    "design-shotgun",
+    "devex-review",
+    "document-release",
+    "find-skills",
+    "freeze",
+    "gstack",
+    "gstack-upgrade",
+    "guard",
+    "health",
+    "idea-radar",
+    "investigate",
+    "jovie-performance-hardening",
+    "land-and-deploy",
+    "landing-report",
+    "learn",
+    "load-investors",
+    "make-pdf",
+    "office-hours",
+    "open-gstack-browser",
+    "pair-agent",
+    "perf",
+    "perf-loop",
+    "plan-ceo-review",
+    "plan-design-review",
+    "plan-devex-review",
+    "plan-eng-review",
+    "plan-tune",
+    "qa",
+    "qa-design-review",
+    "qa-only",
+    "qa-swarm",
+    "retro",
+    "review",
+    "scrape",
+    "setup-browser-cookies",
+    "setup-deploy",
+    "setup-gbrain",
+    "ship",
+    "sync-gbrain",
+    "tool-discovery",
+    "unfreeze"
+  ],
   "skills": {
-    "find-skills": {
-      "source": "vercel-labs/skills",
+    "ai-sdk": {
+      "source": "vercel-labs/ai",
       "sourceType": "github",
-      "skillPath": "skills/find-skills/SKILL.md",
-      "computedHash": "9e1c8b3103f92fa8092568a44fe64858de7c5c9dc65ce4bea8f168080e889cfd"
+      "skillPath": "skills/use-ai-sdk/SKILL.md",
+      "ref": "baee8388b935746407dd7091b2403b66c979a6d7",
+      "computedHash": "30c625c0033914291cfc40d4fbd8ddd9b57165a0ab1e798253b43fee1150c897"
+    },
+    "last30days": {
+      "source": "mvanhorn/last30days-skill",
+      "sourceType": "github",
+      "skillPath": "skills/last30days/SKILL.md",
+      "computedHash": "ca634704512034f027a106d604ec105fb5959f3f4618dee065d881d1eada974c",
+      "globalInstall": true,
+      "globalPath": "~/.claude/skills/last30days/SKILL.md",
+      "version": "3.8.3"
     },
     "lavish": {
       "source": "kunchenguid/lavish-axi",
@@ -13,14 +92,19 @@
       "skillPath": "skills/lavish/SKILL.md",
       "computedHash": "c3a0299d820bc3b30613d7740718b194511201319047fa9d3075e0ab1e596bde"
     },
-    "last30days": {
-      "source": "mvanhorn/last30days-skill",
+    "vercel-composition-patterns": {
+      "source": "vercel-labs/agent-skills",
       "sourceType": "github",
-      "skillPath": "skills/last30days/SKILL.md",
-      "computedHash": "7a17dc6cd15eed851dac592324911b1e984cbe9bc5b8d584ee0aa602acf59cbb",
-      "globalInstall": true,
-      "globalPath": "~/.claude/skills/last30days/SKILL.md",
-      "version": "3.8.3"
+      "skillPath": "skills/composition-patterns/SKILL.md",
+      "ref": "f8a72b9603728bb92a217a879b7e62e43ad76c81",
+      "computedHash": "f98931159fa9c7fed043bcd18a891a46dcf89ababa38df13a4c5b7b30dc0ce07"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "ref": "f8a72b9603728bb92a217a879b7e62e43ad76c81",
+      "computedHash": "29b557803f23bb7d35f06d1afb3e16944ce9fdf4aec3631c1cd55c28199b9c2f"
     }
   }
 }

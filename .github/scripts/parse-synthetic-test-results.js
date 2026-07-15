@@ -15,6 +15,11 @@ const DEFAULT_RESULT_FILES = (
     required: true,
   },
   {
+    name: 'synthetic-better-auth-account',
+    path: 'apps/web/test-results/synthetic-better-auth-account-results.json',
+    required: true,
+  },
+  {
     name: 'onboarding-robot-full',
     path: 'apps/web/test-results/onboarding-robot-full-results.json',
     required: true,
@@ -36,12 +41,14 @@ const DEFAULT_RESULT_FILES = (
   },
 ];
 
-function collectSpecs(suites = [], source) {
+function collectSpecs(suites = [], source, required = true) {
   const specs = [];
 
   for (const suite of suites) {
-    specs.push(...(suite.specs ?? []).map(spec => ({ source, spec })));
-    specs.push(...collectSpecs(suite.suites ?? [], source));
+    specs.push(
+      ...(suite.specs ?? []).map(spec => ({ source, required, spec }))
+    );
+    specs.push(...collectSpecs(suite.suites ?? [], source, required));
   }
 
   return specs;
@@ -53,6 +60,7 @@ function classifySyntheticTests(tests) {
       testCase.status === 'skipped' ||
       (testCase.results ?? []).some(result => result.status === 'skipped')
   );
+  const requiredSkipped = skipped.filter(({ required }) => required);
   const warnings = tests.flatMap(({ source, spec, testCase }) =>
     (testCase.results ?? []).flatMap(result =>
       [...(result.stdout ?? []), ...(result.stderr ?? [])]
@@ -71,7 +79,7 @@ function classifySyntheticTests(tests) {
       !(testCase.results ?? []).some(result => result.status === 'skipped')
   );
 
-  return { skipped, warnings, flaky, failed, passed };
+  return { skipped, requiredSkipped, warnings, flaky, failed, passed };
 }
 
 function resolveSyntheticTestStatus({
@@ -79,13 +87,14 @@ function resolveSyntheticTestStatus({
   missingResults,
   passed,
   skipped,
+  requiredSkipped = [],
   failed,
 }) {
   if (missingResults.length > 0 || tests.length === 0) {
     return 'error';
   }
 
-  if (failed.length > 0) {
+  if (failed.length > 0 || requiredSkipped.length > 0) {
     return 'failed';
   }
 
@@ -114,7 +123,22 @@ function loadSyntheticResultSpecs(resultFiles, fileSystem = fs) {
       const results = JSON.parse(
         fileSystem.readFileSync(resultFile.path, 'utf8')
       );
-      specs.push(...collectSpecs(results.suites ?? [], resultFile.name));
+      const fileSpecs = collectSpecs(
+        results.suites ?? [],
+        resultFile.name,
+        resultFile.required !== false
+      );
+      const fileTestCount = fileSpecs.reduce(
+        (count, { spec }) => count + (spec.tests ?? []).length,
+        0
+      );
+      if (resultFile.required !== false && fileTestCount === 0) {
+        missingResults.push(
+          `${resultFile.name}: Required suite reported zero tests (${resultFile.path})`
+        );
+        continue;
+      }
+      specs.push(...fileSpecs);
     } catch (error) {
       missingResults.push(
         `${resultFile.name}: Failed to parse ${resultFile.path}: ${error.message}`
@@ -134,16 +158,22 @@ function parseSyntheticTestResults({ resultFiles, fileSystem = fs } = {}) {
     resolvedResultFiles,
     fileSystem
   );
-  const tests = specs.flatMap(({ source, spec }) =>
-    (spec.tests ?? []).map(testCase => ({ source, spec, testCase }))
+  const tests = specs.flatMap(({ source, required, spec }) =>
+    (spec.tests ?? []).map(testCase => ({
+      source,
+      required,
+      spec,
+      testCase,
+    }))
   );
-  const { skipped, warnings, flaky, failed, passed } =
+  const { skipped, requiredSkipped, warnings, flaky, failed, passed } =
     classifySyntheticTests(tests);
   const testStatus = resolveSyntheticTestStatus({
     tests,
     missingResults,
     passed,
     skipped,
+    requiredSkipped,
     failed,
   });
 

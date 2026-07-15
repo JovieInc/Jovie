@@ -36,7 +36,7 @@ function createMemoryFileSystem(files) {
   };
 }
 
-test('resolveSyntheticTestStatus treats intentional skips without unexpected failures as passed', () => {
+test('resolveSyntheticTestStatus treats optional skips without unexpected failures as passed', () => {
   const tests = [{}, {}];
   const passed = [{}];
   const skipped = [{}];
@@ -47,6 +47,7 @@ test('resolveSyntheticTestStatus treats intentional skips without unexpected fai
       missingResults: [],
       passed,
       skipped,
+      requiredSkipped: [],
       failed: [],
     }),
     'passed'
@@ -65,6 +66,7 @@ test('resolveSyntheticTestStatus fails only on unexpected failures', () => {
       missingResults: [],
       passed,
       skipped,
+      requiredSkipped: [],
       failed,
     }),
     'failed'
@@ -97,7 +99,7 @@ test('classifySyntheticTests distinguishes skipped results from unexpected failu
   assert.equal(classification.passed.length, 1);
 });
 
-test('parseSyntheticTestResults passes when onboarding robot is skipped and other suites pass', () => {
+test('parseSyntheticTestResults fails closed when a required suite is skipped', () => {
   const fileSystem = createMemoryFileSystem({
     'apps/web/test-results/synthetic-auth-ui-results.json': JSON.stringify(
       buildPlaywrightReport([
@@ -154,13 +156,55 @@ test('parseSyntheticTestResults passes when onboarding robot is skipped and othe
     fileSystem,
   });
 
-  assert.equal(result.testStatus, 'passed');
+  assert.equal(result.testStatus, 'failed');
   assert.equal(result.totalTests, 4);
   assert.equal(result.passedTests, 3);
   assert.equal(result.skippedTests, 1);
   assert.deepEqual(result.failedTests, [
     'Skipped tests:',
     'onboarding-robot-full: creates a profile, verifies dashboard/public profile, and cleans up',
+  ]);
+});
+
+test('parseSyntheticTestResults allows an optional suite to be skipped', () => {
+  const fileSystem = createMemoryFileSystem({
+    'optional.json': JSON.stringify(
+      buildPlaywrightReport([{ title: 'legacy probe', status: 'skipped' }])
+    ),
+  });
+
+  const result = parseSyntheticTestResults({
+    resultFiles: [{ name: 'optional', path: 'optional.json', required: false }],
+    fileSystem,
+  });
+
+  assert.equal(result.testStatus, 'passed');
+  assert.equal(result.skippedTests, 1);
+});
+
+test('parseSyntheticTestResults fails when one required report contains zero tests', () => {
+  const fileSystem = createMemoryFileSystem({
+    'passing.json': JSON.stringify(
+      buildPlaywrightReport([{ title: 'healthy probe', status: 'expected' }])
+    ),
+    'empty-required.json': JSON.stringify({ suites: [] }),
+  });
+
+  const result = parseSyntheticTestResults({
+    resultFiles: [
+      { name: 'passing', path: 'passing.json', required: true },
+      {
+        name: 'empty-required',
+        path: 'empty-required.json',
+        required: true,
+      },
+    ],
+    fileSystem,
+  });
+
+  assert.equal(result.testStatus, 'error');
+  assert.deepEqual(result.failedTests, [
+    'empty-required: Required suite reported zero tests (empty-required.json)',
   ]);
 });
 
