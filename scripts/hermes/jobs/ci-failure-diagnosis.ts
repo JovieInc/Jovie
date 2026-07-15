@@ -2,6 +2,7 @@ export type CiFailureClass =
   | 'agent_gate_evidence_missing_without_producer'
   | 'gate_dependency_cache_timeout'
   | 'bounded_source_scan_timeout'
+  | 'visual_qa_prune_timestamp_race'
   | 'golden_path_smoke_auth_contract'
   | 'neon_endpoint_capacity_admission'
   | 'neon_probe_workspace_dependency_resolution'
@@ -17,6 +18,7 @@ export type CiFailureClass =
   | 'runner_io_pressure_admission'
   | 'runner_host_pressure'
   | 'shared_neon_endpoint_reaped_while_active'
+  | 'runner_image_proof_disk_exhaustion'
   | 'gbrain_ownership_preflight_latency_or_slug_drift'
   | 'unknown';
 
@@ -58,6 +60,16 @@ const DIAGNOSES: ReadonlyArray<{
       'The dependency-free CI Risk Classifier exhausted its three-minute job budget restoring and extracting the full pnpm dependency cache before classification started.',
     remediation:
       'Remove dependency restore, pnpm fetch, and pnpm install from dependency-free gates; run the native Node classifier directly instead of blindly rerunning the same cache extraction.',
+  },
+  {
+    failureClass: 'runner_image_proof_disk_exhaustion',
+    matches: log =>
+      /exporting cache to client directory/i.test(log) &&
+      /(?:no space left on device|ResourceExhausted)/i.test(log),
+    rootCause:
+      'The runner image itself built successfully, but exporting a duplicate local BuildKit cache exhausted the hosted runner disk.',
+    remediation:
+      'Use the GitHub Actions BuildKit cache backend for the second-build cache proof and upload only bounded text evidence instead of the build context or cache directory.',
   },
   {
     failureClass: 'gbrain_ownership_preflight_latency_or_slug_drift',
@@ -170,6 +182,19 @@ const DIAGNOSES: ReadonlyArray<{
       'A named assertion exceeded the 2s absolute ceiling (10x the 200ms p95 target), which filters measured cap-10 scheduler noise while still detecting an isolated stuck test.',
     remediation:
       'Rerun and optimize the named assertion. Keep the 2s max ceiling and the 200ms p95 target unchanged; do not retry blindly or classify the isolated stall as harmless runner noise.',
+  },
+  {
+    failureClass: 'visual_qa_prune_timestamp_race',
+    matches: log =>
+      /diff-artifacts\.test\.ts/i.test(log) &&
+      /pruneCompletedVisualQaRuns\s*>\s*preserves candidates and stops pruning when activity, state, or current-run evidence changes/i.test(
+        log
+      ) &&
+      /AssertionError:[\s\S]*completed-old[\s\S]*to deeply equal/i.test(log),
+    rootCause:
+      'Visual QA pruning revalidated only the run directory identity and newest millisecond mtime, so a late artifact created in the same timestamp tick could look unchanged and an active run could be deleted.',
+    remediation:
+      'Compare a sorted recursive entry fingerprint and entry count during revalidation, keep the deterministic same-mtime regression, and run the focused diff-artifacts suite; do not blindly rerun the unchanged shard.',
   },
   {
     failureClass: 'bounded_source_scan_timeout',

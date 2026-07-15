@@ -54,6 +54,238 @@ env:
   # steps. Job-level concurrency is evaluated before assignment, where github.job is null.
 
 jobs:
+  runner-image-offline-proof:
+    name: Build and verify runner image offline
+    if: >-
+      github.event_name == 'pull_request' &&
+      contains(github.event.pull_request.labels.*.name, 'runner-image-canary')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prepare exact filtered build context
+        id: runner-context
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          mkdir -p runner-image-evidence
+          printf '%s\n' "$EXPECTED_SHA" > runner-image-evidence/head.txt
+          .github/runner-image/build-context.sh "$EXPECTED_SHA" \
+            > runner-image-evidence/context.tar
+          sha256sum runner-image-evidence/context.tar \
+            > runner-image-evidence/context.sha256
+          context_sha=$(cut -d ' ' -f 1 runner-image-evidence/context.sha256)
+          echo "sha256=$context_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Expose GitHub Actions cache runtime to BuildKit
+        uses: crazy-max/ghaction-github-runtime@3cb05d89e1f492524af3d41a1c98c83bc3025124 # v3
+
+      - name: Build twice and prove the dependency layer is cached
+        shell: bash
+        env:
+          IMAGE_TAG: jovie-runner:offline-${{ github.event.pull_request.head.sha }}
+          CACHE_SCOPE: runner-image-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ steps.runner-context.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          cleanup() {
+            docker buildx rm runner-image-first runner-image-second \
+              >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker buildx create --name runner-image-first \
+            --driver docker-container --use
+          docker buildx inspect --bootstrap
+          docker buildx build \
+            --progress=plain \
+            --platform linux/amd64 \
+            --file .github/runner-image/Dockerfile \
+            --cache-from "type=gha,scope=$CACHE_SCOPE,version=2" \
+            --cache-to "type=gha,scope=$CACHE_SCOPE,mode=max,version=2" \
+            --metadata-file runner-image-evidence/first-build-metadata.json \
+            - < runner-image-evidence/context.tar \
+            2>&1 | tee runner-image-evidence/first-build.log
+          test "${PIPESTATUS[0]}" -eq 0
+
+          docker buildx rm runner-image-first
+          docker buildx create --name runner-image-second \
+            --driver docker-container --use
+          docker buildx inspect --bootstrap
+          docker buildx build \
+            --progress=plain \
+            --platform linux/amd64 \
+            --file .github/runner-image/Dockerfile \
+            --cache-from "type=gha,scope=$CACHE_SCOPE,version=2" \
+            --load \
+            --tag "$IMAGE_TAG" \
+            --metadata-file runner-image-evidence/second-build-metadata.json \
+            - < runner-image-evidence/context.tar \
+            2>&1 | tee runner-image-evidence/second-build.log
+          test "${PIPESTATUS[0]}" -eq 0
+
+          node .github/runner-image/verify-build-cache.mjs \
+            runner-image-evidence/second-build.log \
+            runner-image-evidence/cache-proof.json
+          docker image inspect "$IMAGE_TAG" \
+            > runner-image-evidence/image-inspect.json
+
+      - name: Verify candidate with networking disabled
+        shell: bash
+        env:
+          IMAGE_TAG: jovie-runner:offline-${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          docker run --rm --network none \
+            --entrypoint bash \
+            --volume "$PWD:/repo:ro" \
+            "$IMAGE_TAG" -lc '
+              set -euo pipefail
+              test "$(node --version)" = v22.23.1
+              test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.4
+
+              dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
+                node /repo/.github/runner-image/verify-prerequisites.mjs \
+                --component dependencies)
+              playwright_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
+                node /repo/.github/runner-image/verify-prerequisites.mjs \
+                --component playwright)
+              grep -qx "dependencies_warm=true" <<< "$dependency_status"
+              grep -qx "playwright_warm=true" <<< "$playwright_status"
+
+              archive_path=$(sed -n \
+                "s/^installed_tree_archive_path=//p" <<< "$dependency_status")
+              archive_sha=$(sed -n \
+                "s/^installed_tree_archive_sha256=//p" <<< "$dependency_status")
+              test -n "$archive_path"
+              [[ "$archive_sha" =~ ^[0-9a-f]{64}$ ]]
+              mkdir -p /tmp/offline-workspace
+              GITHUB_WORKSPACE=/tmp/offline-workspace \
+                /repo/.github/runner-image/restore-installed-tree.sh \
+                "$archive_path" "$archive_sha"
+              test -f /tmp/offline-workspace/node_modules/.modules.yaml
+              test -x /tmp/offline-workspace/node_modules/.bin/tsx
+              test -e /tmp/offline-workspace/apps/web/node_modules/next
+              printf "offline_image_proof=true\n"
+            ' 2>&1 | tee runner-image-evidence/offline-proof.log
+          test "${PIPESTATUS[0]}" -eq 0
+          grep -qx 'offline_image_proof=true' \
+            runner-image-evidence/offline-proof.log
+
+      - name: Bound runner image proof artifact
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          for log in first-build second-build; do
+            if test -f "runner-image-evidence/$log.log"; then
+              tail -n 500 "runner-image-evidence/$log.log" \
+                > "runner-image-evidence/$log-tail.log"
+              rm "runner-image-evidence/$log.log"
+            fi
+          done
+          rm -f runner-image-evidence/context.tar
+          evidence_kb=$(du -sk runner-image-evidence | cut -f1)
+          if (( evidence_kb > 2048 )); then
+            echo "Runner image proof exceeds 2048 KiB: ${evidence_kb} KiB" >&2
+            exit 1
+          fi
+          echo "Runner image proof is bounded: ${evidence_kb} KiB"
+
+      - name: Upload runner image proof
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runner-image-proof-${{ github.event.pull_request.head.sha }}
+          path: runner-image-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  runner-image-canary:
+    name: Validate runner image warm paths
+    if: >-
+      github.event_name == 'pull_request' &&
+      contains(github.event.pull_request.labels.*.name, 'runner-image-canary')
+    needs: runner-image-offline-proof
+    runs-on: [self-hosted, Linux, X64, "${{ 'jovie-runner-image-canary' }}"]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Setup Node.js and pnpm warm path
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Setup Playwright warm path
+        uses: ./.github/actions/setup-playwright
+
+      - name: Verify warm paths and toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          assert_equal() {
+            local name="$1" expected="$2" actual="$3"
+            if [[ "$actual" != "$expected" ]]; then
+              printf '::error title=Runner image canary::%s: expected %q, got %q\n' \
+                "$name" "$expected" "$actual"
+              return 1
+            fi
+          }
+          assert_line() {
+            local name="$1" expected="$2" actual="$3"
+            if ! grep -Fqx -- "$expected" <<< "$actual"; then
+              printf '::error title=Runner image canary::%s: missing line %q; output was %q\n' \
+                "$name" "$expected" "$actual"
+              return 1
+            fi
+          }
+          assert_executable() {
+            local name="$1" path="$2"
+            if [[ ! -x "$path" ]]; then
+              printf '::error title=Runner image canary::%s: not executable at %s\n' \
+                "$name" "$path"
+              return 1
+            fi
+          }
+
+          # The verifier normally writes machine-readable fields to the
+          # Actions-provided GITHUB_OUTPUT file. This assertion step needs those
+          # fields on stdout so command substitution can inspect them.
+          dependency_status=$(env -u GITHUB_OUTPUT node .github/runner-image/verify-prerequisites.mjs --component dependencies)
+          playwright_status=$(env -u GITHUB_OUTPUT node .github/runner-image/verify-prerequisites.mjs --component playwright)
+          assert_line 'dependency warm status' 'dependencies_warm=true' "$dependency_status"
+          assert_line 'pnpm store path' 'pnpm_store_path=/opt/jovie-pnpm-store' "$dependency_status"
+          assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
+          assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
+          assert_equal 'Node version' v22.23.1 "$(node --version)"
+          assert_equal 'pnpm version' 9.15.4 "$(pnpm --version)"
+          assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
+          assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
+          assert_executable 'Chromium headless shell' /opt/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
+          assert_executable 'FFmpeg' /opt/ms-playwright/ffmpeg-1011/ffmpeg-linux
+
   # ── CI Optimizer + Centralized path-change detection (merged) ──────────
   # Merged optimize_ci + ci-path-changes into one job to eliminate the serial
   # dependency chain that added ~5 min to every CI run. Graphite CI Optimizer

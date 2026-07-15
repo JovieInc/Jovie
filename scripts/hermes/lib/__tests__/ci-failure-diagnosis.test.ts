@@ -56,6 +56,25 @@ describe('diagnoseCiFailure', () => {
     expect(diagnosis.failureClass).toBe('unknown');
   });
 
+  it('diagnoses runner image proof disk exhaustion after a successful build', () => {
+    const diagnosis = diagnoseCiFailure(`
+      #27 exporting to docker image format done
+      #28 exporting cache to client directory
+      ERROR: failed to solve: ResourceExhausted: write cache.db: no space left on device
+    `);
+
+    expect(diagnosis.failureClass).toBe('runner_image_proof_disk_exhaustion');
+    expect(diagnosis.rootCause).toContain('image itself built successfully');
+    expect(diagnosis.remediation).toContain('GitHub Actions BuildKit cache');
+    expect(diagnosis.remediation).toContain('bounded text evidence');
+  });
+
+  it('does not classify an unrelated package-manager ENOSPC as image proof exhaustion', () => {
+    expect(
+      diagnoseCiFailure('npm ERR! ENOSPC: no space left on device').failureClass
+    ).toBe('unknown');
+  });
+
   it('diagnoses ownership preflight slug or latency drift from its structured receipt', () => {
     const diagnosis = diagnoseCiFailure(`
       {"failure_class":"gbrain_ownership_preflight_latency_or_slug_drift","requested_slug":"agent-job-ledger","resolved_slug":null,"engine_ms":3004,"cli_ms":null,"mcp_ms":null,"timeout_tier":"ledger_step","lookup_health":"timeout","db_lock_signal_detected":true,"session_signal_detected":null}
@@ -104,6 +123,27 @@ describe('diagnoseCiFailure', () => {
     expect(diagnoseCiFailure(log).failureClass).toBe(
       'bounded_source_scan_timeout'
     );
+  });
+
+  it('diagnoses the Visual QA prune timestamp race without a blind rerun', () => {
+    const diagnosis = diagnoseCiFailure(`
+      FAIL tests/unit/agent-os/visual-qa/diff-artifacts.test.ts > pruneCompletedVisualQaRuns > preserves candidates and stops pruning when activity, state, or current-run evidence changes
+      AssertionError: expected [ 'completed-old' ] to deeply equal []
+    `);
+
+    expect(diagnosis.failureClass).toBe('visual_qa_prune_timestamp_race');
+    expect(diagnosis.rootCause).toContain('same timestamp tick');
+    expect(diagnosis.remediation).toContain('recursive entry fingerprint');
+    expect(diagnosis.remediation).toContain('do not blindly rerun');
+  });
+
+  it('does not infer the Visual QA race from an unrelated artifact assertion', () => {
+    expect(
+      diagnoseCiFailure(`
+        FAIL tests/unit/agent-os/visual-qa/diff-artifacts.test.ts > writes overlay artifacts
+        AssertionError: expected completed-old to deeply equal []
+      `).failureClass
+    ).toBe('unknown');
   });
 
   it('classifies the touch-target ratchet as the same bounded scanner class', () => {

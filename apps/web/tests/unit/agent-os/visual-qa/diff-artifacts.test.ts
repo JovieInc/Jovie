@@ -526,12 +526,28 @@ describe('pruneCompletedVisualQaRuns', () => {
         passed: true,
       }),
     ]);
+    const fixedTreeMtime = new Date('2026-06-01T01:00:00.000Z');
+    const candidatePath = path.join(rootDirectory, 'completed-old');
+    await Promise.all([
+      utimes(candidatePath, fixedTreeMtime, fixedTreeMtime),
+      utimes(
+        path.join(candidatePath, 'diff-summary.json'),
+        fixedTreeMtime,
+        fixedTreeMtime
+      ),
+    ]);
     const removed = await pruneCompletedVisualQaRuns('current-run', {
       beforeCandidateRevalidation: async runId => {
-        await writeFile(
-          path.join(rootDirectory ?? '', runId, 'late-capture.png'),
-          'active'
+        const lateCapturePath = path.join(
+          rootDirectory ?? '',
+          runId,
+          'late-capture.png'
         );
+        await writeFile(lateCapturePath, 'active');
+        await Promise.all([
+          utimes(lateCapturePath, fixedTreeMtime, fixedTreeMtime),
+          utimes(candidatePath, fixedTreeMtime, fixedTreeMtime),
+        ]);
       },
       retainedCompletedRuns: 2,
       rootDirectory,
