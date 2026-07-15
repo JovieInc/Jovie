@@ -99,9 +99,12 @@ run_deploy() {
   fi
 
   if [ -n "${VERCEL_GIT_COMMIT_SHA:-}" ]; then
+    local build_sha="${VERCEL_GIT_COMMIT_SHA:0:7}"
     "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" \
       --build-env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}" \
       --env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}" \
+      --build-env "NEXT_PUBLIC_BUILD_SHA=${build_sha}" \
+      --env "NEXT_PUBLIC_BUILD_SHA=${build_sha}" \
       --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
