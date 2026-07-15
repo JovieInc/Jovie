@@ -238,6 +238,22 @@ const RUNNER_PREREQUISITE_VISUAL_QA_REPAIR_MANIFEST = new Set([
   ...RUNNER_PREREQUISITE_CONTRACT_MANIFEST,
   ...VISUAL_QA_DIFF_ARTIFACTS_MANIFEST,
 ]);
+const LAYOUT_GUARD_CONTRACT_MANIFEST = new Set([
+  '.github/scripts/layout-guard-manifest.mjs',
+  '.github/scripts/layout-guard-manifest.test.mjs',
+  '.github/workflows/ci.yml',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+]);
+const LAYOUT_GUARD_CONTRACT_ROOT_TESTS = [
+  '.github/scripts/layout-guard-manifest.test.mjs',
+];
+const LAYOUT_GUARD_CONTRACT_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+];
 
 function isInvestorNoteIngestionInput(file) {
   return (
@@ -359,6 +375,12 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactRunnerPrerequisiteRepair =
     isExactRunnerPrerequisiteContract ||
     isExactRunnerPrerequisiteVisualQaRepair;
+  const layoutGuardContractInputCount = files.filter(file =>
+    LAYOUT_GUARD_CONTRACT_MANIFEST.has(file)
+  ).length;
+  const isExactLayoutGuardContract =
+    layoutGuardContractInputCount === LAYOUT_GUARD_CONTRACT_MANIFEST.size &&
+    files.length === LAYOUT_GUARD_CONTRACT_MANIFEST.size;
   const relatedFiles = files.filter(
     file =>
       TESTABLE_FILE.test(file) &&
@@ -455,9 +477,12 @@ export function buildAffectedTestPlan(changedFiles) {
   }
 
   const selectedTests = unique([...directTests, ...mandatoryTests]);
-  const rootVitestTests = isExactVercelCongestionControl
-    ? VERCEL_CONGESTION_CONTROL_ROOT_VITEST_TESTS
-    : [];
+  const rootVitestTests = unique([
+    ...(isExactVercelCongestionControl
+      ? VERCEL_CONGESTION_CONTROL_ROOT_VITEST_TESTS
+      : []),
+    ...(isExactLayoutGuardContract ? LAYOUT_GUARD_CONTRACT_ROOT_TESTS : []),
+  ]);
   const pythonTests = unique([
     ...(isExactVercelCongestionControl
       ? VERCEL_CONGESTION_CONTROL_PYTHON_TESTS
@@ -491,6 +516,7 @@ export function buildAffectedTestPlan(changedFiles) {
     ...(isExactRunnerPrerequisiteRepair
       ? RUNNER_PREREQUISITE_CONTROL_TESTS
       : []),
+    ...(isExactLayoutGuardContract ? LAYOUT_GUARD_CONTRACT_SCRIPT_TESTS : []),
   ]);
   const isCoveredSource = file => {
     if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return true;
@@ -568,14 +594,16 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper &&
     !isExactRunnerIoPressure &&
-    !isExactRunnerPrerequisiteRepair;
+    !isExactRunnerPrerequisiteRepair &&
+    !isExactLayoutGuardContract;
   const hasIncompletePerformanceProfilerRepair =
     performanceProfilerRepairInputCount > 0 &&
     !isExactPerformanceProfilerRepair &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactRunnerIoPressure &&
-    !isExactRunnerPrerequisiteRepair;
+    !isExactRunnerPrerequisiteRepair &&
+    !isExactLayoutGuardContract;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
@@ -585,7 +613,8 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactVisualQaSelectorRepair &&
     !isExactPerformanceProfilerRepairWithSelector &&
     !isExactRunnerIoPressure &&
-    !isExactRunnerPrerequisiteRepair;
+    !isExactRunnerPrerequisiteRepair &&
+    !isExactLayoutGuardContract;
   const hasIncompleteRunnerIoPressure =
     runnerIoPressureInputCount > 0 &&
     !isExactRunnerIoPressure &&
@@ -595,7 +624,8 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper &&
     !isExactPerformanceProfilerRepair &&
-    !isExactRunnerPrerequisiteRepair;
+    !isExactRunnerPrerequisiteRepair &&
+    !isExactLayoutGuardContract;
   const hasIncompleteRunnerPrerequisiteContract =
     runnerPrerequisiteContractInputCount > 0 &&
     !isExactRunnerPrerequisiteRepair &&
@@ -605,6 +635,19 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactPrerequisiteTrain &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactPersistedAuthFixtureRepair &&
+    !isExactLayoutGuardContract &&
+    !isExactPerformanceProfilerRepair &&
+    !isExactRunnerIoPressure;
+  const hasIncompleteLayoutGuardContract =
+    layoutGuardContractInputCount > 0 &&
+    !isExactLayoutGuardContract &&
+    !isExactPrerequisiteTrain &&
+    !isExactAffectedTestSelector &&
+    !isExactGoldenPathSmokeContractRepair &&
+    !isExactPersistedAuthFixtureRepair &&
+    !isExactGtmqSourceGateReaper &&
+    !isExactVisualQaSelectorRepair &&
+    !isExactRunnerPrerequisiteRepair &&
     !isExactPerformanceProfilerRepair &&
     !isExactRunnerIoPressure;
   const hasUncoveredSource =
@@ -619,7 +662,8 @@ export function buildAffectedTestPlan(changedFiles) {
     hasIncompletePerformanceProfilerRepair ||
     hasIncompleteGtmqSourceGateReaper ||
     hasIncompleteRunnerIoPressure ||
-    hasIncompleteRunnerPrerequisiteContract;
+    hasIncompleteRunnerPrerequisiteContract ||
+    hasIncompleteLayoutGuardContract;
   const hasSelectedTests =
     selectedTests.length > 0 ||
     rootVitestTests.length > 0 ||
@@ -640,7 +684,8 @@ export function buildAffectedTestPlan(changedFiles) {
             isExactVisualQaSelectorRepair ||
             isExactGtmqSourceGateReaper ||
             isExactRunnerIoPressure ||
-            isExactRunnerPrerequisiteRepair)
+            isExactRunnerPrerequisiteRepair ||
+            isExactLayoutGuardContract)
         ? 'selected'
         : relatedFiles.length === 0
           ? 'none'

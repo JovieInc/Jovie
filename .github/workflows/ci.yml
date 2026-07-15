@@ -1449,31 +1449,51 @@ jobs:
         if: steps.download.outcome == 'success'
         run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
-      - name: Run layout overlap/touching guard
+      - name: Run deterministic layout behavior guard
         if: steps.download.outcome == 'success'
         run: |
+          set -euo pipefail
           cd apps/web
 
-          if [ ! -f tests/e2e/layout-overlap-guard.spec.ts ]; then
-            echo "⚠ layout-overlap-guard.spec.ts not found — skipping"
-            exit 0
+          LAYOUT_GUARD_MANIFEST=$(node ../../.github/scripts/layout-guard-manifest.mjs)
+          mapfile -t LAYOUT_GUARD_SPECS <<< "$LAYOUT_GUARD_MANIFEST"
+
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "::error::Layout Guard standalone server entrypoint is missing."
+            exit 1
           fi
+
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          PORT=3100 pnpm --filter=@jovie/web exec next start &
+          export HOSTNAME=localhost
+          export NEXT_PUBLIC_APP_URL=http://localhost:3100
+
+          PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then break; fi
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          SERVER_READY=false
+          for attempt in $(seq 1 30); do
+            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+              SERVER_READY=true
+              break
+            fi
+            echo "Waiting for Layout Guard standalone server ($attempt/30)..."
             sleep 1
           done
-          pnpm exec playwright test tests/e2e/layout-overlap-guard.spec.ts --project=chromium --reporter=line
-          EXIT_CODE=$?
-          kill $SERVER_PID 2>/dev/null || true
-          exit $EXIT_CODE
+
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "::error::Layout Guard standalone server failed to start within 30s."
+            exit 1
+          fi
+
+          pnpm exec playwright test "${LAYOUT_GUARD_SPECS[@]}" --config=playwright.config.noauth.ts --project=chromium --reporter=line
         env:
           BASE_URL: http://localhost:3100
           SMOKE_ONLY: '1'
           CI: true
+          HUD_KIOSK_TOKEN: layout-guard-ci
+          HUD_AGENT_RUNS_FIXTURES: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
 
       - name: Upload Playwright Report on Failure
@@ -4355,7 +4375,7 @@ jobs:
             echo "| Unit Tests | $UNIT_RESULT | \`pnpm --filter=@jovie/web run test:fast\` |"
             echo "| Build (public routes) | $BUILD_RESULT | \`pnpm run build:web\` |"
             echo "| A11y (axe) | $A11Y_RESULT | \`pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium\` |"
-            echo "| Layout Guard | $LAYOUT_GUARD_RESULT | \`pnpm exec playwright test tests/e2e/layout-overlap-guard.spec.ts --project=chromium\` |"
+            echo "| Layout Guard | $LAYOUT_GUARD_RESULT | \`pnpm exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo "| Preview Deploy | $PREVIEW_RESULT | \`pnpm run build:web\` |"
             echo
@@ -4409,7 +4429,7 @@ jobs:
           # Layout Guard must succeed when it runs (skipped when the shared build artifact is absent).
           if [[ "$LAYOUT_GUARD_RESULT" != "success" && "$LAYOUT_GUARD_RESULT" != "skipped" ]]; then
             echo "❌ Layout Guard did not pass (result: $LAYOUT_GUARD_RESULT)"
-            echo "Likely fix: run pnpm exec playwright test tests/e2e/layout-overlap-guard.spec.ts locally and fix overlapping/touching elements."
+            echo "Likely fix: run pnpm exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts locally and repair the failing deterministic layout behavior."
             exit 1
           fi
 

@@ -181,6 +181,15 @@ const RUNNER_PREREQUISITE_VISUAL_QA_REPAIR_MANIFEST = [
   'apps/web/lib/agent-os/visual-qa/diff-artifacts.ts',
   'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
 ];
+const LAYOUT_GUARD_CONTRACT_MANIFEST = [
+  '.github/scripts/layout-guard-manifest.mjs',
+  '.github/scripts/layout-guard-manifest.test.mjs',
+  '.github/workflows/ci.yml',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
 
 describe('automation-verify affected scope', () => {
   it('keeps runner I/O admission on focused controller regressions', () => {
@@ -722,6 +731,29 @@ describe('automation-verify affected scope', () => {
         ? ['scripts/lib/__tests__/automation-verify.test.mjs']
         : []),
     ]);
+  });
+
+  it('keeps the Layout Guard contract repair on its focused cross-runtime regressions', () => {
+    const plan = buildAffectedTestPlan(LAYOUT_GUARD_CONTRACT_MANIFEST);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.rootVitestTests).toEqual([
+      '.github/scripts/layout-guard-manifest.test.mjs',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+    ]);
+  });
+
+  it.each(
+    LAYOUT_GUARD_CONTRACT_MANIFEST
+  )('fails closed when the Layout Guard contract repair is missing %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        LAYOUT_GUARD_CONTRACT_MANIFEST.filter(file => file !== missingInput)
+      ).mode
+    ).toBe('full');
   });
 
   it.each(
