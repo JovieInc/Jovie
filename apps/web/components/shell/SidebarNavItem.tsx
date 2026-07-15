@@ -40,17 +40,11 @@ const SIDEBAR_PRIMARY_CHROME =
 const SIDEBAR_ACTIVE_CHROME =
   'bg-sidebar-accent-active text-primary-token font-medium';
 
-function getInactiveColor(nested?: boolean): string {
-  if (nested) {
-    return 'text-sidebar-muted/65 hover:bg-sidebar-accent hover:text-sidebar-item-foreground';
-  }
-
-  return 'text-sidebar-muted/80 hover:bg-sidebar-accent hover:text-sidebar-item-foreground';
-}
+const SIDEBAR_INACTIVE_CHROME =
+  'text-sidebar-item-foreground hover:bg-sidebar-accent hover:text-sidebar-item-foreground';
 
 function getToneClassName({
   active,
-  nested,
   tone,
 }: Pick<SidebarNavChromeOptions, 'active' | 'nested' | 'tone'>): string {
   if (active) {
@@ -61,7 +55,7 @@ function getToneClassName({
     return SIDEBAR_PRIMARY_CHROME;
   }
 
-  return getInactiveColor(nested);
+  return SIDEBAR_INACTIVE_CHROME;
 }
 
 export function getSidebarNavRowClassName({

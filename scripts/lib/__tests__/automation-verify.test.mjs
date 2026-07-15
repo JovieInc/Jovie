@@ -104,6 +104,37 @@ const PERFORMANCE_PROFILER_REPAIR_MANIFEST = [
   ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
+const AUTHENTICATED_A11Y_REPAIR_CORE = [
+  'apps/web/app/app/(shell)/chat/loading.tsx',
+  'apps/web/app/exp/shell-v1/page.tsx',
+  'apps/web/components/jovie/components/ChatInput.tsx',
+  'apps/web/components/organisms/SharedCommandPalette.tsx',
+  'apps/web/components/shell/SidebarNavItem.tsx',
+  'apps/web/styles/design-system.css',
+  'apps/web/tests/e2e/chat-axe.spec.ts',
+  'apps/web/tests/e2e/chat-composer.spec.ts',
+  'apps/web/tests/e2e/chat-first-golden-path-handoff.spec.ts',
+  'apps/web/tests/e2e/chat-rail-composer-interaction.spec.ts',
+  'apps/web/tests/e2e/chat-timeline-regression.spec.ts',
+  'apps/web/tests/e2e/chat-visual.spec.ts',
+  'apps/web/tests/e2e/golden-path-waitlist-local.spec.ts',
+  'apps/web/tests/e2e/homepage-intent.spec.ts',
+  'apps/web/tests/e2e/onboarding-david-guetta-demo.spec.ts',
+  'apps/web/tests/e2e/synthetic-legacy-otp.spec.ts',
+  'apps/web/tests/e2e/yc-demo.spec.ts',
+  'apps/web/tests/performance/onboarding-performance.spec.ts',
+  'apps/web/scripts/performance-interaction-manifest.ts',
+  'apps/web/tests/unit/chat/ChatInput.aria.test.tsx',
+  'apps/web/tests/unit/chat/ChatLoading.test.tsx',
+  'apps/web/tests/unit/chat/chat-composer-system-b-style-guard.test.ts',
+  'apps/web/tests/unit/dashboard/DashboardNav.test.tsx',
+  'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
+  'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
+];
+const CASE_SENSITIVE_LOWERCASE_CHAT_INPUT_PATTERNS = [
+  /aria-label=(['"])Chat message input\1/,
+  /getByLabel(?:Text)?\((['"])Chat message input\1\)/,
+];
 const GOLDEN_PATH_SMOKE_CONTRACT_REPAIR_DIFF = [
   'apps/web/tests/e2e/golden-path.spec.ts',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
@@ -667,6 +698,49 @@ describe('automation-verify affected scope', () => {
     expect(plan.selectedTests).not.toContain(
       'apps/web/tests/e2e/golden-path.spec.ts'
     );
+  });
+
+  it('keeps the authenticated accessibility repair on focused unit coverage', () => {
+    const plan = buildAffectedTestPlan([
+      ...AUTHENTICATED_A11Y_REPAIR_CORE,
+      ...AFFECTED_TEST_SELECTOR_MANIFEST,
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/chat/ChatInput.aria.test.tsx',
+      'apps/web/tests/unit/chat/ChatLoading.test.tsx',
+      'apps/web/tests/unit/chat/chat-composer-system-b-style-guard.test.ts',
+      'apps/web/tests/unit/dashboard/DashboardNav.test.tsx',
+      'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
+      'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+  });
+
+  it('rejects case-sensitive lowercase chat input contracts in the repair surface', () => {
+    const repoRoot = resolve(import.meta.dirname, '../../..');
+
+    for (const file of AUTHENTICATED_A11Y_REPAIR_CORE) {
+      const source = readFileSync(resolve(repoRoot, file), 'utf8');
+      for (const pattern of CASE_SENSITIVE_LOWERCASE_CHAT_INPUT_PATTERNS) {
+        expect(source, `${file} matched ${pattern}`).not.toMatch(pattern);
+      }
+    }
+  });
+
+  it.each(
+    AUTHENTICATED_A11Y_REPAIR_CORE
+  )('fails closed when the authenticated accessibility repair is missing %s', missingInput => {
+    expect(
+      buildAffectedTestPlan([
+        ...AUTHENTICATED_A11Y_REPAIR_CORE.filter(file => file !== missingInput),
+        ...AFFECTED_TEST_SELECTOR_MANIFEST,
+      ]).mode
+    ).toBe('full');
   });
 
   it('keeps persisted auth fixture repairs on focused non-retryable coverage', () => {

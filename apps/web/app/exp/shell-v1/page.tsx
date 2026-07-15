@@ -2323,7 +2323,7 @@ function ShellV1ExperimentContent() {
            own focus-within affordance (pill border, surface tint), where a
            second ring on the bare input reads as a stack of competing
            borders. Keep the global focus-visible everywhere else for a11y. */
-        .shell-v1 textarea[aria-label='Chat message input']:focus-visible {
+        .shell-v1 textarea[aria-label='Chat Message Input']:focus-visible {
           outline: none;
         }
         .shell-v1 input[aria-label='Filter tracks']:focus-visible {

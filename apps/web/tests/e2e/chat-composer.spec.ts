@@ -21,7 +21,7 @@ import {
 } from './utils/smoke-test-utils';
 
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
-const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
+const COMPOSER_TEXTAREA = '[aria-label="Chat Message Input"]';
 const SLASH_MENU = '[data-testid="slash-command-menu"]';
 const CLIPPING_VIEWPORTS = [
   { width: 390, height: 844 },

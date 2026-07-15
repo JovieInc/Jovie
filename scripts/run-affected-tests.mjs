@@ -100,6 +100,33 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
+  'apps/web/app/app/(shell)/chat/loading.tsx',
+  'apps/web/app/exp/shell-v1/page.tsx',
+  'apps/web/components/jovie/components/ChatInput.tsx',
+  'apps/web/components/organisms/SharedCommandPalette.tsx',
+  'apps/web/components/shell/SidebarNavItem.tsx',
+  'apps/web/styles/design-system.css',
+  'apps/web/tests/e2e/chat-axe.spec.ts',
+  'apps/web/tests/e2e/chat-composer.spec.ts',
+  'apps/web/tests/e2e/chat-first-golden-path-handoff.spec.ts',
+  'apps/web/tests/e2e/chat-rail-composer-interaction.spec.ts',
+  'apps/web/tests/e2e/chat-timeline-regression.spec.ts',
+  'apps/web/tests/e2e/chat-visual.spec.ts',
+  'apps/web/tests/e2e/golden-path-waitlist-local.spec.ts',
+  'apps/web/tests/e2e/homepage-intent.spec.ts',
+  'apps/web/tests/e2e/onboarding-david-guetta-demo.spec.ts',
+  'apps/web/tests/e2e/synthetic-legacy-otp.spec.ts',
+  'apps/web/tests/e2e/yc-demo.spec.ts',
+  'apps/web/tests/performance/onboarding-performance.spec.ts',
+  'apps/web/scripts/performance-interaction-manifest.ts',
+  'apps/web/tests/unit/chat/ChatInput.aria.test.tsx',
+  'apps/web/tests/unit/chat/ChatLoading.test.tsx',
+  'apps/web/tests/unit/chat/chat-composer-system-b-style-guard.test.ts',
+  'apps/web/tests/unit/dashboard/DashboardNav.test.tsx',
+  'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
+  'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
+]);
 const GOLDEN_PATH_SMOKE_CONTRACT_CORE = new Set([
   'apps/web/tests/e2e/golden-path.spec.ts',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
@@ -330,6 +357,18 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactAffectedTestSelector =
     affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
     files.length === AFFECTED_TEST_SELECTOR_MANIFEST.size;
+  const authenticatedA11yRepairInputCount = files.filter(file =>
+    AUTHENTICATED_A11Y_REPAIR_CORE.has(file)
+  ).length;
+  const isExactAuthenticatedA11yRepair =
+    authenticatedA11yRepairInputCount === AUTHENTICATED_A11Y_REPAIR_CORE.size &&
+    files.every(
+      file =>
+        AUTHENTICATED_A11Y_REPAIR_CORE.has(file) ||
+        AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+    ) &&
+    (affectedTestSelectorInputCount === 0 ||
+      affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
   const goldenPathSmokeContractInputCount = files.filter(file =>
     GOLDEN_PATH_SMOKE_CONTRACT_CORE.has(file)
   ).length;
@@ -429,6 +468,11 @@ export function buildAffectedTestPlan(changedFiles) {
       !(
         isExactPrerequisiteTrain &&
         PREREQUISITE_TRAIN_PLAYWRIGHT_SPECS.has(file)
+      ) &&
+      !(
+        isExactAuthenticatedA11yRepair &&
+        (file.startsWith('apps/web/tests/e2e/') ||
+          file.startsWith('apps/web/tests/performance/'))
       ) &&
       !(
         isExactGoldenPathSmokeContractRepair &&
@@ -536,6 +580,7 @@ export function buildAffectedTestPlan(changedFiles) {
       ? PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS
       : []),
     ...(isExactAffectedTestSelector ||
+    (isExactAuthenticatedA11yRepair && affectedTestSelectorInputCount > 0) ||
     isExactGoldenPathSmokeContractRepair ||
     isExactNeonAttemptArtifactRepair ||
     isExactPerformanceProfilerRepairWithSelector ||
@@ -572,6 +617,11 @@ export function buildAffectedTestPlan(changedFiles) {
     if (file.startsWith('apps/web/tests/eval/promptfoo/')) return true;
     if (isInvestorNoteIngestionInput(file)) return true;
     if (isCiCancellationHealerInput(file)) return true;
+    if (
+      isExactAuthenticatedA11yRepair &&
+      AUTHENTICATED_A11Y_REPAIR_CORE.has(file)
+    )
+      return true;
     if (
       isExactGoldenPathSmokeContractRepair &&
       GOLDEN_PATH_SMOKE_CONTRACT_CORE.has(file)
@@ -627,7 +677,9 @@ export function buildAffectedTestPlan(changedFiles) {
     files.includes(CI_CANCELLATION_HEALER_COMPANION) &&
     !hasCiCancellationHealerChange;
   const hasIncompletePrerequisiteTrain =
-    prerequisiteTrainCornerCount > 0 && !hasPrerequisiteTrainCorners;
+    prerequisiteTrainCornerCount > 0 &&
+    !hasPrerequisiteTrainCorners &&
+    !isExactAuthenticatedA11yRepair;
   const hasStandalonePrerequisiteGlobal =
     files.length === 1 && PREREQUISITE_TRAIN_STANDALONE_GLOBALS.has(files[0]);
   const hasUnknownPrerequisiteTrainPeer =
@@ -637,6 +689,7 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompleteAffectedTestSelector =
     affectedTestSelectorInputCount > 0 &&
     !isExactAffectedTestSelector &&
+    !isExactAuthenticatedA11yRepair &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactNeonAttemptArtifactRepair &&
     !isExactPerformanceProfilerRepairWithSelector &&
@@ -658,6 +711,7 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
+    !isExactAuthenticatedA11yRepair &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactNeonAttemptArtifactRepair &&
     !isExactPersistedAuthFixtureRepair &&
@@ -670,6 +724,7 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompleteRunnerIoPressure =
     runnerIoPressureInputCount > 0 &&
     !isExactRunnerIoPressure &&
+    !isExactAuthenticatedA11yRepair &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactNeonAttemptArtifactRepair &&
     !isExactPersistedAuthFixtureRepair &&
@@ -682,6 +737,7 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompleteRunnerPrerequisiteContract =
     runnerPrerequisiteContractInputCount > 0 &&
     !isExactRunnerPrerequisiteRepair &&
+    !isExactAuthenticatedA11yRepair &&
     !isExactAffectedTestSelector &&
     !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper &&
@@ -695,6 +751,7 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompleteLayoutGuardContract =
     layoutGuardContractInputCount > 0 &&
     !isExactLayoutGuardContract &&
+    !isExactAuthenticatedA11yRepair &&
     !isExactPrerequisiteTrain &&
     !isExactAffectedTestSelector &&
     !isExactGoldenPathSmokeContractRepair &&
@@ -708,6 +765,7 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompleteNeonAttemptArtifactRepair =
     neonAttemptArtifactInputCount > 0 &&
     !isExactNeonAttemptArtifactRepair &&
+    !isExactAuthenticatedA11yRepair &&
     !isExactPrerequisiteTrain &&
     !isExactVercelCongestionControl &&
     !isExactAffectedTestSelector &&
@@ -748,6 +806,7 @@ export function buildAffectedTestPlan(changedFiles) {
             isExactPrerequisiteTrain ||
             isExactVercelCongestionControl ||
             isExactAffectedTestSelector ||
+            isExactAuthenticatedA11yRepair ||
             isExactGoldenPathSmokeContractRepair ||
             isExactNeonAttemptArtifactRepair ||
             isExactPerformanceProfilerRepair ||

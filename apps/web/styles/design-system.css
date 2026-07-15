@@ -8466,6 +8466,12 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   box-shadow: none;
 }
 
+.system-b-chat-composer-input {
+  color: var(--color-text-primary-token);
+  caret-color: var(--color-text-primary-token);
+  -webkit-text-fill-color: var(--color-text-primary-token);
+}
+
 :where(.system-b-chat-composer-surface[data-hero="true"]) {
   background: color-mix(
     in oklab,

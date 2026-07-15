@@ -165,7 +165,7 @@ test.describe('Homepage chat intake — ID-keyed intent store + /start handoff',
     await page.goto('/start?intent_id=11111111-1111-4111-8111-111111111111');
 
     // No real auth — we are only checking React's escaping and prompt restore.
-    await expect(page.getByLabel('Chat message input')).toHaveValue(
+    await expect(page.getByLabel('Chat Message Input')).toHaveValue(
       '<script>alert("xss")</script>'
     );
     const scriptCount = await page.locator('script:has-text("xss")').count();

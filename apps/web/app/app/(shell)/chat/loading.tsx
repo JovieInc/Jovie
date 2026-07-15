@@ -42,13 +42,12 @@ export default function ChatLoading() {
                   >
                     <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
                   </button>
-                  <textarea
-                    disabled
-                    rows={1}
-                    aria-label='Chat Message Input'
-                    placeholder='What are you working on?'
-                    className='min-w-0 flex-1 resize-none bg-transparent py-1.5 text-sm leading-6 text-primary-token placeholder:text-tertiary-token focus:outline-none'
-                  />
+                  <div
+                    aria-hidden='true'
+                    className='min-w-0 flex-1 py-1.5 text-sm leading-6 text-tertiary-token'
+                  >
+                    What are you working on?
+                  </div>
                   <button
                     type='button'
                     disabled
