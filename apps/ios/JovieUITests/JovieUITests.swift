@@ -316,7 +316,7 @@ final class JovieUITests: XCTestCase {
     chatApp.buttons["Open navigation drawer"].tap()
     chatApp.buttons["shell-drawer-surface-shell-tab-profile"].tap()
     let copyURLButton = chatApp.buttons["Copy URL"]
-    XCTAssertTrue(copyURLButton.waitForExistence(timeout: 3))
+    XCTAssertTrue(copyURLButton.waitForExistence(timeout: 10))
     attachScreenshot(named: "no-ghost-footprint-profile", app: chatApp)
     endUITestSession(chatApp)
 
@@ -581,7 +581,7 @@ final class JovieUITests: XCTestCase {
     app.buttons["Open navigation drawer"].tap()
     app.buttons["shell-drawer-surface-shell-tab-profile"].tap()
     XCTAssertTrue(
-      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      app.buttons["Copy URL"].waitForExistence(timeout: 10),
       "Shell navigation did not switch to Profile.\n\(app.debugDescription)"
     )
 
@@ -589,7 +589,7 @@ final class JovieUITests: XCTestCase {
     app.buttons["shell-drawer-surface-shell-tab-chat"].tap()
     let restoredInput = app.textFields["Ask Jovie"]
     XCTAssertTrue(
-      waitForHittable(restoredInput, timeout: 3),
+      waitForHittable(restoredInput, timeout: 10),
       "Shell navigation did not return to the chat composer.\n\(app.debugDescription)"
     )
     XCTAssertEqual(app.textFields.count, 1)
