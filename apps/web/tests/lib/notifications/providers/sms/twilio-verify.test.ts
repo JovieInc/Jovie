@@ -4,6 +4,8 @@ vi.mock('@/lib/env-server', () => ({
   env: {
     TWILIO_ACCOUNT_SID: 'AC_test',
     TWILIO_AUTH_TOKEN: 'token_test',
+    TWILIO_API_KEY_SID: 'SK_test',
+    TWILIO_API_KEY_SECRET: 'secret_test',
     TWILIO_VERIFY_SERVICE_SID: 'VA_test',
   },
 }));
@@ -36,6 +38,9 @@ describe('Twilio Verify adapter', () => {
     expect(form.get('To')).toBe('+15551112222');
     expect(form.get('Channel')).toBe('sms');
     expect(form.has('Code')).toBe(false);
+    expect(init?.headers).toMatchObject({
+      Authorization: `Basic ${Buffer.from('SK_test:secret_test').toString('base64')}`,
+    });
   });
 
   it('accepts only Twilio approved verification checks', async () => {

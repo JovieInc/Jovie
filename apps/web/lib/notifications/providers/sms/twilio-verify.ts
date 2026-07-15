@@ -17,14 +17,19 @@ async function postVerify(
   path: string,
   form: URLSearchParams
 ): Promise<TwilioVerifyResponse> {
-  const accountSid = env.TWILIO_ACCOUNT_SID;
-  const authToken = env.TWILIO_AUTH_TOKEN;
+  const hasApiKey = Boolean(
+    env.TWILIO_API_KEY_SID && env.TWILIO_API_KEY_SECRET
+  );
+  const username = hasApiKey ? env.TWILIO_API_KEY_SID : env.TWILIO_ACCOUNT_SID;
+  const password = hasApiKey
+    ? env.TWILIO_API_KEY_SECRET
+    : env.TWILIO_AUTH_TOKEN;
   const serviceSid = env.TWILIO_VERIFY_SERVICE_SID;
-  if (!accountSid || !authToken || !serviceSid) {
+  if (!username || !password || !serviceSid) {
     throw new Error('Phone verification is not configured');
   }
 
-  const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+  const auth = Buffer.from(`${username}:${password}`).toString('base64');
   const response = await serverFetch(
     `${TWILIO_VERIFY_API_BASE}/Services/${encodeURIComponent(serviceSid)}/${path}`,
     {
