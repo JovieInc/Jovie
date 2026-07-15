@@ -1,12 +1,30 @@
 import 'server-only';
 
-import { type BetterAuthOptions, betterAuth } from 'better-auth';
+import { createHmac } from 'node:crypto';
+import { oauthProvider } from '@better-auth/oauth-provider';
+import {
+  type BetterAuthOptions,
+  type BetterAuthPlugin,
+  betterAuth,
+} from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { nextCookies } from 'better-auth/next-js';
-import { bearer, emailOTP, oneTap, oneTimeToken } from 'better-auth/plugins';
+import {
+  bearer,
+  emailOTP,
+  jwt,
+  oneTap,
+  oneTimeToken,
+  phoneNumber,
+} from 'better-auth/plugins';
 import { db } from '@/lib/db';
 import {
   baAccounts,
+  baJwks,
+  baOauthAccessTokens,
+  baOauthClients,
+  baOauthConsents,
+  baOauthRefreshTokens,
   baSessions,
   baUsers,
   baVerifications,
@@ -14,9 +32,8 @@ import {
 import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
-import { logger } from '@/lib/utils/logger';
 import { generateAppleClientSecret } from './apple-client-secret';
-import { provisionAppUser } from './provision';
+import { phoneVerification } from './phone-verification';
 import { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
 import { secondaryStorage } from './secondary-storage';
 
@@ -61,6 +78,7 @@ export const STATIC_TRUSTED_ORIGINS = [
   'http://localhost:3100',
   'ie.jov.jovie://',
   'jovie://',
+  'logyourbody://',
 ] as const;
 
 function resolveTrustedOrigins(): (string | undefined)[] {
@@ -84,6 +102,13 @@ function resolveSecret(): string | undefined {
   return env.VERCEL_ENV === 'production'
     ? undefined
     : NON_PRODUCTION_FALLBACK_SECRET;
+}
+
+function getTemporaryPhoneEmail(phone: string): string {
+  const secret = resolveSecret();
+  if (!secret) throw new Error('Better Auth secret is required');
+  const digest = createHmac('sha256', secret).update(phone).digest('hex');
+  return `${digest}@phone.identity.jov.ie`;
 }
 
 function resolveBaseUrl(): string | undefined {
@@ -168,10 +193,49 @@ function buildPlugins() {
         }
       },
     }),
+    phoneNumber({
+      expiresIn: 300,
+      allowedAttempts: 5,
+      phoneNumberValidator: phone => /^\+[1-9]\d{7,14}$/.test(phone),
+      sendOTP: async ({ phoneNumber: phone }) => {
+        await phoneVerification.start(phone);
+      },
+      verifyOTP: async ({ phoneNumber: phone, code }) =>
+        phoneVerification.check(phone, code),
+      signUpOnVerification: {
+        getTempEmail: getTemporaryPhoneEmail,
+        getTempName: () => 'Member',
+      },
+    }),
     ...(googleOneTapClientId
       ? [oneTap({ clientId: googleOneTapClientId })]
       : []),
     bearer(),
+    jwt({
+      disableSettingJwtHeader: true,
+      jwks: {
+        keyPairConfig: { alg: 'EdDSA', crv: 'Ed25519' },
+        rotationInterval: 60 * 60 * 24 * 30,
+        gracePeriod: 60 * 60 * 24 * 30,
+      },
+    }),
+    oauthProvider({
+      loginPage: '/identity',
+      consentPage: '/identity',
+      signup: { page: '/identity' },
+      scopes: ['openid', 'profile', 'email', 'offline_access'],
+      grantTypes: ['authorization_code', 'refresh_token'],
+      allowDynamicClientRegistration: false,
+      allowUnauthenticatedClientRegistration: false,
+      accessTokenExpiresIn: 15 * 60,
+      refreshTokenExpiresIn: 60 * 60 * 24 * 30,
+      storeClientSecret: 'hashed',
+      storeTokens: 'hashed',
+      cachedTrustedClients: new Set([
+        'logyourbody-ios',
+        'logyourbody-supabase',
+      ]),
+    }) as BetterAuthPlugin,
     oneTimeToken({
       // Minutes at 1.6.23 (default 3). Covers the native handoff window.
       expiresIn: 5,
@@ -189,6 +253,9 @@ export const auth = betterAuth({
   appName: 'Jovie',
   baseURL: resolveBaseUrl(),
   secret: resolveSecret(),
+  // The OAuth provider owns /oauth2/token. Disable the JWT plugin's legacy
+  // session-token endpoint so clients cannot use two token contracts.
+  disabledPaths: ['/token'],
   database: drizzleAdapter(db, {
     provider: 'pg',
     // Explicit: the repo bans db.transaction(); do not rely on the adapter
@@ -199,6 +266,11 @@ export const auth = betterAuth({
       session: baSessions,
       account: baAccounts,
       verification: baVerifications,
+      jwks: baJwks,
+      oauthClient: baOauthClients,
+      oauthRefreshToken: baOauthRefreshTokens,
+      oauthAccessToken: baOauthAccessTokens,
+      oauthConsent: baOauthConsents,
     },
   }),
   socialProviders: buildSocialProviders(),
@@ -221,31 +293,6 @@ export const auth = betterAuth({
     customRules: AUTH_RATE_LIMIT_RULES,
   },
   trustedOrigins: () => resolveTrustedOrigins(),
-  databaseHooks: {
-    user: {
-      create: {
-        after: async user => {
-          try {
-            await provisionAppUser({
-              betterAuthUserId: user.id,
-              email: user.email,
-              emailVerified: user.emailVerified,
-              name: user.name,
-            });
-          } catch (error) {
-            // provisionAppUser never throws by contract; this is
-            // belt-and-braces so the OAuth callback can never fail here.
-            // gate.ts lazy-create heals on the next request.
-            logger.error('[auth] provision hook failed', error);
-            await captureError('Better Auth provision hook failed', error, {
-              betterAuthUserId: user.id,
-              operation: 'databaseHooks.user.create.after',
-            });
-          }
-        },
-      },
-    },
-  },
   telemetry: { enabled: false },
   plugins: buildPlugins(),
 });
