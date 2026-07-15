@@ -37,7 +37,6 @@ async function postVerify(
       body: form.toString(),
       timeoutMs: TWILIO_TIMEOUT_MS,
       context: `twilio.verify.${path}`,
-      // Verify POSTs are not safely idempotent; let the user retry explicitly.
     }
   );
 

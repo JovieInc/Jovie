@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useSearchParams } from 'next/navigation';
 import { type FormEvent, useMemo, useState } from 'react';
 import { AuthLayout } from '@/features/auth';
@@ -109,13 +110,13 @@ export function IdentityPageClient() {
                 className='focus-ring-themed min-h-12 w-full rounded-xl border border-subtle bg-surface-1 px-4 text-base text-primary-token'
               />
             </label>
-            <button
+            <Button
               type='submit'
               disabled={pending}
               className='focus-ring-themed min-h-12 w-full rounded-full bg-primary-token px-5 font-medium text-inverse disabled:opacity-50'
             >
               {pending ? 'Sending…' : 'Text me a code'}
-            </button>
+            </Button>
           </form>
         ) : (
           <form className='space-y-4' onSubmit={verifyCode}>
@@ -137,14 +138,14 @@ export function IdentityPageClient() {
                 className='focus-ring-themed min-h-12 w-full rounded-xl border border-subtle bg-surface-1 px-4 text-center text-xl tracking-[0.35em] text-primary-token'
               />
             </label>
-            <button
+            <Button
               type='submit'
               disabled={pending || code.length !== 6}
               className='focus-ring-themed min-h-12 w-full rounded-full bg-primary-token px-5 font-medium text-inverse disabled:opacity-50'
             >
               {pending ? 'Checking…' : 'Continue'}
-            </button>
-            <button
+            </Button>
+            <Button
               type='button'
               onClick={() => {
                 setStep('phone');
@@ -153,8 +154,8 @@ export function IdentityPageClient() {
               }}
               className='focus-ring-themed min-h-11 w-full rounded-full text-sm text-secondary-token'
             >
-              Use a different number
-            </button>
+              Use A Different Number
+            </Button>
           </form>
         )}
 

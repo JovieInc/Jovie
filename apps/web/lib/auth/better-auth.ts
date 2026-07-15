@@ -237,9 +237,7 @@ function buildPlugins() {
       ]),
     }) as BetterAuthPlugin,
     oneTimeToken({
-      // Minutes at 1.6.23 (default 3). Covers the native handoff window.
       expiresIn: 5,
-      // Client-callable generate is a cookie→bearer exfil vector (row 29).
       disableClientRequest: true,
       storeToken: 'hashed',
     }),
@@ -253,8 +251,6 @@ export const auth = betterAuth({
   appName: 'Jovie',
   baseURL: resolveBaseUrl(),
   secret: resolveSecret(),
-  // The OAuth provider owns /oauth2/token. Disable the JWT plugin's legacy
-  // session-token endpoint so clients cannot use two token contracts.
   disabledPaths: ['/token'],
   database: drizzleAdapter(db, {
     provider: 'pg',
