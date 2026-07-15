@@ -975,15 +975,18 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
     expect(new Set(Object.values(neonBranchCreateJobs)).size).toBe(4);
   });
 
-  // ci-golden-path deliberately uses ONE constant repo-wide group: it must
-  // serialize the Clerk dev instance (purgeStaleClerkTestUsers deletes ALL
-  // gp-* users, so two concurrent runs would delete each other's sessions)
-  // as well as the Neon pool. See the concurrency comment on the
-  // ci-golden-path job in ci.yml — do not parameterize that group. Every
-  // other pool group must stay per-job scoped per JOV-2497.
-  const intentionallySerializedPoolGroups = [
-    'group: neon-endpoint-pool-ci-golden-path',
-  ] as const;
+  it('scopes golden-path pending replacement to one PR', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const goldenPathJob = getJobBlock(workflow, 'ci-golden-path');
+
+    expect(goldenPathJob).toContain(
+      'group: neon-endpoint-pool-ci-golden-path-${{ github.event.pull_request.number || github.run_id }}'
+    );
+    expect(goldenPathJob).toContain('cancel-in-progress: false');
+    expect(goldenPathJob).not.toContain(
+      '\n      group: neon-endpoint-pool-ci-golden-path\n'
+    );
+  });
 
   it('uses literal job prefixes because github.job is unavailable before a runner starts', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -992,23 +995,8 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
 
     expect(poolGroups.length).toBeGreaterThan(0);
     for (const group of poolGroups) {
-      if (
-        intentionallySerializedPoolGroups.includes(
-          group.trim() as (typeof intentionallySerializedPoolGroups)[number]
-        )
-      ) {
-        continue;
-      }
       expect(group).not.toContain('${{ github.job }}');
       expect(group).not.toMatch(/neon-endpoint-pool--[0-3]/);
-    }
-  });
-
-  it('keeps the serialized-group allowlist accurate against the workflow', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
-
-    for (const group of intentionallySerializedPoolGroups) {
-      expect(workflow).toContain(group);
     }
   });
 

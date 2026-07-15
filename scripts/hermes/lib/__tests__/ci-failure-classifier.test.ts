@@ -1,8 +1,64 @@
 import { describe, expect, it } from 'vitest';
 import {
   classifyCiFailure,
+  classifyGithubConcurrencyPendingReplacement,
   classifyKnownCiFlake,
 } from '../ci-failure-classifier';
+
+describe('github_concurrency_pending_replacement', () => {
+  const observed = {
+    pending: {
+      id: 87297130629,
+      status: 'cancelled',
+      createdAt: '2026-07-15T07:45:35Z',
+      cancelledAt: '2026-07-15T07:47:02Z',
+      startedAt: null,
+      runnerName: '',
+      steps: [],
+      headSha: 'a'.repeat(40),
+    },
+    replacement: {
+      id: 87297400000,
+      status: 'queued',
+      createdAt: '2026-07-15T07:47:02Z',
+      headSha: 'b'.repeat(40),
+    },
+  } as const;
+
+  it('matches the exact unassigned replacement timeline', () => {
+    expect(classifyGithubConcurrencyPendingReplacement(observed)).toMatchObject(
+      {
+        id: 'github_concurrency_pending_replacement',
+        classification: 'missing-automation',
+        retryable: false,
+      }
+    );
+  });
+
+  it.each([
+    { runnerName: 'runner-1' },
+    { steps: [{}] },
+    { startedAt: '2026-07-15T07:46:00Z' },
+  ])('rejects jobs that obtained execution: %o', patch =>
+    expect(
+      classifyGithubConcurrencyPendingReplacement({
+        ...observed,
+        pending: { ...observed.pending, ...patch },
+      })
+    ).toBeNull());
+
+  it('rejects an unrelated later job', () => {
+    expect(
+      classifyGithubConcurrencyPendingReplacement({
+        ...observed,
+        replacement: {
+          ...observed.replacement,
+          createdAt: '2026-07-15T08:01:00Z',
+        },
+      })
+    ).toBeNull();
+  });
+});
 
 describe('classifyCiFailure', () => {
   it.each([

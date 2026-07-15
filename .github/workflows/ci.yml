@@ -3461,12 +3461,12 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.ci-path-changes.outputs.run_golden_path == 'true' || contains(github.event.pull_request.labels.*.name, 'launch-candidate') || contains(github.event.pull_request.labels.*.name, 'testing')) && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'))) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 25
-    # Constant group so at most ONE golden-path job runs repo-wide. This serializes
-    # both the Neon endpoint pool AND the Clerk dev instance: the spec's
-    # purgeStaleClerkTestUsers deletes ALL gp-* users, so two concurrent runs would
-    # delete each other's sessions and flake. Do not parameterize this group.
+    # Scope pending replacement to one PR. GitHub replaces the older pending job in
+    # a constant concurrency group even when cancel-in-progress is false, which can
+    # cancel a required check before it obtains a runner. Golden-path cleanup only
+    # removes users older than the job timeout, so separate PRs are safe to run.
     concurrency:
-      group: neon-endpoint-pool-ci-golden-path
+      group: neon-endpoint-pool-ci-golden-path-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
