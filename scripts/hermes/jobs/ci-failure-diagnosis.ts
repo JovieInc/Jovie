@@ -6,6 +6,7 @@ export type CiFailureClass =
   | 'golden_path_smoke_auth_contract'
   | 'layout_guard_contract_missing'
   | 'standalone_runtime_launcher_mismatch'
+  | 'chat_composer_unsettled_entry_animation'
   | 'neon_endpoint_capacity_admission'
   | 'neon_probe_workspace_dependency_resolution'
   | 'neon_shared_artifact_credential_mismatch'
@@ -119,6 +120,31 @@ const DIAGNOSES: ReadonlyArray<{
       'A CI lane launched `next start` against an `output: standalone` artifact, so requests used the regular .next/server runtime instead of the traced standalone runtime and could not resolve its hash-shim packages.',
     remediation:
       'Launch .next/standalone/apps/web/server.js directly, fail closed when that entrypoint is absent or never becomes ready, and preserve the synced standalone runtime instead of reinstalling dependencies or blindly retrying.',
+  },
+  {
+    failureClass: 'chat_composer_unsettled_entry_animation',
+    matches: log => {
+      const normalizedLog = log.replace(/(?:\u001b\[|\^\[\[)[0-9;]*m/g, '');
+      const failureMatch = normalizedLog.match(
+        /(?:^|\n)[^\n]*\d+\)\s+\[chromium\]\s+› tests\/e2e\/shell-chat-v1\.spec\.ts:\d+:\d+\s+› chat route picker opens without moving the shell or composer[\s\S]{0,4000}?Expected:\s*<=\s*1[\s\S]{0,1000}?Received:\s+([0-9]+(?:\.[0-9]+)?)/i
+      );
+      const receivedDelta = Number(failureMatch?.[1]);
+
+      return (
+        /E2E Smoke \(PR Fast Feedback\)/i.test(normalizedLog) &&
+        Boolean(failureMatch) &&
+        Number.isFinite(receivedDelta) &&
+        receivedDelta > 1 &&
+        receivedDelta <= 6 &&
+        !/Composer shifted after entry animations settled/i.test(
+          failureMatch?.[0] ?? ''
+        )
+      );
+    },
+    rootCause:
+      'The Shell V1 geometry smoke captured its baseline while the 450ms chat-enter translateY(6px) entry animation was still running after its 160ms stagger delay; toBeVisible checks visibility, not animation completion.',
+    remediation:
+      'Wait for the centered composer getAnimations({ subtree: true }) promises to finish before the baseline boundingBox, retain the <=1px assertion, and keep the zero-width autosize measurement sentinel; do not raise the tolerance or retry.',
   },
   {
     failureClass: 'neon_endpoint_capacity_admission',
