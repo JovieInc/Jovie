@@ -115,6 +115,28 @@ jobs:
                things a single-PR reviewer can't know.
             4. Missing tests on non-trivial logic.
 
+            SCOPE GOVERNOR — classify every accepted finding before proposing a fix:
+            - `in-scope blocker`: a correctness, security, data-loss, or regression
+              issue directly in the PR's original files and intent that must be fixed.
+            - `follow-up`: valid but non-blocking work that can be deferred safely.
+            - `stop-and-escalate`: out-of-scope, ambiguous/high-risk work, or a decision
+              that needs a maintainer rather than an automatic patch.
+            Label every accepted finding with exactly one of those strings. Do not
+            silently turn a follow-up or stop-and-escalate finding into a patch.
+
+            SCOPE BUDGET: Treat the PR's initial changed-file count and non-test LOC as
+            its original scope. Never expand beyond 2x either budget without explicit
+            approval in the PR description or a maintainer comment containing the
+            exact token `scope-approved`. Without that token, classify the finding as
+            `stop-and-escalate` and do not propose edits outside the budget. Test-only
+            additions needed to verify an in-scope fix do not count as non-test LOC.
+
+            TWO-CYCLE PAUSE: Inspect the PR timeline for review-triggered fix cycles
+            (a review finding followed by a patch and another review). After two such
+            cycles without convergence, pause before another edit: reclassify every
+            remaining finding, mark unresolved/ambiguous items `stop-and-escalate`,
+            and ask for a maintainer decision. Never attempt a third automatic fix.
+
             BE HIGH-SIGNAL — this must not become noise:
             - Only comment on things that genuinely matter. No nitpicks, no style
               (biome/lint handle that), no praise, no summaries of what the PR does.
@@ -122,5 +144,9 @@ jobs:
               line saying so.
             - Defer taste/UX/product/copy judgments to human reviewers — do not opine on those.
 
-            Post ONE concise PR review. Each finding: file:line, the issue, why it
-            matters (cite gbrain if relevant), and a concrete fix.
+            Post ONE concise PR review. Start with a `Scope governor` line stating the
+            original files/non-test LOC budget, whether the 2x budget is exceeded, and
+            whether the two-cycle pause applies. Each accepted finding must include:
+            `Classification: in-scope blocker|follow-up|stop-and-escalate`, plus
+            file:line, the issue, why it matters (cite gbrain if relevant), and a
+            concrete fix only when its classification permits one.
