@@ -1,15 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockOnConflictDoUpdate, mockReturning } = vi.hoisted(() => ({
-  mockOnConflictDoUpdate: vi.fn(),
-  mockReturning: vi.fn(),
-}));
+const { mockOnConflictDoNothing, mockReturning, mockSelectLimit } = vi.hoisted(
+  () => ({
+    mockOnConflictDoNothing: vi.fn(),
+    mockReturning: vi.fn(),
+    mockSelectLimit: vi.fn(),
+  })
+);
 
 vi.mock('@/lib/db', () => ({
   db: {
     insert: vi.fn(() => ({
       values: vi.fn(() => ({
-        onConflictDoUpdate: mockOnConflictDoUpdate,
+        onConflictDoNothing: mockOnConflictDoNothing,
+      })),
+    })),
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: mockSelectLimit,
+        })),
       })),
     })),
   },
@@ -18,11 +28,28 @@ vi.mock('@/lib/db', () => ({
 describe('ensureBetterAuthTestUser', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockOnConflictDoUpdate.mockReturnValue({ returning: mockReturning });
+    mockOnConflictDoNothing.mockReturnValue({ returning: mockReturning });
   });
 
-  it('converges on the user already owning the unique email', async () => {
-    mockReturning.mockResolvedValue([{ id: 'existing-better-auth-user' }]);
+  it('returns the newly inserted deterministic identity', async () => {
+    mockReturning.mockResolvedValue([{ id: 'new-better-auth-user' }]);
+    const { ensureBetterAuthTestUser } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await expect(
+      ensureBetterAuthTestUser({
+        email: 'Browse+Clerk_Test@Jov.ie',
+        fullName: 'Browse Creator',
+      })
+    ).resolves.toBe('new-better-auth-user');
+
+    expect(mockSelectLimit).not.toHaveBeenCalled();
+  });
+
+  it('converges on an identity after either unique key conflicts', async () => {
+    mockReturning.mockResolvedValue([]);
+    mockSelectLimit.mockResolvedValue([{ id: 'existing-better-auth-user' }]);
     const { ensureBetterAuthTestUser } = await import(
       '@/lib/testing/test-user-provision.server'
     );
@@ -33,20 +60,11 @@ describe('ensureBetterAuthTestUser', () => {
         fullName: 'Browse Creator',
       })
     ).resolves.toBe('existing-better-auth-user');
-
-    expect(mockOnConflictDoUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        target: expect.objectContaining({ name: 'email' }),
-        set: expect.objectContaining({
-          name: 'Browse Creator',
-          emailVerified: true,
-        }),
-      })
-    );
   });
 
-  it('fails closed if the atomic upsert returns no identity', async () => {
+  it('fails closed if a conflict cannot be resolved', async () => {
     mockReturning.mockResolvedValue([]);
+    mockSelectLimit.mockResolvedValue([]);
     const { ensureBetterAuthTestUser } = await import(
       '@/lib/testing/test-user-provision.server'
     );
@@ -56,6 +74,6 @@ describe('ensureBetterAuthTestUser', () => {
         email: 'browse+clerk_test@jov.ie',
         fullName: 'Browse Creator',
       })
-    ).rejects.toThrow('Better Auth test user upsert returned no user');
+    ).rejects.toThrow('Better Auth test user conflict could not be resolved');
   });
 });

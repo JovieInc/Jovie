@@ -174,11 +174,11 @@ export async function ensureBetterAuthTestUser({
   // the `server-only` guard when this file is imported from globalSetup.
   const { db } = await import('@/lib/db');
 
-  // Email is Better Auth's unique identity key for these test actors. Older
-  // preview branches can already contain the same email under a different
-  // user id, so converge on the existing email row instead of failing the
-  // session bootstrap with ba_users_email_unique.
-  const [user] = await db
+  // Either the deterministic id or email can already exist, including when
+  // parallel Playwright workers race to provision the same actor. Do not name
+  // a single conflict target: PostgreSQL may detect the other unique index
+  // first. Insert if absent, then resolve whichever stable identity won.
+  const [insertedUser] = await db
     .insert(baUsers)
     .values({
       id: baUserId,
@@ -186,18 +186,21 @@ export async function ensureBetterAuthTestUser({
       email: normalizedEmail,
       emailVerified: true,
     })
-    .onConflictDoUpdate({
-      target: baUsers.email,
-      set: {
-        name: fullName,
-        emailVerified: true,
-        updatedAt: new Date(),
-      },
-    })
+    .onConflictDoNothing()
     .returning({ id: baUsers.id });
 
+  if (insertedUser) {
+    return insertedUser.id;
+  }
+
+  const [user] = await db
+    .select({ id: baUsers.id })
+    .from(baUsers)
+    .where(or(eq(baUsers.email, normalizedEmail), eq(baUsers.id, baUserId)))
+    .limit(1);
+
   if (!user) {
-    throw new Error('Better Auth test user upsert returned no user');
+    throw new Error('Better Auth test user conflict could not be resolved');
   }
 
   return user.id;
