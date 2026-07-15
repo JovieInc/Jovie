@@ -1,0 +1,27 @@
+# Reference snapshot only. The capacity installer MUST NOT install this file.
+# The live root-owned service and its drop-ins contain separately managed model
+# routing state; this snapshot documents the reviewed resource envelope.
+
+[Unit]
+Description=CI Runner Autoscaler — ephemeral Docker runners for Jovie CI
+After=docker.service ci-runners.slice
+BindsTo=ci-runners.slice
+
+[Service]
+Type=exec
+User=timwhite
+Group=docker
+WorkingDirectory=/opt/ci-runner-autoscaler
+ExecStart=/usr/bin/tsx /opt/ci-runner-autoscaler/index.ts
+Restart=always
+RestartSec=5
+CPUQuota=800%
+MemoryMax=48G
+Environment=AUTOSCALER_MAX_RUNNERS=10
+Environment=AUTOSCALER_RUNNER_CPUS=2
+Environment=AUTOSCALER_RUNNER_MEMORY_MB=4096
+Environment=AUTOSCALER_RUNNER_LABELS=self-hosted,Linux,X64,jovie-runner,jovie-ephemeral,ephemeral
+Environment=AUTOSCALER_CGROUP_PARENT=ci-runners.slice
+
+# Model routes and credentials are intentionally omitted. They are unrelated to
+# process capacity and remain owned by the live service/drop-in configuration.

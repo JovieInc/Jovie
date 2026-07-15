@@ -67,6 +67,25 @@ describe('diagnoseCiFailure', () => {
     ).toBe('runner_host_pressure');
   });
 
+  it('upgrades the proactive slice diagnostic to an exact capacity class', () => {
+    const diagnosis = diagnoseCiFailure(`
+      runner_tasks_status=critical
+      runner_tasks_current=958
+      runner_tasks_max=1024
+      runner_tasks_ratio_pct=93
+    `);
+
+    expect(diagnosis.failureClass).toBe('runner_slice_task_saturation');
+    expect(diagnosis.rootCause).toContain('ci-runners.slice');
+    expect(diagnosis.remediation).toContain('diagnose-capacity.sh');
+  });
+
+  it('does not infer slice saturation from an unrelated status line', () => {
+    expect(diagnoseCiFailure('runner_tasks_status=critical').failureClass).toBe(
+      'unknown'
+    );
+  });
+
   it('diagnoses a cancelled pending job whose Neon concurrency key lost its job prefix', () => {
     const diagnosis = diagnoseCiFailure(`
       E2E Smoke (PR Fast Feedback) was cancelled before runner assignment.

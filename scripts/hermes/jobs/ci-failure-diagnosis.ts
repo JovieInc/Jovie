@@ -3,6 +3,7 @@ export type CiFailureClass =
   | 'golden_path_smoke_auth_contract'
   | 'neon_concurrency_key_collision'
   | 'test_fixture_import_timeout'
+  | 'runner_slice_task_saturation'
   | 'runner_process_exhaustion'
   | 'runner_host_pressure'
   | 'unknown';
@@ -63,6 +64,16 @@ const DIAGNOSES: ReadonlyArray<{
       'Hoist the mocked HUD page import outside the timed test bodies and avoid resetting modules when the assertions do not require a fresh module graph.',
   },
   {
+    failureClass: 'runner_slice_task_saturation',
+    matches: log =>
+      /runner_tasks_status=(?:warning|critical)/i.test(log) &&
+      /runner_tasks_(?:current|max|ratio_pct)=/i.test(log),
+    rootCause:
+      'The self-hosted runner pool is approaching or has reached the systemd ci-runners.slice task ceiling.',
+    remediation:
+      'Run .github/runner-host/diagnose-capacity.sh and restore the versioned ci-runners.slice TasksMax contract before retrying CI.',
+  },
+  {
     failureClass: 'runner_process_exhaustion',
     matches: log =>
       /\bEAGAIN\b|ERR_WORKER_INIT_FAILED|resource temporarily unavailable/i.test(
@@ -71,7 +82,7 @@ const DIAGNOSES: ReadonlyArray<{
     rootCause:
       'The runner could not create a process or worker because process resources were exhausted.',
     remediation:
-      'Reduce runner process pressure or retry on a healthy runner; do not modify the failing test based on this signature alone.',
+      'Run .github/runner-host/diagnose-capacity.sh to distinguish slice saturation from other host pressure; do not modify the failing test based on this signature alone.',
   },
   {
     failureClass: 'runner_host_pressure',
