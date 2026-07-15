@@ -61,6 +61,27 @@ describe('diagnoseCiFailure', () => {
     ).toBe('bounded_source_scan_timeout');
   });
 
+  it.each([
+    'feature-flags-registry.test.ts',
+    'arbitrary-values-ratchet.test.ts',
+  ])('classifies recurring %s scanner timeouts', testFile => {
+    expect(
+      diagnoseCiFailure(`
+        FAIL tests/unit/${testFile}
+        Error: Test timed out in 12000ms.
+      `).failureClass
+    ).toBe('bounded_source_scan_timeout');
+  });
+
+  it('classifies the exp lint subprocess timeout as bounded scanner work', () => {
+    expect(
+      diagnoseCiFailure(`
+        FAIL tests/unit/app/exp-drift-lint-guard.test.ts
+        Error: spawnSync /bin/sh ETIMEDOUT
+      `).failureClass
+    ).toBe('bounded_source_scan_timeout');
+  });
+
   it('classifies the HUD cold-import timeout as a broken test fixture', () => {
     expect(
       diagnoseCiFailure(`
@@ -128,5 +149,68 @@ describe('diagnoseCiFailure', () => {
         'waiting in concurrency group neon-endpoint-pool-ci-e2e-smoke-0'
       ).failureClass
     ).toBe('unknown');
+  });
+
+  it('classifies the historical full-suite timeout as a broken profiler fixture', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Test Performance Budgets
+      Test suite failed:
+      exit=none
+      signal=SIGTERM
+      stderr=suite exceeded 420000ms
+    `);
+
+    expect(diagnosis).toMatchObject({
+      failureClass: 'broken_profiler_fixture',
+      rootCause: expect.stringContaining('entire ~1,900-file fast suite'),
+      remediation: expect.stringContaining('60s budget'),
+    });
+  });
+
+  it('keeps future bounded-suite timeouts inconclusive until exact rerun evidence exists', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Test Performance Budgets
+      Test suite failed:
+      signal=SIGTERM
+      error=spawnSync pnpm ETIMEDOUT
+      classification=inconclusive-performance-timeout
+    `);
+
+    expect(diagnosis).toMatchObject({
+      failureClass: 'inconclusive_performance_timeout',
+      rootCause: expect.stringContaining('not safe to retry or ignore'),
+      remediation: expect.stringContaining('Do not change the 60s budget'),
+    });
+  });
+
+  it('does not misclassify a truncated modern timeout as the legacy 420s fixture', () => {
+    expect(
+      diagnoseCiFailure(`
+        Test Performance Budgets
+        Test suite failed:
+        signal=SIGTERM
+        error=spawnSync pnpm ETIMEDOUT
+      `).failureClass
+    ).toBe('unknown');
+  });
+
+  it.each([
+    {
+      output: 'Total test duration (61000ms) exceeds threshold (60000ms)',
+      failureClass: 'suite_wide_performance_regression',
+    },
+    {
+      output: 'P95 test duration (201ms) exceeds threshold (200ms)',
+      failureClass: 'broad_test_performance_regression',
+    },
+    {
+      output:
+        'Max individual test duration (2001ms) exceeds threshold (2000ms): stuck assertion',
+      failureClass: 'isolated_stuck_test_regression',
+    },
+  ])('classifies $failureClass independently', ({ output, failureClass }) => {
+    expect(
+      diagnoseCiFailure(`Test Performance Budgets\n${output}`).failureClass
+    ).toBe(failureClass);
   });
 });

@@ -9,6 +9,7 @@
 import { execSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { TEST_PERFORMANCE_TARGETS } from './test-performance-profiler';
 
 interface PerformanceThresholds {
   totalDuration: number; // Maximum total test suite duration (ms)
@@ -40,10 +41,10 @@ class TestPerformanceGuard {
   private resolvedBaselinePath?: string;
 
   private thresholds: PerformanceThresholds = {
-    totalDuration: 480000, // 8 minutes — CI runners vary 360-420s; needs headroom to catch regressions not noise
-    p95: 200, // 200ms
-    setupTime: 150000, // 150 seconds (CI cold start + environment initialization)
-    individualTest: 200, // 200ms
+    totalDuration: TEST_PERFORMANCE_TARGETS.totalDuration,
+    p95: TEST_PERFORMANCE_TARGETS.p95,
+    setupTime: TEST_PERFORMANCE_TARGETS.setupTime,
+    individualTest: TEST_PERFORMANCE_TARGETS.individualTest,
     slowTestCount: 0, // Zero tolerance — every test must be under individualTest threshold
   };
 
@@ -58,9 +59,9 @@ class TestPerformanceGuard {
       description: 'Critical regression suite (includes auth E2E tests)',
     },
     full: {
-      maxTotalDuration: 480000,
+      maxTotalDuration: TEST_PERFORMANCE_TARGETS.totalDuration,
       description:
-        'Full coverage runs should stay under 8 minutes to guard against drift.',
+        'The deterministic representative suite should stay under 60 seconds.',
     },
   };
 
@@ -243,8 +244,11 @@ class TestPerformanceGuard {
 
     // Check slow test count
     if (this.metrics.slowTests.length > this.thresholds.slowTestCount) {
+      const slowest = this.metrics.slowTests.reduce((current, test) =>
+        test.duration > current.duration ? test : current
+      );
       violations.push(
-        `Number of slow tests (${this.metrics.slowTests.length}) exceeds threshold (${this.thresholds.slowTestCount})`
+        `Max individual test duration (${slowest.duration}ms) exceeds threshold (${this.thresholds.individualTest}ms): ${slowest.name}`
       );
     }
 

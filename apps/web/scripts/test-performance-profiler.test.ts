@@ -9,7 +9,10 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  PERFORMANCE_SUITE_FILES,
+  PERFORMANCE_SUITE_TIMEOUT_MS,
   type ProfilerDependencies,
+  TEST_PERFORMANCE_TARGETS,
   TestPerformanceProfiler,
   TestRunError,
 } from './test-performance-profiler';
@@ -62,6 +65,62 @@ afterEach(() => {
 });
 
 describe('TestPerformanceProfiler fail-closed behavior', () => {
+  it('profiles a fixed representative suite within a calibrated ceiling', async () => {
+    const cwd = createWorkspace();
+    const invocations: Array<{ args: string[]; timeout: number }> = [];
+    const profiler = createProfiler(cwd, (args, timeout) => {
+      invocations.push({ args, timeout });
+      if (invocations.length === 1) {
+        return commandResult({ stdout: 'Duration 1.0s (setup 0.2s)' });
+      }
+      writeFileSync(
+        join(cwd, '.cache/vitest-performance-results.json'),
+        JSON.stringify({
+          numTotalTests: 2,
+          testResults: [
+            {
+              assertionResults: [
+                { title: 'cold start', duration: 1_999, status: 'passed' },
+                { title: 'stuck test', duration: 2_001, status: 'passed' },
+              ],
+            },
+          ],
+        })
+      );
+      return commandResult({
+        stdout:
+          'Duration 2.0s (transform 100ms, tests 400ms, environment 500ms)',
+      });
+    });
+
+    const metrics = await profiler.runPerformanceAnalysis();
+
+    expect(invocations[1]).toEqual({
+      args: [
+        'exec',
+        'vitest',
+        'run',
+        '--config=vitest.config.mts',
+        ...PERFORMANCE_SUITE_FILES,
+        '--reporter=default',
+        '--reporter=json',
+        '--outputFile=.cache/vitest-performance-results.json',
+      ],
+      timeout: PERFORMANCE_SUITE_TIMEOUT_MS,
+    });
+    expect(PERFORMANCE_SUITE_FILES).toHaveLength(10);
+    expect(PERFORMANCE_SUITE_TIMEOUT_MS).toBe(
+      TEST_PERFORMANCE_TARGETS.totalDuration + 30_000
+    );
+    expect(TEST_PERFORMANCE_TARGETS).toMatchObject({
+      p95: 200,
+      individualTest: 2_000,
+    });
+    expect(metrics.slowTests).toEqual([
+      expect.objectContaining({ name: 'stuck test', duration: 2_001 }),
+    ]);
+  });
+
   it('reports a missing Vitest executable and preserves the baseline', async () => {
     const cwd = createWorkspace();
     seedBaseline(cwd);
@@ -101,13 +160,15 @@ describe('TestPerformanceProfiler fail-closed behavior', () => {
         error: timeout,
         status: null,
         signal: 'SIGTERM',
-        stderr: 'suite exceeded 420000ms',
+        stderr: `suite exceeded ${PERFORMANCE_SUITE_TIMEOUT_MS}ms`,
       });
     });
 
     await expect(profiler.runPerformanceAnalysis()).rejects.toEqual(
       expect.objectContaining<TestRunError>({
-        details: expect.stringMatching(/signal=SIGTERM[\s\S]*ETIMEDOUT/),
+        details: expect.stringMatching(
+          /signal=SIGTERM[\s\S]*ETIMEDOUT[\s\S]*classification=inconclusive-performance-timeout[\s\S]*remediation=/
+        ),
       })
     );
     expectBaselinePreserved(cwd);
@@ -257,6 +318,25 @@ describe('TestPerformanceProfiler fail-closed behavior', () => {
           })
         ),
       expected: 'vitestJsonCount(declared=2, assertions=1)',
+    },
+    {
+      name: 'non-skipped assertion without a duration',
+      writeJson: (cwd: string) =>
+        writeFileSync(
+          join(cwd, '.cache/vitest-performance-results.json'),
+          JSON.stringify({
+            numTotalTests: 2,
+            testResults: [
+              {
+                assertionResults: [
+                  { title: 'timed', duration: 10, status: 'passed' },
+                  { title: 'missing duration', status: 'passed' },
+                ],
+              },
+            ],
+          })
+        ),
+      expected: 'vitestJsonDuration(nonSkippedMissingOrInvalid=1)',
     },
   ])('rejects $name even when console timings look complete', async scenario => {
     const cwd = createWorkspace();

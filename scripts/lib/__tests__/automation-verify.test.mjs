@@ -81,6 +81,29 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = [
+  '.github/workflows/ci.yml',
+  'apps/web/scripts/test-performance-guard.ts',
+  'apps/web/scripts/test-performance-profiler.test.ts',
+  'apps/web/scripts/test-performance-profiler.ts',
+  'apps/web/tests/unit/app/exp-drift-lint-guard.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+  'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+];
+const PERFORMANCE_PROFILER_REPAIR_ANCHORS = [
+  'apps/web/scripts/test-performance-guard.ts',
+  'apps/web/scripts/test-performance-profiler.test.ts',
+  'apps/web/scripts/test-performance-profiler.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+];
+const PERFORMANCE_PROFILER_REPAIR_MANIFEST = [
+  ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
 const GOLDEN_PATH_SMOKE_CONTRACT_REPAIR_DIFF = [
   'apps/web/tests/e2e/golden-path.spec.ts',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
@@ -620,6 +643,30 @@ describe('automation-verify affected scope', () => {
     ]);
   });
 
+  it.each([
+    { manifest: PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST },
+    { manifest: PERFORMANCE_PROFILER_REPAIR_MANIFEST },
+  ])('selects bounded profiler and Gem regressions for an exact repair signature', ({
+    manifest,
+  }) => {
+    const plan = buildAffectedTestPlan(manifest);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/scripts/test-performance-profiler.test.ts',
+      'apps/web/tests/unit/app/exp-drift-lint-guard.test.ts',
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      ...(manifest.length === PERFORMANCE_PROFILER_REPAIR_MANIFEST.length
+        ? ['scripts/lib/__tests__/automation-verify.test.mjs']
+        : []),
+    ]);
+  });
+
   it.each(
     GTMQ_SOURCE_GATE_REAPER_MANIFEST
   )('fails closed when the Graphite source-gate repair is missing %s', missingInput => {
@@ -627,6 +674,31 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan(
         GTMQ_SOURCE_GATE_REAPER_MANIFEST.filter(file => file !== missingInput)
       ).mode
+    ).toBe('full');
+  });
+
+  it.each(
+    PERFORMANCE_PROFILER_REPAIR_ANCHORS
+  )('fails closed when the profiler repair input %s is standalone', input => {
+    expect(buildAffectedTestPlan([input]).mode).toBe('full');
+  });
+
+  it('fails closed when the profiler repair plus selector signature is partial', () => {
+    expect(
+      buildAffectedTestPlan(
+        PERFORMANCE_PROFILER_REPAIR_MANIFEST.filter(
+          file => file !== 'scripts/lib/__tests__/automation-verify.test.mjs'
+        )
+      ).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when the profiler repair signature includes an unknown peer', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
+        'scripts/hermes/lib/unknown-profiler-helper.ts',
+      ]).mode
     ).toBe('full');
   });
 

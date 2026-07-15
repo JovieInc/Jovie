@@ -1,10 +1,4 @@
-import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -40,13 +34,12 @@ const SOURCE_EXT = /\.(tsx|ts)$/;
 
 function walk(dir: string, out: string[]): void {
   if (!existsSync(dir)) return;
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const s = statSync(full);
-    if (s.isDirectory()) {
-      if (entry === 'node_modules' || entry === '.next') continue;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === '.next') continue;
       walk(full, out);
-    } else if (SOURCE_EXT.test(entry)) {
+    } else if (SOURCE_EXT.test(entry.name)) {
       out.push(full);
     }
   }

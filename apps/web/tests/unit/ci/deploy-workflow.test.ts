@@ -56,6 +56,80 @@ function getJobBlock(workflow: string, jobKey: string): string {
   return block.join('\n');
 }
 
+describe('CI test-performance path gate', () => {
+  it('runs the budget job only for its exact internal-PR inputs or main', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const pathJob = getJobBlock(workflow, 'ci-path-changes');
+    const detectStep = getStepBlock(
+      pathJob,
+      'Detect path changes for all job types'
+    );
+    const graphiteSkip = getStepBlock(pathJob, 'Skip CI (Graphite optimizer)');
+    const performanceJob = getJobBlock(workflow, 'ci-test-performance');
+
+    expect(pathJob).toContain(
+      "run_test_performance: ${{ steps.detect.outputs.run_test_performance || steps.graphite_skip.outputs.run_test_performance || 'false' }}"
+    );
+    expect(graphiteSkip).toContain('run_test_performance');
+    expect(detectStep).toContain(
+      'for t in run_build run_test run_test_performance run_public_lighthouse'
+    );
+    expect(detectStep).toContain(
+      'echo "run_test_performance=false" >> "$GITHUB_OUTPUT"'
+    );
+
+    const pattern = detectStep.match(/TEST_PERFORMANCE_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBe(
+      '^apps/web/scripts/test-performance-(guard\\.ts|profiler(\\.test)?\\.ts)$'
+    );
+    for (const input of [
+      'apps/web/scripts/test-performance-guard.ts',
+      'apps/web/scripts/test-performance-profiler.ts',
+      'apps/web/scripts/test-performance-profiler.test.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-q', '-E', pattern!], { input }).status,
+        input
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-q', '-E', pattern!], {
+        input: 'apps/web/tests/unit/example.test.ts',
+      }).status
+    ).toBe(1);
+
+    const testingStart = detectStep.indexOf(
+      'if [[ "$FULL_CI_LABEL" == "true" ]]'
+    );
+    const testingEnd = detectStep.indexOf('\n          fi', testingStart);
+    expect(testingStart).toBeGreaterThan(0);
+    expect(testingEnd).toBeGreaterThan(testingStart);
+    expect(detectStep.slice(testingStart, testingEnd)).not.toContain(
+      'run_test_performance'
+    );
+    const generalTestElse = detectStep.match(
+      /TEST_PATTERN=[\s\S]*?else\n\s+RUN_TEST=false([\s\S]*?)\n\s+fi/
+    )?.[1];
+    expect(generalTestElse).not.toContain('run_test_performance');
+    const forkGuard = detectStep.slice(
+      detectStep.indexOf('if [[ "$IS_FORK" == "true" ]]')
+    );
+    expect(forkGuard).toContain(
+      'echo "run_test_performance=false" >> "$GITHUB_OUTPUT"'
+    );
+
+    expect(performanceJob).toContain(
+      "if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (needs.ci-path-changes.outputs.skip == 'false' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_test_performance == 'true') }}"
+    );
+    expect(performanceJob).not.toContain(
+      "if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push'"
+    );
+    expect(performanceJob).toContain(
+      "run_full_ci=${{ needs.ci-path-changes.outputs.run_test == 'true' || needs.ci-path-changes.outputs.run_test_performance == 'true' }}"
+    );
+  });
+});
+
 function previewRobotsPolicyValid(
   workflow: string,
   robotsBody: string

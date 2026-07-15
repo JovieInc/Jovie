@@ -106,10 +106,39 @@ const GOLDEN_PATH_SMOKE_CONTRACT_CORE = new Set([
   'scripts/hermes/jobs/ci-failure-diagnosis.ts',
   'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
 ]);
+const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = new Set([
+  '.github/workflows/ci.yml',
+  'apps/web/scripts/test-performance-guard.ts',
+  'apps/web/scripts/test-performance-profiler.test.ts',
+  'apps/web/scripts/test-performance-profiler.ts',
+  'apps/web/tests/unit/app/exp-drift-lint-guard.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+  'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+]);
 const GOLDEN_PATH_SMOKE_CONTRACT_TESTS = [
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
 ];
 const GOLDEN_PATH_SMOKE_CONTRACT_SCRIPT_TESTS = [
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+];
+const PERFORMANCE_PROFILER_REPAIR_ANCHORS = new Set([
+  'apps/web/scripts/test-performance-guard.ts',
+  'apps/web/scripts/test-performance-profiler.test.ts',
+  'apps/web/scripts/test-performance-profiler.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+]);
+const PERFORMANCE_PROFILER_REPAIR_MANIFEST = new Set([
+  ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const PERFORMANCE_PROFILER_REPAIR_WEB_TESTS = [
+  'apps/web/scripts/test-performance-profiler.test.ts',
+];
+const PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS = [
   'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const PERSISTED_AUTH_FIXTURE_REPAIR_CORE = new Set([
@@ -225,6 +254,18 @@ export function buildAffectedTestPlan(changedFiles) {
         AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
     ) &&
     affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size;
+  const performanceProfilerRepairInputCount = files.filter(file =>
+    PERFORMANCE_PROFILER_REPAIR_ANCHORS.has(file)
+  ).length;
+  const isExactPerformanceProfilerRepairPrimary =
+    files.length === PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.size &&
+    files.every(file => PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.has(file));
+  const isExactPerformanceProfilerRepairWithSelector =
+    files.length === PERFORMANCE_PROFILER_REPAIR_MANIFEST.size &&
+    files.every(file => PERFORMANCE_PROFILER_REPAIR_MANIFEST.has(file));
+  const isExactPerformanceProfilerRepair =
+    isExactPerformanceProfilerRepairPrimary ||
+    isExactPerformanceProfilerRepairWithSelector;
   const persistedAuthFixtureInputCount = files.filter(file =>
     PERSISTED_AUTH_FIXTURE_REPAIR_CORE.has(file)
   ).length;
@@ -335,6 +376,9 @@ export function buildAffectedTestPlan(changedFiles) {
   if (isExactGoldenPathSmokeContractRepair) {
     mandatoryTests.push(...GOLDEN_PATH_SMOKE_CONTRACT_TESTS);
   }
+  if (isExactPerformanceProfilerRepair) {
+    mandatoryTests.push(...PERFORMANCE_PROFILER_REPAIR_WEB_TESTS);
+  }
 
   const selectedTests = unique([...directTests, ...mandatoryTests]);
   const rootVitestTests = isExactVercelCongestionControl
@@ -349,8 +393,12 @@ export function buildAffectedTestPlan(changedFiles) {
       : []),
   ]);
   const scriptVitestTests = unique([
+    ...(isExactPerformanceProfilerRepair
+      ? PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS
+      : []),
     ...(isExactAffectedTestSelector ||
     isExactGoldenPathSmokeContractRepair ||
+    isExactPerformanceProfilerRepairWithSelector ||
     (isExactPersistedAuthFixtureRepair && affectedTestSelectorInputCount > 0)
       ? AFFECTED_TEST_SELECTOR_TESTS
       : []),
@@ -390,6 +438,11 @@ export function buildAffectedTestPlan(changedFiles) {
     if (isExactPrerequisiteTrain && PREREQUISITE_TRAIN_MANIFEST.has(file))
       return true;
     if (
+      isExactPerformanceProfilerRepair &&
+      PERFORMANCE_PROFILER_REPAIR_MANIFEST.has(file)
+    )
+      return true;
+    if (
       hasSeedConfirmationChange &&
       (file === 'apps/web/tests/seed-test-data.ts' ||
         file === 'apps/web/lib/events/confirmation-status.ts' ||
@@ -425,8 +478,15 @@ export function buildAffectedTestPlan(changedFiles) {
     affectedTestSelectorInputCount > 0 &&
     !isExactAffectedTestSelector &&
     !isExactGoldenPathSmokeContractRepair &&
+    !isExactPerformanceProfilerRepairWithSelector &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactGtmqSourceGateReaper &&
+    !isExactRunnerIoPressure;
+  const hasIncompletePerformanceProfilerRepair =
+    performanceProfilerRepairInputCount > 0 &&
+    !isExactPerformanceProfilerRepair &&
+    !isExactGoldenPathSmokeContractRepair &&
+    !isExactPersistedAuthFixtureRepair &&
     !isExactRunnerIoPressure;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
@@ -434,6 +494,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactGoldenPathSmokeContractRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactAffectedTestSelector &&
+    !isExactPerformanceProfilerRepairWithSelector &&
     !isExactRunnerIoPressure;
   const hasIncompleteRunnerIoPressure =
     runnerIoPressureInputCount > 0 &&
@@ -441,7 +502,8 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactGoldenPathSmokeContractRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactAffectedTestSelector &&
-    !isExactGtmqSourceGateReaper;
+    !isExactGtmqSourceGateReaper &&
+    !isExactPerformanceProfilerRepair;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
     hasUnknownCiCancellationHealerPeer ||
@@ -451,6 +513,7 @@ export function buildAffectedTestPlan(changedFiles) {
     hasUnknownPrerequisiteTrainPeer ||
     hasIncompleteVercelCongestionControl ||
     hasIncompleteAffectedTestSelector ||
+    hasIncompletePerformanceProfilerRepair ||
     hasIncompleteGtmqSourceGateReaper ||
     hasIncompleteRunnerIoPressure;
   const hasSelectedTests =
@@ -468,6 +531,7 @@ export function buildAffectedTestPlan(changedFiles) {
             isExactVercelCongestionControl ||
             isExactAffectedTestSelector ||
             isExactGoldenPathSmokeContractRepair ||
+            isExactPerformanceProfilerRepair ||
             isExactPersistedAuthFixtureRepair ||
             isExactGtmqSourceGateReaper ||
             isExactRunnerIoPressure)

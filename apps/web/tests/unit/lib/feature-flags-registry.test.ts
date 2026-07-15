@@ -68,6 +68,23 @@ function collectSourceFiles(rootDir: string): string[] {
   return files;
 }
 
+interface SourceFile {
+  readonly absolutePath: string;
+  readonly relativePath: string;
+  readonly source: string;
+}
+
+/** Read the source tree once; every registry assertion reuses this snapshot. */
+function collectSourceCorpus(rootDir: string): SourceFile[] {
+  return collectSourceFiles(rootDir).map(absolutePath => ({
+    absolutePath,
+    relativePath: path.relative(rootDir, absolutePath),
+    source: readFileSync(absolutePath, 'utf8'),
+  }));
+}
+
+const SOURCE_CORPUS = collectSourceCorpus(WEB_ROOT);
+
 function readRepoFile(relativePath: string): string {
   return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 }
@@ -83,12 +100,10 @@ describe('feature flag registry integrity', () => {
   });
 
   it('keeps all runtime app-flag references registered', () => {
-    const sourceFiles = collectSourceFiles(WEB_ROOT);
     const registeredFlags = new Set<string>(Object.keys(APP_FLAG_KEYS));
     const discoveredFlags = new Set<string>();
 
-    for (const sourceFile of sourceFiles) {
-      const source = readFileSync(sourceFile, 'utf8');
+    for (const { source } of SOURCE_CORPUS) {
       const matches = source.matchAll(APP_FLAG_CALL_REGEX);
 
       for (const [, flag] of matches) {
@@ -185,32 +200,24 @@ describe('feature flag registry integrity', () => {
   });
 
   it('forbids legacy feature-flags imports outside lib/flags', () => {
-    const sourceFiles = collectSourceFiles(WEB_ROOT);
     const legacyImportRegex = /from ['"]@\/lib\/feature-flags(?:\/|['"])/;
 
-    const violations = sourceFiles
-      .filter(sourceFile => {
-        const source = readFileSync(sourceFile, 'utf8');
-        return legacyImportRegex.test(source);
-      })
-      .map(sourceFile => path.relative(WEB_ROOT, sourceFile))
+    const violations = SOURCE_CORPUS.filter(({ source }) =>
+      legacyImportRegex.test(source)
+    )
+      .map(({ relativePath }) => relativePath)
       .sort();
 
     expect(violations).toEqual([]);
   });
 
   it('keeps experimental route modules out of production source', () => {
-    const sourceFiles = collectSourceFiles(WEB_ROOT);
-    const violations = sourceFiles
-      .filter(
-        sourceFile =>
-          !sourceFile.includes(`${path.sep}app${path.sep}exp${path.sep}`)
-      )
-      .filter(sourceFile => {
-        const source = readFileSync(sourceFile, 'utf8');
-        return EXP_ROUTE_IMPORT_REGEX.test(source);
-      })
-      .map(sourceFile => path.relative(WEB_ROOT, sourceFile))
+    const violations = SOURCE_CORPUS.filter(
+      ({ absolutePath }) =>
+        !absolutePath.includes(`${path.sep}app${path.sep}exp${path.sep}`)
+    )
+      .filter(({ source }) => EXP_ROUTE_IMPORT_REGEX.test(source))
+      .map(({ relativePath }) => relativePath)
       .sort();
 
     expect(violations).toEqual([]);
