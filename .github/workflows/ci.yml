@@ -1013,7 +1013,7 @@ jobs:
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-artifact/connection.json
           retention-days: 1
 
@@ -1086,7 +1086,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
@@ -1531,7 +1531,7 @@ jobs:
         # Screenshot/UI-only PRs still need seeded profile fixtures for Playwright.
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
@@ -1737,7 +1737,7 @@ jobs:
         # Screenshot/UI-only PRs still need seeded profile fixtures for shard-0 Playwright.
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
@@ -2072,7 +2072,7 @@ jobs:
         if: needs.ci-path-changes.outputs.run_neon == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
@@ -2205,7 +2205,7 @@ jobs:
         if: needs.ci-path-changes.outputs.run_neon == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
@@ -2340,7 +2340,7 @@ jobs:
         if: needs.ci-path-changes.outputs.run_neon == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
@@ -2480,7 +2480,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
@@ -2952,7 +2952,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
@@ -3091,7 +3091,7 @@ jobs:
       - name: Download Neon DB connection artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
         continue-on-error: true
 
@@ -3257,7 +3257,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
@@ -3471,7 +3471,7 @@ jobs:
         if: needs.neon-db.result == 'success'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
@@ -3796,7 +3796,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
@@ -3872,7 +3872,7 @@ jobs:
       - name: Download Neon DB connection artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
@@ -4821,7 +4821,7 @@ jobs:
       - name: Download Neon DB connection artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: neon-db-connection-${{ github.run_id }}
+          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact

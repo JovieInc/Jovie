@@ -8,6 +8,7 @@ export type CiFailureClass =
   | 'standalone_runtime_launcher_mismatch'
   | 'neon_endpoint_capacity_admission'
   | 'neon_probe_workspace_dependency_resolution'
+  | 'neon_shared_artifact_credential_mismatch'
   | 'neon_concurrency_key_collision'
   | 'broken_profiler_fixture'
   | 'inconclusive_performance_timeout'
@@ -141,6 +142,28 @@ const DIAGNOSES: ReadonlyArray<{
       'The repo-root Neon admission probe imported a dependency declared only by the apps/web workspace. Under the strict pnpm layout, Node resolved from the script directory and could not see the web workspace dependency.',
     remediation:
       'Load @neondatabase/serverless through createRequire anchored to apps/web/package.json, then run the real probe without DATABASE_URL and require it to reach its own environment validation instead of hoisting or reinstalling dependencies.',
+  },
+  {
+    failureClass: 'neon_shared_artifact_credential_mismatch',
+    matches: log => {
+      const attemptBlindArtifact =
+        /Download Neon DB connection artifact/i.test(log) &&
+        /name:\s*neon-db-connection-\d+\b(?!-\d+)/i.test(log);
+      const exhaustedConsumerMigration =
+        /Run migrations \(ephemeral Neon\)/i.test(log) &&
+        /Database connection attempt 11\/12 failed/i.test(log);
+
+      return (
+        (attemptBlindArtifact || exhaustedConsumerMigration) &&
+        /password authentication failed for user ['"]neondb_owner['"]/i.test(
+          log
+        )
+      );
+    },
+    rootCause:
+      'A downstream migration exhausted its Neon connectivity retries because the shared connection artifact carried credentials that no longer authenticated; run-id-only artifact selection permits this drift on reruns.',
+    remediation:
+      'Bind the Neon connection artifact producer and every consumer to both github.run_id and github.run_attempt, then fail closed when the exact-attempt artifact is absent instead of retrying stale credentials.',
   },
   {
     failureClass: 'neon_concurrency_key_collision',

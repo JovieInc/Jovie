@@ -56,6 +56,32 @@ function getJobBlock(workflow: string, jobKey: string): string {
   return block.join('\n');
 }
 
+describe('CI Neon connection artifact contract', () => {
+  it('binds every producer and consumer to the current run attempt', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const artifactLines = workflow
+      .split('\n')
+      .filter(line => line.includes('name: neon-db-connection-'));
+
+    expect(artifactLines.length).toBeGreaterThan(1);
+    expect(artifactLines).toEqual(
+      artifactLines.map(
+        () =>
+          '          name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
+      )
+    );
+    expect(workflow).not.toMatch(
+      /name: neon-db-connection-\$\{\{ github\.run_id \}\}\s*$/m
+    );
+
+    const neonJob = getJobBlock(workflow, 'neon-db');
+    expect(neonJob).toContain('SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"');
+    expect(neonJob).toContain(
+      'name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
+    );
+  });
+});
+
 describe('CI test-performance path gate', () => {
   it('runs the budget job only for its exact internal-PR inputs or main', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -784,7 +810,7 @@ describe('CI public lighthouse workflow', () => {
     );
 
     expect(downloadArtifactStep).toContain(
-      'name: neon-db-connection-${{ github.run_id }}'
+      'name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
     );
     expect(resolveDbStep).toContain(
       'connection_file: /tmp/neon-db-connection/connection.json'
@@ -880,7 +906,7 @@ describe('CI mobile overflow workflow', () => {
     );
 
     expect(downloadArtifactStep).toContain(
-      'name: neon-db-connection-${{ github.run_id }}'
+      'name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
     );
     expect(resolveDbStep).toContain(
       'connection_file: /tmp/neon-db-connection/connection.json'
@@ -1115,7 +1141,7 @@ describe('CI public a11y workflow', () => {
       "if: steps.check_changes.outputs.run_full_ci == 'true'"
     );
     expect(downloadArtifactStep).toContain(
-      'name: neon-db-connection-${{ github.run_id }}'
+      'name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
     );
     expect(resolveDbStep).toContain(
       "if: steps.check_changes.outputs.run_full_ci == 'true'"
@@ -1173,7 +1199,7 @@ describe('CI PR neon migrate workflow', () => {
     );
 
     expect(downloadArtifactStep).toContain(
-      'name: neon-db-connection-${{ github.run_id }}'
+      'name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
     );
     expect(resolveDbStep).toContain(
       'connection_file: /tmp/neon-db-connection/connection.json'

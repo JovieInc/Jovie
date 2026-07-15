@@ -293,6 +293,39 @@ describe('diagnoseCiFailure', () => {
     ).toBe('unknown');
   });
 
+  it('diagnoses attempt-blind Neon credentials selected by a rerun consumer', () => {
+    const diagnosis = diagnoseCiFailure(`
+      E2E Smoke (PR Fast Feedback) Run migrations (ephemeral Neon)
+      Database connection attempt 11/12 failed with a transient Neon endpoint error. Retrying in 5s...
+      Failed to connect to database: error: password authentication failed for user 'neondb_owner'
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'neon_shared_artifact_credential_mismatch'
+    );
+    expect(diagnosis.rootCause).toContain('run-id-only');
+    expect(diagnosis.remediation).toContain('github.run_attempt');
+    expect(diagnosis.remediation).toContain('fail closed');
+  });
+
+  it('does not infer rerun artifact drift from an attempt-bound artifact', () => {
+    expect(
+      diagnoseCiFailure(`
+        Download Neon DB connection artifact
+        name: neon-db-connection-29184792705-2
+        password authentication failed for user 'neondb_owner'
+      `).failureClass
+    ).toBe('unknown');
+  });
+
+  it('does not infer shared-artifact drift from an unrelated password failure', () => {
+    expect(
+      diagnoseCiFailure(
+        "password authentication failed for user 'neondb_owner'"
+      ).failureClass
+    ).toBe('unknown');
+  });
+
   it('does not infer slice saturation from an unrelated status line', () => {
     expect(diagnoseCiFailure('runner_tasks_status=critical').failureClass).toBe(
       'unknown'
