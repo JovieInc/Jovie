@@ -118,13 +118,16 @@ const DIAGNOSES: ReadonlyArray<{
   {
     failureClass: 'bounded_source_scan_timeout',
     matches: log =>
-      /(?:analytics-metrics-layer-guard|touch-target-ratchet)\.test\.ts/i.test(
+      /(?:analytics-metrics-layer-guard|touch-target-ratchet|feature-flags-registry|arbitrary-values-ratchet|exp-drift-lint-guard)\.test\.ts/i.test(
         log
-      ) && /(?:test timed out|timeout).*?\b\d+\s*ms/is.test(log),
+      ) &&
+      /(?:test timed out|timeout).*?\b\d+\s*ms|spawnSync\s+\S+\s+ETIMEDOUT/is.test(
+        log
+      ),
     rootCause:
-      'A repository-wide source ratchet exceeded its bounded test timeout while scanning the source tree.',
+      'A source ratchet or nested lint scanner exceeded its bounded test timeout while traversing or analyzing the source tree.',
     remediation:
-      'Inspect the ratchet scanner for unbounded per-file filesystem work; do not classify this as runner EAGAIN or increase the test timeout.',
+      'Inspect the scanner for repeated source reads, per-entry stat calls, or nested package-manager lint processes; do not classify this as runner EAGAIN or increase the test timeout.',
   },
   {
     failureClass: 'test_fixture_import_timeout',

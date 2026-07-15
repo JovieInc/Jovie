@@ -61,6 +61,27 @@ describe('diagnoseCiFailure', () => {
     ).toBe('bounded_source_scan_timeout');
   });
 
+  it.each([
+    'feature-flags-registry.test.ts',
+    'arbitrary-values-ratchet.test.ts',
+  ])('classifies recurring %s scanner timeouts', testFile => {
+    expect(
+      diagnoseCiFailure(`
+        FAIL tests/unit/${testFile}
+        Error: Test timed out in 12000ms.
+      `).failureClass
+    ).toBe('bounded_source_scan_timeout');
+  });
+
+  it('classifies the exp lint subprocess timeout as bounded scanner work', () => {
+    expect(
+      diagnoseCiFailure(`
+        FAIL tests/unit/app/exp-drift-lint-guard.test.ts
+        Error: spawnSync /bin/sh ETIMEDOUT
+      `).failureClass
+    ).toBe('bounded_source_scan_timeout');
+  });
+
   it('classifies the HUD cold-import timeout as a broken test fixture', () => {
     expect(
       diagnoseCiFailure(`

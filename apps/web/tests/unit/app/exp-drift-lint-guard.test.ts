@@ -1,6 +1,13 @@
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
+import { Linter } from 'eslint';
 import { describe, expect, it } from 'vitest';
+
+const require = createRequire(import.meta.url);
+const tsParser = require('@typescript-eslint/parser');
+const canonicalUiLabelCasingRule = require('../../../eslint-rules/canonical-ui-label-casing.js');
 
 const webRoot = path.resolve(__dirname, '../../..');
 const repoRoot = path.resolve(webRoot, '..');
@@ -42,6 +49,42 @@ function run(command: string) {
   });
 }
 
+function canonicalLabelErrors(targets: readonly string[]) {
+  const linter = new Linter({ configType: 'flat' });
+
+  return targets.flatMap(target => {
+    const filePath = path.resolve(webRoot, target.replace('apps/web/', ''));
+    return linter
+      .verify(
+        readFileSync(filePath, 'utf8'),
+        {
+          languageOptions: {
+            parser: tsParser,
+            parserOptions: {
+              ecmaFeatures: { jsx: true },
+              ecmaVersion: 'latest',
+              sourceType: 'module',
+            },
+          },
+          plugins: {
+            '@jovie': {
+              rules: {
+                'canonical-ui-label-casing': canonicalUiLabelCasingRule,
+              },
+            },
+          },
+          rules: { '@jovie/canonical-ui-label-casing': 'error' },
+        },
+        { filename: filePath }
+      )
+      .filter(
+        message =>
+          message.ruleId === '@jovie/canonical-ui-label-casing' &&
+          message.severity === 2
+      );
+  });
+}
+
 describe('exp drift lint guard (#11224 follow-up)', () => {
   it('keeps the three exp pages Biome-clean so pre-push hooks do not fail on unrelated work', () => {
     const files = EXP_DRIFT_TARGETS.join(' ');
@@ -49,41 +92,8 @@ describe('exp drift lint guard (#11224 follow-up)', () => {
   });
 
   it('keeps canonical UI label casing clean on the three exp pages', () => {
-    const files = EXP_DRIFT_TARGETS.map(target =>
-      target.replace('apps/web/', '')
-    ).join(' ');
-
-    let eslintOutput = '';
-    try {
-      eslintOutput = execSync(
-        `pnpm exec eslint --cache --cache-location .cache/eslint --format json ${files}`,
-        {
-          cwd: webRoot,
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'pipe'],
-          timeout: 120_000,
-        }
-      );
-    } catch (error) {
-      const execError = error as { stdout?: string };
-      eslintOutput = execError.stdout ?? '';
-      if (!eslintOutput) throw error;
-    }
-
-    const results = JSON.parse(eslintOutput) as Array<{
-      messages: Array<{ ruleId?: string; severity: number }>;
-    }>;
-
-    const labelCasingErrors = results.flatMap(result =>
-      result.messages.filter(
-        message =>
-          message.ruleId === '@jovie/canonical-ui-label-casing' &&
-          message.severity === 2
-      )
-    );
-
-    expect(labelCasingErrors).toEqual([]);
-  }, 120_000);
+    expect(canonicalLabelErrors(EXP_DRIFT_TARGETS)).toEqual([]);
+  });
 });
 
 describe('component drift lint guard (#11274)', () => {
@@ -93,37 +103,6 @@ describe('component drift lint guard (#11274)', () => {
   });
 
   it('keeps canonical UI label casing clean on the two previously-violated component files', () => {
-    const files = LABEL_CASING_TARGETS.join(' ');
-
-    let eslintOutput = '';
-    try {
-      eslintOutput = execSync(
-        `pnpm exec eslint --cache --cache-location .cache/eslint --format json ${files}`,
-        {
-          cwd: webRoot,
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'pipe'],
-          timeout: 120_000,
-        }
-      );
-    } catch (error) {
-      const execError = error as { stdout?: string };
-      eslintOutput = execError.stdout ?? '';
-      if (!eslintOutput) throw error;
-    }
-
-    const results = JSON.parse(eslintOutput) as Array<{
-      messages: Array<{ ruleId?: string; severity: number }>;
-    }>;
-
-    const labelCasingErrors = results.flatMap(result =>
-      result.messages.filter(
-        message =>
-          message.ruleId === '@jovie/canonical-ui-label-casing' &&
-          message.severity === 2
-      )
-    );
-
-    expect(labelCasingErrors).toEqual([]);
-  }, 120_000);
+    expect(canonicalLabelErrors(LABEL_CASING_TARGETS)).toEqual([]);
+  });
 });
