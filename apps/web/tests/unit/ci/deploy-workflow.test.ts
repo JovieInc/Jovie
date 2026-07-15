@@ -291,6 +291,8 @@ describe('deploy workflow Vercel env resolution', () => {
       'uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e'
     );
     expect(classifierJob).toContain("node-version: '22'");
+    // biome-ignore format: merge-group checkout contract stays compact for the integration-train cap
+    expect([classifierJob.includes('fetch-depth: 2'), classifierJob.includes('git fetch origin "${{ github.event.merge_group.base_sha }}" --depth=1')]).toEqual([true, true]);
     expect(classifierJob).toContain(
       'node scripts/ci-harness.mjs classify-risk'
     );

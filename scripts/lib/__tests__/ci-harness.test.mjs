@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -144,12 +144,8 @@ describe('ci-harness manifest', () => {
     expect(runPrReadyGate('GRAPHITE_SKIP', { GRAPHITE_SKIP: 'true' })).toBe(1);
     // biome-ignore format: executable preview fixture stays compact for the integration-train cap
     const skippedPreview = { RISK_REQUIRES_PREVIEW: 'true', PREVIEW_RESULT: 'skipped', BUILD_RESULT: 'success', BUILD_HAS_ARTIFACT: 'true' };
-    for (const [isDependabot, hasArtifact, previewResult, status] of [
-      ['true', 'true', 'skipped', 0],
-      ['true', 'false', 'skipped', 1],
-      ['false', 'true', 'skipped', 1],
-      ['true', 'true', 'failure', 1],
-    ])
+    // biome-ignore format: executable preview matrix stays compact for the integration-train cap
+    for (const [isDependabot, hasArtifact, previewResult, status] of [['true', 'true', 'skipped', 0], ['true', 'false', 'skipped', 1], ['false', 'true', 'skipped', 1], ['true', 'true', 'failure', 1]])
       expect(
         runPrReadyGate('RISK_REQUIRES_PREVIEW', {
           ...skippedPreview,
@@ -160,22 +156,20 @@ describe('ci-harness manifest', () => {
       ).toBe(status);
 
     const pathChanges = extractWorkflowJobBlock(workflow, 'ci-path-changes');
+    // biome-ignore format: unique command-file path stays compact for the integration-train cap
+    const exactHeadOutput = resolve(process.env.RUNNER_TEMP || process.env.TMPDIR || '/tmp', `ci-exact-head-${process.pid}-${Date.now()}`);
     const exactHead = runWorkflowBash(
       pathChanges,
       /^ {10}if \[\[ "\$GRAPHITE_SKIP_REQUESTED"[\s\S]*?^ {10}done/m,
       // biome-ignore format: executable exact-head fixture stays compact for the integration-train cap
-      { GRAPHITE_SKIP_REQUESTED: 'true', GITHUB_OUTPUT: '/dev/stdout' }
+      { GRAPHITE_SKIP_REQUESTED: 'true', GITHUB_OUTPUT: exactHeadOutput }
     );
-    expect(exactHead.stdout).toContain('skip=false');
-    const intendedGates = {
-      'ci-e2e-smoke': 'E2E_SMOKE',
-      'ci-golden-path': 'GOLDEN_PATH',
-      'ci-smoke-required': 'EXTENDED_SMOKE',
-      'ci-lighthouse-pr': 'PUBLIC_LIGHTHOUSE',
-      'ci-lighthouse-dashboard-pr': 'DASHBOARD_LIGHTHOUSE',
-      'ci-lighthouse-onboarding-pr': 'ONBOARDING_LIGHTHOUSE',
-      'ci-lighthouse-admin-pr': 'ADMIN_LIGHTHOUSE',
-    };
+    const exactHeadCommandFile = readFileSync(exactHeadOutput, 'utf8');
+    unlinkSync(exactHeadOutput);
+    expect(exactHead.status).toBe(0);
+    expect(exactHeadCommandFile).toContain('skip=false');
+    // biome-ignore format: intended evidence matrix stays compact for the integration-train cap
+    const intendedGates = { 'ci-e2e-smoke': 'E2E_SMOKE', 'ci-golden-path': 'GOLDEN_PATH', 'ci-smoke-required': 'EXTENDED_SMOKE', 'ci-lighthouse-pr': 'PUBLIC_LIGHTHOUSE', 'ci-lighthouse-dashboard-pr': 'DASHBOARD_LIGHTHOUSE', 'ci-lighthouse-onboarding-pr': 'ONBOARDING_LIGHTHOUSE', 'ci-lighthouse-admin-pr': 'ADMIN_LIGHTHOUSE' };
     for (const [jobId, prefix] of Object.entries(intendedGates)) {
       expect(prReady).toMatch(new RegExp(`\\b${jobId},`));
       expect(prReady).toContain(
@@ -192,12 +186,13 @@ describe('ci-harness manifest', () => {
     const neonDecision = runWorkflowBash(
       neon,
       /^ {10}if \[\[ "\$REQUIRES_GOLDEN_PATH"[\s\S]*?^ {10}fi/m,
-      {
-        REQUIRES_EXTENDED_SMOKE: String(chatNeedsE2e),
-        GITHUB_OUTPUT: '/dev/stdout',
-      }
+      // biome-ignore format: executable Neon fixture stays compact for the integration-train cap
+      { REQUIRES_EXTENDED_SMOKE: String(chatNeedsE2e), GITHUB_OUTPUT: exactHeadOutput }
     );
-    expect(neonDecision.stdout).toContain('needs_db=true');
+    const neonCommandFile = readFileSync(exactHeadOutput, 'utf8');
+    unlinkSync(exactHeadOutput);
+    expect(neonDecision.status).toBe(0);
+    expect(neonCommandFile).toContain('needs_db=true');
 
     const evidenceStatus = (intended, result) =>
       runWorkflowBash(
