@@ -2564,10 +2564,17 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Wait for CDN propagation
-        run: |
-          echo "Waiting 30s for Vercel CDN propagation after deploy..."
-          sleep 30
+      - name: Verify exact production deployment before smoke
+        timeout-minutes: 2
+        env:
+          EXPECTED_COMMIT_SHA: ${{ github.sha }}
+          EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.production_deployment_id }}
+          PRODUCTION_ALIAS_MAX_ATTEMPTS: '3'
+          PRODUCTION_ALIAS_REQUIRED_ROUNDS: '1'
+          PRODUCTION_ALIAS_RETRY_SECONDS: '5'
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: bash .github/scripts/verify-production-alias.sh
 
       - name: Verify production endpoints are healthy
         env:
@@ -5365,14 +5372,13 @@ jobs:
             if [ $i -eq 3 ]; then exit 1; fi
           done
         env:
-          # The restored prebuilt artifact uploads but its function runtime is
-          # not healthy. Use Vercel's source-build cache until the artifact is
-          # proven runtime-closed by canary.
-          VERCEL_FORCE_SOURCE_DEPLOY: 'true'
           VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
           # The closed staging artifact contains more than Vercel's 15k plain
           # upload limit. Give the archive path the full prebuilt budget.
           VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'false'
+          # The restored artifact is the thing canary verifies. A source
+          # fallback would silently discard it and repeat the slow server build.
+          VERCEL_ENABLE_SOURCE_FALLBACK: 'false'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
 
@@ -5466,7 +5472,7 @@ jobs:
     needs: [deploy-staging, canary-health-gate, alias-staging]
     if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     concurrency:
       group: production-deploy
       cancel-in-progress: false
@@ -5476,11 +5482,10 @@ jobs:
     outputs:
       # Emitted when promote-production exits non-zero so deploy-notify can
       # distinguish silent-no-op regressions from generic promote failures.
-      # Values: "domain_project_mismatch" (public domains are not on the
-      # canonical Vercel project) | "no_match" (no Vercel deployment for
-      # github.sha) | "verify_mismatch" (production keeps serving the old
-      # commit after promote).
-      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.promote.outputs.failure_subtype }}
+      # Values distinguish production artifact, promotion state, and canonical
+      # alias convergence failures for deploy-notify and Gem diagnosis.
+      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.stage-production.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype }}
+      production_deployment_id: ${{ steps.stage-production.outputs.production_deployment_id }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
@@ -5495,9 +5500,9 @@ jobs:
             echo "failure_subtype=domain_project_mismatch" >> "$GITHUB_OUTPUT"
             exit 1
           fi
-      - name: Promote specific deployment for this SHA
-        timeout-minutes: 10
-        id: promote
+      - name: Build and stage production deployment
+        id: stage-production
+        timeout-minutes: 30
         env:
           GITHUB_SHA: ${{ github.sha }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -5505,211 +5510,166 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
-          # Resolve the exact deployment URL for github.sha via the Vercel API.
-          # We deliberately do NOT promote the staging.jov.ie alias: if staging
-          # drifts (silent `vercel alias set` failure, stale alias), promoting
-          # the alias hits "already the current production deployment" and
-          # silently no-ops. That regression kept production 7 days stale in
-          # 2026-04. Looking up by SHA means the only way to silently succeed
-          # is if we actually promote the right commit.
           set -euo pipefail
-          echo "Resolving deployment URL for SHA ${GITHUB_SHA}..."
-          deploy_url="$(python3 - <<'PY'
-          import json
-          import os
-          import sys
-          import urllib.parse
-          import urllib.request
 
-          token = os.environ.get("VERCEL_TOKEN", "")
-          org_id = os.environ.get("VERCEL_ORG_ID", "")
-          project_id = os.environ.get("VERCEL_PROJECT_ID", "")
-          commit_sha = os.environ.get("GITHUB_SHA", "")
-
-          # Distinguish missing-creds from genuine no-match so the shell can
-          # pick a different failure subtype. Without this, an unset secret
-          # silently triggers the `no_match` Slack alert.
-          if not token or not project_id or not commit_sha:
-              print("__MISSING_CREDS__", end="")
-              sys.exit(0)
-
-          # Paginate over READY deployments until we find the SHA or the
-          # Vercel API says there are no more pages. A hard page cap prevents
-          # runaway API calls on pathological account state.
-          #
-          # No target filter: the upstream deploy-staging job uses
-          # `vercel deploy --prebuilt` (via vercel-prebuilt-deploy.sh) without
-          # --prod, which creates PREVIEW deployments. Filtering by
-          # target=production would never match and every promote would fail
-          # with no_match. Preview-collision safety comes from (a) projectId
-          # scoping the query to this project, (b) exact 40-char SHA match,
-          # and (c) the `vercel promote` step itself, which only accepts URLs
-          # from the same project.
-          base_params = {
-              "projectId": project_id,
-              "state": "READY",
-              "limit": 100,
+          fail_stage() {
+            echo "::error::$1"
+            echo "failure_subtype=$2" >> "$GITHUB_OUTPUT"
+            exit 1
           }
-          if org_id.startswith("team_"):
-              base_params["teamId"] = org_id
 
-          next_cursor = None
-          found = False
-          for _page in range(10):  # hard cap: 1000 deployments searched
-              params = dict(base_params)
-              if next_cursor is not None:
-                  params["until"] = next_cursor
-              url = f"https://api.vercel.com/v6/deployments?{urllib.parse.urlencode(params)}"
-              req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
-              with urllib.request.urlopen(req, timeout=15) as response:
-                  payload = json.load(response)
-
-              deployments = payload.get("deployments", [])
-              for deployment in deployments:
-                  meta = deployment.get("meta") or {}
-                  if meta.get("githubCommitSha") == commit_sha:
-                      print(f"https://{deployment['url']}")
-                      found = True
-                      break
-              if found:
-                  break
-
-              pagination = payload.get("pagination") or {}
-              next_cursor = pagination.get("next")
-              if not next_cursor or not deployments:
-                  break
-          PY
-          )"
-
-          if [ "$deploy_url" = "__MISSING_CREDS__" ]; then
-            echo "❌ Missing Vercel credentials (VERCEL_TOKEN / VERCEL_PROJECT_ID / GITHUB_SHA)."
-            echo "   Cannot resolve deployment URL. Check repo secrets."
-            echo "failure_subtype=missing_creds" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          if [ -z "$deploy_url" ]; then
-            echo "❌ No READY Vercel deployment found for SHA ${GITHUB_SHA}."
-            echo "   Either the deploy-staging job never produced a READY deployment"
-            echo "   (build error, timeout) or it sits beyond the 1000-deployment"
-            echo "   search window. Failing loudly instead of silently no-opping."
-            echo "failure_subtype=no_match" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-          echo "Found deployment for SHA: promoting..."
-
-          set +e
-          promote_output=$(./node_modules/.bin/vercel promote "$deploy_url" --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID" 2>&1)
-          promote_exit_code=$?
-          set -e
-          printf '%s\n' "$promote_output"
-
-          if [ "$promote_exit_code" -ne 0 ]; then
-            # Re-running ship on the same SHA is legitimately idempotent.
-            if printf '%s' "$promote_output" | grep -q "already the current production deployment"; then
-              echo "Deployment for SHA ${GITHUB_SHA} is already in production; continuing to verify."
-            else
-              exit "$promote_exit_code"
+          missing=()
+          for key in GITHUB_SHA VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("$key")
             fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            fail_stage "Missing production deployment inputs: ${missing[*]}" missing_creds
           fi
 
-          # Verify production actually serves github.sha. /api/health/build-info
-          # returns commitSha as a 7-char slice of VERCEL_GIT_COMMIT_SHA (see
-          # apps/web/app/api/health/build-info/route.ts:35).
           expected="${GITHUB_SHA:0:7}"
-          USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
-          BYPASS_ARGS=()
-          if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
-            BYPASS_ARGS+=(-H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}")
+          scope_args=(--scope "$VERCEL_ORG_ID")
+          rm -rf .vercel/output .vercel/.env.preview.local .vercel/.env.production.local .vercel/.env.local
+
+          if ! ./node_modules/.bin/vercel pull --yes --environment=production \
+            --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+            fail_stage "Unable to pull the Production environment." production_artifact_failed
           fi
 
-          # Prefer the deployment URL when Vercel allows direct access, but
-          # also verify the canonical production alias. Protected deployment
-          # URLs can return 401 even after a successful promote; jov.ie is the
-          # user-facing surface and catches domain/project wiring regressions.
-          probe_urls=(
-            "${deploy_url}/api/health/build-info"
-            "https://jov.ie/api/health/build-info"
-          )
-          probe_labels=(
-            "deployment"
-            "production-alias"
-          )
-          echo "Verifying promoted deployment serves ${expected}..."
-          # Track confirmed_mismatch separately from saw_valid_probe so a
-          # late 500 can't overwrite an earlier confirmed mismatch. Once we
-          # see a 200 with a wrong SHA, it IS a mismatch — routing a
-          # subsequent edge hiccup to verify_probe_failed would send the
-          # wrong alert path.
-          actual=""
-          last_status=""
-          saw_valid_probe=false
-          confirmed_mismatch=false
-          # Vercel edge rollout can lag behind a successful `vercel promote`.
-          # Keep verification strict, but use a bounded 5-minute window to
-          # avoid false negatives on healthy deploys.
-          max_attempts=15
-          for attempt in $(seq 1 "$max_attempts"); do
-            # Skip sleep on the first attempt; wait between retries so we
-            # don't burn 10s after the final failing attempt.
-            if [ "$attempt" -gt 1 ]; then
-              sleep 10
+          for env_file in .vercel/.env.production.local .vercel/.env.local; do
+            if [ -f "$env_file" ]; then
+              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
+              mv "${env_file}.tmp" "$env_file"
             fi
-            for index in "${!probe_urls[@]}"; do
-              probe_url="${probe_urls[$index]}"
-              probe_label="${probe_labels[$index]}"
-              response=$(curl -sS -L \
-                --connect-timeout 5 \
-                --max-time 10 \
-                -A "$USER_AGENT" \
-                -H "Cache-Control: no-cache" \
-                "${BYPASS_ARGS[@]}" \
-                -w "\n%{http_code}" \
-                "${probe_url}?_cb=$(date +%s%N)" 2>/dev/null || printf '\n000')
-              last_status="${response##*$'\n'}"
-              body="${response%$'\n'*}"
-
-              if [ "$last_status" != "200" ]; then
-                echo "  attempt ${attempt} ${probe_label}: build-info returned HTTP ${last_status}"
-                continue
-              fi
-
-              actual=$(printf '%s' "$body" | jq -r '.commitSha // ""' 2>/dev/null || echo "")
-              if [ -z "$actual" ]; then
-                echo "  attempt ${attempt} ${probe_label}: build-info returned 200 without commitSha"
-                continue
-              fi
-
-              echo "  attempt ${attempt} ${probe_label}: build-info commitSha=${actual}"
-              saw_valid_probe=true
-              if [ "$actual" = "$expected" ]; then
-                echo "✅ ${probe_label} serves ${expected} — promote succeeded."
-                exit 0
-              fi
-              confirmed_mismatch=true
-            done
           done
 
-          if [ "$confirmed_mismatch" = "true" ]; then
-            echo "❌ Production verification returned commitSha='${actual:-<empty>}' but expected '${expected}'."
-            echo "   The promoted deployment or jov.ie alias is serving a different SHA."
-            echo "failure_subtype=verify_mismatch" >> "$GITHUB_OUTPUT"
-            exit 1
+          if ! pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts \
+            --target=prd --source=vercel-file; then
+            fail_stage "Production signup configuration is incomplete." production_artifact_failed
           fi
 
-          if [ "$saw_valid_probe" != "true" ]; then
-            echo "❌ Production build-info probes failed across all attempts (last HTTP ${last_status})."
-            echo "   Cannot confirm whether production is serving ${expected}."
-            echo "failure_subtype=verify_probe_failed" >> "$GITHUB_OUTPUT"
-            exit 1
+          if ! env -u TURBO_REMOTE_ONLY \
+            VERCEL_GIT_COMMIT_SHA="$GITHUB_SHA" \
+            NEXT_PUBLIC_BUILD_SHA="$expected" \
+            ./node_modules/.bin/vercel build --prod \
+              --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+            fail_stage "Production Vercel build failed." production_artifact_failed
+          fi
+          if [ ! -f .vercel/output/config.json ]; then
+            fail_stage "Production build did not create .vercel/output/config.json." production_artifact_failed
           fi
 
-          # Unreachable: the loop either exits 0 on match, or both
-          # confirmed_mismatch=false and saw_valid_probe=false can't both
-          # hold — if we got here, something broke the control flow.
-          echo "❌ Verification loop finished in an unexpected state."
-          echo "failure_subtype=verify_probe_failed" >> "$GITHUB_OUTPUT"
-          exit 1
+          deploy_json=""
+          if ! deploy_json="$(./node_modules/.bin/vercel deploy \
+            --prebuilt --archive=tgz --prod --skip-domain --format=json \
+            --env "VERCEL_GIT_COMMIT_SHA=${GITHUB_SHA}" \
+            --env "NEXT_PUBLIC_BUILD_SHA=${expected}" \
+            --meta "githubCommitSha=${GITHUB_SHA}" \
+            --token "$VERCEL_TOKEN" "${scope_args[@]}")"; then
+            fail_stage "Production prebuilt deployment failed." production_artifact_failed
+          fi
+          if ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$deploy_json"; then
+            fail_stage "Production deploy returned malformed JSON." production_artifact_failed
+          fi
+
+          production_deploy_id="$(jq -r '.id // .deployment.id // ""' <<<"$deploy_json")"
+          production_deploy_url="$(jq -r '.url // .deployment.url // ""' <<<"$deploy_json")"
+          if [[ "$production_deploy_url" != *://* && "$production_deploy_url" == *.vercel.app ]]; then
+            production_deploy_url="https://${production_deploy_url}"
+          fi
+          production_deploy_url="${production_deploy_url%/}"
+          if [[ "$production_deploy_id" != dpl_* ]] ||
+            [[ "$production_deploy_url" != https://*.vercel.app ]]; then
+            fail_stage "Production deploy returned an invalid deployment ID or URL." production_artifact_failed
+          fi
+          echo "Staged production deployment: ${production_deploy_id} (${production_deploy_url})"
+
+          inspect_wait_status=0
+          ./node_modules/.bin/vercel inspect "$production_deploy_id" \
+            --wait --timeout 15m --token "$VERCEL_TOKEN" "${scope_args[@]}" ||
+            inspect_wait_status=$?
+          if ! production_deploy_json="$(./node_modules/.bin/vercel inspect \
+            "$production_deploy_id" --format=json --token "$VERCEL_TOKEN" \
+            "${scope_args[@]}")" ||
+            ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$production_deploy_json"; then
+            fail_stage "Unable to inspect the staged production deployment." staged_production_not_ready
+          fi
+
+          inspected_id="$(jq -r '.id // ""' <<<"$production_deploy_json")"
+          production_deploy_state="$(jq -r \
+            '(.readyState // .state // .status // "unknown") | ascii_upcase' \
+            <<<"$production_deploy_json")"
+          production_deploy_target="$(jq -r '(.target // "") | ascii_downcase' \
+            <<<"$production_deploy_json")"
+          if [ "$inspected_id" != "$production_deploy_id" ] ||
+            [ "$production_deploy_state" != "READY" ] ||
+            [ "$production_deploy_target" != "production" ]; then
+            fail_stage "Staged production deployment is not the exact READY Production target (wait status ${inspect_wait_status})." staged_production_not_ready
+          fi
+
+          bypass_args=()
+          if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
+            bypass_args+=(-H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}")
+          fi
+          fetch_staged() {
+            local url="$1"
+            local separator="?"
+            [[ "$url" == *"?"* ]] && separator="&"
+            STAGED_RESPONSE="$(curl -sS -L --connect-timeout 5 --max-time 15 \
+              -A "Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)" \
+              -H "Cache-Control: no-cache, no-store, must-revalidate" \
+              "${bypass_args[@]}" -w "\n%{http_code}" \
+              "${url}${separator}_cb=$(date +%s%N)" \
+              2>/dev/null || printf '\n000')"
+            STAGED_STATUS="${STAGED_RESPONSE##*$'\n'}"
+            STAGED_BODY="${STAGED_RESPONSE%$'\n'*}"
+          }
+
+          fetch_staged "${production_deploy_url}/api/health/build-info"
+          staged_sha="$(printf '%s' "$STAGED_BODY" | jq -r '.commitSha // ""' 2>/dev/null || echo "")"
+          staged_environment="$(printf '%s' "$STAGED_BODY" | jq -r '.environment // ""' 2>/dev/null || echo "")"
+          if [ "$STAGED_STATUS" != "200" ] ||
+            [ "$staged_sha" != "$expected" ] ||
+            [ "$staged_environment" != "production" ]; then
+            fail_stage "Staged production build-info canary failed (HTTP ${STAGED_STATUS}, SHA ${staged_sha:-<empty>}, environment ${staged_environment:-<empty>})." staged_production_canary_failed
+          fi
+
+          fetch_staged "${production_deploy_url}/api/health"
+          staged_health="$(printf '%s' "$STAGED_BODY" | jq -r '.status // ""' 2>/dev/null || echo "")"
+          if [ "$STAGED_STATUS" != "200" ] || [ "$staged_health" != "ok" ]; then
+            fail_stage "Staged production health canary failed (HTTP ${STAGED_STATUS})." staged_production_canary_failed
+          fi
+
+          fetch_staged "${production_deploy_url}/"
+          if [ "$STAGED_STATUS" != "200" ] ||
+            [ "${#STAGED_BODY}" -lt 1000 ] ||
+            printf '%s' "$STAGED_BODY" | grep -qiE 'application error|internal server error|something went wrong'; then
+            fail_stage "Staged production homepage canary failed (HTTP ${STAGED_STATUS}, ${#STAGED_BODY} bytes)." staged_production_canary_failed
+          fi
+
+          echo "production_deployment_id=$production_deploy_id" >> "$GITHUB_OUTPUT"
+          echo "production_deployment_url=$production_deploy_url" >> "$GITHUB_OUTPUT"
+
+      - name: Promote staged production deployment
+        id: promote
+        timeout-minutes: 10
+        env:
+          PRODUCTION_DEPLOYMENT_ID: ${{ steps.stage-production.outputs.production_deployment_id }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: bash .github/scripts/promote-production-deployment.sh
+
+      - name: Verify canonical production deployment
+        id: verify-production
+        timeout-minutes: 8
+        env:
+          EXPECTED_COMMIT_SHA: ${{ github.sha }}
+          EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ steps.stage-production.outputs.production_deployment_id }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: bash .github/scripts/verify-production-alias.sh
 
   sentry-error-gate:
     name: Sentry Error Gate (production)
@@ -5933,6 +5893,30 @@ jobs:
             exit 0
           fi
 
+          if [ "$PROMOTE_RESULT" = "failure" ] && [[ "$PROMOTE_SUBTYPE" =~ ^(production_artifact_failed|staged_production_not_ready|staged_production_canary_failed)$ ]]; then
+            echo "failure_type=promote_staged_production_failed" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=🏗️" >> "$GITHUB_OUTPUT"
+            echo "failure_title=Staged Production deployment failed" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=The exact Production-target prebuilt artifact did not build, become READY, or pass its direct canary. The verified Preview deployment was not promoted." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "production_alias_not_updated" ]; then
+            echo "failure_type=promote_production_alias_not_updated" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=🪞" >> "$GITHUB_OUTPUT"
+            echo "failure_title=Canonical production alias did not converge" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=The staged Production deployment was READY, but cache-busted jov.ie stable/canary routes did not all serve its deployment ID and exact runtime SHA." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$PROMOTE_RESULT" = "failure" ] && [[ "$PROMOTE_SUBTYPE" =~ ^production_promotion_ ]]; then
+            echo "failure_type=promote_production_state_blocked" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=🚦" >> "$GITHUB_OUTPUT"
+            echo "failure_title=Production promotion state is blocked" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Vercel reported foreign, malformed, failed, or unverified rolling-release state. The bounded controller did not submit a second mutation or touch a foreign rollout." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "no_match" ]; then
             echo "failure_type=promote_no_match" >> "$GITHUB_OUTPUT"
             echo "failure_emoji=🕳️" >> "$GITHUB_OUTPUT"
@@ -6106,7 +6090,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notify (general deploy failure)
-        if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'promote' || steps.classify-failure.outputs.failure_type == 'promote_domain_project_mismatch' || steps.classify-failure.outputs.failure_type == 'promote_no_match' || steps.classify-failure.outputs.failure_type == 'promote_verify_mismatch' || steps.classify-failure.outputs.failure_type == 'promote_verify_probe_failed' || steps.classify-failure.outputs.failure_type == 'promote_missing_creds' || steps.classify-failure.outputs.failure_type == 'cancelled' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'promote' || steps.classify-failure.outputs.failure_type == 'promote_domain_project_mismatch' || steps.classify-failure.outputs.failure_type == 'promote_staged_production_failed' || steps.classify-failure.outputs.failure_type == 'promote_production_alias_not_updated' || steps.classify-failure.outputs.failure_type == 'promote_production_state_blocked' || steps.classify-failure.outputs.failure_type == 'promote_no_match' || steps.classify-failure.outputs.failure_type == 'promote_verify_mismatch' || steps.classify-failure.outputs.failure_type == 'promote_verify_probe_failed' || steps.classify-failure.outputs.failure_type == 'promote_missing_creds' || steps.classify-failure.outputs.failure_type == 'cancelled' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom

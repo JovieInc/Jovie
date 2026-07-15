@@ -7,6 +7,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_SCRIPT = REPO_ROOT / ".github/scripts/vercel-prebuilt-deploy.sh"
+PRODUCTION_PROMOTION_SCRIPT = (
+    REPO_ROOT / ".github/scripts/promote-production-deployment.sh"
+)
+PRODUCTION_ALIAS_SCRIPT = REPO_ROOT / ".github/scripts/verify-production-alias.sh"
 CI_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
 CANARY_WORKFLOW = REPO_ROOT / ".github/workflows/canary-health-gate.yml"
 
@@ -193,6 +197,54 @@ echo "https://jovie-source-after-cancel.vercel.app"
     assert len(calls) == 2
     assert "--prebuilt --archive=tgz" in calls[0]
     assert "--prebuilt" not in calls[1]
+
+
+def test_prebuilt_failure_does_not_fall_back_to_source_when_disabled(
+    tmp_path: Path,
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake_vercel = bin_dir / "vercel"
+    fake_vercel.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "${VERCEL_CALL_LOG}"
+if [[ " $* " == *" --prebuilt "* ]]; then
+  exit 1
+fi
+echo "source deploy must not run" >&2
+exit 99
+"""
+    )
+    fake_vercel.chmod(0o755)
+
+    prebuilt_output = tmp_path / ".vercel/output"
+    prebuilt_output.mkdir(parents=True)
+    (prebuilt_output / "config.json").write_text("{}")
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "VERCEL_TOKEN": "test-token",
+        "VERCEL_ORG_ID": "test-org",
+        "VERCEL_ENABLE_SOURCE_FALLBACK": "false",
+        "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
+        "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
+    }
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY_SCRIPT), "deploy_url", "--yes"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    calls = (tmp_path / "vercel-calls").read_text().splitlines()
+    assert len(calls) == 1
+    assert "--prebuilt --archive=tgz" in calls[0]
 
 
 def test_default_attempt_budgets_leave_one_minute_for_step_overhead() -> None:
@@ -482,3 +534,262 @@ def test_readiness_gate_hands_active_deployment_to_retrying_canary() -> None:
     assert "BUILDING|QUEUED|INITIALIZING)" in readiness
     assert "handing off to retrying canary" in readiness
     assert "terminal state" in readiness
+
+
+def _write_fake_promotion_vercel(tmp_path: Path) -> Path:
+    fake_vercel = tmp_path / "vercel"
+    fake_vercel.write_text(
+        r'''#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$VERCEL_CALL_LOG"
+cmd="$1"
+
+if [ "$cmd" = "inspect" ]; then
+  if [ "$FAKE_SCENARIO" = "malformed" ]; then
+    echo '{}'
+    exit 0
+  fi
+  current="dpl_previous"
+  if [ "$FAKE_SCENARIO" = "owned-timeout" ]; then
+    current="dpl_previous"
+  elif [ "$FAKE_SCENARIO" = "rolling" ]; then
+    if grep -q '^rolling-release complete ' "$VERCEL_CALL_LOG"; then
+      current="dpl_target"
+    fi
+  elif grep -q '^promote ' "$VERCEL_CALL_LOG"; then
+    current="dpl_target"
+  fi
+  printf '{"id":"%s","readyState":"READY","target":"production"}\n' "$current"
+  exit 0
+fi
+
+if [ "$cmd" = "rolling-release" ] && [ "$2" = "fetch" ]; then
+  if [ "$FAKE_SCENARIO" = "foreign" ]; then
+    echo '{"activeStage":{"targetPercentage":10},"canaryDeployment":{"id":"dpl_foreign"}}'
+  elif [ "$FAKE_SCENARIO" = "rolling" ] &&
+    grep -q '^promote ' "$VERCEL_CALL_LOG" &&
+    ! grep -q '^rolling-release complete ' "$VERCEL_CALL_LOG"; then
+    echo '{"activeStage":{"targetPercentage":10},"canaryDeployment":{"id":"dpl_target"}}'
+  elif [ "$FAKE_SCENARIO" = "owned-timeout" ] &&
+    grep -q '^promote ' "$VERCEL_CALL_LOG" &&
+    ! grep -q '^rolling-release abort ' "$VERCEL_CALL_LOG"; then
+    echo '{"activeStage":{"targetPercentage":10},"default":{"targetDeploymentId":"dpl_target"}}'
+  else
+    echo 'null'
+  fi
+  exit 0
+fi
+
+if [ "$cmd" = "promote" ]; then
+  if [ "$FAKE_SCENARIO" = "promote-timeout" ]; then
+    echo 'promotion timed out after server acceptance' >&2
+    exit 1
+  fi
+  exit 0
+fi
+
+exit 0
+'''
+    )
+    fake_vercel.chmod(0o755)
+    return fake_vercel
+
+
+def _run_promotion_controller(
+    tmp_path: Path, scenario: str
+) -> subprocess.CompletedProcess[str]:
+    fake_vercel = _write_fake_promotion_vercel(tmp_path)
+    env = {
+        **os.environ,
+        "FAKE_SCENARIO": scenario,
+        "PRODUCTION_DEPLOYMENT_ID": "dpl_target",
+        "PRODUCTION_PROMOTION_POLL_SECONDS": "0",
+        "PRODUCTION_PROMOTION_SETTLE_ATTEMPTS": "2",
+        "PRODUCTION_PROMOTION_CLEANUP_ATTEMPTS": "2",
+        "PRODUCTION_PROMOTION_CLI_TIMEOUT": "1s",
+        "VERCEL_CLI": str(fake_vercel),
+        "VERCEL_TOKEN": "token",
+        "VERCEL_ORG_ID": "team_test",
+        "VERCEL_PROJECT_ID": "project_test",
+        "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
+        "GITHUB_OUTPUT": str(tmp_path / "github-output"),
+    }
+    return subprocess.run(
+        ["bash", str(PRODUCTION_PROMOTION_SCRIPT)],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+
+def test_promotion_controller_promotes_once_and_requires_terminal_current(
+    tmp_path: Path,
+) -> None:
+    result = _run_promotion_controller(tmp_path, "standard")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert calls.count("promote dpl_target") == 1
+    assert "Production Current is terminal on dpl_target" in result.stdout
+
+
+def test_promotion_controller_observes_nonzero_promote_without_resubmitting(
+    tmp_path: Path,
+) -> None:
+    result = _run_promotion_controller(tmp_path, "promote-timeout")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert calls.count("promote dpl_target") == 1
+    assert "without resubmitting" in result.stderr
+
+
+def test_promotion_controller_completes_only_its_exact_rolling_release(
+    tmp_path: Path,
+) -> None:
+    result = _run_promotion_controller(tmp_path, "rolling")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert "rolling-release complete --dpl dpl_target" in calls
+    assert "rolling-release abort" not in calls
+
+
+def test_promotion_controller_rejects_foreign_rollout_without_mutation(
+    tmp_path: Path,
+) -> None:
+    result = _run_promotion_controller(tmp_path, "foreign")
+
+    assert result.returncode == 1
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert "promote dpl_target" not in calls
+    assert "rolling-release complete" not in calls
+    assert (tmp_path / "github-output").read_text().strip() == (
+        "failure_subtype=production_promotion_foreign_rollout"
+    )
+
+
+def test_promotion_controller_aborts_timed_out_owned_rollout_and_stops(
+    tmp_path: Path,
+) -> None:
+    result = _run_promotion_controller(tmp_path, "owned-timeout")
+
+    assert result.returncode == 1
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert calls.count("promote dpl_target") == 1
+    assert "rolling-release abort --dpl dpl_target" in calls
+    assert "vercel rollback" not in calls
+    assert (tmp_path / "github-output").read_text().strip().endswith(
+        "failure_subtype=production_promotion_failed"
+    )
+
+
+def test_promotion_controller_fails_closed_on_malformed_preflight(
+    tmp_path: Path,
+) -> None:
+    result = _run_promotion_controller(tmp_path, "malformed")
+
+    assert result.returncode == 1
+    assert (tmp_path / "github-output").read_text().strip() == (
+        "failure_subtype=production_promotion_state_invalid"
+    )
+    assert "promote dpl_target" not in (tmp_path / "vercel-calls").read_text()
+
+
+def _write_fake_alias_tools(tmp_path: Path) -> tuple[Path, Path]:
+    fake_vercel = tmp_path / "vercel"
+    fake_vercel.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "printf '%s\\n' \"$*\" >> \"$VERCEL_CALL_LOG\"\n"
+        "printf '{\"id\":\"%s\",\"readyState\":\"READY\",\"target\":\"production\"}\\n' \"$FAKE_CURRENT_ID\"\n"
+    )
+    fake_vercel.chmod(0o755)
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_curl = fake_bin / "curl"
+    fake_curl.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "printf '%s\\n' \"$*\" >> \"$CURL_CALL_LOG\"\n"
+        "printf '{\"commitSha\":\"%s\",\"environment\":\"production\"}\\n200\\n' \"$FAKE_BUILD_SHA\"\n"
+    )
+    fake_curl.chmod(0o755)
+    return fake_vercel, fake_bin
+
+
+def _run_alias_verifier(
+    tmp_path: Path, *, current_id: str, build_sha: str
+) -> subprocess.CompletedProcess[str]:
+    fake_vercel, fake_bin = _write_fake_alias_tools(tmp_path)
+    env = {
+        **os.environ,
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "EXPECTED_COMMIT_SHA": "new5678full",
+        "EXPECTED_PRODUCTION_DEPLOYMENT_ID": "dpl_target",
+        "PRODUCTION_ALIAS_MAX_ATTEMPTS": "1",
+        "PRODUCTION_ALIAS_REQUIRED_ROUNDS": "1",
+        "PRODUCTION_ALIAS_RETRY_SECONDS": "0",
+        "VERCEL_CLI": str(fake_vercel),
+        "VERCEL_TOKEN": "token",
+        "VERCEL_ORG_ID": "team_test",
+        "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
+        "CURL_CALL_LOG": str(tmp_path / "curl-calls"),
+        "FAKE_CURRENT_ID": current_id,
+        "FAKE_BUILD_SHA": build_sha,
+        "GITHUB_OUTPUT": str(tmp_path / "github-output"),
+    }
+    return subprocess.run(
+        ["bash", str(PRODUCTION_ALIAS_SCRIPT)],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+
+def test_alias_verifier_requires_exact_id_sha_and_all_rolling_routes(
+    tmp_path: Path,
+) -> None:
+    result = _run_alias_verifier(
+        tmp_path, current_id="dpl_target", build_sha="new5678"
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    curl_calls = (tmp_path / "curl-calls").read_text()
+    assert curl_calls.count("api/health/build-info") == 3
+    assert "vcrrForceStable=true" in curl_calls
+    assert "vcrrForceCanary=true" in curl_calls
+    assert "x-vercel-protection-bypass" not in curl_calls
+
+
+def test_alias_verifier_rejects_stale_sha_even_on_expected_deployment(
+    tmp_path: Path,
+) -> None:
+    result = _run_alias_verifier(
+        tmp_path, current_id="dpl_target", build_sha="old1234"
+    )
+
+    assert result.returncode == 1
+    assert (tmp_path / "github-output").read_text().strip() == (
+        "failure_subtype=production_alias_not_updated"
+    )
+
+
+def test_alias_verifier_rejects_wrong_current_id_even_with_expected_sha(
+    tmp_path: Path,
+) -> None:
+    result = _run_alias_verifier(
+        tmp_path, current_id="dpl_old", build_sha="new5678"
+    )
+
+    assert result.returncode == 1
+    assert (tmp_path / "github-output").read_text().strip() == (
+        "failure_subtype=production_alias_not_updated"
+    )

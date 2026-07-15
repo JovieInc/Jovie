@@ -7,6 +7,18 @@ import { describe, expect, it } from 'vitest';
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
 const workflowPath = resolve(repoRoot, '.github/workflows/ci.yml');
+const productionAliasVerifierPath = resolve(
+  repoRoot,
+  '.github/scripts/verify-production-alias.sh'
+);
+const productionPromotionControllerPath = resolve(
+  repoRoot,
+  '.github/scripts/promote-production-deployment.sh'
+);
+const vercelPrebuiltDeployPath = resolve(
+  repoRoot,
+  '.github/scripts/vercel-prebuilt-deploy.sh'
+);
 const visualA11yWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/visual-a11y.yml'
@@ -440,14 +452,15 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(deployScript).toContain('VERCEL_FORCE_SOURCE_DEPLOY');
   });
 
-  it('uses the Vercel source cache while prebuilt runtime closure is unhealthy', () => {
+  it('uses the restored prebuilt and refuses source-cache substitution', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const deployStep = getStepBlock(
       workflow,
       'Deploy (staging preview, prebuilt)'
     );
 
-    expect(deployStep).toContain("VERCEL_FORCE_SOURCE_DEPLOY: 'true'");
+    expect(deployStep).not.toContain('VERCEL_FORCE_SOURCE_DEPLOY');
+    expect(deployStep).toContain("VERCEL_ENABLE_SOURCE_FALLBACK: 'false'");
   });
 
   it('packages generated public trace files and budgets remote fallback readiness', () => {
@@ -527,21 +540,37 @@ describe('deploy workflow Vercel env resolution', () => {
       promoteJob,
       'Verify production domains are on canonical Vercel project'
     );
+    const stageStep = getStepBlock(
+      promoteJob,
+      'Build and stage production deployment'
+    );
     const promoteStep = getStepBlock(
       promoteJob,
-      'Promote specific deployment for this SHA'
+      'Promote staged production deployment'
+    );
+    const verifyStep = getStepBlock(
+      promoteJob,
+      'Verify canonical production deployment'
     );
     const domainGuardIndex = promoteJob.indexOf(
       '- name: Verify production domains are on canonical Vercel project'
     );
+    const stageIndex = promoteJob.indexOf(
+      '- name: Build and stage production deployment'
+    );
     const promoteIndex = promoteJob.indexOf(
-      '- name: Promote specific deployment for this SHA'
+      '- name: Promote staged production deployment'
+    );
+    const verifyIndex = promoteJob.indexOf(
+      '- name: Verify canonical production deployment'
     );
 
     expect(domainGuardIndex).toBeGreaterThanOrEqual(0);
-    expect(promoteIndex).toBeGreaterThan(domainGuardIndex);
+    expect(stageIndex).toBeGreaterThan(domainGuardIndex);
+    expect(promoteIndex).toBeGreaterThan(stageIndex);
+    expect(verifyIndex).toBeGreaterThan(promoteIndex);
     expect(promoteJob).toContain(
-      'failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.promote.outputs.failure_subtype }}'
+      'steps.stage-production.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype'
     );
     expect(domainGuardStep).toContain('id: domain-guard');
     expect(domainGuardStep).toContain(
@@ -553,11 +582,17 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(domainGuardStep).toContain(
       'failure_subtype=domain_project_mismatch'
     );
-    expect(promoteStep).toContain('"https://jov.ie/api/health/build-info"');
-    expect(promoteStep).toContain('probe_labels=(');
-    expect(promoteStep).toContain('"production-alias"');
-    expect(promoteStep).toContain('max_attempts=15');
-    expect(promoteStep).toContain('URLs can return 401');
+    expect(stageStep).toContain('--prod --skip-domain --format=json');
+    expect(stageStep).toContain(
+      '${production_deploy_url}/api/health/build-info'
+    );
+    expect(promoteStep).toContain(
+      'bash .github/scripts/promote-production-deployment.sh'
+    );
+    expect(verifyStep).toContain(
+      'bash .github/scripts/verify-production-alias.sh'
+    );
+    expect(verifyStep).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
   });
 
   it('alerts specifically when production domains drift off the canonical Vercel project', () => {
@@ -1382,5 +1417,139 @@ describe('CI PR neon migrate workflow', () => {
     );
     expect(migrateStep).toContain('drizzle:migrate:ci');
     expect(migrateJob).not.toContain('credential_source_url');
+  });
+});
+
+describe('production promotion exact-artifact contract', () => {
+  it('deploys the restored staging prebuilt without a source fallback', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const deployStep = getStepBlock(
+      workflow,
+      'Deploy (staging preview, prebuilt)'
+    );
+    const deployHelper = readFileSync(vercelPrebuiltDeployPath, 'utf8');
+
+    expect(deployStep).not.toContain('VERCEL_FORCE_SOURCE_DEPLOY');
+    expect(deployStep).toContain("VERCEL_ENABLE_SOURCE_FALLBACK: 'false'");
+    expect(deployHelper).toContain(
+      'source_fallback_requested="${VERCEL_ENABLE_SOURCE_FALLBACK:-true}"'
+    );
+    expect(deployHelper).toContain('[ "$source_fallback_requested" = "true" ]');
+  });
+
+  it('builds and canaries a Production-target prebuilt before promotion', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const promoteJob = getJobBlock(workflow, 'promote-production');
+    const stageStep = getStepBlock(
+      promoteJob,
+      'Build and stage production deployment'
+    );
+    const promoteStep = getStepBlock(
+      promoteJob,
+      'Promote staged production deployment'
+    );
+    const verifyStep = getStepBlock(
+      promoteJob,
+      'Verify canonical production deployment'
+    );
+
+    const pullIndex = stageStep.indexOf('--environment=production');
+    const buildIndex = stageStep.indexOf('vercel build --prod');
+    const deployIndex = stageStep.indexOf(
+      '--prebuilt --archive=tgz --prod --skip-domain --format=json'
+    );
+    const inspectIndex = stageStep.indexOf(
+      'vercel inspect "$production_deploy_id"'
+    );
+    const canaryIndex = stageStep.indexOf(
+      '${production_deploy_url}/api/health/build-info'
+    );
+
+    expect(pullIndex).toBeGreaterThanOrEqual(0);
+    expect(buildIndex).toBeGreaterThan(pullIndex);
+    expect(deployIndex).toBeGreaterThan(buildIndex);
+    expect(inspectIndex).toBeGreaterThan(deployIndex);
+    expect(canaryIndex).toBeGreaterThan(inspectIndex);
+    expect(stageStep).toContain('--target=prd --source=vercel-file');
+    expect(stageStep).toContain('VERCEL_GIT_COMMIT_SHA="$GITHUB_SHA"');
+    expect(stageStep).toContain('NEXT_PUBLIC_BUILD_SHA="$expected"');
+    expect(stageStep).toContain('--meta "githubCommitSha=${GITHUB_SHA}"');
+    expect(stageStep).toContain('[ "$production_deploy_state" != "READY" ]');
+    expect(stageStep).toContain(
+      '[ "$production_deploy_target" != "production" ]'
+    );
+    expect(stageStep).toContain('${production_deploy_url}/api/health');
+    expect(stageStep).toContain('${production_deploy_url}/"');
+    expect(promoteStep).toContain(
+      'bash .github/scripts/promote-production-deployment.sh'
+    );
+    expect(verifyStep).toContain(
+      'bash .github/scripts/verify-production-alias.sh'
+    );
+    expect(promoteJob).toContain('timeout-minutes: 60');
+    expect(promoteJob).not.toContain('timeout-minutes: 360');
+    expect(promoteJob).not.toContain('vercel promote "$deploy_url"');
+  });
+
+  it('requires canonical deployment ID and SHA convergence before smoke', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const verifier = readFileSync(productionAliasVerifierPath, 'utf8');
+    const smokeJob = getJobBlock(workflow, 'ci-public-profile-smoke');
+    const exactGate = getStepBlock(
+      smokeJob,
+      'Verify exact production deployment before smoke'
+    );
+    const genericSmokeIndex = smokeJob.indexOf(
+      '- name: Verify production endpoints are healthy'
+    );
+    const exactGateIndex = smokeJob.indexOf(
+      '- name: Verify exact production deployment before smoke'
+    );
+
+    expect(verifier).toContain('vercel inspect "$canonical_domain"');
+    expect(verifier).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
+    expect(verifier).toContain('vcrrForceStable=true');
+    expect(verifier).toContain('vcrrForceCanary=true');
+    expect(verifier).toContain('Cache-Control: no-cache, no-store');
+    expect(verifier).toContain('[ "$environment" != "production" ]');
+    expect(verifier).not.toContain('x-vercel-protection-bypass');
+    expect(exactGate).toContain(
+      'EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.production_deployment_id }}'
+    );
+    expect(exactGate).toContain("PRODUCTION_ALIAS_REQUIRED_ROUNDS: '1'");
+    expect(exactGateIndex).toBeGreaterThanOrEqual(0);
+    expect(genericSmokeIndex).toBeGreaterThan(exactGateIndex);
+    expect(smokeJob).not.toContain('Wait for CDN propagation');
+  });
+
+  it('keeps promotion ownership checks and cleanup hard-bounded', () => {
+    const controller = readFileSync(productionPromotionControllerPath, 'utf8');
+
+    expect(controller).toContain('PRODUCTION_PROMOTION_SETTLE_ATTEMPTS:-36');
+    expect(controller).toContain('PRODUCTION_PROMOTION_CLEANUP_ATTEMPTS:-12');
+    expect(controller).toContain('rolling-release fetch');
+    expect(controller).toContain('rollout_target_id');
+    expect(controller).toContain('rolling-release complete --dpl "$deploy_id"');
+    expect(controller).toContain('rolling-release abort --dpl "$deploy_id"');
+    expect(controller).toContain('without resubmitting');
+    expect(controller).not.toContain('while true');
+    expect(controller).not.toContain('vercel rollback');
+    expect(controller.match(/vercel promote/g)).toHaveLength(1);
+  });
+
+  it('routes new production failure subtypes to actionable notifications', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const classifyStep = getStepBlock(workflow, 'Classify failure type');
+    const generalSlackStep = getStepBlock(
+      workflow,
+      'Slack notify (general deploy failure)'
+    );
+
+    expect(classifyStep).toContain('staged_production_canary_failed');
+    expect(classifyStep).toContain('production_alias_not_updated');
+    expect(classifyStep).toContain('^production_promotion_');
+    expect(generalSlackStep).toContain('promote_staged_production_failed');
+    expect(generalSlackStep).toContain('promote_production_alias_not_updated');
+    expect(generalSlackStep).toContain('promote_production_state_blocked');
   });
 });

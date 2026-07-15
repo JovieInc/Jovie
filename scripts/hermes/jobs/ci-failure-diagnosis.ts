@@ -1,5 +1,8 @@
 export type CiFailureClass =
   | 'agent_gate_evidence_missing_without_producer'
+  | 'staged_production_deployment_failed'
+  | 'production_alias_not_updated'
+  | 'production_promotion_state_blocked'
   | 'gate_dependency_cache_timeout'
   | 'bounded_source_scan_timeout'
   | 'visual_qa_prune_timestamp_race'
@@ -75,6 +78,36 @@ const DIAGNOSES: ReadonlyArray<{
       'The dependency-free CI Risk Classifier exhausted its three-minute job budget restoring and extracting the full pnpm dependency cache before classification started.',
     remediation:
       'Remove dependency restore, pnpm fetch, and pnpm install from dependency-free gates; run the native Node classifier directly instead of blindly rerunning the same cache extraction.',
+  },
+  {
+    failureClass: 'staged_production_deployment_failed',
+    matches: log =>
+      /failure_subtype=(?:production_artifact_failed|staged_production_not_ready|staged_production_canary_failed)/i.test(
+        log
+      ),
+    rootCause:
+      'The exact Production-target prebuilt artifact failed to build, become READY, or pass its direct build-info, health, and homepage canary before promotion.',
+    remediation:
+      'Inspect the Production env pull, prebuilt deploy JSON, exact deployment state, and direct canary. Never substitute or promote the Preview deployment.',
+  },
+  {
+    failureClass: 'production_alias_not_updated',
+    matches: log => /failure_subtype=production_alias_not_updated/i.test(log),
+    rootCause:
+      'Vercel accepted the staged Production deployment, but canonical jov.ie did not converge to its deployment ID and exact runtime SHA across plain, stable, and canary routes.',
+    remediation:
+      'Inspect `vercel inspect jov.ie`, rolling-release state, and cache-busted unauthenticated build-info responses. Do not accept direct deployment or Preview evidence as production proof.',
+  },
+  {
+    failureClass: 'production_promotion_state_blocked',
+    matches: log =>
+      /failure_subtype=production_promotion_(?:foreign_rollout|state_invalid|state_blocked|failed|rollback_failed)/i.test(
+        log
+      ),
+    rootCause:
+      'Vercel promotion state was foreign, malformed, failed, or could not be safely returned to a verified terminal state inside the bounded controller window.',
+    remediation:
+      'Inspect the exact active rolling-release target and `vercel inspect jov.ie`. Never resubmit promotion or mutate a rollout unless its deployment ID proves this run owns it.',
   },
   {
     failureClass: 'runner_image_proof_disk_exhaustion',
