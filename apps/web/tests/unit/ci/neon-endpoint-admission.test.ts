@@ -373,6 +373,23 @@ describe('Neon endpoint admission', () => {
     expect(result.stderr).toContain('maxAttempts must be a positive integer');
   });
 
+  it('resolves the real admission probe dependency from the web workspace', () => {
+    const result = spawnSync(
+      'node',
+      [resolve(repoRoot, 'scripts/ci/probe-neon-branch.mjs')],
+      {
+        env: { ...process.env, DATABASE_URL: '' },
+        encoding: 'utf8',
+      }
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(
+      'Neon admission probe requires DATABASE_URL.'
+    );
+    expect(result.stderr).not.toContain('ERR_MODULE_NOT_FOUND');
+  });
+
   it('routes every endpoint creator, including visual regression, through admission', () => {
     const workflows = [
       '.github/workflows/ci.yml',

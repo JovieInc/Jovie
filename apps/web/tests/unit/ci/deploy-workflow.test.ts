@@ -154,6 +154,26 @@ function previewRobotsPolicyValid(
 }
 
 describe('deploy workflow Vercel env resolution', () => {
+  it('keeps the dependency-free risk classifier off dependency caches', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const classifierJob = getJobBlock(workflow, 'ci-risk-classifier');
+
+    expect(classifierJob).toContain('timeout-minutes: 3');
+    expect(classifierJob).toContain(
+      'uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e'
+    );
+    expect(classifierJob).toContain("node-version: '22'");
+    expect(classifierJob).toContain(
+      'node scripts/ci-harness.mjs classify-risk'
+    );
+    expect(classifierJob).not.toContain(
+      'uses: ./.github/actions/setup-node-pnpm'
+    );
+    expect(classifierJob).not.toMatch(
+      /(?:\bpnpm (?:fetch|install)\b|\bcache:)/
+    );
+  });
+
   it('routes main deploy artifact builds to hosted capacity', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const buildJob = getJobBlock(workflow, 'ci-build-public');

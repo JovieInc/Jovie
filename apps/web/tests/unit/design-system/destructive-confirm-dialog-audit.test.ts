@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -44,15 +44,14 @@ const REQUIRED_DESTRUCTIVE_FLOWS = [
 
 function walk(dir: string, out: string[]): void {
   if (!existsSync(dir)) return;
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const stats = statSync(full);
-    if (stats.isDirectory()) {
-      if (entry === 'node_modules' || entry === '.next') continue;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === '.next') continue;
       walk(full, out);
       continue;
     }
-    if (SOURCE_EXT.test(entry)) out.push(full);
+    if (entry.isFile() && SOURCE_EXT.test(entry.name)) out.push(full);
   }
 }
 

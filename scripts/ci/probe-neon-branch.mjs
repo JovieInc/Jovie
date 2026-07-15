@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
-import { neon } from '@neondatabase/serverless';
+import { createRequire } from 'node:module';
+
+const requireFromWeb = createRequire(
+  new URL('../../apps/web/package.json', import.meta.url)
+);
+const { neon } = requireFromWeb('@neondatabase/serverless');
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 

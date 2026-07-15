@@ -1,7 +1,10 @@
 export type CiFailureClass =
+  | 'agent_gate_evidence_missing_without_producer'
+  | 'gate_dependency_cache_timeout'
   | 'bounded_source_scan_timeout'
   | 'golden_path_smoke_auth_contract'
   | 'neon_endpoint_capacity_admission'
+  | 'neon_probe_workspace_dependency_resolution'
   | 'neon_concurrency_key_collision'
   | 'broken_profiler_fixture'
   | 'inconclusive_performance_timeout'
@@ -29,6 +32,33 @@ const DIAGNOSES: ReadonlyArray<{
   readonly rootCause: string;
   readonly remediation: string;
 }> = [
+  {
+    failureClass: 'agent_gate_evidence_missing_without_producer',
+    matches: log =>
+      /(?:Verify Draft Agent PR|Require GStack gate evidence)/i.test(log) &&
+      /Missing recorded gate evidence for:\s*gstack\.qa\.exhaustive,\s*gstack\.review,\s*gstack\.ship/i.test(
+        log
+      ),
+    rootCause:
+      'The draft-promotion workflow required exact-head GStack receipts, but no trusted producer recorded them before the deterministic evidence check ran.',
+    remediation:
+      'Do not blindly rerun the unchanged check or fabricate an artifact. Normally produce trusted exact-head QA, review, and ship evidence. Under explicit time-bounded CI-recovery authorization only, mark the reviewed PR ready before its next substantive push so this draft-only workflow safely skips while required CI remains authoritative.',
+  },
+  {
+    failureClass: 'gate_dependency_cache_timeout',
+    matches: log =>
+      /complete job name:\s*CI Risk Classifier/i.test(log) &&
+      /cache size:[^\n]*\bMB\b/i.test(log) &&
+      /tar -xf[^\n]*cache\.tzst/i.test(log) &&
+      /\bunzstd\b|use-compress-program/i.test(log) &&
+      /(?:the operation was canceled|operation cancelled|job.+(?:3 minutes|timeout))/is.test(
+        log
+      ),
+    rootCause:
+      'The dependency-free CI Risk Classifier exhausted its three-minute job budget restoring and extracting the full pnpm dependency cache before classification started.',
+    remediation:
+      'Remove dependency restore, pnpm fetch, and pnpm install from dependency-free gates; run the native Node classifier directly instead of blindly rerunning the same cache extraction.',
+  },
   {
     failureClass: 'gbrain_ownership_preflight_latency_or_slug_drift',
     matches: log =>
@@ -63,6 +93,17 @@ const DIAGNOSES: ReadonlyArray<{
       'The shared ephemeral Neon branch was created, but its database endpoint could not activate because the account had exhausted its concurrently active endpoint capacity.',
     remediation:
       'Preserve the same branch and connection artifact, run the proven-owner orphan reaper, and retry the SELECT 1 admission probe within a bounded budget; do not create another branch or publish an unproven connection artifact.',
+  },
+  {
+    failureClass: 'neon_probe_workspace_dependency_resolution',
+    matches: log =>
+      /ERR_MODULE_NOT_FOUND/i.test(log) &&
+      /Cannot find package ['"]@neondatabase\/serverless['"]/i.test(log) &&
+      /scripts[\\/]ci[\\/]probe-neon-branch\.mjs/i.test(log),
+    rootCause:
+      'The repo-root Neon admission probe imported a dependency declared only by the apps/web workspace. Under the strict pnpm layout, Node resolved from the script directory and could not see the web workspace dependency.',
+    remediation:
+      'Load @neondatabase/serverless through createRequire anchored to apps/web/package.json, then run the real probe without DATABASE_URL and require it to reach its own environment validation instead of hoisting or reinstalling dependencies.',
   },
   {
     failureClass: 'neon_concurrency_key_collision',
@@ -133,7 +174,7 @@ const DIAGNOSES: ReadonlyArray<{
   {
     failureClass: 'bounded_source_scan_timeout',
     matches: log =>
-      /(?:analytics-metrics-layer-guard|touch-target-ratchet|feature-flags-registry|arbitrary-values-ratchet|exp-drift-lint-guard)\.test\.ts/i.test(
+      /(?:analytics-metrics-layer-guard|touch-target-ratchet|destructive-confirm-dialog-audit|feature-flags-registry|arbitrary-values-ratchet|exp-drift-lint-guard)\.test\.ts/i.test(
         log
       ) &&
       /(?:test timed out|timeout).*?\b\d+\s*ms|spawnSync\s+\S+\s+ETIMEDOUT/is.test(
