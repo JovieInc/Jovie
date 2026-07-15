@@ -700,8 +700,8 @@ export function validateMergeQueueRepoConfig(input) {
   }
 
   if (ciWorkflowHasMergeGroupTrigger(input.ciWorkflowYaml)) {
-    errors.push(
-      'ci.yml must not declare merge_group trigger (Graphite never creates merge_group events)'
+    warnings.push(
+      'ci.yml declares inert merge_group compatibility; Graphite remains the active queue until the ruleset/backend changes'
     );
   }
 
