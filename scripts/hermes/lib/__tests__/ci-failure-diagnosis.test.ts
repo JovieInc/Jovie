@@ -75,6 +75,43 @@ describe('diagnoseCiFailure', () => {
     ).toBe('unknown');
   });
 
+  it.each([
+    'production_artifact_failed',
+    'staged_production_not_ready',
+    'staged_production_canary_failed',
+  ])('diagnoses staged Production failure subtype %s', failureSubtype => {
+    const diagnosis = diagnoseCiFailure(`failure_subtype=${failureSubtype}`);
+
+    expect(diagnosis.failureClass).toBe('staged_production_deployment_failed');
+    expect(diagnosis.rootCause).toContain('Production-target prebuilt');
+    expect(diagnosis.remediation).toContain('Never substitute');
+  });
+
+  it('diagnoses canonical production alias convergence failure', () => {
+    const diagnosis = diagnoseCiFailure(
+      'failure_subtype=production_alias_not_updated'
+    );
+
+    expect(diagnosis.failureClass).toBe('production_alias_not_updated');
+    expect(diagnosis.rootCause).toContain('plain, stable, and canary');
+    expect(diagnosis.remediation).toContain('unauthenticated build-info');
+    expect(diagnosis.remediation).toContain('Preview evidence');
+  });
+
+  it.each([
+    'production_promotion_foreign_rollout',
+    'production_promotion_state_invalid',
+    'production_promotion_state_blocked',
+    'production_promotion_failed',
+    'production_promotion_rollback_failed',
+  ])('diagnoses bounded promotion blocker %s', failureSubtype => {
+    const diagnosis = diagnoseCiFailure(`failure_subtype=${failureSubtype}`);
+
+    expect(diagnosis.failureClass).toBe('production_promotion_state_blocked');
+    expect(diagnosis.remediation).toContain('Never resubmit promotion');
+    expect(diagnosis.remediation).toContain('proves this run owns it');
+  });
+
   it('diagnoses ownership preflight slug or latency drift from its structured receipt', () => {
     const diagnosis = diagnoseCiFailure(`
       {"failure_class":"gbrain_ownership_preflight_latency_or_slug_drift","requested_slug":"agent-job-ledger","resolved_slug":null,"engine_ms":3004,"cli_ms":null,"mcp_ms":null,"timeout_tier":"ledger_step","lookup_health":"timeout","db_lock_signal_detected":true,"session_signal_detected":null}

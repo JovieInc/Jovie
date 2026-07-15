@@ -149,6 +149,7 @@ try_mode() {
 
 plain_prebuilt_limit=15000
 plain_prebuilt_requested="${VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK:-false}"
+source_fallback_requested="${VERCEL_ENABLE_SOURCE_FALLBACK:-true}"
 force_source_deploy="${VERCEL_FORCE_SOURCE_DEPLOY:-false}"
 prebuilt_file_count="$(count_prebuilt_files)"
 has_prebuilt_output=true
@@ -174,7 +175,13 @@ resolve_vercel_cmd
 echo "Using Vercel CLI command: ${VERCEL_CMD[*]}"
 echo "Plain prebuilt fallback requested: $plain_prebuilt_requested"
 echo "Plain prebuilt fallback enabled: $can_use_plain_prebuilt"
+echo "Source fallback requested: $source_fallback_requested"
 echo "Force source deploy: $force_source_deploy"
+
+if [ "$force_source_deploy" = "true" ] && [ "$source_fallback_requested" != "true" ]; then
+  echo "Deploy failed: force-source and disabled source fallback are mutually exclusive." >&2
+  exit 1
+fi
 
 deploy_modes=()
 
@@ -186,7 +193,14 @@ if [ "$can_use_plain_prebuilt" = true ] && [ "$force_source_deploy" != "true" ];
   deploy_modes+=(plain)
 fi
 
-deploy_modes+=(source)
+if [ "$force_source_deploy" = "true" ] || [ "$source_fallback_requested" = "true" ]; then
+  deploy_modes+=(source)
+fi
+
+if [ "${#deploy_modes[@]}" -eq 0 ]; then
+  echo "Deploy failed: no prebuilt output is available and source fallback is disabled." >&2
+  exit 1
+fi
 total_attempts="${#deploy_modes[@]}"
 attempt=0
 
