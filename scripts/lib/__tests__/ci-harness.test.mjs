@@ -142,12 +142,8 @@ describe('ci-harness manifest', () => {
     // biome-ignore format: executable gate selector stays compact for the integration-train cap
     const runPrReadyGate = (variable, env) => runWorkflowBash(prReady, new RegExp(`^ {10}if \\[\\[ "\\$${variable}"[\\s\\S]*?^ {10}fi`, 'm'), env).status;
     expect(runPrReadyGate('GRAPHITE_SKIP', { GRAPHITE_SKIP: 'true' })).toBe(1);
-    const skippedPreview = {
-      RISK_REQUIRES_PREVIEW: 'true',
-      PREVIEW_RESULT: 'skipped',
-      BUILD_RESULT: 'success',
-      BUILD_HAS_ARTIFACT: 'true',
-    };
+    // biome-ignore format: executable preview fixture stays compact for the integration-train cap
+    const skippedPreview = { RISK_REQUIRES_PREVIEW: 'true', PREVIEW_RESULT: 'skipped', BUILD_RESULT: 'success', BUILD_HAS_ARTIFACT: 'true' };
     for (const [isDependabot, hasArtifact, previewResult, status] of [
       ['true', 'true', 'skipped', 0],
       ['true', 'false', 'skipped', 1],
@@ -167,10 +163,8 @@ describe('ci-harness manifest', () => {
     const exactHead = runWorkflowBash(
       pathChanges,
       /^ {10}if \[\[ "\$GRAPHITE_SKIP_REQUESTED"[\s\S]*?^ {10}done/m,
-      {
-        GRAPHITE_SKIP_REQUESTED: 'true',
-        GITHUB_OUTPUT: '/dev/stdout',
-      }
+      // biome-ignore format: executable exact-head fixture stays compact for the integration-train cap
+      { GRAPHITE_SKIP_REQUESTED: 'true', GITHUB_OUTPUT: '/dev/stdout' }
     );
     expect(exactHead.stdout).toContain('skip=false');
     const intendedGates = {
@@ -243,9 +237,11 @@ describe('ci-harness manifest', () => {
   it('defaults bare merge queue checks to the active Graphite backend', () => {
     const { MERGE_QUEUE_BACKEND: _ignored, ...env } = process.env;
     // biome-ignore format: executable CLI regression stays compact for the integration-train cap
-    const result = spawnSync(process.execPath, [resolve(REPO_ROOT, 'scripts/ci-merge-queue-check.mjs'), 'validate'], { env, encoding: 'utf8' });
-    expect(result.status).toBe(0);
-    expect(result.stderr).toContain('Graphite remains active');
+    const run = command => spawnSync(process.execPath, [resolve(REPO_ROOT, 'scripts/ci-merge-queue-check.mjs'), command], { env: { ...env, PATH: '' }, encoding: 'utf8' });
+    const validate = run('validate');
+    const verify = run('verify');
+    // biome-ignore format: executable offline/live status matrix stays compact for the integration-train cap
+    expect([validate.status, validate.stderr.includes('Graphite remains active'), verify.status, verify.stderr.includes('Live GitHub ruleset verification failed')]).toEqual([0, true, 1, true]);
   });
 
   it('generates stable docs from tiers, merge gates, and risk rules', () => {

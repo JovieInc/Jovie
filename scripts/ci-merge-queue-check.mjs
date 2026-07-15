@@ -109,9 +109,8 @@ function runValidate({ checkLive = false } = {}) {
 
   const live = loadLiveRuleset();
   if (live.error) {
-    console.warn(
-      `Skipping live ruleset verification (gh unavailable): ${live.error}`
-    );
+    console.error(`Live GitHub ruleset verification failed: ${live.error}`);
+    process.exitCode = 1;
     return;
   }
 
