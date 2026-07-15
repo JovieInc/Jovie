@@ -215,7 +215,7 @@ function PrimaryButton({
         activate();
       }}
       disabled={disabled}
-      className='inline-flex h-12 w-full items-center justify-center rounded-3xl bg-white/14 px-5 text-sm font-semibold tracking-[-0.01em] text-(--color-text-tooltip) transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-12 w-full items-center justify-center rounded-3xl bg-white/14 px-5 text-sm font-semibold tracking-tight text-(--color-text-tooltip) transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -268,7 +268,7 @@ function LabeledInput({
 }>) {
   return (
     <label className='block space-y-2'>
-      <span className='text-app font-medium tracking-[-0.01em] text-white/42'>
+      <span className='text-app font-medium tracking-tight text-white/42'>
         {label}
       </span>
       <input
@@ -722,7 +722,7 @@ export function ProfileMobileNotificationsFlow({
           <div className='space-y-6'>
             <div className='space-y-3'>
               <p
-                className='text-app font-semibold tracking-[-0.01em] text-white/42'
+                className='text-app font-semibold tracking-tight text-white/42'
                 data-testid='profile-mobile-notifications-sent-from'
               >
                 Sent from Jovie
@@ -764,7 +764,7 @@ export function ProfileMobileNotificationsFlow({
               <>
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
-                  <p className='text-app font-semibold tracking-[-0.01em] text-white/42'>
+                  <p className='text-app font-semibold tracking-tight text-white/42'>
                     Sent by {artistName}
                   </p>
 

@@ -37,7 +37,7 @@ export function TeleprompterNotchVisual({
         className='absolute left-1/2 top-2 h-5 w-24 -translate-x-1/2 rounded-full bg-black dark:bg-black'
       />
       <div className='absolute inset-x-3 top-10 bottom-4 flex flex-col items-center justify-start px-2 pt-3 text-center'>
-        <p className='text-[11px] font-medium leading-snug tracking-[-0.01em] text-white/88 dark:text-white/88'>
+        <p className='text-[11px] font-medium leading-snug tracking-tight text-white/88 dark:text-white/88'>
           {preview}
         </p>
         <span

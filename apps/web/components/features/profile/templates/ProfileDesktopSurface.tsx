@@ -191,7 +191,7 @@ function DesktopSurfaceCard({
       data-testid={testId}
     >
       <div className='mb-4 flex items-center justify-between gap-4'>
-        <h2 className='text-base font-semibold tracking-[-0.02em] text-white dark:text-white'>
+        <h2 className='text-base font-semibold tracking-tighter text-white dark:text-white'>
           {title}
         </h2>
         {actionLabel && onAction ? (
@@ -339,7 +339,7 @@ export function ProfileDesktopSurface({
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
   const showArtistEmailRow = isSubscribed && artistEmailReady;
   const primaryActionControlClassName =
-    'inline-flex h-11 items-center gap-2 rounded-full bg-white dark:bg-surface-1 px-4 text-app font-semibold tracking-[-0.01em] text-black dark:text-white transition-colors duration-subtle hover:bg-white dark:bg-surface-1/88';
+    'inline-flex h-11 items-center gap-2 rounded-full bg-white dark:bg-surface-1 px-4 text-app font-semibold tracking-tight text-black dark:text-white transition-colors duration-subtle hover:bg-white dark:bg-surface-1/88';
   const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
@@ -437,7 +437,7 @@ export function ProfileDesktopSurface({
 
               <div className='flex flex-wrap items-center gap-2.5'>
                 {primaryActionElement}
-                <span className='inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 text-xs font-semibold tracking-[-0.01em] text-white/82'>
+                <span className='inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 text-xs font-semibold tracking-tight text-white/82'>
                   <span className='h-1.5 w-1.5 rounded-full bg-white/52' />
                   <span>{statusPill.label}</span>
                 </span>
@@ -485,7 +485,7 @@ export function ProfileDesktopSurface({
                     className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3'
                   >
                     <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
-                      <div className='text-3xs font-semibold tracking-[0.01em] text-white/58'>
+                      <div className='text-3xs font-semibold tracking-wide text-white/58'>
                         {formatMonth(tourDate.startDate)}
                       </div>
                       <div className='mt-1 text-xl font-semibold leading-none tracking-[-0.05em] text-white dark:text-white'>
@@ -641,7 +641,7 @@ export function ProfileDesktopSurface({
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
                   <div className='space-y-1'>
-                    <p className='text-app font-semibold tracking-[-0.01em] text-white/44'>
+                    <p className='text-app font-semibold tracking-tight text-white/44'>
                       Sent by {artist.name}
                     </p>
                     <p className='text-sm leading-5 text-white/58'>
@@ -759,7 +759,7 @@ export function ProfileDesktopSurface({
                 className='grid grid-cols-[68px_minmax(0,1fr)_auto] items-center gap-4 rounded-3xl bg-white/[0.025] px-4 py-3'
               >
                 <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2.5 text-center'>
-                  <div className='text-3xs font-semibold tracking-[0.01em] text-white/58'>
+                  <div className='text-3xs font-semibold tracking-wide text-white/58'>
                     {formatMonth(tourDate.startDate)}
                   </div>
                   <div className='mt-1 text-2xl font-semibold leading-none tracking-[-0.05em] text-white dark:text-white'>
@@ -833,7 +833,7 @@ export function ProfileDesktopSurface({
                   onClick={() => onModeSelect(tab.mode)}
                   data-testid={`profile-primary-tab-${tab.mode}`}
                   className={cn(
-                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-[-0.01em] transition-colors duration-subtle active:bg-white/[0.08]',
+                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
                     isActive
                       ? 'text-white dark:text-white'
                       : 'text-white/50 hover:text-white/78'
