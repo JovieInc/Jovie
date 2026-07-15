@@ -463,6 +463,7 @@ jobs:
     runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 10
     permissions:
+      actions: read
       contents: read
 
     steps:

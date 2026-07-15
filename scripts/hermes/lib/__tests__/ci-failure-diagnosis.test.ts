@@ -126,6 +126,26 @@ describe('diagnoseCiFailure', () => {
     expect(diagnosis.remediation).toContain('diagnose-capacity.sh');
   });
 
+  it('diagnoses a shared Neon endpoint deleted while its workflow was active', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Download Neon DB connection artifact: neon-db-connection-29202024722
+      Mobile Overflow 390 connectivity failed: The requested endpoint could not be found
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'shared_neon_endpoint_reaped_while_active'
+    );
+    expect(diagnosis.rootCause).toContain('without proving');
+    expect(diagnosis.remediation).toContain('completed workflow-run ownership');
+  });
+
+  it('does not infer active shared-branch deletion from an unrelated missing endpoint', () => {
+    expect(
+      diagnoseCiFailure('The requested endpoint could not be found')
+        .failureClass
+    ).toBe('unknown');
+  });
+
   it('does not infer slice saturation from an unrelated status line', () => {
     expect(diagnoseCiFailure('runner_tasks_status=critical').failureClass).toBe(
       'unknown'
@@ -141,6 +161,24 @@ describe('diagnoseCiFailure', () => {
     expect(diagnosis.failureClass).toBe('neon_concurrency_key_collision');
     expect(diagnosis.rootCause).toContain('github.job');
     expect(diagnosis.remediation).toContain('literal job identifier');
+  });
+
+  it('diagnoses exact Neon HTTP 402 endpoint-capacity admission failures', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Neon admission probe failed: HTTP status 402: You have exceeded the limit of concurrently active endpoints.
+    `);
+
+    expect(diagnosis.failureClass).toBe('neon_endpoint_capacity_admission');
+    expect(diagnosis.rootCause).toContain('could not activate');
+    expect(diagnosis.remediation).toContain('same branch');
+    expect(diagnosis.remediation).toContain('SELECT 1');
+  });
+
+  it.each([
+    'You have exceeded the limit of concurrently active endpoints.',
+    'HTTP status 402: payment required',
+  ])('does not infer Neon endpoint capacity from a partial signature: %s', log => {
+    expect(diagnoseCiFailure(log).failureClass).toBe('unknown');
   });
 
   it('does not classify a valid per-job Neon concurrency group as a collision', () => {

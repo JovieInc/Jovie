@@ -985,6 +985,31 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
 
     expect(createBranchStep).toContain("expires_in_hours: '2'");
   });
+
+  it('admits the shared Neon endpoint before publishing its connection artifact', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const neonDbJob = getJobBlock(workflow, 'neon-db');
+    const prepareIndex = neonDbJob.indexOf(
+      '- name: Prepare shared Neon admission probe'
+    );
+    const admissionIndex = neonDbJob.indexOf(
+      '- name: Verify shared Neon branch admission before publish'
+    );
+    const persistIndex = neonDbJob.indexOf(
+      '- name: Persist Neon DB connection artifact'
+    );
+    const uploadIndex = neonDbJob.indexOf(
+      '- name: Upload Neon DB connection artifact'
+    );
+
+    expect(prepareIndex).toBeGreaterThanOrEqual(0);
+    expect(admissionIndex).toBeGreaterThan(prepareIndex);
+    expect(persistIndex).toBeGreaterThan(admissionIndex);
+    expect(uploadIndex).toBeGreaterThan(persistIndex);
+    expect(neonDbJob).toContain(
+      'run: bash scripts/ci/verify-neon-branch-admission.sh'
+    );
+  });
 });
 
 describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
@@ -1010,16 +1035,17 @@ describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
     );
   });
 
-  it('recognizes lighthouse and smoke ephemeral branch name patterns', () => {
+  it('recognizes only exact creator prefixes for ephemeral branches', () => {
     const cleanupAction = readFileSync(
       resolve(repoRoot, '.github/actions/neon-branch-cleanup/action.yml'),
       'utf8'
     );
 
-    expect(cleanupAction).toContain(
-      'dashboard|onboarding|admin|chat)-lighthouse-'
-    );
+    expect(cleanupAction).toContain('dashboard-lighthouse-[0-9]+-[0-9]+');
     expect(cleanupAction).toContain('admin-smoke-[0-9]+-[0-9]+');
+    expect(cleanupAction).toContain('visual-regression-[0-9]+');
+    expect(cleanupAction).toContain('ci-neon-run-[0-9]+-[0-9]+');
+    expect(cleanupAction).not.toContain('[a-z0-9._-]+-[0-9]+-[0-9]+)$');
   });
 });
 
