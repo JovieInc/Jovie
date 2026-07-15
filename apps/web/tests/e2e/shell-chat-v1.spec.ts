@@ -346,10 +346,7 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
     timeout: 30_000,
   });
   await expect(chatContent).toBeVisible({ timeout: 30_000 });
-  await expect(composer).toHaveCSS(
-    'border-radius',
-    /^(?:999px|9999px|18px|20px|24px|28px|36px|45rem)$/
-  );
+  await expect(composer).toHaveCSS('border-radius', '9999px');
   await expect(page.locator('.animate-shell-in')).toHaveCount(0);
 });
 
@@ -375,6 +372,20 @@ test('chat route picker opens without moving the shell or composer', async ({
   const { composer, input, shellScroll } = shellChatFrameLocators(page);
   await expect(composer).toBeVisible({ timeout: 30_000 });
 
+  const centeredComposer = page.getByTestId(
+    'chat-empty-state-centered-composer'
+  );
+  await centeredComposer.evaluate(async element => {
+    const entryAnimations = element
+      .getAnimations({ subtree: true })
+      .filter(
+        animation =>
+          animation instanceof CSSAnimation &&
+          animation.animationName === 'chat-enter'
+      );
+    await Promise.all(entryAnimations.map(animation => animation.finished));
+  });
+
   const beforeBox = await composer.boundingBox();
   const beforeScrollTop = await shellScroll.evaluate(
     element => element.scrollTop
@@ -394,7 +405,10 @@ test('chat route picker opens without moving the shell or composer', async ({
   expect(beforeBox).not.toBeNull();
   expect(afterBox).not.toBeNull();
   if (beforeBox && afterBox) {
-    expect(Math.abs(afterBox.y - beforeBox.y)).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(afterBox.y - beforeBox.y),
+      'Composer shifted after entry animations settled'
+    ).toBeLessThanOrEqual(1);
   }
   expect(afterScrollTop).toBe(beforeScrollTop);
 });

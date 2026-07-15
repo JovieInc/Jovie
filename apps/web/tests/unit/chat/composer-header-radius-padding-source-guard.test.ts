@@ -147,6 +147,13 @@ describe('composer + header radius/padding source guard (JOV-3532)', () => {
     expect(source).toContain('SYSTEM_B_RADIUS_PX');
     expect(source).toContain("'3xl': 24");
     expect(source).toContain('pill: 9999');
+
+    const css = readFileSync(
+      resolve(appRoot, 'styles/design-system.css'),
+      'utf8'
+    );
+    expect(css).toContain('--radius-full: 9999px');
+    expect(css).toContain('--system-b-radius-pill: var(--radius-full)');
   });
 
   it('keeps ChatInput + HomeComposerHero geometry on SYSTEM_B_RADIUS_PX', () => {

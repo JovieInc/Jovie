@@ -157,6 +157,45 @@ describe('diagnoseCiFailure', () => {
     ).toBe('unknown');
   });
 
+  it('diagnoses the pre-barrier chat composer entry-animation race', () => {
+    const diagnosis = diagnoseCiFailure(`
+      E2E Smoke (PR Fast Feedback)
+      1) [chromium] › tests/e2e/shell-chat-v1.spec.ts:356:5 › chat route picker opens without moving the shell or composer
+      Expected: <= ^[[32m1^[[39m
+      Received: ^[[31m5.90582275390625^[[39m
+      at /home/runner/work/Jovie/Jovie/apps/web/tests/e2e/shell-chat-v1.spec.ts:397:48
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'chat_composer_unsettled_entry_animation'
+    );
+    expect(diagnosis.rootCause).toContain('chat-enter translateY(6px)');
+    expect(diagnosis.remediation).toContain('getAnimations({ subtree: true })');
+  });
+
+  it.each([
+    {
+      label: 'a real post-barrier geometry shift',
+      detail: 'Composer shifted after entry animations settled',
+      received: '5.90582275390625',
+    },
+    {
+      label: 'a shift larger than the six-pixel entry transform',
+      detail: '',
+      received: '6.5',
+    },
+  ])('does not mask $label', ({ detail, received }) => {
+    expect(
+      diagnoseCiFailure(`
+        E2E Smoke (PR Fast Feedback)
+        1) [chromium] › tests/e2e/shell-chat-v1.spec.ts:363:5 › chat route picker opens without moving the shell or composer
+        ${detail}
+        Expected: <= 1
+       Received: ${received}
+       `).failureClass
+    ).toBe('unknown');
+  });
+
   it('classifies the analytics scanner timeout separately from runner pressure', () => {
     const log = `
       FAIL tests/unit/analytics-metrics-layer-guard.test.ts > canonical metrics layer guard
