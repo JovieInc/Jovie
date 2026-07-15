@@ -6,6 +6,7 @@ export type CiFailureClass =
   | 'runner_slice_task_saturation'
   | 'runner_process_exhaustion'
   | 'runner_host_pressure'
+  | 'gbrain_ownership_preflight_latency_or_slug_drift'
   | 'unknown';
 
 export interface CiFailureDiagnosis {
@@ -20,6 +21,15 @@ const DIAGNOSES: ReadonlyArray<{
   readonly rootCause: string;
   readonly remediation: string;
 }> = [
+  {
+    failureClass: 'gbrain_ownership_preflight_latency_or_slug_drift',
+    matches: log =>
+      /gbrain_ownership_preflight_latency_or_slug_drift/i.test(log),
+    rootCause:
+      'The ownership preflight could not resolve the canonical GBrain ledger inside its bounded deadline because the requested slug drifted, the CLI exceeded a nested or overall timeout, or the database session was unhealthy.',
+    remediation:
+      'Read coordination/agent-job-ledger first, preserve the 10s fail-closed ceiling, and use the receipt requested/resolved slug, engine/CLI/MCP latency, timeout tier, lookup health, and DB lock/session signals to repair the lookup path before retrying.',
+  },
   {
     failureClass: 'golden_path_smoke_auth_contract',
     matches: log =>

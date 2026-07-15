@@ -4,9 +4,9 @@
  * Collects environment facts, evaluates via preflight-lib, prints one JSON receipt.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import {
   assembleReceipt,
@@ -58,8 +58,8 @@ function run(cmd, args, opts = {}) {
   };
 }
 
-function which(bin) {
-  const r = run('bash', ['-lc', `command -v ${bin}`], { timeout: 3000 });
+function which(bin, timeout = 3_000) {
+  const r = run('bash', ['-c', `command -v ${bin}`], { timeout });
   if (r.status !== 0) return null;
   return r.stdout.trim() || null;
 }
@@ -115,7 +115,71 @@ const OWNERSHIP_BUDGET_MS = Math.max(
   Number(process.env.AGENT_PREFLIGHT_OWNERSHIP_BUDGET_MS) || 10_000
 );
 const OWNERSHIP_LEDGER_PAGE =
-  process.env.AGENT_PREFLIGHT_LEDGER_PAGE || 'agent-job-ledger';
+  process.env.AGENT_PREFLIGHT_LEDGER_PAGE || 'coordination/agent-job-ledger';
+
+const PAGE_NOT_FOUND = /(?:page[_ -]?not[_ -]?found|no page[^\n]*slug)/i;
+
+// `gbrain get` pays CLI bootstrap, migration/config probes, and shutdown drain
+// on every invocation. GBrain's public package exports provide a bounded,
+// read-only one-process path that connects once and reads the canonical page.
+// This is intentionally discovered from the installed gbrain binary; when a
+// compiled/no-source install does not expose the public package, the existing
+// CLI path remains the fallback.
+const GBRAIN_ENGINE_READ_SOURCE = `
+import { loadConfig, toEngineConfig } from 'gbrain/config';
+import { createEngine } from 'gbrain/engine-factory';
+const started = Date.now();
+const config = loadConfig();
+if (!config) throw new Error('gbrain_config_missing');
+const engineConfig = toEngineConfig(config);
+const engine = await createEngine(engineConfig);
+const created = Date.now();
+try {
+  await engine.connect(engineConfig);
+  const connected = Date.now();
+  const page = await engine.getPage(process.argv[1]);
+  const read = Date.now();
+  process.stdout.write(JSON.stringify({
+    found: Boolean(page),
+    create_ms: created - started,
+    connect_ms: connected - created,
+    read_ms: read - connected,
+    total_ms: read - started,
+  }));
+} finally {
+  await engine.disconnect();
+}
+`;
+
+function findGbrainPackageRoot(gbrain) {
+  let current;
+  try {
+    current = dirname(realpathSync(gbrain));
+  } catch {
+    return null;
+  }
+  for (let i = 0; i < 5; i++) {
+    const manifest = join(current, 'package.json');
+    if (existsSync(manifest)) {
+      try {
+        const pkg = JSON.parse(readFileSync(manifest, 'utf8'));
+        if (
+          pkg.name === 'gbrain' &&
+          pkg.exports?.['./config'] &&
+          pkg.exports?.['./engine-factory']
+        ) {
+          return current;
+        }
+      } catch {
+        return null;
+      }
+    }
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return null;
+}
 
 function collectOwnership(task) {
   const start = nowMs();
@@ -133,44 +197,198 @@ function collectOwnership(task) {
 
   const deadline = start + OWNERSHIP_BUDGET_MS;
   const remaining = () => Math.max(0, deadline - nowMs());
-  const finish = (out, source, timedOut = false) =>
-    evaluateOwnership({
+  const attempts = [];
+  const finish = (out, source, failureReason = null) => {
+    const elapsed = nowMs() - start;
+    const timeoutAttempt = [...attempts]
+      .reverse()
+      .find(attempt => attempt.outcome === 'timeout');
+    const resolvedSlug = source === 'ledger' ? OWNERSHIP_LEDGER_PAGE : null;
+    const degradedAttempt = attempts.find(attempt =>
+      ['timeout', 'page_not_found', 'error'].includes(attempt.outcome)
+    );
+    const health = out
+      ? degradedAttempt
+        ? `degraded_${degradedAttempt.outcome}`
+        : 'healthy'
+      : failureReason === 'page_not_found'
+        ? 'page_not_found'
+        : failureReason === 'timeout'
+          ? 'timeout'
+          : 'empty';
+    const diagnostics = {
+      failure_class:
+        health === 'healthy'
+          ? null
+          : 'gbrain_ownership_preflight_latency_or_slug_drift',
+      requested_slug: OWNERSHIP_LEDGER_PAGE,
+      resolved_slug: resolvedSlug,
+      transport:
+        attempts.find(attempt => attempt.outcome === 'success')?.transport ??
+        'cli',
+      cli_ms:
+        attempts
+          .filter(attempt => attempt.transport === 'cli')
+          .reduce((sum, attempt) => sum + attempt.ms, 0) || null,
+      mcp_ms: null,
+      engine_ms:
+        attempts
+          .filter(attempt => attempt.transport === 'engine')
+          .reduce((sum, attempt) => sum + attempt.ms, 0) || null,
+      timeout_tier: timeoutAttempt?.timeout_tier ?? null,
+      lookup_health: health,
+      db_lock_signal_detected: attempts.some(
+        attempt => attempt.db_lock_signal_detected === true
+      )
+        ? true
+        : null,
+      session_signal_detected: attempts.some(
+        attempt => attempt.session_signal_detected === true
+      )
+        ? true
+        : null,
+      attempts,
+    };
+    return evaluateOwnership({
       gbrainOnPath: true,
       gbrainOutput: out,
       source,
-      timedOut,
+      timedOut: failureReason === 'timeout',
+      diagnostics,
       requireGbrain,
       task,
-      ms: nowMs() - start,
+      ms: elapsed,
     });
-
-  let timedOut = false;
-  const step = (args, cap) => {
-    const budget = Math.min(cap, remaining());
-    if (budget <= 0) return '';
-    const r = run(gbrain, args, { timeout: budget });
-    if (r.error) timedOut = true;
-    return (r.stdout || '').trim();
   };
 
-  // 1. FAST PATH — the agent-job-ledger page is the canonical ownership
+  const step = (name, args, cap) => {
+    const budget = Math.min(cap, remaining());
+    if (budget <= 0) {
+      attempts.push({
+        step: name,
+        ms: 0,
+        outcome: 'timeout',
+        timeout_tier: 'overall',
+        db_lock_signal_detected: null,
+        session_signal_detected: null,
+      });
+      return { output: '', outcome: 'timeout' };
+    }
+    const stepStart = nowMs();
+    const r = run(gbrain, args, { timeout: budget });
+    const combined = `${r.stdout || ''}\n${r.stderr || ''}`;
+    const output = (r.stdout || '').trim();
+    const timedOut = r.error?.code === 'ETIMEDOUT';
+    const pageNotFound = !timedOut && PAGE_NOT_FOUND.test(combined);
+    const outcome = timedOut
+      ? 'timeout'
+      : pageNotFound
+        ? 'page_not_found'
+        : output
+          ? 'success'
+          : 'empty';
+    attempts.push({
+      step: name,
+      transport: 'cli',
+      ms: nowMs() - stepStart,
+      outcome,
+      timeout_tier: timedOut
+        ? budget < cap
+          ? 'overall'
+          : `${name}_step`
+        : null,
+      db_lock_signal_detected:
+        /(?:database|db)[^\n]{0,40}lock|advisory lock/i.test(combined) || null,
+      session_signal_detected:
+        /(?:stale|blocked|waiting)[^\n]{0,40}session/i.test(combined) || null,
+    });
+    return { output: pageNotFound ? '' : output, outcome };
+  };
+
+  const packageRoot = findGbrainPackageRoot(gbrain);
+  const bunBudget = Math.min(1_000, remaining());
+  const bun = packageRoot && bunBudget > 0 ? which('bun', bunBudget) : null;
+  if (packageRoot && bun) {
+    const budget = Math.min(7_000, remaining());
+    const engineStart = nowMs();
+    const r = run(
+      bun,
+      ['-e', GBRAIN_ENGINE_READ_SOURCE, OWNERSHIP_LEDGER_PAGE],
+      { timeout: budget, cwd: packageRoot }
+    );
+    const ms = nowMs() - engineStart;
+    const timedOut = r.error?.code === 'ETIMEDOUT';
+    let result = null;
+    if (!timedOut && r.status === 0) {
+      try {
+        result = JSON.parse(r.stdout.trim());
+      } catch {
+        result = null;
+      }
+    }
+    const outcome = timedOut
+      ? 'timeout'
+      : result?.found === true
+        ? 'success'
+        : result?.found === false
+          ? 'page_not_found'
+          : 'error';
+    attempts.push({
+      step: 'ledger',
+      transport: 'engine',
+      ms,
+      outcome,
+      timeout_tier: timedOut
+        ? budget < 7_000
+          ? 'overall'
+          : 'ledger_step'
+        : null,
+      db_lock_signal_detected:
+        /(?:database|db)[^\n]{0,40}lock|advisory lock/i.test(r.stderr || '') ||
+        null,
+      session_signal_detected:
+        /(?:stale|blocked|waiting)[^\n]{0,40}session/i.test(r.stderr || '') ||
+        null,
+    });
+    if (outcome === 'success') {
+      return finish('canonical ledger available', 'ledger');
+    }
+    // A timed-out engine read has already consumed most/all of the gate. A
+    // cold CLI retry cannot fit its remaining budget and would only add load.
+    if (outcome === 'timeout') return finish('', null, 'timeout');
+  }
+
+  // 1. FAST PATH — the canonical ledger page is the ownership
   //    surface: one deterministic read, no ranking, no embedding.
-  const ledger = step(['get', OWNERSHIP_LEDGER_PAGE], 3_000);
-  if (ledger) return finish(ledger, 'ledger');
+  const priorLedgerAttempt = attempts.find(
+    attempt => attempt.step === 'ledger'
+  );
+  const ledger =
+    priorLedgerAttempt?.outcome === 'page_not_found'
+      ? { output: '', outcome: attempts[0]?.outcome ?? 'empty' }
+      : step('ledger', ['get', OWNERSHIP_LEDGER_PAGE], 3_000);
+  if (ledger.outcome === 'success') return finish(ledger.output, 'ledger');
 
   // 2. Keyword index — deterministic search over current claims/priorities.
   const queryText = task
     ? `agent ownership current claims priorities: ${task}`
     : 'agent org chart ownership coordination';
-  const keyword = step(['search', queryText, '--limit', '5'], 5_000);
-  if (keyword) return finish(keyword, 'keyword');
+  const keyword = step('keyword', ['search', queryText, '--limit', '5'], 5_000);
+  if (keyword.outcome === 'success') return finish(keyword.output, 'keyword');
 
   // 3. Semantic/hybrid query — ONLY when keyword came back empty, and only
   //    inside whatever budget is left (never past the 10s hard ceiling).
-  const semantic = step(['query', queryText], remaining());
-  if (semantic) return finish(semantic, 'semantic');
+  const semantic = step('semantic', ['query', queryText], OWNERSHIP_BUDGET_MS);
+  if (semantic.outcome === 'success') {
+    return finish(semantic.output, 'semantic');
+  }
 
-  return finish('', null, timedOut);
+  const failureReason = attempts.some(attempt => attempt.outcome === 'timeout')
+    ? 'timeout'
+    : ledger.outcome === 'page_not_found'
+      ? 'page_not_found'
+      : 'empty';
+  return finish('', null, failureReason);
 }
 
 function findGstackBin(repoRoot) {
