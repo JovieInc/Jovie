@@ -65,7 +65,7 @@ CODEX_ARCHIVE_ON_STOP=1 ./scripts/codex-cleanup.sh
 
 | Tool | Required Version |
 |------|------------------|
-| Node.js | 22.x (22.13.0+) |
+| Node.js | 22.x (22.23.1+) |
 | pnpm | 9.15.4 |
 | Doppler CLI | Required for secret-bound commands |
 | GitHub CLI | Required for PR and GitHub automation |

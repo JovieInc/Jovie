@@ -6,7 +6,7 @@
     "*.css"
   ],
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.23.1"
   },
   "main": "./index.ts",
   "types": "./index.ts",
