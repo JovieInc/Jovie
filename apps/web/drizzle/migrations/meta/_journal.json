@@ -554,6 +554,13 @@
       "when": 1784073739325,
       "tag": "0078_fair_network",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1784091200000,
+      "tag": "0079_logyourbody_oauth_clients",
+      "breakpoints": true
     }
   ]
 }

@@ -7,7 +7,7 @@ const { oauthQuery, sendOtp, verify } = vi.hoisted(() => ({
   sendOtp: vi.fn(),
   verify: vi.fn(),
   oauthQuery:
-    'client_id=logyourbody-supabase&redirect_uri=https%3A%2F%2Fexample.supabase.co%2Fauth%2Fv1%2Fcallback&sig=test',
+    'client_id=logyourbody-web&redirect_uri=https%3A%2F%2Flogyourbody.com%2Fapi%2Fauth%2Fcallback&sig=test',
 }));
 
 vi.mock('next/navigation', () => ({
