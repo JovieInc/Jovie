@@ -317,6 +317,15 @@ const DIAGNOSES: ReadonlyArray<{
       'Require completed workflow-run ownership proof immediately before every cleanup delete, fail closed for queued, active, or unavailable proof, then rerun the consumer against a newly admitted shared branch.',
   },
   {
+    failureClass: 'runner_io_pressure_post_admission_herd',
+    matches: log =>
+      /runner_failure_class=runner-io-pressure-post-admission\b/i.test(log),
+    rootCause:
+      'Gem admitted runner work before restore I/O became visible, then a later admission sample detected full-pressure saturation and stopped the remaining cohort.',
+    remediation:
+      'Do not retry or add runners. Let admitted restores drain; the one-runner-per-tick budget and I/O hysteresis will resume scale-up only after pressure recovers.',
+  },
+  {
     failureClass: 'runner_io_pressure_admission',
     matches: log =>
       /runner_failure_class=runner-io-pressure(?:-unavailable)?\b/i.test(log) ||

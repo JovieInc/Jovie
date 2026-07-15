@@ -50,6 +50,14 @@ reaper. Diagnostics use `runner-io-pressure` (or
 `runner-io-pressure-unavailable`) and explicitly distinguish I/O admission from
 CPU, memory, EAGAIN process capacity, and GitHub scheduler starvation.
 
+The admission result now has a one-runner-per-poll spawn budget. Each additional
+runner waits for the next 15-second poll, which refreshes queue depth, active
+containers, and I/O PSI before another token is consumed. This prevents one low
+sample from launching an entire five-runner restore cohort before overlay2 load
+is visible. If pressure blocks within three polls of a successful spawn, Gem
+records `runner-io-pressure-post-admission` so Hermes diagnoses the delayed
+restore herd separately from initial admission pressure.
+
 ## Review and cutover
 
 The installer is dry-run unless `--apply` is provided. Applying the TasksMax

@@ -148,9 +148,24 @@ const GTMQ_SOURCE_GATE_REAPER_MANIFEST = [
 const RUNNER_IO_PRESSURE_MANIFEST = [
   '.github/runner-host/README.md',
   '.github/runner-host/autoscaler/controller-io-pressure.patch',
+  '.github/runner-host/autoscaler/controller-io-pressure-v1-to-v2.patch',
   '.github/runner-host/autoscaler/io-pressure.ts',
   '.github/runner-host/ci-runner-autoscaler.service.snapshot',
   '.github/runner-host/install-io-pressure-guard.sh',
+  'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
+const RUNNER_IO_PRESSURE_V2_MANIFEST = [
+  '.github/runner-host/README.md',
+  '.github/runner-host/autoscaler/controller-io-pressure.patch',
+  '.github/runner-host/autoscaler/controller-io-pressure-v1-to-v2.patch',
+  '.github/runner-host/autoscaler/io-pressure.ts',
+  '.github/runner-host/install-io-pressure-guard.sh',
+  '.github/workflows/runner-autoscaler-canary.yml',
+  'apps/web/tests/unit/ci/runner-autoscaler-canary-workflow.test.ts',
   'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
   'scripts/hermes/jobs/ci-failure-diagnosis.ts',
   'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
@@ -205,6 +220,20 @@ describe('automation-verify affected scope', () => {
 
     expect(plan.mode).toBe('selected');
     expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+  });
+
+  it('keeps the autoscaler canary and v2 admission repair on focused regressions', () => {
+    const plan = buildAffectedTestPlan(RUNNER_IO_PRESSURE_V2_MANIFEST);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/ci/runner-autoscaler-canary-workflow.test.ts',
       'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([

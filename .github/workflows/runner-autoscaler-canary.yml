@@ -1,0 +1,54 @@
+name: Runner Autoscaler Canary
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runner-autoscaler-canary
+  cancel-in-progress: false
+
+jobs:
+  unit-shard:
+    name: Autoscaled Unit Tests (1/5)
+    runs-on: [self-hosted, Linux, X64, "${{ 'jovie-ephemeral' }}"]
+    timeout-minutes: 25
+    steps:
+      - name: Verify ephemeral runner identity
+        shell: bash
+        run: |
+          case "$RUNNER_NAME" in
+            jovie-eph-*) ;;
+            *) echo "Expected an autoscaled ephemeral runner, got: $RUNNER_NAME" >&2; exit 1 ;;
+          esac
+          node --version
+          echo "runner_name=$RUNNER_NAME"
+          echo "runner_os=$RUNNER_OS"
+          echo "runner_arch=$RUNNER_ARCH"
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Load quarantined unit tests
+        id: quarantine
+        run: node .github/scripts/quarantine-ledger.mjs emit-github-output
+
+      - name: Run representative unit shard
+        env:
+          NODE_OPTIONS: --max-old-space-size=3072
+        run: |
+          pnpm turbo test:fast --filter=@jovie/web -- \
+            --pool=forks \
+            --maxWorkers=3 \
+            --retry=${{ steps.quarantine.outputs.unit_default_retries }} \
+            --shard=1/5 \
+            ${{ steps.quarantine.outputs.unit_excludes }} \
+            --outputFile=test-report.runner-autoscaler-canary.1-5.junit.xml

@@ -1,0 +1,32 @@
+--- a/controller.ts
++++ b/controller.ts
+@@ -29,0 +30 @@
++  classifyIoPressureFailure,
+@@ -101,0 +103 @@
++  private lastSuccessfulSpawnTick: number | null = null;
+@@ -203,0 +206,7 @@
++          const failureClass = classifyIoPressureFailure(
++            admission,
++            tickNum,
++            this.lastSuccessfulSpawnTick,
++          );
++          const spawnedRecently =
++            failureClass === "runner-io-pressure-post-admission";
+@@ -205 +214 @@
+-            `runner_spawn_admission=blocked runner_failure_class=${admission.classification} io_full_avg10_pct=${avg10} distinct_from=cpu,memory,eagain,github-scheduler-starvation reason=${admission.reason}`,
++            `runner_spawn_admission=blocked runner_failure_class=${failureClass} io_full_avg10_pct=${avg10} spawned_recently=${spawnedRecently} remaining_deficit=${deficit} distinct_from=cpu,memory,eagain,github-scheduler-starvation reason=${admission.reason}`,
+@@ -218 +227,2 @@
+-                failureClass: admission.classification,
++                failureClass,
++                spawnedRecently,
+@@ -232,0 +243,2 @@
++      const spawnBudget = Math.min(admittedDeficit, 1);
++
+@@ -263 +275 @@
+-      if (admittedDeficit > 0 && !this.config.dryRun) {
++      if (spawnBudget > 0 && !this.config.dryRun) {
+@@ -265 +277 @@
+-        for (let i = 0; i < admittedDeficit; i++) {
++        for (let i = 0; i < spawnBudget; i++) {
+@@ -275,0 +288 @@
++            this.lastSuccessfulSpawnTick = tickNum;
