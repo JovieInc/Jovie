@@ -1,8 +1,5 @@
-import {
-  emailOTPClient,
-  oneTapClient,
-  phoneNumberClient,
-} from 'better-auth/client/plugins';
+import { oauthProviderClient } from '@better-auth/oauth-provider/client';
+import { emailOTPClient, oneTapClient } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
 
 /**
@@ -40,7 +37,9 @@ const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 export const authClient = createAuthClient({
   plugins: [
     emailOTPClient(),
-    phoneNumberClient(),
+    // Carries the OAuth provider's signed authorization query through the
+    // upstream Apple redirect so the callback can finish the LYB PKCE flow.
+    oauthProviderClient(),
     ...(googleClientId
       ? [
           oneTapClient({

@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { createHmac } from 'node:crypto';
 import { oauthProvider } from '@better-auth/oauth-provider';
 import {
   type BetterAuthOptions,
@@ -15,7 +14,6 @@ import {
   jwt,
   oneTap,
   oneTimeToken,
-  phoneNumber,
 } from 'better-auth/plugins';
 import { db } from '@/lib/db';
 import {
@@ -33,8 +31,6 @@ import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
 import { generateAppleClientSecret } from './apple-client-secret';
-import { getOAuthPhoneClaims } from './oauth-phone-claims';
-import { phoneVerification } from './phone-verification';
 import { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
 import { secondaryStorage } from './secondary-storage';
 
@@ -76,6 +72,7 @@ export function isDeterministicTestOtpEmail(email: string): boolean {
 export const STATIC_TRUSTED_ORIGINS = [
   'https://jov.ie',
   'https://staging.jov.ie',
+  'https://appleid.apple.com',
   'http://localhost:3100',
   'ie.jov.jovie://',
   'jovie://',
@@ -103,13 +100,6 @@ function resolveSecret(): string | undefined {
   return env.VERCEL_ENV === 'production'
     ? undefined
     : NON_PRODUCTION_FALLBACK_SECRET;
-}
-
-function getTemporaryPhoneEmail(phone: string): string {
-  const secret = resolveSecret();
-  if (!secret) throw new Error('Better Auth secret is required');
-  const digest = createHmac('sha256', secret).update(phone).digest('hex');
-  return `${digest}@phone.identity.jov.ie`;
 }
 
 function resolveBaseUrl(): string | undefined {
@@ -194,20 +184,6 @@ function buildPlugins() {
         }
       },
     }),
-    phoneNumber({
-      expiresIn: 300,
-      allowedAttempts: 5,
-      phoneNumberValidator: phone => /^\+[1-9]\d{7,14}$/.test(phone),
-      sendOTP: async ({ phoneNumber: phone }) => {
-        await phoneVerification.start(phone);
-      },
-      verifyOTP: async ({ phoneNumber: phone, code }) =>
-        phoneVerification.check(phone, code),
-      signUpOnVerification: {
-        getTempEmail: getTemporaryPhoneEmail,
-        getTempName: () => 'Member',
-      },
-    }),
     ...(googleOneTapClientId
       ? [oneTap({ clientId: googleOneTapClientId })]
       : []),
@@ -224,12 +200,7 @@ function buildPlugins() {
       loginPage: '/identity',
       consentPage: '/identity',
       signup: { page: '/identity' },
-      scopes: ['openid', 'profile', 'email', 'phone', 'offline_access'],
-      customUserInfoClaims: ({ user, scopes }) =>
-        getOAuthPhoneClaims(user, scopes),
-      advertisedMetadata: {
-        claims_supported: ['phone_number', 'phone_number_verified'],
-      },
+      scopes: ['openid', 'profile', 'email', 'offline_access'],
       grantTypes: ['authorization_code', 'refresh_token'],
       allowDynamicClientRegistration: false,
       allowUnauthenticatedClientRegistration: false,
