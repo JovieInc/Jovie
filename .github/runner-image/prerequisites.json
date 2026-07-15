@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "nodeMajor": 22,
+  "nodeMinimum": "22.23.1",
+  "pnpmVersion": "9.15.4",
+  "pnpmStorePath": "/opt/jovie-pnpm-store",
+  "installedTreeRoot": "/opt/jovie-installed-tree",
+  "playwrightVersion": "1.60.0",
+  "playwrightBrowsersPath": "/opt/ms-playwright",
+  "playwrightExecutables": [
+    "chromium-1223/chrome-linux64/chrome",
+    "chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell",
+    "ffmpeg-1011/ffmpeg-linux"
+  ]
+}

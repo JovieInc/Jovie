@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   lstat,
   mkdir,
@@ -93,6 +94,8 @@ interface VisualQaRunTreeState {
   readonly birthtimeMs: number;
   readonly containsSymlink: boolean;
   readonly dev: number;
+  readonly entryCount: number;
+  readonly entryFingerprint: string;
   readonly ino: number;
   readonly newestMtimeMs: number;
 }
@@ -204,6 +207,8 @@ async function inspectVisualQaRunTree(
         birthtimeMs: runStats.birthtimeMs,
         containsSymlink: true,
         dev: runStats.dev,
+        entryCount: 1,
+        entryFingerprint: `${runStats.dev}:${runStats.ino}:${runStats.birthtimeMs}:symlink`,
         ino: runStats.ino,
         newestMtimeMs: runStats.mtimeMs,
       };
@@ -213,6 +218,8 @@ async function inspectVisualQaRunTree(
         birthtimeMs: runStats.birthtimeMs,
         containsSymlink: false,
         dev: runStats.dev,
+        entryCount: 1,
+        entryFingerprint: `${runStats.dev}:${runStats.ino}:${runStats.birthtimeMs}:file`,
         ino: runStats.ino,
         newestMtimeMs: runStats.mtimeMs,
       };
@@ -222,30 +229,47 @@ async function inspectVisualQaRunTree(
     }
 
     const childStates = await Promise.all(
-      (await readdir(runDirectory)).map(entryName =>
-        inspectVisualQaRunTree(path.join(runDirectory, entryName))
-      )
+      (await readdir(runDirectory)).map(async entryName => ({
+        entryName,
+        state: await inspectVisualQaRunTree(path.join(runDirectory, entryName)),
+      }))
     );
-    if (childStates.some(state => state === null)) {
+    if (childStates.some(({ state }) => state === null)) {
       return null;
     }
 
+    const entryFingerprint = createHash('sha256');
+    entryFingerprint.update(
+      `${runStats.dev}:${runStats.ino}:${runStats.birthtimeMs}:directory\0`
+    );
+    for (const child of childStates.sort((left, right) =>
+      left.entryName.localeCompare(right.entryName)
+    )) {
+      entryFingerprint.update(
+        `${child.entryName}\0${child.state?.entryFingerprint ?? ''}\0`
+      );
+    }
+
     return childStates.reduce<VisualQaRunTreeState>(
-      (state, childState) => ({
+      (state, child) => ({
         birthtimeMs: state.birthtimeMs,
         containsSymlink:
-          state.containsSymlink || childState?.containsSymlink === true,
+          state.containsSymlink || child.state?.containsSymlink === true,
         dev: state.dev,
+        entryCount: state.entryCount + (child.state?.entryCount ?? 0),
+        entryFingerprint: state.entryFingerprint,
         ino: state.ino,
         newestMtimeMs: Math.max(
           state.newestMtimeMs,
-          childState?.newestMtimeMs ?? 0
+          child.state?.newestMtimeMs ?? 0
         ),
       }),
       {
         birthtimeMs: runStats.birthtimeMs,
         containsSymlink: false,
         dev: runStats.dev,
+        entryCount: 1,
+        entryFingerprint: entryFingerprint.digest('hex'),
         ino: runStats.ino,
         newestMtimeMs: runStats.mtimeMs,
       }
@@ -282,6 +306,8 @@ function sameTreeState(
   return (
     planned.birthtimeMs === current.birthtimeMs &&
     planned.dev === current.dev &&
+    planned.entryCount === current.entryCount &&
+    planned.entryFingerprint === current.entryFingerprint &&
     planned.ino === current.ino &&
     planned.newestMtimeMs === current.newestMtimeMs &&
     !current.containsSymlink

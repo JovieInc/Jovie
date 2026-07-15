@@ -157,6 +157,30 @@ const RUNNER_IO_PRESSURE_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const RUNNER_PREREQUISITE_CONTRACT_MANIFEST = [
+  '.github/actions/setup-node-pnpm/action.yml',
+  '.github/actions/setup-playwright/action.yml',
+  '.github/runner-image/Dockerfile',
+  '.github/runner-image/Dockerfile.dockerignore',
+  '.github/runner-image/build-context.sh',
+  '.github/runner-image/create-installed-tree.mjs',
+  '.github/runner-image/README.md',
+  '.github/runner-image/prerequisites.json',
+  '.github/runner-image/restore-installed-tree.sh',
+  '.github/runner-image/verify-build-cache.mjs',
+  '.github/runner-image/verify-prerequisites.mjs',
+  '.github/workflows/ci.yml',
+  'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
+const RUNNER_PREREQUISITE_VISUAL_QA_REPAIR_MANIFEST = [
+  ...RUNNER_PREREQUISITE_CONTRACT_MANIFEST,
+  'apps/web/lib/agent-os/visual-qa/diff-artifacts.ts',
+  'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
+];
 
 describe('automation-verify affected scope', () => {
   it('keeps runner I/O admission on focused controller regressions', () => {
@@ -236,6 +260,39 @@ describe('automation-verify affected scope', () => {
       'apps/web/lib/events/confirmation-status.test.ts',
       'apps/web/tests/unit/events/insert.test.ts',
       'apps/web/tests/unit/testing/seed-test-data-import-boundary.test.ts',
+    ]);
+  });
+
+  it('maps Visual QA diff-artifact changes to the focused TOCTOU regression', () => {
+    const plan = buildAffectedTestPlan([
+      'apps/web/lib/agent-os/visual-qa/diff-artifacts.ts',
+      'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.relatedFiles).toHaveLength(2);
+    expect(plan.mandatoryTests).toEqual([
+      'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
+    ]);
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
+    ]);
+  });
+
+  it('keeps the selector plus Visual QA repair manifest on focused suites', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'apps/web/lib/agent-os/visual-qa/diff-artifacts.ts',
+      'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
     ]);
   });
 
@@ -707,6 +764,66 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...GTMQ_SOURCE_GATE_REAPER_MANIFEST,
         'scripts/unknown-graphite-controller.sh',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects runner setup and CI controls for the exact prerequisite contract', () => {
+    const plan = buildAffectedTestPlan(RUNNER_PREREQUISITE_CONTRACT_MANIFEST);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.mandatoryTests).toEqual([
+      'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/lib/__tests__/ci-harness.test.mjs',
+      'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
+      'scripts/lib/__tests__/ci-branching-guard.test.mjs',
+      'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+      'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
+    ]);
+  });
+
+  it('composes the runner prerequisite and Visual QA race repairs on focused suites', () => {
+    const plan = buildAffectedTestPlan(
+      RUNNER_PREREQUISITE_VISUAL_QA_REPAIR_MANIFEST
+    );
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.mandatoryTests).toEqual([
+      'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts',
+      'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/lib/__tests__/ci-harness.test.mjs',
+      'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
+      'scripts/lib/__tests__/ci-branching-guard.test.mjs',
+      'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+      'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
+    ]);
+  });
+
+  it.each(
+    RUNNER_PREREQUISITE_CONTRACT_MANIFEST
+  )('fails closed when the runner prerequisite contract is missing %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        RUNNER_PREREQUISITE_CONTRACT_MANIFEST.filter(
+          file => file !== missingInput
+        )
+      ).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when the runner prerequisite contract includes an unknown peer', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...RUNNER_PREREQUISITE_CONTRACT_MANIFEST,
+        '.github/runner-image/unknown-bootstrap.sh',
       ]).mode
     ).toBe('full');
   });

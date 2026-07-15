@@ -164,6 +164,14 @@ const PERSISTED_AUTH_FIXTURE_SCRIPT_TESTS = [
   'scripts/hermes/lib/__tests__/ci-failure-classifier.test.ts',
   'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
+const VISUAL_QA_DIFF_ARTIFACTS_SOURCE =
+  'apps/web/lib/agent-os/visual-qa/diff-artifacts.ts';
+const VISUAL_QA_DIFF_ARTIFACTS_TEST =
+  'apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts';
+const VISUAL_QA_DIFF_ARTIFACTS_MANIFEST = new Set([
+  VISUAL_QA_DIFF_ARTIFACTS_SOURCE,
+  VISUAL_QA_DIFF_ARTIFACTS_TEST,
+]);
 const GTMQ_SOURCE_GATE_REAPER_MANIFEST = new Set([
   '.github/actions/setup-node-pnpm/action.yml',
   '.github/workflows/gtmq-source-authorization.yml',
@@ -195,6 +203,41 @@ const RUNNER_IO_PRESSURE_SCRIPT_TESTS = [
   'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const RUNNER_PREREQUISITE_CONTRACT_TESTS = [
+  'apps/web/tests/unit/ci/runner-setup-action.test.ts',
+];
+const RUNNER_PREREQUISITE_CONTROL_TESTS = [
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-harness.test.mjs',
+  'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
+  'scripts/lib/__tests__/ci-branching-guard.test.mjs',
+  'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
+];
+const RUNNER_PREREQUISITE_CONTRACT_MANIFEST = new Set([
+  '.github/actions/setup-node-pnpm/action.yml',
+  '.github/actions/setup-playwright/action.yml',
+  '.github/runner-image/Dockerfile',
+  '.github/runner-image/Dockerfile.dockerignore',
+  '.github/runner-image/build-context.sh',
+  '.github/runner-image/create-installed-tree.mjs',
+  '.github/runner-image/README.md',
+  '.github/runner-image/prerequisites.json',
+  '.github/runner-image/restore-installed-tree.sh',
+  '.github/runner-image/verify-build-cache.mjs',
+  '.github/runner-image/verify-prerequisites.mjs',
+  '.github/workflows/ci.yml',
+  ...RUNNER_PREREQUISITE_CONTRACT_TESTS,
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+]);
+const RUNNER_PREREQUISITE_VISUAL_QA_REPAIR_MANIFEST = new Set([
+  ...RUNNER_PREREQUISITE_CONTRACT_MANIFEST,
+  ...VISUAL_QA_DIFF_ARTIFACTS_MANIFEST,
+]);
 
 function isInvestorNoteIngestionInput(file) {
   return (
@@ -279,6 +322,16 @@ export function buildAffectedTestPlan(changedFiles) {
     ) &&
     (affectedTestSelectorInputCount === 0 ||
       affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  const visualQaDiffArtifactsInputCount = files.filter(file =>
+    VISUAL_QA_DIFF_ARTIFACTS_MANIFEST.has(file)
+  ).length;
+  const isExactVisualQaSelectorRepair =
+    affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
+    visualQaDiffArtifactsInputCount ===
+      VISUAL_QA_DIFF_ARTIFACTS_MANIFEST.size &&
+    files.length ===
+      AFFECTED_TEST_SELECTOR_MANIFEST.size +
+        VISUAL_QA_DIFF_ARTIFACTS_MANIFEST.size;
   const gtmqSourceGateReaperInputCount = files.filter(file =>
     GTMQ_SOURCE_GATE_REAPER_MANIFEST.has(file)
   ).length;
@@ -291,6 +344,21 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactRunnerIoPressure =
     runnerIoPressureInputCount === RUNNER_IO_PRESSURE_MANIFEST.size &&
     files.length === RUNNER_IO_PRESSURE_MANIFEST.size;
+  const runnerPrerequisiteContractInputCount = files.filter(file =>
+    RUNNER_PREREQUISITE_CONTRACT_MANIFEST.has(file)
+  ).length;
+  const isExactRunnerPrerequisiteContract =
+    runnerPrerequisiteContractInputCount ===
+      RUNNER_PREREQUISITE_CONTRACT_MANIFEST.size &&
+    files.length === RUNNER_PREREQUISITE_CONTRACT_MANIFEST.size;
+  const isExactRunnerPrerequisiteVisualQaRepair =
+    files.length === RUNNER_PREREQUISITE_VISUAL_QA_REPAIR_MANIFEST.size &&
+    files.every(file =>
+      RUNNER_PREREQUISITE_VISUAL_QA_REPAIR_MANIFEST.has(file)
+    );
+  const isExactRunnerPrerequisiteRepair =
+    isExactRunnerPrerequisiteContract ||
+    isExactRunnerPrerequisiteVisualQaRepair;
   const relatedFiles = files.filter(
     file =>
       TESTABLE_FILE.test(file) &&
@@ -370,6 +438,9 @@ export function buildAffectedTestPlan(changedFiles) {
   if (hasCiCancellationHealerChange) {
     mandatoryTests.push(...CI_CANCELLATION_HEALER_TESTS);
   }
+  if (files.includes(VISUAL_QA_DIFF_ARTIFACTS_SOURCE)) {
+    mandatoryTests.push(VISUAL_QA_DIFF_ARTIFACTS_TEST);
+  }
   if (isExactPrerequisiteTrain) {
     mandatoryTests.push(...PREREQUISITE_TRAIN_TESTS);
   }
@@ -378,6 +449,9 @@ export function buildAffectedTestPlan(changedFiles) {
   }
   if (isExactPerformanceProfilerRepair) {
     mandatoryTests.push(...PERFORMANCE_PROFILER_REPAIR_WEB_TESTS);
+  }
+  if (isExactRunnerPrerequisiteRepair) {
+    mandatoryTests.push(...RUNNER_PREREQUISITE_CONTRACT_TESTS);
   }
 
   const selectedTests = unique([...directTests, ...mandatoryTests]);
@@ -399,6 +473,8 @@ export function buildAffectedTestPlan(changedFiles) {
     ...(isExactAffectedTestSelector ||
     isExactGoldenPathSmokeContractRepair ||
     isExactPerformanceProfilerRepairWithSelector ||
+    isExactVisualQaSelectorRepair ||
+    isExactRunnerPrerequisiteVisualQaRepair ||
     (isExactPersistedAuthFixtureRepair && affectedTestSelectorInputCount > 0)
       ? AFFECTED_TEST_SELECTOR_TESTS
       : []),
@@ -412,6 +488,9 @@ export function buildAffectedTestPlan(changedFiles) {
       ? GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS
       : []),
     ...(isExactRunnerIoPressure ? RUNNER_IO_PRESSURE_SCRIPT_TESTS : []),
+    ...(isExactRunnerPrerequisiteRepair
+      ? RUNNER_PREREQUISITE_CONTROL_TESTS
+      : []),
   ]);
   const isCoveredSource = file => {
     if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return true;
@@ -435,11 +514,17 @@ export function buildAffectedTestPlan(changedFiles) {
       return true;
     if (isExactRunnerIoPressure && RUNNER_IO_PRESSURE_MANIFEST.has(file))
       return true;
+    if (file === VISUAL_QA_DIFF_ARTIFACTS_SOURCE) return true;
     if (isExactPrerequisiteTrain && PREREQUISITE_TRAIN_MANIFEST.has(file))
       return true;
     if (
       isExactPerformanceProfilerRepair &&
       PERFORMANCE_PROFILER_REPAIR_MANIFEST.has(file)
+    )
+      return true;
+    if (
+      isExactRunnerPrerequisiteRepair &&
+      RUNNER_PREREQUISITE_CONTRACT_MANIFEST.has(file)
     )
       return true;
     if (
@@ -480,30 +565,48 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactGoldenPathSmokeContractRepair &&
     !isExactPerformanceProfilerRepairWithSelector &&
     !isExactPersistedAuthFixtureRepair &&
+    !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper &&
-    !isExactRunnerIoPressure;
+    !isExactRunnerIoPressure &&
+    !isExactRunnerPrerequisiteRepair;
   const hasIncompletePerformanceProfilerRepair =
     performanceProfilerRepairInputCount > 0 &&
     !isExactPerformanceProfilerRepair &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactPersistedAuthFixtureRepair &&
-    !isExactRunnerIoPressure;
+    !isExactRunnerIoPressure &&
+    !isExactRunnerPrerequisiteRepair;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactAffectedTestSelector &&
+    !isExactVisualQaSelectorRepair &&
     !isExactPerformanceProfilerRepairWithSelector &&
-    !isExactRunnerIoPressure;
+    !isExactRunnerIoPressure &&
+    !isExactRunnerPrerequisiteRepair;
   const hasIncompleteRunnerIoPressure =
     runnerIoPressureInputCount > 0 &&
     !isExactRunnerIoPressure &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactAffectedTestSelector &&
+    !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper &&
-    !isExactPerformanceProfilerRepair;
+    !isExactPerformanceProfilerRepair &&
+    !isExactRunnerPrerequisiteRepair;
+  const hasIncompleteRunnerPrerequisiteContract =
+    runnerPrerequisiteContractInputCount > 0 &&
+    !isExactRunnerPrerequisiteRepair &&
+    !isExactAffectedTestSelector &&
+    !isExactVisualQaSelectorRepair &&
+    !isExactGtmqSourceGateReaper &&
+    !isExactPrerequisiteTrain &&
+    !isExactGoldenPathSmokeContractRepair &&
+    !isExactPersistedAuthFixtureRepair &&
+    !isExactPerformanceProfilerRepair &&
+    !isExactRunnerIoPressure;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
     hasUnknownCiCancellationHealerPeer ||
@@ -515,7 +618,8 @@ export function buildAffectedTestPlan(changedFiles) {
     hasIncompleteAffectedTestSelector ||
     hasIncompletePerformanceProfilerRepair ||
     hasIncompleteGtmqSourceGateReaper ||
-    hasIncompleteRunnerIoPressure;
+    hasIncompleteRunnerIoPressure ||
+    hasIncompleteRunnerPrerequisiteContract;
   const hasSelectedTests =
     selectedTests.length > 0 ||
     rootVitestTests.length > 0 ||
@@ -533,8 +637,10 @@ export function buildAffectedTestPlan(changedFiles) {
             isExactGoldenPathSmokeContractRepair ||
             isExactPerformanceProfilerRepair ||
             isExactPersistedAuthFixtureRepair ||
+            isExactVisualQaSelectorRepair ||
             isExactGtmqSourceGateReaper ||
-            isExactRunnerIoPressure)
+            isExactRunnerIoPressure ||
+            isExactRunnerPrerequisiteRepair)
         ? 'selected'
         : relatedFiles.length === 0
           ? 'none'
