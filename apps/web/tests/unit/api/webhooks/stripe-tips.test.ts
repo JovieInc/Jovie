@@ -183,6 +183,53 @@ describe('POST /api/webhooks/stripe-tips', () => {
     );
   });
 
+  it('acknowledges a resolved handle with no matching creator profile and records critical context', async () => {
+    // Override the shared db mock's limit() so the by-handle lookup resolves
+    // empty (profile not found), distinct from the shared beforeEach default
+    // that always finds 'profile-123'. This exercises the branch at
+    // route.ts:144-156 (`if (!creatorProfileId)`), which was previously
+    // unreachable in this suite.
+    const chainable = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([]),
+    };
+    mockDbSelect.mockReturnValue(chainable);
+
+    const { stripe } = await import('@/lib/stripe/client');
+    vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { handle: 'ghostartist' },
+          payment_intent: 'pi_no_profile',
+          amount_total: 900,
+          customer_details: { email: 'fan@example.com', name: 'Test Fan' },
+          customer_email: null,
+          id: 'cs_no_profile',
+        },
+      },
+    } as never);
+
+    const { POST } = await import('@/app/api/webhooks/stripe-tips/route');
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(mockDbSelect).toHaveBeenCalled();
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockProcessTipCompleted).not.toHaveBeenCalled();
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Tip checkout completed but no creator profile found',
+      expect.any(Error),
+      expect.objectContaining({
+        route: '/api/webhooks/stripe-tips',
+        handle: 'ghostartist',
+        session_id: 'cs_no_profile',
+        amount: 900,
+      })
+    );
+  });
+
   it('acknowledges unattributable checkout sessions and records critical context', async () => {
     const { stripe } = await import('@/lib/stripe/client');
     vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
