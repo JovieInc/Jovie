@@ -113,6 +113,50 @@ describe('diagnoseCiFailure', () => {
     ).toBe('unknown');
   });
 
+  it('diagnoses the fail-closed Layout Guard manifest signature', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Layout Guard
+      ::error::Layout Guard contract missing required spec: tests/e2e/hud-scroll.spec.ts
+    `);
+
+    expect(diagnosis.failureClass).toBe('layout_guard_contract_missing');
+    expect(diagnosis.rootCause).toContain('missing test');
+    expect(diagnosis.remediation).toContain('never turn');
+  });
+
+  it('recognizes the legacy missing-spec false green without matching generic missing files', () => {
+    expect(
+      diagnoseCiFailure('layout-overlap-guard.spec.ts not found — skipping')
+        .failureClass
+    ).toBe('layout_guard_contract_missing');
+    expect(
+      diagnoseCiFailure('unrelated.spec.ts not found — skipping').failureClass
+    ).toBe('unknown');
+  });
+
+  it('diagnoses a standalone artifact launched through next start', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Layout Guard
+      \"next start\" does not work with \"output: standalone\" configuration.
+      Error: Failed to load external module require-in-the-middle-a99415fa67232f7f
+    `);
+
+    expect(diagnosis.failureClass).toBe('standalone_runtime_launcher_mismatch');
+    expect(diagnosis.rootCause).toContain('next start');
+    expect(diagnosis.remediation).toContain(
+      '.next/standalone/apps/web/server.js'
+    );
+    expect(diagnosis.remediation).toContain('fail closed');
+  });
+
+  it('does not infer a launcher mismatch from an unrelated missing module', () => {
+    expect(
+      diagnoseCiFailure(
+        'Error: Failed to load external module require-in-the-middle-deadbeef'
+      ).failureClass
+    ).toBe('unknown');
+  });
+
   it('classifies the analytics scanner timeout separately from runner pressure', () => {
     const log = `
       FAIL tests/unit/analytics-metrics-layer-guard.test.ts > canonical metrics layer guard

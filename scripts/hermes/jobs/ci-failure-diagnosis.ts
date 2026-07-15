@@ -4,6 +4,8 @@ export type CiFailureClass =
   | 'bounded_source_scan_timeout'
   | 'visual_qa_prune_timestamp_race'
   | 'golden_path_smoke_auth_contract'
+  | 'layout_guard_contract_missing'
+  | 'standalone_runtime_launcher_mismatch'
   | 'neon_endpoint_capacity_admission'
   | 'neon_probe_workspace_dependency_resolution'
   | 'neon_concurrency_key_collision'
@@ -93,6 +95,29 @@ const DIAGNOSES: ReadonlyArray<{
       'The real-auth golden-path spec ran inside the bypass smoke lane, where E2E_TEST_MODE and the dedicated journey credentials are intentionally absent, so the Better Auth test code was rejected.',
     remediation:
       'Keep golden-path self-skipped whenever the smoke auth bypass is enabled and run the journey only in the dedicated Golden Path job, which supplies E2E_TEST_MODE and real-auth credentials.',
+  },
+  {
+    failureClass: 'layout_guard_contract_missing',
+    matches: log =>
+      /::error::Layout Guard contract missing required spec: tests\/e2e\/[\w./-]+\.spec\.ts/i.test(
+        log
+      ) || /layout-overlap-guard\.spec\.ts not found [—-] skipping/i.test(log),
+    rootCause:
+      'The Layout Guard workflow referenced a deleted or absent Playwright contract and treated the missing test as a successful check.',
+    remediation:
+      'Restore the required deterministic Layout Guard manifest or update the workflow and its contract test together; never turn a missing required spec into success.',
+  },
+  {
+    failureClass: 'standalone_runtime_launcher_mismatch',
+    matches: log =>
+      /"next start" does not work with "output: standalone"/i.test(log) &&
+      /Failed to load external module require-in-the-middle-[a-z0-9]+/i.test(
+        log
+      ),
+    rootCause:
+      'A CI lane launched `next start` against an `output: standalone` artifact, so requests used the regular .next/server runtime instead of the traced standalone runtime and could not resolve its hash-shim packages.',
+    remediation:
+      'Launch .next/standalone/apps/web/server.js directly, fail closed when that entrypoint is absent or never becomes ready, and preserve the synced standalone runtime instead of reinstalling dependencies or blindly retrying.',
   },
   {
     failureClass: 'neon_endpoint_capacity_admission',
