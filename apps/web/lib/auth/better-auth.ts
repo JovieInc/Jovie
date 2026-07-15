@@ -33,6 +33,7 @@ import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
 import { generateAppleClientSecret } from './apple-client-secret';
+import { getOAuthPhoneClaims } from './oauth-phone-claims';
 import { phoneVerification } from './phone-verification';
 import { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
 import { secondaryStorage } from './secondary-storage';
@@ -223,7 +224,12 @@ function buildPlugins() {
       loginPage: '/identity',
       consentPage: '/identity',
       signup: { page: '/identity' },
-      scopes: ['openid', 'profile', 'email', 'offline_access'],
+      scopes: ['openid', 'profile', 'email', 'phone', 'offline_access'],
+      customUserInfoClaims: ({ user, scopes }) =>
+        getOAuthPhoneClaims(user, scopes),
+      advertisedMetadata: {
+        claims_supported: ['phone_number', 'phone_number_verified'],
+      },
       grantTypes: ['authorization_code', 'refresh_token'],
       allowDynamicClientRegistration: false,
       allowUnauthenticatedClientRegistration: false,
