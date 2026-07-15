@@ -299,6 +299,18 @@ describe('diagnoseCiFailure', () => {
     expect(diagnosis.remediation).toContain('Do not retry or add runners');
   });
 
+  it('diagnoses post-admission restore pressure before the generic I/O class', () => {
+    const diagnosis = diagnoseCiFailure(
+      'runner_spawn_admission=blocked runner_failure_class=runner-io-pressure-post-admission io_full_avg10_pct=60.84 spawned_recently=true remaining_deficit=4'
+    );
+
+    expect(diagnosis.failureClass).toBe(
+      'runner_io_pressure_post_admission_herd'
+    );
+    expect(diagnosis.rootCause).toContain('before restore I/O became visible');
+    expect(diagnosis.remediation).toContain('one-runner-per-tick');
+  });
+
   it('upgrades the proactive slice diagnostic to an exact capacity class', () => {
     const diagnosis = diagnoseCiFailure(`
       runner_tasks_status=critical

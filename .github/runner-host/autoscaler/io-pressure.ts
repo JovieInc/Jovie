@@ -1,6 +1,7 @@
 export const DEFAULT_IO_FULL_BLOCK_AVG10_PCT = 20;
 export const DEFAULT_IO_FULL_RECOVERY_AVG10_PCT = 10;
 export const DEFAULT_IO_RECOVERY_SAMPLES = 3;
+export const DEFAULT_IO_POST_ADMISSION_TICKS = 3;
 
 export interface IoPressureAdmissionState {
   readonly blocked: boolean;
@@ -24,6 +25,10 @@ export interface IoPressureAdmissionDecision {
   readonly state: IoPressureAdmissionState;
   readonly reason: string;
 }
+
+export type IoPressureFailureClassification =
+  | IoPressureAdmissionDecision['classification']
+  | 'runner-io-pressure-post-admission';
 
 export const INITIAL_IO_PRESSURE_STATE: IoPressureAdmissionState = {
   blocked: false,
@@ -77,6 +82,33 @@ export function parseIoFullAvg10(pressure: string): number | null {
 
   const value = Number.parseFloat(match[1]);
   return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+}
+
+export function classifyIoPressureFailure(
+  admission: Pick<
+    IoPressureAdmissionDecision,
+    'admitScaleUp' | 'classification'
+  >,
+  currentTick: number,
+  lastSuccessfulSpawnTick: number | null,
+  postAdmissionTicks = DEFAULT_IO_POST_ADMISSION_TICKS
+): IoPressureFailureClassification {
+  const ticksSinceLastSpawn =
+    lastSuccessfulSpawnTick === null
+      ? null
+      : currentTick - lastSuccessfulSpawnTick;
+
+  if (
+    !admission.admitScaleUp &&
+    admission.classification === 'runner-io-pressure' &&
+    ticksSinceLastSpawn !== null &&
+    ticksSinceLastSpawn > 0 &&
+    ticksSinceLastSpawn <= postAdmissionTicks
+  ) {
+    return 'runner-io-pressure-post-admission';
+  }
+
+  return admission.classification;
 }
 
 export function evaluateIoPressureAdmission(

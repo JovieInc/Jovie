@@ -204,9 +204,24 @@ const GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS = [
 const RUNNER_IO_PRESSURE_MANIFEST = new Set([
   '.github/runner-host/README.md',
   '.github/runner-host/autoscaler/controller-io-pressure.patch',
+  '.github/runner-host/autoscaler/controller-io-pressure-v1-to-v2.patch',
   '.github/runner-host/autoscaler/io-pressure.ts',
   '.github/runner-host/ci-runner-autoscaler.service.snapshot',
   '.github/runner-host/install-io-pressure-guard.sh',
+  'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+]);
+const RUNNER_IO_PRESSURE_V2_MANIFEST = new Set([
+  '.github/runner-host/README.md',
+  '.github/runner-host/autoscaler/controller-io-pressure.patch',
+  '.github/runner-host/autoscaler/controller-io-pressure-v1-to-v2.patch',
+  '.github/runner-host/autoscaler/io-pressure.ts',
+  '.github/runner-host/install-io-pressure-guard.sh',
+  '.github/workflows/runner-autoscaler-canary.yml',
+  'apps/web/tests/unit/ci/runner-autoscaler-canary-workflow.test.ts',
   'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
   'scripts/hermes/jobs/ci-failure-diagnosis.ts',
   'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
@@ -378,8 +393,10 @@ export function buildAffectedTestPlan(changedFiles) {
     RUNNER_IO_PRESSURE_MANIFEST.has(file)
   ).length;
   const isExactRunnerIoPressure =
-    runnerIoPressureInputCount === RUNNER_IO_PRESSURE_MANIFEST.size &&
-    files.length === RUNNER_IO_PRESSURE_MANIFEST.size;
+    (runnerIoPressureInputCount === RUNNER_IO_PRESSURE_MANIFEST.size &&
+      files.length === RUNNER_IO_PRESSURE_MANIFEST.size) ||
+    (files.length === RUNNER_IO_PRESSURE_V2_MANIFEST.size &&
+      files.every(file => RUNNER_IO_PRESSURE_V2_MANIFEST.has(file)));
   const runnerPrerequisiteContractInputCount = files.filter(file =>
     RUNNER_PREREQUISITE_CONTRACT_MANIFEST.has(file)
   ).length;
