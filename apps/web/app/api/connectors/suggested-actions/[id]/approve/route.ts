@@ -2,20 +2,15 @@
  * POST /api/connectors/suggested-actions/[id]/approve
  *
  * CAS-only approve endpoint.
- * Atomically transitions suggested_actions row: pending → accepted.
+ * Atomically transitions suggested_actions row: pending → approved.
  * On success, inserts a workflow_runs row to execute the approved action.
- *
- * Returns 409 if the row was already decided (CAS missed).
  *
  * Design: The CAS update and workflow_runs insert are two sequential writes.
  * db.transaction() is forbidden per .claude/rules/db.md; transactional atomicity
- * is handled at the application layer instead:
- * - If the CAS update succeeds but the workflowRuns insert fails, the endpoint
- *   returns 500 so the client can retry. On retry the CAS will miss (409) because
- *   the action is now 'accepted', but the client can treat 409 as "already accepted"
- *   and check whether a run was enqueued (or re-enqueue via a recovery path if added).
- * - In the closed beta (single design-partner DJs), lost runs surface quickly and
- *   can be recovered manually. A compensating recovery scan is tracked in Linear.
+ * is handled at the application layer. On a CAS miss,
+ * recoverOrphanedApprovedAction returns 200 when it enqueues or finds an existing
+ * workflow run, 404 when the action is not found, and 409 for other decided rows.
+ * The frequent reconciliation job also enqueues approved rows that have no run.
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -51,7 +46,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
   if (error) return error;
 
   try {
-    // CAS transition: pending → accepted (WHERE status='pending' AND userId=:userId)
+    // CAS transition: pending → approved (WHERE status='pending' AND userId=:userId)
     // Also return payload so we can include eventPayload in the workflow_runs row.
     const updated = await db
       .update(suggestedActions)

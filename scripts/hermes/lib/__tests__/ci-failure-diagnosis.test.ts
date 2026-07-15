@@ -402,12 +402,17 @@ describe('diagnoseCiFailure', () => {
   });
 
   it('classifies the touch-target ratchet as the same bounded scanner class', () => {
-    expect(
-      diagnoseCiFailure(`
-        FAIL tests/unit/design-system/touch-target-ratchet.test.ts
-        Error: Test timed out in 12000ms.
-      `).failureClass
-    ).toBe('bounded_source_scan_timeout');
+    const diagnosis = diagnoseCiFailure(`
+      FAIL tests/unit/design-system/touch-target-ratchet.test.ts
+      Error: Test timed out in 12000ms.
+    `);
+
+    expect(diagnosis.failureClass).toBe('bounded_source_scan_timeout');
+    expect(diagnosis.remediation).toContain(
+      'Intersect native candidate-token and semantic file sets'
+    );
+    expect(diagnosis.remediation).toContain('preserve fail-closed fallback');
+    expect(diagnosis.remediation).toContain('blindly rerunning');
   });
 
   it('classifies the destructive dialog audit as bounded scanner work', () => {

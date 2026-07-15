@@ -14,6 +14,7 @@ import {
   countViolations,
   findTouchTargetSourceFiles,
   findViolationsInSource,
+  intersectRipgrepFileLists,
   type RipgrepRunner,
   resolveTrustedRipgrepPath,
   runRipgrep,
@@ -164,6 +165,25 @@ describe('touch-target detection — violations are caught (red→green proof)',
         join(scanRoot, 'components', 'safe.tsx'),
         '<button className="h-11">safe</button>\n'
       );
+      writeFileSync(
+        join(scanRoot, 'components', 'candidate-only.tsx'),
+        '<div className="h-8">decorative</div>\n'
+      );
+      writeFileSync(
+        join(scanRoot, 'components', 'interactive-only.tsx'),
+        '<button className="px-3 py-2">safe</button>\n'
+      );
+
+      expect(
+        intersectRipgrepFileLists(
+          'components/safe.tsx\ncomponents/candidate-only.tsx\napp/multiline.tsx\ncomponents/arbitrary.tsx\n',
+          'components/interactive-only.tsx\ncomponents/arbitrary.tsx\ncomponents/safe.tsx\napp/multiline.tsx\n'
+        )
+      ).toEqual([
+        'app/multiline.tsx',
+        'components/arbitrary.tsx',
+        'components/safe.tsx',
+      ]);
 
       const fallback: RipgrepRunner = () => ({ status: 2, stdout: '' });
       expect(countViolations(scanRoot)).toEqual(

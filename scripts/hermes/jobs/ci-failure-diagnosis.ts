@@ -429,7 +429,7 @@ const DIAGNOSES: ReadonlyArray<{
     rootCause:
       'A source ratchet or nested lint scanner exceeded its bounded test timeout while traversing or analyzing the source tree.',
     remediation:
-      'Inspect the scanner for repeated source reads, per-entry stat calls, or nested package-manager lint processes; do not classify this as runner EAGAIN or increase the test timeout.',
+      'Intersect native candidate-token and semantic file sets before JavaScript source reads, and remove repeated reads, per-entry stat calls, or nested package-manager lint processes; preserve fail-closed fallback instead of classifying this as runner EAGAIN, increasing the timeout, or blindly rerunning.',
   },
   {
     failureClass: 'test_fixture_import_timeout',
