@@ -561,6 +561,13 @@
       "when": 1784091200000,
       "tag": "0079_logyourbody_oauth_clients",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1784101200000,
+      "tag": "0080_logyourbody_apple_only_scopes",
+      "breakpoints": true
     }
   ]
 }
