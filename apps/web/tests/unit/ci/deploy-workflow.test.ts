@@ -106,7 +106,7 @@ describe('CI test-performance path gate', () => {
       pathJob,
       'Detect path changes for all job types'
     );
-    const graphiteSkip = getStepBlock(pathJob, 'Skip CI (Graphite optimizer)');
+    const graphiteSkip = getStepBlock(pathJob, 'Resolve exact-head CI policy');
     const performanceJob = getJobBlock(workflow, 'ci-test-performance');
 
     expect(pathJob).toContain(
@@ -180,7 +180,7 @@ describe('CI Storybook accessibility path gate', () => {
       pathJob,
       'Detect path changes for all job types'
     );
-    const graphiteSkip = getStepBlock(pathJob, 'Skip CI (Graphite optimizer)');
+    const graphiteSkip = getStepBlock(pathJob, 'Resolve exact-head CI policy');
 
     expect(pathJob).toContain(
       "run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || steps.graphite_skip.outputs.run_storybook_a11y || 'false' }}"

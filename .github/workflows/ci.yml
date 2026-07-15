@@ -297,10 +297,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      # Prefer real path detect; fall back to graphite-skip defaults so job
+      # Prefer real path detect; fall back to exact-head policy defaults so job
       # outputs are never empty when Path Changes succeeds (empty has_code_changes
       # was treated as docs-only and skip-cascaded ci-fast / unit leaves).
-      skip: ${{ steps.graphite.outputs.skip || 'false' }}
+      skip: ${{ steps.graphite_skip.outputs.skip || 'false' }}
       run_build: ${{ steps.detect.outputs.run_build || steps.graphite_skip.outputs.run_build || 'false' }}
       run_test: ${{ steps.detect.outputs.run_test || steps.graphite_skip.outputs.run_test || 'false' }}
       run_test_performance: ${{ steps.detect.outputs.run_test_performance || steps.graphite_skip.outputs.run_test_performance || 'false' }}
@@ -338,17 +338,20 @@ jobs:
         with:
           graphite_token: ${{ secrets.GRAPHITE_TOKEN }}
 
-      - name: Skip CI (Graphite optimizer)
+      - name: Resolve exact-head CI policy
         id: graphite_skip
-        if: steps.graphite.outputs.skip == 'true'
+        env:
+          GRAPHITE_SKIP_REQUESTED: ${{ steps.graphite.outputs.skip || 'false' }}
         run: |
-          echo "Graphite CI optimizer requested skip — CI will be skipped."
+          if [[ "$GRAPHITE_SKIP_REQUESTED" == "true" ]]; then
+            echo "::warning::Graphite reuse lacks verifiable exact-head evidence; running selected gates."
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
           for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
             echo "$t=false" >> "$GITHUB_OUTPUT"
           done
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        if: steps.graphite.outputs.skip != 'true'
         with:
           # Blobless partial clone: full commit graph for merge-base/diff
           # (names only), no historical file contents. Cuts the clone from
@@ -357,7 +360,6 @@ jobs:
           fetch-depth: 0
           filter: blob:none
       - name: Detect path changes for all job types
-        if: steps.graphite.outputs.skip != 'true'
         id: detect
         shell: bash
         run: |
@@ -871,10 +873,8 @@ jobs:
   neon-db:
     name: Neon DB
     needs: [ci-path-changes]
-    # Run for push to main, DB/public-Lighthouse paths, or launch evidence that
-    # requires an ephemeral database. UI/perf/docs-only PRs still skip it unless
-    # Golden/launch policy explicitly selects the prerequisite.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || needs.ci-path-changes.outputs.run_golden_path == 'true' || contains(github.event.pull_request.labels.*.name, 'launch-candidate')))) }}
+    # Run for push to main or any selected evidence lane that needs ephemeral DB credentials.
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || needs.ci-path-changes.outputs.run_golden_path == 'true' || contains(github.event.pull_request.labels.*.name, 'launch-candidate') || (contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true')))) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     concurrency:
@@ -893,11 +893,12 @@ jobs:
         env:
           REQUIRES_GOLDEN_PATH: ${{ needs.ci-path-changes.outputs.run_golden_path }}
           IS_LAUNCH_CANDIDATE: ${{ contains(github.event.pull_request.labels.*.name, 'launch-candidate') }}
+          REQUIRES_EXTENDED_SMOKE: ${{ contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true' }}
         run: |
           set -euo pipefail
 
-          if [[ "$REQUIRES_GOLDEN_PATH" == "true" || "$IS_LAUNCH_CANDIDATE" == "true" ]]; then
-            echo "Golden/launch evidence requires an ephemeral Neon branch"
+          if [[ "$REQUIRES_GOLDEN_PATH" == "true" || "$IS_LAUNCH_CANDIDATE" == "true" || "$REQUIRES_EXTENDED_SMOKE" == "true" ]]; then
+            echo "Selected Golden/launch/Extended Smoke evidence requires an ephemeral Neon branch"
             echo "needs_db=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -4507,8 +4508,8 @@ jobs:
           fi
 
           if [[ "$GRAPHITE_SKIP" == "true" ]]; then
-            echo "Graphite optimizer reuse accepted only after Path Changes and Secret Scan passed."
-            exit 0
+            echo "❌ Unverified Graphite reuse reached PR Ready instead of exact-head gates."
+            exit 1
           fi
 
           if [[ "$RISK_RESULT" != "success" ]]; then
@@ -4568,13 +4569,13 @@ jobs:
             echo "Build failure will be corrected post-merge or in a follow-up PR."
           fi
 
-          if [[ "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" && "$IS_DEPENDABOT" != "true" ]]; then
-            echo "❌ Risk classifier requires preview evidence, but Preview Deploy result was $PREVIEW_RESULT"
-            echo "Likely fix: inspect the Preview Deploy logs, then run pnpm run build:web locally."
-            exit 1
-          fi
-          if [[ "$IS_DEPENDABOT" == "true" && "$PREVIEW_RESULT" == "skipped" ]]; then
-            echo "Dependabot PR: preview deploy intentionally skipped — treating as waived."
+          if [[ "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" ]]; then
+            if [[ "$IS_DEPENDABOT" == "true" && "$PREVIEW_RESULT" == "skipped" && "$BUILD_RESULT" == "success" && "$BUILD_HAS_ARTIFACT" == "true" ]]; then
+              echo "Dependabot preview unavailable; accepting the successful exact-head build output."
+            else
+              echo "❌ Risk classifier requires preview evidence, but Preview Deploy result was $PREVIEW_RESULT"
+              exit 1
+            fi
           fi
 
           require_evidence() {

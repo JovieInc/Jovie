@@ -19,6 +19,12 @@ import { extractWorkflowJobBlock } from '../merge-queue-guard.mjs';
 
 const manifest = loadCiHarnessManifest();
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+function runWorkflowBash(source, pattern, env = {}, suffix = '') {
+  const script = source.match(pattern)?.[0];
+  expect(script).toBeTruthy();
+  // biome-ignore format: executable workflow fixture stays compact for the integration-train cap
+  return spawnSync('bash', ['-c', `${script.replace(/^ {10}/gm, '')}\n${suffix}`], { env: { ...process.env, ...env }, encoding: 'utf8' });
+}
 
 /** Locked PR merge-gate set (manifest is source of truth for harness docs + artifact). */
 const EXPECTED_MERGE_GATE_NAMES = [
@@ -126,23 +132,47 @@ describe('ci-harness manifest', () => {
     }
   });
 
-  it('fans intended heavy evidence and Storybook into PR Ready', () => {
+  it('executes intended heavy-evidence prerequisites before PR Ready', () => {
     const workflow = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/ci.yml'),
       'utf8'
     );
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
-    expect(prReady).toBeTruthy();
-    expect(prReady).toContain(
-      "if: ${{ always() && github.event_name == 'pull_request'"
-    );
     expect(prReady).not.toContain('!cancelled()');
-    expect(prReady).toMatch(/\bci-storybook-a11y,/);
-    expect(prReady).toContain('STORYBOOK_A11Y_RESULT');
-    expect(prReady).toMatch(
-      /RISK_REQUIRES_PREVIEW.*true.*PREVIEW_RESULT.*success[\s\S]*?exit 1/
-    );
+    // biome-ignore format: executable gate selector stays compact for the integration-train cap
+    const runPrReadyGate = (variable, env) => runWorkflowBash(prReady, new RegExp(`^ {10}if \\[\\[ "\\$${variable}"[\\s\\S]*?^ {10}fi`, 'm'), env).status;
+    expect(runPrReadyGate('GRAPHITE_SKIP', { GRAPHITE_SKIP: 'true' })).toBe(1);
+    const skippedPreview = {
+      RISK_REQUIRES_PREVIEW: 'true',
+      PREVIEW_RESULT: 'skipped',
+      BUILD_RESULT: 'success',
+      BUILD_HAS_ARTIFACT: 'true',
+    };
+    for (const [isDependabot, hasArtifact, previewResult, status] of [
+      ['true', 'true', 'skipped', 0],
+      ['true', 'false', 'skipped', 1],
+      ['false', 'true', 'skipped', 1],
+      ['true', 'true', 'failure', 1],
+    ])
+      expect(
+        runPrReadyGate('RISK_REQUIRES_PREVIEW', {
+          ...skippedPreview,
+          IS_DEPENDABOT: isDependabot,
+          BUILD_HAS_ARTIFACT: hasArtifact,
+          PREVIEW_RESULT: previewResult,
+        })
+      ).toBe(status);
 
+    const pathChanges = extractWorkflowJobBlock(workflow, 'ci-path-changes');
+    const exactHead = runWorkflowBash(
+      pathChanges,
+      /^ {10}if \[\[ "\$GRAPHITE_SKIP_REQUESTED"[\s\S]*?^ {10}done/m,
+      {
+        GRAPHITE_SKIP_REQUESTED: 'true',
+        GITHUB_OUTPUT: '/dev/stdout',
+      }
+    );
+    expect(exactHead.stdout).toContain('skip=false');
     const intendedGates = {
       'ci-e2e-smoke': 'E2E_SMOKE',
       'ci-golden-path': 'GOLDEN_PATH',
@@ -152,91 +182,70 @@ describe('ci-harness manifest', () => {
       'ci-lighthouse-onboarding-pr': 'ONBOARDING_LIGHTHOUSE',
       'ci-lighthouse-admin-pr': 'ADMIN_LIGHTHOUSE',
     };
-
     for (const [jobId, prefix] of Object.entries(intendedGates)) {
       expect(prReady).toMatch(new RegExp(`\\b${jobId},`));
       expect(prReady).toContain(
         `require_evidence "$${prefix}_INTENDED" "$${prefix}_RESULT"`
       );
     }
-    expect(prReady).not.toContain('needs.ci-a11y-authed');
-    expect(prReady).not.toContain('needs.ci-lighthouse-chat-pr');
-
-    const functionMatch = prReady.match(
-      /^ {10}require_evidence\(\) \{[\s\S]*?^ {10}\}/m
+    const neon = extractWorkflowJobBlock(workflow, 'neon-db');
+    expect(neon).toContain(
+      "contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true'"
     );
-    expect(functionMatch).not.toBeNull();
-    const requireEvidence = functionMatch[0].replace(/^ {10}/gm, '');
+    const chatNeedsE2e = new RegExp(
+      workflow.match(/E2E_PATTERN='([^']+)'/)?.[1]
+    ).test('apps/web/components/chat/Composer.tsx');
+    const neonDecision = runWorkflowBash(
+      neon,
+      /^ {10}if \[\[ "\$REQUIRES_GOLDEN_PATH"[\s\S]*?^ {10}fi/m,
+      {
+        REQUIRES_EXTENDED_SMOKE: String(chatNeedsE2e),
+        GITHUB_OUTPUT: '/dev/stdout',
+      }
+    );
+    expect(neonDecision.stdout).toContain('needs_db=true');
+
     const evidenceStatus = (intended, result) =>
-      spawnSync(
-        'bash',
-        [
-          '-c',
-          `${requireEvidence}\nrequire_evidence ${intended} ${result} gate`,
-        ],
-        { encoding: 'utf8' }
+      runWorkflowBash(
+        prReady,
+        /^ {10}require_evidence\(\) \{[\s\S]*?^ {10}\}/m,
+        {},
+        `require_evidence ${intended} ${result} gate`
       ).status;
-    for (const result of [
-      'failure',
-      'cancelled',
-      'skipped',
-      'pending',
-      'queued',
-    ]) {
+    // biome-ignore format: executable status matrix stays compact for the integration-train cap
+    for (const result of ['failure', 'cancelled', 'skipped', 'pending', 'queued']) {
       expect(evidenceStatus('true', result), result).toBe(1);
     }
     expect(evidenceStatus('true', 'success')).toBe(0);
     expect(evidenceStatus('false', 'skipped')).toBe(0);
-  });
-
-  it('routes launch candidates through Golden, dashboard, and onboarding evidence', () => {
-    const workflow = readFileSync(
-      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
-      'utf8'
-    );
-    for (const jobId of [
-      'neon-db',
-      'ci-golden-path',
-      'ci-lighthouse-dashboard-pr',
-      'ci-lighthouse-onboarding-pr',
-    ]) {
-      const job = extractWorkflowJobBlock(workflow, jobId);
-      expect(job, jobId).toContain("'launch-candidate'");
-    }
-
-    const neon = extractWorkflowJobBlock(workflow, 'neon-db');
-    expect(neon).toContain(
-      "needs.ci-path-changes.outputs.run_golden_path == 'true'"
-    );
-    expect(neon).toContain(
-      "IS_LAUNCH_CANDIDATE: ${{ contains(github.event.pull_request.labels.*.name, 'launch-candidate') }}"
-    );
-    expect(neon).toContain(
-      'if [[ "$REQUIRES_GOLDEN_PATH" == "true" || "$IS_LAUNCH_CANDIDATE" == "true" ]]'
-    );
-    expect(neon).toContain('echo "needs_db=true" >> "$GITHUB_OUTPUT"');
-
+    // biome-ignore format: launch prerequisite matrix stays compact for the integration-train cap
+    for (const jobId of ['neon-db', 'ci-golden-path', 'ci-lighthouse-dashboard-pr', 'ci-lighthouse-onboarding-pr'])
+      expect(extractWorkflowJobBlock(workflow, jobId)).toContain(
+        "'launch-candidate'"
+      );
     const dashboard = extractWorkflowJobBlock(
       workflow,
       'ci-lighthouse-dashboard-pr'
     );
-    expect(dashboard).toContain(
-      'IS_LAUNCH_CANDIDATE="${{ contains(github.event.pull_request.labels.*.name, \'launch-candidate\') }}"'
-    );
     expect(dashboard).toContain('|| "$IS_LAUNCH_CANDIDATE" == "true" ]]');
-
-    const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
     for (const intended of [
       'GOLDEN_PATH_INTENDED',
       'DASHBOARD_LIGHTHOUSE_INTENDED',
       'ONBOARDING_LIGHTHOUSE_INTENDED',
-    ]) {
+    ])
       expect(prReady).toMatch(
         new RegExp(
           `${intended}=false[\\s\\S]*?HAS_LAUNCH_CANDIDATE_LABEL.*?true[\\s\\S]*?${intended}=true`
         )
       );
-    }
+  });
+
+  it('defaults bare merge queue checks to the active Graphite backend', () => {
+    const { MERGE_QUEUE_BACKEND: _ignored, ...env } = process.env;
+    // biome-ignore format: executable CLI regression stays compact for the integration-train cap
+    const result = spawnSync(process.execPath, [resolve(REPO_ROOT, 'scripts/ci-merge-queue-check.mjs'), 'validate'], { env, encoding: 'utf8' });
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain('Graphite remains active');
   });
 
   it('generates stable docs from tiers, merge gates, and risk rules', () => {

@@ -13,10 +13,9 @@ import {
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 
 function configuredBackend() {
-  // Repo source-of-record targets native after this bootstrap lands. The live
-  // controller remains explicitly defaulted to Graphite until the guarded
-  // ruleset + repository-variable cutover is performed.
-  const backend = process.env.MERGE_QUEUE_BACKEND?.trim() || 'native';
+  // Match the live controller until the guarded repository-variable cutover.
+  // Native source validation must remain an explicit opt-in before then.
+  const backend = process.env.MERGE_QUEUE_BACKEND?.trim() || 'graphite';
   if (backend !== 'graphite' && backend !== 'native') {
     throw new Error(`Unknown MERGE_QUEUE_BACKEND: ${backend}`);
   }

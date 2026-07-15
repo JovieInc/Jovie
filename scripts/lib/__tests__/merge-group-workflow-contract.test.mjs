@@ -137,7 +137,7 @@ describe('merge_group workflow contract', () => {
       "if: ${{ always() && github.event_name == 'pull_request'"
     );
     expect(sourceReady).toContain(
-      'Graphite optimizer reuse accepted only after Path Changes and Secret Scan passed.'
+      'Unverified Graphite reuse reached PR Ready instead of exact-head gates.'
     );
     expect(SECURITY_WORKFLOW).not.toMatch(/^\s*pull_request:/m);
   });

@@ -713,8 +713,8 @@ export function validateMergeQueueRepoConfig(input) {
   );
 
   if (backend === 'graphite' && hasNativeQueue) {
-    errors.push(
-      'branch-protection.yml must not enable GitHub native merge_queue (Graphite owns the queue)'
+    warnings.push(
+      'branch-protection.yml contains dormant native merge_queue source; Graphite remains active until guarded live cutover'
     );
   }
   if (backend === 'native' && !hasNativeQueue) {
