@@ -8469,7 +8469,7 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 .system-b-chat-composer-input {
   color: var(--color-text-primary-token);
   caret-color: var(--color-text-primary-token);
-  -webkit-text-fill-color: var(--color-text-primary-token);
+  -webkit-text-fill-color: currentColor;
 }
 
 :where(.system-b-chat-composer-surface[data-hero="true"]) {

@@ -58,7 +58,8 @@ describe('chat composer System B source contract', () => {
       /\.system-b-chat-composer-input\s*\{[\s\S]*?\}/
     )?.[0];
     expect(inputRule).toContain('color: var(--color-text-primary-token)');
-    expect(inputRule).toContain(
+    expect(inputRule).toContain('-webkit-text-fill-color: currentColor');
+    expect(inputRule).not.toContain(
       '-webkit-text-fill-color: var(--color-text-primary-token)'
     );
 
