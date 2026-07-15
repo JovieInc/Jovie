@@ -12,7 +12,7 @@ export function GET() {
   const version = env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0';
   const environment = env.VERCEL_ENV;
   const isDevelopment = env.NODE_ENV !== 'production';
-  const buildSha = env.NEXT_PUBLIC_BUILD_SHA?.trim();
+  const buildSha = env.NEXT_PUBLIC_BUILD_SHA?.trim().slice(0, 7);
   const runtimeCommitSha = env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
 
   if (_cachedBuildId === undefined) {
