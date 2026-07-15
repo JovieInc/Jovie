@@ -69,6 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
+      actions: read
       contents: read
     env:
       REFRESH_MODE: ${{ github.event_name != 'pull_request' && 'true' || 'false' }}

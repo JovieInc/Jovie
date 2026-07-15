@@ -63,9 +63,8 @@ runs:
         echo "expires_at=$EXPIRES_AT" >> $GITHUB_OUTPUT
         echo "Branch will auto-expire at: $EXPIRES_AT (${HOURS}h from now)"
 
-    - name: Create Neon branch (attempt 1)
-      id: create-branch-attempt-1
-      continue-on-error: true
+    - name: Create Neon branch with bounded capacity retry
+      id: create-branch
       shell: bash
       env:
         NEON_API_KEY: ${{ inputs.api_key }}
@@ -74,36 +73,15 @@ runs:
         PARENT_BRANCH: ${{ inputs.parent_branch }}
         ROLE_NAME: ${{ inputs.role }}
         EXPIRES_AT: ${{ steps.compute-expiry.outputs.expires_at }}
-      run: bash "${{ github.action_path }}/create-branch.sh"
-
-    - name: Aggressive cleanup on limit error
-      if: steps.create-branch-attempt-1.outcome == 'failure'
-      uses: ./.github/actions/neon-branch-cleanup
-      with:
-        neon_api_key: ${{ inputs.api_key }}
-        neon_project_id: ${{ inputs.project_id }}
-        branch_limit: ${{ inputs.branch_limit }}
-        protected_branches: ${{ inputs.protected_branches }}
-        cleanup_threshold: ${{ inputs.cleanup_threshold }}
-
-    - name: Create Neon branch (attempt 2)
-      id: create-branch-attempt-2
-      if: steps.create-branch-attempt-1.outcome == 'failure'
-      shell: bash
-      env:
-        NEON_API_KEY: ${{ inputs.api_key }}
-        NEON_PROJECT_ID: ${{ inputs.project_id }}
-        BRANCH_NAME: ${{ inputs.branch_name }}
-        PARENT_BRANCH: ${{ inputs.parent_branch }}
-        ROLE_NAME: ${{ inputs.role }}
-        EXPIRES_AT: ${{ steps.compute-expiry.outputs.expires_at }}
-      run: bash "${{ github.action_path }}/create-branch.sh"
+        GITHUB_TOKEN: ${{ github.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_RUN_ID: ${{ github.run_id }}
+        PROTECTED_BRANCHES: ${{ inputs.protected_branches }}
+      run: bash "${{ github.action_path }}/create-branch-with-capacity-retry.sh"
 
     - name: Set outputs from successful attempt
       id: set-outputs
       shell: bash
-      env:
-        ATTEMPT_1_OUTCOME: ${{ steps.create-branch-attempt-1.outcome }}
       run: |
         set -euo pipefail
         CONNECTION_DIR="${RUNNER_TEMP:-/tmp}/neon-connection"
@@ -111,11 +89,6 @@ runs:
 
         if [ ! -f "$CONNECTION_FILE" ]; then
           echo "Neon connection file missing after create attempts: $CONNECTION_FILE"
-          exit 1
-        fi
-
-        if [ "$ATTEMPT_1_OUTCOME" != "success" ] && [ ! -s "$CONNECTION_DIR/db_url" ]; then
-          echo "Neon branch creation failed and no connection strings were written."
           exit 1
         fi
 
@@ -147,27 +120,11 @@ runs:
       if: always()
       shell: bash
       env:
-        ATTEMPT_1_OUTCOME: ${{ steps.create-branch-attempt-1.outcome }}
-        ATTEMPT_1_CONCLUSION: ${{ steps.create-branch-attempt-1.conclusion }}
-        ATTEMPT_2_OUTCOME: ${{ steps.create-branch-attempt-2.outcome }}
-        ATTEMPT_2_CONCLUSION: ${{ steps.create-branch-attempt-2.conclusion }}
+        CREATE_OUTCOME: ${{ steps.create-branch.outcome }}
         BRANCH_ID: ${{ steps.set-outputs.outputs.branch_id }}
       run: |
-        if [ "$ATTEMPT_1_OUTCOME" == "success" ]; then
-          echo "✅ Branch created on first attempt: $BRANCH_ID" >> "$GITHUB_STEP_SUMMARY"
+        if [ "$CREATE_OUTCOME" == "success" ]; then
+          echo "✅ Neon branch ready after bounded provider admission: $BRANCH_ID" >> "$GITHUB_STEP_SUMMARY"
           exit 0
         fi
-
-        if [ "$ATTEMPT_2_OUTCOME" == "success" ]; then
-          echo "⚠️ First attempt failed - ran aggressive cleanup and retried" >> "$GITHUB_STEP_SUMMARY"
-          echo "✅ Branch created on retry: $BRANCH_ID" >> "$GITHUB_STEP_SUMMARY"
-          exit 0
-        fi
-
-        echo "❌ Failed to create Neon branch after 2 attempts" >> "$GITHUB_STEP_SUMMARY"
-        echo "Attempt 1 outcome: $ATTEMPT_1_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
-        echo "Attempt 1 conclusion: $ATTEMPT_1_CONCLUSION" >> "$GITHUB_STEP_SUMMARY"
-        echo "Attempt 2 outcome: $ATTEMPT_2_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
-        echo "Attempt 2 conclusion: $ATTEMPT_2_CONCLUSION" >> "$GITHUB_STEP_SUMMARY"
-        echo "set-outputs branch_id: $BRANCH_ID" >> "$GITHUB_STEP_SUMMARY"
-        echo "See the 'Create Neon branch' step logs above for Neon API error details." >> "$GITHUB_STEP_SUMMARY"
+        echo "❌ Neon provider admission failed or exhausted bounded retries" >> "$GITHUB_STEP_SUMMARY"

@@ -1,6 +1,7 @@
 export type CiFailureClass =
   | 'bounded_source_scan_timeout'
   | 'golden_path_smoke_auth_contract'
+  | 'neon_endpoint_capacity_admission'
   | 'neon_concurrency_key_collision'
   | 'broken_profiler_fixture'
   | 'inconclusive_performance_timeout'
@@ -12,6 +13,7 @@ export type CiFailureClass =
   | 'runner_process_exhaustion'
   | 'runner_io_pressure_admission'
   | 'runner_host_pressure'
+  | 'shared_neon_endpoint_reaped_while_active'
   | 'gbrain_ownership_preflight_latency_or_slug_drift'
   | 'unknown';
 
@@ -49,6 +51,18 @@ const DIAGNOSES: ReadonlyArray<{
       'The real-auth golden-path spec ran inside the bypass smoke lane, where E2E_TEST_MODE and the dedicated journey credentials are intentionally absent, so the Better Auth test code was rejected.',
     remediation:
       'Keep golden-path self-skipped whenever the smoke auth bypass is enabled and run the journey only in the dedicated Golden Path job, which supplies E2E_TEST_MODE and real-auth credentials.',
+  },
+  {
+    failureClass: 'neon_endpoint_capacity_admission',
+    matches: log =>
+      /HTTP(?:[\s-]+status)?[\s:=-]*402\b/i.test(log) &&
+      /You have exceeded the limit of concurrently active endpoints\./i.test(
+        log
+      ),
+    rootCause:
+      'The shared ephemeral Neon branch was created, but its database endpoint could not activate because the account had exhausted its concurrently active endpoint capacity.',
+    remediation:
+      'Preserve the same branch and connection artifact, run the proven-owner orphan reaper, and retry the SELECT 1 admission probe within a bounded budget; do not create another branch or publish an unproven connection artifact.',
   },
   {
     failureClass: 'neon_concurrency_key_collision',
@@ -149,6 +163,18 @@ const DIAGNOSES: ReadonlyArray<{
       'The self-hosted runner pool is approaching or has reached the systemd ci-runners.slice task ceiling.',
     remediation:
       'Run .github/runner-host/diagnose-capacity.sh and restore the versioned ci-runners.slice TasksMax contract before retrying CI.',
+  },
+  {
+    failureClass: 'shared_neon_endpoint_reaped_while_active',
+    matches: log =>
+      /The requested endpoint could not be found/i.test(log) &&
+      /(?:neon-db-connection|shared Neon (?:branch|artifact)|Download Neon DB connection artifact)/i.test(
+        log
+      ),
+    rootCause:
+      'A consumer downloaded the shared Neon connection artifact, but a concurrent legacy cleanup deleted that branch without proving its owning workflow had completed.',
+    remediation:
+      'Require completed workflow-run ownership proof immediately before every cleanup delete, fail closed for queued, active, or unavailable proof, then rerun the consumer against a newly admitted shared branch.',
   },
   {
     failureClass: 'runner_io_pressure_admission',
