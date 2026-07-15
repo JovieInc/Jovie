@@ -36,10 +36,10 @@ export default defineConfig({
     baseURL,
     trace: 'on-first-retry',
     video: 'retain-on-failure',
-    // Add custom headers to bypass Clerk in test mode
-    extraHTTPHeaders: {
-      'x-test-mode': 'bypass-auth',
-    },
+    // Keep public contexts genuinely signed out. Tests that exercise protected
+    // routes establish their own deterministic session with
+    // setTestAuthBypassSession; a global bypass header makes auth entry routes
+    // redirect to /app, whose cookie gate then redirects back to /signin.
   },
   projects: [
     {
