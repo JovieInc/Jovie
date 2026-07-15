@@ -10,6 +10,7 @@ export type CiFailureClass =
   | 'test_fixture_import_timeout'
   | 'runner_slice_task_saturation'
   | 'runner_process_exhaustion'
+  | 'runner_io_pressure_admission'
   | 'runner_host_pressure'
   | 'gbrain_ownership_preflight_latency_or_slug_drift'
   | 'unknown';
@@ -148,6 +149,16 @@ const DIAGNOSES: ReadonlyArray<{
       'The self-hosted runner pool is approaching or has reached the systemd ci-runners.slice task ceiling.',
     remediation:
       'Run .github/runner-host/diagnose-capacity.sh and restore the versioned ci-runners.slice TasksMax contract before retrying CI.',
+  },
+  {
+    failureClass: 'runner_io_pressure_admission',
+    matches: log =>
+      /runner_failure_class=runner-io-pressure(?:-unavailable)?\b/i.test(log) ||
+      /runner_spawn_admission=blocked[^\n]*\bio_full_avg10_pct=/i.test(log),
+    rootCause:
+      'Gem runner scale-up was admission-blocked because Linux I/O full pressure reached the reviewed saturation threshold or PSI telemetry was unavailable.',
+    remediation:
+      'Do not retry or add runners. Let existing jobs drain, then verify /proc/pressure/io full avg10 stays below the recovery threshold before admission resumes.',
   },
   {
     failureClass: 'runner_process_exhaustion',

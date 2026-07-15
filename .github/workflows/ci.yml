@@ -2552,16 +2552,16 @@ jobs:
     # Parallel with typecheck/build for faster CI.
     # Path-gated: skips test execution when no test-relevant files changed.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
-    # 5-shard unit tests; runner is var-switchable (CI_UNIT_RUNNER=jovie-runner
-    # offloads all shards to the self-hosted pool when hosted concurrency is
-    # the bottleneck). Defaults to GitHub-hosted. Shards upload no artifacts on
-    # the PR path (coverage is nightly-only), so pool egress is not a concern.
+    # When CI_UNIT_RUNNER routes to the 10-slot autoscaled ephemeral pool, one
+    # PR uses 5 slots, two PRs use all 10, and a third queues behind natural
+    # pool backpressure. The hosted fallback retains the original 3-shard cap
+    # for burst protection when the runner override is absent or rerouted.
     runs-on: ${{ vars.CI_UNIT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 40
     strategy:
       fail-fast: false
-      # Cap shard concurrency so multi-PR bursts don't open 5×N runners at once.
-      max-parallel: 3
+      # Fill the ephemeral pool; preserve the hosted fallback's burst limit.
+      max-parallel: ${{ vars.CI_UNIT_RUNNER == 'jovie-ephemeral' && 5 || 3 }}
       matrix:
         shard: ['1/5', '2/5', '3/5', '4/5', '5/5']
     outputs:

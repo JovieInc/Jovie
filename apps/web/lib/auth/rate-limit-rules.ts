@@ -10,5 +10,7 @@ export const AUTH_RATE_LIMIT_RULES = {
   '/get-session': false,
   '/sign-in/social': { window: 60, max: 10 },
   '/email-otp/send-verification-otp': { window: 60, max: 3 },
+  '/phone-number/send-otp': { window: 60, max: 3 },
+  '/phone-number/verify': { window: 60, max: 5 },
   '/one-time-token/verify': { window: 60, max: 10 },
 } as const;

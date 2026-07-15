@@ -86,7 +86,10 @@ const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = [
   'apps/web/scripts/test-performance-guard.ts',
   'apps/web/scripts/test-performance-profiler.test.ts',
   'apps/web/scripts/test-performance-profiler.ts',
+  'apps/web/tests/unit/app/exp-drift-lint-guard.test.ts',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+  'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
   'scripts/hermes/jobs/ci-failure-diagnosis.ts',
   'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
@@ -142,8 +145,42 @@ const GTMQ_SOURCE_GATE_REAPER_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const RUNNER_IO_PRESSURE_MANIFEST = [
+  '.github/runner-host/README.md',
+  '.github/runner-host/autoscaler/controller-io-pressure.patch',
+  '.github/runner-host/autoscaler/io-pressure.ts',
+  '.github/runner-host/ci-runner-autoscaler.service.snapshot',
+  '.github/runner-host/install-io-pressure-guard.sh',
+  'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
 
 describe('automation-verify affected scope', () => {
+  it('keeps runner I/O admission on focused controller regressions', () => {
+    const plan = buildAffectedTestPlan(RUNNER_IO_PRESSURE_MANIFEST);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+  });
+
+  it('fails closed when runner I/O admission includes an unknown peer', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...RUNNER_IO_PRESSURE_MANIFEST,
+        '.github/runner-host/autoscaler/unknown-controller.ts',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('selects related tests instead of the whole affected workspace package', () => {
     expect(script).toContain('node scripts/run-affected-tests.mjs');
     expect(script).not.toContain('turbo-local.mjs test --affected');
@@ -617,7 +654,10 @@ describe('automation-verify affected scope', () => {
     expect(plan.mode).toBe('selected');
     expect(plan.selectedTests).toEqual([
       'apps/web/scripts/test-performance-profiler.test.ts',
+      'apps/web/tests/unit/app/exp-drift-lint-guard.test.ts',
       'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
