@@ -474,7 +474,7 @@ jobs:
           # Screenshot-only product exports live under public/product-screenshots and
           # must not force public Lighthouse + Neon on main (they are marketing assets,
           # not route code). Filter that tree out before matching public/* paths.
-          PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/components/homepage/|apps/web/components/marketing/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/profile-mobile-viewport-stability\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/(public-surface-(manifest|helpers)|smoke-test-utils|mobile-profile-viewports)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
+          PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|scripts/lighthouse-retry\.mjs|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/components/homepage/|apps/web/components/marketing/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/profile-mobile-viewport-stability\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/(public-surface-(manifest|helpers)|smoke-test-utils|mobile-profile-viewports)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
           PUBLIC_LIGHTHOUSE_FILES=$(echo "$CHANGED_FILES" | grep -v -E '^apps/web/public/product-screenshots/' || true)
           if echo "$PUBLIC_LIGHTHOUSE_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
             echo "run_public_lighthouse=true" >> "$GITHUB_OUTPUT"
@@ -706,8 +706,7 @@ jobs:
           echo "✅ .env.example looks safe (no obvious secrets)."
 
   ci-secret-scan:
-    needs: [ci-path-changes]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     name: Secret Scan (gitleaks + trufflehog)
     # Always run; fast, catches secrets in PR diffs including *.backup files (JOV-3215).
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
@@ -723,16 +722,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             git fetch origin "${{ github.base_ref }}"
             ./scripts/security/scan-secrets.sh ci-pr "origin/${{ github.base_ref }}"
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
-            if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
-              git fetch origin main --depth=1
-              ./scripts/security/scan-secrets.sh ci-pr "origin/main"
-            else
-              ./scripts/security/scan-secrets.sh ci-pr "${{ github.event.before }}"
-            fi
           else
-            git fetch origin main --depth=1
-            ./scripts/security/scan-secrets.sh ci-pr "origin/main"
+            ./scripts/security/scan-secrets.sh ci-pr "${{ github.event.merge_group.base_sha }}"
           fi
       - name: Verify backup-file fixture coverage
         run: ./scripts/security/verify-gitleaks-coverage.sh
@@ -880,10 +871,10 @@ jobs:
   neon-db:
     name: Neon DB
     needs: [ci-path-changes]
-    # Run for push to main, testing-labeled full CI, or PRs touching DB-relevant paths.
-    # run_neon covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
-    # package.json changes. PRs touching only UI/perf/docs skip this job entirely.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true'))) }}
+    # Run for push to main, DB/public-Lighthouse paths, or launch evidence that
+    # requires an ephemeral database. UI/perf/docs-only PRs still skip it unless
+    # Golden/launch policy explicitly selects the prerequisite.
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || needs.ci-path-changes.outputs.run_golden_path == 'true' || contains(github.event.pull_request.labels.*.name, 'launch-candidate')))) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     concurrency:
@@ -899,8 +890,17 @@ jobs:
       - name: Check for backend changes
         id: check-backend
         if: ${{ github.event_name == 'pull_request' }}
+        env:
+          REQUIRES_GOLDEN_PATH: ${{ needs.ci-path-changes.outputs.run_golden_path }}
+          IS_LAUNCH_CANDIDATE: ${{ contains(github.event.pull_request.labels.*.name, 'launch-candidate') }}
         run: |
           set -euo pipefail
+
+          if [[ "$REQUIRES_GOLDEN_PATH" == "true" || "$IS_LAUNCH_CANDIDATE" == "true" ]]; then
+            echo "Golden/launch evidence requires an ephemeral Neon branch"
+            echo "needs_db=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           git fetch origin "${{ github.base_ref }}" --depth=1
           CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
@@ -1520,8 +1520,9 @@ jobs:
     timeout-minutes: 45
     strategy:
       fail-fast: false
-      # Cap concurrent widths so 3 PRs don't open 9 overflow runners at once.
-      max-parallel: 1
+      # The expanded runner pool supports two widths while the third remains
+      # bounded; non-320 widths already wait for the shared seed explicitly.
+      max-parallel: 2
       matrix:
         width: [320, 390, 430]
     steps:
@@ -1729,8 +1730,9 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      # Serial shards: Lighthouse is CPU-heavy; 2 concurrent shards × N PRs saturates hosts.
-      max-parallel: 1
+      # The expanded runner pool supports both CPU-heavy shards concurrently.
+      # Keep the cap explicit so future shard additions do not fan out silently.
+      max-parallel: 2
       matrix:
         shard: [0, 1]
     steps:
@@ -1914,7 +1916,7 @@ jobs:
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'launch-candidate') || (contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_dashboard_lighthouse == 'true')))) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     concurrency:
@@ -1932,7 +1934,8 @@ jobs:
           RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
           RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
           RUN_DASHBOARD_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_dashboard_lighthouse }}"
-          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_DASHBOARD_LIGHTHOUSE" == "true" ]]; then
+          IS_LAUNCH_CANDIDATE="${{ contains(github.event.pull_request.labels.*.name, 'launch-candidate') }}"
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_DASHBOARD_LIGHTHOUSE" == "true" || "$IS_LAUNCH_CANDIDATE" == "true" ]]; then
             echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_full_ci=false" >> "$GITHUB_OUTPUT"
@@ -2079,7 +2082,7 @@ jobs:
   ci-lighthouse-onboarding-pr:
     name: Lighthouse (onboarding PR)
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (contains(github.event.pull_request.labels.*.name, 'launch-candidate') || (contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true')))) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
@@ -3258,7 +3261,7 @@ jobs:
     # Full E2E runs on merge to main anyway.
     # Dependabot PRs cannot access NEON_API_KEY or other Preview-environment secrets.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'))) }}
+    if: ${{ always() && needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'))) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     concurrency:
@@ -4270,7 +4273,7 @@ jobs:
   # Production Lighthouse (in ci-build job) has even stricter thresholds (0.8 perf, 0.95 a11y).
 
   ci-merge-group-ready:
-    name: PR Ready
+    name: ${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}
     # Source PRs retain the A11y evidence that required Neon. Combined heads run
     # the shared-artifact Layout Guard without creating a second Neon branch.
     needs:
@@ -4281,8 +4284,9 @@ jobs:
         ci-unit-tests,
         ci-build-public,
         ci-layout-guard,
+        ci-secret-scan,
       ]
-    if: ${{ always() && !cancelled() && github.event_name == 'merge_group' }}
+    if: ${{ always() && github.event_name == 'merge_group' }}
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 2
     steps:
@@ -4297,6 +4301,7 @@ jobs:
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
           BUILD_HAS_ARTIFACT="${{ needs.ci-build-public.outputs.has_artifact }}"
           LAYOUT_RESULT="${{ needs.ci-layout-guard.result }}"
+          SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
           RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
 
           {
@@ -4313,6 +4318,7 @@ jobs:
             echo "| Unit Tests | $UNIT_RESULT |"
             echo "| Build (public routes) | $BUILD_RESULT |"
             echo "| Layout Guard | $LAYOUT_RESULT |"
+            echo "| Secret Scan | $SECRET_RESULT |"
             echo
             echo "Source-PR A11y evidence is inherited; merge groups do not provision Neon."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -4321,6 +4327,7 @@ jobs:
             "Path Changes:$PATH_RESULT" \
             "CI Risk Classifier:$RISK_RESULT" \
             "ci-fast:$FAST_RESULT" \
+            "Secret Scan:$SECRET_RESULT" \
             "Build (public routes):$BUILD_RESULT"; do
             name="${gate%%:*}"
             result="${gate#*:}"
@@ -4363,7 +4370,7 @@ jobs:
       - name: Run Storybook accessibility tests
         run: pnpm --filter @jovie/web test:a11y
   ci-pr-ready:
-    name: PR Ready
+    name: ${{ github.event_name == 'pull_request' && 'PR Ready' || 'PR Ready (source inactive)' }}
     # THE single aggregate merge gate (docs/PR_FLOW.md, merge-queue-guard.mjs
     # REQUIRED_MERGE_STATUSES). Branch protection and every enqueue automation
     # (drain-pr-queue.sh, agent-pipeline, agent-landing-sweep, agent-tick,
@@ -4381,15 +4388,23 @@ jobs:
         ci-fast,
         ci-unit-tests,
         ci-build-public,
+        neon-db,
         ci-pr-vercel-preview,
+        ci-e2e-smoke,
+        ci-golden-path,
+        ci-smoke-required,
+        ci-lighthouse-pr,
+        ci-lighthouse-dashboard-pr,
+        ci-lighthouse-onboarding-pr,
+        ci-lighthouse-admin-pr,
         ci-a11y,
         ci-storybook-a11y,
         ci-layout-guard,
+        ci-secret-scan,
       ]
-    # always() so we still evaluate when a leaf fails. !cancelled() avoids a
-    # second red PR Ready when the whole run is concurrency-cancelled mid-DAG
-    # (Path Changes cancel → leaves SKIPPED → risk "skipped" noise).
-    if: ${{ always() && !cancelled() && needs.ci-path-changes.outputs.skip == 'false' && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
+    # always() makes selected failed, skipped, or cancelled leaves observable
+    # instead of inheriting GitHub's implicit successful-needs condition.
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 2
     steps:
@@ -4399,26 +4414,55 @@ jobs:
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_RESULT="${{ needs.ci-build-public.result }}"
+          BUILD_HAS_ARTIFACT="${{ needs.ci-build-public.outputs.has_artifact }}"
+          NEON_RESULT="${{ needs.neon-db.result }}"
           A11Y_RESULT="${{ needs.ci-a11y.result }}"
           STORYBOOK_A11Y_RESULT="${{ needs.ci-storybook-a11y.result }}"
           LAYOUT_GUARD_RESULT="${{ needs.ci-layout-guard.result }}"
+          SECRET_SCAN_RESULT="${{ needs.ci-secret-scan.result }}"
+          GRAPHITE_SKIP="${{ needs.ci-path-changes.outputs.skip }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
+          RISK_REQUIRES_SMOKE="${{ needs.ci-risk-classifier.outputs.requires_smoke }}"
           RISK_REQUIRES_PREVIEW="${{ needs.ci-risk-classifier.outputs.requires_preview }}"
           RISK_BLOCKS_UNATTENDED="${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
           PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
+          E2E_SMOKE_RESULT="${{ needs.ci-e2e-smoke.result }}"
+          GOLDEN_PATH_RESULT="${{ needs.ci-golden-path.result }}"
+          EXTENDED_SMOKE_RESULT="${{ needs.ci-smoke-required.result }}"
+          PUBLIC_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-pr.result }}"
+          DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
+          ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
+          ADMIN_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-admin-pr.result }}"
+          HAS_TESTING_LABEL="${{ contains(github.event.pull_request.labels.*.name, 'testing') }}"
+          HAS_LAUNCH_CANDIDATE_LABEL="${{ contains(github.event.pull_request.labels.*.name, 'launch-candidate') }}"
+          RUN_E2E="${{ needs.ci-path-changes.outputs.run_e2e }}"
+          RUN_GOLDEN_PATH="${{ needs.ci-path-changes.outputs.run_golden_path }}"
+          RUN_PUBLIC_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_public_lighthouse }}"
+          RUN_DASHBOARD_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_dashboard_lighthouse }}"
+          RUN_ONBOARDING_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_onboarding_lighthouse }}"
+          RUN_ADMIN_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_admin_lighthouse }}"
           IS_DEPENDABOT="${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
           HAS_CODE_CHANGES="${{ needs.ci-path-changes.outputs.has_code_changes }}"
           echo "ci-path-changes: $PATH_RESULT (has_code_changes=$HAS_CODE_CHANGES)"
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
-          echo "ci-build-public: $BUILD_RESULT"
+          echo "ci-build-public: $BUILD_RESULT (has_artifact=$BUILD_HAS_ARTIFACT)"
+          echo "neon-db: $NEON_RESULT"
           echo "ci-a11y: $A11Y_RESULT"
           echo "ci-storybook-a11y: $STORYBOOK_A11Y_RESULT"
           echo "ci-layout-guard: $LAYOUT_GUARD_RESULT"
+          echo "ci-secret-scan: $SECRET_SCAN_RESULT"
           echo "ci-risk-classifier: $RISK_RESULT ($RISK_LEVEL; rules: ${RISK_RULES:-none})"
           echo "ci-pr-vercel-preview: $PREVIEW_RESULT"
+          echo "ci-e2e-smoke: $E2E_SMOKE_RESULT"
+          echo "ci-golden-path: $GOLDEN_PATH_RESULT"
+          echo "ci-smoke-required: $EXTENDED_SMOKE_RESULT"
+          echo "ci-lighthouse-pr: $PUBLIC_LIGHTHOUSE_RESULT"
+          echo "ci-lighthouse-dashboard-pr: $DASHBOARD_LIGHTHOUSE_RESULT"
+          echo "ci-lighthouse-onboarding-pr: $ONBOARDING_LIGHTHOUSE_RESULT"
+          echo "ci-lighthouse-admin-pr: $ADMIN_LIGHTHOUSE_RESULT"
 
           {
             echo "### PR Ready"
@@ -4428,12 +4472,21 @@ jobs:
             echo "| Path Changes | $PATH_RESULT | re-run workflow if cancelled/failed |"
             echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
             echo "| Unit Tests | $UNIT_RESULT | \`pnpm --filter=@jovie/web run test:fast\` |"
-            echo "| Build (public routes) | $BUILD_RESULT | \`pnpm run build:web\` |"
+            echo "| Build (public routes) | $BUILD_RESULT (has_artifact=$BUILD_HAS_ARTIFACT) | \`pnpm run build:web\` |"
+            echo "| Neon DB | $NEON_RESULT | inspect the selected ephemeral-database prerequisite |"
             echo "| A11y (axe) | $A11Y_RESULT | \`pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium\` |"
             echo "| Storybook A11y | $STORYBOOK_A11Y_RESULT | \`pnpm --filter @jovie/web test:a11y\` |"
             echo "| Layout Guard | $LAYOUT_GUARD_RESULT | \`pnpm exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium\` |"
+            echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo "| Preview Deploy | $PREVIEW_RESULT | \`pnpm run build:web\` |"
+            echo "| E2E Smoke | $E2E_SMOKE_RESULT | \`pnpm run test:web:smoke\` |"
+            echo "| Golden Path | $GOLDEN_PATH_RESULT | \`pnpm --filter @jovie/web run test:e2e:golden-path:ci\` |"
+            echo "| Extended Smoke | $EXTENDED_SMOKE_RESULT | inspect the failing Playwright spec |"
+            echo "| Public Lighthouse | $PUBLIC_LIGHTHOUSE_RESULT | \`pnpm --filter=@jovie/web run test:lighthouse:public:launch\` |"
+            echo "| Dashboard Lighthouse | $DASHBOARD_LIGHTHOUSE_RESULT | \`pnpm --filter=@jovie/web run test:lighthouse:dashboard:pr\` |"
+            echo "| Onboarding Lighthouse | $ONBOARDING_LIGHTHOUSE_RESULT | \`pnpm --filter=@jovie/web run test:lighthouse:onboarding:pr\` |"
+            echo "| Admin Lighthouse | $ADMIN_LIGHTHOUSE_RESULT | \`pnpm --filter=@jovie/web run test:lighthouse:admin:pr\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -4446,6 +4499,16 @@ jobs:
             echo "Leaf gates (CI Risk Classifier, ci-fast, Unit Tests, …) were skipped because the path DAG root did not finish."
             echo "Likely fix: re-run the failed jobs / workflow. Path Changes is hosted ubuntu-latest to avoid self-hosted cancel cascades."
             exit 1
+          fi
+
+          if [[ "$SECRET_SCAN_RESULT" != "success" ]]; then
+            echo "❌ Secret Scan did not pass (result: $SECRET_SCAN_RESULT)"
+            exit 1
+          fi
+
+          if [[ "$GRAPHITE_SKIP" == "true" ]]; then
+            echo "Graphite optimizer reuse accepted only after Path Changes and Secret Scan passed."
+            exit 0
           fi
 
           if [[ "$RISK_RESULT" != "success" ]]; then
@@ -4514,11 +4577,58 @@ jobs:
             echo "Dependabot PR: preview deploy intentionally skipped — treating as waived."
           fi
 
+          require_evidence() {
+            local intended="$1"
+            local result="$2"
+            local name="$3"
+            if [[ "$intended" == "true" && "$result" != "success" ]]; then
+              echo "❌ $name was required for this PR, but result was $result"
+              exit 1
+            fi
+          }
+
+          E2E_SMOKE_INTENDED=false
+          if [[ "$RISK_REQUIRES_SMOKE" == "true" || ("$HAS_TESTING_LABEL" == "true" && "$RUN_E2E" == "true") ]]; then
+            E2E_SMOKE_INTENDED=true
+          fi
+          GOLDEN_PATH_INTENDED=false
+          if [[ "$RUN_GOLDEN_PATH" == "true" || "$HAS_LAUNCH_CANDIDATE_LABEL" == "true" ]]; then
+            GOLDEN_PATH_INTENDED=true
+          fi
+          EXTENDED_SMOKE_INTENDED=false
+          if [[ "$HAS_TESTING_LABEL" == "true" && "$RUN_E2E" == "true" ]]; then
+            EXTENDED_SMOKE_INTENDED=true
+          fi
+          PUBLIC_LIGHTHOUSE_INTENDED=false
+          if [[ "$HAS_TESTING_LABEL" == "true" && "$RUN_PUBLIC_LIGHTHOUSE" == "true" ]]; then
+            PUBLIC_LIGHTHOUSE_INTENDED=true
+          fi
+          DASHBOARD_LIGHTHOUSE_INTENDED=false
+          if [[ "$HAS_LAUNCH_CANDIDATE_LABEL" == "true" || ("$HAS_TESTING_LABEL" == "true" && "$RUN_DASHBOARD_LIGHTHOUSE" == "true") ]]; then
+            DASHBOARD_LIGHTHOUSE_INTENDED=true
+          fi
+          ONBOARDING_LIGHTHOUSE_INTENDED=false
+          if [[ "$HAS_LAUNCH_CANDIDATE_LABEL" == "true" || ("$HAS_TESTING_LABEL" == "true" && "$RUN_ONBOARDING_LIGHTHOUSE" == "true") ]]; then
+            ONBOARDING_LIGHTHOUSE_INTENDED=true
+          fi
+          ADMIN_LIGHTHOUSE_INTENDED=false
+          if [[ "$HAS_TESTING_LABEL" == "true" && "$RUN_ADMIN_LIGHTHOUSE" == "true" ]]; then
+            ADMIN_LIGHTHOUSE_INTENDED=true
+          fi
+
+          require_evidence "$E2E_SMOKE_INTENDED" "$E2E_SMOKE_RESULT" "E2E Smoke (PR Fast Feedback)"
+          require_evidence "$GOLDEN_PATH_INTENDED" "$GOLDEN_PATH_RESULT" "Golden Path (PR)"
+          require_evidence "$EXTENDED_SMOKE_INTENDED" "$EXTENDED_SMOKE_RESULT" "Extended Smoke (Preview)"
+          require_evidence "$PUBLIC_LIGHTHOUSE_INTENDED" "$PUBLIC_LIGHTHOUSE_RESULT" "Lighthouse (public routes PR)"
+          require_evidence "$DASHBOARD_LIGHTHOUSE_INTENDED" "$DASHBOARD_LIGHTHOUSE_RESULT" "Lighthouse (dashboard PR)"
+          require_evidence "$ONBOARDING_LIGHTHOUSE_INTENDED" "$ONBOARDING_LIGHTHOUSE_RESULT" "Lighthouse (onboarding PR)"
+          require_evidence "$ADMIN_LIGHTHOUSE_INTENDED" "$ADMIN_LIGHTHOUSE_RESULT" "Lighthouse (admin PR)"
+
           if [[ "$RISK_BLOCKS_UNATTENDED" == "true" ]]; then
             echo "Risk classifier blocks unattended auto-merge for this PR. Human review may still merge after required evidence is present."
           fi
 
-          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, a11y, Storybook a11y, layout guard, build"
+          echo "All intended PR checks passed: fast gate, unit tests, a11y, Storybook a11y, layout, preview, smoke, Golden Path, and Lighthouse evidence"
 
   ci-summary:
     name: PR Summary
@@ -4540,6 +4650,8 @@ jobs:
       - drizzle-migration-guard
       - ci-drizzle-check
       - ci-e2e-smoke
+      - ci-golden-path
+      - ci-smoke-required
       - ci-pr-neon-migrate
       - ci-unit-tests
       - ci-test-performance
@@ -4614,6 +4726,8 @@ jobs:
           CI_HARNESS_JOB_CI_LIGHTHOUSE_ONBOARDING_PR: ${{ needs.ci-lighthouse-onboarding-pr.result }}
           CI_HARNESS_JOB_CI_LIGHTHOUSE_ADMIN_PR: ${{ needs.ci-lighthouse-admin-pr.result }}
           CI_HARNESS_JOB_CI_E2E_SMOKE: ${{ needs.ci-e2e-smoke.result }}
+          CI_HARNESS_JOB_CI_GOLDEN_PATH: ${{ needs.ci-golden-path.result }}
+          CI_HARNESS_JOB_CI_SMOKE_REQUIRED: ${{ needs.ci-smoke-required.result }}
           CI_HARNESS_JOB_CI_PR_VERCEL_PREVIEW: ${{ needs.ci-pr-vercel-preview.result }}
         run: |
           set -euo pipefail
@@ -6129,4 +6243,4 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Lighthouse CI against production
-        run: for attempt in 1 2 3; do if pnpm --filter web exec lhci autorun --config=.lighthouserc.json; then exit 0; fi; echo "Lighthouse production attempt $attempt failed (PROTOCOL_TIMEOUT), retrying after 10s..."; sleep 10; done; echo "All 3 Lighthouse production attempts failed."; exit 1
+        run: node scripts/lighthouse-retry.mjs -- pnpm --filter web exec lhci autorun --config=.lighthouserc.json

@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# Graphite-native PR queue drain.
-# Classifies every open PR and ENROLLS the clean ones into the Graphite merge
-# queue by applying the `merge-queue` label. It also removes that label from
-# PRs that cannot currently merge so they stop occupying queue slots.
+# Backend-routed PR queue drain. Graphite uses the merge-queue label as its
+# transport; GitHub native uses exact-head enrollment and authoritative queue
+# state while retaining the label only as intent/audit evidence.
 # Autonomous shipping (2026-07-06): taste gates are advisory — only hold/gated/needs-human block.
 #
 # It deliberately does NOT:
-#   - run `gh pr merge` (branch protection lets only the Graphite app push to
-#     main; Graphite rebase-merges enrolled PRs server-side)
+#   - directly merge a PR (native enrollment uses `gh pr merge --auto`; the
+#     queue still owns integration validation and the eventual merge)
 #   - retarget to integration/loop-* (agents ship straight to main now)
 #   - close ordinary PRs (surfaced for a human instead — see the SURFACE bucket)
 #
@@ -25,6 +24,7 @@
 #   DRAIN_MUTATION_AUTHORIZATION  required for every live mutation run
 #   DRAIN_EXPECT_GH  optional exact gh path assertion used by test fixtures
 #   DRAIN_MAX_SECONDS  hard wall-clock budget between GitHub calls (default 900)
+#   MERGE_QUEUE_BACKEND  graphite (default) or native; unknown values fail closed
 set -euo pipefail
 
 DRY_RUN="${DRY_RUN:-0}"
@@ -49,6 +49,14 @@ fi
 source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 
 REPO="${REPO:-JovieInc/Jovie}"
+MERGE_QUEUE_BACKEND="${MERGE_QUEUE_BACKEND:-graphite}"
+case "$MERGE_QUEUE_BACKEND" in
+  graphite | native) ;;
+  *)
+    echo "::error::Unknown MERGE_QUEUE_BACKEND: $MERGE_QUEUE_BACKEND" >&2
+    exit 2
+    ;;
+esac
 DRAIN_MAX_SECONDS="${DRAIN_MAX_SECONDS:-900}"
 DRAIN_STARTED_AT="$SECONDS"
 
@@ -80,27 +88,47 @@ unlabel() {  # unlabel <num> <label>
 # authoritative PR state immediately before mutation so a draft conversion or
 # a queue-deferred hold cannot be overwritten by this controller.
 enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
-  local n="$1" current
+  local n="$1" current head_oid json_fields
+  json_fields="state,isDraft,mergeable,labels"
+  [[ "$MERGE_QUEUE_BACKEND" == "native" ]] && json_fields+=",headRefOid"
   if ! current="$(gh_retry pr view "$n" -R "$REPO" \
-    --json state,isDraft,mergeable,labels 2>/dev/null)"; then
+    --json "$json_fields" 2>/dev/null)"; then
     echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
     return 1
   fi
-  if ! jq -e '
+  if ! jq -e --arg backend "$MERGE_QUEUE_BACKEND" '
     .state == "OPEN"
     and (.isDraft | not)
     and .mergeable == "MERGEABLE"
     and ([.labels[].name] | any(
       . == "needs-human" or . == "hold" or . == "gated"
       or . == "queue-deferred" or . == "needs-conflict-resolution"
-      or . == "merge-queue" or . == "fast"
+      or . == "fast" or ($backend == "graphite" and . == "merge-queue")
     ) | not)
   ' <<<"$current" >/dev/null; then
     echo "    ⏸ eligibility changed; refusing enrollment for #$n"
     return 2
   fi
   if [[ "$DRY_RUN" == "1" ]]; then
-    echo "    [dry-run] would +merge-queue on #$n"
+    if [[ "$MERGE_QUEUE_BACKEND" == "graphite" ]]; then
+      echo "    [dry-run] would +merge-queue on #$n"
+    else
+      echo "    [dry-run] would enroll #$n via native"
+    fi
+    return 0
+  fi
+  if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+    head_oid="$(jq -r '.headRefOid // empty' <<<"$current")"
+    if [[ ! "$head_oid" =~ ^[0-9a-fA-F]{40}$ ]]; then
+      echo "    !! missing exact head SHA for native enrollment of #$n" >&2
+      return 1
+    fi
+    if ! node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid" >/dev/null; then
+      echo "    !! native enrollment/postcondition failed for #$n" >&2
+      return 1
+    fi
+    label "$n" merge-queue
+    echo "    +native-queue on #$n at $head_oid"
     return 0
   fi
   if ! gh_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
@@ -139,7 +167,29 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
 remove_held_queue_label_strict() {  # remove_held_queue_label_strict <num>
   local n="$1" current
   if [[ "$DRY_RUN" == "1" ]]; then
-    echo "    [dry-run] would -merge-queue on #$n"
+    if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+      echo "    [dry-run] would dequeue #$n from native"
+    else
+      echo "    [dry-run] would -merge-queue on #$n"
+    fi
+    return 0
+  fi
+  if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+    if ! node scripts/merge-queue-backend.mjs dequeue "$n" >/dev/null; then
+      echo "    !! failed to prove native dequeue for held PR #$n" >&2
+      return 1
+    fi
+    if ! current="$(gh_retry pr view "$n" -R "$REPO" --json labels 2>/dev/null)"; then
+      echo "    !! could not read intent label after native dequeue for #$n" >&2
+      return 1
+    fi
+    if jq -e '([.labels[].name] | index("merge-queue")) != null' <<<"$current" >/dev/null; then
+      if ! gh_retry pr edit "$n" -R "$REPO" --remove-label merge-queue >/dev/null; then
+        echo "    !! failed to remove native intent label from #$n" >&2
+        return 1
+      fi
+    fi
+    echo "    -native-queue on #$n"
     return 0
   fi
   if ! gh_retry pr edit "$n" -R "$REPO" --remove-label merge-queue >/dev/null; then
@@ -227,14 +277,38 @@ SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
     fail: []
   } ]')"
 
-# --- Graphite MQ synthetic authorization: fail closed before expensive checks ---
-# A source can be dequeued or gated after Graphite has already materialized a
-# speculative gtmq branch. Removing the source label alone does not reliably
-# cancel that generated branch, so re-check each source and close the synthetic
-# before this run spends its budget on checks or mutates ordinary enrollment.
-echo "=== GRAPHITE MQ source authorization ==="
-printf '%s\n' "$SNAP" | GTMQ_MUTATION_AUTHORIZATION=drain-snapshot \
-  bash "$(dirname "${BASH_SOURCE[0]}")/guard-gtmq-source-authorization.sh" --snapshot
+# Resolve authoritative queue membership once for the snapshot. In native
+# mode labels are only intent/audit evidence and must never be treated as queue
+# state. Fail closed if GitHub omits any open PR from the GraphQL snapshot.
+if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+  if [[ "$DRY_RUN" != "1" ]]; then
+    node scripts/merge-queue-backend.mjs preflight >/dev/null
+  fi
+  NATIVE_QUEUE_STATE="$(node scripts/merge-queue-backend.mjs list-state)"
+  if ! jq -e --argjson states "$NATIVE_QUEUE_STATE" '
+    all(.[]; ($states[(.n | tostring)] | type) == "object")
+  ' <<<"$SNAP" >/dev/null; then
+    echo "::error::Native queue state omitted an open PR; refusing partial drain" >&2
+    exit 1
+  fi
+  SNAP="$(jq -c --argjson states "$NATIVE_QUEUE_STATE" '
+    map(. + {
+      q: ($states[(.n | tostring)].queued == true),
+      oid: $states[(.n | tostring)].headRefOid
+    })
+  ' <<<"$SNAP")"
+else
+  SNAP="$(jq -c '
+    map(. + {q: (((.L // []) | index("merge-queue")) != null)})
+  ' <<<"$SNAP")"
+
+  # A source can be dequeued or gated after Graphite has already materialized
+  # a speculative gtmq branch. Removing the source label alone does not
+  # reliably cancel that generated branch, so fail closed before other work.
+  echo "=== GRAPHITE MQ source authorization ==="
+  printf '%s\n' "$SNAP" | GTMQ_MUTATION_AUTHORIZATION=drain-snapshot \
+    bash "$(dirname "${BASH_SOURCE[0]}")/guard-gtmq-source-authorization.sh" --snapshot
+fi
 
 ENRICHED="[]"
 while IFS= read -r pr; do
@@ -250,9 +324,9 @@ while IFS= read -r pr; do
     fail="$(check_failures_for_pr "$n")"
   fi
   # Guard: check_failures_for_pr might return non-JSON under transient gh errors.
-  # Default to empty array if $fail isn't valid JSON.
+  # Unknown check state is a blocker, never permission to enqueue.
   if ! jq -e . <<<"$fail" >/dev/null 2>&1; then
-    fail='[]'
+    fail='["required check status unavailable"]'
   fi
   ENRICHED="$(jq -c --argjson pr "$pr" --argjson fail "$fail" '. + [$pr + {fail: $fail}]' <<<"$ENRICHED")"
 done < <(jq -c '.[]' <<<"$SNAP")
@@ -262,7 +336,7 @@ SNAP="$ENRICHED"
 echo "=== QUEUE SUMMARY ==="
 echo "$SNAP" | jq -r '
   def labels: (.L // []);
-  def queued: labels | index("merge-queue");
+  def queued: .q == true;
   def hard_gated: labels | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred");
   [
     "  CLEAN: " + ([.[] | select(queued and (.ms // "") == "CLEAN")] | length | tostring),
@@ -273,7 +347,7 @@ echo "$SNAP" | jq -r '
     "  gtmq: " + ([.[] | select((.head // "") | startswith("gtmq_"))] | length | tostring)
   ] | .[]'
 
-# --- DEQUEUE: hard-gated PRs must not occupy Graphite queue slots ---
+# --- DEQUEUE: hard-gated PRs must not occupy queue slots ---
 echo "=== DEQUEUE (hard gates → -merge-queue) ==="
 while read -r pr; do
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
@@ -283,7 +357,7 @@ while read -r pr; do
       exit 1
     fi
   done < <(echo "$SNAP" | jq -c '.[]
-  | select([.L[]] | index("merge-queue"))
+  | select(.q == true)
   | select((.head|startswith("gtmq_"))|not)
   | select(.draft or ([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred")))')
 
@@ -301,7 +375,7 @@ while read -r pr; do
 # (m == CONFLICTING, never UNKNOWN), or actually-failing checks (.fail).
 echo "=== DEQUEUE (conflict / failing → -merge-queue) ==="
 echo "$SNAP" | jq -c '.[]
-  | select([.L[]] | index("merge-queue"))
+  | select(.q == true)
   | select((.head|startswith("gtmq_"))|not)
   | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred")) | not)
   | select(
@@ -319,7 +393,14 @@ echo "$SNAP" | jq -c '.[]
       ] | join("; ")
     ' <<<"$pr")
     echo "  #$n  $t  ✗ $reason"
-    unlabel "$n" merge-queue
+    if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+      if ! remove_held_queue_label_strict "$n"; then
+        echo "::error::Failed to prove PR #$n is outside native merge queue" >&2
+        exit 1
+      fi
+    else
+      unlabel "$n" merge-queue
+    fi
   done
 
 # --- ENROLL: non-draft, mergeable, no FAILING checks, not opted-out, not queued ---
@@ -330,11 +411,11 @@ echo "$SNAP" | jq -c '.[]
 # safe — Graphite re-validates and the dequeue step above removes any that truly
 # fail. `.fail` only counts terminal failing checks, not pending/queued ones.
 echo "=== ENROLL (mergeable + not failing → +merge-queue) ==="
-# Honor GRAPHITE_QUEUE_POLICY.maxQueueDepth. Use process substitution rather
+# Honor the checked-in queue policy's maxQueueDepth. Use process substitution rather
 # than a pipe so ENROLLED_THIS_RUN remains in the parent shell and the cap is
 # actually enforced.
 MAX_QUEUE_DEPTH=$(node scripts/ci-merge-queue-check.mjs max-queue-depth 2>/dev/null || echo 16)
-QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select([.L[]] | index("merge-queue"))] | length')
+QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
 ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
 [[ "$ENROLL_SLOTS" -lt 0 ]] && ENROLL_SLOTS=0
 echo "  queue depth: $QUEUED_NOW/$MAX_QUEUE_DEPTH ($ENROLL_SLOTS slots)"
@@ -364,7 +445,8 @@ done < <(echo "$SNAP" | jq -c '.[]
   | select(.m=="MERGEABLE")
   | select(.fail|length==0)
   | select((.head|startswith("gtmq_"))|not)
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or .=="needs-conflict-resolution" or .=="merge-queue" or .=="fast") | not)')
+  | select(.q | not)
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or .=="needs-conflict-resolution" or .=="fast") | not)')
 
 # --- CONFLICT: needs rebase (agent branches only) → label + hand to fix agent ---
 echo "=== CONFLICT (needs rebase → fix agent) ==="

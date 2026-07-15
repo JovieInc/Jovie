@@ -1,3 +1,6 @@
+import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildCiHarnessArtifact,
@@ -12,8 +15,10 @@ import {
   validateCiHarnessManifest,
 } from '../ci-control-plane.mjs';
 import { replaceGeneratedBlock } from '../ci-harness.mjs';
+import { extractWorkflowJobBlock } from '../merge-queue-guard.mjs';
 
 const manifest = loadCiHarnessManifest();
+const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
 /** Locked PR merge-gate set (manifest is source of truth for harness docs + artifact). */
 const EXPECTED_MERGE_GATE_NAMES = [
@@ -28,6 +33,7 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Lighthouse (admin PR)',
   'E2E Smoke (PR Fast Feedback)',
   'Golden Path (PR)',
+  'Extended Smoke (Preview)',
   'Preview Deploy (PR)',
 ];
 
@@ -96,7 +102,7 @@ describe('ci-harness manifest', () => {
     expect(byId['ci-workflows']).toMatchObject({
       level: 'high',
       requiresSmoke: true,
-      requiresPreview: false,
+      requiresPreview: true,
       blocksUnattendedAutoMerge: false,
     });
   });
@@ -117,6 +123,119 @@ describe('ci-harness manifest', () => {
           FORBIDDEN_PINNED_JOB_CONTEXTS.includes(`CI / ${name}`),
         `expected forbidden pin for merge-gate job "${name}"`
       ).toBe(true);
+    }
+  });
+
+  it('fans intended heavy evidence and Storybook into PR Ready', () => {
+    const workflow = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+      'utf8'
+    );
+    const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
+    expect(prReady).toBeTruthy();
+    expect(prReady).toContain(
+      "if: ${{ always() && github.event_name == 'pull_request'"
+    );
+    expect(prReady).not.toContain('!cancelled()');
+    expect(prReady).toMatch(/\bci-storybook-a11y,/);
+    expect(prReady).toContain('STORYBOOK_A11Y_RESULT');
+    expect(prReady).toMatch(
+      /RISK_REQUIRES_PREVIEW.*true.*PREVIEW_RESULT.*success[\s\S]*?exit 1/
+    );
+
+    const intendedGates = {
+      'ci-e2e-smoke': 'E2E_SMOKE',
+      'ci-golden-path': 'GOLDEN_PATH',
+      'ci-smoke-required': 'EXTENDED_SMOKE',
+      'ci-lighthouse-pr': 'PUBLIC_LIGHTHOUSE',
+      'ci-lighthouse-dashboard-pr': 'DASHBOARD_LIGHTHOUSE',
+      'ci-lighthouse-onboarding-pr': 'ONBOARDING_LIGHTHOUSE',
+      'ci-lighthouse-admin-pr': 'ADMIN_LIGHTHOUSE',
+    };
+
+    for (const [jobId, prefix] of Object.entries(intendedGates)) {
+      expect(prReady).toMatch(new RegExp(`\\b${jobId},`));
+      expect(prReady).toContain(
+        `require_evidence "$${prefix}_INTENDED" "$${prefix}_RESULT"`
+      );
+    }
+    expect(prReady).not.toContain('needs.ci-a11y-authed');
+    expect(prReady).not.toContain('needs.ci-lighthouse-chat-pr');
+
+    const functionMatch = prReady.match(
+      /^ {10}require_evidence\(\) \{[\s\S]*?^ {10}\}/m
+    );
+    expect(functionMatch).not.toBeNull();
+    const requireEvidence = functionMatch[0].replace(/^ {10}/gm, '');
+    const evidenceStatus = (intended, result) =>
+      spawnSync(
+        'bash',
+        [
+          '-c',
+          `${requireEvidence}\nrequire_evidence ${intended} ${result} gate`,
+        ],
+        { encoding: 'utf8' }
+      ).status;
+    for (const result of [
+      'failure',
+      'cancelled',
+      'skipped',
+      'pending',
+      'queued',
+    ]) {
+      expect(evidenceStatus('true', result), result).toBe(1);
+    }
+    expect(evidenceStatus('true', 'success')).toBe(0);
+    expect(evidenceStatus('false', 'skipped')).toBe(0);
+  });
+
+  it('routes launch candidates through Golden, dashboard, and onboarding evidence', () => {
+    const workflow = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+      'utf8'
+    );
+    for (const jobId of [
+      'neon-db',
+      'ci-golden-path',
+      'ci-lighthouse-dashboard-pr',
+      'ci-lighthouse-onboarding-pr',
+    ]) {
+      const job = extractWorkflowJobBlock(workflow, jobId);
+      expect(job, jobId).toContain("'launch-candidate'");
+    }
+
+    const neon = extractWorkflowJobBlock(workflow, 'neon-db');
+    expect(neon).toContain(
+      "needs.ci-path-changes.outputs.run_golden_path == 'true'"
+    );
+    expect(neon).toContain(
+      "IS_LAUNCH_CANDIDATE: ${{ contains(github.event.pull_request.labels.*.name, 'launch-candidate') }}"
+    );
+    expect(neon).toContain(
+      'if [[ "$REQUIRES_GOLDEN_PATH" == "true" || "$IS_LAUNCH_CANDIDATE" == "true" ]]'
+    );
+    expect(neon).toContain('echo "needs_db=true" >> "$GITHUB_OUTPUT"');
+
+    const dashboard = extractWorkflowJobBlock(
+      workflow,
+      'ci-lighthouse-dashboard-pr'
+    );
+    expect(dashboard).toContain(
+      'IS_LAUNCH_CANDIDATE="${{ contains(github.event.pull_request.labels.*.name, \'launch-candidate\') }}"'
+    );
+    expect(dashboard).toContain('|| "$IS_LAUNCH_CANDIDATE" == "true" ]]');
+
+    const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
+    for (const intended of [
+      'GOLDEN_PATH_INTENDED',
+      'DASHBOARD_LIGHTHOUSE_INTENDED',
+      'ONBOARDING_LIGHTHOUSE_INTENDED',
+    ]) {
+      expect(prReady).toMatch(
+        new RegExp(
+          `${intended}=false[\\s\\S]*?HAS_LAUNCH_CANDIDATE_LABEL.*?true[\\s\\S]*?${intended}=true`
+        )
+      );
     }
   });
 
@@ -300,7 +419,7 @@ describe('ci-harness risk classifier', () => {
     const risk = classifyCiRisk(['.github/workflows/ci.yml'], manifest);
     expect(risk.riskLevel).toBe('high');
     expect(risk.requiresSmoke).toBe(true);
-    expect(risk.requiresPreview).toBe(false);
+    expect(risk.requiresPreview).toBe(true);
     expect(risk.blocksUnattendedAutoMerge).toBe(false);
   });
 

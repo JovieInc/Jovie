@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
   merge-group-size:
-    name: PR Size Guard
+    name: ${{ github.event_name == 'merge_group' && 'PR Size Guard' || 'PR Size Guard (merge-group inactive)' }}
     if: github.event_name == 'merge_group'
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 1
@@ -46,7 +46,7 @@ jobs:
         run: echo "Merge-group members were size-checked as source PRs."
 
   size:
-    name: PR Size Guard
+    name: ${{ github.event_name == 'pull_request' && 'PR Size Guard' || 'PR Size Guard (source inactive)' }}
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     if: github.event_name == 'pull_request'

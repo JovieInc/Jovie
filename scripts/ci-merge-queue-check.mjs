@@ -12,6 +12,17 @@ import {
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 
+function configuredBackend() {
+  // Repo source-of-record targets native after this bootstrap lands. The live
+  // controller remains explicitly defaulted to Graphite until the guarded
+  // ruleset + repository-variable cutover is performed.
+  const backend = process.env.MERGE_QUEUE_BACKEND?.trim() || 'native';
+  if (backend !== 'graphite' && backend !== 'native') {
+    throw new Error(`Unknown MERGE_QUEUE_BACKEND: ${backend}`);
+  }
+  return backend;
+}
+
 function readRepoFile(relativePath) {
   return readFileSync(resolve(REPO_ROOT, relativePath), 'utf8');
 }
@@ -42,13 +53,14 @@ function loadLiveRuleset() {
 }
 
 function printPolicySummary() {
-  console.log('Graphite merge-queue policy (source-of-record):');
+  console.log(`${configuredBackend()} merge-queue policy (source-of-record):`);
   for (const [key, value] of Object.entries(GRAPHITE_QUEUE_POLICY)) {
     console.log(`  ${key}: ${JSON.stringify(value)}`);
   }
 }
 
 function runValidate({ checkLive = false } = {}) {
+  const backend = configuredBackend();
   const branchProtectionYaml = readRepoFile(
     MERGE_QUEUE_REPO_PATHS.branchProtection
   );
@@ -57,6 +69,7 @@ function runValidate({ checkLive = false } = {}) {
     MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow
   );
   const repoValidation = validateMergeQueueRepoConfig({
+    backend,
     branchProtectionYaml,
     ciWorkflowYaml,
   });
@@ -103,7 +116,7 @@ function runValidate({ checkLive = false } = {}) {
     return;
   }
 
-  const liveValidation = validateLiveMergeQueueRuleset(live);
+  const liveValidation = validateLiveMergeQueueRuleset(live, { backend });
   if (!liveValidation.ok) {
     console.error('Live GitHub ruleset validation failed:');
     for (const error of liveValidation.errors) {

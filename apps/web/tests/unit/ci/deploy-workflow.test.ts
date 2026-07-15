@@ -1145,6 +1145,45 @@ describe('CI mobile overflow workflow', () => {
   });
 });
 
+describe('CI required smoke materialization', () => {
+  it('evaluates the smoke condition when the shared Neon prerequisite is path-skipped', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const smokeJob = getJobBlock(workflow, 'ci-e2e-smoke');
+
+    expect(smokeJob).toContain('if: ${{ always() &&');
+    expect(smokeJob).toContain(
+      "needs.ci-risk-classifier.outputs.requires_smoke == 'true'"
+    );
+    expect(smokeJob).toContain(
+      "needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'"
+    );
+    expect(smokeJob).toContain(
+      "if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'"
+    );
+    expect(smokeJob).toContain(
+      "if: always() && steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'"
+    );
+  });
+});
+
+describe('CI bounded evidence parallelism', () => {
+  it('uses both Lighthouse shards without unbounded future fan-out', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const lighthouse = getJobBlock(workflow, 'ci-lighthouse-pr');
+
+    expect(lighthouse).toContain('max-parallel: 2');
+    expect(lighthouse).toContain('shard: [0, 1]');
+  });
+
+  it('runs two mobile widths while retaining the three-width evidence set', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const mobile = getJobBlock(workflow, 'ci-mobile-overflow');
+
+    expect(mobile).toContain('max-parallel: 2');
+    expect(mobile).toContain('width: [320, 390, 430]');
+  });
+});
+
 describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
   const neonBranchCreateJobs = {
     'neon-db': 'neon-endpoint-pool-neon-db-',

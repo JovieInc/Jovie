@@ -57,7 +57,7 @@ concurrency:
 
 jobs:
   merge-group-gate:
-    name: Fork PR Gate
+    name: ${{ github.event_name == 'merge_group' && 'Fork PR Gate' || 'Fork PR Gate (merge-group inactive)' }}
     if: github.event_name == 'merge_group'
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 1
@@ -71,7 +71,7 @@ jobs:
   # the Fork PR Gate status to be set by jovie-bot specifically. No code from
   # the head branch is checked out here, so pull_request_target is safe.
   dependabot-gate:
-    name: Fork PR Gate
+    name: Fork PR Gate Dependabot Controller
     if: github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]'
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 1
@@ -96,7 +96,7 @@ jobs:
             -f context="Fork PR Gate"
 
   fork-gate:
-    name: Fork PR Gate
+    name: Fork PR Gate Controller
     # pull_request_target is safe here: this job only reads PR metadata/diffs
     # through the API and sets a commit status; it never checks out head code.
     # It gives fork PRs the bot credential required to update the required gate.

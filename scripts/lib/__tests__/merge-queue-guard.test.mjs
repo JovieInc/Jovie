@@ -12,6 +12,7 @@ import {
   isAutonomousBranch,
   MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
+  NATIVE_QUEUE_POLICY,
   parseMergeQueueTimeline,
   parseRequiredStatusChecksFromYaml,
   preQueueFreshnessDecision,
@@ -371,6 +372,7 @@ describe('aggregate required checks', () => {
     );
 
     const result = validateMergeQueueRepoConfig({
+      backend: 'native',
       branchProtectionYaml,
       ciWorkflowYaml,
     });
@@ -378,9 +380,7 @@ describe('aggregate required checks', () => {
     expect(result.errors).toEqual([]);
     expect(result.ok).toBe(true);
     expect(ciWorkflowHasMergeGroupTrigger(ciWorkflowYaml)).toBe(true);
-    expect(result.warnings).toContain(
-      'ci.yml declares inert merge_group compatibility; Graphite remains the active queue until the ruleset/backend changes'
-    );
+    expect(result.warnings).toEqual([]);
     expect(parseRequiredStatusChecksFromYaml(branchProtectionYaml)).toEqual([
       'CI / PR Ready',
       'CI / Migration Guard',
@@ -467,6 +467,105 @@ describe('aggregate required checks', () => {
     const result = validateLiveMergeQueueRuleset(liveRuleset);
     expect(result.ok).toBe(true);
     expect(result.hasGraphiteBypass).toBe(true);
+  });
+
+  it('fails closed when native source wiring omits the queue event and retains Graphite bypass', () => {
+    const unsafe = validateMergeQueueRepoConfig({
+      backend: 'native',
+      branchProtectionYaml: `
+        rules:
+          - type: non_fast_forward
+        bypass_actors:
+          - actor_id: 158384
+      `,
+      ciWorkflowYaml: 'on: pull_request',
+    });
+
+    expect(unsafe.ok).toBe(false);
+    expect(unsafe.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('must enable GitHub native merge_queue'),
+        expect.stringContaining('must handle merge_group'),
+        expect.stringContaining('must remove the graphite-app bypass actor'),
+      ])
+    );
+  });
+
+  it('validates native live ruleset shape and rejects Graphite bypass residue', () => {
+    const requiredStatusChecks = {
+      type: 'required_status_checks',
+      parameters: {
+        strict_required_status_checks_policy: false,
+        required_status_checks: [
+          'PR Ready',
+          'Migration Guard',
+          'Fork PR Gate',
+          'PR Size Guard',
+        ].map(context => ({ context })),
+      },
+    };
+    const nativeRules = [
+      { type: 'pull_request' },
+      requiredStatusChecks,
+      { type: 'merge_queue', parameters: NATIVE_QUEUE_POLICY },
+    ];
+    const result = validateLiveMergeQueueRuleset(
+      {
+        bypass_actors: [],
+        rules: nativeRules,
+      },
+      { backend: 'native' }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      hasGraphiteBypass: false,
+      hasNativeMergeQueue: true,
+    });
+
+    for (const bypass_actors of [undefined, {}]) {
+      const malformed = validateLiveMergeQueueRuleset(
+        { bypass_actors, rules: nativeRules },
+        { backend: 'native' }
+      );
+      expect(malformed.errors).toContain(
+        'live ruleset bypass_actors must be an array'
+      );
+    }
+
+    const unsafe = validateLiveMergeQueueRuleset(
+      {
+        bypass_actors: [{ actor_id: 158384, actor_type: 'Integration' }],
+        rules: [
+          requiredStatusChecks,
+          {
+            type: 'merge_queue',
+            parameters: {
+              ...NATIVE_QUEUE_POLICY,
+              max_entries_to_build: 99,
+              merge_method: 'MERGE',
+            },
+          },
+        ],
+      },
+      { backend: 'native' }
+    );
+    expect(unsafe.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('SQUASH'),
+        expect.stringContaining('max_entries_to_build'),
+        expect.stringContaining('still grants graphite-app bypass'),
+      ])
+    );
+  });
+
+  it('rejects unknown backend names instead of falling back to Graphite', () => {
+    const result = validateLiveMergeQueueRuleset(
+      { bypass_actors: [], rules: [] },
+      { backend: 'other' }
+    );
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain('unknown merge queue backend: other');
   });
 });
 
