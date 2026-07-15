@@ -4,7 +4,7 @@
   "private": true,
   "sideEffects": false,
   "engines": {
-    "node": ">=22.13.0 <23"
+    "node": ">=22.23.1 <23"
   },
   "scripts": {
     "dev": "next dev --port 3003",

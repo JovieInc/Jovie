@@ -318,18 +318,18 @@ echo ""
 echo "── Node.js ─────────────────────────────────────────────────────────────"
 if command -v node &>/dev/null; then
   NODE_VERSION=$(node --version)
-  NODE_MAJOR=$(echo "$NODE_VERSION" | sed 's/v\([0-9]*\).*/\1/')
-  if [[ "$NODE_MAJOR" == "22" ]]; then
-    success "Node.js $NODE_VERSION (22.x ✓)"
+  if [[ "$NODE_VERSION" =~ ^v22\.([0-9]+)\.([0-9]+) ]] &&
+    ((10#${BASH_REMATCH[1]} > 23 || (10#${BASH_REMATCH[1]} == 23 && 10#${BASH_REMATCH[2]} >= 1))); then
+    success "Node.js $NODE_VERSION (22.23.1+ ✓)"
   else
-    warn "Node.js $NODE_VERSION detected — MUST be 22.x (22.13+)"
+    warn "Node.js $NODE_VERSION detected — MUST be 22.x (22.23.1+)"
     info "Fix: nvm use 22  (or: nvm install 22)"
-    MISSING+=("Node.js 22.x")
+    MISSING+=("Node.js 22.23.1+")
   fi
 else
   warn "Node.js not found"
   info "Install via nvm: https://github.com/nvm-sh/nvm"
-  MISSING+=("Node.js 22.x")
+  MISSING+=("Node.js 22.23.1+")
 fi
 
 # ─── 2. pnpm ────────────────────────────────────────────────────────────────

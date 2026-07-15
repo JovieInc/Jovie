@@ -24,7 +24,7 @@ Run `./scripts/setup.sh` again on every fresh Git worktree before doing anything
 
 | Tool | Required Version | Enforcement |
 |------|------------------|-------------|
-| **Node.js** | **22.x** (22.13.0+) | `.nvmrc`, `package.json` engines |
+| **Node.js** | **22.x** (22.23.1+) | `.nvmrc`, `package.json` engines |
 | **pnpm** | **9.15.4** (exact) | `package.json` packageManager field |
 | **Turbo** | 2.8+ | Root devDependencies |
 
@@ -33,7 +33,7 @@ AI agents frequently default to Node 18/20 which **will fail** or cause subtle i
 ### Pre-Flight Checklist
 
 ```bash
-node --version  # Expected: v22.13.0 or higher
+node --version  # Expected: v22.23.1 or higher
 pnpm --version  # Expected: 9.15.4
 
 # If wrong:
@@ -106,7 +106,7 @@ set -euo pipefail
 curl -fsSL https://fnm.vercel.app/install | bash
 export PATH="$HOME/.local/share/fnm:$PATH"
 eval "$(fnm env)"
-fnm install 22.13.0 && fnm use 22.13.0
+fnm install 22.23.1 && fnm use 22.23.1
 corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 # 2. Doppler CLI
