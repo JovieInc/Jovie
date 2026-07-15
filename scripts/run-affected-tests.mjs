@@ -456,6 +456,7 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasIncompletePerformanceProfilerRepair =
     performanceProfilerRepairInputCount > 0 &&
     !isExactPerformanceProfilerRepair &&
+    !isExactGoldenPathSmokeContractRepair &&
     !isExactPersistedAuthFixtureRepair;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
