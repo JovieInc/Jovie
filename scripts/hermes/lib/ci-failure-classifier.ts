@@ -1,9 +1,59 @@
 export interface CiFailureDiagnosis {
   readonly id: string;
-  readonly classification: 'broken-e2e-fixture';
+  readonly classification: 'broken-e2e-fixture' | 'missing-automation';
   readonly retryable: false;
   readonly rootCause: string;
   readonly remediation: string;
+}
+
+export interface GithubPendingReplacement {
+  pending: {
+    id: number;
+    status: string;
+    createdAt: string;
+    cancelledAt: string;
+    startedAt: string | null;
+    runnerName: string | null;
+    steps: ReadonlyArray<unknown>;
+    headSha: string;
+  };
+  replacement: {
+    id: number;
+    status: string;
+    createdAt: string;
+    headSha: string;
+  };
+}
+
+export function classifyGithubConcurrencyPendingReplacement({
+  pending,
+  replacement,
+}: GithubPendingReplacement): CiFailureDiagnosis | null {
+  const created = Date.parse(pending.createdAt);
+  const cancelled = Date.parse(pending.cancelledAt);
+  const replaced = Date.parse(replacement.createdAt);
+  if (
+    pending.status !== 'cancelled' ||
+    pending.startedAt !== null ||
+    ![null, ''].includes(pending.runnerName) ||
+    pending.steps.length !== 0 ||
+    pending.id === replacement.id ||
+    pending.headSha === replacement.headSha ||
+    !['queued', 'in_progress', 'completed'].includes(replacement.status) ||
+    ![created, cancelled, replaced].every(Number.isFinite) ||
+    replaced < created ||
+    replaced > cancelled
+  )
+    return null;
+  return {
+    id: 'github_concurrency_pending_replacement',
+    classification: 'missing-automation',
+    retryable: false,
+    rootCause:
+      'GitHub replaced an unassigned, never-started pending job with a newer different-head job in the same constant concurrency group.',
+    remediation:
+      'Scope the concurrency key per PR and ensure shared-fixture cleanup preserves resources owned by active jobs.',
+  };
 }
 
 const SYNTHETIC_AUTH_ACTOR = /\b(?:user_test|ba_dev_[a-z0-9_-]+)\b/i;
