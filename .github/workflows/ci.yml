@@ -515,6 +515,15 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Verify Node and tsx seed-loader compatibility
+        shell: bash
+        run: |
+          if ! output=$(node --import tsx --import ./apps/web/tests/eval/promptfoo/server-only-preload.mjs -e 'console.log("seed-loader-runtime-ok")' 2>&1); then
+            echo "::error title=Node/tsx runtime drift::The .nvmrc runtime cannot load the Promptfoo seed hook through tsx. Align the Node pin and seed-loader API before retrying CI."
+            printf '%s\n' "$output"
+            exit 1
+          fi
+          printf '%s\n' "$output"
       - name: Cache Turbo
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

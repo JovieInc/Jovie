@@ -143,8 +143,9 @@ if [[ ! "$NODE_VERSION" =~ ^v22\.([0-9]+)\.([0-9]+) ]]; then
   die "Node 22.x required, found $NODE_VERSION. Run: nvm use 22 && corepack prepare pnpm@9.15.4 --activate"
 fi
 NODE_MINOR="${BASH_REMATCH[1]}"
-if (( 10#$NODE_MINOR < 13 )); then
-  die "Node >=22.13.0 required, found $NODE_VERSION. Run: nvm use 22 && corepack prepare pnpm@9.15.4 --activate"
+NODE_PATCH="${BASH_REMATCH[2]}"
+if ((10#$NODE_MINOR < 23 || (10#$NODE_MINOR == 23 && 10#$NODE_PATCH < 1))); then
+  die "Node >=22.23.1 required, found $NODE_VERSION. Run: nvm use 22 && corepack prepare pnpm@9.15.4 --activate"
 fi
 ok "Node $NODE_VERSION supported"
 NODE_BIN_DIR="$(dirname "$(command -v node)")"
