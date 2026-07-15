@@ -3928,16 +3928,30 @@ jobs:
 
       - name: Wait for PR preview readiness
         timeout-minutes: 9
-        run: |
-          ./node_modules/.bin/vercel inspect "${{ steps.pr_deploy.outputs.deployment_url }}" \
-            --wait \
-            --timeout 8m \
-            --token "$VERCEL_TOKEN" \
-            --scope "$VERCEL_ORG_ID"
         env:
+          DEPLOYMENT_URL: ${{ steps.pr_deploy.outputs.deployment_url }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          inspect_wait_status=0
+          ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
+            --wait \
+            --timeout 8m \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID" || inspect_wait_status=$?
+          deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
+            --format=json \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID")"
+          deployment_state="$(jq -r '(.readyState // .state // .status // "unknown") | ascii_upcase' \
+            <<<"$deployment_json")"
+          echo "Current PR preview deployment state: $deployment_state"
+          if [ "$deployment_state" != "READY" ]; then
+            echo "::error::PR preview is $deployment_state after readiness wait (status $inspect_wait_status); refusing a false-green preview."
+            exit 1
+          fi
 
   # PR Lighthouse runs as a path-gated preview-evidence lane with stricter thresholds (0.75 perf, 0.85 a11y).
   # Original removal was due to 0.5 thresholds being too relaxed. Updated .lighthouserc.pr.json fixes this.
