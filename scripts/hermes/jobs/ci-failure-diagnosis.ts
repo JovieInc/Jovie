@@ -38,7 +38,7 @@ const DIAGNOSES: ReadonlyArray<{
     failureClass: 'broken_profiler_fixture',
     matches: log =>
       /Test Performance Budgets/i.test(log) &&
-      /Test suite failed:[\s\S]*signal=SIGTERM[\s\S]*(?:ETIMEDOUT|suite exceeded 420000ms)/i.test(
+      /Test suite failed:[\s\S]*signal=SIGTERM[\s\S]*suite exceeded 420000ms/i.test(
         log
       ),
     rootCause:

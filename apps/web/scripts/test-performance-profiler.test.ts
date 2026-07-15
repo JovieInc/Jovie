@@ -319,6 +319,25 @@ describe('TestPerformanceProfiler fail-closed behavior', () => {
         ),
       expected: 'vitestJsonCount(declared=2, assertions=1)',
     },
+    {
+      name: 'non-skipped assertion without a duration',
+      writeJson: (cwd: string) =>
+        writeFileSync(
+          join(cwd, '.cache/vitest-performance-results.json'),
+          JSON.stringify({
+            numTotalTests: 2,
+            testResults: [
+              {
+                assertionResults: [
+                  { title: 'timed', duration: 10, status: 'passed' },
+                  { title: 'missing duration', status: 'passed' },
+                ],
+              },
+            ],
+          })
+        ),
+      expected: 'vitestJsonDuration(nonSkippedMissingOrInvalid=1)',
+    },
   ])('rejects $name even when console timings look complete', async scenario => {
     const cwd = createWorkspace();
     seedBaseline(cwd);

@@ -74,6 +74,17 @@ describe('diagnoseCiFailure', () => {
     });
   });
 
+  it('does not misclassify a truncated modern timeout as the legacy 420s fixture', () => {
+    expect(
+      diagnoseCiFailure(`
+        Test Performance Budgets
+        Test suite failed:
+        signal=SIGTERM
+        error=spawnSync pnpm ETIMEDOUT
+      `).failureClass
+    ).toBe('unknown');
+  });
+
   it.each([
     {
       output: 'Total test duration (61000ms) exceeds threshold (60000ms)',

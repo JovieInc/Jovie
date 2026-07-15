@@ -40,6 +40,7 @@ interface JsonEvidence {
   valid: boolean;
   declaredTests: number | null;
   assertionCount: number;
+  invalidNonSkippedDurationCount: number;
   reason: string;
 }
 
@@ -136,6 +137,7 @@ function createEmptyJsonEvidence(): JsonEvidence {
     valid: false,
     declaredTests: null,
     assertionCount: 0,
+    invalidNonSkippedDurationCount: 0,
     reason: 'Vitest JSON output was not parsed.',
   };
 }
@@ -402,6 +404,13 @@ class TestPerformanceProfiler {
             ? parsed.numTotalTests
             : null,
         assertionCount: assertionResults.length,
+        invalidNonSkippedDurationCount: assertionResults.filter(
+          result =>
+            result.status !== 'skipped' &&
+            (typeof result.duration !== 'number' ||
+              !Number.isFinite(result.duration) ||
+              result.duration < 0)
+        ).length,
         reason: '',
       };
 
@@ -428,6 +437,7 @@ class TestPerformanceProfiler {
         valid: false,
         declaredTests: null,
         assertionCount: 0,
+        invalidNonSkippedDurationCount: 0,
         reason: `Vitest JSON is missing or malformed: ${String(error)}`,
       };
       // Fallback parsing from console output is still available when JSON parsing fails.
@@ -488,6 +498,11 @@ class TestPerformanceProfiler {
     ) {
       invalid.push(
         `vitestJsonCount(declared=${this.jsonEvidence.declaredTests ?? 'missing'}, assertions=${this.jsonEvidence.assertionCount})`
+      );
+    }
+    if (this.jsonEvidence.invalidNonSkippedDurationCount > 0) {
+      invalid.push(
+        `vitestJsonDuration(nonSkippedMissingOrInvalid=${this.jsonEvidence.invalidNonSkippedDurationCount})`
       );
     }
     if (invalid.length > 0) {
