@@ -41,4 +41,23 @@ describe('diagnoseCiFailure', () => {
       diagnoseCiFailure('PSI: sustained memory pressure on runner').failureClass
     ).toBe('runner_host_pressure');
   });
+
+  it('diagnoses a cancelled pending job whose Neon concurrency key lost its job prefix', () => {
+    const diagnosis = diagnoseCiFailure(`
+      E2E Smoke (PR Fast Feedback) was cancelled before runner assignment.
+      A newer pending job replaced it in concurrency group neon-endpoint-pool--0.
+    `);
+
+    expect(diagnosis.failureClass).toBe('neon_concurrency_key_collision');
+    expect(diagnosis.rootCause).toContain('github.job');
+    expect(diagnosis.remediation).toContain('literal job identifier');
+  });
+
+  it('does not classify a valid per-job Neon concurrency group as a collision', () => {
+    expect(
+      diagnoseCiFailure(
+        'waiting in concurrency group neon-endpoint-pool-ci-e2e-smoke-0'
+      ).failureClass
+    ).toBe('unknown');
+  });
 });

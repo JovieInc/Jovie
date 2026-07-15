@@ -1,5 +1,6 @@
 export type CiFailureClass =
   | 'bounded_source_scan_timeout'
+  | 'neon_concurrency_key_collision'
   | 'test_fixture_import_timeout'
   | 'runner_process_exhaustion'
   | 'runner_host_pressure'
@@ -17,6 +18,14 @@ const DIAGNOSES: ReadonlyArray<{
   readonly rootCause: string;
   readonly remediation: string;
 }> = [
+  {
+    failureClass: 'neon_concurrency_key_collision',
+    matches: log => /neon-endpoint-pool--[0-3]\b/i.test(log),
+    rootCause:
+      'A job-level Neon concurrency key used github.job before runner assignment, where that property is null, collapsing distinct jobs into one empty-prefix pool group.',
+    remediation:
+      'Replace github.job in job-level concurrency with a stable literal job identifier and preserve the four-slot suffix hash.',
+  },
   {
     failureClass: 'bounded_source_scan_timeout',
     matches: log =>

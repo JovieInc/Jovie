@@ -761,12 +761,13 @@ describe('CI mobile overflow workflow', () => {
 });
 
 describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
-  const neonBranchCreateJobs = [
-    'neon-db',
-    'ci-lighthouse-dashboard-pr',
-    'ci-e2e-smoke',
-    'ci-admin-smoke',
-  ] as const;
+  const neonBranchCreateJobs = {
+    'neon-db': 'neon-endpoint-pool-neon-db-',
+    'ci-lighthouse-dashboard-pr':
+      'neon-endpoint-pool-ci-lighthouse-dashboard-pr-',
+    'ci-e2e-smoke': 'neon-endpoint-pool-ci-e2e-smoke-',
+    'ci-admin-smoke': 'neon-endpoint-pool-ci-admin-smoke-',
+  } as const;
 
   const neonArtifactConsumerJobs = [
     'ci-lighthouse-pr',
@@ -780,12 +781,27 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
   it('caps cross-PR Neon branch creation with a four-slot queue', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
-    for (const jobKey of neonBranchCreateJobs) {
+    for (const [jobKey, expectedGroupPrefix] of Object.entries(
+      neonBranchCreateJobs
+    )) {
       const job = getJobBlock(workflow, jobKey);
       expect(job).toContain('concurrency:');
-      expect(job).toContain('group: neon-endpoint-pool-${{ github.job }}-');
+      expect(job).toContain(`group: ${expectedGroupPrefix}`);
+      expect(job).not.toContain('group: neon-endpoint-pool-${{ github.job }}-');
       expect(job).toContain('cancel-in-progress: false');
+
+      // Preserve the four-slot hash: decimal endings 0/4/8 -> 0,
+      // 1/5/9 -> 1, 2/6 -> 2, and 3/7 -> the fallback slot 3.
+      for (const suffix of ['0', '4', '8', '1', '5', '9', '2', '6']) {
+        expect(job).toContain(`, '${suffix}')`);
+      }
+      expect(job).toContain("&& '0'");
+      expect(job).toContain("&& '1'");
+      expect(job).toContain("&& '2'");
+      expect(job).toContain("|| '3'");
     }
+
+    expect(new Set(Object.values(neonBranchCreateJobs)).size).toBe(4);
   });
 
   // ci-golden-path deliberately uses ONE constant repo-wide group: it must
@@ -798,7 +814,7 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
     'group: neon-endpoint-pool-ci-golden-path',
   ] as const;
 
-  it('scopes branch-creation pool per job so siblings in one workflow are not cancelled', () => {
+  it('uses literal job prefixes because github.job is unavailable before a runner starts', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const poolGroups =
       workflow.match(/group: neon-endpoint-pool-[^\n]+/g) ?? [];
@@ -812,7 +828,8 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
       ) {
         continue;
       }
-      expect(group).toContain('${{ github.job }}');
+      expect(group).not.toContain('${{ github.job }}');
+      expect(group).not.toMatch(/neon-endpoint-pool--[0-3]/);
     }
   });
 
