@@ -304,7 +304,7 @@ jobs:
       run_build: ${{ steps.detect.outputs.run_build || steps.graphite_skip.outputs.run_build || 'false' }}
       run_test: ${{ steps.detect.outputs.run_test || steps.graphite_skip.outputs.run_test || 'false' }}
       run_test_performance: ${{ steps.detect.outputs.run_test_performance || steps.graphite_skip.outputs.run_test_performance || 'false' }}
-      run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || 'false' }}
+      run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || steps.graphite_skip.outputs.run_storybook_a11y || 'false' }}
       run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse || steps.graphite_skip.outputs.run_public_lighthouse || 'false' }}
       run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse || steps.graphite_skip.outputs.run_dashboard_lighthouse || 'false' }}
       run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse || steps.graphite_skip.outputs.run_onboarding_lighthouse || 'false' }}
@@ -343,7 +343,7 @@ jobs:
         if: steps.graphite.outputs.skip == 'true'
         run: |
           echo "Graphite CI optimizer requested skip — CI will be skipped."
-          for t in run_build run_test run_test_performance run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+          for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
             echo "$t=false" >> "$GITHUB_OUTPUT"
           done
 
@@ -382,7 +382,7 @@ jobs:
             CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD || true)
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
               echo "Empty changed-file list vs origin/${{ github.base_ref }} — no path triggers"
-              for t in run_build run_test run_test_performance run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+              for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
                 echo "$t=false" >> "$GITHUB_OUTPUT"
               done
               exit 0
@@ -390,7 +390,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_test_performance run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -415,7 +415,7 @@ jobs:
             echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
             echo "run_promptfoo_evals=true" >> "$GITHUB_OUTPUT"
             echo "run_golden_eval_set=true" >> "$GITHUB_OUTPUT"
-            for t in run_build run_test run_test_performance run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -426,7 +426,7 @@ jobs:
           # into Neon, Lighthouse, or Playwright work by label accident.
           if [[ "$FULL_CI_LABEL" == "true" ]]; then
             echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -436,7 +436,7 @@ jobs:
           if ! echo "$CHANGED_FILES" | grep -q -E '^\.github/' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_test_performance run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -464,7 +464,7 @@ jobs:
             echo "run_test=false" >> "$GITHUB_OUTPUT"
           fi
 
-          STORYBOOK_A11Y_PATTERN='^(apps/web/components/|apps/web/\.storybook/|apps/web/vitest\.config\.storybook\.mts|apps/web/package\.json|packages/ui/|pnpm-lock\.yaml|\.github/workflows/(ci|visual-a11y)\.yml)'
+          STORYBOOK_A11Y_PATTERN='^(apps/web/components/|apps/web/\.storybook/|apps/web/app/globals\.css|apps/web/styles/|apps/web/(tailwind|postcss)\.config\.|apps/web/vitest\.config\.storybook\.mts|apps/web/package\.json|packages/ui/|pnpm-lock\.yaml|\.github/workflows/(ci|visual-a11y)\.yml)'
           if echo "$CHANGED_FILES" | grep -q -E "$STORYBOOK_A11Y_PATTERN"; then
             echo "run_storybook_a11y=true" >> "$GITHUB_OUTPUT"
           else

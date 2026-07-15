@@ -33,8 +33,10 @@ jobs:
       - name: Detect visual-relevant changes
         id: detect
         run: |
-          VISUAL_PATTERNS='^apps/web/components/|^apps/web/.storybook/|^packages/ui/'
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
+          VISUAL_PATTERNS='^(apps/web/components/|apps/web/\.storybook/|apps/web/app/globals\.css|apps/web/styles/|apps/web/(tailwind|postcss)\.config\.|apps/web/vitest\.config\.storybook\.mts|apps/web/package\.json|packages/ui/|pnpm-lock\.yaml|\.github/workflows/visual-a11y\.yml)'
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
             CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD 2>/dev/null || echo "")
             if echo "$CHANGED_FILES" | grep -qE "$VISUAL_PATTERNS"; then
               echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"

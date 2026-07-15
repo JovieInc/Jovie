@@ -7,6 +7,10 @@ import { describe, expect, it } from 'vitest';
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
 const workflowPath = resolve(repoRoot, '.github/workflows/ci.yml');
+const visualA11yWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/visual-a11y.yml'
+);
 const ciFastLanesPath = resolve(repoRoot, 'scripts/ci-fast-lanes.mjs');
 const canaryWorkflowPath = resolve(
   repoRoot,
@@ -98,7 +102,7 @@ describe('CI test-performance path gate', () => {
     );
     expect(graphiteSkip).toContain('run_test_performance');
     expect(detectStep).toContain(
-      'for t in run_build run_test run_test_performance run_public_lighthouse'
+      'for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse'
     );
     expect(detectStep).toContain(
       'echo "run_test_performance=false" >> "$GITHUB_OUTPUT"'
@@ -153,6 +157,92 @@ describe('CI test-performance path gate', () => {
     expect(performanceJob).toContain(
       "run_full_ci=${{ needs.ci-path-changes.outputs.run_test == 'true' || needs.ci-path-changes.outputs.run_test_performance == 'true' }}"
     );
+  });
+});
+
+describe('CI Storybook accessibility path gate', () => {
+  it('runs for relevant paths and every full-CI request', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const pathJob = getJobBlock(workflow, 'ci-path-changes');
+    const detectStep = getStepBlock(
+      pathJob,
+      'Detect path changes for all job types'
+    );
+    const graphiteSkip = getStepBlock(pathJob, 'Skip CI (Graphite optimizer)');
+
+    expect(pathJob).toContain(
+      "run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || steps.graphite_skip.outputs.run_storybook_a11y || 'false' }}"
+    );
+    expect(graphiteSkip).toContain('run_storybook_a11y');
+
+    const testingStart = detectStep.indexOf(
+      'if [[ "$FULL_CI_LABEL" == "true" ]]'
+    );
+    const testingEnd = detectStep.indexOf('\n          fi', testingStart);
+    expect(testingStart).toBeGreaterThan(0);
+    expect(testingEnd).toBeGreaterThan(testingStart);
+    expect(detectStep.slice(testingStart, testingEnd)).toContain(
+      'run_storybook_a11y'
+    );
+
+    const pattern = detectStep.match(/STORYBOOK_A11Y_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    for (const input of [
+      'apps/web/.storybook/main.ts',
+      'apps/web/app/globals.css',
+      'apps/web/components/atoms/Button.tsx',
+      'apps/web/styles/theme.css',
+      'apps/web/tailwind.config.ts',
+      'apps/web/postcss.config.mjs',
+      'apps/web/vitest.config.storybook.mts',
+      'apps/web/package.json',
+      'packages/ui/src/Button.tsx',
+      'pnpm-lock.yaml',
+      '.github/workflows/visual-a11y.yml',
+    ]) {
+      expect(
+        spawnSync('grep', ['-q', '-E', pattern!], { input }).status,
+        input
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-q', '-E', pattern!], {
+        input: 'apps/web/lib/unrelated.ts',
+      }).status
+    ).toBe(1);
+
+    const visualWorkflow = readFileSync(visualA11yWorkflowPath, 'utf8');
+    const visualPathJob = getJobBlock(visualWorkflow, 'ci-visual-path-changes');
+    const visualDetectStep = getStepBlock(
+      visualPathJob,
+      'Detect visual-relevant changes'
+    );
+    expect(visualDetectStep).toContain(
+      'if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then'
+    );
+    expect(visualDetectStep).toContain(
+      'echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"'
+    );
+    const visualPattern = visualDetectStep.match(
+      /VISUAL_PATTERNS='([^']+)'/
+    )?.[1];
+    expect(visualPattern).toBeTruthy();
+    for (const input of [
+      'apps/web/.storybook/preview.tsx',
+      'apps/web/app/globals.css',
+      'apps/web/styles/theme.css',
+      'apps/web/tailwind.config.ts',
+      'apps/web/postcss.config.mjs',
+      'apps/web/package.json',
+      'packages/ui/src/Button.tsx',
+      'pnpm-lock.yaml',
+      '.github/workflows/visual-a11y.yml',
+    ]) {
+      expect(
+        spawnSync('grep', ['-q', '-E', visualPattern!], { input }).status,
+        input
+      ).toBe(0);
+    }
   });
 });
 
