@@ -190,6 +190,14 @@ const LAYOUT_GUARD_CONTRACT_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const NEON_ATTEMPT_ARTIFACT_MANIFEST = [
+  '.github/workflows/ci.yml',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
 
 describe('automation-verify affected scope', () => {
   it('keeps runner I/O admission on focused controller regressions', () => {
@@ -744,6 +752,38 @@ describe('automation-verify affected scope', () => {
       'scripts/lib/__tests__/automation-verify.test.mjs',
       'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
     ]);
+  });
+
+  it('keeps the Neon rerun artifact repair on focused workflow and Gem regressions', () => {
+    const plan = buildAffectedTestPlan(NEON_ATTEMPT_ARTIFACT_MANIFEST);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.mandatoryTests).toEqual([
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+    ]);
+  });
+
+  it.each(
+    NEON_ATTEMPT_ARTIFACT_MANIFEST
+  )('fails closed when the Neon rerun artifact repair is missing %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        NEON_ATTEMPT_ARTIFACT_MANIFEST.filter(file => file !== missingInput)
+      ).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when the Neon rerun artifact repair includes an unknown peer', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...NEON_ATTEMPT_ARTIFACT_MANIFEST,
+        'scripts/hermes/lib/unknown-neon-artifact-helper.ts',
+      ]).mode
+    ).toBe('full');
   });
 
   it.each(

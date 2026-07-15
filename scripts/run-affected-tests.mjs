@@ -106,6 +106,20 @@ const GOLDEN_PATH_SMOKE_CONTRACT_CORE = new Set([
   'scripts/hermes/jobs/ci-failure-diagnosis.ts',
   'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
 ]);
+const NEON_ATTEMPT_ARTIFACT_MANIFEST = new Set([
+  '.github/workflows/ci.yml',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const NEON_ATTEMPT_ARTIFACT_TESTS = [
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+];
+const NEON_ATTEMPT_ARTIFACT_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+];
 const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = new Set([
   '.github/workflows/ci.yml',
   'apps/web/scripts/test-performance-guard.ts',
@@ -313,6 +327,12 @@ export function buildAffectedTestPlan(changedFiles) {
         AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
     ) &&
     affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size;
+  const neonAttemptArtifactInputCount = files.filter(file =>
+    NEON_ATTEMPT_ARTIFACT_MANIFEST.has(file)
+  ).length;
+  const isExactNeonAttemptArtifactRepair =
+    neonAttemptArtifactInputCount === NEON_ATTEMPT_ARTIFACT_MANIFEST.size &&
+    files.length === NEON_ATTEMPT_ARTIFACT_MANIFEST.size;
   const performanceProfilerRepairInputCount = files.filter(file =>
     PERFORMANCE_PROFILER_REPAIR_ANCHORS.has(file)
   ).length;
@@ -469,6 +489,9 @@ export function buildAffectedTestPlan(changedFiles) {
   if (isExactGoldenPathSmokeContractRepair) {
     mandatoryTests.push(...GOLDEN_PATH_SMOKE_CONTRACT_TESTS);
   }
+  if (isExactNeonAttemptArtifactRepair) {
+    mandatoryTests.push(...NEON_ATTEMPT_ARTIFACT_TESTS);
+  }
   if (isExactPerformanceProfilerRepair) {
     mandatoryTests.push(...PERFORMANCE_PROFILER_REPAIR_WEB_TESTS);
   }
@@ -497,6 +520,7 @@ export function buildAffectedTestPlan(changedFiles) {
       : []),
     ...(isExactAffectedTestSelector ||
     isExactGoldenPathSmokeContractRepair ||
+    isExactNeonAttemptArtifactRepair ||
     isExactPerformanceProfilerRepairWithSelector ||
     isExactVisualQaSelectorRepair ||
     isExactRunnerPrerequisiteVisualQaRepair ||
@@ -505,6 +529,9 @@ export function buildAffectedTestPlan(changedFiles) {
       : []),
     ...(isExactGoldenPathSmokeContractRepair
       ? GOLDEN_PATH_SMOKE_CONTRACT_SCRIPT_TESTS
+      : []),
+    ...(isExactNeonAttemptArtifactRepair
+      ? NEON_ATTEMPT_ARTIFACT_SCRIPT_TESTS
       : []),
     ...(isExactPersistedAuthFixtureRepair
       ? PERSISTED_AUTH_FIXTURE_SCRIPT_TESTS
@@ -531,6 +558,11 @@ export function buildAffectedTestPlan(changedFiles) {
     if (
       isExactGoldenPathSmokeContractRepair &&
       GOLDEN_PATH_SMOKE_CONTRACT_CORE.has(file)
+    )
+      return true;
+    if (
+      isExactNeonAttemptArtifactRepair &&
+      NEON_ATTEMPT_ARTIFACT_MANIFEST.has(file)
     )
       return true;
     if (
@@ -589,6 +621,7 @@ export function buildAffectedTestPlan(changedFiles) {
     affectedTestSelectorInputCount > 0 &&
     !isExactAffectedTestSelector &&
     !isExactGoldenPathSmokeContractRepair &&
+    !isExactNeonAttemptArtifactRepair &&
     !isExactPerformanceProfilerRepairWithSelector &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactVisualQaSelectorRepair &&
@@ -600,6 +633,7 @@ export function buildAffectedTestPlan(changedFiles) {
     performanceProfilerRepairInputCount > 0 &&
     !isExactPerformanceProfilerRepair &&
     !isExactGoldenPathSmokeContractRepair &&
+    !isExactNeonAttemptArtifactRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
@@ -608,6 +642,7 @@ export function buildAffectedTestPlan(changedFiles) {
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
     !isExactGoldenPathSmokeContractRepair &&
+    !isExactNeonAttemptArtifactRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactAffectedTestSelector &&
     !isExactVisualQaSelectorRepair &&
@@ -619,6 +654,7 @@ export function buildAffectedTestPlan(changedFiles) {
     runnerIoPressureInputCount > 0 &&
     !isExactRunnerIoPressure &&
     !isExactGoldenPathSmokeContractRepair &&
+    !isExactNeonAttemptArtifactRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactAffectedTestSelector &&
     !isExactVisualQaSelectorRepair &&
@@ -634,6 +670,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactGtmqSourceGateReaper &&
     !isExactPrerequisiteTrain &&
     !isExactGoldenPathSmokeContractRepair &&
+    !isExactNeonAttemptArtifactRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactLayoutGuardContract &&
     !isExactPerformanceProfilerRepair &&
@@ -644,12 +681,27 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactPrerequisiteTrain &&
     !isExactAffectedTestSelector &&
     !isExactGoldenPathSmokeContractRepair &&
+    !isExactNeonAttemptArtifactRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactGtmqSourceGateReaper &&
     !isExactVisualQaSelectorRepair &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactPerformanceProfilerRepair &&
     !isExactRunnerIoPressure;
+  const hasIncompleteNeonAttemptArtifactRepair =
+    neonAttemptArtifactInputCount > 0 &&
+    !isExactNeonAttemptArtifactRepair &&
+    !isExactPrerequisiteTrain &&
+    !isExactVercelCongestionControl &&
+    !isExactAffectedTestSelector &&
+    !isExactGoldenPathSmokeContractRepair &&
+    !isExactPerformanceProfilerRepair &&
+    !isExactPersistedAuthFixtureRepair &&
+    !isExactVisualQaSelectorRepair &&
+    !isExactGtmqSourceGateReaper &&
+    !isExactRunnerIoPressure &&
+    !isExactRunnerPrerequisiteRepair &&
+    !isExactLayoutGuardContract;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
     hasUnknownCiCancellationHealerPeer ||
@@ -663,7 +715,8 @@ export function buildAffectedTestPlan(changedFiles) {
     hasIncompleteGtmqSourceGateReaper ||
     hasIncompleteRunnerIoPressure ||
     hasIncompleteRunnerPrerequisiteContract ||
-    hasIncompleteLayoutGuardContract;
+    hasIncompleteLayoutGuardContract ||
+    hasIncompleteNeonAttemptArtifactRepair;
   const hasSelectedTests =
     selectedTests.length > 0 ||
     rootVitestTests.length > 0 ||
@@ -679,6 +732,7 @@ export function buildAffectedTestPlan(changedFiles) {
             isExactVercelCongestionControl ||
             isExactAffectedTestSelector ||
             isExactGoldenPathSmokeContractRepair ||
+            isExactNeonAttemptArtifactRepair ||
             isExactPerformanceProfilerRepair ||
             isExactPersistedAuthFixtureRepair ||
             isExactVisualQaSelectorRepair ||
