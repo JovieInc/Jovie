@@ -2,6 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { diagnoseCiFailure } from '../../jobs/ci-failure-diagnosis';
 
 describe('diagnoseCiFailure', () => {
+  it('diagnoses ownership preflight slug or latency drift from its structured receipt', () => {
+    const diagnosis = diagnoseCiFailure(`
+      {"failure_class":"gbrain_ownership_preflight_latency_or_slug_drift","requested_slug":"agent-job-ledger","resolved_slug":null,"engine_ms":3004,"cli_ms":null,"mcp_ms":null,"timeout_tier":"ledger_step","lookup_health":"timeout","db_lock_signal_detected":true,"session_signal_detected":null}
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'gbrain_ownership_preflight_latency_or_slug_drift'
+    );
+    expect(diagnosis.remediation).toContain('coordination/agent-job-ledger');
+    expect(diagnosis.remediation).toContain('engine/CLI/MCP latency');
+    expect(diagnosis.remediation).toContain('timeout tier');
+  });
+
   it('diagnoses deterministic Better Auth OTP rejection in the bypass smoke lane', () => {
     const diagnosis = diagnoseCiFailure(`
       E2E Smoke (PR Fast Feedback)
