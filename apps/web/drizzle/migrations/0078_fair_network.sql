@@ -101,15 +101,3 @@ CREATE INDEX IF NOT EXISTS "idx_ba_oauth_access_tokens_refresh_id" ON "ba_oauth_
 CREATE INDEX IF NOT EXISTS "idx_ba_oauth_consents_client_id" ON "ba_oauth_consents" ("client_id");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_ba_oauth_consents_user_id" ON "ba_oauth_consents" ("user_id");
---> statement-breakpoint
-INSERT INTO "ba_oauth_clients" (
-	"id", "client_id", "disabled", "skip_consent", "enable_end_session",
-	"scopes", "name", "redirect_uris", "token_endpoint_auth_method",
-	"grant_types", "response_types", "public", "type", "require_pkce"
-) VALUES (
-	'logyourbody-ios', 'logyourbody-ios', false, true, true,
-	'["openid","profile","email","offline_access"]'::jsonb,
-	'LogYourBody iOS', '["logyourbody://oauth"]'::jsonb, 'none',
-	'["authorization_code","refresh_token"]'::jsonb, '["code"]'::jsonb,
-	true, 'native', true
-) ON CONFLICT ("client_id") DO NOTHING;

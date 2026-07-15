@@ -231,10 +231,7 @@ function buildPlugins() {
       refreshTokenExpiresIn: 60 * 60 * 24 * 30,
       storeClientSecret: 'hashed',
       storeTokens: 'hashed',
-      cachedTrustedClients: new Set([
-        'logyourbody-ios',
-        'logyourbody-supabase',
-      ]),
+      cachedTrustedClients: new Set(['logyourbody-supabase']),
     }) as BetterAuthPlugin,
     oneTimeToken({
       expiresIn: 5,
