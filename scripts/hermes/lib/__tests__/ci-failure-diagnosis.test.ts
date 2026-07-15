@@ -2,6 +2,60 @@ import { describe, expect, it } from 'vitest';
 import { diagnoseCiFailure } from '../../jobs/ci-failure-diagnosis';
 
 describe('diagnoseCiFailure', () => {
+  it('diagnoses missing draft evidence when no trusted producer ran', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Complete job name: Verify Draft Agent PR
+      Require GStack gate evidence
+      Missing recorded gate evidence for: gstack.qa.exhaustive, gstack.review, gstack.ship
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'agent_gate_evidence_missing_without_producer'
+    );
+    expect(diagnosis.rootCause).toContain('no trusted producer');
+    expect(diagnosis.remediation).toContain('Do not blindly rerun');
+    expect(diagnosis.remediation).toContain('mark the reviewed PR ready');
+    expect(diagnosis.remediation).toContain(
+      'required CI remains authoritative'
+    );
+  });
+
+  it('does not waive a generic missing-evidence message', () => {
+    expect(
+      diagnoseCiFailure('Missing recorded gate evidence for: gstack.review')
+        .failureClass
+    ).toBe('unknown');
+  });
+
+  it('classifies a dependency-free gate timing out during pnpm cache extraction', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Complete job name: CI Risk Classifier
+      Cache hit for: node-cache-Linux-x64-pnpm-adca8ba
+      Cache Size: ~1265 MB (1326889463 B)
+      /usr/bin/tar -xf /home/runner/work/_temp/cache.tzst -P \\
+        --use-compress-program unzstd
+      ##[error]The operation was canceled.
+      Terminate orphan process: pid (2230) (unzstd)
+    `);
+
+    expect(diagnosis.failureClass).toBe('gate_dependency_cache_timeout');
+    expect(diagnosis.rootCause).toContain('three-minute job budget');
+    expect(diagnosis.remediation).toContain('dependency-free gates');
+    expect(diagnosis.remediation).toContain('instead of blindly rerunning');
+  });
+
+  it('does not apply the classifier diagnosis to a dependency-requiring job', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Complete job name: Unit Tests (1/5)
+      Cache Size: ~1265 MB (1326889463 B)
+      /usr/bin/tar -xf /home/runner/work/_temp/cache.tzst -P \\
+        --use-compress-program unzstd
+      ##[error]The operation was canceled.
+    `);
+
+    expect(diagnosis.failureClass).toBe('unknown');
+  });
+
   it('diagnoses ownership preflight slug or latency drift from its structured receipt', () => {
     const diagnosis = diagnoseCiFailure(`
       {"failure_class":"gbrain_ownership_preflight_latency_or_slug_drift","requested_slug":"agent-job-ledger","resolved_slug":null,"engine_ms":3004,"cli_ms":null,"mcp_ms":null,"timeout_tier":"ledger_step","lookup_health":"timeout","db_lock_signal_detected":true,"session_signal_detected":null}
@@ -56,6 +110,15 @@ describe('diagnoseCiFailure', () => {
     expect(
       diagnoseCiFailure(`
         FAIL tests/unit/design-system/touch-target-ratchet.test.ts
+        Error: Test timed out in 12000ms.
+      `).failureClass
+    ).toBe('bounded_source_scan_timeout');
+  });
+
+  it('classifies the destructive dialog audit as bounded scanner work', () => {
+    expect(
+      diagnoseCiFailure(`
+        FAIL tests/unit/design-system/destructive-confirm-dialog-audit.test.ts
         Error: Test timed out in 12000ms.
       `).failureClass
     ).toBe('bounded_source_scan_timeout');
@@ -172,6 +235,28 @@ describe('diagnoseCiFailure', () => {
     expect(diagnosis.rootCause).toContain('could not activate');
     expect(diagnosis.remediation).toContain('same branch');
     expect(diagnosis.remediation).toContain('SELECT 1');
+  });
+
+  it('diagnoses strict-workspace resolution failure in the real Neon probe', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@neondatabase/serverless' imported from /home/runner/work/Jovie/Jovie/scripts/ci/probe-neon-branch.mjs
+      Neon SELECT 1 failed with a non-capacity error; refusing to reap or retry.
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'neon_probe_workspace_dependency_resolution'
+    );
+    expect(diagnosis.rootCause).toContain('strict pnpm layout');
+    expect(diagnosis.remediation).toContain('apps/web/package.json');
+    expect(diagnosis.remediation).toContain('instead of hoisting');
+  });
+
+  it('does not infer the Neon probe class from an unrelated missing package', () => {
+    expect(
+      diagnoseCiFailure(`
+        Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'other-package' imported from /home/runner/work/Jovie/Jovie/scripts/ci/probe-neon-branch.mjs
+      `).failureClass
+    ).toBe('unknown');
   });
 
   it.each([
