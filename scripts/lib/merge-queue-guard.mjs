@@ -82,6 +82,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Claude Review',
   'Seer Code Review',
   'Storybook A11y Checks',
+  'CI / Storybook A11y',
+  'Storybook A11y',
   'Playwright Visual Regression',
 ]);
 

@@ -389,6 +389,40 @@ describe('aggregate required checks', () => {
     ]);
   });
 
+  it('keeps Storybook A11y path-gated as a leaf and blocking through PR Ready', () => {
+    const branchProtectionYaml = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.branchProtection),
+      'utf8'
+    );
+    const ciWorkflowYaml = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.ciWorkflow),
+      'utf8'
+    );
+    const visualWorkflowYaml = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/visual-a11y.yml'),
+      'utf8'
+    );
+    const storybookBlock = extractWorkflowJobBlock(
+      ciWorkflowYaml,
+      'ci-storybook-a11y'
+    );
+    const prReadyBlock = extractWorkflowJobBlock(ciWorkflowYaml, 'ci-pr-ready');
+
+    expect(
+      parseRequiredStatusChecksFromYaml(branchProtectionYaml)
+    ).not.toContain('Storybook A11y');
+    expect(storybookBlock).toMatch(/run_storybook_a11y == 'true'/);
+    expect(storybookBlock).toMatch(/pnpm --filter @jovie\/web test:a11y/);
+    expect(prReadyBlock).toMatch(/ci-storybook-a11y/);
+    expect(prReadyBlock).toMatch(
+      /STORYBOOK_A11Y_RESULT.*needs\.ci-storybook-a11y\.result/
+    );
+    expect(prReadyBlock).toMatch(
+      /STORYBOOK_A11Y_RESULT.*!= "success".*!= "skipped"/
+    );
+    expect(visualWorkflowYaml).not.toMatch(/^\s+pull_request:/m);
+  });
+
   it('keeps merge-queue enroll hot path free of pytest/Python bootstrap (GH-13630)', () => {
     const autoenrollYaml = readFileSync(
       resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow),
