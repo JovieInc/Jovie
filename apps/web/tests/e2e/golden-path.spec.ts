@@ -3,17 +3,25 @@ import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   ensureSignedInUser,
+  fillControlledInputUntilEnabled,
   getAdminCredentials,
   hasAdminCredentials,
 } from '../helpers/clerk-auth';
+import {
+  installRuntimeAutomationBypass,
+  resetAuthStatePreservingOnboardingSession,
+} from './utils/runtime-automation-bypass';
 
 /**
- * Golden Path E2E — Signup -> Onboarding -> Music Fetch -> Live Profile
+ * Golden Path E2E — Anonymous Chat -> Signup -> Claim -> Live Profile
  *
  * Tests the complete new-user journey end to end with REAL data:
- * - No mocks for music fetch
+ * - Real anonymous conversation persistence and Better Auth signup
+ * - Deterministic confirmed artist/handle tool-call fixtures
+ * - Real claim endpoint and public profile activation
  * - No pre-authenticated state
- * - Real Better Auth email-OTP signup (test environment)
+ *
+ * MusicFetch integration coverage remains in musicfetch-coverage.spec.ts.
  *
  * Jovie's pricing is a 14-day reverse trial with NO card required at signup
  * (see docs/PRICING-PHILOSOPHY.md), so the golden path's "first value" moment
@@ -114,11 +122,28 @@ async function ensureDbUser(betterAuthUserId: string) {
     WHERE spotify_id = ${KNOWN_TIM_WHITE_SPOTIFY_ID}
   `;
 
-  await sql`
-    UPDATE users
-    SET user_status = 'waitlist_approved', updated_at = NOW()
-    WHERE better_auth_user_id = ${betterAuthUserId}
-  `;
+  await expect
+    .poll(
+      async () => {
+        const [user] = await sql`
+          UPDATE users
+          SET user_status = 'waitlist_approved', updated_at = NOW()
+          WHERE better_auth_user_id = ${betterAuthUserId}
+          RETURNING id
+        `;
+        return user?.id ?? null;
+      },
+      {
+        message:
+          'Better Auth app-user provisioning hook did not create a linked users row',
+        timeout: 30_000,
+      }
+    )
+    .toBeTruthy();
+
+  // The sign-in response is still withheld at this point, so the browser has
+  // neither the new session cookie nor a chance to cache the pending state.
+  // Approving here removes the old cache-invalidation race entirely.
 }
 
 /**
@@ -244,39 +269,223 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const continueButton = page.getByRole('button', {
     name: 'Continue with Email',
   });
-  await emailInput.fill(email);
-  // The standalone app can finish client hydration immediately after its
-  // server-rendered form becomes visible. Wait for React state to enable the
-  // submit control before clicking so the typed address is not lost.
-  await expect(continueButton).toBeEnabled({ timeout: 30_000 });
+  // Hydration can reset the server-rendered controlled input after the first
+  // fill. Refill until React retains the value and enables submission.
+  await fillControlledInputUntilEnabled(emailInput, continueButton, email);
   await continueButton.click();
   await expect(page.locator('[data-auth-email-code-step="code"]')).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByLabel('Digit 1 of 6').pressSequentially('424242');
-  await page.waitForURL(/\/(start|onboarding)/, { timeout: 30_000 });
-  await page.waitForLoadState('domcontentloaded');
 
-  const sessionHandle = await page.waitForFunction(
-    async () => {
-      try {
-        const response = await fetch('/api/auth/get-session');
-        if (!response.ok) return false;
-        const session = (await response.json()) as {
-          user?: { id?: string };
-        };
-        return session.user?.id || false;
-      } catch {
-        return false;
+  // OTP verification hard-navigates to /start as soon as Better Auth returns.
+  // New app users begin in the pending waitlist state, so approve the linked
+  // app row while the sign-in response is withheld from the browser. This
+  // preserves the real session cookie and lets the first /start mount perform
+  // the one authoritative claim without racing the start-route auth gate.
+  const signInRoute = '**/api/auth/sign-in/email-otp';
+  let betterAuthUserId: string | null = null;
+  let settleAuthPreparation: (error: Error | null) => void = () => undefined;
+  const authPreparationResult = new Promise<Error | null>(resolve => {
+    settleAuthPreparation = resolve;
+  });
+  await page.route(signInRoute, async route => {
+    let response: Awaited<ReturnType<typeof route.fetch>> | null = null;
+    let body: string | null = null;
+    let preparationError: Error | null = null;
+
+    try {
+      response = await route.fetch();
+      body = await response.text();
+      if (response.status() !== 200) {
+        throw new Error(
+          `Better Auth email-OTP sign-in returned ${response.status()}`
+        );
       }
-    },
-    undefined,
-    { timeout: 30_000 }
-  );
-  const betterAuthUserId = await sessionHandle.jsonValue<string>();
 
-  await ensureDbUser(betterAuthUserId);
-  return { email, betterAuthUserId };
+      const payload = JSON.parse(body) as { user?: { id?: string } };
+      betterAuthUserId = payload.user?.id ?? null;
+      if (!betterAuthUserId) {
+        throw new Error('Better Auth email-OTP response omitted the user id');
+      }
+
+      await ensureDbUser(betterAuthUserId);
+    } catch (error) {
+      preparationError =
+        error instanceof Error ? error : new Error(String(error));
+    }
+
+    try {
+      if (response && body !== null) {
+        await route.fulfill({ response, body });
+      } else {
+        await route.abort();
+      }
+    } catch (error) {
+      preparationError ??=
+        error instanceof Error ? error : new Error(String(error));
+    }
+
+    settleAuthPreparation(preparationError);
+  });
+  try {
+    const automaticStartNavigationPromise = page.waitForURL(
+      url => url.pathname === '/start',
+      { waitUntil: 'domcontentloaded', timeout: 30_000 }
+    );
+    void automaticStartNavigationPromise.catch(() => undefined);
+    const claimResponsePromise = page.waitForResponse(
+      response =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === '/api/onboarding/claim',
+      { timeout: 30_000 }
+    );
+    void claimResponsePromise.catch(() => undefined);
+    await page.getByLabel('Digit 1 of 6').pressSequentially('424242');
+    let authPreparationTimeout: ReturnType<typeof setTimeout> | undefined;
+    const authPreparationError = await Promise.race([
+      authPreparationResult,
+      new Promise<Error>(resolve => {
+        authPreparationTimeout = setTimeout(
+          () =>
+            resolve(
+              new Error(
+                'Better Auth email-OTP request did not reach the preparation barrier'
+              )
+            ),
+          30_000
+        );
+      }),
+    ]);
+    if (authPreparationTimeout) clearTimeout(authPreparationTimeout);
+    if (authPreparationError) throw authPreparationError;
+    await automaticStartNavigationPromise;
+    const claimResponse = await claimResponsePromise;
+    expect(claimResponse.status()).toBe(200);
+    const claimPayload = (await claimResponse.json()) as {
+      claimed?: number;
+      conversationId?: string;
+    };
+
+    if (!betterAuthUserId) {
+      throw new Error('Better Auth sign-in did not expose a user id');
+    }
+
+    return { email, betterAuthUserId, claimPayload };
+  } finally {
+    await page.unroute(signInRoute);
+  }
+}
+
+async function seedAnonymousOnboardingJourney(page: Page, handle: string) {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) throw new Error('DATABASE_URL required for onboarding seed');
+
+  // Mark only this browser as local automation before React initializes so
+  // the anonymous turn bypasses Turnstile without enabling auth bypass.
+  await page.addInitScript(installRuntimeAutomationBypass);
+  await page.route('**/api/chat', async route => {
+    await route.continue({
+      headers: {
+        ...route.request().headers(),
+        'x-jovie-e2e-llm-failure': '1',
+      },
+    });
+  });
+  await page.goto('/start', { waitUntil: 'domcontentloaded' });
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => document.documentElement.dataset.e2eMode ?? null),
+      {
+        message: 'Golden path browser did not install its runtime marker',
+        timeout: 30_000,
+      }
+    )
+    .toBe('1');
+  const input = page.locator('[aria-label="Chat message input" i]');
+  await expect(input).toBeVisible({ timeout: 30_000 });
+  await input.fill('I am Tim White');
+  const sendButton = page.getByRole('button', { name: 'Send message' });
+  // Synchronize on the real user-facing composer without coupling the fixture
+  // to component attributes that the canonical chat does not expose.
+  await expect(sendButton).toBeEnabled({ timeout: 30_000 });
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      candidate =>
+        candidate.request().method() === 'POST' &&
+        new URL(candidate.url()).pathname === '/api/chat'
+    ),
+    sendButton.click(),
+  ]);
+  expect(response.status()).toBe(200);
+  const requestBody = response.request().postDataJSON() as {
+    messages?: Array<{ id?: string; role?: string }>;
+  };
+  const clientMessageId = requestBody.messages
+    ?.toReversed()
+    .find(message => message.role === 'user')?.id;
+  expect(
+    clientMessageId,
+    'Anonymous chat request did not include a user message id'
+  ).toBeTruthy();
+
+  const sql = neon(dbUrl);
+  const persistedMessages = await sql`
+    SELECT conversation_id
+    FROM chat_messages
+    WHERE client_message_id = ${clientMessageId}
+      AND role = 'user'
+    ORDER BY created_at DESC
+    LIMIT 2
+  `;
+  expect(
+    persistedMessages.length,
+    'Anonymous chat user message was not persisted exactly once'
+  ).toBe(1);
+  const conversationId = persistedMessages[0]?.conversation_id;
+  expect(
+    conversationId,
+    'Anonymous chat did not reserve a conversation'
+  ).toBeTruthy();
+
+  const toolCalls = [
+    {
+      schemaVersion: 2,
+      toolCallId: `golden-artist-${Date.now()}`,
+      toolName: 'confirmSpotifyArtist',
+      state: 'succeeded',
+      output: {
+        action: 'spotify_artist_confirmed',
+        spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm',
+        artist: {
+          id: '4Uwpa6zW3zzCSQvooQNksm',
+          name: 'Tim White',
+          url: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+        },
+      },
+      uiHint: 'artifact',
+    },
+    {
+      schemaVersion: 2,
+      toolCallId: `golden-handle-${Date.now()}`,
+      toolName: 'checkHandle',
+      state: 'succeeded',
+      output: { action: 'check_handle', handle },
+      uiHint: 'artifact',
+    },
+  ];
+  const updated = await sql`
+    UPDATE chat_messages
+    SET tool_calls = ${JSON.stringify(toolCalls)}::jsonb
+    WHERE id = (
+      SELECT id FROM chat_messages
+      WHERE conversation_id = ${conversationId}
+      ORDER BY created_at DESC LIMIT 1
+    )
+    RETURNING id
+  `;
+  expect(updated.length, 'Anonymous chat message was not persisted').toBe(1);
+  return conversationId;
 }
 
 async function createFreshUser(page: import('@playwright/test').Page) {
@@ -297,7 +506,7 @@ async function createFreshUser(page: import('@playwright/test').Page) {
         throw error;
       }
 
-      await page.context().clearCookies();
+      await resetAuthStatePreservingOnboardingSession(page.context());
       await page
         .evaluate(() => {
           localStorage.clear();
@@ -317,7 +526,7 @@ async function createFreshUser(page: import('@playwright/test').Page) {
 /*  Test suite                                                          */
 /* ------------------------------------------------------------------ */
 
-test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile', () => {
+test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', () => {
   test.describe.configure({ mode: 'serial' });
 
   // Fresh browser — no inherited auth state
@@ -352,114 +561,56 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Live Profile'
       timeout: 30_000,
     });
 
-    // The collapsed homepage (#11988) is hero + minimal footer: no claim
-    // input, no signup links — the funnel routes through the hero command
-    // center into /start chat. Assert the hero rendered, then enter the
-    // classic signup path directly (this spec's scope is signup →
-    // onboarding → live profile, not the chat funnel).
+    // The collapsed homepage routes onboarding through /start chat.
     await expect(page.getByTestId('homepage-hero-command-center')).toBeVisible({
       timeout: 20_000,
     });
 
     // ──────────────────────────────────────────────────────────────────
-    // STEP 2: Initiate signup
+    // STEP 2: Start the canonical anonymous chat journey
     // ──────────────────────────────────────────────────────────────────
-    await page.goto('/signup', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
-    });
-    await page.waitForURL(/\/(signup|onboarding)/, { timeout: 30_000 });
+    const randomSuffix = Math.random().toString(36).slice(2, 8);
+    const uniqueHandle = `t${Date.now().toString(36)}${randomSuffix}`;
+    const conversationId = await seedAnonymousOnboardingJourney(
+      page,
+      uniqueHandle
+    );
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 3: Create account
     // ──────────────────────────────────────────────────────────────────
-    const { betterAuthUserId } = await createFreshUser(page);
-
-    // ──────────────────────────────────────────────────────────────────
-    // STEP 4: Onboarding — Handle step
-    // ──────────────────────────────────────────────────────────────────
-    // Generate a unique handle and pass it via search param.
-    // When the handle is pre-filled via ?handle=, the validation hook's
-    // fast path marks it as available immediately (skips API check),
-    // avoiding the TanStack Pacer debouncer state race condition.
-    const randomSuffix = Math.random().toString(36).slice(2, 8);
-    const uniqueHandle = `t${Date.now().toString(36)}${randomSuffix}`;
-
-    // Navigate to onboarding with pre-filled handle, submit handle step,
-    // and advance to DSP step. Retry the whole sequence since the Neon
-    // WebSocket pool can fail during SSR or server action execution.
-    await expect(async () => {
-      await page.goto(`/onboarding?handle=${uniqueHandle}`, {
-        waitUntil: 'domcontentloaded',
-        timeout: 60_000,
-      });
-      await expect(
-        page.locator('[data-testid="onboarding-form-wrapper"]')
-      ).toBeVisible({ timeout: 10_000 });
-
-      // Handle input should be pre-filled
-      const handleEl = page.getByLabel('Claim Your Handle');
-      const handleVisible = await handleEl
-        .isVisible({ timeout: 3_000 })
-        .catch(() => false);
-
-      if (handleVisible) {
-        // Still on handle step — submit it through the icon-only claim button.
-        await expect
-          .poll(async () => (await handleEl.inputValue()).trim(), {
-            timeout: 20_000,
-          })
-          .toBe(uniqueHandle);
-
-        const claimHandleButton = page.getByTestId('onboarding-handle-submit');
-        await expect(claimHandleButton).toBeEnabled({ timeout: 30_000 });
-        await claimHandleButton.click();
-      }
-
-      // Must reach DSP step (artist search)
-      await expect(
-        page.getByPlaceholder(/search by artist name or paste a spotify link/i)
-      ).toBeVisible({ timeout: 60_000 });
-    }).toPass({
-      timeout: 180_000,
-      intervals: [3_000, 5_000, 10_000, 15_000],
-    });
-
-    // ──────────────────────────────────────────────────────────────────
-    // STEP 5: Onboarding — Artist search (Music Fetch)
-    // ──────────────────────────────────────────────────────────────────
-    const artistInput = page.getByPlaceholder(
-      /search by artist name or paste a spotify link/i
-    );
-    await expect(artistInput).toBeVisible({ timeout: 5_000 });
-
+    const { betterAuthUserId, claimPayload } = await createFreshUser(page);
     const TEST_SPOTIFY_ID = '4Uwpa6zW3zzCSQvooQNksm';
     const testSpotifyUrl = `https://open.spotify.com/artist/${TEST_SPOTIFY_ID}`;
-    const capturedSpotifyUrl: string | null = testSpotifyUrl;
-    const capturedSpotifyId: string | null = TEST_SPOTIFY_ID;
 
-    await artistInput.fill(testSpotifyUrl);
-
-    // ──────────────────────────────────────────────────────────────────
-    // STEP 6: Current onboarding V2 — verify import and finish path
-    // ──────────────────────────────────────────────────────────────────
-
-    const importCompleteHeading = page.getByRole('heading', {
-      name: /^(Spotify connected|Your Link Is Live)$/i,
+    // Assert the real client auto-claim response captured during OTP completion.
+    // A duplicate request here would race the hook and mask which caller won.
+    expect(claimPayload).toMatchObject({
+      claimed: 1,
+      conversationId,
     });
-    await expect(importCompleteHeading).toBeVisible({ timeout: 180_000 });
+    const sql = neon(process.env.DATABASE_URL!);
+    await expect
+      .poll(async () => {
+        const rows = await sql`
+          SELECT cp.id FROM creator_profiles cp
+          INNER JOIN users u ON u.id = cp.user_id
+          WHERE u.better_auth_user_id = ${betterAuthUserId}
+            AND cp.username_normalized = ${uniqueHandle}
+        `;
+        return rows.length;
+      })
+      .toBe(1);
 
     // Ensure Spotify URL is saved on the profile via direct DB write.
     // The fire-and-forget connectSpotifyArtist uses the flaky WebSocket pool
     // and often fails silently in test envs. This guarantees the URL is persisted
     // so we can hard-assert DSP links render on the public profile.
     //
-    // Fallback uses a known real Spotify artist ID for "Tim White" in case
-    // the response interceptor didn't capture the URL (e.g. search cached).
-    const spotifyIdToSave = capturedSpotifyId || TEST_SPOTIFY_ID;
-    const spotifyUrlToSave = capturedSpotifyUrl || testSpotifyUrl;
+    const spotifyIdToSave = TEST_SPOTIFY_ID;
+    const spotifyUrlToSave = testSpotifyUrl;
     console.log(
-      `[golden-path] Setting spotify_url=${spotifyUrlToSave} spotify_id=${spotifyIdToSave} (captured=${capturedSpotifyUrl})`
+      `[golden-path] Activated conversation=${conversationId}; setting spotify_url=${spotifyUrlToSave}`
     );
     await ensureSpotifyUrlOnProfile(
       betterAuthUserId,

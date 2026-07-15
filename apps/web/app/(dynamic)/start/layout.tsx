@@ -18,8 +18,11 @@ export default async function StartLayout({
 }>) {
   // Anonymous onboarding never needs a live Clerk bootstrap on loopback E2E/dev
   // hosts — loading FAPI JS from localhost causes CORS console errors and jank.
+  // The Golden Path uses the same loopback Turnstile bypass with a real Better
+  // Auth signup, so E2E_TEST_MODE must keep the live cookie-backed provider.
   const forceBypassClerk =
     !isSecureEnv() &&
+    env.E2E_TEST_MODE !== '1' &&
     (env.PUBLIC_NOAUTH_SMOKE === '1' ||
       process.env.NEXT_PUBLIC_E2E_MODE === '1');
   const initialFlags = await getAppFlagsSnapshot({

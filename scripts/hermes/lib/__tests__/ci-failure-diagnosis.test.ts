@@ -88,6 +88,178 @@ describe('diagnoseCiFailure', () => {
     expect(diagnosis.remediation).toContain('timeout tier');
   });
 
+  it('diagnoses a Golden Path email value erased by hydration', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path (PR)
+      [chromium] tests/e2e/golden-path.spec.ts
+      Continue with Email
+      expect(locator).toBeEnabled() failed: element is not enabled
+    `);
+
+    expect(diagnosis.failureClass).toBe('golden_path_signup_hydration_reset');
+    expect(diagnosis.rootCause).toContain('hydration');
+    expect(diagnosis.remediation).toContain('Refill');
+  });
+
+  it('diagnoses the real-auth Golden Path mounted with signed-out defaults', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path (PR)
+      export E2E_TEST_MODE=1
+      export PUBLIC_NOAUTH_SMOKE=1
+      TimeoutError: page.waitForResponse: Timeout 30000ms exceeded
+      waiting for POST /api/onboarding/claim
+    `);
+
+    expect(diagnosis.failureClass).toBe('golden_path_auth_provider_bypassed');
+    expect(diagnosis.rootCause).toContain('signed-out auth defaults');
+    expect(diagnosis.remediation).toContain('live auth provider');
+  });
+
+  it('diagnoses the pending-user waitlist deadlock before the first claim', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile
+      TimeoutError: page.waitForResponse: Timeout 30000ms exceeded while waiting for event "response"
+      > 309 | const heldClaimResponsePromise = page.waitForResponse(
+      at createFreshUserOnce (tests/e2e/golden-path.spec.ts:309:43)
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'golden_path_waitlist_gate_before_claim'
+    );
+    expect(diagnosis.rootCause).toContain('/waitlist');
+    expect(diagnosis.remediation).toContain('Do not rerun');
+    expect(diagnosis.remediation).toContain('withholding that response');
+  });
+
+  it('diagnoses a Golden Path app-user provisioning gap instead of rerunning', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile
+      Expected: 200
+      Received: 401
+      > 357 | expect(claimResponse.status()).toBe(200);
+      at createFreshUserOnce (tests/e2e/golden-path.spec.ts:357:34)
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'golden_path_app_user_provisioning_gap'
+    );
+    expect(diagnosis.rootCause).toContain('linked app users.id');
+    expect(diagnosis.remediation).toContain('Do not rerun');
+    expect(diagnosis.remediation).toContain('provisionAppUser');
+  });
+
+  it('diagnoses the explicit provisioning barrier when the hook is removed', () => {
+    expect(
+      diagnoseCiFailure(
+        'Better Auth app-user provisioning hook did not create a linked users row'
+      ).failureClass
+    ).toBe('golden_path_app_user_provisioning_gap');
+  });
+
+  it('diagnoses competing OTP and fixture navigation to /start', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path (PR)
+      tests/e2e/golden-path.spec.ts
+      Error: page.goto: net::ERR_ABORTED at http://localhost:3100/start
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'golden_path_competing_start_navigation'
+    );
+    expect(diagnosis.rootCause).toContain('OTP form');
+    expect(diagnosis.remediation).toContain('withhold the sign-in response');
+  });
+
+  it('diagnoses the removed classic onboarding fixture on canonical /start', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path (PR)
+      [chromium] tests/e2e/golden-path.spec.ts
+      page URL: http://localhost:3100/start?handle=tmrlisyuuem7u0e
+      expect(locator('[data-testid="onboarding-form-wrapper"]')).toBeVisible()
+      waiting for locator('[data-testid="onboarding-form-wrapper"]')
+    `);
+
+    expect(diagnosis.failureClass).toBe('golden_path_stale_onboarding_surface');
+    expect(diagnosis.rootCause).toContain('canonical /start');
+    expect(diagnosis.remediation).toContain('anonymous chat');
+  });
+
+  it('diagnoses a stale Golden Path runtime marker assertion', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path (PR)
+      [chromium] tests/e2e/golden-path.spec.ts:335:5
+      Onboarding runtime policy did not finish initializing
+      expect(locator).toHaveAttribute('data-interaction-ready', 'true')
+      Expected: "true"
+      Received: null
+    `);
+
+    expect(diagnosis.failureClass).toBe('golden_path_stale_runtime_marker');
+    expect(diagnosis.rootCause).toContain('marker attributes');
+    expect(diagnosis.remediation).toContain('real chat input');
+  });
+
+  it('diagnoses the padded profile artwork assertion against the wrong box', () => {
+    const diagnosis = diagnoseCiFailure(`
+      [chromium] tests/e2e/profile-mobile-viewport-stability.spec.ts:636:9
+      Error: iPhone SE 2/3 bento artwork should fill the card width
+      Expected: >= 222
+      Received: 196
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'profile_release_card_content_box_mismatch'
+    );
+    expect(diagnosis.rootCause).toContain('outer card width');
+    expect(diagnosis.remediation).toContain('artwork parent content box');
+    expect(diagnosis.remediation).toContain('instead of widening');
+  });
+
+  it('diagnoses the stale notifications-page dialog fixture after its canonical redirect', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Lighthouse (public routes PR) (1)
+      [chromium] tests/e2e/profile-mobile-viewport-stability.spec.ts:820:9
+      Public Profile Mobile Viewport Stability @smoke @critical › iPhone SE 2/3 alerts walkthrough focus never shifts the shell
+      Error: iPhone SE 2/3 email target should be visible
+      Locator: locator('[role="dialog"][data-testid="profile-mobile-notifications-flow"]').getByTestId('mobile-email-input')
+      Error: element(s) not found
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'profile_mobile_legacy_notifications_route'
+    );
+    expect(diagnosis.rootCause).toContain('followed its redirect');
+    expect(diagnosis.remediation).toContain('Do not rerun');
+    expect(diagnosis.remediation).toContain('profile-compact-surface');
+    expect(diagnosis.remediation).toContain(
+      'legacy redirect covered separately'
+    );
+  });
+
+  it('diagnoses an accepted PR preview stuck in Vercel concurrency', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Vercel accepted https://jovie-example.vercel.app
+      Current PR preview deployment state: QUEUED
+      ::error::PR preview is QUEUED after readiness wait (status 0)
+    `);
+
+    expect(diagnosis.failureClass).toBe('vercel_concurrent_build_queue');
+    expect(diagnosis.rootCause).toContain('concurrent-build capacity');
+    expect(diagnosis.remediation).toContain('Do not rerun the unchanged head');
+    expect(diagnosis.remediation).toContain('provably obsolete');
+  });
+
+  it('diagnoses a Vercel source build holding capacity until timeout', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Vercel deployment dpl_example failed
+      errorCode=BUILD_EXCEEDED_MAXIMUM_TIME
+    `);
+
+    expect(diagnosis.failureClass).toBe('vercel_build_exceeded_maximum_time');
+    expect(diagnosis.rootCause).toContain('source deployment');
+    expect(diagnosis.remediation).toContain('runtime-closed prebuilt artifact');
+  });
+
   it('diagnoses deterministic Better Auth OTP rejection in the bypass smoke lane', () => {
     const diagnosis = diagnoseCiFailure(`
       E2E Smoke (PR Fast Feedback)

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { authClient } from '@/lib/auth/client';
+import { authClient, isGoogleOneTapConfigured } from '@/lib/auth/client';
 import type { AuthShellMode } from './AuthShell';
 
 /**
@@ -47,11 +47,11 @@ export function GoogleOneTap({ mode, suppress }: GoogleOneTapProps) {
   useEffect(() => {
     if (suppress) return;
     if (isNativeWebview()) return;
+    if (!isGoogleOneTapConfigured()) return;
 
-    // `authClient.oneTap` is only present when the `oneTapClient` plugin was
-    // mounted in `lib/auth/client.ts` (i.e. `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is
-    // set). If absent, One Tap is silently disabled — the provider buttons
-    // remain the primary Google affordance.
+    // Better Auth's proxy client can expose a callable unknown property even
+    // when the plugin is absent. The explicit configuration gate above keeps
+    // mock/DB-less builds from calling a server route that was never mounted.
     const oneTap = authClient.oneTap;
     if (!oneTap) return;
 

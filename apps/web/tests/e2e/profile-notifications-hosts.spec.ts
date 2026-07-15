@@ -113,7 +113,7 @@ test.describe('Profile Notifications Hosts', () => {
       ).toBeVisible();
     });
 
-    test(`dedicated notifications page auto-opens overlay flow @ ${breakpoint.name}`, async ({
+    test(`legacy notifications page redirects to the canonical subscribe flow @ ${breakpoint.name}`, async ({
       page,
     }) => {
       await blockAnalytics(page);
@@ -128,9 +128,12 @@ test.describe('Profile Notifications Hosts', () => {
       });
       await waitForHydration(page);
 
-      await expect(page.getByTestId('notifications-page')).toBeVisible();
+      await expect(page).toHaveURL(/\/testartist\?mode=subscribe$/);
+      await expect(page.getByTestId('profile-compact-surface')).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-flow')
+        page.locator(
+          '[data-testid="profile-mobile-notifications-flow"]:visible'
+        )
       ).toBeVisible();
       await expect(
         page.getByTestId('profile-mobile-notifications-step-email')

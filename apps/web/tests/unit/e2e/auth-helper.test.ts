@@ -1,9 +1,35 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  fillControlledInputUntilEnabled,
   resolveBypassFallbackUserId,
   setTestAuthBypassSession,
 } from '../../helpers/auth';
+
+describe('fillControlledInputUntilEnabled', () => {
+  it('refills when hydration resets the first controlled value', async () => {
+    let value = '';
+    let fills = 0;
+    const input = {
+      fill: vi.fn(async (next: string) => {
+        fills += 1;
+        value = fills === 1 ? '' : next;
+      }),
+      inputValue: () => Promise.resolve(value),
+    } as unknown as Locator;
+    const submit = {
+      isEnabled: () => Promise.resolve(Boolean(value)),
+    } as unknown as Locator;
+
+    await fillControlledInputUntilEnabled(
+      input,
+      submit,
+      'artist@test.jovie.com'
+    );
+
+    expect(input.fill).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe('resolveBypassFallbackUserId', () => {
   it('returns the persisted UUID identity for a persona cookie fallback', () => {

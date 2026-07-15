@@ -2,7 +2,6 @@ import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
 import { chatAuditLog, chatConversations } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { materializeClaimedOnboardingProfile } from '@/lib/onboarding/claim-profile';
@@ -28,12 +27,12 @@ function profilePayload(
 /**
  * POST /api/onboarding/claim (JOV-2132).
  *
- * Called by the inline Clerk SignUp completion handler to associate any
- * anonymous onboarding chat transcript(s) with the freshly created Clerk user.
+ * Called by the inline signup completion handler to associate any anonymous
+ * onboarding chat transcript(s) with the freshly created app user.
  *
  * Flow:
- *  1. Require Clerk auth (must be called from an authenticated context — the
- *     user just signed up; Clerk middleware has populated request auth).
+ *  1. Require auth (must be called from an authenticated context — the user
+ *     just signed up and Better Auth has provisioned the app user).
  *  2. Resolve the signed sessionId from the onboarding cookie.
  *  3. SELECT all chat_conversations rows where sessionId = ? AND userId IS NULL.
  *  4. If 1 row → UPDATE userId, record consent audit log entry.
@@ -48,8 +47,10 @@ function profilePayload(
  */
 export async function POST(req: Request) {
   try {
-    const { userId: clerkUserId } = await getCachedAuth();
-    if (!clerkUserId) {
+    // getCachedAuth().userId is the app `users.id` UUID. A valid Better Auth
+    // session without a linked app user intentionally resolves to null.
+    const { userId } = await getCachedAuth();
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized', errorCode: 'UNAUTHORIZED' },
         { status: 401 }
@@ -61,20 +62,6 @@ export async function POST(req: Request) {
       // No anonymous session to claim — successful no-op so the client can
       // call this endpoint unconditionally after sign-up.
       return NextResponse.json({ claimed: 0 });
-    }
-
-    // Resolve the internal DB users.id from the Clerk user id.
-    const [userRow] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
-
-    if (!userRow) {
-      // The Clerk user has authenticated but hasn't been mirrored into our
-      // users table yet (Clerk webhook race). Treat as a soft success — the
-      // client can retry once the webhook fires.
-      return NextResponse.json({ claimed: 0, retryAfterWebhook: true });
     }
 
     // Look up all unclaimed conversations tied to this sessionId.
@@ -116,7 +103,7 @@ export async function POST(req: Request) {
       //     is still the catch-all for the cross-user case
       const claimedPrimary = await db
         .update(chatConversations)
-        .set({ userId: userRow.id, updatedAt: new Date() })
+        .set({ userId, updatedAt: new Date() })
         .where(
           and(
             eq(chatConversations.id, primary.id),
@@ -140,7 +127,7 @@ export async function POST(req: Request) {
       }
 
       const profile = await materializeClaimedOnboardingProfile({
-        userId: userRow.id,
+        userId,
         conversationId: primary.id,
         ipAddress,
         userAgent,
@@ -150,13 +137,13 @@ export async function POST(req: Request) {
       // primary is already claimed, audit gap is a forensic loss but not a
       // user-visible failure.
       await db.insert(chatAuditLog).values({
-        userId: userRow.id,
+        userId,
         creatorProfileId: null,
         conversationId: primary.id,
         action: 'claim_anonymous_conversation',
         field: 'user_id',
         previousValue: null,
-        newValue: userRow.id,
+        newValue: userId,
         metadata: {
           sessionId,
           claimedConversationCount: candidates.length,
@@ -173,7 +160,7 @@ export async function POST(req: Request) {
         await db
           .update(chatConversations)
           .set({
-            userId: userRow.id,
+            userId,
             sessionId: null,
             title: '(superseded — claimed alongside another transcript)',
             updatedAt: new Date(),

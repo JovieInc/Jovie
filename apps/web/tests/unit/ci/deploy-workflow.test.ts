@@ -765,13 +765,73 @@ describe('CI E2E smoke workflow', () => {
     expect(smokeManifest).toContain("'golden-path.spec.ts'");
     expect(smokeStep).toContain('export E2E_USE_TEST_AUTH_BYPASS=1');
     expect(smokeStep).not.toContain('export E2E_TEST_MODE=1');
+    expect(smokeStep).not.toContain('export PUBLIC_NOAUTH_SMOKE=1');
     expect(goldenPathStep).toContain('export E2E_TEST_MODE=1');
+    expect(goldenPathStep).toContain('export CHAT_LLM_FAILURE_INJECTION=1');
+    expect(goldenPathStep).toContain('export PUBLIC_NOAUTH_SMOKE=1');
     expect(goldenPathStep).not.toContain('E2E_USE_TEST_AUTH_BYPASS');
     expect(goldenPathSpec).toContain(
       "process.env.E2E_USE_TEST_AUTH_BYPASS === '1'"
     );
     expect(goldenPathSpec).toContain(
       'Golden path requires the dedicated real-auth lane'
+    );
+    expect(goldenPathSpec).toContain(
+      "const signInRoute = '**/api/auth/sign-in/email-otp'"
+    );
+    const routeFetchIndex = goldenPathSpec.indexOf(
+      'response = await route.fetch()'
+    );
+    const approveAppUserIndex = goldenPathSpec.indexOf(
+      'await ensureDbUser(betterAuthUserId)'
+    );
+    const signInFulfillIndex = goldenPathSpec.indexOf(
+      'await route.fulfill({ response, body })'
+    );
+    const navigationArmIndex = goldenPathSpec.indexOf(
+      'const automaticStartNavigationPromise = page.waitForURL('
+    );
+    const claimArmIndex = goldenPathSpec.indexOf(
+      'const claimResponsePromise = page.waitForResponse('
+    );
+    const otpSubmitIndex = goldenPathSpec.indexOf(
+      "pressSequentially('424242')"
+    );
+    const authPreparationIndex = goldenPathSpec.indexOf(
+      'const authPreparationError = await Promise.race(['
+    );
+    const unrouteIndex = goldenPathSpec.indexOf(
+      'await page.unroute(signInRoute)'
+    );
+    expect(routeFetchIndex).toBeGreaterThan(-1);
+    expect(approveAppUserIndex).toBeGreaterThan(routeFetchIndex);
+    expect(signInFulfillIndex).toBeGreaterThan(approveAppUserIndex);
+    expect(navigationArmIndex).toBeGreaterThan(-1);
+    expect(navigationArmIndex).toBeLessThan(otpSubmitIndex);
+    expect(claimArmIndex).toBeGreaterThan(navigationArmIndex);
+    expect(claimArmIndex).toBeLessThan(otpSubmitIndex);
+    expect(authPreparationIndex).toBeGreaterThan(otpSubmitIndex);
+    expect(unrouteIndex).toBeGreaterThan(authPreparationIndex);
+    expect(goldenPathSpec).toContain('authPreparationResult,');
+    expect(goldenPathSpec).toContain(
+      'without racing the start-route auth gate'
+    );
+    expect(goldenPathSpec).toContain(
+      'Better Auth email-OTP request did not reach the preparation barrier'
+    );
+    expect(goldenPathSpec).not.toContain('heldClaimResponsePromise');
+    expect(goldenPathSpec).not.toContain('await page.reload({');
+    expect(goldenPathSpec).not.toContain(
+      "const claimRoute = '**/api/onboarding/claim'"
+    );
+    expect(goldenPathSpec).not.toContain(
+      'body: JSON.stringify({ claimed: 0 })'
+    );
+    expect(goldenPathSpec).not.toContain(
+      'const sessionHandle = await page.waitForFunction('
+    );
+    expect(goldenPathSpec).toContain(
+      'resetAuthStatePreservingOnboardingSession(page.context())'
     );
   });
 
@@ -866,6 +926,25 @@ describe('CI E2E smoke workflow', () => {
 });
 
 describe('CI public lighthouse workflow', () => {
+  it('pins the standalone server and browser to one loopback origin', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const lighthouseJob = getJobBlock(workflow, 'ci-lighthouse-pr');
+    const runStep = getStepBlock(
+      lighthouseJob,
+      'Run Lighthouse CI (public launch thresholds)'
+    );
+    const localOrigin = 'http://localhost:3000';
+
+    expect(runStep).toContain('export HOSTNAME=localhost');
+    expect(runStep).toContain(`export NEXT_PUBLIC_APP_URL=${localOrigin}`);
+    expect(runStep).toContain(`export BETTER_AUTH_URL=${localOrigin}`);
+    expect(runStep).toContain(
+      `export NEXT_PUBLIC_BETTER_AUTH_URL=${localOrigin}`
+    );
+    expect(runStep).toContain(`BASE_URL: ${localOrigin}`);
+    expect(runStep).not.toContain('http://127.0.0.1:3000');
+  });
+
   it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const lighthouseJob = getJobBlock(workflow, 'ci-lighthouse-pr');
@@ -929,6 +1008,16 @@ describe('CI public lighthouse workflow', () => {
     expect(lighthouseJob).toContain(
       'tests/e2e/profile-mobile-viewport-stability.spec.ts'
     );
+
+    const failureArtifactStep = getStepBlock(
+      lighthouseJob,
+      'Upload public Lighthouse mobile artifacts on failure'
+    );
+    expect(failureArtifactStep).toContain(
+      'if: ${{ failure() && matrix.shard == 1 }}'
+    );
+    expect(failureArtifactStep).toContain('apps/web/playwright-report/');
+    expect(failureArtifactStep).toContain('apps/web/test-results/');
   });
 
   it('public launch Lighthouse config includes CI Chrome stability flags', () => {

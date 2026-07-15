@@ -3,7 +3,18 @@ export type CiFailureClass =
   | 'gate_dependency_cache_timeout'
   | 'bounded_source_scan_timeout'
   | 'visual_qa_prune_timestamp_race'
+  | 'golden_path_signup_hydration_reset'
+  | 'golden_path_competing_start_navigation'
+  | 'golden_path_waitlist_gate_before_claim'
+  | 'golden_path_auth_provider_bypassed'
+  | 'golden_path_app_user_provisioning_gap'
   | 'golden_path_smoke_auth_contract'
+  | 'golden_path_stale_runtime_marker'
+  | 'golden_path_stale_onboarding_surface'
+  | 'profile_release_card_content_box_mismatch'
+  | 'profile_mobile_legacy_notifications_route'
+  | 'vercel_build_exceeded_maximum_time'
+  | 'vercel_concurrent_build_queue'
   | 'layout_guard_contract_missing'
   | 'standalone_runtime_launcher_mismatch'
   | 'chat_composer_unsettled_entry_animation'
@@ -83,6 +94,71 @@ const DIAGNOSES: ReadonlyArray<{
       'The ownership preflight could not resolve the canonical GBrain ledger inside its bounded deadline because the requested slug drifted, the CLI exceeded a nested or overall timeout, or the database session was unhealthy.',
     remediation:
       'Read coordination/agent-job-ledger first, preserve the 10s fail-closed ceiling, and use the receipt requested/resolved slug, engine/CLI/MCP latency, timeout tier, lookup health, and DB lock/session signals to repair the lookup path before retrying.',
+  },
+  {
+    failureClass: 'golden_path_signup_hydration_reset',
+    matches: log =>
+      /Golden Path \(PR\)/i.test(log) &&
+      /golden-path\.spec\.ts/i.test(log) &&
+      /Continue with Email/i.test(log) &&
+      /(?:toBeEnabled|element is not enabled|disabled)/i.test(log),
+    rootCause:
+      'React hydration reset the server-rendered controlled email value after the Golden Path filled it, so the Continue with Email button remained disabled.',
+    remediation:
+      'Refill the controlled email input until React retains the exact value and enables submission; keep the behavioral helper covered by a first-fill-reset regression.',
+  },
+  {
+    failureClass: 'golden_path_competing_start_navigation',
+    matches: log =>
+      /(?:Golden Path \(PR\)|golden-path\.spec\.ts)/i.test(log) &&
+      /page\.goto: net::ERR_ABORTED/i.test(log) &&
+      /\/start/i.test(log),
+    rootCause:
+      'The Golden Path issued an explicit /start navigation while the OTP form was still completing its own hard navigation, so one request was deterministically aborted before the authenticated onboarding mount stabilized.',
+    remediation:
+      'Arm the OTP-driven /start navigation and real claim before submitting the code. If the fixture must approve the app user, withhold the sign-in response until that row is ready instead of issuing a competing goto or reload.',
+  },
+  {
+    failureClass: 'golden_path_waitlist_gate_before_claim',
+    matches: log =>
+      /Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile/i.test(
+        log
+      ) &&
+      /page\.waitForResponse: Timeout \d+ms exceeded/i.test(log) &&
+      /heldClaimResponsePromise/i.test(log),
+    rootCause:
+      'The Golden fixture waited for the first onboarding claim before approving the freshly provisioned app user. The start-route auth gate server-redirected /start to /waitlist first, so useOnboardingClaim unmounted and the awaited request could never occur.',
+    remediation:
+      'Do not rerun the unchanged head. Intercept the Better Auth email-OTP sign-in response, approve the linked app user while withholding that response, then release the response so client navigation reaches the first /start mount and performs the single authoritative claim.',
+  },
+  {
+    failureClass: 'golden_path_auth_provider_bypassed',
+    matches: log =>
+      /Golden Path \(PR\)/i.test(log) &&
+      /export E2E_TEST_MODE=1/i.test(log) &&
+      /export PUBLIC_NOAUTH_SMOKE=1/i.test(log) &&
+      /page\.waitForResponse: Timeout \d+ms exceeded/i.test(log) &&
+      /api\/onboarding\/claim/i.test(log),
+    rootCause:
+      'The loopback no-auth smoke flag forced the /start route to mount signed-out auth defaults during the real-auth Golden Path, so the cookie-backed session never reached useOnboardingClaim and no claim request was sent.',
+    remediation:
+      'Keep the live auth provider enabled when E2E_TEST_MODE arms the real-auth Golden Path while retaining the loopback-only Turnstile bypass; cover the combined flag state in the start-layout regression.',
+  },
+  {
+    failureClass: 'golden_path_app_user_provisioning_gap',
+    matches: log =>
+      /Better Auth app-user provisioning hook did not create a linked users row/i.test(
+        log
+      ) ||
+      (/Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile/i.test(
+        log
+      ) &&
+        /claimResponse\.status\(\)\)\.toBe\(200\)/i.test(log) &&
+        /Received:[^\n]*401/i.test(log)),
+    rootCause:
+      'The real-auth Golden Path created a valid Better Auth identity, but it did not resolve to a linked app users.id before the onboarding claim. A stale auth merge may have removed databaseHooks.user.create.after, or the claim route may still be reinterpreting the canonical app UUID as a legacy Clerk id.',
+    remediation:
+      'Do not rerun the unchanged head. Restore the idempotent provisionAppUser create hook, use getCachedAuth().userId directly as the app UUID in the claim route, and preserve both the missing-app-user 401 regression and hook-wiring test.',
   },
   {
     failureClass: 'golden_path_smoke_auth_contract',
@@ -190,6 +266,77 @@ const DIAGNOSES: ReadonlyArray<{
       'A downstream migration exhausted its Neon connectivity retries because the shared connection artifact carried credentials that no longer authenticated; run-id-only artifact selection permits this drift on reruns.',
     remediation:
       'Bind the Neon connection artifact producer and every consumer to both github.run_id and github.run_attempt, then fail closed when the exact-attempt artifact is absent instead of retrying stale credentials.',
+  },
+  {
+    failureClass: 'golden_path_stale_runtime_marker',
+    matches: log =>
+      /Golden Path \(PR\)/i.test(log) &&
+      /golden-path\.spec\.ts/i.test(log) &&
+      /Onboarding runtime policy did not finish initializing/i.test(log) &&
+      /data-interaction-ready/i.test(log),
+    rootCause:
+      'The Golden Path waited for removed onboarding-chat marker attributes even though the canonical chat and composer had rendered and were ready for behavioral interaction.',
+    remediation:
+      'Wait for the real chat input and enabled send control after installing the document-scoped automation marker; do not couple the fixture to nonexistent component attributes.',
+  },
+  {
+    failureClass: 'golden_path_stale_onboarding_surface',
+    matches: log =>
+      /Golden Path \(PR\)/i.test(log) &&
+      /golden-path\.spec\.ts/i.test(log) &&
+      /onboarding-form-wrapper/i.test(log) &&
+      /(?:\/start\?handle|waiting for locator|toBeVisible)/i.test(log),
+    rootCause:
+      'The Golden Path still asserted the removed classic onboarding form after the compatibility route redirected the browser to the canonical /start chat surface.',
+    remediation:
+      'Drive the canonical /start anonymous chat, persist deterministic artist and handle tool calls, then verify the real signup claim response instead of retrying the removed form.',
+  },
+  {
+    failureClass: 'profile_mobile_legacy_notifications_route',
+    matches: log =>
+      /profile-mobile-viewport-stability\.spec\.ts/i.test(log) &&
+      /alerts walkthrough focus never shifts the shell/i.test(log) &&
+      /email target should be visible/i.test(log) &&
+      /\[role=["']dialog["']\]\[data-testid=["']profile-mobile-notifications-flow["']\]/i.test(
+        log
+      ) &&
+      /element\(s\) not found/i.test(log),
+    rootCause:
+      'The mobile profile fixture opened the retired /testartist/notifications surface, followed its redirect to the canonical ?mode=subscribe route, then searched the inline flow through an obsolete role=dialog wrapper and silently allowed the missing notifications-page root to fall back.',
+    remediation:
+      'Do not rerun the unchanged head. Exercise /testartist?mode=subscribe directly, require profile-compact-surface as the layout root, and scope interactions to the visible profile-mobile-notifications-flow regardless of overlay or inline presentation. Keep the legacy redirect covered separately.',
+  },
+  {
+    failureClass: 'profile_release_card_content_box_mismatch',
+    matches: log =>
+      /profile-mobile-viewport-stability\.spec\.ts/i.test(log) &&
+      /bento artwork should fill the card width/i.test(log) &&
+      /Expected:\s*>=\s*\d+[\s\S]*Received:\s*\d+/i.test(log),
+    rootCause:
+      'The mobile profile fixture compared an image inside the detailed card padding and artwork border with the outer card width, so stable padded geometry failed deterministically.',
+    remediation:
+      'Compare the rendered image width with its artwork parent content box within the existing two-pixel rendering tolerance; retain the separate outer-card and document-overflow assertions instead of widening the threshold or rerunning.',
+  },
+  {
+    failureClass: 'vercel_build_exceeded_maximum_time',
+    matches: log =>
+      /BUILD_EXCEEDED_MAXIMUM_TIME/i.test(log) &&
+      /(?:Vercel|deployment|deploy)/i.test(log),
+    rootCause:
+      'A Vercel source deployment occupied a concurrent-build slot until it exceeded the platform build-time ceiling, starving accepted prebuilt PR deployments behind it.',
+    remediation:
+      'Do not rerun queued PR previews. Inspect the slot-holding deployment, cancel it only when ownership proves it obsolete, suppress irrelevant main deploys, and restore a runtime-closed prebuilt artifact so staging does not force another source build.',
+  },
+  {
+    failureClass: 'vercel_concurrent_build_queue',
+    matches: log =>
+      /(?:Current PR preview deployment state:\s*QUEUED|PR preview is QUEUED after readiness wait|isInConcurrentBuildsQueue[^\n]*(?:true|1))/i.test(
+        log
+      ),
+    rootCause:
+      'Vercel accepted the exact-head deployment, but project concurrent-build capacity was occupied and the deployment remained in the concurrent-build queue past the bounded readiness wait.',
+    remediation:
+      'Do not rerun the unchanged head or create a duplicate deployment. Inspect the accepted deployment and current slot holder, cancel only provably obsolete work, and retry through normal CI only after a new head or confirmed capacity recovery.',
   },
   {
     failureClass: 'neon_concurrency_key_collision',

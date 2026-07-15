@@ -235,6 +235,26 @@ export async function setTestAuthBypassSession(
   }
 }
 
+/** Refill a controlled field until React hydration retains it and enables submit. */
+export async function fillControlledInputUntilEnabled(
+  input: Locator,
+  submit: Locator,
+  value: string,
+  timeout = 30_000
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        await input.fill(value);
+        return (
+          (await input.inputValue()) === value && (await submit.isEnabled())
+        );
+      },
+      { timeout, intervals: [100, 250, 500] }
+    )
+    .toBe(true);
+}
+
 export async function waitForAuthenticatedHealth(
   page: Page,
   options: { readonly timeout?: number } = {}

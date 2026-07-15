@@ -1843,6 +1843,13 @@ jobs:
 
           export NEXT_PUBLIC_CLERK_MOCK=1
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
+          # GHA sets HOSTNAME to the runner name. Next standalone otherwise uses
+          # its 0.0.0.0 bind address for absolute redirects, which turns a
+          # same-origin Lighthouse request into cross-origin CORS/HTTP noise.
+          export HOSTNAME=localhost
+          export NEXT_PUBLIC_APP_URL=http://localhost:3000
+          export BETTER_AUTH_URL=http://localhost:3000
+          export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 
           if [ ! -f .next/standalone/apps/web/server.js ]; then
             echo "Standalone server not found - public Lighthouse cannot start."
@@ -1883,7 +1890,7 @@ jobs:
           fi
         env:
           CI: true
-          BASE_URL: http://127.0.0.1:3000
+          BASE_URL: http://localhost:3000
           PUBLIC_LIGHTHOUSE_SHARD_INDEX: ${{ matrix.shard }}
           PUBLIC_LIGHTHOUSE_TOTAL_SHARDS: '2'
           PROFILE_MOBILE_PERF_BUDGETS: '1'
@@ -1893,6 +1900,16 @@ jobs:
           PUBLIC_NOAUTH_SMOKE: '1'
           URL_ENCRYPTION_KEY: lighthouse-public-ci-url-encryption-key
           AI_GATEWAY_API_KEY: lighthouse-public-ci
+
+      - name: Upload public Lighthouse mobile artifacts on failure
+        if: ${{ failure() && matrix.shard == 1 }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 3
 
   ci-lighthouse-dashboard-pr:
     name: Lighthouse (dashboard PR)
@@ -3566,6 +3583,12 @@ jobs:
           # Enables Better Auth's deterministic OTP only for the golden path's
           # canonical +e2e test address; production hard-blocks this switch.
           export E2E_TEST_MODE=1
+          # Makes the anonymous /start turn deterministic while preserving the
+          # real session cookie, persistence, signup, claim, and activation path.
+          export CHAT_LLM_FAILURE_INJECTION=1
+          # The loopback-only server gate also requires this explicit flag before
+          # it will bypass Turnstile for the first anonymous request.
+          export PUBLIC_NOAUTH_SMOKE=1
           export NEXT_PUBLIC_APP_URL=http://localhost:3100
           export BETTER_AUTH_URL=http://localhost:3100
           export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100

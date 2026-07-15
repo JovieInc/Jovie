@@ -30,7 +30,9 @@ import {
 import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
 import { generateAppleClientSecret } from './apple-client-secret';
+import { provisionAppUser } from './provision';
 import { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
 import { secondaryStorage } from './secondary-storage';
 
@@ -263,6 +265,40 @@ export const auth = betterAuth({
     customRules: AUTH_RATE_LIMIT_RULES,
   },
   trustedOrigins: () => resolveTrustedOrigins(),
+  databaseHooks: {
+    user: {
+      create: {
+        after: async user => {
+          try {
+            await provisionAppUser({
+              betterAuthUserId: user.id,
+              email: user.email,
+              emailVerified: user.emailVerified,
+              name: user.name,
+            });
+          } catch (error) {
+            // provisionAppUser never throws by contract; this is
+            // belt-and-braces so the auth callback can never fail here.
+            // gate.ts lazy-create heals on the next request.
+            try {
+              logger.error('[auth] provision hook failed', error);
+              await captureError('Better Auth provision hook failed', error, {
+                betterAuthUserId: user.id,
+                operation: 'databaseHooks.user.create.after',
+              });
+            } catch (telemetryError) {
+              // Telemetry must never turn the fail-open repair path into an
+              // auth failure. The next request still heals through gate.ts.
+              console.error(
+                '[auth] provision hook telemetry failed',
+                telemetryError
+              );
+            }
+          }
+        },
+      },
+    },
+  },
   telemetry: { enabled: false },
   plugins: buildPlugins(),
 });
