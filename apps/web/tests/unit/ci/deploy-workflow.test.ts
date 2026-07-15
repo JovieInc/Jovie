@@ -514,6 +514,38 @@ describe('canary health gate workflow', () => {
 });
 
 describe('CI E2E smoke workflow', () => {
+  it('keeps the real-auth golden path inert in the bypass smoke lane', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const smokeStep = getStepBlock(
+      getJobBlock(workflow, 'ci-e2e-smoke'),
+      'Run E2E Smoke (Chromium)'
+    );
+    const goldenPathStep = getStepBlock(
+      getJobBlock(workflow, 'ci-golden-path'),
+      'Run Golden Path (Chromium, Better Auth)'
+    );
+    const goldenPathSpec = readFileSync(
+      resolve(repoRoot, 'apps/web/tests/e2e/golden-path.spec.ts'),
+      'utf8'
+    );
+    const smokeManifest = readFileSync(
+      resolve(repoRoot, 'apps/web/tests/e2e/smoke-manifest.ts'),
+      'utf8'
+    );
+
+    expect(smokeManifest).toContain("'golden-path.spec.ts'");
+    expect(smokeStep).toContain('export E2E_USE_TEST_AUTH_BYPASS=1');
+    expect(smokeStep).not.toContain('export E2E_TEST_MODE=1');
+    expect(goldenPathStep).toContain('export E2E_TEST_MODE=1');
+    expect(goldenPathStep).not.toContain('E2E_USE_TEST_AUTH_BYPASS');
+    expect(goldenPathSpec).toContain(
+      "process.env.E2E_USE_TEST_AUTH_BYPASS === '1'"
+    );
+    expect(goldenPathSpec).toContain(
+      'Golden path requires the dedicated real-auth lane'
+    );
+  });
+
   it('seeds public QA fixtures on ephemeral Neon before PR smoke runs', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const smokeJob = getJobBlock(workflow, 'ci-e2e-smoke');

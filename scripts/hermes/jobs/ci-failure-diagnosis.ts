@@ -1,5 +1,6 @@
 export type CiFailureClass =
   | 'bounded_source_scan_timeout'
+  | 'golden_path_smoke_auth_contract'
   | 'neon_concurrency_key_collision'
   | 'test_fixture_import_timeout'
   | 'runner_process_exhaustion'
@@ -18,6 +19,20 @@ const DIAGNOSES: ReadonlyArray<{
   readonly rootCause: string;
   readonly remediation: string;
 }> = [
+  {
+    failureClass: 'golden_path_smoke_auth_contract',
+    matches: log =>
+      /E2E Smoke \(PR Fast Feedback\)/i.test(log) &&
+      /export E2E_USE_TEST_AUTH_BYPASS=1/i.test(log) &&
+      /golden-path\.spec\.ts/i.test(log) &&
+      /(?:That code is incorrect|createFreshUserOnce|page\.waitForURL)/i.test(
+        log
+      ),
+    rootCause:
+      'The real-auth golden-path spec ran inside the bypass smoke lane, where E2E_TEST_MODE and the dedicated journey credentials are intentionally absent, so the Better Auth test code was rejected.',
+    remediation:
+      'Keep golden-path self-skipped whenever the smoke auth bypass is enabled and run the journey only in the dedicated Golden Path job, which supplies E2E_TEST_MODE and real-auth credentials.',
+  },
   {
     failureClass: 'neon_concurrency_key_collision',
     matches: log => /neon-endpoint-pool--[0-3]\b/i.test(log),

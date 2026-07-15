@@ -2,6 +2,31 @@ import { describe, expect, it } from 'vitest';
 import { diagnoseCiFailure } from '../../jobs/ci-failure-diagnosis';
 
 describe('diagnoseCiFailure', () => {
+  it('diagnoses deterministic Better Auth OTP rejection in the bypass smoke lane', () => {
+    const diagnosis = diagnoseCiFailure(`
+      E2E Smoke (PR Fast Feedback)
+      export E2E_USE_TEST_AUTH_BYPASS=1
+      [chromium] tests/e2e/golden-path.spec.ts
+      TimeoutError: page.waitForURL: Timeout 30000ms exceeded.
+      at createFreshUserOnce (tests/e2e/golden-path.spec.ts:252:14)
+    `);
+
+    expect(diagnosis.failureClass).toBe('golden_path_smoke_auth_contract');
+    expect(diagnosis.rootCause).toContain('E2E_TEST_MODE');
+    expect(diagnosis.remediation).toContain('dedicated Golden Path job');
+  });
+
+  it('does not misclassify the authoritative real-auth golden-path lane', () => {
+    expect(
+      diagnoseCiFailure(`
+        Golden Path (PR)
+        export E2E_TEST_MODE=1
+        [chromium] tests/e2e/golden-path.spec.ts
+        TimeoutError: page.waitForURL: Timeout 30000ms exceeded.
+      `).failureClass
+    ).toBe('unknown');
+  });
+
   it('classifies the analytics scanner timeout separately from runner pressure', () => {
     const log = `
       FAIL tests/unit/analytics-metrics-layer-guard.test.ts > canonical metrics layer guard
