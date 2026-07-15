@@ -81,7 +81,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 
 ### Prerequisites
 
-- **Node.js 22.13.0+** (22.x only)
+- **Node.js 22.23.1+** (22.x only)
 - **pnpm 9.15.4** (exact, via Corepack)
 - **ripgrep (`rg`)** for local agent and search tooling
 - **Doppler CLI** (secrets management) - [Install Guide](docs/DOPPLER_SETUP.md)
