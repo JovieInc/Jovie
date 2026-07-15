@@ -210,6 +210,7 @@
     "@jovie/auth-routing": "workspace:*",
     "@jovie/ui": "workspace:*",
     "@neondatabase/serverless": "^1.1.0",
+    "@noble/hashes": "2.2.0",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.218.0",
     "@opentelemetry/sdk-node": "^0.218.0",
     "@opentelemetry/sdk-trace-base": "^2.9.0",

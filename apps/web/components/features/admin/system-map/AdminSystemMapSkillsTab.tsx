@@ -3,15 +3,27 @@ import path from 'node:path';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
 import { SkillDocCard } from './SkillDocCard';
 
+const promptReaders: Record<string, () => Promise<string>> = {
+  'apps/web/lib/services/retouching/styles/white-space.md': () =>
+    fs.readFile(
+      path.join(
+        process.cwd(),
+        'lib',
+        'services',
+        'retouching',
+        'styles',
+        'white-space.md'
+      ),
+      'utf-8'
+    ),
+};
+
 async function readPromptContent(
   promptPath: string | undefined
 ): Promise<string | null> {
   if (!promptPath) return null;
   try {
-    // promptPath is relative to the repo root; Next.js cwd is the app dir
-    const repoRoot = path.resolve(process.cwd(), '../..');
-    const fullPath = path.join(repoRoot, promptPath);
-    return await fs.readFile(fullPath, 'utf-8');
+    return (await promptReaders[promptPath]?.()) ?? null;
   } catch {
     return null;
   }

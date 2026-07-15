@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getDeterministicDevTestAuthPersonaUserId } from '@/lib/auth/dev-test-auth-identity';
 import {
+  DEFAULT_TEST_CREATOR_USER_ID,
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
   TEST_AUTH_BYPASS_MODE,
@@ -138,7 +139,10 @@ describe('test-mode auth bypass', () => {
           return null;
         },
       })
-    ).toBe(getDeterministicDevTestAuthPersonaUserId('creator'));
+    ).toBe(DEFAULT_TEST_CREATOR_USER_ID);
+    expect(DEFAULT_TEST_CREATOR_USER_ID).toBe(
+      getDeterministicDevTestAuthPersonaUserId('creator')
+    );
   });
 
   it('allows bypass markers on private development hosts', () => {
