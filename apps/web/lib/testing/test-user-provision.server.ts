@@ -174,9 +174,11 @@ export async function ensureBetterAuthTestUser({
   // the `server-only` guard when this file is imported from globalSetup.
   const { db } = await import('@/lib/db');
 
-  // Upsert into ba_users — idempotent. `onConflictDoUpdate` on the
-  // primary key (id) so concurrent callers converge.
-  await db
+  // Email is Better Auth's unique identity key for these test actors. Older
+  // preview branches can already contain the same email under a different
+  // user id, so converge on the existing email row instead of failing the
+  // session bootstrap with ba_users_email_unique.
+  const [user] = await db
     .insert(baUsers)
     .values({
       id: baUserId,
@@ -185,16 +187,20 @@ export async function ensureBetterAuthTestUser({
       emailVerified: true,
     })
     .onConflictDoUpdate({
-      target: baUsers.id,
+      target: baUsers.email,
       set: {
         name: fullName,
-        email: normalizedEmail,
         emailVerified: true,
         updatedAt: new Date(),
       },
-    });
+    })
+    .returning({ id: baUsers.id });
 
-  return baUserId;
+  if (!user) {
+    throw new Error('Better Auth test user upsert returned no user');
+  }
+
+  return user.id;
 }
 
 function resolveMatchedSeedUser(
