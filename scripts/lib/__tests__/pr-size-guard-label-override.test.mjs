@@ -97,7 +97,7 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
     expect(workflow).toContain('types: [opened, synchronize, reopened]');
     expect(workflow).not.toMatch(/types:\s*\[[^\]]*labeled/);
     expect(workflow).toContain(
-      'group: pr-size-${{ github.event.pull_request.number }}'
+      "group: pr-size-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}"
     );
     expect(workflow).toContain('cancel-in-progress: true');
     expect(workflow).toContain('JOV-3580');
@@ -116,13 +116,7 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
     );
     expect(workflow).toContain('node scripts/lib/pr-size-guard-policy.mjs');
     expect(workflow).toContain('checks: write');
-    expect(workflow).toContain(
-      'ref: ${{ github.event.pull_request.base.sha }}'
-    );
     expect(workflow).toContain('persist-credentials: false');
-    expect(workflow).not.toContain(
-      'ref: ${{ github.event.pull_request.head.sha }}'
-    );
     expect(workflow).toContain(
       'group: pr-size-label-override-${{ github.event.pull_request.number }}'
     );
@@ -132,6 +126,22 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
     );
     expect(workflow).toContain('node scripts/pr-size-guard-label-override.mjs');
     expect(workflow).toContain('JOV-3580');
+  });
+
+  it('executes checks-write policy code from the immutable workflow commit', () => {
+    const workflow = readFileSync(OVERRIDE_WORKFLOW, 'utf8');
+
+    expect(workflow).toContain('ref: ${{ github.workflow_sha }}');
+    expect(workflow).toContain(
+      'exact trusted commit that supplied this workflow'
+    );
+    expect(workflow).toContain('stale PR base or PR-controlled head');
+    expect(workflow).not.toContain(
+      'ref: ${{ github.event.pull_request.base.sha }}'
+    );
+    expect(workflow).not.toContain(
+      'ref: ${{ github.event.pull_request.head.sha }}'
+    );
   });
 
   it('does not skip the job before supported-label step conditions can run', () => {

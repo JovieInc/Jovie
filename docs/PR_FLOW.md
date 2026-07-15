@@ -59,13 +59,12 @@ Rules:
   isn't required for correctness of *this* diff, path-gate it or move it off-PR.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
-- **There is no separate merge-queue lane.** Graphite is configured to run on
+- **Graphite has no separate merge-queue lane.** It is configured to run on
   every PR directly (not draft-batch mode), so `gtmq_*` batch branches are never
-  created and the gtmq slim-lane job conditions were removed from `ci.yml`
-  (#13610). The `pull_request` workflow on the PR itself is the only CI a change
-  pays for pre-merge. If Graphite's batching mode is ever re-enabled, the
-  slim-lane conditions must come back with it — see the 2026-06-22 post-mortem
-  below for why batches must never run the informational lanes.
+  created. CI also supports GitHub's `merge_group` event ahead of a native-queue
+  cutover: that inert compatibility lane validates the synthetic combined head
+  and emits the four required contexts without running PR-only or deployment
+  work. It does not activate the native queue; the live ruleset owns that switch.
 
 ### Does my change need the heavy lane, a preview, or taste approval?
 

@@ -1,4 +1,5 @@
 import { isIPv4 } from 'node:net';
+import { getDeterministicDevTestAuthPersonaUserId } from '@/lib/auth/dev-test-auth-identity';
 import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
@@ -169,6 +170,6 @@ export function resolveTestBypassUserId(
         process.env.TEST_CLERK_USER_ID ??
         null
     ) ??
-    'user_test'
+    getDeterministicDevTestAuthPersonaUserId('creator')
   );
 }

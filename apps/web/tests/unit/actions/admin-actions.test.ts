@@ -418,6 +418,49 @@ describe('admin/actions.ts', () => {
       expect(mockRevalidatePath).toHaveBeenCalledWith('/admin');
     });
 
+    it('skips profiles missing both spotifyId and spotifyUrl without failing the batch', async () => {
+      const profiles = [
+        {
+          id: 'p1',
+          spotifyId: 'spotify-1',
+          spotifyUrl: null,
+        },
+        {
+          id: 'p2',
+          spotifyId: null,
+          spotifyUrl: null,
+        },
+      ];
+
+      createMultiSelectChain([
+        [{ userStatus: 'active', deletedAt: null }], // requireAdmin lookup
+        profiles, // action's select
+      ]);
+
+      mockEnqueueMusicFetchEnrichmentJob.mockResolvedValue('job-id');
+      mockEnqueueDspArtistDiscoveryJob.mockResolvedValue('discovery-job-id');
+
+      const { bulkRerunCreatorIngestionAction } = await import(
+        '@/app/app/(shell)/admin/actions'
+      );
+
+      const fd = makeFormData({
+        profileIds: JSON.stringify(['p1', 'p2']),
+      });
+
+      await expect(bulkRerunCreatorIngestionAction(fd)).resolves.toEqual({
+        queuedCount: 1,
+      });
+      expect(mockEnqueueMusicFetchEnrichmentJob).toHaveBeenCalledTimes(1);
+      expect(mockEnqueueMusicFetchEnrichmentJob).toHaveBeenCalledWith({
+        creatorProfileId: 'p1',
+        spotifyUrl: 'https://open.spotify.com/artist/spotify-1',
+      });
+      // p2 is skipped entirely -- no DSP discovery fired for the bad record.
+      expect(mockEnqueueDspArtistDiscoveryJob).toHaveBeenCalledTimes(1);
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/admin');
+    });
+
     it('rejects more than 200 profileIds', async () => {
       const { bulkRerunCreatorIngestionAction } = await import(
         '@/app/app/(shell)/admin/actions'

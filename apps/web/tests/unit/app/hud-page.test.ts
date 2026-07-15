@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import HudPage from '@/app/hud/page';
 
 const {
   redirectMock,
@@ -38,14 +39,11 @@ vi.mock('@/lib/env-server', () => ({
 
 describe('/hud page auth', () => {
   beforeEach(() => {
-    vi.resetModules();
     vi.clearAllMocks();
     getHudMetricsMock.mockResolvedValue({ accessMode: 'admin' });
   });
 
   it('redirects kiosk bookmarks to /hud-tv', async () => {
-    const { default: HudPage } = await import('@/app/hud/page');
-
     await expect(
       HudPage({
         searchParams: Promise.resolve({ kiosk: 'test-token' }),
@@ -61,7 +59,6 @@ describe('/hud page auth', () => {
       userId: null,
     });
 
-    const { default: HudPage } = await import('@/app/hud/page');
     await HudPage({ searchParams: Promise.resolve({}) });
 
     expect(unauthorizedMock).toHaveBeenCalled();
@@ -74,7 +71,6 @@ describe('/hud page auth', () => {
       userId: 'user_123',
     });
 
-    const { default: HudPage } = await import('@/app/hud/page');
     await HudPage({ searchParams: Promise.resolve({}) });
 
     expect(forbiddenMock).toHaveBeenCalled();

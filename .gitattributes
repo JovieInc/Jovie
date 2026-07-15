@@ -9,3 +9,5 @@
 *.woff2 binary
 *.ttf binary
 *.eot binary
+.claude/skills/vercel-composition-patterns/** -whitespace
+.claude/skills/vercel-react-best-practices/** -whitespace

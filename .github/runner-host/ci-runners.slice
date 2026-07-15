@@ -1,0 +1,13 @@
+# Versioned resource envelope for Gem's ephemeral CI containers.
+# Ten runners have been observed at 958 tasks in aggregate. A 2,048-task
+# ceiling preserves >2x measured headroom without increasing runner count.
+
+[Unit]
+Description=CI Runner Resource Slice
+Before=ci-runner-autoscaler.service
+Wants=ci-runner-autoscaler.service
+
+[Slice]
+CPUQuota=1600%
+MemoryMax=50G
+TasksMax=2048

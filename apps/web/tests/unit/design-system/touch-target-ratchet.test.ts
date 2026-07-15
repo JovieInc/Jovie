@@ -1,10 +1,22 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   countViolations,
+  findTouchTargetSourceFiles,
   findViolationsInSource,
+  type RipgrepRunner,
+  resolveTrustedRipgrepPath,
+  runRipgrep,
   tagHasSub44Height,
 } from '../../../lib/a11y-gates/touch-target-engine';
 
@@ -75,6 +87,94 @@ describe('touch-target ratchet', () => {
 });
 
 describe('touch-target detection — violations are caught (red→green proof)', () => {
+  it('prefilters candidates deterministically and falls back only on rg errors', () => {
+    const scanRoot = mkdtempSync(join(tmpdir(), 'touch-target-ratchet-'));
+    const result =
+      (status: number | null, stdout = '', error?: Error): RipgrepRunner =>
+      () => ({ status, stdout, error });
+
+    try {
+      mkdirSync(join(scanRoot, 'app'), { recursive: true });
+      mkdirSync(join(scanRoot, 'components'), { recursive: true });
+      writeFileSync(join(scanRoot, 'app', 'a.tsx'), '<button />');
+      writeFileSync(join(scanRoot, 'components', 'z.tsx'), '<button />');
+
+      const expected = [
+        join(scanRoot, 'app', 'a.tsx'),
+        join(scanRoot, 'components', 'z.tsx'),
+      ];
+      expect(
+        findTouchTargetSourceFiles(
+          scanRoot,
+          result(0, 'components/z.tsx\napp/a.tsx\n')
+        )
+      ).toEqual(expected);
+      expect(
+        findTouchTargetSourceFiles(
+          scanRoot,
+          result(0, 'app/a.tsx\ncomponents/z.tsx\n')
+        )
+      ).toEqual(expected);
+      expect(findTouchTargetSourceFiles(scanRoot, result(1))).toEqual([]);
+      expect(findTouchTargetSourceFiles(scanRoot, result(2))).toEqual(expected);
+      expect(
+        findTouchTargetSourceFiles(
+          scanRoot,
+          result(null, '', new Error('spawnSync rg ENOENT'))
+        )
+      ).toEqual(expected);
+    } finally {
+      rmSync(scanRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('uses only trusted absolute rg paths and falls back when none exist', () => {
+    const scanRoot = mkdtempSync(join(tmpdir(), 'touch-target-no-rg-'));
+
+    try {
+      mkdirSync(join(scanRoot, 'app'), { recursive: true });
+      writeFileSync(join(scanRoot, 'app', 'fallback.tsx'), '<button />');
+
+      expect(resolveTrustedRipgrepPath(() => false)).toBeNull();
+      expect(
+        findTouchTargetSourceFiles(scanRoot, root =>
+          runRipgrep(root, () => null)
+        )
+      ).toEqual([join(scanRoot, 'app', 'fallback.tsx')]);
+    } finally {
+      rmSync(scanRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ripgrep candidates preserve multiline and arbitrary-token violations', () => {
+    const scanRoot = mkdtempSync(join(tmpdir(), 'touch-target-parity-'));
+
+    try {
+      mkdirSync(join(scanRoot, 'app'), { recursive: true });
+      mkdirSync(join(scanRoot, 'components'), { recursive: true });
+      writeFileSync(
+        join(scanRoot, 'app', 'multiline.tsx'),
+        '<button\n className="h-8 w-8"\n>compact</button>\n'
+      );
+      writeFileSync(
+        join(scanRoot, 'components', 'arbitrary.tsx'),
+        '<a className="size-[43.5px]">compact</a>\n'
+      );
+      writeFileSync(
+        join(scanRoot, 'components', 'safe.tsx'),
+        '<button className="h-11">safe</button>\n'
+      );
+
+      const fallback: RipgrepRunner = () => ({ status: 2, stdout: '' });
+      expect(countViolations(scanRoot)).toEqual(
+        countViolations(scanRoot, fallback)
+      );
+      expect(countViolations(scanRoot)).toHaveLength(2);
+    } finally {
+      rmSync(scanRoot, { recursive: true, force: true });
+    }
+  });
+
   it('RED: flags a sub-44px icon button', () => {
     const violations = findViolationsInSource(
       '<button className="h-8 w-8 rounded-full" onClick={fn}>x</button>'

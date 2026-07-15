@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,6 +56,29 @@ function getJobBlock(workflow: string, jobKey: string): string {
   return block.join('\n');
 }
 
+function previewRobotsPolicyValid(
+  workflow: string,
+  robotsBody: string
+): boolean {
+  const step = getStepBlock(workflow, 'Canary health check');
+  const start = step.indexOf('preview_robots_policy_valid() {');
+  const end = step.indexOf('\n\n          if ! printf', start);
+  expect(start).toBeGreaterThan(0);
+  expect(end).toBeGreaterThan(start);
+  const source = step
+    .slice(start, end)
+    .split('\n')
+    .map(line => line.replace(/^ {10}/, ''))
+    .join('\n');
+
+  return (
+    spawnSync('bash', ['-c', `${source}\npreview_robots_policy_valid`], {
+      input: robotsBody,
+      encoding: 'utf8',
+    }).status === 0
+  );
+}
+
 describe('deploy workflow Vercel env resolution', () => {
   it('routes main deploy artifact builds to hosted capacity', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -82,6 +106,38 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(readFileSync(canaryWorkflowPath, 'utf8')).toContain(
       'runs-on: ubuntu-latest'
+    );
+  });
+
+  it('passes the exact GitHub SHA into every external Vercel build and source deploy', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const buildShaEnv = 'VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}';
+    const buildJob = getJobBlock(workflow, 'ci-build-public');
+    const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const deployStep = getStepBlock(
+      stagingJob,
+      'Deploy (staging preview, prebuilt)'
+    );
+    const deployScript = readFileSync(
+      resolve(repoRoot, '.github/scripts/vercel-prebuilt-deploy.sh'),
+      'utf8'
+    );
+
+    expect(getStepBlock(buildJob, 'Vercel build (deploy artifact)')).toContain(
+      buildShaEnv
+    );
+    expect(
+      getStepBlock(
+        stagingJob,
+        'Build (preview target for staging verification)'
+      )
+    ).toContain(buildShaEnv);
+    expect(deployStep).toContain(buildShaEnv);
+    expect(deployScript).toContain(
+      '--build-env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}"'
+    );
+    expect(deployScript).toContain(
+      '--env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}"'
     );
   });
 
@@ -314,6 +370,48 @@ describe('deploy workflow Vercel env resolution', () => {
 });
 
 describe('canary health gate workflow', () => {
+  it('accepts a wildcard block for a raw preview', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+    const canaryStep = getStepBlock(workflow, 'Canary health check');
+
+    expect(
+      previewRobotsPolicyValid(workflow, 'User-agent: *\nDisallow: /')
+    ).toBe(true);
+    expect(canaryStep).toContain(
+      `if ! printf '%s\\n' "$robots_body" | preview_robots_policy_valid; then`
+    );
+  });
+
+  it('rejects a block that only belongs to an unrelated crawler group', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+
+    expect(
+      previewRobotsPolicyValid(
+        workflow,
+        'User-agent: *\nDisallow:\n\nUser-agent: BadBot\nDisallow: /'
+      )
+    ).toBe(false);
+  });
+
+  it('rejects a wildcard root allow on a raw preview', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+
+    expect(
+      previewRobotsPolicyValid(workflow, 'User-agent: *\nDisallow: /\nAllow: /')
+    ).toBe(false);
+  });
+
+  it('rejects a sitemap advertised by a raw preview', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+
+    expect(
+      previewRobotsPolicyValid(
+        workflow,
+        'User-agent: *\nDisallow: /\nSitemap: https://preview.example/sitemap.xml'
+      )
+    ).toBe(false);
+  });
+
   it('fails closed when the automation bypass secret is missing', () => {
     const workflow = readFileSync(canaryWorkflowPath, 'utf8');
     const canaryStep = getStepBlock(workflow, 'Canary health check');
@@ -416,6 +514,38 @@ describe('canary health gate workflow', () => {
 });
 
 describe('CI E2E smoke workflow', () => {
+  it('keeps the real-auth golden path inert in the bypass smoke lane', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const smokeStep = getStepBlock(
+      getJobBlock(workflow, 'ci-e2e-smoke'),
+      'Run E2E Smoke (Chromium)'
+    );
+    const goldenPathStep = getStepBlock(
+      getJobBlock(workflow, 'ci-golden-path'),
+      'Run Golden Path (Chromium, Better Auth)'
+    );
+    const goldenPathSpec = readFileSync(
+      resolve(repoRoot, 'apps/web/tests/e2e/golden-path.spec.ts'),
+      'utf8'
+    );
+    const smokeManifest = readFileSync(
+      resolve(repoRoot, 'apps/web/tests/e2e/smoke-manifest.ts'),
+      'utf8'
+    );
+
+    expect(smokeManifest).toContain("'golden-path.spec.ts'");
+    expect(smokeStep).toContain('export E2E_USE_TEST_AUTH_BYPASS=1');
+    expect(smokeStep).not.toContain('export E2E_TEST_MODE=1');
+    expect(goldenPathStep).toContain('export E2E_TEST_MODE=1');
+    expect(goldenPathStep).not.toContain('E2E_USE_TEST_AUTH_BYPASS');
+    expect(goldenPathSpec).toContain(
+      "process.env.E2E_USE_TEST_AUTH_BYPASS === '1'"
+    );
+    expect(goldenPathSpec).toContain(
+      'Golden path requires the dedicated real-auth lane'
+    );
+  });
+
   it('seeds public QA fixtures on ephemeral Neon before PR smoke runs', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const smokeJob = getJobBlock(workflow, 'ci-e2e-smoke');
@@ -663,12 +793,13 @@ describe('CI mobile overflow workflow', () => {
 });
 
 describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
-  const neonBranchCreateJobs = [
-    'neon-db',
-    'ci-lighthouse-dashboard-pr',
-    'ci-e2e-smoke',
-    'ci-admin-smoke',
-  ] as const;
+  const neonBranchCreateJobs = {
+    'neon-db': 'neon-endpoint-pool-neon-db-',
+    'ci-lighthouse-dashboard-pr':
+      'neon-endpoint-pool-ci-lighthouse-dashboard-pr-',
+    'ci-e2e-smoke': 'neon-endpoint-pool-ci-e2e-smoke-',
+    'ci-admin-smoke': 'neon-endpoint-pool-ci-admin-smoke-',
+  } as const;
 
   const neonArtifactConsumerJobs = [
     'ci-lighthouse-pr',
@@ -682,12 +813,27 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
   it('caps cross-PR Neon branch creation with a four-slot queue', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
-    for (const jobKey of neonBranchCreateJobs) {
+    for (const [jobKey, expectedGroupPrefix] of Object.entries(
+      neonBranchCreateJobs
+    )) {
       const job = getJobBlock(workflow, jobKey);
       expect(job).toContain('concurrency:');
-      expect(job).toContain('group: neon-endpoint-pool-${{ github.job }}-');
+      expect(job).toContain(`group: ${expectedGroupPrefix}`);
+      expect(job).not.toContain('group: neon-endpoint-pool-${{ github.job }}-');
       expect(job).toContain('cancel-in-progress: false');
+
+      // Preserve the four-slot hash: decimal endings 0/4/8 -> 0,
+      // 1/5/9 -> 1, 2/6 -> 2, and 3/7 -> the fallback slot 3.
+      for (const suffix of ['0', '4', '8', '1', '5', '9', '2', '6']) {
+        expect(job).toContain(`, '${suffix}')`);
+      }
+      expect(job).toContain("&& '0'");
+      expect(job).toContain("&& '1'");
+      expect(job).toContain("&& '2'");
+      expect(job).toContain("|| '3'");
     }
+
+    expect(new Set(Object.values(neonBranchCreateJobs)).size).toBe(4);
   });
 
   // ci-golden-path deliberately uses ONE constant repo-wide group: it must
@@ -700,7 +846,7 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
     'group: neon-endpoint-pool-ci-golden-path',
   ] as const;
 
-  it('scopes branch-creation pool per job so siblings in one workflow are not cancelled', () => {
+  it('uses literal job prefixes because github.job is unavailable before a runner starts', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const poolGroups =
       workflow.match(/group: neon-endpoint-pool-[^\n]+/g) ?? [];
@@ -714,7 +860,8 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
       ) {
         continue;
       }
-      expect(group).toContain('${{ github.job }}');
+      expect(group).not.toContain('${{ github.job }}');
+      expect(group).not.toMatch(/neon-endpoint-pool--[0-3]/);
     }
   });
 

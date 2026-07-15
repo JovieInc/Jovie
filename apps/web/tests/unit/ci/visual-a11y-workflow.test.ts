@@ -62,4 +62,15 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(visualJob).toContain('- name: Cleanup Neon branch');
     expect(visualJob).toContain('if: always()');
   });
+
+  it('preserves authenticated axe diagnostics when Playwright fails', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const authenticatedA11yJob = getJobBlock(workflow, 'ci-a11y-authed');
+
+    expect(authenticatedA11yJob).not.toContain('--reporter=line');
+    expect(authenticatedA11yJob).toContain('path: |');
+    expect(authenticatedA11yJob).toContain('apps/web/playwright-report/');
+    expect(authenticatedA11yJob).toContain('apps/web/test-results/');
+    expect(authenticatedA11yJob).toContain('if-no-files-found: error');
+  });
 });

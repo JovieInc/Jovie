@@ -1,5 +1,6 @@
 import { Redis } from '@upstash/redis';
 import { and, eq, or } from 'drizzle-orm';
+import { getDeterministicTestBetterAuthUserId } from '@/lib/auth/dev-test-auth-identity';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -7,6 +8,8 @@ import { baUsers } from '@/lib/db/schema/better-auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { normalizeEmail } from '@/lib/utils/email';
+
+export { getDeterministicTestBetterAuthUserId } from '@/lib/auth/dev-test-auth-identity';
 
 export const DEFAULT_TEST_AVATAR_URL = '/avatars/default-user.png';
 
@@ -149,12 +152,6 @@ export function getDeterministicTestClerkId(email: string): string {
  * `getDeterministicTestClerkId` for the BA path. The id is stable per email
  * so re-running `ensureBetterAuthTestUser` is idempotent.
  */
-export function getDeterministicTestBetterAuthUserId(email: string): string {
-  const normalizedEmail = normalizeEmail(email);
-  const stableId = normalizedEmail.replaceAll(/[^a-z0-9]+/gi, '_').slice(0, 48);
-  return `ba_dev_${stableId || 'browse'}`;
-}
-
 /**
  * Ensure a Better Auth test user exists in `ba_users` and return the BA user
  * id (plan decision 10, commit ⑨). Direct drizzle upsert — no Clerk API
