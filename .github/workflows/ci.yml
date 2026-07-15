@@ -3,8 +3,10 @@ name: CI
 on:
   pull_request:
     branches: [main, 'integration/**']
-  # merge_group retired 2026-06-18: Graphite owns the merge queue; GitHub never
-  # creates a merge_group, so this trigger would never fire. See .github/MERGE_QUEUE.md.
+  # Inert while Graphite owns landing. Keeping combined-head support on main
+  # lets GitHub native merge queue be canaried without a workflow bootstrap gap.
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
     paths-ignore:
@@ -28,9 +30,11 @@ concurrency:
     ${{ github.workflow }}-${{
       (github.event_name == 'pull_request')
         && format('pr-{0}', github.event.pull_request.number)
-        || ((github.event_name == 'push' && github.ref == 'refs/heads/main')
+        || (github.event_name == 'merge_group'
+           && format('merge-group-{0}', github.event.merge_group.head_sha)
+           || ((github.event_name == 'push' && github.ref == 'refs/heads/main')
            && github.sha
-           || github.ref)
+           || github.ref))
     }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
@@ -46,8 +50,8 @@ env:
   # Only jobs that call neon-create-branch-with-retry use the pool — artifact consumers
   # (Lighthouse/A11y/Mobile Overflow) reuse neon-db and must NOT share the pool or
   # sibling matrix jobs cancel each other within the same workflow run.
-  # Pool groups include github.job so branch-creator siblings in one workflow (neon-db,
-  # dashboard Lighthouse, E2E smoke fallback, admin smoke) do not queue-cancel each other.
+  # Pool groups use literal job IDs because github.job is only populated inside runner
+  # steps. Job-level concurrency is evaluated before assignment, where github.job is null.
 
 jobs:
   # ── CI Optimizer + Centralized path-change detection (merged) ──────────
@@ -83,6 +87,7 @@ jobs:
     steps:
       - id: graphite-token
         name: Check Graphite token configuration
+        if: github.event_name != 'merge_group'
         env:
           GRAPHITE_TOKEN: ${{ secrets.GRAPHITE_TOKEN }}
         run: |
@@ -94,7 +99,7 @@ jobs:
           fi
 
       - id: graphite
-        if: steps.graphite-token.outputs.configured == 'true'
+        if: github.event_name != 'merge_group' && steps.graphite-token.outputs.configured == 'true'
         continue-on-error: true
         uses: withgraphite/graphite-ci-action@402a89bc8aa6db18ae1f9c61953d001d5f9d828f # v0.0.11
         with:
@@ -126,7 +131,13 @@ jobs:
           set -euo pipefail
           IS_FORK="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}"
           # Determine changed files
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            MERGE_GROUP_BASE_SHA="${{ github.event.merge_group.base_sha }}"
+            MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"
+            git cat-file -e "${MERGE_GROUP_BASE_SHA}^{commit}"
+            git cat-file -e "${MERGE_GROUP_HEAD_SHA}^{commit}"
+            CHANGED_FILES=$(git diff --name-only "$MERGE_GROUP_BASE_SHA...$MERGE_GROUP_HEAD_SHA")
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             # Fail closed on base resolution: a failed fetch used to leave an
             # empty CHANGED_FILES list that looked like docs-only and skip-
             # cascaded ci-fast / unit leaves while risk still ran.
@@ -325,7 +336,7 @@ jobs:
   ci-risk-classifier:
     # Trusted PRs need classification before their build, smoke, and preview
     # dependencies evaluate. Forks intentionally stay on the secret-free path.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
     name: CI Risk Classifier
     needs: [ci-path-changes]
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
@@ -359,6 +370,9 @@ jobs:
             git fetch origin "$BASE_REF" --depth=1
             DIFF_BASE="origin/$BASE_REF"
             git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES"
+          elif [[ "$EVENT_NAME" == "merge_group" ]]; then
+            DIFF_BASE="${{ github.event.merge_group.base_sha }}"
+            git diff --name-only "$DIFF_BASE...${{ github.event.merge_group.head_sha }}" > "$CHANGED_FILES"
           elif [[ "$EVENT_NAME" == "push" ]]; then
             DIFF_BASE="HEAD~1"
             git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES" 2>/dev/null || git show --pretty="" --name-only HEAD > "$CHANGED_FILES"
@@ -540,7 +554,7 @@ jobs:
       - name: Run ci-fast lanes
         id: lanes
         env:
-          TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || ((github.base_ref && format('origin/{0}', github.base_ref)) || '') }}
           CI_FAST_SKIP_STRUCTURAL: ${{ steps.structural.outputs.skip }}
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json
         run: node scripts/ci-fast-lanes.mjs
@@ -620,7 +634,7 @@ jobs:
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     concurrency:
-      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
+      group: neon-endpoint-pool-neon-db-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
       cancel-in-progress: false
     outputs:
       branch_name: ${{ steps.sanitize-branch.outputs.name }}
@@ -762,7 +776,7 @@ jobs:
     name: Migration Guard
     needs: [ci-path-changes]
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 3
     outputs:
@@ -889,10 +903,10 @@ jobs:
     needs: [ci-path-changes, ci-risk-classifier]
     # Shared Next.js build for a11y + layout-guard — build once, test twice.
     # On PRs to main: always runs (non-fork) for build validation. Part of the merge gate.
-    # Merge queue intentionally skips build (already validated on the PR).
+    # Merge groups rebuild the synthetic combined head to catch integration failures.
     # On main push: always runs for full coverage + JOV-4087 vercel deploy artifact.
     # Fork PRs are excluded (no secrets) — skipped via fork-pr-gate.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') }}
     # Production deploy artifacts must not wait behind the saturated fixed PR
     # runner. Keep PR builds on jovie-fixed; route main to hosted capacity.
     runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'ubuntu-latest' || vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
@@ -1126,12 +1140,46 @@ jobs:
     needs: [ci-path-changes, ci-build-public]
     # Blocking on PRs via ci-pr-ready (flipped from informational — Tim directive,
     # a11y/visual gating mission 2026-07-06 / JOV-4060). Runs on PRs to main when the
-    # shared build artifact exists, plus push:main for post-merge coverage.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    # shared build artifact exists, plus merge-group combined heads and push:main.
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 8
     steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -d .git ]]; then exit 0; fi
+          git sparse-checkout disable 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+          git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+          rm -f .git/info/sparse-checkout
+          git config --local --unset-all extensions.partialClone 2>/dev/null || true
+          git config --local --unset-all remote.origin.promisorRemote 2>/dev/null || true
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          clean: true
+
+      - name: Materialize full tree (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git sparse-checkout disable 2>/dev/null || true
+          git reset --hard HEAD
+          git checkout-index -a -f
+
+      - name: Verify checkout sentinel
+        shell: bash
+        run: |
+          set -euo pipefail
+          sentinel=".github/actions/setup-node-pnpm/action.yml"
+          if [[ ! -f "$sentinel" ]]; then
+            echo "::error::Incomplete checkout — missing ${sentinel}"
+            exit 1
+          fi
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -1145,6 +1193,12 @@ jobs:
         with:
           name: nextjs-build-${{ github.run_id }}
           path: /tmp/nextjs-build-download
+
+      - name: Require combined-head build artifact
+        if: github.event_name == 'merge_group' && steps.download.outcome != 'success'
+        run: |
+          echo "::error::Combined-head build was required, but its shared artifact could not be downloaded."
+          exit 1
 
       - name: Extract build artifact
         if: steps.download.outcome == 'success'
@@ -1574,7 +1628,7 @@ jobs:
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     concurrency:
-      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
+      group: neon-endpoint-pool-ci-lighthouse-dashboard-pr-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -2485,10 +2539,10 @@ jobs:
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
     needs: [ci-path-changes]
-    # Runs on PRs to main, main pushes, and manual dispatch. Merge queue skips (PR-validated).
+    # Runs on PRs to main, merge-group combined heads, main pushes, and manual dispatch.
     # Parallel with typecheck/build for faster CI.
     # Path-gated: skips test execution when no test-relevant files changed.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
     # 5-shard unit tests; runner is var-switchable (CI_UNIT_RUNNER=jovie-runner
     # offloads all shards to the self-hosted pool when hosted concurrency is
     # the bottleneck). Defaults to GitHub-hosted. Shards upload no artifacts on
@@ -2535,7 +2589,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         env:
           TURBO_SCM_HEAD: ${{ github.sha }}
-          TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || ((github.base_ref && format('origin/{0}', github.base_ref)) || '') }}
         run: |
           # Use forked pool with limited workers to reduce CI flakiness from memory pressure
           export NODE_OPTIONS="--max-old-space-size=3072"
@@ -2552,9 +2606,9 @@ jobs:
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "main: Running web unit suite through Turbo without coverage; nightly coverage audit uploads Codecov coverage"
             pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
-          elif [ -n "${{ github.base_ref }}" ]; then
-            echo "🔍 PR: Running full test suite"
-            # Run all tests on PRs to catch regressions before merge
+          elif [[ "${{ github.event_name }}" == "merge_group" || -n "${{ github.base_ref }}" ]]; then
+            echo "🔍 PR/merge group: Running affected test suite"
+            # Run affected tests against the PR base or merge-group base SHA.
             pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           else
             echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"
@@ -2569,7 +2623,7 @@ jobs:
         continue-on-error: true
         env:
           TURBO_SCM_HEAD: ${{ github.sha }}
-          TURBO_SCM_BASE: ${{ (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || ((github.base_ref && format('origin/{0}', github.base_ref)) || '') }}
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
 
       - name: Run packages/ui unit tests
@@ -2871,7 +2925,7 @@ jobs:
           pnpm exec playwright test \
             tests/e2e/a11y.spec.ts \
             tests/e2e/chat-axe.spec.ts \
-            --config=playwright.config.ts --project=chromium --reporter=line
+            --config=playwright.config.ts --project=chromium
         env:
           BASE_URL: http://localhost:3100
           CI: true
@@ -2894,8 +2948,11 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/playwright-report/
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
           retention-days: 7
+          if-no-files-found: error
 
   ci-e2e-smoke:
     name: E2E Smoke (PR Fast Feedback)
@@ -2908,7 +2965,7 @@ jobs:
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     concurrency:
-      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
+      group: neon-endpoint-pool-ci-e2e-smoke-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
       cancel-in-progress: false
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -3318,7 +3375,7 @@ jobs:
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     concurrency:
-      group: neon-endpoint-pool-${{ github.job }}-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
+      group: neon-endpoint-pool-ci-admin-smoke-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -3880,20 +3937,113 @@ jobs:
 
       - name: Wait for PR preview readiness
         timeout-minutes: 9
-        run: |
-          ./node_modules/.bin/vercel inspect "${{ steps.pr_deploy.outputs.deployment_url }}" \
-            --wait \
-            --timeout 8m \
-            --token "$VERCEL_TOKEN" \
-            --scope "$VERCEL_ORG_ID"
         env:
+          DEPLOYMENT_URL: ${{ steps.pr_deploy.outputs.deployment_url }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          inspect_wait_status=0
+          ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
+            --wait \
+            --timeout 8m \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID" || inspect_wait_status=$?
+          deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
+            --format=json \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID")"
+          deployment_state="$(jq -r '(.readyState // .state // .status // "unknown") | ascii_upcase' \
+            <<<"$deployment_json")"
+          echo "Current PR preview deployment state: $deployment_state"
+          if [ "$deployment_state" != "READY" ]; then
+            echo "::error::PR preview is $deployment_state after readiness wait (status $inspect_wait_status); refusing a false-green preview."
+            exit 1
+          fi
 
   # PR Lighthouse runs as a path-gated preview-evidence lane with stricter thresholds (0.75 perf, 0.85 a11y).
   # Original removal was due to 0.5 thresholds being too relaxed. Updated .lighthouserc.pr.json fixes this.
   # Production Lighthouse (in ci-build job) has even stricter thresholds (0.8 perf, 0.95 a11y).
+
+  ci-merge-group-ready:
+    name: PR Ready
+    # Source PRs retain the A11y evidence that required Neon. Combined heads run
+    # the shared-artifact Layout Guard without creating a second Neon branch.
+    needs:
+      [
+        ci-path-changes,
+        ci-risk-classifier,
+        ci-fast,
+        ci-unit-tests,
+        ci-build-public,
+        ci-layout-guard,
+      ]
+    if: ${{ always() && !cancelled() && github.event_name == 'merge_group' }}
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 2
+    steps:
+      - name: Evaluate combined-head checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          PATH_RESULT="${{ needs.ci-path-changes.result }}"
+          RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
+          FAST_RESULT="${{ needs.ci-fast.result }}"
+          UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
+          BUILD_RESULT="${{ needs.ci-build-public.result }}"
+          BUILD_HAS_ARTIFACT="${{ needs.ci-build-public.outputs.has_artifact }}"
+          LAYOUT_RESULT="${{ needs.ci-layout-guard.result }}"
+          RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
+
+          {
+            echo "### Merge group ready"
+            echo
+            echo "Combined head: \`${{ github.event.merge_group.head_sha }}\`"
+            echo "Base: \`${{ github.event.merge_group.base_sha }}\`"
+            echo
+            echo "| Gate | Result |"
+            echo "| --- | --- |"
+            echo "| Path Changes | $PATH_RESULT |"
+            echo "| CI Risk Classifier | $RISK_RESULT |"
+            echo "| ci-fast | $FAST_RESULT |"
+            echo "| Unit Tests | $UNIT_RESULT |"
+            echo "| Build (public routes) | $BUILD_RESULT |"
+            echo "| Layout Guard | $LAYOUT_RESULT |"
+            echo
+            echo "Source-PR A11y evidence is inherited; merge groups do not provision Neon."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for gate in \
+            "Path Changes:$PATH_RESULT" \
+            "CI Risk Classifier:$RISK_RESULT" \
+            "ci-fast:$FAST_RESULT" \
+            "Build (public routes):$BUILD_RESULT"; do
+            name="${gate%%:*}"
+            result="${gate#*:}"
+            if [[ "$result" != "success" ]]; then
+              echo "::error::$name did not pass on the merge-group combined head (result: $result)"
+              exit 1
+            fi
+          done
+
+          if [[ "$UNIT_RESULT" != "success" ]]; then
+            if [[ "$UNIT_RESULT" != "skipped" || "$RUN_TEST" == "true" ]]; then
+              echo "::error::Unit Tests did not pass on the merge-group combined head (result: $UNIT_RESULT; run_test=$RUN_TEST)"
+              exit 1
+            fi
+            echo "Unit Tests legitimately skipped because path detection selected no test-relevant files."
+          fi
+
+          if [[ "$LAYOUT_RESULT" != "success" ]]; then
+            if [[ "$LAYOUT_RESULT" != "skipped" || "$BUILD_HAS_ARTIFACT" == "true" ]]; then
+              echo "::error::Layout Guard did not pass on the merge-group combined head (result: $LAYOUT_RESULT; build_artifact=$BUILD_HAS_ARTIFACT)"
+              exit 1
+            fi
+            echo "Layout Guard legitimately skipped because no shared build artifact was required."
+          fi
+
+          echo "All required combined-head checks passed."
 
   ci-pr-ready:
     name: PR Ready
@@ -5365,7 +5515,7 @@ jobs:
   deploy-notify:
     name: Notify production deploy
     needs: [deploy-staging, canary-health-gate, promote-production, sentry-error-gate, production-oauth-gate]
-    if: ${{ always() }}
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Resolve failure provenance

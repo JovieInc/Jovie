@@ -24,8 +24,9 @@ The ownership gate is deterministic and hard-budgeted — a semantic query can
 never hang the run (the previously observed failure mode was a 90s hybrid
 query hang):
 
-1. **ledger** — `gbrain get agent-job-ledger` (canonical ownership surface,
-   one deterministic read, 3s cap)
+1. **ledger** — read `coordination/agent-job-ledger` through GBrain's declared
+   public engine exports in one process (7s cap); source/compiled installs
+   without those exports fall back to `gbrain get` (3s cap)
 2. **keyword** — `gbrain search "<terms>" --limit 5` (keyword index, 5s cap)
 3. **semantic** — `gbrain query "<terms>"` ONLY when keyword came back empty,
    capped to whatever remains of the budget
@@ -36,6 +37,14 @@ source (`ledger` / `keyword` / `semantic`) is recorded in
 `receipt.ownership.source`; a budget-exhausted lookup records
 `gbrain-timeout`. Unreachable/empty GBrain keeps the existing policy:
 soft by default, hard block with `AGENT_PREFLIGHT_REQUIRE_GBRAIN=1`.
+
+The ownership receipt also records requested/resolved slug, engine/CLI/MCP
+latency when available, timeout tier, and lookup health. Nullable DB lock and
+session signal fields only report signatures seen in command stderr; `null`
+means no signal was observed, not that a database health probe passed. This
+lets Gem classify
+`gbrain_ownership_preflight_latency_or_slug_drift` without scraping free-form
+logs or exposing database details.
 
 ## gstack: pinned version, out-of-band upgrades (JOV-4184)
 
@@ -126,5 +135,5 @@ Exit `0` = `verdict: go`. Exit `1` = `verdict: blocked`. Exit `2` = script error
 | `AGENT_PREFLIGHT_REQUIRE_GSTACK=1` | Missing gstack bin → hard block |
 | `AGENT_PREFLIGHT_TASK` | Same as `--task` |
 | `AGENT_PREFLIGHT_OWNERSHIP_BUDGET_MS` | Ownership hard ceiling (default 10000) |
-| `AGENT_PREFLIGHT_LEDGER_PAGE` | Ledger page slug (default `agent-job-ledger`) |
+| `AGENT_PREFLIGHT_LEDGER_PAGE` | Ledger page slug (default `coordination/agent-job-ledger`) |
 | `GSTACK_STATE_DIR` | Override `~/.gstack` for the cached update-check read |

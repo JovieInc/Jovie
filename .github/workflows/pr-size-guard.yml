@@ -22,20 +22,34 @@ name: PR Size Guard
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  # Inert while Graphite owns landing. Every source PR has already passed the
+  # size policy, so only the required context is reproduced on the combined SHA.
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: pr-size-${{ github.event.pull_request.number }}
+  group: pr-size-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
+  merge-group-size:
+    name: PR Size Guard
+    if: github.event_name == 'merge_group'
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 1
+    steps:
+      - name: Confirm source PR size checks
+        run: echo "Merge-group members were size-checked as source PRs."
+
   size:
     name: PR Size Guard
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:

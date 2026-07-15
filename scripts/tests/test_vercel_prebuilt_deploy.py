@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import textwrap
 from pathlib import Path
 
 
@@ -284,6 +285,84 @@ def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
     )
     preview_wait_index = workflow.index("- name: Wait for PR preview readiness")
     assert preview_deploy_index < preview_wait_index < deploy_index
+
+
+def test_pr_preview_readiness_requires_terminal_ready_state() -> None:
+    workflow = CI_WORKFLOW.read_text()
+    readiness = workflow[
+        workflow.index("- name: Wait for PR preview readiness") : workflow.index(
+            "  # PR Lighthouse runs"
+        )
+    ]
+
+    assert "set -euo pipefail" in readiness
+    assert "--wait" in readiness
+    assert "--format=json" in readiness
+    assert '(.readyState // .state // .status // "unknown") | ascii_upcase' in readiness
+    assert 'if [ "$deployment_state" != "READY" ]; then' in readiness
+    assert "refusing a false-green preview" in readiness
+    assert "exit 1" in readiness
+    assert "handing off to retrying canary" not in readiness
+
+
+def test_pr_preview_readiness_script_fails_closed_for_every_non_ready_state(
+    tmp_path: Path,
+) -> None:
+    workflow = CI_WORKFLOW.read_text()
+    readiness = workflow[
+        workflow.index("- name: Wait for PR preview readiness") : workflow.index(
+            "  # PR Lighthouse runs"
+        )
+    ]
+    script = textwrap.dedent(readiness.split("        run: |\n", 1)[1])
+
+    fake_vercel = tmp_path / "node_modules/.bin/vercel"
+    fake_vercel.parent.mkdir(parents=True)
+    fake_vercel.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+if [[ " $* " == *" --format=json "* ]]; then
+  printf '%s\n' "${DEPLOYMENT_JSON}"
+  exit "${FORMAT_STATUS:-0}"
+fi
+exit "${WAIT_STATUS:-0}"
+"""
+    )
+    fake_vercel.chmod(0o755)
+
+    cases = [
+        ("READY after wait timeout", '{"readyState":"READY"}', "0", False),
+        ("BUILDING", '{"readyState":"BUILDING"}', "0", True),
+        ("QUEUED", '{"readyState":"QUEUED"}', "0", True),
+        ("INITIALIZING", '{"readyState":"INITIALIZING"}', "0", True),
+        ("ERROR", '{"readyState":"ERROR"}', "0", True),
+        ("CANCELED", '{"readyState":"CANCELED"}', "0", True),
+        ("unknown", "{}", "0", True),
+        ("malformed JSON", "{", "0", True),
+        ("JSON inspection failure", '{"readyState":"READY"}', "23", True),
+    ]
+    for name, deployment_json, format_status, expected_failure in cases:
+        result = subprocess.run(
+            ["bash", "-euo", "pipefail", "-c", script],
+            cwd=tmp_path,
+            env={
+                **os.environ,
+                "DEPLOYMENT_URL": "https://jovie-readiness-test.vercel.app",
+                "DEPLOYMENT_JSON": deployment_json,
+                "FORMAT_STATUS": format_status,
+                "VERCEL_TOKEN": "test-token",
+                "VERCEL_ORG_ID": "team-test",
+                "WAIT_STATUS": "124",
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert (result.returncode != 0) == expected_failure, (
+            name,
+            result.stdout,
+            result.stderr,
+        )
 
 
 def test_staging_job_budget_contains_deploy_and_readiness_steps() -> None:

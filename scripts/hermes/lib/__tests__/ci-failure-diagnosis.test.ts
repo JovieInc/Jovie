@@ -2,6 +2,44 @@ import { describe, expect, it } from 'vitest';
 import { diagnoseCiFailure } from '../../jobs/ci-failure-diagnosis';
 
 describe('diagnoseCiFailure', () => {
+  it('diagnoses ownership preflight slug or latency drift from its structured receipt', () => {
+    const diagnosis = diagnoseCiFailure(`
+      {"failure_class":"gbrain_ownership_preflight_latency_or_slug_drift","requested_slug":"agent-job-ledger","resolved_slug":null,"engine_ms":3004,"cli_ms":null,"mcp_ms":null,"timeout_tier":"ledger_step","lookup_health":"timeout","db_lock_signal_detected":true,"session_signal_detected":null}
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'gbrain_ownership_preflight_latency_or_slug_drift'
+    );
+    expect(diagnosis.remediation).toContain('coordination/agent-job-ledger');
+    expect(diagnosis.remediation).toContain('engine/CLI/MCP latency');
+    expect(diagnosis.remediation).toContain('timeout tier');
+  });
+
+  it('diagnoses deterministic Better Auth OTP rejection in the bypass smoke lane', () => {
+    const diagnosis = diagnoseCiFailure(`
+      E2E Smoke (PR Fast Feedback)
+      export E2E_USE_TEST_AUTH_BYPASS=1
+      [chromium] tests/e2e/golden-path.spec.ts
+      TimeoutError: page.waitForURL: Timeout 30000ms exceeded.
+      at createFreshUserOnce (tests/e2e/golden-path.spec.ts:252:14)
+    `);
+
+    expect(diagnosis.failureClass).toBe('golden_path_smoke_auth_contract');
+    expect(diagnosis.rootCause).toContain('E2E_TEST_MODE');
+    expect(diagnosis.remediation).toContain('dedicated Golden Path job');
+  });
+
+  it('does not misclassify the authoritative real-auth golden-path lane', () => {
+    expect(
+      diagnoseCiFailure(`
+        Golden Path (PR)
+        export E2E_TEST_MODE=1
+        [chromium] tests/e2e/golden-path.spec.ts
+        TimeoutError: page.waitForURL: Timeout 30000ms exceeded.
+      `).failureClass
+    ).toBe('unknown');
+  });
+
   it('classifies the analytics scanner timeout separately from runner pressure', () => {
     const log = `
       FAIL tests/unit/analytics-metrics-layer-guard.test.ts > canonical metrics layer guard
@@ -40,6 +78,44 @@ describe('diagnoseCiFailure', () => {
     expect(
       diagnoseCiFailure('PSI: sustained memory pressure on runner').failureClass
     ).toBe('runner_host_pressure');
+  });
+
+  it('upgrades the proactive slice diagnostic to an exact capacity class', () => {
+    const diagnosis = diagnoseCiFailure(`
+      runner_tasks_status=critical
+      runner_tasks_current=958
+      runner_tasks_max=1024
+      runner_tasks_ratio_pct=93
+    `);
+
+    expect(diagnosis.failureClass).toBe('runner_slice_task_saturation');
+    expect(diagnosis.rootCause).toContain('ci-runners.slice');
+    expect(diagnosis.remediation).toContain('diagnose-capacity.sh');
+  });
+
+  it('does not infer slice saturation from an unrelated status line', () => {
+    expect(diagnoseCiFailure('runner_tasks_status=critical').failureClass).toBe(
+      'unknown'
+    );
+  });
+
+  it('diagnoses a cancelled pending job whose Neon concurrency key lost its job prefix', () => {
+    const diagnosis = diagnoseCiFailure(`
+      E2E Smoke (PR Fast Feedback) was cancelled before runner assignment.
+      A newer pending job replaced it in concurrency group neon-endpoint-pool--0.
+    `);
+
+    expect(diagnosis.failureClass).toBe('neon_concurrency_key_collision');
+    expect(diagnosis.rootCause).toContain('github.job');
+    expect(diagnosis.remediation).toContain('literal job identifier');
+  });
+
+  it('does not classify a valid per-job Neon concurrency group as a collision', () => {
+    expect(
+      diagnoseCiFailure(
+        'waiting in concurrency group neon-endpoint-pool-ci-e2e-smoke-0'
+      ).failureClass
+    ).toBe('unknown');
   });
 
   it('classifies the historical full-suite timeout as a broken profiler fixture', () => {

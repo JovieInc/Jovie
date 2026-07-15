@@ -101,6 +101,13 @@ const PERFORMANCE_PROFILER_REPAIR_MANIFEST = [
   ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
+const GOLDEN_PATH_SMOKE_CONTRACT_REPAIR_DIFF = [
+  'apps/web/tests/e2e/golden-path.spec.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
 const PERSISTED_AUTH_FIXTURE_REPAIR_CORE = [
   'apps/web/app/api/dev/test-auth/session/route.ts',
   'apps/web/lib/auth/dev-test-auth-identity.ts',
@@ -504,6 +511,22 @@ describe('automation-verify affected scope', () => {
         ],
       ],
     ]);
+  });
+
+  it('keeps the golden-path smoke contract repair on focused coverage', () => {
+    const plan = buildAffectedTestPlan(GOLDEN_PATH_SMOKE_CONTRACT_REPAIR_DIFF);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+    ]);
+    expect(plan.selectedTests).not.toContain(
+      'apps/web/tests/e2e/golden-path.spec.ts'
+    );
   });
 
   it('keeps persisted auth fixture repairs on focused non-retryable coverage', () => {

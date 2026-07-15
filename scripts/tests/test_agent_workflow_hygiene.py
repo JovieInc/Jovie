@@ -16,6 +16,7 @@ HOT_PATH_WORKFLOWS = (
 
 FULL_CHECKOUT_JOBS = (
     ("ci.yml", "ci-build-public"),
+    ("ci.yml", "ci-layout-guard"),
     ("ci.yml", "ci-summary"),
 )
 
@@ -129,10 +130,22 @@ def test_trigger_guard_materializes_systemic_detector_import_closure() -> None:
 
 def test_self_hosted_gate_jobs_materialize_full_checkout() -> None:
     """Jobs that need repo scripts/actions must recover from sparse workspaces."""
-    for workflow_name, _job_hint in FULL_CHECKOUT_JOBS:
-        content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
-        assert "git checkout-index -a -f" in content, workflow_name
-        assert "Verify checkout sentinel" in content, workflow_name
+    required_steps = (
+        "Reset workspace git state (self-hosted)",
+        "uses: actions/checkout@",
+        "Materialize full tree (self-hosted)",
+        "git checkout-index -a -f",
+        "Verify checkout sentinel",
+        "uses: ./.github/actions/setup-node-pnpm",
+    )
+
+    for workflow_name, job_name in FULL_CHECKOUT_JOBS:
+        block = _job_block(workflow_name, job_name)
+        positions = []
+        for step in required_steps:
+            assert step in block, (workflow_name, job_name, step)
+            positions.append(block.index(step))
+        assert positions == sorted(positions), (workflow_name, job_name)
 
 
 def test_trufflehog_job_does_not_require_docker() -> None:
