@@ -150,6 +150,22 @@ const GTMQ_SOURCE_GATE_REAPER_PYTHON_TESTS = ['scripts/tests/test_gh_retry.py'];
 const GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const RUNNER_IO_PRESSURE_MANIFEST = new Set([
+  '.github/runner-host/README.md',
+  '.github/runner-host/autoscaler/controller-io-pressure.patch',
+  '.github/runner-host/autoscaler/io-pressure.ts',
+  '.github/runner-host/ci-runner-autoscaler.service.snapshot',
+  '.github/runner-host/install-io-pressure-guard.sh',
+  'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+]);
+const RUNNER_IO_PRESSURE_SCRIPT_TESTS = [
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
 
 function isInvestorNoteIngestionInput(file) {
   return (
@@ -228,6 +244,12 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount === GTMQ_SOURCE_GATE_REAPER_MANIFEST.size &&
     files.length === GTMQ_SOURCE_GATE_REAPER_MANIFEST.size;
+  const runnerIoPressureInputCount = files.filter(file =>
+    RUNNER_IO_PRESSURE_MANIFEST.has(file)
+  ).length;
+  const isExactRunnerIoPressure =
+    runnerIoPressureInputCount === RUNNER_IO_PRESSURE_MANIFEST.size &&
+    files.length === RUNNER_IO_PRESSURE_MANIFEST.size;
   const relatedFiles = files.filter(
     file =>
       TESTABLE_FILE.test(file) &&
@@ -341,6 +363,7 @@ export function buildAffectedTestPlan(changedFiles) {
     ...(isExactGtmqSourceGateReaper
       ? GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS
       : []),
+    ...(isExactRunnerIoPressure ? RUNNER_IO_PRESSURE_SCRIPT_TESTS : []),
   ]);
   const isCoveredSource = file => {
     if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return true;
@@ -361,6 +384,8 @@ export function buildAffectedTestPlan(changedFiles) {
       isExactPersistedAuthFixtureRepair &&
       PERSISTED_AUTH_FIXTURE_REPAIR_CORE.has(file)
     )
+      return true;
+    if (isExactRunnerIoPressure && RUNNER_IO_PRESSURE_MANIFEST.has(file))
       return true;
     if (isExactPrerequisiteTrain && PREREQUISITE_TRAIN_MANIFEST.has(file))
       return true;
@@ -401,13 +426,22 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactAffectedTestSelector &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactPersistedAuthFixtureRepair &&
-    !isExactGtmqSourceGateReaper;
+    !isExactGtmqSourceGateReaper &&
+    !isExactRunnerIoPressure;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactPersistedAuthFixtureRepair &&
-    !isExactAffectedTestSelector;
+    !isExactAffectedTestSelector &&
+    !isExactRunnerIoPressure;
+  const hasIncompleteRunnerIoPressure =
+    runnerIoPressureInputCount > 0 &&
+    !isExactRunnerIoPressure &&
+    !isExactGoldenPathSmokeContractRepair &&
+    !isExactPersistedAuthFixtureRepair &&
+    !isExactAffectedTestSelector &&
+    !isExactGtmqSourceGateReaper;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
     hasUnknownCiCancellationHealerPeer ||
@@ -417,7 +451,8 @@ export function buildAffectedTestPlan(changedFiles) {
     hasUnknownPrerequisiteTrainPeer ||
     hasIncompleteVercelCongestionControl ||
     hasIncompleteAffectedTestSelector ||
-    hasIncompleteGtmqSourceGateReaper;
+    hasIncompleteGtmqSourceGateReaper ||
+    hasIncompleteRunnerIoPressure;
   const hasSelectedTests =
     selectedTests.length > 0 ||
     rootVitestTests.length > 0 ||
@@ -434,7 +469,8 @@ export function buildAffectedTestPlan(changedFiles) {
             isExactAffectedTestSelector ||
             isExactGoldenPathSmokeContractRepair ||
             isExactPersistedAuthFixtureRepair ||
-            isExactGtmqSourceGateReaper)
+            isExactGtmqSourceGateReaper ||
+            isExactRunnerIoPressure)
         ? 'selected'
         : relatedFiles.length === 0
           ? 'none'

@@ -80,6 +80,18 @@ describe('diagnoseCiFailure', () => {
     ).toBe('runner_host_pressure');
   });
 
+  it.each([
+    'runner_failure_class=runner-io-pressure',
+    'runner_failure_class=runner-io-pressure-unavailable',
+    'runner_spawn_admission=blocked io_full_avg10_pct=49.82',
+  ])('diagnoses I/O-pressure admission without recommending retries: %s', log => {
+    const diagnosis = diagnoseCiFailure(log);
+
+    expect(diagnosis.failureClass).toBe('runner_io_pressure_admission');
+    expect(diagnosis.rootCause).toContain('scale-up was admission-blocked');
+    expect(diagnosis.remediation).toContain('Do not retry or add runners');
+  });
+
   it('upgrades the proactive slice diagnostic to an exact capacity class', () => {
     const diagnosis = diagnoseCiFailure(`
       runner_tasks_status=critical

@@ -22,6 +22,9 @@ Environment=AUTOSCALER_RUNNER_CPUS=2
 Environment=AUTOSCALER_RUNNER_MEMORY_MB=4096
 Environment=AUTOSCALER_RUNNER_LABELS=self-hosted,Linux,X64,jovie-runner,jovie-ephemeral,ephemeral
 Environment=AUTOSCALER_CGROUP_PARENT=ci-runners.slice
+Environment=AUTOSCALER_IO_FULL_BLOCK_AVG10_PCT=20
+Environment=AUTOSCALER_IO_FULL_RECOVERY_AVG10_PCT=10
+Environment=AUTOSCALER_IO_RECOVERY_SAMPLES=3
 
 # Model routes and credentials are intentionally omitted. They are unrelated to
 # process capacity and remain owned by the live service/drop-in configuration.
