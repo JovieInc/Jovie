@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   dequeuePullRequest,
@@ -9,6 +11,7 @@ import {
 } from '../../merge-queue-backend.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
+const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const RULESET_ID = 10512119;
 const HEAD = 'a'.repeat(40);
 const OTHER_HEAD = 'b'.repeat(40);
@@ -124,6 +127,18 @@ const dequeue = runner => dequeuePullRequest(nativeOptions(runner));
 const invokedMerge = runner =>
   runner.mock.calls.some(([args]) => args[0] === 'pr' && args[1] === 'merge');
 
+function readRepoFile(path) {
+  return readFileSync(resolve(REPO_ROOT, path), 'utf8');
+}
+
+function workflowStep(workflow, name) {
+  const marker = `      - name: ${name}`;
+  const start = workflow.indexOf(marker);
+  if (start === -1) throw new Error(`Workflow step not found: ${name}`);
+  const end = workflow.indexOf('\n      - name:', start + marker.length);
+  return workflow.slice(start, end === -1 ? undefined : end);
+}
+
 describe('merge queue backend resolution', () => {
   it('fails unknown backends before any command can run', async () => {
     const runner = vi.fn();
@@ -143,6 +158,77 @@ describe('merge queue backend resolution', () => {
       })
     ).rejects.toMatchObject({ code: 'native_mutation_unauthorized' });
     expect(runner).not.toHaveBeenCalled();
+  });
+});
+
+describe('queue workflow mutation safety', () => {
+  it('revalidates the live head and hard gates before approval, then delegates enrollment', () => {
+    const workflow = readRepoFile('.github/workflows/agent-pipeline.yml');
+    const approval = workflowStep(workflow, 'Auto-approve PR');
+    const handoff = workflowStep(
+      workflow,
+      'Mark approved PR for queue controller'
+    );
+
+    expect(approval).toContain(
+      'PR_HEAD_SHA="${{ needs.guard.outputs.pr_head_sha }}"'
+    );
+    expect(approval).toContain('--json state,isDraft,headRefOid,labels');
+    expect(approval).toContain('.headRefOid == $expected_head');
+    for (const label of [
+      'needs-human',
+      'hold',
+      'gated',
+      'queue-deferred',
+      'needs-conflict-resolution',
+      'fast',
+    ]) {
+      expect(approval).toContain(`. == "${label}"`);
+    }
+    expect(approval.indexOf('CURRENT_STATE=$(gh pr view')).toBeLessThan(
+      approval.indexOf('-f event="APPROVE"')
+    );
+    expect(approval).toContain('echo "approved=false"');
+    expect(approval).toContain('echo "approved=true"');
+
+    expect(handoff).toContain("steps.auto-approve.outputs.approved == 'true'");
+    expect(handoff).toContain('--field "labels[]=auto-approved"');
+    expect(handoff).toContain('merge-queue-autoenroll');
+    expect(workflow).not.toContain('name: Add to Graphite merge queue');
+    expect(workflow).not.toMatch(
+      /gh pr edit[^\n]*--add-label[^\n]*merge-queue/
+    );
+  });
+
+  it('requires native configuration and ruleset preflight before autoenroll mutations', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const enroll = workflowStep(workflow, 'Enroll clean PRs');
+    const rebasePreflight = workflowStep(
+      workflow,
+      'Preflight native queue cutover'
+    );
+    const drain = readRepoFile('scripts/drain-pr-queue.sh');
+
+    expect(workflow).toContain(
+      'MERGE_QUEUE_BACKEND: ${{ vars.MERGE_QUEUE_BACKEND }}'
+    );
+    expect(workflow).not.toContain("MERGE_QUEUE_BACKEND || 'graphite'");
+    expect(workflow).toContain('  rebase:\n    needs: enroll\n');
+    expect(enroll).toContain('if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]');
+    expect(enroll).toContain('bash scripts/drain-pr-queue.sh');
+    expect(rebasePreflight).toContain(
+      'if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]'
+    );
+    expect(rebasePreflight).toContain(
+      'node scripts/merge-queue-backend.mjs preflight'
+    );
+    expect(
+      drain.indexOf('node scripts/merge-queue-backend.mjs preflight')
+    ).toBeLessThan(
+      drain.indexOf('node scripts/merge-queue-backend.mjs list-state')
+    );
   });
 });
 

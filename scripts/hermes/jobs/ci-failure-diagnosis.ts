@@ -539,16 +539,16 @@ const DIAGNOSES: ReadonlyArray<{
   {
     failureClass: 'bounded_source_scan_timeout',
     matches: log =>
-      /(?:analytics-metrics-layer-guard|touch-target-ratchet|destructive-confirm-dialog-audit|feature-flags-registry|arbitrary-values-ratchet|exp-drift-lint-guard)\.test\.ts/i.test(
+      /(?:analytics-metrics-layer-guard|touch-target-ratchet|destructive-confirm-dialog-audit|feature-flags-registry|arbitrary-values-ratchet|exp-import-boundary|exp-drift-lint-guard)\.test\.ts/i.test(
         log
       ) &&
       /(?:test timed out|timeout).*?\b\d+\s*ms|spawnSync\s+\S+\s+ETIMEDOUT/is.test(
         log
       ),
     rootCause:
-      'A source ratchet or nested lint scanner exceeded its bounded test timeout while traversing or analyzing the source tree.',
+      'A source ratchet or nested lint scanner exceeded its bounded test timeout while traversing or analyzing the source tree. The timeout log alone cannot distinguish a scanner regression from shared-host I/O saturation.',
     remediation:
-      'Intersect native candidate-token and semantic file sets before JavaScript source reads, and remove repeated reads, per-entry stat calls, or nested package-manager lint processes; preserve fail-closed fallback instead of classifying this as runner EAGAIN, increasing the timeout, or blindly rerunning.',
+      'Compare the scanner blob with its base and run the exact focused test first. An unchanged blob plus a focused pass identifies shared-host I/O saturation; otherwise inspect and optimize the scanner. Intersect native candidate-token and semantic file sets before JavaScript source reads, preserve a complete fail-closed fallback, match Vitest workers to the runner CPU quota, and keep full-tree scanners within an explicit 30-second ceiling; do not skip the check, add runner fanout, or try to fix the failure by blindly rerunning.',
   },
   {
     failureClass: 'test_fixture_import_timeout',
