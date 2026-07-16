@@ -387,6 +387,24 @@ describe('aggregate required checks', () => {
       'Fork PR Gate',
       'PR Size Guard',
     ]);
+
+    for (const bypass_actors of [
+      '{}',
+      '\n  - actor_id: 158384',
+      '\n  - actor_id: 2934433',
+    ]) {
+      const unsafe = validateMergeQueueRepoConfig({
+        backend: 'native',
+        branchProtectionYaml: branchProtectionYaml.replace(
+          'bypass_actors: []',
+          `bypass_actors: ${bypass_actors}`
+        ),
+        ciWorkflowYaml,
+      });
+      expect(unsafe.errors).toContain(
+        'branch-protection.yml native bypass_actors must be an empty array'
+      );
+    }
   });
 
   it('keeps Storybook A11y path-gated as a leaf and blocking through PR Ready', () => {
@@ -486,7 +504,7 @@ describe('aggregate required checks', () => {
       expect.arrayContaining([
         expect.stringContaining('must enable GitHub native merge_queue'),
         expect.stringContaining('must handle merge_group'),
-        expect.stringContaining('must remove the graphite-app bypass actor'),
+        expect.stringContaining('bypass_actors must be an empty array'),
       ])
     );
   });
@@ -533,6 +551,19 @@ describe('aggregate required checks', () => {
       );
     }
 
+    for (const actor_id of [158384, 2934433]) {
+      const unsafeBypass = validateLiveMergeQueueRuleset(
+        {
+          bypass_actors: [{ actor_id, actor_type: 'Integration' }],
+          rules: nativeRules,
+        },
+        { backend: 'native' }
+      );
+      expect(unsafeBypass.errors).toContain(
+        'live native ruleset bypass_actors must be empty'
+      );
+    }
+
     const unsafe = validateLiveMergeQueueRuleset(
       {
         bypass_actors: [{ actor_id: 158384, actor_type: 'Integration' }],
@@ -554,7 +585,7 @@ describe('aggregate required checks', () => {
       expect.arrayContaining([
         expect.stringContaining('SQUASH'),
         expect.stringContaining('max_entries_to_build'),
-        expect.stringContaining('still grants graphite-app bypass'),
+        expect.stringContaining('bypass_actors must be empty'),
       ])
     );
   });

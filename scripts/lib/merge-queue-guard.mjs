@@ -792,10 +792,12 @@ export function validateMergeQueueRepoConfig(input) {
   }
   if (
     backend === 'native' &&
-    /actor_id:\s*158384\b/i.test(input.branchProtectionYaml)
+    !/^\s*bypass_actors:\s*\[\s*\]\s*(?:#.*)?$/m.test(
+      input.branchProtectionYaml
+    )
   ) {
     errors.push(
-      'branch-protection.yml must remove the graphite-app bypass actor before native cutover'
+      'branch-protection.yml native bypass_actors must be an empty array'
     );
   }
 
@@ -886,10 +888,8 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
       `live ruleset missing graphite-app bypass actor (id ${GRAPHITE_QUEUE_POLICY.graphiteBypassActorId})`
     );
   }
-  if (backend === 'native' && hasGraphiteBypass) {
-    errors.push(
-      `live ruleset still grants graphite-app bypass (id ${GRAPHITE_QUEUE_POLICY.graphiteBypassActorId})`
-    );
+  if (backend === 'native' && bypassActors.length > 0) {
+    errors.push('live native ruleset bypass_actors must be empty');
   }
 
   return {

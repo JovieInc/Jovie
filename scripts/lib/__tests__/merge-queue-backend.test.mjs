@@ -23,7 +23,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[{"actor_id":2934433,"actor_type":"Integration"}],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":2,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":2,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -159,6 +159,22 @@ describe('native live preflight', () => {
     expect(result.errors).toContain('ruleset bypass_actors must be an array');
   });
 
+  it.each([
+    158384, 2934433,
+  ])('rejects non-empty bypass_actors including actor %s', actor_id => {
+    const result = validateNativePreflightEvidence({
+      ruleset: {
+        ...structuredClone(VALID_RULESET),
+        bypass_actors: [{ actor_id, actor_type: 'Integration' }],
+      },
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+    });
+    expect(result.errors).toContain(
+      'ruleset bypass_actors must be empty before native enrollment'
+    );
+  });
+
   it('reports every unsafe activation condition instead of partially enabling native mode', () => {
     const invalidRuleset = structuredClone(VALID_RULESET);
     invalidRuleset.enforcement = 'evaluate';
@@ -185,7 +201,7 @@ describe('native live preflight', () => {
         'ruleset enforcement must be active',
         'ruleset must contain an active merge_queue rule',
         'ruleset is missing required checks: Migration Guard, Fork PR Gate, PR Size Guard',
-        'Graphite bypass actor must be absent before native enrollment',
+        'ruleset bypass_actors must be empty before native enrollment',
         'repository auto-merge must be enabled',
         'CI workflow must handle merge_group checks_requested',
       ])
