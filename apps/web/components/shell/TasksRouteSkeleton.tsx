@@ -18,7 +18,6 @@ export function TasksRouteSkeleton() {
       aria-label='Loading Tasks'
       aria-busy='true'
       aria-live='polite'
-      data-testid='tasks-route-skeleton'
       className='absolute inset-0 overflow-hidden'
       toolbar={
         <PageToolbar

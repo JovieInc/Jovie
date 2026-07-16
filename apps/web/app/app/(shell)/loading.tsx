@@ -4,20 +4,15 @@ import { PageShell } from '@/components/organisms/PageShell';
 import { DashboardSegmentSkeleton } from '@/components/shell/DashboardSegmentSkeleton';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
-import AdminLoading from './admin/loading';
 import { CalendarRouteSkeleton } from './calendar/LazyCalendarPageClient';
 import ChatLoading from './chat/loading';
-import PresenceLoading from './dashboard/presence/loading';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
-import InsightsLoading from './insights/loading';
 import { LibraryLoadingState } from './library/LibrarySurface';
 import SettingsLoading from './settings/loading';
 import {
-  isAdminShellRoute,
   isAudienceShellRoute,
   isCalendarShellRoute,
   isChatShellRoute,
-  isInsightsShellRoute,
   isLibraryShellRoute,
   isLyricsShellRoute,
   isPresenceShellRoute,
@@ -88,7 +83,7 @@ export default async function ShellLoading() {
   }
 
   if (isPresenceShellRoute(pathname)) {
-    return <PresenceLoading />;
+    return <SettingsShellLoading />;
   }
 
   if (isAudienceShellRoute(pathname)) {
@@ -97,14 +92,6 @@ export default async function ShellLoading() {
 
   if (isCalendarShellRoute(pathname)) {
     return <CalendarRouteSkeleton />;
-  }
-
-  if (isInsightsShellRoute(pathname)) {
-    return <InsightsLoading />;
-  }
-
-  if (isAdminShellRoute(pathname)) {
-    return <AdminLoading />;
   }
 
   return <DashboardSegmentSkeleton rowKeyPrefix='shell-loading-row' />;

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  isAdminShellRoute,
   isAudienceShellRoute,
   isCalendarShellRoute,
   isChatShellRoute,
@@ -205,18 +204,6 @@ describe('isSettingsShellRoute', () => {
   it('returns false for non-settings routes', () => {
     expect(isSettingsShellRoute(APP_ROUTES.AUDIENCE)).toBe(false);
     expect(isSettingsShellRoute(null)).toBe(false);
-  });
-});
-
-describe('isAdminShellRoute', () => {
-  it('matches the admin root and nested admin subroutes', () => {
-    expect(isAdminShellRoute(APP_ROUTES.ADMIN)).toBe(true);
-    expect(isAdminShellRoute(`${APP_ROUTES.ADMIN}/activity`)).toBe(true);
-  });
-
-  it('returns false for non-admin routes', () => {
-    expect(isAdminShellRoute(APP_ROUTES.SETTINGS)).toBe(false);
-    expect(isAdminShellRoute(null)).toBe(false);
   });
 });
 

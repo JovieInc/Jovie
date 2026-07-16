@@ -139,10 +139,6 @@ export function isSettingsShellRoute(pathname: string | null): boolean {
   return matchesRoutePrefix(pathname, APP_ROUTES.SETTINGS);
 }
 
-export function isAdminShellRoute(pathname: string | null): boolean {
-  return matchesRoutePrefix(pathname, APP_ROUTES.ADMIN);
-}
-
 function isLightweightShellRoute(pathname: string | null): boolean {
   return (
     isChatShellRoute(pathname) ||
