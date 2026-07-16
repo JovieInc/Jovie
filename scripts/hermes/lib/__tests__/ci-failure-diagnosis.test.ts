@@ -517,14 +517,17 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
   });
 
   it('classifies the analytics scanner timeout separately from runner pressure', () => {
-    const log = `
-      FAIL tests/unit/analytics-metrics-layer-guard.test.ts > canonical metrics layer guard
+    const diagnosis = diagnoseCiFailure(`
+      Complete job name: Unit Tests (Shard 1/5)
+      FAIL tests/unit/analytics-metrics-layer-guard.test.ts:48
       Error: Test timed out in 12000ms.
-      PSI telemetry: sustained I/O pressure
-    `;
+      File body completed after 34.690s under shared I/O load.
+    `);
 
-    expect(diagnoseCiFailure(log).failureClass).toBe(
-      'bounded_source_scan_timeout'
+    expect(diagnosis.failureClass).toBe('bounded_source_scan_timeout');
+    expect(diagnosis.rootCause).toContain('cannot distinguish');
+    expect(diagnosis.remediation).toContain(
+      'unchanged blob plus a focused pass identifies shared-host I/O saturation'
     );
   });
 
@@ -559,15 +562,18 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
     expect(diagnosis.remediation).toContain(
       'Intersect native candidate-token and semantic file sets'
     );
-    expect(diagnosis.remediation).toContain('preserve fail-closed fallback');
+    expect(diagnosis.remediation).toContain('preserve');
+    expect(diagnosis.remediation).toContain('complete fail-closed fallback');
     expect(diagnosis.remediation).toContain('blindly rerunning');
   });
 
   it('classifies the destructive dialog audit as bounded scanner work', () => {
     expect(
       diagnoseCiFailure(`
-        FAIL tests/unit/design-system/destructive-confirm-dialog-audit.test.ts
+        Complete job name: Unit Tests (Shard 2/5)
+        FAIL tests/unit/design-system/destructive-confirm-dialog-audit.test.ts:94
         Error: Test timed out in 12000ms.
+        File body completed after 19.388s under shared I/O load.
       `).failureClass
     ).toBe('bounded_source_scan_timeout');
   });
@@ -575,13 +581,18 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
   it.each([
     'feature-flags-registry.test.ts',
     'arbitrary-values-ratchet.test.ts',
+    'app/exp-import-boundary.test.ts',
   ])('classifies recurring %s scanner timeouts', testFile => {
-    expect(
-      diagnoseCiFailure(`
+    const diagnosis = diagnoseCiFailure(`
         FAIL tests/unit/${testFile}
         Error: Test timed out in 12000ms.
-      `).failureClass
-    ).toBe('bounded_source_scan_timeout');
+      `);
+
+    expect(diagnosis.failureClass).toBe('bounded_source_scan_timeout');
+    expect(diagnosis.rootCause).toContain('shared-host I/O saturation');
+    expect(diagnosis.remediation).toContain('runner CPU quota');
+    expect(diagnosis.remediation).toContain('30-second ceiling');
+    expect(diagnosis.remediation).toContain('do not skip');
   });
 
   it('classifies the exp lint subprocess timeout as bounded scanner work', () => {

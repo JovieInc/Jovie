@@ -2893,9 +2893,11 @@ jobs:
           TURBO_SCM_HEAD: ${{ github.sha }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || ((github.base_ref && format('origin/{0}', github.base_ref)) || '') }}
         run: |
-          # Use forked pool with limited workers to reduce CI flakiness from memory pressure
+          # Each ephemeral runner has 2 CPUs. Match Vitest forks to that quota so
+          # two five-shard PR cohorts use 20 workers across 20 allocated CPUs
+          # instead of oversubscribing the shared Docker/NVMe host with 30.
           export NODE_OPTIONS="--max-old-space-size=3072"
-          VITEST_CI_FLAGS="--pool=forks --maxWorkers=3"
+          VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
           # Retry budget comes from apps/web/tests/quarantine.json
           RETRY_FLAG="--retry=${{ steps.quarantine.outputs.unit_default_retries }}"
           # Use shard-specific output file so Codecov Test Analytics receives all 10 shards
@@ -4667,7 +4669,8 @@ jobs:
       - ci-lighthouse-onboarding-pr
       - ci-lighthouse-admin-pr
       - ci-a11y
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Keep this informational tail off the saturated ephemeral unit-test pool.
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - name: Reset workspace git state (self-hosted)

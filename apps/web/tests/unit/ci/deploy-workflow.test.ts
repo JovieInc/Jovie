@@ -617,7 +617,7 @@ describe('deploy workflow Vercel env resolution', () => {
 });
 
 describe('unit-test runner capacity', () => {
-  it('fills the ephemeral pool while retaining hosted burst protection', () => {
+  it('fills the pool without exceeding each ephemeral runner CPU quota', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const unitJob = getJobBlock(workflow, 'ci-unit-tests');
 
@@ -632,6 +632,24 @@ describe('unit-test runner capacity', () => {
     expect(unitJob).toContain(
       'hosted fallback retains the original 3-shard cap'
     );
+    expect(unitJob).toContain('Each ephemeral runner has 2 CPUs');
+    expect(unitJob).toContain('VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"');
+    expect(unitJob).not.toContain(
+      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=3"'
+    );
+  });
+});
+
+describe('informational CI tail capacity', () => {
+  it('keeps PR Summary off the ephemeral unit-test pool', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const summaryJob = getJobBlock(workflow, 'ci-summary');
+
+    expect(summaryJob).toContain('Informational only (posts a PR comment)');
+    expect(summaryJob).toContain(
+      "runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}"
+    );
+    expect(summaryJob).not.toContain('runs-on: ${{ vars.CI_FAST_RUNNER }}');
   });
 });
 

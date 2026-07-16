@@ -176,6 +176,33 @@ const PERFORMANCE_PROFILER_REPAIR_MANIFEST = new Set([
   ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
+const SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST = new Set([
+  '.github/workflows/agent-pipeline.yml',
+  '.github/workflows/ci.yml',
+  '.github/workflows/merge-queue-autoenroll.yml',
+  'apps/web/tests/unit/analytics-metrics-layer-guard.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+  'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
+  'apps/web/tests/unit/metrics-layer-guard-logic.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+]);
+const SCANNER_LOAD_REPAIR_MANIFEST = new Set([
+  ...SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SCANNER_LOAD_REPAIR_WEB_TESTS = [
+  'apps/web/tests/unit/analytics-metrics-layer-guard.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+  'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
+];
+const SCANNER_LOAD_REPAIR_SCRIPT_TESTS = [
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+];
 const PERFORMANCE_PROFILER_REPAIR_WEB_TESTS = [
   'apps/web/scripts/test-performance-profiler.test.ts',
 ];
@@ -393,12 +420,26 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactPerformanceProfilerRepairPrimary =
     files.length === PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.size &&
     files.every(file => PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.has(file));
-  const isExactPerformanceProfilerRepairWithSelector =
+  const isExactPerformanceProfilerRepairWithSelectorLegacy =
     files.length === PERFORMANCE_PROFILER_REPAIR_MANIFEST.size &&
     files.every(file => PERFORMANCE_PROFILER_REPAIR_MANIFEST.has(file));
+  const isExactScannerLoadRepairPrimary =
+    files.length === SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST.size &&
+    files.every(file => SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST.has(file));
+  const isExactScannerLoadRepairWithSelector =
+    files.length === SCANNER_LOAD_REPAIR_MANIFEST.size &&
+    files.every(file => SCANNER_LOAD_REPAIR_MANIFEST.has(file));
+  const scannerLoadRepairInputCount = files.filter(file =>
+    SCANNER_LOAD_REPAIR_MANIFEST.has(file)
+  ).length;
+  const isExactPerformanceProfilerRepairWithSelector =
+    isExactPerformanceProfilerRepairWithSelectorLegacy ||
+    isExactScannerLoadRepairWithSelector;
   const isExactPerformanceProfilerRepair =
     isExactPerformanceProfilerRepairPrimary ||
-    isExactPerformanceProfilerRepairWithSelector;
+    isExactPerformanceProfilerRepairWithSelectorLegacy ||
+    isExactScannerLoadRepairPrimary ||
+    isExactScannerLoadRepairWithSelector;
   const persistedAuthFixtureInputCount = files.filter(file =>
     PERSISTED_AUTH_FIXTURE_REPAIR_CORE.has(file)
   ).length;
@@ -553,8 +594,14 @@ export function buildAffectedTestPlan(changedFiles) {
   if (isExactNeonAttemptArtifactRepair) {
     mandatoryTests.push(...NEON_ATTEMPT_ARTIFACT_TESTS);
   }
-  if (isExactPerformanceProfilerRepair) {
+  if (
+    isExactPerformanceProfilerRepairPrimary ||
+    isExactPerformanceProfilerRepairWithSelectorLegacy
+  ) {
     mandatoryTests.push(...PERFORMANCE_PROFILER_REPAIR_WEB_TESTS);
+  }
+  if (isExactScannerLoadRepairPrimary || isExactScannerLoadRepairWithSelector) {
+    mandatoryTests.push(...SCANNER_LOAD_REPAIR_WEB_TESTS);
   }
   if (isExactRunnerPrerequisiteRepair) {
     mandatoryTests.push(...RUNNER_PREREQUISITE_CONTRACT_TESTS);
@@ -576,8 +623,12 @@ export function buildAffectedTestPlan(changedFiles) {
       : []),
   ]);
   const scriptVitestTests = unique([
-    ...(isExactPerformanceProfilerRepair
+    ...(isExactPerformanceProfilerRepairPrimary ||
+    isExactPerformanceProfilerRepairWithSelectorLegacy
       ? PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS
+      : []),
+    ...(isExactScannerLoadRepairPrimary || isExactScannerLoadRepairWithSelector
+      ? SCANNER_LOAD_REPAIR_SCRIPT_TESTS
       : []),
     ...(isExactAffectedTestSelector ||
     (isExactAuthenticatedA11yRepair && affectedTestSelectorInputCount > 0) ||
@@ -644,7 +695,8 @@ export function buildAffectedTestPlan(changedFiles) {
       return true;
     if (
       isExactPerformanceProfilerRepair &&
-      PERFORMANCE_PROFILER_REPAIR_MANIFEST.has(file)
+      (PERFORMANCE_PROFILER_REPAIR_MANIFEST.has(file) ||
+        SCANNER_LOAD_REPAIR_MANIFEST.has(file))
     )
       return true;
     if (
@@ -708,6 +760,22 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract;
+  const hasIncompleteScannerLoadRepair =
+    scannerLoadRepairInputCount > 0 &&
+    !isExactScannerLoadRepairPrimary &&
+    !isExactScannerLoadRepairWithSelector &&
+    !isExactAffectedTestSelector &&
+    !isExactAuthenticatedA11yRepair &&
+    !isExactPrerequisiteTrain &&
+    !isExactGoldenPathSmokeContractRepair &&
+    !isExactNeonAttemptArtifactRepair &&
+    !isExactPerformanceProfilerRepair &&
+    !isExactPersistedAuthFixtureRepair &&
+    !isExactVisualQaSelectorRepair &&
+    !isExactGtmqSourceGateReaper &&
+    !isExactRunnerIoPressure &&
+    !isExactRunnerPrerequisiteRepair &&
+    !isExactLayoutGuardContract;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
@@ -716,6 +784,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactNeonAttemptArtifactRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactAffectedTestSelector &&
+    !isExactScannerLoadRepairPrimary &&
     !isExactVisualQaSelectorRepair &&
     !isExactPerformanceProfilerRepairWithSelector &&
     !isExactRunnerIoPressure &&
@@ -787,6 +856,7 @@ export function buildAffectedTestPlan(changedFiles) {
     hasIncompleteVercelCongestionControl ||
     hasIncompleteAffectedTestSelector ||
     hasIncompletePerformanceProfilerRepair ||
+    hasIncompleteScannerLoadRepair ||
     hasIncompleteGtmqSourceGateReaper ||
     hasIncompleteRunnerIoPressure ||
     hasIncompleteRunnerPrerequisiteContract ||

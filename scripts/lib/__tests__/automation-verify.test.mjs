@@ -104,6 +104,23 @@ const PERFORMANCE_PROFILER_REPAIR_MANIFEST = [
   ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
+const SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST = [
+  '.github/workflows/agent-pipeline.yml',
+  '.github/workflows/ci.yml',
+  '.github/workflows/merge-queue-autoenroll.yml',
+  'apps/web/tests/unit/analytics-metrics-layer-guard.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+  'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
+  'apps/web/tests/unit/metrics-layer-guard-logic.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+];
+const SCANNER_LOAD_REPAIR_MANIFEST = [
+  ...SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
 const AUTHENTICATED_A11Y_REPAIR_CORE = [
   'apps/web/app/app/(shell)/chat/loading.tsx',
   'apps/web/app/exp/shell-v1/page.tsx',
@@ -842,6 +859,57 @@ describe('automation-verify affected scope', () => {
         ? ['scripts/lib/__tests__/automation-verify.test.mjs']
         : []),
     ]);
+  });
+
+  it.each([
+    { manifest: SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST },
+    { manifest: SCANNER_LOAD_REPAIR_MANIFEST },
+  ])('selects scanner-load and Gem regressions for an exact repair signature', ({
+    manifest,
+  }) => {
+    const plan = buildAffectedTestPlan(manifest);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/analytics-metrics-layer-guard.test.ts',
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+      ...(manifest.length === SCANNER_LOAD_REPAIR_MANIFEST.length
+        ? ['scripts/lib/__tests__/automation-verify.test.mjs']
+        : []),
+    ]);
+  });
+
+  it.each(
+    SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST
+  )('fails closed when the scanner-load repair is missing %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST.filter(
+          file => file !== missingInput
+        )
+      ).mode
+    ).toBe('full');
+    expect(
+      buildAffectedTestPlan(
+        SCANNER_LOAD_REPAIR_MANIFEST.filter(file => file !== missingInput)
+      ).mode
+    ).toBe('full');
+  });
+
+  it.each(
+    AFFECTED_TEST_SELECTOR_MANIFEST
+  )('fails closed when the scanner-load repair is missing selector input %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        SCANNER_LOAD_REPAIR_MANIFEST.filter(file => file !== missingInput)
+      ).mode
+    ).toBe('full');
   });
 
   it('keeps the Layout Guard contract repair on its focused cross-runtime regressions', () => {
