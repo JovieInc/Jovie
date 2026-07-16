@@ -135,8 +135,12 @@ function isDashboardSubRoute(pathname: string | null): boolean {
   return matchesNestedRoute(pathname, APP_ROUTES.LEGACY_DASHBOARD);
 }
 
-function isShellOptimizedSettingsRoute(pathname: string | null): boolean {
+export function isSettingsShellRoute(pathname: string | null): boolean {
   return matchesRoutePrefix(pathname, APP_ROUTES.SETTINGS);
+}
+
+export function isAdminShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(pathname, APP_ROUTES.ADMIN);
 }
 
 function isLightweightShellRoute(pathname: string | null): boolean {
@@ -152,7 +156,7 @@ function isLightweightShellRoute(pathname: string | null): boolean {
     isAudienceShellRoute(pathname) ||
     isCalendarShellRoute(pathname) ||
     isDashboardSubRoute(pathname) ||
-    isShellOptimizedSettingsRoute(pathname)
+    isSettingsShellRoute(pathname)
   );
 }
 
