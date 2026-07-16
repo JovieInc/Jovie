@@ -456,17 +456,6 @@ async function handleMissingDbUser(
   );
 
   if (!newUserId) {
-    await captureCriticalError(
-      'User creation failed after retries',
-      new Error('User creation failed after maximum retry attempts'),
-      {
-        betterAuthUserId,
-        email,
-        waitlistEntryId,
-        context: 'resolveUserState',
-      }
-    );
-
     return {
       state: CanonicalUserState.USER_CREATION_FAILED,
       clerkUserId: betterAuthUserId,
