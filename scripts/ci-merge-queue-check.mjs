@@ -12,6 +12,16 @@ import {
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 
+function configuredBackend() {
+  // Match the live controller until the guarded repository-variable cutover.
+  // Native source validation must remain an explicit opt-in before then.
+  const backend = process.env.MERGE_QUEUE_BACKEND?.trim() || 'graphite';
+  if (backend !== 'graphite' && backend !== 'native') {
+    throw new Error(`Unknown MERGE_QUEUE_BACKEND: ${backend}`);
+  }
+  return backend;
+}
+
 function readRepoFile(relativePath) {
   return readFileSync(resolve(REPO_ROOT, relativePath), 'utf8');
 }
@@ -42,13 +52,14 @@ function loadLiveRuleset() {
 }
 
 function printPolicySummary() {
-  console.log('Graphite merge-queue policy (source-of-record):');
+  console.log(`${configuredBackend()} merge-queue policy (source-of-record):`);
   for (const [key, value] of Object.entries(GRAPHITE_QUEUE_POLICY)) {
     console.log(`  ${key}: ${JSON.stringify(value)}`);
   }
 }
 
 function runValidate({ checkLive = false } = {}) {
+  const backend = configuredBackend();
   const branchProtectionYaml = readRepoFile(
     MERGE_QUEUE_REPO_PATHS.branchProtection
   );
@@ -57,6 +68,7 @@ function runValidate({ checkLive = false } = {}) {
     MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow
   );
   const repoValidation = validateMergeQueueRepoConfig({
+    backend,
     branchProtectionYaml,
     ciWorkflowYaml,
   });
@@ -97,13 +109,12 @@ function runValidate({ checkLive = false } = {}) {
 
   const live = loadLiveRuleset();
   if (live.error) {
-    console.warn(
-      `Skipping live ruleset verification (gh unavailable): ${live.error}`
-    );
+    console.error(`Live GitHub ruleset verification failed: ${live.error}`);
+    process.exitCode = 1;
     return;
   }
 
-  const liveValidation = validateLiveMergeQueueRuleset(live);
+  const liveValidation = validateLiveMergeQueueRuleset(live, { backend });
   if (!liveValidation.ok) {
     console.error('Live GitHub ruleset validation failed:');
     for (const error of liveValidation.errors) {

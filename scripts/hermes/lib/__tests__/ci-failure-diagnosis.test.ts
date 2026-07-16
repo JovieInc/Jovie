@@ -2,6 +2,117 @@ import { describe, expect, it } from 'vitest';
 import { diagnoseCiFailure } from '../../jobs/ci-failure-diagnosis';
 
 describe('diagnoseCiFailure', () => {
+  it('diagnoses required smoke suppressed by a skipped prerequisite without recommending a blind rerun', () => {
+    const diagnosis = diagnoseCiFailure(`PR Ready
+ci-risk-classifier: success (high; rules: auth-identity)
+ci-build-public: success (has_artifact=true)
+neon-db: skipped
+ci-e2e-smoke: skipped
+E2E Smoke (PR Fast Feedback) was required for this PR, but result was skipped`);
+
+    expect(diagnosis.failureClass).toBe(
+      'required_smoke_suppressed_by_dependency_skip'
+    );
+    expect(diagnosis.rootCause).toContain('prerequisite skipped');
+    expect(diagnosis.remediation).toContain('Do not rerun');
+    expect(diagnosis.remediation).toContain('always()');
+  });
+
+  it.each([
+    ['success (has_artifact=false)', 'skipped'],
+    ['success (has_artifact=true)', 'failure'],
+  ])('does not blame implicit skip propagation when build=%s and Neon=%s', (build, neon) => {
+    expect(
+      diagnoseCiFailure(`ci-build-public: ${build}
+neon-db: ${neon}
+ci-e2e-smoke: skipped
+E2E Smoke (PR Fast Feedback) was required for this PR, but result was skipped`)
+        .failureClass
+    ).toBe('unknown');
+  });
+
+  it('diagnoses the paired Storybook setup-import and iframe transport failure', () => {
+    const diagnosis = diagnoseCiFailure(`Complete job name: Storybook A11y
+storybook (chromium) components/atoms/AvatarUploadOverlay.stories.tsx
+Error: Failed to import test file /work/apps/web/.storybook/vitest.setup.ts
+Caused by: TypeError: Failed to fetch dynamically imported module: http://localhost:63315/work/apps/web/.storybook/vitest.setup.ts?import
+Error: Cannot connect to the iframe.
+Received URL: unknown due to CORS
+Test Files 1 failed | 37 passed | 1 skipped (121)
+Tests 289 passed (289)`);
+
+    expect(diagnosis.failureClass).toBe('storybook_browser_iframe_transport');
+    expect(diagnosis.rootCause).toContain('localhost Vitest iframe transport');
+    expect(diagnosis.remediation).toContain(
+      'one targeted Storybook A11y rerun'
+    );
+    expect(diagnosis.remediation).toContain('browser process');
+  });
+
+  it.each([
+    `storybook (chromium)\nFailed to import test file .storybook/vitest.setup.ts\nError [ERR_UNKNOWN_BUILTIN_MODULE]: No such built-in module: node:crypto`,
+    `Storybook A11y\nStorybook packages must use matching versions\n37 passed\n289 passed`,
+    `storybook (chromium)\nCannot connect to the iframe\nReceived URL: unknown due to CORS`,
+  ])('does not infer iframe transport from a partial Storybook signature', log => {
+    expect(diagnoseCiFailure(log).failureClass).toBe('unknown');
+  });
+
+  it('separates Lighthouse protocol transport exhaustion from product assertions', () => {
+    const diagnosis = diagnoseCiFailure(`Lighthouse CI (Production)
+PROTOCOL_TIMEOUT: Waiting for DevTools protocol response has exceeded the allotted time
+pending method: DOMSnapshot.disable
+LIGHTHOUSE_FAILURE_CLASS=transient_protocol LIGHTHOUSE_ATTEMPT=3/3`);
+
+    expect(diagnosis.failureClass).toBe('lighthouse_protocol_timeout');
+    expect(diagnosis.rootCause).toContain('Chrome DevTools protocol');
+    expect(diagnosis.remediation).toContain('bounded transient retry');
+  });
+
+  it('stops Lighthouse assertion failures without retrying', () => {
+    const diagnosis = diagnoseCiFailure(`Lighthouse (public routes PR)
+assertion failure for color-contrast: expected score of at least 1, but got 0
+LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
+
+    expect(diagnosis.failureClass).toBe('lighthouse_deterministic_assertion');
+    expect(diagnosis.remediation).toContain('Do not retry');
+  });
+
+  it('diagnoses the seeded-profile loopback origin drift before the generic assertion class', () => {
+    const diagnosis = diagnoseCiFailure(`BASE_URL: http://127.0.0.1:3000
+Network: http://0.0.0.0:3000
+2 result(s) for http://127.0.0.1:3000/testartist?mode=subscribe :
+categories.best-practices failure for minScore assertion
+expected: >=0.9
+found: 0.78
+errors-in-console warning for minScore assertion
+Assertion failed. Exiting with status code 1.
+LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
+
+    expect(diagnosis.failureClass).toBe('lighthouse_loopback_origin_drift');
+    expect(diagnosis.rootCause).toContain('cross loopback origins');
+    expect(diagnosis.remediation).toContain('HOSTNAME');
+    expect(diagnosis.remediation).toContain('never redirects to 0.0.0.0');
+  });
+
+  it('does not infer loopback drift from an ordinary deterministic assertion', () => {
+    expect(
+      diagnoseCiFailure(`
+        BASE_URL: http://127.0.0.1:3000
+        color-contrast failure for minScore assertion
+        Assertion failed.
+        LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion
+      `).failureClass
+    ).toBe('lighthouse_deterministic_assertion');
+  });
+
+  it.each([
+    'PROTOCOL_TIMEOUT: DOMSnapshot.disable',
+    'LIGHTHOUSE_FAILURE_CLASS=transient_protocol',
+    'assertion failure for color-contrast: expected 1, but got 0',
+  ])('does not classify a partial Lighthouse signature: %s', log => {
+    expect(diagnoseCiFailure(log).failureClass).toBe('unknown');
+  });
+
   it('diagnoses missing draft evidence when no trusted producer ran', () => {
     const diagnosis = diagnoseCiFailure(`
       Complete job name: Verify Draft Agent PR

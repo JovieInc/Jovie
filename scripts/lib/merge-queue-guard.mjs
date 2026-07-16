@@ -29,6 +29,16 @@ export const GRAPHITE_QUEUE_POLICY = Object.freeze({
   rulesetId: '10512119',
 });
 
+export const NATIVE_QUEUE_POLICY = Object.freeze({
+  check_response_timeout_minutes: 60,
+  grouping_strategy: 'ALLGREEN',
+  max_entries_to_build: 2,
+  max_entries_to_merge: 10,
+  merge_method: 'SQUASH',
+  min_entries_to_merge: 1,
+  min_entries_to_merge_wait_minutes: 0,
+});
+
 /**
  * Allowed required-check contexts for main. These are aggregates — never pin
  * individual CI jobs (ci-fast, Typecheck, Unit Tests, …) or a batch failure
@@ -74,6 +84,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'E2E Smoke (PR Fast Feedback)',
   'CI / Golden Path (PR)',
   'Golden Path (PR)',
+  'CI / Extended Smoke (Preview)',
+  'Extended Smoke (Preview)',
   'CI / Preview Deploy (PR)',
   'Preview Deploy (PR)',
   // LLM / advisory checks — never pin as branch-protection required contexts
@@ -689,22 +701,63 @@ export function ciWorkflowHasMergeGroupTrigger(yamlText = '') {
  * @param {{
  *   branchProtectionYaml: string,
  *   ciWorkflowYaml: string,
+ *   backend?: 'graphite' | 'native',
  * }} input
  */
 export function validateMergeQueueRepoConfig(input) {
   const errors = [];
   const warnings = [];
+  const backend = input.backend ?? 'graphite';
+  const hasNativeQueue = branchProtectionHasNativeMergeQueueRule(
+    input.branchProtectionYaml
+  );
 
-  if (branchProtectionHasNativeMergeQueueRule(input.branchProtectionYaml)) {
-    errors.push(
-      'branch-protection.yml must not enable GitHub native merge_queue (Graphite owns the queue)'
+  if (backend === 'graphite' && hasNativeQueue) {
+    warnings.push(
+      'branch-protection.yml contains dormant native merge_queue source; Graphite remains active until guarded live cutover'
     );
+  }
+  if (backend === 'native' && !hasNativeQueue) {
+    errors.push(
+      'branch-protection.yml must enable GitHub native merge_queue when the native backend is selected'
+    );
+  }
+  if (
+    backend === 'native' &&
+    !/strict_required_status_checks_policy:\s*false\b/i.test(
+      input.branchProtectionYaml
+    )
+  ) {
+    errors.push(
+      'branch-protection.yml must leave source status checks loose; native merge_group validates latest main'
+    );
+  }
+  if (backend !== 'graphite' && backend !== 'native') {
+    errors.push(`unknown merge queue backend: ${backend}`);
+  }
+  if (backend === 'native') {
+    for (const [field, expected] of Object.entries(NATIVE_QUEUE_POLICY)) {
+      const value =
+        typeof expected === 'string' ? `['"]?${expected}['"]?` : expected;
+      if (
+        !new RegExp(`^\\s*${field}:\\s*${value}\\s*$`, 'm').test(
+          input.branchProtectionYaml
+        )
+      )
+        errors.push(
+          `branch-protection.yml native merge_queue ${field} must be ${expected}`
+        );
+    }
   }
 
   if (ciWorkflowHasMergeGroupTrigger(input.ciWorkflowYaml)) {
-    warnings.push(
-      'ci.yml declares inert merge_group compatibility; Graphite remains the active queue until the ruleset/backend changes'
-    );
+    if (backend === 'graphite') {
+      warnings.push(
+        'ci.yml declares inert merge_group compatibility; Graphite remains the active queue until the ruleset/backend changes'
+      );
+    }
+  } else if (backend === 'native') {
+    errors.push('ci.yml must handle merge_group for the native queue backend');
   }
 
   const contexts = parseRequiredStatusChecksFromYaml(
@@ -729,9 +782,20 @@ export function validateMergeQueueRepoConfig(input) {
     }
   }
 
-  if (!/graphite-app/i.test(input.branchProtectionYaml)) {
+  if (
+    backend === 'graphite' &&
+    !/graphite-app/i.test(input.branchProtectionYaml)
+  ) {
     warnings.push(
       'branch-protection.yml should document graphite-app bypass actor for queue merges'
+    );
+  }
+  if (
+    backend === 'native' &&
+    /actor_id:\s*158384\b/i.test(input.branchProtectionYaml)
+  ) {
+    errors.push(
+      'branch-protection.yml must remove the graphite-app bypass actor before native cutover'
     );
   }
 
@@ -748,18 +812,39 @@ export function validateMergeQueueRepoConfig(input) {
  * Validate a live GitHub ruleset payload (gh api repos/.../rulesets/...).
  *
  * @param {Record<string, unknown>} ruleset
+ * @param {{ backend?: 'graphite' | 'native' }} [options]
  */
-export function validateLiveMergeQueueRuleset(ruleset) {
+export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
   const errors = [];
+  const backend = options.backend ?? 'graphite';
   const rules = Array.isArray(ruleset?.rules) ? ruleset.rules : [];
+  const mergeQueueRule = rules.find(rule => rule?.type === 'merge_queue');
 
-  if (rules.some(rule => rule?.type === 'merge_queue')) {
+  if (backend === 'graphite' && mergeQueueRule) {
     errors.push('live ruleset still has native merge_queue rule');
+  }
+  if (backend === 'native' && !mergeQueueRule) {
+    errors.push('live ruleset is missing the native merge_queue rule');
+  }
+  if (backend === 'native' && mergeQueueRule)
+    for (const [field, expected] of Object.entries(NATIVE_QUEUE_POLICY))
+      if (mergeQueueRule?.parameters?.[field] !== expected)
+        errors.push(`live native merge_queue ${field} must be ${expected}`);
+  if (backend !== 'graphite' && backend !== 'native') {
+    errors.push(`unknown merge queue backend: ${backend}`);
   }
 
   const statusRule = rules.find(
     rule => rule?.type === 'required_status_checks'
   );
+  if (
+    backend === 'native' &&
+    statusRule?.parameters?.strict_required_status_checks_policy !== false
+  ) {
+    errors.push(
+      'live native ruleset must leave source status checks loose; merge_group owns latest-main validation'
+    );
+  }
   const parameters = statusRule?.parameters;
   const contexts = Array.isArray(parameters)
     ? parameters.map(entry => normalizeCheckContext(entry?.context ?? ''))
@@ -786,17 +871,24 @@ export function validateLiveMergeQueueRuleset(ruleset) {
     );
   }
 
-  const bypassActors = Array.isArray(ruleset?.bypass_actors)
-    ? ruleset.bypass_actors
-    : [];
+  const hasValidBypassActors = Array.isArray(ruleset?.bypass_actors);
+  const bypassActors = hasValidBypassActors ? ruleset.bypass_actors : [];
+  if (!hasValidBypassActors) {
+    errors.push('live ruleset bypass_actors must be an array');
+  }
   const hasGraphiteBypass = bypassActors.some(
     actor =>
       actor?.actor_id === GRAPHITE_QUEUE_POLICY.graphiteBypassActorId &&
       actor?.actor_type === 'Integration'
   );
-  if (!hasGraphiteBypass) {
+  if (backend === 'graphite' && !hasGraphiteBypass) {
     errors.push(
       `live ruleset missing graphite-app bypass actor (id ${GRAPHITE_QUEUE_POLICY.graphiteBypassActorId})`
+    );
+  }
+  if (backend === 'native' && hasGraphiteBypass) {
+    errors.push(
+      `live ruleset still grants graphite-app bypass (id ${GRAPHITE_QUEUE_POLICY.graphiteBypassActorId})`
     );
   }
 
@@ -806,6 +898,7 @@ export function validateLiveMergeQueueRuleset(ruleset) {
     contexts,
     checks,
     hasGraphiteBypass,
+    hasNativeMergeQueue: Boolean(mergeQueueRule),
   };
 }
 
@@ -934,6 +1027,18 @@ export function validateMergeQueueEnrollHotPath(workflowYaml = '') {
 
   if (!/drain-pr-queue\.sh/.test(enrollBlock)) {
     errors.push('enroll hot path must invoke scripts/drain-pr-queue.sh');
+  }
+  if (!/MERGE_QUEUE_BACKEND:/.test(enrollBlock)) {
+    errors.push('enroll hot path must declare MERGE_QUEUE_BACKEND');
+  }
+  if (
+    !/MERGE_QUEUE_NATIVE_AUTHORIZATION:\s*merge-queue-autoenroll/.test(
+      enrollBlock
+    )
+  ) {
+    errors.push(
+      'enroll hot path must authorize only the native queue controller'
+    );
   }
 
   return { ok: errors.length === 0, errors };

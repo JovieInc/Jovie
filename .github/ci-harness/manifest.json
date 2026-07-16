@@ -136,6 +136,14 @@
       "remediation": "The launch-gate golden path (signup -> onboarding -> import -> live public profile) regressed. Reproduce locally with the pinned Doppler command; do not weaken the spec to pass."
     },
     {
+      "id": "ci-smoke-required",
+      "name": "Extended Smoke (Preview)",
+      "tier": "risk-triggered-smoke",
+      "mergeGate": true,
+      "nextLocalCommand": "pnpm --filter @jovie/web exec playwright test --config=playwright.config.smoke.ts",
+      "remediation": "A testing-labeled PR requested the extended preview smoke suite. Inspect the failing Playwright report and fix the fixture or product regression before removing the label."
+    },
+    {
       "id": "ci-pr-vercel-preview",
       "name": "Preview Deploy (PR)",
       "tier": "preview-evidence",
@@ -170,7 +178,7 @@
         "^\\.github/ci-harness/"
       ],
       "requiresSmoke": true,
-      "requiresPreview": false,
+      "requiresPreview": true,
       "blocksUnattendedAutoMerge": false,
       "reason": "Workflow and CI-control changes can silently alter merge, deploy, or agent feedback behavior."
     },

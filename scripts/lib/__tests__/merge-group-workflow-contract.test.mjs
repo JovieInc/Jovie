@@ -15,6 +15,10 @@ const SIZE_GUARD_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/pr-size-guard.yml'),
   'utf8'
 );
+const SECURITY_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/security.yml'),
+  'utf8'
+);
 const EVENT = JSON.parse(
   readFileSync(
     resolve(import.meta.dirname, 'fixtures/merge-group-checks-requested.json'),
@@ -63,8 +67,13 @@ describe('merge_group workflow contract', () => {
 
   it('fans real combined-head checks into PR Ready without PR metadata or deploy evidence', () => {
     const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
-    expect(aggregate).toContain('name: PR Ready');
-    expect(aggregate).toContain("github.event_name == 'merge_group'");
+    expect(aggregate).toContain(
+      "github.event_name == 'merge_group' && 'PR Ready'"
+    );
+    expect(aggregate).toContain(
+      "if: ${{ always() && github.event_name == 'merge_group' }}"
+    );
+    expect(aggregate).not.toContain('!cancelled()');
     expect(aggregate).toContain('ci-fast');
     expect(aggregate).toContain('ci-unit-tests');
     expect(aggregate).toContain('ci-build-public');
@@ -111,6 +120,28 @@ describe('merge_group workflow contract', () => {
     );
   });
 
+  it('requires one diff-scoped secret scan on source and combined heads', () => {
+    const secret = getJobBlock(CI_WORKFLOW, 'ci-secret-scan');
+    const mergeReady = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
+    const sourceReady = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
+    expect(secret).not.toContain('needs: [ci-path-changes]');
+    expect(secret).toContain(
+      "github.event_name == 'pull_request' || github.event_name == 'merge_group'"
+    );
+    expect(secret).toContain('github.event.merge_group.base_sha');
+    for (const aggregate of [mergeReady, sourceReady]) {
+      expect(aggregate).toContain('ci-secret-scan');
+      expect(aggregate).toContain('Secret Scan');
+    }
+    expect(sourceReady).toContain(
+      "if: ${{ always() && github.event_name == 'pull_request'"
+    );
+    expect(sourceReady).toContain(
+      'Unverified Graphite reuse reached PR Ready instead of exact-head gates.'
+    );
+    expect(SECURITY_WORKFLOW).not.toMatch(/^\s*pull_request:/m);
+  });
+
   it('keeps merge groups out of PR-only and deployment jobs', () => {
     expect(getJobBlock(CI_WORKFLOW, 'neon-db')).toContain(
       "github.event_name == 'push' || (github.event_name == 'pull_request'"
@@ -154,7 +185,9 @@ describe('merge_group workflow contract', () => {
       /merge_group:\n\s+types: \[checks_requested\]/
     );
     const forkGate = getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate');
-    expect(forkGate).toContain('name: Fork PR Gate');
+    expect(forkGate).toContain(
+      "github.event_name == 'merge_group' && 'Fork PR Gate'"
+    );
     expect(forkGate).toContain("github.event_name == 'merge_group'");
     expect(forkGate).not.toContain('github.event.pull_request');
 
@@ -162,11 +195,44 @@ describe('merge_group workflow contract', () => {
       /merge_group:\n\s+types: \[checks_requested\]/
     );
     const sizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-size');
-    expect(sizeGuard).toContain('name: PR Size Guard');
+    expect(sizeGuard).toContain(
+      "github.event_name == 'merge_group' && 'PR Size Guard'"
+    );
     expect(sizeGuard).toContain("github.event_name == 'merge_group'");
     expect(sizeGuard).not.toContain('github.event.pull_request');
     expect(getJobBlock(SIZE_GUARD_WORKFLOW, 'size')).toContain(
       "github.event_name == 'pull_request'"
+    );
+  });
+
+  it('reserves each exact required context for its active event producer', () => {
+    const mergeReady = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
+    const sourceReady = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
+    expect(mergeReady).toContain(
+      "name: ${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}"
+    );
+    expect(sourceReady).toContain(
+      "name: ${{ github.event_name == 'pull_request' && 'PR Ready' || 'PR Ready (source inactive)' }}"
+    );
+    expect(CI_WORKFLOW).not.toMatch(/^ {4}name: PR Ready\s*$/m);
+
+    const mergeSize = getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-size');
+    const sourceSize = getJobBlock(SIZE_GUARD_WORKFLOW, 'size');
+    expect(mergeSize).toContain("'PR Size Guard (merge-group inactive)'");
+    expect(sourceSize).toContain("'PR Size Guard (source inactive)'");
+    expect(SIZE_GUARD_WORKFLOW).not.toMatch(/^ {4}name: PR Size Guard\s*$/m);
+
+    const mergeFork = getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate');
+    expect(mergeFork).toContain("'Fork PR Gate (merge-group inactive)'");
+    expect(getJobBlock(FORK_GATE_WORKFLOW, 'dependabot-gate')).toContain(
+      'name: Fork PR Gate Dependabot Controller'
+    );
+    expect(getJobBlock(FORK_GATE_WORKFLOW, 'fork-gate')).toContain(
+      'name: Fork PR Gate Controller'
+    );
+    expect(FORK_GATE_WORKFLOW).not.toMatch(/^ {4}name: Fork PR Gate\s*$/m);
+    expect(FORK_GATE_WORKFLOW.match(/-f context="Fork PR Gate"/g)).toHaveLength(
+      3
     );
   });
 });

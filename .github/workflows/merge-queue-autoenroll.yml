@@ -3,9 +3,9 @@ name: Merge Queue Auto-Enroll
 # Fully event-driven — zero polling crons.
 #
 # Every state change that affects enrollment eligibility fires exactly one
-# workflow run. The drain script adds the `merge-queue` label to clean PRs,
-# which is the enqueue signal for Graphite's merge queue. Graphite handles
-# batch processing, rebasing, and merging — no `gh pr merge --auto` needed.
+# workflow run. The drain script routes through MERGE_QUEUE_BACKEND: Graphite
+# uses the `merge-queue` label, while native uses exact-head GitHub auto-merge.
+# Existing label producers remain intent emitters for both backends.
 #
 # Triggers:
 #   pull_request      — PR label changes, ready, reopen (eligibility change)
@@ -63,7 +63,9 @@ jobs:
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
+          MERGE_QUEUE_BACKEND: ${{ vars.MERGE_QUEUE_BACKEND || 'graphite' }}
           DRAIN_MUTATION_AUTHORIZATION: merge-queue-autoenroll
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll
         run: bash scripts/drain-pr-queue.sh
 
   rebase:

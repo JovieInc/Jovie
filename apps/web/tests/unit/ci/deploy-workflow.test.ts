@@ -106,7 +106,7 @@ describe('CI test-performance path gate', () => {
       pathJob,
       'Detect path changes for all job types'
     );
-    const graphiteSkip = getStepBlock(pathJob, 'Skip CI (Graphite optimizer)');
+    const graphiteSkip = getStepBlock(pathJob, 'Resolve exact-head CI policy');
     const performanceJob = getJobBlock(workflow, 'ci-test-performance');
 
     expect(pathJob).toContain(
@@ -180,7 +180,7 @@ describe('CI Storybook accessibility path gate', () => {
       pathJob,
       'Detect path changes for all job types'
     );
-    const graphiteSkip = getStepBlock(pathJob, 'Skip CI (Graphite optimizer)');
+    const graphiteSkip = getStepBlock(pathJob, 'Resolve exact-head CI policy');
 
     expect(pathJob).toContain(
       "run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || steps.graphite_skip.outputs.run_storybook_a11y || 'false' }}"
@@ -291,6 +291,8 @@ describe('deploy workflow Vercel env resolution', () => {
       'uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e'
     );
     expect(classifierJob).toContain("node-version: '22'");
+    // biome-ignore format: merge-group checkout contract stays compact for the integration-train cap
+    expect([classifierJob.includes('fetch-depth: 2'), classifierJob.includes('git fetch --no-tags --depth=1 origin "$DIFF_BASE"'), classifierJob.includes('git diff --name-only "$DIFF_BASE" "${{ github.event.merge_group.head_sha }}"'), classifierJob.includes('$DIFF_BASE...${{ github.event.merge_group.head_sha }}')]).toEqual([true, true, true, false]);
     expect(classifierJob).toContain(
       'node scripts/ci-harness.mjs classify-risk'
     );
@@ -1142,6 +1144,45 @@ describe('CI mobile overflow workflow', () => {
     expect(mobileOverflowJob).not.toContain(
       '- name: Create ephemeral Neon database branch (with retry)'
     );
+  });
+});
+
+describe('CI required smoke materialization', () => {
+  it('evaluates the smoke condition when the shared Neon prerequisite is path-skipped', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const smokeJob = getJobBlock(workflow, 'ci-e2e-smoke');
+
+    expect(smokeJob).toContain('if: ${{ always() &&');
+    expect(smokeJob).toContain(
+      "needs.ci-risk-classifier.outputs.requires_smoke == 'true'"
+    );
+    expect(smokeJob).toContain(
+      "needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'"
+    );
+    expect(smokeJob).toContain(
+      "if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'"
+    );
+    expect(smokeJob).toContain(
+      "if: always() && steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'"
+    );
+  });
+});
+
+describe('CI bounded evidence parallelism', () => {
+  it('uses both Lighthouse shards without unbounded future fan-out', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const lighthouse = getJobBlock(workflow, 'ci-lighthouse-pr');
+
+    expect(lighthouse).toContain('max-parallel: 2');
+    expect(lighthouse).toContain('shard: [0, 1]');
+  });
+
+  it('runs two mobile widths while retaining the three-width evidence set', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const mobile = getJobBlock(workflow, 'ci-mobile-overflow');
+
+    expect(mobile).toContain('max-parallel: 2');
+    expect(mobile).toContain('width: [320, 390, 430]');
   });
 });
 

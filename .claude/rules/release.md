@@ -145,7 +145,9 @@ When in doubt, skip auto-merge and request review.
 3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually).
 4. `/ship` handles: tests, review, CHANGELOG `[Unreleased]` notes, commit, push, PR creation/update. It must **not** bump the version fan-out (`VERSION`, `version.json`, `package.json` versions, dated CHANGELOG headings) — see "Version Stamping (main-only)" below.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
-6. **Add to the Graphite merge queue** after the PR is marked ready. Apply the `merge-queue` label and Graphite enqueues and merges the PR when CI is green:
+6. Apply `merge-queue` after the PR is ready. While
+   `MERGE_QUEUE_BACKEND=graphite`, Graphite remains the live transport; native
+   enrollment stays dormant until the guarded cutover:
    ```bash
    gh pr edit --add-label merge-queue
    ```
@@ -310,7 +312,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | --- | --- | --- |
 | Fast Gate | Cheap deterministic checks required for every merge candidate. | `ci-fast`, `Unit Tests` |
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `Structural Contract`, `CI Risk Classifier` |
-| Risk-Triggered Smoke | Focused smoke validation for sensitive auth, billing, DB, config, and agent-control-plane changes. | `E2E Smoke (PR Fast Feedback)`, `Golden Path (PR)` |
+| Risk-Triggered Smoke | Focused smoke validation for sensitive auth, billing, DB, config, and agent-control-plane changes. | `E2E Smoke (PR Fast Feedback)`, `Golden Path (PR)`, `Extended Smoke (Preview)` |
 | Preview Evidence | Preview deploys and visual/a11y/performance evidence for review. | `Build (public routes)`, `Lighthouse (public routes PR)`, `Lighthouse (dashboard PR)`, `Lighthouse (onboarding PR)`, `Lighthouse (admin PR)`, `Preview Deploy (PR)` |
 | Main Deploy | Post-merge staging, canary, production promotion, and deploy-health gates. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
@@ -332,6 +334,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | `Lighthouse (admin PR)` | preview-evidence | `pnpm --filter=@jovie/web run test:lighthouse:admin:pr` |
 | `E2E Smoke (PR Fast Feedback)` | risk-triggered-smoke | `pnpm run test:web:smoke` |
 | `Golden Path (PR)` | risk-triggered-smoke | `doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e:golden-path:ci` |
+| `Extended Smoke (Preview)` | risk-triggered-smoke | `pnpm --filter @jovie/web exec playwright test --config=playwright.config.smoke.ts` |
 | `Preview Deploy (PR)` | preview-evidence | `pnpm run build:web` |
 
 ### Risk-Triggered Evidence
@@ -340,7 +343,7 @@ Sensitive changes are classified deterministically before auto-merge. High-risk 
 
 | Surface | Level | Smoke | Preview | Blocks unattended auto-merge |
 | --- | --- | --- | --- | --- |
-| CI and workflow control plane | high | yes | no | no |
+| CI and workflow control plane | high | yes | yes | no |
 | Agent control plane | high | yes | no | no |
 | Auth and identity | high | yes | yes | no |
 | Activation, AI, and background data flows | high | yes | yes | no |
