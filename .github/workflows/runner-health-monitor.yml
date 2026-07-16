@@ -7,143 +7,73 @@ name: Runner Health Monitor
 # Detects 2+ consecutive lost heartbeats before flipping to avoid flapping
 # on brief network blips.
 #
-# Also guards against runner label drift: self-hosted runners must never carry
-# GitHub-hosted labels (`ubuntu-latest`, `macos-latest`, `windows-latest`). A
-# self-hosted runner labeled `ubuntu-latest` hijacks workflows intended for
-# GitHub-hosted runners onto an incomplete toolchain.
+# Health comes from the dedicated self-hosted heartbeat workflow. The monitor
+# itself always runs on GitHub-hosted capacity so an offline pool cannot prevent
+# its own fallback repair.
 
 on:
   workflow_dispatch:         # manual trigger (cron moved to agent-tick.yml)
 
 permissions:
   contents: read
-  actions: write             # needed to read runners + update repo variables
+  actions: write             # needed to read heartbeat runs + update repo variables
 
 jobs:
   monitor:
     name: Check runner health
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 2
+    concurrency:
+      group: runner-health-routing
+      cancel-in-progress: false
     env:
       GH_TOKEN: ${{ github.token }}
       TARGET_VARIABLE: CI_FAST_RUNNER
       OFFLINE_TARGET: ubuntu-latest
       ONLINE_TARGET: jovie-runner
+      # Two missed 10-minute heartbeats indicate either outage or saturation.
+      # The routing debounce requires that signal on two observer ticks.
+      HEARTBEAT_MAX_AGE_SECONDS: '1500'
     steps:
+      - name: Checkout main policy code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Mint Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Query runner status
         id: runners
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          set -euo pipefail
-
-          STATE_FILE="${{ runner.temp }}/runner-health-state"
-          PREV="${{ runner.temp }}/runner-health-prev"
-
-          # Fetch runners (online, offline — just not removed)
-          RUNNERS=$(gh api repos/JovieInc/Jovie/actions/runners --jq \
-            '[.runners[] | select(.labels[].name == "jovie-runner") | {name: .name, status: .status, busy: .busy}]')
-
-          TOTAL=$(echo "$RUNNERS" | jq length)
-          ONLINE=$(echo "$RUNNERS" | jq '[.[] | select(.status == "online")] | length')
-          OFFLINE=$(echo "$RUNNERS" | jq '[.[] | select(.status == "offline")] | length')
-
-          echo "total=$TOTAL"
-          echo "online=$ONLINE"
-          echo "offline=$OFFLINE"
-          echo "runner_list=$RUNNERS"
-
-          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
-          echo "online=$ONLINE" >> "$GITHUB_OUTPUT"
-
-          # Determine current health state
-          if [ "$ONLINE" -eq 0 ]; then
-            echo "health=down" >> "$GITHUB_OUTPUT"
-          elif [ "$ONLINE" -ge 1 ]; then
-            echo "health=up" >> "$GITHUB_OUTPUT"
-          fi
+          .github/scripts/query-runner-heartbeat.sh
 
       - name: Flip to GitHub-hosted fallback if runners are down
         if: steps.runners.outputs.health == 'down'
         env:
-          PREV_FLIP_FILE: ${{ runner.temp }}/last-flipped
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          RUNNER_HEALTH: down
         run: |
-          set -euo pipefail
-
-          CURRENT=$(gh api repos/JovieInc/Jovie/actions/variables/CI_FAST_RUNNER --jq '.value' 2>/dev/null || echo "")
-
-          if [ "$CURRENT" = "ubuntu-latest" ]; then
-            echo "Already on fallback (ubuntu-latest). No action needed."
-            exit 0
-          fi
-
-          # Require 2+ consecutive detections before flipping (anti-flap)
-          CONSECUTIVE_FILE="${{ runner.temp }}/runner-down-count"
-          COUNT=0
-          if [ -f "$CONSECUTIVE_FILE" ]; then
-            COUNT=$(cat "$CONSECUTIVE_FILE")
-          fi
-          COUNT=$((COUNT + 1))
-          echo "$COUNT" > "$CONSECUTIVE_FILE"
-
-          FLAP_THRESHOLD=2  # require 2+ consecutive checks (~10 min) before flipping
-          if [ "$COUNT" -lt "$FLAP_THRESHOLD" ]; then
-            echo "First detection of runner outage. Need $((FLAP_THRESHOLD - COUNT)) more. (count=$COUNT)"
-            exit 0
-          fi
-
-          echo "Runners offline for $COUNT consecutive checks. Flipping CI_FAST_RUNNER → ubuntu-latest..."
-          gh api -X PATCH repos/JovieInc/Jovie/actions/variables/CI_FAST_RUNNER \
-            -f name=CI_FAST_RUNNER -f value=ubuntu-latest 2>&1
-
-          echo "last_flip=down" > "$PREV_FLIP_FILE"
+          .github/scripts/update-runner-routing.sh
 
       - name: Restore self-hosted runners when they come back
         if: steps.runners.outputs.health == 'up'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          RUNNER_HEALTH: up
         run: |
-          set -euo pipefail
-
-          CURRENT=$(gh api repos/JovieInc/Jovie/actions/variables/CI_FAST_RUNNER --jq '.value' 2>/dev/null || echo "")
-
-          if [ "$CURRENT" = "jovie-runner" ]; then
-            echo "Already on self-hosted (jovie-runner). No action needed."
-            exit 0
-          fi
-
-          # Only restore if we were previously on fallback (debounce: 2 checks)
-          CONSECUTIVE_FILE="${{ runner.temp }}/runner-up-count"
-          COUNT=0
-          if [ -f "$CONSECUTIVE_FILE" ]; then
-            COUNT=$(cat "$CONSECUTIVE_FILE")
-          fi
-          COUNT=$((COUNT + 1))
-          echo "$COUNT" > "$CONSECUTIVE_FILE"
-
-          FLAP_THRESHOLD=2
-          if [ "$COUNT" -lt "$FLAP_THRESHOLD" ]; then
-            echo "First detection of runner recovery. Need $((FLAP_THRESHOLD - COUNT)) more. (count=$COUNT)"
-            exit 0
-          fi
-
-          echo "Runners back for $COUNT consecutive checks. Restoring CI_FAST_RUNNER → jovie-runner..."
-          gh api -X PATCH repos/JovieInc/Jovie/actions/variables/CI_FAST_RUNNER \
-            -f name=CI_FAST_RUNNER -f value=jovie-runner 2>&1
+          .github/scripts/update-runner-routing.sh
 
       - name: Log health state
         run: |
-          echo "::notice::Runner health: online=${{ steps.runners.outputs.online }}/${{ steps.runners.outputs.total }}"
-
-      - name: Detect self-hosted runner label drift
-        run: |
-          set -euo pipefail
-
-          OFFENDERS=$(gh api repos/JovieInc/Jovie/actions/runners --jq \
-            '[.runners[] | select([.labels[].name] | any(. == "ubuntu-latest" or . == "macos-latest" or . == "windows-latest")) | {name: .name, labels: [.labels[].name]}]')
-          COUNT=$(echo "$OFFENDERS" | jq length)
-
-          if [ "$COUNT" -gt 0 ]; then
-            DETAIL=$(echo "$OFFENDERS" | jq -r '[.[] | "\(.name) [\(.labels | join(","))]"] | join("; ")')
-            echo "::warning::Self-hosted runner label drift: $COUNT runner(s) carry forbidden GitHub-hosted labels (ubuntu-latest/macos-latest/windows-latest): $DETAIL. Remove those labels; self-hosted runners must use explicit labels such as jovie-runner."
-            echo "::notice::Drift detected; the auto-flip safety net still works independently."
-            echo "Drift found — $COUNT runner(s) with forbidden labels. No action taken; auto-flip remains intact."
-          else
-            echo "OK: no self-hosted runners carry GitHub-hosted labels."
-          fi
+          echo "::notice::${{ steps.runners.outputs.evidence }}"

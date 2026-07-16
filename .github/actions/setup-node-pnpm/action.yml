@@ -21,6 +21,14 @@ runs:
             || git config --global --add safe.directory "$GITHUB_WORKSPACE"
         fi
 
+    # Decide whether this image is exact before running either setup action.
+    # The missing-marker path does not inspect Node or pnpm, so old images and
+    # GitHub-hosted runners fall back without needing baked prerequisites.
+    - name: Verify baked runner prerequisites
+      id: runner-prereqs
+      shell: bash
+      run: node .github/runner-image/verify-prerequisites.mjs --component dependencies
+
     # Per-job pnpm install dir (JOV-4175). Two prior failure modes on the
     # self-hosted pool, both from a shared persistent dest:
     #   1. default ~/setup-pnpm carried a pnpm v11 layout that crashed pinned
@@ -31,41 +39,41 @@ runs:
     # runner.temp is per-job, so no sharing is possible; the pnpm tarball
     # re-download costs seconds. The package store stays shared and safe.
     - name: Setup pnpm
+      if: steps.runner-prereqs.outputs.dependencies_warm != 'true'
       uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       with:
         dest: ${{ runner.temp }}/setup-pnpm
 
-    # Actions-cache-backed pnpm caching is GitHub-hosted only. Self-hosted
-    # runners (jovie-runner) keep a persistent pnpm store on disk, so the
-    # restore is pointless and the post-run save uploads ~1.2 GB — observed
-    # stalling at 0 B/s and eating the whole job timeout (Typecheck cancelled
-    # at 10m during the "Post Run" cache save, 2026-07-06).
+    # setup-node's pnpm cache is GitHub-hosted only. Every self-hosted runner,
+    # fixed or ephemeral, skips Actions cache restore/save. Fixed runners reuse
+    # their persistent local pnpm store; ephemeral runners warm a fresh store
+    # below. Do not add a separate actions/cache step here: run 29220980115
+    # uploaded a 1.335 GB store at 1-1.5 MB/s until the 20-minute canary timed
+    # out after all tests had passed.
     - name: Setup Node.js with pnpm cache
+      if: steps.runner-prereqs.outputs.dependencies_warm != 'true'
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
       with:
-        node-version: '22'
+        node-version-file: '.nvmrc'
         cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
         cache-dependency-path: '**/pnpm-lock.yaml'
 
-    - name: Get pnpm store directory
-      id: pnpm-cache
-      shell: bash
-      run: |
-        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-
-    - name: Setup pnpm cache
-      if: runner.environment != 'github-hosted'
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-        key: ${{ runner.os }}-pnpm-store-${{ runner.name }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-pnpm-store-${{ runner.name }}-
-
     - name: Warm pnpm store
+      if: steps.runner-prereqs.outputs.dependencies_warm != 'true'
       shell: bash
+      env:
+        ONNXRUNTIME_NODE_INSTALL: skip
       run: pnpm fetch --frozen-lockfile
 
     - name: Install dependencies
       shell: bash
-      run: pnpm install --frozen-lockfile
+      env:
+        ONNXRUNTIME_NODE_INSTALL: skip
+      run: |
+        if [[ "${{ steps.runner-prereqs.outputs.dependencies_warm }}" == "true" ]]; then
+          .github/runner-image/restore-installed-tree.sh \
+            "${{ steps.runner-prereqs.outputs.installed_tree_archive_path }}" \
+            "${{ steps.runner-prereqs.outputs.installed_tree_archive_sha256 }}"
+        else
+          pnpm install --frozen-lockfile
+        fi

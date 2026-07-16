@@ -47,7 +47,7 @@ on:
 jobs:
   canary-health-gate:
     name: Canary health gate
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
       canary_status: ${{ steps.canary-status.outputs.canary_status || steps.canary-check.outputs.canary_status }}
@@ -415,51 +415,46 @@ jobs:
 
           echo "✅ Homepage renders correctly"
 
-          echo "Checking production-shaped robots.txt and sitemap.xml..."
+          # This gate verifies the raw Vercel preview deployment. Preview/staging
+          # must stay out of search indexes; production SEO is checked separately
+          # against jov.ie after promotion.
+          echo "Checking preview-safe robots.txt..."
           robots_url="${deployment_url%/}/robots.txt"
-          sitemap_url="${deployment_url%/}/sitemap.xml"
           robots_body=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${robots_url}$( [[ "$robots_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
-          sitemap_body=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${sitemap_url}$( [[ "$sitemap_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
 
-          if echo "$robots_body" | grep -Eiq '^[[:space:]]*user-agent:[[:space:]]*\*[[:space:]]*$' && echo "$robots_body" | grep -Eiq '^[[:space:]]*disallow:[[:space:]]*/[[:space:]]*$' && ! echo "$robots_body" | grep -Eiq '^[[:space:]]*allow:[[:space:]]*/[[:space:]]*$'; then
-            echo "❌ Canary failed: robots.txt globally blocks all crawlers with Disallow: /"
+          preview_robots_policy_valid() {
+            awk '
+              function trim(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+              BEGIN { wildcard_group = 0; group_has_rules = 0; wildcard_disallow = 0; root_allow = 0; sitemap_advertised = 0 }
+              {
+                line = $0; sub(/\r$/, "", line); sub(/[[:space:]]*#.*/, "", line); line = trim(line)
+                if (line == "") next
+                separator = index(line, ":"); if (separator == 0) next
+                directive = tolower(trim(substr(line, 1, separator - 1)))
+                value = trim(substr(line, separator + 1))
+                if (directive == "sitemap") { sitemap_advertised = 1; next }
+                if (directive == "user-agent") {
+                  if (group_has_rules) { wildcard_group = 0; group_has_rules = 0 }
+                  if (value == "*") wildcard_group = 1
+                  next
+                }
+                if (directive == "allow" || directive == "disallow") {
+                  group_has_rules = 1
+                  if (wildcard_group && directive == "allow" && value == "/") root_allow = 1
+                  if (wildcard_group && directive == "disallow" && value == "/") wildcard_disallow = 1
+                }
+              }
+              END { exit(wildcard_disallow && !root_allow && !sitemap_advertised ? 0 : 1) }
+            '
+          }
+
+          if ! printf '%s\n' "$robots_body" | preview_robots_policy_valid; then
+            echo "❌ Canary failed: preview robots.txt must globally block crawlers with Disallow: /, without Allow: / or Sitemap:"
             echo "canary_status=failed_seo_robots" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
-          if ! echo "$robots_body" | grep -Eiq '^[[:space:]]*sitemap:.*sitemap\.xml[[:space:]]*$'; then
-            echo "❌ Canary failed: robots.txt is missing a Sitemap: .../sitemap.xml reference"
-            echo "canary_status=failed_seo_robots" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          for crawler in GPTBot ChatGPT-User Claude-Web PerplexityBot Google-Extended; do
-            if ! echo "$robots_body" | grep -Eiq "^[[:space:]]*user-agent:[[:space:]]*${crawler}[[:space:]]*$"; then
-              echo "❌ Canary failed: robots.txt is missing User-agent: ${crawler}"
-              echo "canary_status=failed_seo_robots" >> "$GITHUB_OUTPUT"
-              exit 1
-            fi
-          done
-
-          if [ -z "$sitemap_body" ] || ! echo "$sitemap_body" | grep -Eiq '<urlset'; then
-            echo "❌ Canary failed: sitemap.xml is empty or missing <urlset>"
-            echo "canary_status=failed_seo_sitemap" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          if ! echo "$sitemap_body" | grep -Eiq '<url\b'; then
-            echo "❌ Canary failed: sitemap.xml contains zero <url> entries"
-            echo "canary_status=failed_seo_sitemap" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          if echo "$sitemap_body" | grep -Eiq '<url\b' && ! echo "$sitemap_body" | grep -Eiq '<lastmod>'; then
-            echo "❌ Canary failed: sitemap.xml is missing <lastmod> entries"
-            echo "canary_status=failed_seo_sitemap" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          echo "✅ robots.txt and sitemap.xml passed SEO guardrails"
+          echo "✅ preview robots.txt blocks indexing"
 
           check_route_renders() {
             local route_label="$1"

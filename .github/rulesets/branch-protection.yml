@@ -51,10 +51,10 @@
 #    would be stuck forever. Instead, auto-approve checks for
 #    scope-judge status internally before enabling auto-merge.
 #
-# 6. Graphite merge queue (not GitHub native merge_queue)
-#    PRs enter Graphite's queue via the merge-queue label. Graphite rebases on
-#    main and reruns the same aggregate PR lane (CI / PR Ready) — no merge_group
-#    trigger and no pinned leaf jobs. Batch failures bisect to the culprit PR.
+# 6. GitHub native merge queue
+#    Existing producers keep applying merge-queue as an intent label; the
+#    central controller converts that intent into exact-head native enrollment.
+#    GitHub validates the synthetic merge_group head before squash-merging.
 #
 # 7. Fork PR Gate (required status check)
 #    Since required_approving_review_count is 0, fork PRs from external
@@ -95,9 +95,9 @@ rules:
   # ── Required Status Checks ────────────────────────────────────────────
   - type: 'required_status_checks'
     parameters:
-      # Require branch to be up-to-date with main before merging.
-      # Graphite rebases each PR on latest main before merging, satisfying this.
-      strict_required_status_checks_policy: true
+      # Source branches need not rebase and rerun after every main merge;
+      # the native queue validates each combined head against latest main.
+      strict_required_status_checks_policy: false
       required_status_checks:
         # PR Ready: The single aggregate gate for the fast PR lane.
         # Internally aggregates:
@@ -121,22 +121,27 @@ rules:
         # mechanical codemods opt out with the `big-pr` label.
         - context: 'PR Size Guard'
 
-  # ── Merge Queue: Graphite (not GitHub-native) ──────────────────────────
-  # The native `merge_queue` rule was retired 2026-06-18 — Graphite owns the
-  # queue now (the two are mutually exclusive). Graphite enqueues PRs labeled
-  # `merge-queue`, rebases on main, runs the required checks above, and
-  # squash-merges. Queue settings (strategy, timeout, CI optimization,
-  # fast-track) live in app.graphite.com/settings/merge-queue — there is no
-  # CLI/API for them. See .github/MERGE_QUEUE.md.
+  # ── Merge Queue: GitHub native ─────────────────────────────────────────
+  - type: 'merge_queue'
+    parameters:
+      merge_method: 'SQUASH'
+      grouping_strategy: 'ALLGREEN'
+      min_entries_to_merge: 1
+      max_entries_to_merge: 10
+      # At most two queued PRs may request checks concurrently, using expanded
+      # runner capacity without an unbounded merge-group fan-out.
+      max_entries_to_build: 2
+      min_entries_to_merge_wait_minutes: 0
+      check_response_timeout_minutes: 60
 
   # ── Linear History ─────────────────────────────────────────────────────
   - type: 'required_linear_history'
-    # Squash-only history. Graphite squash-merges, so this always holds.
+    # Squash-only history. Native queue configuration above matches this.
 
   # ── Signed Commits ─────────────────────────────────────────────────────
   - type: 'required_signatures'
     # Every commit on main must be cryptographically signed (GPG or SSH/Sigstore).
-    # Graphite squash-merges and agent-authored commits must sign before merge.
+    # GitHub squash-merges and agent-authored commits must sign before merge.
     # security.yml commit-signature-check surfaces unsigned merges post-hoc.
     # Human/admin: apply this ruleset via gh api after agent signing is configured.
 
@@ -145,11 +150,5 @@ rules:
     # Block force pushes to main. Always.
 
 # ── Bypass Actors ──────────────────────────────────────────────────────
-# Graphite App (graphite-app, App ID 158384) must bypass so it can merge
-# through this protected branch from its queue. Required by Graphite's
-# merge-queue setup — without it Graphite cannot push the merged commit.
-# No human/agent bypass: every PR still passes CI + Graphite's queue.
-bypass_actors:
-  - actor_id: 158384
-    actor_type: 'Integration'
-    bypass_mode: 'always'
+# Native merge-queue cutover requires no Graphite or human bypass actor.
+bypass_actors: []

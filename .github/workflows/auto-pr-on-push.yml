@@ -233,6 +233,7 @@ jobs:
           name: agent-run-artifact-auto-pr-capacity-blocked
           path: ${{ runner.temp }}/agent-run-artifacts/auto-pr-capacity-blocked.json
           if-no-files-found: error
+          retention-days: 10
 
       - name: Parse branch name
         id: parse

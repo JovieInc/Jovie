@@ -24,6 +24,12 @@ interface UseTextareaAutosizeReturn {
   hiddenDivRef: React.RefObject<HTMLDivElement | null>;
 }
 
+export function getTextareaMeasurementText(value: string): string {
+  // A zero-width final glyph preserves an intentional trailing newline without
+  // turning every non-empty single-line draft into two measured rows.
+  return `${value}\u200b`;
+}
+
 /**
  * Measures textarea content height using a hidden div mirror.
  * Avoids the `height: 'auto'` trick that causes 1-frame layout collapse.
@@ -62,7 +68,7 @@ export function useTextareaAutosize({
     const hiddenDiv = hiddenDivRef.current;
     if (!hiddenDiv) return;
 
-    hiddenDiv.textContent = valueRef.current + '\n';
+    hiddenDiv.textContent = getTextareaMeasurementText(valueRef.current);
     const scrollHeight = hiddenDiv.scrollHeight;
     const clamped = Math.max(
       minHeightRef.current,

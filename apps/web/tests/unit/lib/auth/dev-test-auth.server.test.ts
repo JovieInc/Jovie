@@ -8,6 +8,8 @@ const {
   mockEnsureUserProfileClaim,
   mockEnsureUserRecord,
   mockInvalidateTestUserCaches,
+  mockDbLimit,
+  mockCreateSession,
   mockLoggerWarn,
   mockSetActiveProfileForUser,
 } = vi.hoisted(() => ({
@@ -18,19 +20,22 @@ const {
   mockEnsureUserProfileClaim: vi.fn(),
   mockEnsureUserRecord: vi.fn(),
   mockInvalidateTestUserCaches: vi.fn(),
+  mockDbLimit: vi.fn(),
+  mockCreateSession: vi.fn().mockResolvedValue({ id: 'sess_test' }),
   mockLoggerWarn: vi.fn(),
   mockSetActiveProfileForUser: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => {
-  const limit = vi
-    .fn()
-    .mockResolvedValue([{ id: 'db_user', betterAuthUserId: 'ba_user_clerk' }]);
+  const limit = mockDbLimit;
   const where = vi.fn(() => ({
     limit,
     where: vi.fn().mockResolvedValue(undefined),
   }));
-  const from = vi.fn(() => ({ where }));
+  const from = vi.fn(() => ({
+    where,
+    leftJoin: vi.fn(() => ({ where })),
+  }));
   const select = vi.fn(() => ({ from }));
   const set = vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) }));
   const update = vi.fn(() => ({ set }));
@@ -46,7 +51,7 @@ vi.mock('@/lib/auth/better-auth', () => ({
   auth: {
     $context: Promise.resolve({
       internalAdapter: {
-        createSession: vi.fn().mockResolvedValue({ id: 'sess_test' }),
+        createSession: mockCreateSession,
       },
     }),
   },
@@ -54,10 +59,15 @@ vi.mock('@/lib/auth/better-auth', () => ({
 
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn((...args: unknown[]) => args),
+  or: vi.fn((...args: unknown[]) => args),
 }));
 
 vi.mock('@/lib/db/schema/auth', () => ({
-  users: { id: 'id', betterAuthUserId: 'betterAuthUserId' },
+  users: {
+    id: 'id',
+    betterAuthUserId: 'betterAuthUserId',
+    clerkId: 'clerkId',
+  },
 }));
 
 vi.mock('@/lib/db/schema/better-auth', () => ({
@@ -100,6 +110,79 @@ describe('dev-test-auth.server', () => {
     mockEnsureUserProfileClaim.mockResolvedValue(undefined);
     mockSetActiveProfileForUser.mockResolvedValue(undefined);
     mockEnsureSocialLinkRecord.mockResolvedValue(undefined);
+    mockDbLimit.mockResolvedValue([
+      {
+        dbUserId: 'db_user',
+        clerkUserId: 'user_dev_existing',
+        betterAuthUserId: 'ba_user_clerk',
+        email: 'existing@test.jovie.com',
+        fullName: 'Existing User',
+        isAdmin: false,
+        username: 'existing-user',
+        displayName: 'Existing User',
+      },
+    ]);
+  });
+
+  it('mints a session for a direct persisted Better Auth actor id', async () => {
+    const { ensureExistingDevTestAuthActor } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    await expect(
+      ensureExistingDevTestAuthActor('ba_user_clerk', null)
+    ).resolves.toMatchObject({
+      dbUserId: 'db_user',
+      clerkUserId: 'ba_user_clerk',
+    });
+  });
+
+  it('resolves a legacy Clerk actor id to its linked persisted Better Auth actor', async () => {
+    const { ensureExistingDevTestAuthActor } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    await expect(
+      ensureExistingDevTestAuthActor('user_dev_existing', null)
+    ).resolves.toMatchObject({
+      dbUserId: 'db_user',
+      clerkUserId: 'ba_user_clerk',
+    });
+    expect(mockCreateSession).toHaveBeenCalledWith('ba_user_clerk', false);
+  });
+
+  it('fails closed when a Clerk actor has no linked Better Auth identity', async () => {
+    mockDbLimit.mockResolvedValueOnce([
+      {
+        dbUserId: 'db_user',
+        clerkUserId: 'user_dev_unlinked',
+        betterAuthUserId: null,
+        email: 'unlinked@test.jovie.com',
+        fullName: 'Unlinked User',
+        isAdmin: false,
+        username: 'unlinked-user',
+        displayName: 'Unlinked User',
+      },
+    ]);
+    const { ensureExistingDevTestAuthActor } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    await expect(
+      ensureExistingDevTestAuthActor('user_dev_unlinked', null)
+    ).resolves.toBeNull();
+    expect(mockCreateSession).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when no persisted actor matches either identity id', async () => {
+    const { ensureExistingDevTestAuthActor } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    mockDbLimit.mockResolvedValueOnce([]);
+    await expect(
+      ensureExistingDevTestAuthActor('unknown-user', null)
+    ).resolves.toBeNull();
   });
 
   it('enables local browse auth on trusted hosts when bypass mode is enabled', async () => {

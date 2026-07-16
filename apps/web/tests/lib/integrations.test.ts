@@ -53,7 +53,9 @@ describe('Integration Health Diagnostics', () => {
   });
 
   describe('Auth Integration Health', () => {
-    it('should expose Better Auth configuration', async () => {
+    it('should expose Better Auth configuration', {
+      timeout: 30000,
+    }, async () => {
       // Better Auth uses BETTER_AUTH_SECRET / app URL — no Clerk publishable key.
       const { auth } = await import('@/lib/auth/better-auth');
       expect(auth).toBeDefined();

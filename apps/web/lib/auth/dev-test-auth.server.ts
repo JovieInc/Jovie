@@ -1,9 +1,10 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
 import { auth } from '@/lib/auth/better-auth';
+import { DEFAULT_DEV_TEST_AUTH_EMAILS } from '@/lib/auth/dev-test-auth-identity';
 import type {
   ClientAuthBootstrap,
   DevTestAuthActor,
@@ -42,13 +43,14 @@ import { logger } from '@/lib/utils/logger';
 
 const DEV_TEST_AUTH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 12;
 
-const DEFAULT_CREATOR_EMAIL = 'browse+clerk_test@jov.ie';
+const DEFAULT_CREATOR_EMAIL = DEFAULT_DEV_TEST_AUTH_EMAILS.creator;
 const DEFAULT_CREATOR_USERNAME = 'browse-test-user';
 const DEFAULT_CREATOR_FULL_NAME = 'Browse Test User';
 const DEFAULT_CREATOR_BIO =
   'Stable creator profile for local browse QA and dashboard verification.';
 const DEFAULT_CREATOR_VENMO = 'browse-test-user';
-const DEFAULT_READY_CREATOR_EMAIL = 'browse-ready+clerk_test@jov.ie';
+const DEFAULT_READY_CREATOR_EMAIL =
+  DEFAULT_DEV_TEST_AUTH_EMAILS['creator-ready'];
 const DEFAULT_READY_CREATOR_USERNAME = 'browse-ready-user';
 const DEFAULT_READY_CREATOR_FULL_NAME = 'Browse Ready User';
 const DEFAULT_READY_CREATOR_BIO =
@@ -57,7 +59,7 @@ const DEFAULT_READY_CREATOR_VENMO = 'browse-ready-user';
 const DEFAULT_READY_CREATOR_SPOTIFY_URL =
   'https://open.spotify.com/artist/4NHQUkpP4uKj7LKEMstSxN';
 
-const DEFAULT_ADMIN_EMAIL = 'browse-admin+clerk_test@jov.ie';
+const DEFAULT_ADMIN_EMAIL = DEFAULT_DEV_TEST_AUTH_EMAILS.admin;
 const DEFAULT_ADMIN_USERNAME = 'browse-admin-user';
 const DEFAULT_ADMIN_FULL_NAME = 'Browse Admin';
 const DEFAULT_ADMIN_BIO =
@@ -226,9 +228,10 @@ function getFallbackActorFromPersona(
 }
 
 async function findDevTestAuthSession(
-  betterAuthUserId: string,
-  requestedPersona: DevTestAuthPersona | null
-): Promise<DevTestAuthSession> {
+  authUserId: string,
+  requestedPersona: DevTestAuthPersona | null,
+  allowSyntheticFallback = true
+): Promise<DevTestAuthSession | null> {
   let matchedUser:
     | {
         dbUserId: string;
@@ -256,24 +259,41 @@ async function findDevTestAuthSession(
       })
       .from(users)
       .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
-      .where(eq(users.betterAuthUserId, betterAuthUserId))
+      .where(
+        or(
+          eq(users.betterAuthUserId, authUserId),
+          eq(users.clerkId, authUserId)
+        )
+      )
       .limit(1);
   } catch (error) {
+    if (!allowSyntheticFallback) {
+      logger.warn('Failed to validate persisted dev test auth actor', {
+        authUserId,
+        error,
+      });
+      return null;
+    }
     logger.warn('Falling back to synthetic dev test auth actor', {
-      betterAuthUserId,
+      authUserId,
       error,
     });
     return getFallbackActorFromPersona(
-      betterAuthUserId,
+      authUserId,
       requestedPersona ?? 'creator'
     );
   }
 
   if (!matchedUser) {
+    if (!allowSyntheticFallback) return null;
     return getFallbackActorFromPersona(
-      betterAuthUserId,
+      authUserId,
       requestedPersona ?? 'creator'
     );
+  }
+
+  if (!matchedUser.betterAuthUserId) {
+    return null;
   }
 
   const persona =
@@ -286,13 +306,33 @@ async function findDevTestAuthSession(
   return {
     dbUserId: matchedUser.dbUserId,
     persona,
-    clerkUserId: matchedUser.betterAuthUserId ?? betterAuthUserId,
+    clerkUserId: matchedUser.betterAuthUserId,
     email: matchedUser.email ?? config.email,
     username,
     fullName,
     isAdmin: matchedUser.isAdmin,
     profilePath: username ? `/${username}` : null,
   };
+}
+
+export async function ensureExistingDevTestAuthActor(
+  betterAuthUserId: string,
+  requestedPersona: DevTestAuthPersona | null
+): Promise<DevTestAuthActor | null> {
+  const actor = await findDevTestAuthSession(
+    betterAuthUserId,
+    requestedPersona,
+    false
+  );
+  if (!actor) return null;
+
+  await mintBetterAuthSessionForDevTestActor({
+    dbUserId: actor.dbUserId,
+    betterAuthUserId: actor.clerkUserId,
+    email: actor.email,
+    fullName: actor.fullName,
+  });
+  return actor;
 }
 
 async function ensurePersonaProfile(

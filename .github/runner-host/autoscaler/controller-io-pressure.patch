@@ -1,0 +1,97 @@
+--- a/controller.ts
++++ b/controller.ts
+@@ -18 +18 @@
+-import { appendFileSync } from "node:fs";
++import { appendFileSync, readFileSync } from "node:fs";
+@@ -28,0 +29,8 @@
++import {
++  classifyIoPressureFailure,
++  evaluateIoPressureAdmission,
++  INITIAL_IO_PRESSURE_STATE,
++  type IoPressureAdmissionConfig,
++  type IoPressureAdmissionState,
++  ioPressureConfigFromEnv,
++} from "./io-pressure";
+@@ -63,0 +72 @@
++  readonly readIoPressure: () => string;
+@@ -87,0 +97 @@
++  private readonly readIoPressure: AutoscalerDependencies["readIoPressure"];
+@@ -88,0 +99 @@
++  private readonly ioPressureConfig: IoPressureAdmissionConfig;
+@@ -90,0 +102,2 @@
++  private ioPressureState: IoPressureAdmissionState = INITIAL_IO_PRESSURE_STATE;
++  private lastSuccessfulSpawnTick: number | null = null;
+@@ -96,0 +110 @@
++    this.ioPressureConfig = ioPressureConfigFromEnv(process.env);
+@@ -108,0 +123,3 @@
++    this.readIoPressure =
++      dependencies.readIoPressure ??
++      (() => readFileSync("/proc/pressure/io", "utf8"));
+@@ -170,0 +188,56 @@
++
++      let admittedDeficit = deficit;
++      if (deficit > 0) {
++        let pressure: string | null = null;
++        try {
++          pressure = this.readIoPressure();
++        } catch {
++          // Admission fails closed below; current runners remain untouched.
++        }
++        const admission = evaluateIoPressureAdmission(
++          pressure,
++          this.ioPressureState,
++          this.ioPressureConfig,
++        );
++        this.ioPressureState = admission.state;
++        if (!admission.admitScaleUp) {
++          admittedDeficit = 0;
++          const avg10 = admission.fullAvg10Pct?.toFixed(2) ?? "unavailable";
++          const failureClass = classifyIoPressureFailure(
++            admission,
++            tickNum,
++            this.lastSuccessfulSpawnTick,
++          );
++          const spawnedRecently =
++            failureClass === "runner-io-pressure-post-admission";
++          this.log(
++            `runner_spawn_admission=blocked runner_failure_class=${failureClass} io_full_avg10_pct=${avg10} spawned_recently=${spawnedRecently} remaining_deficit=${deficit} distinct_from=cpu,memory,eagain,github-scheduler-starvation reason=${admission.reason}`,
++          );
++          try {
++            this.gbrain.recordScalingDecision(
++              activeContainers,
++              admission.reason,
++              "high",
++              {
++                tick: tickNum,
++                queuedJobs,
++                activeContainers,
++                requestedDeficit: deficit,
++                ioFullAvg10Pct: admission.fullAvg10Pct,
++                failureClass,
++                spawnedRecently,
++              },
++            );
++          } catch {
++            // Admission safety never depends on telemetry availability.
++          }
++        } else if (
++          admission.classification === "runner-io-pressure-recovered"
++        ) {
++          this.log(
++            `runner_spawn_admission=recovered runner_failure_class=${admission.classification} io_full_avg10_pct=${admission.fullAvg10Pct?.toFixed(2)}`,
++          );
++        }
++      }
++
++      const spawnBudget = Math.min(admittedDeficit, 1);
+@@ -173 +246 @@
+-      if (this.consecutiveFailures > 0 && deficit > 0) {
++      if (this.consecutiveFailures > 0 && admittedDeficit > 0) {
+@@ -202 +275 @@
+-      if (deficit > 0 && !this.config.dryRun) {
++      if (spawnBudget > 0 && !this.config.dryRun) {
+@@ -204 +277 @@
+-        for (let i = 0; i < deficit; i++) {
++        for (let i = 0; i < spawnBudget; i++) {
+@@ -214,0 +288 @@
++            this.lastSuccessfulSpawnTick = tickNum;

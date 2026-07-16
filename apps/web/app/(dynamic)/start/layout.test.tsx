@@ -79,6 +79,19 @@ describe('start route layout', () => {
     ]);
   });
 
+  it('keeps live auth enabled for the real-auth Golden Path on loopback', async () => {
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
+    vi.stubEnv('E2E_TEST_MODE', '1');
+    vi.stubEnv('VERCEL_ENV', '');
+    const { default: StartLayout } = await import('./layout');
+
+    render(await StartLayout({ children: <div data-testid='child' /> }));
+
+    expect(mocks.providerProps).toEqual([
+      { forceBypassClerk: false, skipCoreProviders: true },
+    ]);
+  });
+
   it('bypasses Clerk for local Playwright E2E runs', async () => {
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
     vi.stubEnv('VERCEL_ENV', '');

@@ -115,6 +115,9 @@ describe('AgentOS gate evidence', () => {
 
     expect(evaluation.passed).toBe(false);
     expect(evaluation.artifacts).toEqual([]);
+    expect(evaluation.artifactIssues).toEqual([
+      expect.objectContaining({ kind: 'malformed-json' }),
+    ]);
   });
 
   it('continues after malformed artifact comments', () => {
@@ -127,8 +130,9 @@ describe('AgentOS gate evidence', () => {
       ].join('\n')
     );
 
-    expect(evaluation.passed).toBe(true);
+    expect(evaluation.passed).toBe(false);
     expect(evaluation.artifacts).toHaveLength(1);
+    expect(evaluation.artifactIssues).toHaveLength(1);
   });
 
   it('continues after schema-invalid artifact comments', () => {
@@ -141,8 +145,54 @@ describe('AgentOS gate evidence', () => {
       ].join('\n')
     );
 
-    expect(evaluation.passed).toBe(true);
+    expect(evaluation.passed).toBe(false);
     expect(evaluation.artifacts).toHaveLength(1);
+    expect(evaluation.artifactIssues).toEqual([
+      expect.objectContaining({ kind: 'schema-invalid' }),
+    ]);
+  });
+
+  it('reports exact invalid route and action paths instead of only missing gates', () => {
+    const invalid = JSON.stringify({
+      ...baseArtifact,
+      modelRoute: 'codex',
+      forbiddenActions: ['merge', 'mutate_ruleset'],
+    });
+    const evaluation = evaluateAgentRunGateEvidence(
+      `<!-- agent-run-artifact\n${invalid}\n-->`,
+      undefined,
+      { sourceRunId: '123' }
+    );
+
+    expect(evaluation.passed).toBe(false);
+    expect(evaluation.artifactIssues[0]?.details).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('modelRoute'),
+        expect.stringContaining('forbiddenActions.1'),
+      ])
+    );
+  });
+
+  it('does not let a stale invalid artifact block exact-head evidence', () => {
+    const stale = JSON.stringify({
+      ...baseArtifact,
+      sourceRunId: 'stale-sha',
+      modelRoute: 'codex',
+    });
+    const evaluation = evaluateAgentRunGateEvidence(
+      [
+        `<!-- agent-run-artifact\n${stale}\n-->`,
+        formatAgentRunArtifactComment({
+          ...baseArtifact,
+          sourceRunId: 'current-sha',
+        }),
+      ].join('\n'),
+      undefined,
+      { sourceRunId: 'current-sha' }
+    );
+
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.artifactIssues).toEqual([]);
   });
 
   it('continues after unclosed malformed artifact comments', () => {
@@ -154,8 +204,9 @@ describe('AgentOS gate evidence', () => {
       ].join('\n')
     );
 
-    expect(evaluation.passed).toBe(true);
+    expect(evaluation.passed).toBe(false);
     expect(evaluation.artifacts).toHaveLength(1);
+    expect(evaluation.artifactIssues).toHaveLength(1);
   });
 
   it('parses artifact comments when JSON strings contain comment terminators', () => {

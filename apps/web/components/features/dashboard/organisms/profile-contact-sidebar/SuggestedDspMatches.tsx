@@ -65,7 +65,11 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
 
   if (error) {
     return (
-      <div className='mt-3 space-y-1.5'>
+      <div
+        className='mt-3 space-y-1.5'
+        data-testid='suggested-dsp-matches'
+        data-state='error'
+      >
         <SectionHeading count={0} />
         <p className='px-2 text-xs text-tertiary-token'>
           Couldn&apos;t load suggestions.{' '}
@@ -84,7 +88,11 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
   if (!sorted.length) return null;
 
   return (
-    <div className='mt-3 space-y-1.5'>
+    <div
+      className='mt-3 space-y-1.5'
+      data-testid='suggested-dsp-matches'
+      data-state='ready'
+    >
       <SectionHeading count={sorted.length} />
       <p className='px-2 text-app font-book leading-[18px] text-secondary-token'>
         We found profiles that may be you on other platforms. Confirm or dismiss

@@ -139,36 +139,8 @@ export function isSettingsShellRoute(pathname: string | null): boolean {
   return matchesRoutePrefix(pathname, APP_ROUTES.SETTINGS);
 }
 
-// Admin gating (`app/app/(shell)/admin/layout.tsx`) resolves access itself via
-// `getCurrentAdminPageAccess()`, and no admin page or component reads
-// `useDashboardData()`/`DashboardDataContext`. `isAdmin` on the shell payload
-// is computed identically (via `checkAdminRole()`) on both the essential and
-// full data paths, so the admin subtree never needed the full fetch.
-// Exported for the loading.tsx skeleton dispatch (chunk 0.4).
 export function isAdminShellRoute(pathname: string | null): boolean {
   return matchesRoutePrefix(pathname, APP_ROUTES.ADMIN);
-}
-
-// These routes already call `loadAppShellRouteContext()` (which fetches
-// `getDashboardShellData()` itself) or are pure client-independent redirects
-// that render no dashboard-derived UI. Keeping them on the full path only
-// duplicated (earnings, youtube, feature-flags) or wasted (tour-dates,
-// contacts) a full dashboard fetch before the page's own redirect/logic ran.
-function isSelfFetchingOrRedirectOnlyRoute(pathname: string | null): boolean {
-  return matchesExactRoute(
-    pathname,
-    APP_ROUTES.EARNINGS,
-    APP_ROUTES.YOUTUBE_REVIVAL,
-    APP_ROUTES.FEATURE_FLAGS,
-    APP_ROUTES.TOUR_DATES,
-    APP_ROUTES.CONTACTS
-  );
-}
-
-// `JovieWorkPanel` only reads `selectedProfile` from `useDashboardData()`,
-// which the essential/base fetch already populates.
-function isJovieWorkShellRoute(pathname: string | null): boolean {
-  return matchesExactRoute(pathname, APP_ROUTES.JOVIE_WORK);
 }
 
 function isLightweightShellRoute(pathname: string | null): boolean {
@@ -184,10 +156,7 @@ function isLightweightShellRoute(pathname: string | null): boolean {
     isAudienceShellRoute(pathname) ||
     isCalendarShellRoute(pathname) ||
     isDashboardSubRoute(pathname) ||
-    isSettingsShellRoute(pathname) ||
-    isAdminShellRoute(pathname) ||
-    isSelfFetchingOrRedirectOnlyRoute(pathname) ||
-    isJovieWorkShellRoute(pathname)
+    isSettingsShellRoute(pathname)
   );
 }
 

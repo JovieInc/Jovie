@@ -843,7 +843,7 @@ test.describe('YC Demo Recording', () => {
 
     await expect(page.getByTestId('release-tour-date-la')).toBeVisible();
 
-    const chatInput = page.getByLabel('Chat message input').first();
+    const chatInput = page.getByLabel('Chat Message Input').first();
     await expect(chatInput).toBeVisible({ timeout: 30_000 });
     await chatInput.fill('Move the remix closer to the LA show');
     await page.getByLabel('Send message').first().click();

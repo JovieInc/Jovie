@@ -24,7 +24,7 @@ import {
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 import { gotoAuthenticatedChatRoute } from './utils/smoke-test-utils';
 
-const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
+const COMPOSER_TEXTAREA = '[aria-label="Chat Message Input"]';
 const RAIL_TOGGLE = '[data-testid="artist-profile-rail-toggle"]';
 const RIGHT_RAIL = '[data-testid="app-shell-right-rail"]';
 const APP_SHELL_FRAME = '[data-app-shell-frame="true"]';

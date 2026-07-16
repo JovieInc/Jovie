@@ -65,6 +65,19 @@ describe('ChatLoading (chat home)', () => {
       'true'
     );
   });
+
+  it('does not expose disabled controls as the loading composer', async () => {
+    const { default: ChatLoading } = await import(
+      '@/app/app/(shell)/chat/loading'
+    );
+    render(<ChatLoading />);
+
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.getByText('What are you working on?')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+  });
 });
 
 describe('ChatConversationLoading (chat/[id])', () => {

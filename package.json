@@ -8,7 +8,7 @@
     }
   },
   "engines": {
-    "node": ">=22.13.0 <23",
+    "node": ">=22.23.1 <23",
     "pnpm": "9.15.4"
   },
   "packageManager": "pnpm@9.15.4",
@@ -157,6 +157,8 @@
     "ci:merge-queue:check": "node scripts/ci-merge-queue-check.mjs validate",
     "ci:merge-queue:verify": "node scripts/ci-merge-queue-check.mjs verify",
     "ci:typecheck-gate-guard": "node scripts/ci-typecheck-gate-guard.mjs",
+    "skill-governance:check": "node scripts/skill-governance-guard.mjs",
+    "skill-governance:test": "node --test scripts/skill-governance-guard.test.mjs",
     "ci:taste-guard": "node scripts/taste-label-guard.mjs",
     "ci:taste-guard:sweep": "node scripts/taste-label-guard.mjs sweep",
     "pr:conflict:dry-run": "node scripts/pr-conflict-handler.mjs --dry-run",
@@ -178,8 +180,10 @@
     "pre-push": "bash scripts/hooks/biome-pre-push.sh && pnpm --filter=@jovie/web run pre-push",
     "pre-push:gate": "bash scripts/hooks/pre-push-gate.sh lint",
     "pre-push:gate:test": "bash scripts/hooks/pre-push-gate.sh test",
+    "pre-push:gate:affected": "bash scripts/hooks/pre-push-gate.sh affected",
     "pre-push:gate:format": "bash scripts/hooks/pre-push-gate.sh format",
     "pre-push:gate:all": "bash scripts/hooks/pre-push-gate.sh all",
+    "ship:verify": "node scripts/ship-verify.mjs",
     "tailwind:check": "pnpm --filter=@jovie/web run tailwind:check",
     "db:web:migrate": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run drizzle:migrate",
     "db:web:studio": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run drizzle:studio",

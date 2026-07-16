@@ -1,5 +1,6 @@
 import { isIPv4 } from 'node:net';
 import {
+  DEFAULT_TEST_CREATOR_USER_ID,
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
   TEST_MODE_HEADER,
@@ -8,6 +9,7 @@ import {
 } from '@/lib/auth/test-mode-constants';
 
 export {
+  DEFAULT_TEST_CREATOR_USER_ID,
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_COOKIE,
   TEST_MODE_HEADER,
@@ -169,6 +171,6 @@ export function resolveTestBypassUserId(
         process.env.TEST_CLERK_USER_ID ??
         null
     ) ??
-    'user_test'
+    DEFAULT_TEST_CREATOR_USER_ID
   );
 }

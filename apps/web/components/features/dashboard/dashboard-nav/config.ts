@@ -64,7 +64,7 @@ export const inboxNavItem: NavItem = {
 };
 
 export const newThreadNavItem: NavItem = {
-  name: 'Chat',
+  name: 'New Chat',
   href: APP_ROUTES.CHAT,
   id: 'chat',
   icon: SquarePen,
@@ -80,7 +80,7 @@ export const profileNavItem: NavItem = {
 };
 
 export const releasesNavItem: NavItem = {
-  name: 'Library',
+  name: 'Releases',
   href: buildLibraryViewRoute('releases'),
   id: 'releases',
   icon: Music,
@@ -107,45 +107,37 @@ export const touringNavItem: NavItem = {
   description: 'Manage tour dates and touring settings',
 };
 
-export const contactsNavItem: NavItem = {
-  name: 'Contacts',
-  href: APP_ROUTES.CONTACTS,
-  id: 'contacts',
-  icon: IdCard,
-  description: 'Manage contacts, collaborators, and press relationships',
-};
-
-export const calendarNavItem: NavItem = {
-  name: 'Calendar',
-  href: APP_ROUTES.CALENDAR,
-  id: 'calendar',
-  icon: CalendarDays,
-  description: 'See release dates, events, and calendar moments',
-};
-
-export const tasksNavItem: NavItem = {
-  name: 'Tasks',
-  href: APP_ROUTES.TASKS,
-  id: 'tasks',
-  icon: CheckSquare,
-  description: 'Track release work and general artist operations',
-};
-
-/**
- * Canonical 6-item nav IA (GH #12634 taste decision / #12640): Inbox is the
- * named home and appears first. Consumers gate Inbox's presence on the
- * `INBOX_HOME` rollout flag (see DashboardNav) rather than filtering it out
- * of this array, so this list stays the single source of truth for the
- * target IA order even while Inbox is mid-rollout.
- */
 export const primaryNavigation: NavItem[] = [
-  inboxNavItem,
   newThreadNavItem,
   releasesNavItem,
-  contactsNavItem,
-  calendarNavItem,
-  tasksNavItem,
+  artistProfileNavItem,
+  touringNavItem,
+  {
+    name: 'Calendar',
+    href: APP_ROUTES.CALENDAR,
+    id: 'calendar',
+    icon: CalendarDays,
+    description: 'See release dates, events, and calendar moments',
+  },
+  {
+    name: 'Tasks',
+    href: APP_ROUTES.TASKS,
+    id: 'tasks',
+    icon: CheckSquare,
+    description: 'Track release work and general artist operations',
+  },
+  {
+    name: 'Audience',
+    href: APP_ROUTES.AUDIENCE,
+    id: 'audience',
+    icon: Users,
+    description: 'Understand your audience demographics',
+  },
 ];
+
+export const calendarNavItem = primaryNavigation.find(
+  item => item.id === 'calendar'
+)!;
 
 export const settingsNavItem: NavItem = {
   name: 'Settings',
@@ -317,23 +309,15 @@ export const adminNavigationSections: AdminNavSection[] = [
  */
 export const mobilePrimaryNavigation: NavItem[] = [
   newThreadNavItem,
-  releasesNavItem,
-  tasksNavItem,
+  primaryNavigation.find(i => i.id === 'releases')!,
+  primaryNavigation.find(i => i.id === 'audience')!,
 ];
 
-/**
- * Items shown in the expanded "more" menu on mobile.
- *
- * Inbox is intentionally excluded from both mobile lists for now — the
- * bottom bar is computed once at module load (no flag read), so it cannot
- * mirror desktop's `INBOX_HOME` rollout gating yet. Wiring Inbox into mobile
- * is deeper mobile work tracked separately (chunk 1.5 of the One App Shell
- * program, GH #12633).
- */
+/** Items shown in the expanded "more" menu on mobile. */
 export const mobileExpandedNavigation: NavItem[] = [
   artistProfileNavItem,
   touringNavItem,
-  contactsNavItem,
   calendarNavItem,
+  primaryNavigation.find(i => i.id === 'tasks')!,
   settingsNavItem,
 ];

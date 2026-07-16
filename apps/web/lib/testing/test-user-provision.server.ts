@@ -1,5 +1,6 @@
 import { Redis } from '@upstash/redis';
 import { and, eq, or } from 'drizzle-orm';
+import { getDeterministicTestBetterAuthUserId } from '@/lib/auth/dev-test-auth-identity';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -7,6 +8,8 @@ import { baUsers } from '@/lib/db/schema/better-auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { normalizeEmail } from '@/lib/utils/email';
+
+export { getDeterministicTestBetterAuthUserId } from '@/lib/auth/dev-test-auth-identity';
 
 export const DEFAULT_TEST_AVATAR_URL = '/avatars/default-user.png';
 
@@ -149,12 +152,6 @@ export function getDeterministicTestClerkId(email: string): string {
  * `getDeterministicTestClerkId` for the BA path. The id is stable per email
  * so re-running `ensureBetterAuthTestUser` is idempotent.
  */
-export function getDeterministicTestBetterAuthUserId(email: string): string {
-  const normalizedEmail = normalizeEmail(email);
-  const stableId = normalizedEmail.replaceAll(/[^a-z0-9]+/gi, '_').slice(0, 48);
-  return `ba_dev_${stableId || 'browse'}`;
-}
-
 /**
  * Ensure a Better Auth test user exists in `ba_users` and return the BA user
  * id (plan decision 10, commit ⑨). Direct drizzle upsert — no Clerk API
@@ -177,9 +174,11 @@ export async function ensureBetterAuthTestUser({
   // the `server-only` guard when this file is imported from globalSetup.
   const { db } = await import('@/lib/db');
 
-  // Upsert into ba_users — idempotent. `onConflictDoUpdate` on the
-  // primary key (id) so concurrent callers converge.
-  await db
+  // Either the deterministic id or email can already exist, including when
+  // parallel Playwright workers race to provision the same actor. Do not name
+  // a single conflict target: PostgreSQL may detect the other unique index
+  // first. Insert if absent, then resolve whichever stable identity won.
+  const [insertedUser] = await db
     .insert(baUsers)
     .values({
       id: baUserId,
@@ -187,17 +186,24 @@ export async function ensureBetterAuthTestUser({
       email: normalizedEmail,
       emailVerified: true,
     })
-    .onConflictDoUpdate({
-      target: baUsers.id,
-      set: {
-        name: fullName,
-        email: normalizedEmail,
-        emailVerified: true,
-        updatedAt: new Date(),
-      },
-    });
+    .onConflictDoNothing()
+    .returning({ id: baUsers.id });
 
-  return baUserId;
+  if (insertedUser) {
+    return insertedUser.id;
+  }
+
+  const [user] = await db
+    .select({ id: baUsers.id })
+    .from(baUsers)
+    .where(or(eq(baUsers.email, normalizedEmail), eq(baUsers.id, baUserId)))
+    .limit(1);
+
+  if (!user) {
+    throw new Error('Better Auth test user conflict could not be resolved');
+  }
+
+  return user.id;
 }
 
 function resolveMatchedSeedUser(

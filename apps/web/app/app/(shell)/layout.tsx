@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
-import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
+import { CinematicAppBoot } from '@/components/organisms/CinematicAppBoot';
 import { PersistentAudioBar } from '@/components/organisms/PersistentAudioBar';
 import { NuqsProvider } from '@/components/providers/NuqsProvider';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
@@ -117,14 +117,13 @@ export default async function AppShellLayout({
       routeMain = <TasksRouteSkeleton />;
     }
 
-    // Cold shell entry must paint instantly: the route-aware AppShellSkeleton
-    // renders directly as the Suspense fallback with no timed intro. A
-    // timed boot animation previously gated first paint behind a multi-second
-    // timeline on the first shell mount per tab; it was removed so cold entry
-    // matches the perceived-<100ms shell target instead of opposing it
-    // (Part of #12633).
+    // CinematicAppBoot internally renders <AppShellSkeleton main={routeMain}
+    // variant={shellVariant} /> unless this is the FIRST shell mount of the
+    // tab AND prefers-reduced-motion is off, in which case it plays a 2.4s
+    // cinematic timeline before the underlying tree resolves. Per-tab gate
+    // via sessionStorage flag `jovie:cinematic-boot-played`.
     const shellFallback = (
-      <AppShellSkeleton
+      <CinematicAppBoot
         main={routeMain}
         audioPlayer={audioPlayer}
         variant={shellVariant}

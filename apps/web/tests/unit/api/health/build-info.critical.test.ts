@@ -45,7 +45,7 @@ describe('@critical GET /api/health/build-info', () => {
 
   it('prefers build-time commit sha when available in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abcdef1');
+    vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abcdef1234567890');
     vi.stubEnv('VERCEL_GIT_COMMIT_SHA', '1234567890abcdef');
 
     const { GET } = await import('@/app/api/health/build-info/route');

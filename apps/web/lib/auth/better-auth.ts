@@ -1,12 +1,28 @@
 import 'server-only';
 
-import { type BetterAuthOptions, betterAuth } from 'better-auth';
+import { oauthProvider } from '@better-auth/oauth-provider';
+import {
+  type BetterAuthOptions,
+  type BetterAuthPlugin,
+  betterAuth,
+} from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { nextCookies } from 'better-auth/next-js';
-import { bearer, emailOTP, oneTap, oneTimeToken } from 'better-auth/plugins';
+import {
+  bearer,
+  emailOTP,
+  jwt,
+  oneTap,
+  oneTimeToken,
+} from 'better-auth/plugins';
 import { db } from '@/lib/db';
 import {
   baAccounts,
+  baJwks,
+  baOauthAccessTokens,
+  baOauthClients,
+  baOauthConsents,
+  baOauthRefreshTokens,
   baSessions,
   baUsers,
   baVerifications,
@@ -17,7 +33,10 @@ import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { generateAppleClientSecret } from './apple-client-secret';
 import { provisionAppUser } from './provision';
+import { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
 import { secondaryStorage } from './secondary-storage';
+
+export { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
 
 /**
  * Better Auth server instance (Clerk → Better Auth migration; see
@@ -48,17 +67,6 @@ export function isDeterministicTestOtpEmail(email: string): boolean {
 }
 
 /**
- * Durable rate limits for the new public auth endpoints (plan eng row 28).
- * Windows are seconds. Stored via secondary storage (Redis) — never
- * in-memory in production (security.md).
- */
-export const AUTH_RATE_LIMIT_RULES = {
-  '/sign-in/social': { window: 60, max: 10 },
-  '/email-otp/send-verification-otp': { window: 60, max: 3 },
-  '/one-time-token/verify': { window: 60, max: 10 },
-} as const;
-
-/**
  * Trusted origins: production + staging + local dev + native deep-link
  * schemes. Vercel previews are scoped to the exact deployment URL via the
  * function form — never a bare *.vercel.app wildcard (plan eng row 36).
@@ -66,9 +74,11 @@ export const AUTH_RATE_LIMIT_RULES = {
 export const STATIC_TRUSTED_ORIGINS = [
   'https://jov.ie',
   'https://staging.jov.ie',
+  'https://appleid.apple.com',
   'http://localhost:3100',
   'ie.jov.jovie://',
   'jovie://',
+  'logyourbody://',
 ] as const;
 
 function resolveTrustedOrigins(): (string | undefined)[] {
@@ -180,10 +190,30 @@ function buildPlugins() {
       ? [oneTap({ clientId: googleOneTapClientId })]
       : []),
     bearer(),
+    jwt({
+      disableSettingJwtHeader: true,
+      jwks: {
+        keyPairConfig: { alg: 'EdDSA', crv: 'Ed25519' },
+        rotationInterval: 60 * 60 * 24 * 30,
+        gracePeriod: 60 * 60 * 24 * 30,
+      },
+    }),
+    oauthProvider({
+      loginPage: '/identity',
+      consentPage: '/identity',
+      signup: { page: '/identity' },
+      scopes: ['openid', 'profile', 'email', 'offline_access'],
+      grantTypes: ['authorization_code', 'refresh_token'],
+      allowDynamicClientRegistration: false,
+      allowUnauthenticatedClientRegistration: false,
+      accessTokenExpiresIn: 15 * 60,
+      refreshTokenExpiresIn: 60 * 60 * 24 * 30,
+      storeClientSecret: 'hashed',
+      storeTokens: 'hashed',
+      cachedTrustedClients: new Set(['logyourbody-ios', 'logyourbody-web']),
+    }) as BetterAuthPlugin,
     oneTimeToken({
-      // Minutes at 1.6.23 (default 3). Covers the native handoff window.
       expiresIn: 5,
-      // Client-callable generate is a cookie→bearer exfil vector (row 29).
       disableClientRequest: true,
       storeToken: 'hashed',
     }),
@@ -197,6 +227,7 @@ export const auth = betterAuth({
   appName: 'Jovie',
   baseURL: resolveBaseUrl(),
   secret: resolveSecret(),
+  disabledPaths: ['/token'],
   database: drizzleAdapter(db, {
     provider: 'pg',
     // Explicit: the repo bans db.transaction(); do not rely on the adapter
@@ -207,6 +238,11 @@ export const auth = betterAuth({
       session: baSessions,
       account: baAccounts,
       verification: baVerifications,
+      jwks: baJwks,
+      oauthClient: baOauthClients,
+      oauthRefreshToken: baOauthRefreshTokens,
+      oauthAccessToken: baOauthAccessTokens,
+      oauthConsent: baOauthConsents,
     },
   }),
   socialProviders: buildSocialProviders(),
@@ -242,13 +278,22 @@ export const auth = betterAuth({
             });
           } catch (error) {
             // provisionAppUser never throws by contract; this is
-            // belt-and-braces so the OAuth callback can never fail here.
+            // belt-and-braces so the auth callback can never fail here.
             // gate.ts lazy-create heals on the next request.
-            logger.error('[auth] provision hook failed', error);
-            await captureError('Better Auth provision hook failed', error, {
-              betterAuthUserId: user.id,
-              operation: 'databaseHooks.user.create.after',
-            });
+            try {
+              logger.error('[auth] provision hook failed', error);
+              await captureError('Better Auth provision hook failed', error, {
+                betterAuthUserId: user.id,
+                operation: 'databaseHooks.user.create.after',
+              });
+            } catch (telemetryError) {
+              // Telemetry must never turn the fail-open repair path into an
+              // auth failure. The next request still heals through gate.ts.
+              console.error(
+                '[auth] provision hook telemetry failed',
+                telemetryError
+              );
+            }
           }
         },
       },

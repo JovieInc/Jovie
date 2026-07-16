@@ -58,13 +58,21 @@ describe('pr-check-failures', () => {
     const e2eSmoke = harness.jobs.find(
       job => job.name === 'E2E Smoke (PR Fast Feedback)'
     );
+    const extendedSmoke = harness.jobs.find(
+      job => job.name === 'Extended Smoke (Preview)'
+    );
 
     expect(e2eSmoke?.mergeGate).toBe(true);
+    expect(extendedSmoke?.mergeGate).toBe(true);
     expect(ADVISORY_CHECK_NAMES).toContain('Preview Deploy');
+    expect(ADVISORY_CHECK_NAMES).toContain(
+      'A11y (authenticated, informational)'
+    );
     expect(ADVISORY_CHECK_NAMES).not.toContain('Gitleaks Secret Scanning');
     expect(ADVISORY_CHECK_NAMES).not.toContain('TruffleHog Secret Scanning');
     expect(ADVISORY_CHECK_NAMES).not.toContain('Verify Draft Agent PR');
     expect(ADVISORY_CHECK_NAMES).not.toContain('E2E Smoke (PR Fast Feedback)');
+    expect(ADVISORY_CHECK_NAMES).not.toContain('Extended Smoke (Preview)');
     expect(
       extractTerminalFailures([
         { bucket: 'fail', name: 'Preview Deploy' },
@@ -73,9 +81,12 @@ describe('pr-check-failures', () => {
         { bucket: 'fail', name: 'Gitleaks Secret Scanning' },
         { bucket: 'fail', name: 'Verify Draft Agent PR' },
         { bucket: 'fail', name: 'E2E Smoke (PR Fast Feedback)' },
+        { bucket: 'fail', name: 'Extended Smoke (Preview)' },
+        { bucket: 'fail', name: 'A11y (authenticated, informational)' },
       ])
     ).toEqual([
       'E2E Smoke (PR Fast Feedback)',
+      'Extended Smoke (Preview)',
       'Gitleaks Secret Scanning',
       'Preview Deploy (PR)',
       'Security Advisory Enforcement',
@@ -113,6 +124,30 @@ describe('pr-check-failures', () => {
         checks.filter(check => check.name !== 'PR Ready')
       )
     ).toContain('CI / PR Ready (missing)');
+  });
+
+  it('keeps Extended Smoke pending until the testing evidence completes', () => {
+    const checks = [
+      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+      {
+        bucket: 'pending',
+        state: 'IN_PROGRESS',
+        name: 'Extended Smoke (Preview)',
+      },
+      {
+        bucket: 'fail',
+        state: 'FAILURE',
+        name: 'A11y (authenticated, informational)',
+      },
+    ];
+
+    expect(classifyQueueCheckBlockers(checks)).toEqual([
+      'Extended Smoke (Preview) (not complete)',
+      'Extended Smoke (Preview) (pending)',
+    ]);
   });
 
   it('uses only the uniquely newest same-name check attempt', () => {
@@ -183,6 +218,79 @@ describe('pr-check-failures', () => {
     ).toEqual([
       expect.objectContaining({ name: 'Fork PR Gate', state: 'SUCCESS' }),
     ]);
+
+    const requiredWithoutForkGate = required.filter(
+      check => check.name !== 'Fork PR Gate'
+    );
+    const forkGateSuccess = {
+      bucket: 'pass',
+      state: 'SUCCESS',
+      name: 'Fork PR Gate',
+      startedAt: '2026-07-13T08:34:09Z',
+      completedAt: '2026-07-13T08:34:16Z',
+    };
+    const skippedForkGateAttempts = [
+      {
+        bucket: 'skipping',
+        state: 'SKIPPED',
+        name: 'Fork PR Gate',
+        startedAt: '2026-07-13T08:49:01Z',
+        completedAt: '2026-07-13T08:49:00Z',
+      },
+      {
+        bucket: 'skipping',
+        state: 'SKIPPED',
+        name: 'Fork PR Gate',
+        startedAt: '2026-07-13T08:49:08Z',
+        completedAt: '2026-07-13T08:49:00Z',
+      },
+    ];
+    expect(
+      classifyQueueCheckBlockers([
+        ...requiredWithoutForkGate,
+        forkGateSuccess,
+        ...skippedForkGateAttempts,
+      ])
+    ).toEqual([]);
+
+    const newerForkGateFailure = {
+      bucket: 'fail',
+      state: 'FAILURE',
+      name: 'Fork PR Gate',
+      startedAt: '2026-07-13T08:50:00Z',
+      completedAt: '2026-07-13T08:50:10Z',
+    };
+    expect(
+      classifyQueueCheckBlockers([
+        ...requiredWithoutForkGate,
+        forkGateSuccess,
+        ...skippedForkGateAttempts,
+        newerForkGateFailure,
+      ])
+    ).toEqual(['Fork PR Gate', 'Fork PR Gate (not successful)']);
+
+    const newerForkGatePending = {
+      bucket: 'pending',
+      state: 'IN_PROGRESS',
+      name: 'Fork PR Gate',
+      startedAt: '2026-07-13T08:50:00Z',
+      completedAt: '0001-01-01T00:00:00Z',
+    };
+    expect(
+      classifyQueueCheckBlockers([
+        ...requiredWithoutForkGate,
+        forkGateSuccess,
+        ...skippedForkGateAttempts,
+        newerForkGatePending,
+      ])
+    ).toEqual(['Fork PR Gate (not successful)', 'Fork PR Gate (pending)']);
+
+    expect(
+      classifyQueueCheckBlockers([
+        ...requiredWithoutForkGate,
+        ...skippedForkGateAttempts,
+      ])
+    ).toEqual(['Fork PR Gate (not successful)']);
     expect(
       classifyQueueCheckBlockers([
         ...required,
@@ -213,6 +321,8 @@ describe('pr-check-failures', () => {
 
     expect(autoReady).toContain('--classify-auto-ready');
     expect(autoReady).not.toContain('dependabot/');
+    expect(drain).toContain(`fail='["required check status unavailable"]'`);
+    expect(drain).not.toContain("fail='[]'");
   });
 
   it('recognizes agent branches used by drain AGENT_RE', () => {

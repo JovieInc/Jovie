@@ -39,8 +39,6 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/settings/admin': 'Legacy admin settings route redirected to Ops',
   '/app/dashboard/release-plan':
     'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',
-  '/app/audience':
-    'Demoted from the primary nav by the 6-item IA (GH #12634); still reachable by direct link until a Settings/panel placement lands',
   '/app/insights':
     'AI insights workspace is reachable from dashboard widgets and direct app links until nav placement is finalised',
   '/app/jovie-work':

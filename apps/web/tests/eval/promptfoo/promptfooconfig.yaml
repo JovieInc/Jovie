@@ -1595,8 +1595,10 @@ tests:
       coverage:
         expectedSkillIds:
           - analyzePackaging
+          - fan_email_send
           - generateReleasePitch
           - retouch
+          - smart_link_switch_live
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend
@@ -1613,8 +1615,10 @@ tests:
       coverage:
         expectedSkillIds:
           - analyzePackaging
+          - fan_email_send
           - generateReleasePitch
           - retouch
+          - smart_link_switch_live
         minimumPromptChars: 300
         promptGuardrails:
           retouch:
@@ -1638,8 +1642,10 @@ tests:
       coverage:
         expectedSkillIds:
           - analyzePackaging
+          - fan_email_send
           - generateReleasePitch
           - retouch
+          - smart_link_switch_live
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend
@@ -1677,8 +1683,10 @@ tests:
       coverage:
         expectedSkillIds:
           - analyzePackaging
+          - fan_email_send
           - generateReleasePitch
           - retouch
+          - smart_link_switch_live
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend

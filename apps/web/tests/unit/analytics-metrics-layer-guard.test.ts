@@ -1,9 +1,18 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   countMetricsLayerViolations,
+  type MetricsRipgrepRunner,
   type ViolationMap,
 } from './metrics-layer-guard-logic';
 
@@ -79,5 +88,99 @@ describe('canonical metrics layer guard', () => {
     }
 
     expect(failures, failures.join('\n')).toEqual([]);
+  }, 30_000);
+
+  it('walks source directories without treating test files as violations', () => {
+    const webRoot = mkdtempSync(join(tmpdir(), 'metrics-layer-guard-'));
+    const result =
+      (
+        status: number | null,
+        stdout = '',
+        error?: Error
+      ): MetricsRipgrepRunner =>
+      () => ({ status, stdout, error });
+
+    try {
+      mkdirSync(join(webRoot, 'app', 'nested'), { recursive: true });
+      mkdirSync(join(webRoot, 'components'), { recursive: true });
+      mkdirSync(join(webRoot, 'lib', 'analytics'), { recursive: true });
+      for (const dir of ['node_modules/pkg', '.next', 'coverage']) {
+        mkdirSync(join(webRoot, 'components', dir), { recursive: true });
+      }
+      mkdirSync(join(webRoot, 'components', 'not-a-file.ts'));
+      const tokenFixtures = [
+        ['a-click-events.ts', 'éclickEvents'],
+        ['b-click-events-snake.ts', '\0click_events'],
+        ['c-daily-profile-views.ts', 'dailyProfileViews'],
+        ['d-daily-profile-views-snake.ts', 'daily_profile_views'],
+        ['e-notification-subscriptions.ts', 'notificationSubscriptions'],
+        ['f-notification-subscriptions-snake.ts', 'notification_subscriptions'],
+      ] as const;
+      for (const [file, token] of tokenFixtures) {
+        writeFileSync(
+          join(webRoot, 'components', file),
+          `const raw = ${token};\n`
+        );
+      }
+      writeFileSync(
+        join(webRoot, 'app', 'nested', 'regular-rate.ts'),
+        'const rate = (clicks / views)\n  *\n  100;\n'
+      );
+      writeFileSync(
+        join(webRoot, 'app', 'nested', 'legacy-rate.ts'),
+        'const rate = Math.round(clicks *\n  1000)\n  /\n  10;\n'
+      );
+      writeFileSync(
+        join(webRoot, 'components', 'ignored.test.tsx'),
+        'const raw = click_events;\n'
+      );
+      writeFileSync(
+        join(webRoot, 'lib', 'analytics', 'metrics.ts'),
+        'const raw = click_events; const rate = (clicks / views) * 100;\n'
+      );
+      for (const file of [
+        'components/node_modules/pkg/ignored.ts',
+        'components/.next/ignored.ts',
+        'components/coverage/ignored.ts',
+      ]) {
+        writeFileSync(join(webRoot, file), 'const raw = click_events;\n');
+      }
+
+      const expected = Object.fromEntries(
+        [
+          ['app/nested/legacy-rate.ts', { tables: 0, rates: 1 }],
+          ['app/nested/regular-rate.ts', { tables: 0, rates: 1 }],
+          ...tokenFixtures.map(([file]) => [
+            `components/${file}`,
+            { tables: 1, rates: 0 },
+          ]),
+        ].sort(([a], [b]) => a.localeCompare(b))
+      );
+      const realRipgrep = countMetricsLayerViolations(webRoot);
+      expect(realRipgrep).toEqual(expected);
+      const selectedFiles = Object.keys(expected).reverse();
+      const selected = countMetricsLayerViolations(
+        webRoot,
+        result(0, `${selectedFiles.join('\0')}\0${selectedFiles[0]}\0`)
+      );
+      expect(selected).toEqual(expected);
+      expect(Object.keys(selected)).toEqual(Object.keys(expected));
+
+      for (const runner of [
+        result(2),
+        result(null, '', new Error('spawnSync rg ETIMEDOUT')),
+        result(0),
+        result(0, '../outside.ts\0'),
+        result(0, 'components/missing.ts\0'),
+        result(0, 'components/not-a-file.ts\0'),
+      ]) {
+        expect(countMetricsLayerViolations(webRoot, runner)).toEqual(
+          realRipgrep
+        );
+      }
+      expect(countMetricsLayerViolations(webRoot, result(1))).toEqual({});
+    } finally {
+      rmSync(webRoot, { recursive: true, force: true });
+    }
   });
 });

@@ -1,5 +1,6 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 
 /**
  * Shared counting logic for the canonical-metrics-layer guard ratchet
@@ -32,6 +33,29 @@ export type ViolationMap = Record<string, FileViolations>;
 
 const SOURCE_EXT = /\.(tsx|ts)$/;
 const SKIP_DIRS = new Set(['node_modules', '.next', 'coverage']);
+const SCAN_DIRS = ['app', 'components', 'lib'] as const;
+const TRUSTED_RIPGREP_PATHS = [
+  '/usr/bin/rg',
+  '/usr/local/bin/rg',
+  '/opt/homebrew/bin/rg',
+] as const;
+const CANDIDATE_TOKENS = [
+  '*',
+  'clickEvents',
+  'click_events',
+  'dailyProfileViews',
+  'daily_profile_views',
+  'notificationSubscriptions',
+  'notification_subscriptions',
+] as const;
+
+interface RipgrepResult {
+  readonly status: number | null;
+  readonly stdout: string;
+  readonly error?: Error;
+}
+
+export type MetricsRipgrepRunner = (webRoot: string) => RipgrepResult;
 
 /** The canonical layer itself — the one place formulas are allowed. */
 const CANONICAL_LAYER = 'lib/analytics/metrics.ts';
@@ -56,19 +80,107 @@ const RATE_DERIVATION_LEGACY = /\*\s*1000\s*\)\s*\/\s*10\b/g;
 
 function walk(dir: string, out: string[]): void {
   if (!existsSync(dir)) return;
-  for (const entry of readdirSync(dir)) {
-    if (SKIP_DIRS.has(entry)) continue;
-    const full = join(dir, entry);
-    const s = statSync(full);
-    if (s.isDirectory()) {
+  // Dirent already carries the file type from the directory read. Avoiding a
+  // separate statSync for every entry keeps this repository-wide guard bounded
+  // when the shared runner's filesystem is under load.
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (SKIP_DIRS.has(entry.name)) continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
       walk(full, out);
     } else if (
-      SOURCE_EXT.test(entry) &&
-      !/\.(test|spec|stories)\./.test(entry)
+      entry.isFile() &&
+      SOURCE_EXT.test(entry.name) &&
+      !/\.(test|spec|stories)\./.test(entry.name)
     ) {
       out.push(full);
     }
   }
+}
+
+function isRegularFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function runRipgrepCandidates(webRoot: string): RipgrepResult {
+  const ripgrepPath = TRUSTED_RIPGREP_PATHS.find(path => existsSync(path));
+  if (!ripgrepPath) return { status: null, stdout: '' };
+
+  const result = spawnSync(
+    ripgrepPath,
+    [
+      '--no-config',
+      '--files-with-matches',
+      '--sort',
+      'path',
+      '--null',
+      '--hidden',
+      '--text',
+      '--no-messages',
+      '--no-ignore',
+      '--threads',
+      '2',
+      '--glob',
+      '*.{ts,tsx}',
+      '--glob',
+      '!**/*.{test,spec,stories}.{ts,tsx}',
+      '--glob',
+      '!**/{node_modules,.next,coverage}/**',
+      '--fixed-strings',
+      ...CANDIDATE_TOKENS.flatMap(token => ['--regexp', token]),
+      ...SCAN_DIRS,
+    ],
+    {
+      cwd: webRoot,
+      encoding: 'utf8',
+      maxBuffer: 5 * 1024 * 1024,
+      timeout: 5_000,
+    }
+  );
+  return {
+    status: result.status,
+    stdout: result.stdout ?? '',
+    error: result.error,
+  };
+}
+
+function findRipgrepCandidates(
+  webRoot: string,
+  runner: MetricsRipgrepRunner
+): string[] | null {
+  const result = runner(webRoot);
+  if (result.error || (result.status !== 0 && result.status !== 1)) return null;
+  if (result.status === 1) return [];
+
+  const candidates = [
+    ...new Set((result.stdout ?? '').split('\0').filter(Boolean)),
+  ];
+  if (
+    candidates.length === 0 ||
+    candidates.some(file => {
+      const full = join(webRoot, file);
+      const rel = relative(webRoot, full).split('\\').join('/');
+      const segments = rel.split('/');
+      return (
+        isAbsolute(file) ||
+        rel.startsWith('..') ||
+        !SCAN_DIRS.includes(segments[0] as (typeof SCAN_DIRS)[number]) ||
+        segments.some(segment => SKIP_DIRS.has(segment)) ||
+        !SOURCE_EXT.test(rel) ||
+        /\.(test|spec|stories)\./.test(rel) ||
+        !isRegularFile(full)
+      );
+    })
+  ) {
+    return null;
+  }
+  return candidates
+    .sort((a, b) => a.localeCompare(b))
+    .map(file => join(webRoot, file));
 }
 
 function countMatches(source: string, regex: RegExp): number {
@@ -81,10 +193,14 @@ function countMatches(source: string, regex: RegExp): number {
  * Returns a map of web-root-relative posix paths → violation counts,
  * including only files with at least one violation.
  */
-export function countMetricsLayerViolations(webRoot: string): ViolationMap {
-  const files: string[] = [];
-  for (const dir of ['app', 'components', 'lib']) {
-    walk(join(webRoot, dir), files);
+export function countMetricsLayerViolations(
+  webRoot: string,
+  runner: MetricsRipgrepRunner = runRipgrepCandidates
+): ViolationMap {
+  let files = findRipgrepCandidates(webRoot, runner);
+  if (files === null) {
+    files = [];
+    for (const dir of SCAN_DIRS) walk(join(webRoot, dir), files);
   }
 
   const result: ViolationMap = {};

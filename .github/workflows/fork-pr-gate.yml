@@ -42,25 +42,36 @@ on:
   # workflow never checks out PR code, so re-evaluating metadata is safe.
   pull_request_review:
     types: [submitted]
-  # merge_group retired 2026-06-18: Graphite owns the merge queue; GitHub never
-  # creates a merge_group. The native-queue auto-pass step below is now inert.
+  # Inert while Graphite owns landing. Source PRs have already passed the real
+  # metadata gate, so the synthetic combined head receives the same context.
+  merge_group:
+    types: [checks_requested]
 
 permissions: {}
 
 concurrency:
   # Include the event name so review re-evaluation does not cancel the initial
   # metadata gate for the same PR.
-  group: fork-pr-gate-${{ github.event_name }}-${{ github.event.pull_request.number }}
+  group: fork-pr-gate-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
+  merge-group-gate:
+    name: ${{ github.event_name == 'merge_group' && 'Fork PR Gate' || 'Fork PR Gate (merge-group inactive)' }}
+    if: github.event_name == 'merge_group'
+    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 1
+    steps:
+      - name: Confirm source PR gate inheritance
+        run: echo "Merge-group combined head inherits the source PR fork-policy decisions."
+
   # Fast path: Dependabot PRs are internal (not forks) but pull_request runs
   # in dependabot's restricted secret context. Run via pull_request_target so
   # the Jovie Bot App private key is available — the branch ruleset requires
   # the Fork PR Gate status to be set by jovie-bot specifically. No code from
   # the head branch is checked out here, so pull_request_target is safe.
   dependabot-gate:
-    name: Fork PR Gate
+    name: Fork PR Gate Dependabot Controller
     if: github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]'
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 1
@@ -85,7 +96,7 @@ jobs:
             -f context="Fork PR Gate"
 
   fork-gate:
-    name: Fork PR Gate
+    name: Fork PR Gate Controller
     # pull_request_target is safe here: this job only reads PR metadata/diffs
     # through the API and sets a commit status; it never checks out head code.
     # It gives fork PRs the bot credential required to update the required gate.

@@ -46,6 +46,7 @@ describe('chat composer System B source contract', () => {
       'system-b-chat-composer-scroll-fade',
       'system-b-chat-composer-thread-scroll-padding',
       'system-b-chat-composer-surface',
+      'system-b-chat-composer-input',
       'system-b-chat-composer-picker-shell',
       'system-b-chat-composer-primary-action',
       'system-b-chat-composer-menu',
@@ -53,11 +54,30 @@ describe('chat composer System B source contract', () => {
       expect(styles).toContain(className);
     }
 
+    const inputRule = styles.match(
+      /\.system-b-chat-composer-input\s*\{[\s\S]*?\}/
+    )?.[0];
+    expect(inputRule).toContain('color: var(--color-text-primary-token)');
+    expect(inputRule).toContain(
+      '-webkit-text-fill-color: var(--color-text-primary-token)'
+    );
+
     const toolbarSource = readFileSync(
       resolve(appRoot, 'components/jovie/components/ChatComposerToolbar.tsx'),
       'utf8'
     );
     expect(toolbarSource).toContain("variant='ghost'");
     expect(toolbarSource).not.toContain('system-b-chat-composer-icon-button');
+
+    const paletteSource = readFileSync(
+      resolve(appRoot, 'components/organisms/SharedCommandPalette.tsx'),
+      'utf8'
+    );
+    expect(paletteSource).toContain(
+      'text-3xs font-semibold uppercase tracking-[0.1em] text-tertiary-token'
+    );
+    expect(paletteSource).not.toContain(
+      'text-3xs font-semibold uppercase tracking-[0.1em] text-quaternary-token'
+    );
   });
 });

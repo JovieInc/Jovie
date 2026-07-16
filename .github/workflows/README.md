@@ -138,7 +138,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | --- | --- | --- |
 | Fast Gate | Cheap deterministic checks required for every merge candidate. | `ci-fast`, `Unit Tests` |
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `Structural Contract`, `CI Risk Classifier` |
-| Risk-Triggered Smoke | Focused smoke validation for sensitive auth, billing, DB, config, and agent-control-plane changes. | `E2E Smoke (PR Fast Feedback)`, `Golden Path (PR)` |
+| Risk-Triggered Smoke | Focused smoke validation for sensitive auth, billing, DB, config, and agent-control-plane changes. | `E2E Smoke (PR Fast Feedback)`, `Golden Path (PR)`, `Extended Smoke (Preview)` |
 | Preview Evidence | Preview deploys and visual/a11y/performance evidence for review. | `Build (public routes)`, `Lighthouse (public routes PR)`, `Lighthouse (dashboard PR)`, `Lighthouse (onboarding PR)`, `Lighthouse (admin PR)`, `Preview Deploy (PR)` |
 | Main Deploy | Post-merge staging, canary, production promotion, and deploy-health gates. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
@@ -160,6 +160,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | `Lighthouse (admin PR)` | preview-evidence | `pnpm --filter=@jovie/web run test:lighthouse:admin:pr` |
 | `E2E Smoke (PR Fast Feedback)` | risk-triggered-smoke | `pnpm run test:web:smoke` |
 | `Golden Path (PR)` | risk-triggered-smoke | `doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e:golden-path:ci` |
+| `Extended Smoke (Preview)` | risk-triggered-smoke | `pnpm --filter @jovie/web exec playwright test --config=playwright.config.smoke.ts` |
 | `Preview Deploy (PR)` | preview-evidence | `pnpm run build:web` |
 
 ### Risk-Triggered Evidence
@@ -168,7 +169,7 @@ Sensitive changes are classified deterministically before auto-merge. High-risk 
 
 | Surface | Level | Smoke | Preview | Blocks unattended auto-merge |
 | --- | --- | --- | --- | --- |
-| CI and workflow control plane | high | yes | no | no |
+| CI and workflow control plane | high | yes | yes | no |
 | Agent control plane | high | yes | no | no |
 | Auth and identity | high | yes | yes | no |
 | Activation, AI, and background data flows | high | yes | yes | no |

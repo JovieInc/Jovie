@@ -22,7 +22,6 @@ const clerkOauthOptionsMustIncludePromptRule = require('./eslint-rules/clerk-oau
 const chatToolSchemaStrictRule = require('./eslint-rules/chat-tool-schema-strict');
 const canonicalUiLabelCasingRule = require('./eslint-rules/canonical-ui-label-casing');
 const noHardcodedThemeColorsRule = require('./eslint-rules/no-hardcoded-theme-colors');
-const noNewHeaderToolbarComponentsRule = require('./eslint-rules/no-new-header-toolbar-components');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -53,7 +52,6 @@ const baseConfig = {
         'chat-tool-schema-strict': chatToolSchemaStrictRule,
         'canonical-ui-label-casing': canonicalUiLabelCasingRule,
         'no-hardcoded-theme-colors': noHardcodedThemeColorsRule,
-        'no-new-header-toolbar-components': noNewHeaderToolbarComponentsRule,
       },
     },
   },
@@ -217,9 +215,6 @@ const baseConfig = {
     // Contrast guardrail — bare text-black/bg-white without dark: counterpart (JOV-11038)
     // error at author time; contrast-ratchet counts legacy debt in CI (JOV-3572)
     '@jovie/no-hardcoded-theme-colors': 'error',
-    // Freeze the header/toolbar component zoo ahead of the One App Shell
-    // refactor — warn only, see eslint-rules/no-new-header-toolbar-components.js
-    '@jovie/no-new-header-toolbar-components': 'warn',
   },
 };
 

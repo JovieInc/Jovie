@@ -94,9 +94,6 @@ function EntityCtaControl({
 
   if (cta.href?.startsWith('/')) {
     return (
-      // Justified suppression: EntityCard renders in carousels/lists (release
-      // matrix, profile rails) where dozens of cards can be in the viewport
-      // at once — default prefetch would stampede on scroll.
       <Link
         href={cta.href}
         prefetch={false}
@@ -148,8 +145,6 @@ function CardShell({
 }>) {
   if (href?.startsWith('/')) {
     return (
-      // Justified suppression: same carousel/list stampede risk as the CTA
-      // link above — CardShell wraps the whole card in release/profile rails.
       <Link
         href={href}
         prefetch={false}

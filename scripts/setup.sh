@@ -152,10 +152,140 @@ install_ripgrep_standalone() {
 MISSING=()
 IS_WORKTREE=false
 SETUP_START_SECONDS=$(date +%s)
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 DOPPLER_PROJECT="jovie-web"
 DOPPLER_CONFIG="dev"
 DOPPLER_LOCAL_RUN=(doppler run --project "$DOPPLER_PROJECT" --config "$DOPPLER_CONFIG" --)
+
+is_safe_cache_directory() {
+  local boundary="$1"
+  local candidate="$2"
+  local relative current part candidate_real
+  local -a parts
+  [[ -d "$boundary" && ! -L "$boundary" ]] || return 1
+  case "$candidate" in
+    "$boundary"/*) ;;
+    *) return 1 ;;
+  esac
+  relative="${candidate#"$boundary"/}"
+  current="$boundary"
+  IFS='/' read -r -a parts <<< "$relative"
+  for part in "${parts[@]}"; do
+    [[ -n "$part" && "$part" != "." && "$part" != ".." ]] || return 1
+    current="$current/$part"
+    [[ ! -L "$current" ]] || return 1
+    [[ -d "$current" ]] || return 1
+  done
+  candidate_real="$(cd "$candidate" && pwd -P)" || return 1
+  [[ "$candidate_real" == "$candidate" ]]
+}
+
+cleanup_next_cache() {
+  local root="$1"
+  local max_kib="${JOVIE_NEXT_CACHE_MAX_KIB:-8388608}"
+  local force_reset="${JOVIE_DEV_RESET_NEXT_CACHE:-0}"
+  local total_kib=0 path size_kib
+  local cache_paths=(
+    "$root/apps/web/.next/dev/cache/turbopack"
+    "$root/apps/web/.next/cache/turbopack"
+    "$root/apps/web/.next/cache/pack"
+  )
+
+  for path in "${cache_paths[@]}"; do
+    [[ -d "$path" ]] || continue
+    if ! is_safe_cache_directory "$root" "$path"; then
+      warn "Preserved unsafe or symlinked Next cache path: $path"
+      return 0
+    fi
+    size_kib="$(du -sk "$path" 2>/dev/null | awk '{print $1}')"
+    total_kib=$((total_kib + ${size_kib:-0}))
+  done
+
+  if [[ "$force_reset" != "1" ]] && (( total_kib <= max_kib )); then
+    info "Preserved Next cache (${total_kib} KiB <= ${max_kib} KiB limit; set JOVIE_DEV_RESET_NEXT_CACHE=1 to force reset)"
+    return 0
+  fi
+
+  if [[ "$force_reset" != "1" && "${JOVIE_SETUP_CACHE_SKIP_OWNER_CHECK:-0}" != "1" ]]; then
+    local writers=""
+    if [[ "${JOVIE_SETUP_CACHE_TEST_NO_LSOF:-0}" == "1" ]] || ! command -v lsof >/dev/null 2>&1; then
+      warn "Next cache exceeds ${max_kib} KiB but lsof is unavailable; preserving it because active ownership cannot be proven"
+      return 0
+    fi
+    for path in "${cache_paths[@]}"; do
+      [[ -d "$path" ]] || continue
+      writers+="$(lsof +D "$path" 2>/dev/null | awk 'NR > 1 && $1 ~ /^(node|next|pnpm|turbo|bun|npm|yarn|tsc)/ { print $1 " pid=" $2 }' | sort -u || true)"
+    done
+    if [[ -n "$writers" ]]; then
+      warn "Next cache exceeds ${max_kib} KiB but is owned by an active process; skipping reset"
+      return 0
+    fi
+    if ps -axo command= 2>/dev/null | grep -F "$root" | grep -E 'next dev|next-server|turbo dev|pnpm( run)? dev:web' >/dev/null 2>&1; then
+      warn "Next cache exceeds ${max_kib} KiB but a repo dev process is active; skipping reset"
+      return 0
+    fi
+  fi
+
+  for path in "${cache_paths[@]}"; do
+    [[ -d "$path" ]] || continue
+    is_safe_cache_directory "$root" "$path" || {
+      warn "Preserved Next caches because a path became unsafe: $path"
+      return 0
+    }
+    rm -rf -- "$path"
+  done
+  if [[ "$force_reset" == "1" ]]; then
+    success "Cleared current and legacy Next caches (forced reset)"
+  else
+    success "Cleared current and legacy Next caches (${total_kib} KiB exceeded ${max_kib} KiB limit)"
+  fi
+}
+
+if [[ "${JOVIE_SETUP_CACHE_ONLY:-0}" == "1" ]]; then
+  if [[
+    "${JOVIE_SETUP_CACHE_SKIP_OWNER_CHECK:-0}" == "1" &&
+    "${JOVIE_SETUP_CACHE_TEST_MODE:-0}" != "1"
+  ]]; then
+    echo "JOVIE_SETUP_CACHE_SKIP_OWNER_CHECK is restricted to cache test mode" >&2
+    exit 2
+  fi
+  if [[
+    "${JOVIE_SETUP_CACHE_TEST_NO_LSOF:-0}" == "1" &&
+    "${JOVIE_SETUP_CACHE_TEST_MODE:-0}" != "1"
+  ]]; then
+    echo "JOVIE_SETUP_CACHE_TEST_NO_LSOF is restricted to cache test mode" >&2
+    exit 2
+  fi
+  setup_cache_root="$REPO_ROOT"
+  if [[ -n "${JOVIE_SETUP_CACHE_ROOT:-}" ]]; then
+    if [[ "${JOVIE_SETUP_CACHE_TEST_MODE:-0}" != "1" ]]; then
+      echo "JOVIE_SETUP_CACHE_ROOT is restricted to explicit test mode" >&2
+      exit 2
+    fi
+    if [[ ! -d "$JOVIE_SETUP_CACHE_ROOT" || -L "$JOVIE_SETUP_CACHE_ROOT" ]]; then
+      echo "Setup cache test root must be a real directory" >&2
+      exit 2
+    fi
+    setup_cache_root="$(cd "$JOVIE_SETUP_CACHE_ROOT" && pwd -P)"
+    if [[ "$(basename "$setup_cache_root")" != jovie-setup-cache-* ]]; then
+      echo "Setup cache test root must be a jovie-setup-cache-* fixture" >&2
+      exit 2
+    fi
+  fi
+  node "$REPO_ROOT/scripts/local-runtime-retention.mjs" --apply \
+    --repo-root "$setup_cache_root"
+  cleanup_next_cache "$setup_cache_root"
+  exit 0
+fi
+
+if [[ -n "${JOVIE_SETUP_CACHE_ROOT:-}" ]]; then
+  echo "JOVIE_SETUP_CACHE_ROOT is only valid with JOVIE_SETUP_CACHE_ONLY=1" >&2
+  exit 2
+fi
+if [[ "${JOVIE_SETUP_CACHE_SKIP_OWNER_CHECK:-0}" == "1" ]]; then
+  echo "JOVIE_SETUP_CACHE_SKIP_OWNER_CHECK is restricted to cache test mode" >&2
+  exit 2
+fi
 
 if git rev-parse --is-inside-work-tree &>/dev/null && [ -f ".git" ]; then
   IS_WORKTREE=true
@@ -188,18 +318,18 @@ echo ""
 echo "── Node.js ─────────────────────────────────────────────────────────────"
 if command -v node &>/dev/null; then
   NODE_VERSION=$(node --version)
-  NODE_MAJOR=$(echo "$NODE_VERSION" | sed 's/v\([0-9]*\).*/\1/')
-  if [[ "$NODE_MAJOR" == "22" ]]; then
-    success "Node.js $NODE_VERSION (22.x ✓)"
+  if [[ "$NODE_VERSION" =~ ^v22\.([0-9]+)\.([0-9]+) ]] &&
+    ((10#${BASH_REMATCH[1]} > 23 || (10#${BASH_REMATCH[1]} == 23 && 10#${BASH_REMATCH[2]} >= 1))); then
+    success "Node.js $NODE_VERSION (22.23.1+ ✓)"
   else
-    warn "Node.js $NODE_VERSION detected — MUST be 22.x (22.13+)"
+    warn "Node.js $NODE_VERSION detected — MUST be 22.x (22.23.1+)"
     info "Fix: nvm use 22  (or: nvm install 22)"
-    MISSING+=("Node.js 22.x")
+    MISSING+=("Node.js 22.23.1+")
   fi
 else
   warn "Node.js not found"
   info "Install via nvm: https://github.com/nvm-sh/nvm"
-  MISSING+=("Node.js 22.x")
+  MISSING+=("Node.js 22.23.1+")
 fi
 
 # ─── 2. pnpm ────────────────────────────────────────────────────────────────
@@ -354,15 +484,13 @@ fi
 # ─── 5.5. Turbopack cache ──────────────────────────────────────────────────
 echo ""
 echo "── Turbopack cache ─────────────────────────────────────────────────"
-NEXT_CACHE="$REPO_ROOT/apps/web/.next/cache"
-if [[ "${JOVIE_DEV_RESET_NEXT_CACHE:-0}" == "1" && -d "$NEXT_CACHE" ]]; then
-  rm -rf "$NEXT_CACHE/pack" "$NEXT_CACHE/turbopack"
-  success "Cleared Turbopack cache"
-elif [[ "${JOVIE_DEV_RESET_NEXT_CACHE:-0}" == "1" ]]; then
-  info "No Turbopack cache to clear"
-else
-  info "Preserved Turbopack cache (set JOVIE_DEV_RESET_NEXT_CACHE=1 to reset)"
-fi
+node "$REPO_ROOT/scripts/local-runtime-retention.mjs" --apply --repo-root "$REPO_ROOT"
+cleanup_next_cache "$REPO_ROOT"
+
+echo ""
+echo "── Generated artifact retention ───────────────────────────────────────"
+node "$REPO_ROOT/scripts/generated-artifact-retention.mjs" --apply --repo-root "$REPO_ROOT"
+success "Applied bounded generated-artifact retention"
 
 # ─── 6. Doppler auth / config check ─────────────────────────────────────────
 echo ""

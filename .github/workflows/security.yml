@@ -9,16 +9,9 @@
 name: Security Scanning
 
 on:
-  # Risk-tiered CI (JOV-3461). The FAST secret scans (gitleaks + trufflehog,
-  # diff-scoped via `scan-secrets.sh ci-pr`) run on PRs — a leaked key on a
-  # PUBLIC repo is scraped within seconds of hitting main, so secret detection
-  # must gate pre-merge (EVENT-class). The HEAVY scans (Trivy full-tree, CodeQL,
-  # Scorecard) stay post-merge on main + nightly — they saturated runners and
-  # stalled the queue when run per-PR (2026-06-22). Per-job `if:` guards below
-  # keep the heavy ones off the PR path.
+  # PR and merge-group diff scans are required through ci.yml / PR Ready.
+  # This workflow owns post-merge and nightly security scans only.
   push:
-    branches: ['main']
-  pull_request:
     branches: ['main']
   schedule:
     - cron: '0 6 * * *' # Nightly at 06:00 UTC

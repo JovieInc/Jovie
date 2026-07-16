@@ -1,21 +1,16 @@
-import { render, screen } from '@testing-library/react';
+import { TooltipProvider } from '@jovie/ui';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AuthShell } from '@/components/organisms/AuthShell';
+import { APP_ROUTES } from '@/constants/routes';
+import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
-
-/**
- * Deletion-safety net for chunk 2.1 (legacy variant removal).
- *
- * Renders AuthShell (which composes the real AppShellFrame + AppShellRightRail)
- * under both `legacy` and `shellChatV1` variants with every optional slot
- * populated (header, rightPanel, audioPlayer, mobileBottomNav) and asserts
- * both variants mount all six shell slots with the testids downstream code
- * depends on. See `.context/one-shell/parity-audit.md` for the full
- * difference audit this test encodes.
- */
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({ toggle: vi.fn() }),
@@ -29,16 +24,38 @@ vi.mock('@/components/organisms/PersistentAudioBar', () => ({
   ),
 }));
 
-vi.mock('@/components/organisms/Sidebar', () => ({
-  SidebarProvider: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  SidebarTrigger: () => <button type='button'>Toggle Sidebar</button>,
-  useSidebar: () => ({ isMobile: false, state: 'open' }),
+vi.mock('next/navigation', () => ({
+  usePathname: () => APP_ROUTES.DASHBOARD,
 }));
 
-vi.mock('@/components/organisms/UnifiedSidebar', () => ({
-  UnifiedSidebar: () => <aside data-testid='fixture-sidebar'>Sidebar</aside>,
+vi.mock('@/lib/desktop/electron-bridge', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/desktop/electron-bridge')>()),
+  useIsElectronRuntime: () => false,
+}));
+
+vi.mock('@/hooks/useBreakpoint', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/hooks/useBreakpoint')>()),
+  useBreakpointDown: () => false,
+}));
+
+vi.mock('@/features/dashboard/dashboard-nav', () => ({
+  DashboardNav: () => <nav aria-label='Dashboard navigation' />,
+}));
+
+vi.mock('@/components/organisms/user-button', () => ({
+  UserButton: () => <div data-testid='fixture-user-button' />,
+}));
+
+vi.mock('@/features/feedback/SidebarUpgradeBanner', () => ({
+  SidebarUpgradeBanner: () => null,
+}));
+
+vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
+  SidebarInstallBanner: () => null,
+}));
+
+vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
+  SidebarBottomNowPlayingBridge: () => null,
 }));
 
 vi.mock('@/contexts/RightPanelContext', () => ({
@@ -66,15 +83,53 @@ vi.mock('@/features/dashboard/organisms/MobileProfileDrawer', () => ({
   MobileProfileDrawer: () => null,
 }));
 
+const dashboardData: DashboardData = {
+  user: { id: 'user_123' },
+  creatorProfiles: [],
+  selectedProfile: null,
+  needsOnboarding: false,
+  sidebarCollapsed: false,
+  hasSocialLinks: false,
+  hasMusicLinks: false,
+  isAdmin: false,
+  tippingStats: {
+    tipClicks: 0,
+    qrTipClicks: 0,
+    linkTipClicks: 0,
+    tipsSubmitted: 0,
+    totalReceivedCents: 0,
+    monthReceivedCents: 0,
+  },
+  profileCompletion: {
+    percentage: 0,
+    completedCount: 0,
+    totalCount: 6,
+    steps: [],
+    profileIsLive: false,
+  },
+};
+
 function renderShell(designV1: boolean) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
   return render(
-    <AppFlagProvider
-      initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: designV1 }}
-    >
-      <AuthShell section='dashboard' breadcrumbs={[]} showMobileTabs>
-        <div>Main Content</div>
-      </AuthShell>
-    </AppFlagProvider>
+    <QueryClientProvider client={queryClient}>
+      <AppFlagProvider
+        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: designV1 }}
+      >
+        <DashboardDataProvider value={dashboardData}>
+          <TooltipProvider>
+            <ShellSidebarOverrideProvider>
+              <AuthShell section='dashboard' breadcrumbs={[]} showMobileTabs>
+                <div>Main Content</div>
+              </AuthShell>
+            </ShellSidebarOverrideProvider>
+          </TooltipProvider>
+        </DashboardDataProvider>
+      </AppFlagProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -89,58 +144,57 @@ describe('shell variant parity (legacy vs shellChatV1)', () => {
   ] as const)('renders all six AppShellFrame slots for the %s variant', (variantName, designV1) => {
     renderShell(designV1);
 
-    // Frame-level variant marker
     const frame = screen
       .getByTestId('app-shell-sidebar-mount')
       .closest('[data-app-shell-frame]');
     expect(frame).toHaveAttribute('data-shell-design', variantName);
 
-    // Slot 1: sidebar
-    expect(screen.getByTestId('fixture-sidebar')).toBeInTheDocument();
-    expect(screen.getByTestId('app-shell-sidebar-mount')).toContainElement(
-      screen.getByTestId('fixture-sidebar')
-    );
+    expect(
+      screen
+        .getByTestId('app-shell-sidebar-mount')
+        .querySelector('[data-sidebar="sidebar"]')
+    ).toBeInTheDocument();
 
-    // Slot 2: header
     expect(screen.getByTestId('fixture-header')).toBeInTheDocument();
 
-    // Slot 3: main
     const scrollPane = screen.getByTestId('app-shell-scroll');
     expect(scrollPane).toContainElement(screen.getByText('Main Content'));
 
-    // Slot 4: rightPanel
     const rightRail = screen.getByTestId('app-shell-right-rail');
     expect(rightRail).toHaveAttribute('data-shell-design', variantName);
     expect(rightRail).toContainElement(
       screen.getByTestId('fixture-right-panel')
     );
 
-    // Slot 5: audioPlayer
     expect(screen.getByTestId('fixture-audio-player')).toHaveAttribute(
       'data-variant',
       variantName
     );
 
-    // Slot 6: mobileBottomNav
     expect(screen.getByTestId('fixture-mobile-tabs')).toBeInTheDocument();
   });
 
   it('keeps the sidebar toggle reachable in both variants (header trigger or in-sidebar collapse control)', () => {
-    // legacy: header always renders SidebarTrigger regardless of sidebar state.
     renderShell(false);
     expect(
-      screen.getByRole('button', { name: 'Toggle Sidebar' })
+      within(screen.getByTestId('fixture-header')).getByRole('button', {
+        name: 'Toggle Sidebar',
+      })
     ).toBeInTheDocument();
   });
 
-  it('omits the header trigger in shellChatV1 when the sidebar is open (collapse control lives in UnifiedSidebar itself)', () => {
-    // shellChatV1: header trigger only reappears once the sidebar is closed
-    // (SidebarCollapseButton), so it must not duplicate UnifiedSidebar's own
-    // in-sidebar collapse affordance while open. This is intentional parity
-    // (both provide a reachable toggle, just relocated) — see parity-audit.md.
+  it('keeps the real UnifiedSidebar collapse control reachable when shellChatV1 is open', () => {
     renderShell(true);
     expect(
-      screen.queryByRole('button', { name: 'Toggle Sidebar' })
+      within(screen.getByTestId('fixture-header')).queryByRole('button', {
+        name: 'Toggle Sidebar',
+      })
     ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('app-shell-sidebar-mount')).getByRole(
+        'button',
+        { name: 'Collapse sidebar' }
+      )
+    ).toBeInTheDocument();
   });
 });

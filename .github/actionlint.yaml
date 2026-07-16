@@ -1,6 +1,7 @@
 self-hosted-runner:
   labels:
     - jovie-runner
+    - jovie-fixed
     - hermes
     - ubicloud-standard-2
     - ubicloud-standard-8

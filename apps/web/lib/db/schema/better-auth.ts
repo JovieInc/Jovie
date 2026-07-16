@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -29,6 +30,10 @@ export const baUsers = pgTable('ba_users', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
+  phoneNumber: text('phone_number').unique(),
+  phoneNumberVerified: boolean('phone_number_verified')
+    .notNull()
+    .default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -50,6 +55,147 @@ export const baSessions = pgTable(
   table => ({
     tokenIdx: uniqueIndex('idx_ba_sessions_token').on(table.token),
     userIdIdx: index('idx_ba_sessions_user_id').on(table.userId),
+  })
+);
+
+/** Asymmetric signing keys used by Better Auth's JWT/OIDC issuer. */
+export const baJwks = pgTable('ba_jwks', {
+  id: text('id').primaryKey(),
+  publicKey: text('public_key').notNull(),
+  privateKey: text('private_key').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  expiresAt: timestamp('expires_at'),
+});
+
+export const baOauthClients = pgTable(
+  'ba_oauth_clients',
+  {
+    id: text('id').primaryKey(),
+    clientId: text('client_id').notNull().unique(),
+    clientSecret: text('client_secret'),
+    disabled: boolean('disabled').notNull().default(false),
+    skipConsent: boolean('skip_consent'),
+    enableEndSession: boolean('enable_end_session'),
+    subjectType: text('subject_type'),
+    scopes: jsonb('scopes').$type<string[]>(),
+    userId: text('user_id').references(() => baUsers.id, {
+      onDelete: 'cascade',
+    }),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+    name: text('name'),
+    uri: text('uri'),
+    icon: text('icon'),
+    contacts: jsonb('contacts').$type<string[]>(),
+    tos: text('tos'),
+    policy: text('policy'),
+    softwareId: text('software_id'),
+    softwareVersion: text('software_version'),
+    softwareStatement: text('software_statement'),
+    redirectUris: jsonb('redirect_uris').$type<string[]>().notNull(),
+    postLogoutRedirectUris: jsonb('post_logout_redirect_uris').$type<
+      string[]
+    >(),
+    tokenEndpointAuthMethod: text('token_endpoint_auth_method'),
+    grantTypes: jsonb('grant_types').$type<string[]>(),
+    responseTypes: jsonb('response_types').$type<string[]>(),
+    public: boolean('public'),
+    type: text('type'),
+    requirePKCE: boolean('require_pkce'),
+    referenceId: text('reference_id'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  },
+  table => ({
+    userIdIdx: index('idx_ba_oauth_clients_user_id').on(table.userId),
+  })
+);
+
+export const baOauthRefreshTokens = pgTable(
+  'ba_oauth_refresh_tokens',
+  {
+    id: text('id').primaryKey(),
+    token: text('token').notNull().unique(),
+    clientId: text('client_id')
+      .notNull()
+      .references(() => baOauthClients.clientId, { onDelete: 'cascade' }),
+    sessionId: text('session_id').references(() => baSessions.id, {
+      onDelete: 'set null',
+    }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => baUsers.id, { onDelete: 'cascade' }),
+    referenceId: text('reference_id'),
+    expiresAt: timestamp('expires_at').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    revoked: timestamp('revoked'),
+    authTime: timestamp('auth_time'),
+    scopes: jsonb('scopes').$type<string[]>().notNull(),
+  },
+  table => ({
+    clientIdIdx: index('idx_ba_oauth_refresh_tokens_client_id').on(
+      table.clientId
+    ),
+    sessionIdIdx: index('idx_ba_oauth_refresh_tokens_session_id').on(
+      table.sessionId
+    ),
+    userIdIdx: index('idx_ba_oauth_refresh_tokens_user_id').on(table.userId),
+  })
+);
+
+export const baOauthAccessTokens = pgTable(
+  'ba_oauth_access_tokens',
+  {
+    id: text('id').primaryKey(),
+    token: text('token').notNull().unique(),
+    clientId: text('client_id')
+      .notNull()
+      .references(() => baOauthClients.clientId, { onDelete: 'cascade' }),
+    sessionId: text('session_id').references(() => baSessions.id, {
+      onDelete: 'set null',
+    }),
+    userId: text('user_id').references(() => baUsers.id, {
+      onDelete: 'cascade',
+    }),
+    referenceId: text('reference_id'),
+    refreshId: text('refresh_id').references(() => baOauthRefreshTokens.id, {
+      onDelete: 'set null',
+    }),
+    expiresAt: timestamp('expires_at').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    scopes: jsonb('scopes').$type<string[]>().notNull(),
+  },
+  table => ({
+    clientIdIdx: index('idx_ba_oauth_access_tokens_client_id').on(
+      table.clientId
+    ),
+    sessionIdIdx: index('idx_ba_oauth_access_tokens_session_id').on(
+      table.sessionId
+    ),
+    userIdIdx: index('idx_ba_oauth_access_tokens_user_id').on(table.userId),
+    refreshIdIdx: index('idx_ba_oauth_access_tokens_refresh_id').on(
+      table.refreshId
+    ),
+  })
+);
+
+export const baOauthConsents = pgTable(
+  'ba_oauth_consents',
+  {
+    id: text('id').primaryKey(),
+    clientId: text('client_id')
+      .notNull()
+      .references(() => baOauthClients.clientId, { onDelete: 'cascade' }),
+    userId: text('user_id').references(() => baUsers.id, {
+      onDelete: 'cascade',
+    }),
+    referenceId: text('reference_id'),
+    scopes: jsonb('scopes').$type<string[]>().notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  table => ({
+    clientIdIdx: index('idx_ba_oauth_consents_client_id').on(table.clientId),
+    userIdIdx: index('idx_ba_oauth_consents_user_id').on(table.userId),
   })
 );
 

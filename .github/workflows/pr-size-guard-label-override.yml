@@ -11,7 +11,10 @@ name: PR Size Guard Label Override
 # API only — it cannot cancel the real size-computation job.
 
 on:
-  pull_request:
+  # Use the default-branch workflow definition so old PR heads can receive a
+  # newly shipped label policy. All executable code remains pinned to the
+  # immutable workflow SHA below; no PR-head code runs with checks:write.
+  pull_request_target:
     types: [labeled]
 
 permissions:
@@ -28,25 +31,29 @@ jobs:
     name: PR Size Guard Label Override
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 2
-    if: >-
-      github.event.pull_request.user.login != 'dependabot[bot]' &&
-      github.event.pull_request.head.ref != 'screenshots/auto-update' &&
-      (
-        github.event.label.name == 'big-pr' ||
-        github.event.label.name == 'codemod' ||
-        github.event.label.name == 'integration-train'
-      )
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.head.ref != 'screenshots/auto-update' &&
+          (
+            github.event.label.name == 'big-pr' ||
+            github.event.label.name == 'codemod' ||
+            github.event.label.name == 'integration-train'
+          )
         with:
           # This job has checks:write. Execute policy code only from the
-          # immutable base commit, never from a PR-controlled head.
-          ref: ${{ github.event.pull_request.base.sha }}
+          # exact trusted commit that supplied this workflow, never from a
+          # stale PR base or PR-controlled head.
+          ref: ${{ github.workflow_sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - name: Recompute and validate bounded integration train
-        if: ${{ github.event.label.name == 'integration-train' }}
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.head.ref != 'screenshots/auto-update' &&
+          github.event.label.name == 'integration-train'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -81,6 +88,14 @@ jobs:
             node scripts/lib/pr-size-guard-policy.mjs
 
       - name: Post passing PR Size Guard check
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.head.ref != 'screenshots/auto-update' &&
+          (
+            github.event.label.name == 'big-pr' ||
+            github.event.label.name == 'codemod' ||
+            github.event.label.name == 'integration-train'
+          )
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}

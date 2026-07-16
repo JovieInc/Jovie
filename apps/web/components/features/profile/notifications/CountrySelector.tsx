@@ -54,7 +54,7 @@ const CountryOptionButton = memo(function CountryOptionButton({
     <button
       type='button'
       onClick={handleClick}
-      className={`flex w-full items-center gap-3 rounded-(--radius-2xl) px-3 py-2 text-app font-semibold leading-[20px] tracking-[-0.01em] transition-colors duration-normal ease-out ${
+      className={`flex w-full items-center gap-3 rounded-(--radius-2xl) px-3 py-2 text-app font-semibold leading-5 tracking-tight transition-colors duration-normal ease-out ${
         isSelected
           ? 'border border-[color:var(--profile-pearl-border)] bg-(--profile-pearl-bg-active) text-primary-token'
           : 'text-primary-token hover:bg-(--profile-pearl-bg)'

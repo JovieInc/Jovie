@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/nextjs';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
@@ -57,11 +56,6 @@ export async function DashboardShellContent({
     flagNames: resolveAppShellRouteFlagNames(pathname),
   });
 
-  // Timing evidence for the essential vs. full dashboard-data split (JOV
-  // one-shell chunk 1.2). Cheap `performance.now()` diff, not a hot-path
-  // dependency — safe to leave on permanently.
-  const dataFetchStartedAt = performance.now();
-
   // Run ban check in parallel with dashboard data fetch
   const [dashboardData, banStatus, cookieStore, initialFlags] =
     await Promise.all([
@@ -70,12 +64,6 @@ export async function DashboardShellContent({
       cookieStorePromise,
       initialFlagsPromise,
     ]);
-
-  Sentry.logger.debug('[DashboardShellContent] dashboard data fetch', {
-    pathname,
-    useEssentialShell,
-    durationMs: Math.round(performance.now() - dataFetchStartedAt),
-  });
 
   if (banStatus.isBanned) {
     return <UnavailablePage />;

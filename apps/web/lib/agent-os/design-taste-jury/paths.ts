@@ -53,3 +53,11 @@ export function resolveDesignTasteJuryIssueFilingsPath(runId: string): string {
     getDesignTasteJuryRootDirectory()
   );
 }
+
+export function resolveDesignTasteJuryCompletionPath(runId: string): string {
+  const safeRunId = assertValidDesignTasteJuryRunId(runId);
+  return validatePathTraversal(
+    path.join(safeRunId, 'complete.json'),
+    getDesignTasteJuryRootDirectory()
+  );
+}

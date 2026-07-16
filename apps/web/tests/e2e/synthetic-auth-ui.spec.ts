@@ -10,10 +10,9 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  * for the original SSO-only cutover context.
  *
  * What this catches:
- * - Broken Clerk JS bundle / FAPI proxy regression (/__clerk/*)
- * - Publishable/secret key mismatch on the active deploy
+ * - Broken auth client or Better Auth route configuration
  * - Missing or misconfigured SSO provider
- * - CSP misconfig blocking Clerk
+ * - CSP misconfig blocking OAuth initiation
  * - Auth surface failing to render live SSO + email controls
  *
  * What this does NOT cover (deferred to Sentry/RUM + the Layer B follow-up
@@ -95,13 +94,23 @@ async function assertAuthShellReady(page: Page, expectedMode: string) {
   ).toBeVisible({ timeout: 30_000 });
 }
 
-async function assertClerkCaptchaMount(page: Page) {
-  const captcha = page.locator('#clerk-captcha[data-cl-size="invisible"]');
+async function assertActiveAuthSurfaceContract(page: Page) {
   await expect(
-    captcha,
-    'Auth shell must mount the invisible Clerk Smart CAPTCHA element'
-  ).toHaveCount(1, { timeout: 15_000 });
-  await expect(captcha).toHaveAttribute('data-cl-theme', 'dark');
+    page.locator('[data-auth-sso-surface]'),
+    'Auth shell should render the active SSO surface'
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.locator('[data-auth-provider-slots]'),
+    'Auth shell should expose provider controls'
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-auth-email-form-slot]'),
+    'Auth shell should expose the passwordless email flow'
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-auth-oauth-error-slot][aria-live="polite"]'),
+    'OAuth start errors should have a live announcement region'
+  ).toHaveCount(1);
 }
 
 test.describe('Synthetic Monitoring — Layer A (auth UI, SSO + email)', () => {
@@ -130,7 +139,7 @@ test.describe('Synthetic Monitoring — Layer A (auth UI, SSO + email)', () => {
 
     await assertNoFrontDoorConfigErrors(page);
     await assertAuthShellReady(page, 'sign-in');
-    await assertClerkCaptchaMount(page);
+    await assertActiveAuthSurfaceContract(page);
 
     console.log(
       '[Synthetic][Layer A] Asserting intentional email auth surface'
@@ -186,7 +195,7 @@ test.describe('Synthetic Monitoring — Layer A (auth UI, SSO + email)', () => {
 
     await assertNoFrontDoorConfigErrors(page);
     await assertAuthShellReady(page, 'sign-up');
-    await assertClerkCaptchaMount(page);
+    await assertActiveAuthSurfaceContract(page);
     await assertIntentionalEmailAuthSurface(page);
 
     const googleButton = page.getByRole('button', {

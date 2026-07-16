@@ -2,7 +2,17 @@
  * Contrast baseline schema guard — JOV-#11028
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import os from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
@@ -13,6 +23,7 @@ import {
   type ContrastInventory,
   inferComponentKey,
   isContrastInventory,
+  resetContrastScreenshotDirectory,
 } from '../../e2e/utils/contrast-inventory';
 
 const WEB_ROOT = process.cwd();
@@ -124,5 +135,66 @@ describe('Contrast baseline schema (JOV-#11028)', () => {
     expect(inventory.totalViolations).toBe(computedTotal);
     expect(indexedSelectorTotal).toBe(computedTotal);
     expect(indexedComponentTotal).toBe(computedTotal);
+  });
+
+  it('resets only the owned screenshot directory and refuses symlinks', () => {
+    const root = mkdtempSync(
+      join(realpathSync(os.tmpdir()), 'contrast-inventory-')
+    );
+    const screenshotDir = join(root, 'contrast-screenshots');
+    const outsideDir = join(root, 'outside');
+    const outsideSentinel = join(outsideDir, 'sentinel.txt');
+
+    try {
+      mkdirSync(screenshotDir);
+      mkdirSync(outsideDir);
+      writeFileSync(join(screenshotDir, 'stale.png'), 'stale');
+      writeFileSync(outsideSentinel, 'keep');
+
+      expect(resetContrastScreenshotDirectory(root)).toBe(screenshotDir);
+      expect(existsSync(join(screenshotDir, 'stale.png'))).toBe(false);
+      expect(readFileSync(outsideSentinel, 'utf8')).toBe('keep');
+
+      rmSync(screenshotDir, { recursive: true });
+      symlinkSync(outsideDir, screenshotDir, 'dir');
+      expect(() => resetContrastScreenshotDirectory(root)).toThrow(
+        'refuses to replace a symlinked output root'
+      );
+      expect(readFileSync(outsideSentinel, 'utf8')).toBe('keep');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    'live',
+    'dangling',
+  ] as const)('refuses a %s symlinked ancestor without deleting outside files', symlinkType => {
+    const root = mkdtempSync(
+      join(realpathSync(os.tmpdir()), 'contrast-ancestor-')
+    );
+    const lexicalRoot = join(root, 'lexical');
+    const outsideDir = join(root, 'outside');
+    const outsideSentinel = join(outsideDir, 'sentinel.txt');
+
+    try {
+      mkdirSync(lexicalRoot);
+      mkdirSync(outsideDir);
+      writeFileSync(outsideSentinel, 'keep');
+      const linkedAncestor = join(lexicalRoot, 'tests');
+      symlinkSync(
+        symlinkType === 'live' ? outsideDir : join(root, 'missing'),
+        linkedAncestor,
+        'dir'
+      );
+      const outputRoot = join(linkedAncestor, 'e2e');
+
+      expect(() => resetContrastScreenshotDirectory(outputRoot)).toThrow(
+        'resolves outside its lexical root'
+      );
+      expect(readFileSync(outsideSentinel, 'utf8')).toBe('keep');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

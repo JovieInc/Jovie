@@ -1,38 +1,13 @@
-/**
- * Skeleton -> hydrated shell-chrome parity guard.
- *
- * Regression guard for #13819, #13821, #13823 (JOV-4157 UI drift wave) and a
- * standing guard for every future shell chunk in the One App Shell program
- * (#12633): the persistent shell chrome (sidebar mount + header) must not
- * shift position or size while a route's loading skeleton is swapped for its
- * hydrated content during a client-side navigation. `DashboardShellContent`
- * (sidebar, header, `AppShellFrame`) stays mounted across in-shell route
- * changes — only the inner route segment (dispatched by
- * `apps/web/app/app/(shell)/loading.tsx` / `shell-route-matches.ts`) swaps
- * between its skeleton and hydrated content. A skeleton whose structure
- * doesn't match the loaded layout can leak into the persistent frame (e.g.
- * via a horizontal scrollbar or a reflowed content-container height); this
- * spec asserts it never does.
- *
- * How it works, per route:
- * 1. Auth via the dev bypass to a creator-ready session and land on
- *    `/app/dashboard` (the persistent shell mounts here).
- * 2. Capture the sidebar + header bounding boxes as a baseline.
- * 3. Click the sidebar nav link for the target route (client-side
- *    navigation — the same transition a real user triggers).
- * 4. Capture the sidebar + header bounding boxes immediately after the
- *    click (the route's skeleton may still be visible at this point).
- * 5. Wait for the route's hydrated content testid to appear.
- * 6. Capture the sidebar + header bounding boxes once more and assert all
- *    three snapshots are equal within 1px.
- *
- * Run:
- *   pnpm run test:web:e2e -- skeleton-parity --project=chromium
- *
- * @stability
- */
+/** Holds each route's RSC request to measure its skeleton and hydrated root. */
 
-import { expect, type Page, test } from '@playwright/test';
+import {
+  expect,
+  type Locator,
+  type Page,
+  type Request,
+  type Route,
+  test,
+} from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 
 const BYPASS_URL =
@@ -44,110 +19,164 @@ const HEADER_SELECTOR = '[data-testid="dashboard-header"]';
 interface RouteCase {
   readonly name: string;
   readonly path: string;
-  /** Hydrated content that replaces the route's loading skeleton. */
-  readonly contentSelector?: string;
-  /** Loading skeleton to wait for disappearance of, when there is no single
-   * stable "hydrated" content testid to assert visible instead. */
-  readonly skeletonSelector?: string;
+  readonly skeletonSelector: string;
+  readonly contentSelector: string;
 }
 
-async function waitForRouteReady(
-  page: Page,
-  routeCase: RouteCase
-): Promise<void> {
-  if (routeCase.contentSelector) {
-    await expect(page.locator(routeCase.contentSelector).first()).toBeVisible({
-      timeout: 45_000,
-    });
-    return;
-  }
-
-  if (routeCase.skeletonSelector) {
-    await expect(page.locator(routeCase.skeletonSelector)).toHaveCount(0, {
-      timeout: 45_000,
-    });
-    return;
-  }
-
-  throw new Error(`Route case ${routeCase.name} has no readiness condition.`);
-}
-
-// Routes reachable via a direct sidebar nav link so the transition is a real
-// client-side navigation (not a hard reload that would instead hit the
-// layout-level cold-boot skeleton). Covers both a pre-existing dedicated
-// skeleton (tasks, audience) and the new dispatch branch added for #13823
-// (settings, previously fell through to the generic DashboardSegmentSkeleton).
 const ROUTE_CASES: readonly RouteCase[] = [
   {
     name: 'tasks',
     path: APP_ROUTES.TASKS,
+    skeletonSelector: '[data-testid="tasks-route-skeleton"]',
     contentSelector:
       '[data-testid="tasks-workspace"], [data-testid="tasks-upgrade-interstitial"]',
   },
   {
     name: 'audience',
     path: APP_ROUTES.AUDIENCE,
+    skeletonSelector: '[data-testid="dashboard-audience-loading"]',
     contentSelector: '[data-testid="dashboard-audience-table"]',
   },
   {
     name: 'settings',
     path: APP_ROUTES.SETTINGS,
-    skeletonSelector: '[data-testid="settings-loading-skeleton"]',
+    skeletonSelector: '[data-testid="settings-route-skeleton"]',
+    contentSelector: '[data-testid="settings-shell-content"]',
   },
 ];
 
+interface ElementBox {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 interface ChromeBoxes {
-  readonly sidebar: { x: number; y: number; width: number; height: number };
-  readonly header: { x: number; y: number; width: number; height: number };
+  readonly sidebar: ElementBox;
+  readonly header: ElementBox;
+}
+
+function isRscRequest(request: Request): boolean {
+  try {
+    if (new URL(request.url()).searchParams.has('_rsc')) return true;
+  } catch {
+    return false;
+  }
+
+  const headers = request.headers();
+  return headers.rsc === '1' || headers.accept?.includes('text/x-component');
+}
+
+function requestMatchesPath(request: Request, path: string): boolean {
+  try {
+    const pathname = new URL(request.url()).pathname;
+    return pathname === path || pathname.startsWith(`${path}/`);
+  } catch {
+    return false;
+  }
+}
+
+interface HeldRscTransition {
+  readonly requestStarted: Promise<void>;
+  readonly heldRequestCount: () => number;
+  readonly release: () => void;
+  readonly dispose: () => Promise<void>;
+}
+
+async function holdRscTransition(
+  page: Page,
+  path: string
+): Promise<HeldRscTransition> {
+  let resolveRequestStarted: (() => void) | undefined;
+  let resolveRelease: (() => void) | undefined;
+  let released = false;
+  let heldRequestCount = 0;
+
+  const requestStarted = new Promise<void>(resolve => {
+    resolveRequestStarted = resolve;
+  });
+  const releaseGate = new Promise<void>(resolve => {
+    resolveRelease = resolve;
+  });
+
+  const release = () => {
+    if (released) return;
+    released = true;
+    resolveRelease?.();
+  };
+
+  const handler = async (route: Route) => {
+    const request = route.request();
+    if (!requestMatchesPath(request, path) || !isRscRequest(request)) {
+      await route.continue();
+      return;
+    }
+
+    heldRequestCount += 1;
+    resolveRequestStarted?.();
+    await releaseGate;
+    await route.continue();
+  };
+
+  await page.route('**/*', handler);
+
+  return {
+    requestStarted,
+    heldRequestCount: () => heldRequestCount,
+    release,
+    dispose: async () => {
+      release();
+      await page.unroute('**/*', handler);
+    },
+  };
+}
+
+async function captureBox(
+  locator: Locator,
+  label: string
+): Promise<ElementBox> {
+  await expect(locator, `${label}: element is visible`).toBeVisible({
+    timeout: 30_000,
+  });
+  const box = await locator.boundingBox();
+  if (!box) {
+    throw new Error(`${label}: bounding box was not measurable.`);
+  }
+  return box;
 }
 
 async function captureChromeBoxes(page: Page): Promise<ChromeBoxes> {
-  const sidebar = page.locator(SIDEBAR_SELECTOR);
-  const header = page.locator(HEADER_SELECTOR);
-
-  await expect(sidebar).toBeVisible({ timeout: 30_000 });
-  await expect(header).toBeVisible({ timeout: 30_000 });
-
-  const [sidebarBox, headerBox] = await Promise.all([
-    sidebar.boundingBox(),
-    header.boundingBox(),
+  const [sidebar, header] = await Promise.all([
+    captureBox(page.locator(SIDEBAR_SELECTOR), 'shell sidebar'),
+    captureBox(page.locator(HEADER_SELECTOR), 'shell header'),
   ]);
 
-  if (!sidebarBox || !headerBox) {
-    throw new Error('Shell chrome bounding boxes were not measurable.');
-  }
-
-  return { sidebar: sidebarBox, header: headerBox };
+  return { sidebar, header };
 }
 
-function assertBoxesMatch(
-  before: ChromeBoxes,
-  after: ChromeBoxes,
+function assertBoxMatches(
+  before: ElementBox,
+  after: ElementBox,
   label: string
 ): void {
   const tolerancePx = 1;
 
-  for (const key of ['sidebar', 'header'] as const) {
-    const beforeBox = before[key];
-    const afterBox = after[key];
-
+  for (const key of ['x', 'y', 'width', 'height'] as const) {
     expect(
-      Math.abs(beforeBox.x - afterBox.x),
-      `${label}: ${key} x shifted`
-    ).toBeLessThanOrEqual(tolerancePx);
-    expect(
-      Math.abs(beforeBox.y - afterBox.y),
-      `${label}: ${key} y shifted`
-    ).toBeLessThanOrEqual(tolerancePx);
-    expect(
-      Math.abs(beforeBox.width - afterBox.width),
-      `${label}: ${key} width shifted`
-    ).toBeLessThanOrEqual(tolerancePx);
-    expect(
-      Math.abs(beforeBox.height - afterBox.height),
-      `${label}: ${key} height shifted`
+      Math.abs(before[key] - after[key]),
+      `${label}: ${key} shifted`
     ).toBeLessThanOrEqual(tolerancePx);
   }
+}
+
+function assertChromeBoxesMatch(
+  before: ChromeBoxes,
+  after: ChromeBoxes,
+  label: string
+): void {
+  assertBoxMatches(before.sidebar, after.sidebar, `${label}: sidebar`);
+  assertBoxMatches(before.header, after.header, `${label}: header`);
 }
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -155,43 +184,68 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test.describe('Skeleton parity across shell routes', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto(BYPASS_URL, { waitUntil: 'domcontentloaded' });
-    await page.waitForURL(/\/app\/dashboard/, { timeout: 60_000 });
-    await captureChromeBoxes(page); // shell fully mounted before we start clicking
   });
 
   for (const routeCase of ROUTE_CASES) {
-    test(`${routeCase.name} shell chrome does not shift between skeleton and hydrated states`, async ({
+    test(`${routeCase.name} keeps shell chrome and route-content geometry stable`, async ({
       page,
     }) => {
-      test.setTimeout(60_000);
+      test.setTimeout(90_000);
+      const heldTransition = await holdRscTransition(page, routeCase.path);
 
-      const baselineBoxes = await captureChromeBoxes(page);
+      try {
+        await page.goto(BYPASS_URL, { waitUntil: 'domcontentloaded' });
+        await page.waitForURL(/\/app\/dashboard/, { timeout: 60_000 });
+        const baselineBoxes = await captureChromeBoxes(page);
 
-      const navLink = page.locator(`a[href="${routeCase.path}"]`).first();
-      await expect(navLink).toBeVisible({ timeout: 30_000 });
-      await navLink.click();
-      await page.waitForURL(url => url.pathname.startsWith(routeCase.path), {
-        timeout: 30_000,
-      });
+        const navLink = page.locator(`a[href="${routeCase.path}"]`).first();
+        await expect(navLink).toBeVisible({ timeout: 30_000 });
+        await navLink.click({ noWaitAfter: true });
+        await heldTransition.requestStarted;
+        expect(heldTransition.heldRequestCount()).toBeGreaterThan(0);
 
-      // Captured immediately after the client-side transition starts — the
-      // route's loading skeleton may still be visible here.
-      const duringTransitionBoxes = await captureChromeBoxes(page);
-      assertBoxesMatch(
-        baselineBoxes,
-        duringTransitionBoxes,
-        `${routeCase.name} (baseline -> during transition)`
-      );
+        const skeleton = page.locator(routeCase.skeletonSelector).first();
+        await expect(
+          skeleton,
+          `${routeCase.name}: route-specific skeleton mounted during held RSC transition`
+        ).toBeVisible({ timeout: 30_000 });
 
-      await waitForRouteReady(page, routeCase);
+        const [duringTransitionBoxes, skeletonBox] = await Promise.all([
+          captureChromeBoxes(page),
+          captureBox(skeleton, `${routeCase.name} skeleton root`),
+        ]);
+        assertChromeBoxesMatch(
+          baselineBoxes,
+          duringTransitionBoxes,
+          `${routeCase.name} baseline -> skeleton`
+        );
 
-      const hydratedBoxes = await captureChromeBoxes(page);
-      assertBoxesMatch(
-        duringTransitionBoxes,
-        hydratedBoxes,
-        `${routeCase.name} (during transition -> hydrated)`
-      );
+        heldTransition.release();
+        await page.waitForURL(url => url.pathname.startsWith(routeCase.path), {
+          timeout: 30_000,
+        });
+
+        const content = page.locator(routeCase.contentSelector).first();
+        await expect(content).toBeVisible({ timeout: 45_000 });
+        await expect(skeleton).toHaveCount(0, { timeout: 45_000 });
+
+        const [hydratedBoxes, contentBox] = await Promise.all([
+          captureChromeBoxes(page),
+          captureBox(content, `${routeCase.name} hydrated content root`),
+        ]);
+        assertChromeBoxesMatch(
+          duringTransitionBoxes,
+          hydratedBoxes,
+          `${routeCase.name} skeleton -> hydrated`
+        );
+        assertBoxMatches(
+          skeletonBox,
+          contentBox,
+          `${routeCase.name} route content skeleton -> hydrated`
+        );
+      } finally {
+        await heldTransition.dispose();
+      }
     });
   }
 });

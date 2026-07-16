@@ -5,7 +5,9 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -402,13 +404,15 @@ function installFakeGbrain(dir, script) {
   return bin;
 }
 
-test('CLI: ownership fast path reads the agent-job-ledger page first', () => {
+test('CLI: ownership fast path reads the canonical ledger slug and short-circuits', () => {
   const dir = mkdtempSync(join(tmpdir(), 'pf-ledger-'));
   try {
     makeGitRepo(dir);
+    const calls = join(dir, 'calls.log');
     const bin = installFakeGbrain(
       dir,
-      `if [ "$1" = "get" ] && [ "$2" = "agent-job-ledger" ]; then
+      `echo "$*" >> "${calls}"
+if [ "$1" = "get" ] && [ "$2" = "coordination/agent-job-ledger" ]; then
   echo "ledger: eve owns triage"
   exit 0
 fi
@@ -421,6 +425,141 @@ exit 1`
     const receipt = JSON.parse(res.stdout.trim().split('\n').pop());
     assert.equal(receipt.ownership.source, 'ledger');
     assert.equal(receipt.ownership.reachable, true);
+    assert.equal(
+      readFileSync(calls, 'utf8').trim(),
+      'get coordination/agent-job-ledger'
+    );
+    assert.equal(
+      receipt.ownership.diagnostics.requested_slug,
+      'coordination/agent-job-ledger'
+    );
+    assert.equal(
+      receipt.ownership.diagnostics.resolved_slug,
+      'coordination/agent-job-ledger'
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CLI: page_not_found is distinct from timeout and falls back to keyword', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pf-page-missing-'));
+  try {
+    makeGitRepo(dir);
+    const bin = installFakeGbrain(
+      dir,
+      `if [ "$1" = "get" ]; then echo "page_not_found: $2" >&2; exit 1; fi
+if [ "$1" = "search" ]; then echo "keyword owner context"; exit 0; fi
+exit 1`
+    );
+    const res = runPreflight(dir, {
+      PATH: `${bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${dirname(process.execPath)}`,
+    });
+    const receipt = JSON.parse(res.stdout.trim().split('\n').pop());
+    assert.equal(receipt.ownership.source, 'keyword');
+    assert.equal(
+      receipt.ownership.diagnostics.failure_class,
+      'gbrain_ownership_preflight_latency_or_slug_drift'
+    );
+    assert.equal(
+      receipt.ownership.diagnostics.lookup_health,
+      'degraded_page_not_found'
+    );
+    assert.equal(receipt.ownership.diagnostics.db_lock_signal_detected, null);
+    assert.equal(receipt.ownership.diagnostics.session_signal_detected, null);
+    assert.equal(receipt.ownership.diagnostics.timeout_tier, null);
+    assert.equal(
+      receipt.ownership.diagnostics.attempts[0].outcome,
+      'page_not_found'
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CLI: diagnostics distinguish nested step timeout from overall deadline', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pf-timeout-tiers-'));
+  try {
+    makeGitRepo(dir);
+    const bin = installFakeGbrain(
+      dir,
+      `if [ "$1" = "get" ]; then sleep 30; fi
+if [ "$1" = "search" ]; then echo "fallback owner"; exit 0; fi
+exit 1`
+    );
+    const nested = runPreflight(dir, {
+      AGENT_PREFLIGHT_OWNERSHIP_BUDGET_MS: '4500',
+      PATH: `${bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${dirname(process.execPath)}`,
+    });
+    const nestedReceipt = JSON.parse(nested.stdout.trim().split('\n').pop());
+    assert.equal(nestedReceipt.ownership.source, 'keyword');
+    assert.equal(
+      nestedReceipt.ownership.diagnostics.attempts[0].timeout_tier,
+      'ledger_step'
+    );
+
+    const overallDir = join(dir, 'overall');
+    const overallBin = installFakeGbrain(
+      overallDir,
+      `if [ "$1" = "get" ]; then exit 0; fi
+if [ "$1" = "search" ]; then sleep 30; fi
+exit 1`
+    );
+    const overall = runPreflight(dir, {
+      AGENT_PREFLIGHT_OWNERSHIP_BUDGET_MS: '1500',
+      PATH: `${overallBin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${dirname(process.execPath)}`,
+    });
+    const overallReceipt = JSON.parse(overall.stdout.trim().split('\n').pop());
+    assert.equal(overallReceipt.ownership.source, 'gbrain-timeout');
+    assert.equal(overallReceipt.ownership.diagnostics.timeout_tier, 'overall');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CLI: supported one-process gbrain engine read wins before cold CLI', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pf-engine-'));
+  try {
+    makeGitRepo(dir);
+    const packageRoot = join(dir, 'gbrain-package');
+    const packageSrc = join(packageRoot, 'src');
+    const bin = join(dir, 'fake-bin');
+    mkdirSync(packageSrc, { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(
+      join(packageRoot, 'package.json'),
+      JSON.stringify({
+        name: 'gbrain',
+        exports: {
+          './config': './src/config.ts',
+          './engine-factory': './src/engine-factory.ts',
+        },
+      })
+    );
+    writeFileSync(
+      join(packageSrc, 'cli.ts'),
+      '#!/usr/bin/env bash\necho COLD_CLI_SHOULD_NOT_RUN >&2\nexit 1\n'
+    );
+    chmodSync(join(packageSrc, 'cli.ts'), 0o755);
+    symlinkSync(join(packageSrc, 'cli.ts'), join(bin, 'gbrain'));
+    const calls = join(dir, 'bun-calls.log');
+    writeFileSync(
+      join(bin, 'bun'),
+      `#!/usr/bin/env bash
+echo "$*" >> "${calls}"
+echo '{"found":true,"create_ms":1,"connect_ms":3,"read_ms":1,"total_ms":5}'
+`
+    );
+    chmodSync(join(bin, 'bun'), 0o755);
+
+    const res = runPreflight(dir, {
+      PATH: `${bin}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${dirname(process.execPath)}`,
+    });
+    const receipt = JSON.parse(res.stdout.trim().split('\n').pop());
+    assert.equal(receipt.ownership.source, 'ledger');
+    assert.equal(receipt.ownership.diagnostics.engine_ms > 0, true);
+    assert.equal(receipt.ownership.diagnostics.cli_ms, null);
+    assert.match(readFileSync(calls, 'utf8'), /coordination\/agent-job-ledger/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

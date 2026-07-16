@@ -86,7 +86,7 @@ export function SidebarInstallBanner() {
       <div className='relative rounded-xl border border-sidebar-border/70 bg-sidebar-accent/12 px-2.5 py-2 text-sidebar-muted'>
         <button
           type='button'
-          aria-label='Dismiss version update banner'
+          aria-label='Dismiss Version Update Banner'
           onClick={dismissVersionUpdate}
           className='absolute top-1 right-1 flex size-6 items-center justify-center rounded text-sidebar-muted/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
         >
@@ -96,7 +96,7 @@ export function SidebarInstallBanner() {
         <div className='flex items-start gap-1.5 pr-7'>
           <RefreshCw className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon/60' />
           <div className='min-w-0'>
-            <p className='text-2xs font-medium tracking-[-0.01em] text-sidebar-item-foreground/75'>
+            <p className='text-2xs font-medium tracking-tight text-sidebar-item-foreground/75'>
               {title}
             </p>
             <p className='mt-0.5 text-3xs leading-[1.35] text-sidebar-muted/80'>

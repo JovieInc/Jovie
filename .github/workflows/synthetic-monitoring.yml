@@ -114,6 +114,24 @@ jobs:
           doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-legacy-otp.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-legacy-otp
         continue-on-error: true
 
+      - name: Run Better Auth Production Account Canary
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          BASE_URL: https://jov.ie
+          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
+          E2E_SKIP_WEB_SERVER: '1'
+          E2E_SYNTHETIC_MODE: 'true'
+          E2E_PROD_ACCOUNT_CANARY_ENABLED: 'true'
+          E2E_ENVIRONMENT: production
+          SYNTHETIC_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-better-auth-account-results.json
+        run: |
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-better-auth-account.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-better-auth-account
+        continue-on-error: true
+
       - name: Run Public Profile Smoke Test (JOV-1653)
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
@@ -127,19 +145,10 @@ jobs:
           doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
         continue-on-error: true
 
-      - name: Upload Public Profile Smoke Screenshots
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: public-profile-smoke-screenshots
-          path: apps/web/test-results/public-profile-smoke-*.png
-          if-no-files-found: ignore
-          retention-days: 14
-
       - name: Confirm scoped synthetic cleanup
         if: always()
         run: |
-          echo "Production signup canary cleanup is scoped by exact plus-addressed email."
+          echo "Better Auth account cleanup is transactionally scoped to the exact +jovie-ba-prod-canary-<run> address and must prove zero residue."
           echo "Onboarding robot cleanup is scoped by exact robot email, Clerk user id, run id, and generated handle."
           echo "No broad production Clerk cleanup script is run from this workflow."
 

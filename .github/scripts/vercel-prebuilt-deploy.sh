@@ -65,11 +65,11 @@ run_deploy() {
   local mode="$1"
   shift
 
-  # Three bounded prebuilt attempts plus the source fallback must leave a full
-  # minute beneath the workflow step's 10-minute ceiling, including kill grace.
-  local timeout_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-15}"
+  # One realistically budgeted archive attempt plus the source fallback must
+  # leave a full minute beneath the workflow step's 10-minute ceiling.
+  local timeout_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-480}"
   if [ "$mode" = "source" ]; then
-    timeout_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-475}"
+    timeout_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-30}"
   fi
   local kill_grace_seconds="${VERCEL_DEPLOY_KILL_GRACE_SECONDS:-5}"
 
@@ -87,6 +87,25 @@ run_deploy() {
 
   if [ "$mode" = "plain" ]; then
     "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
+    return
+  fi
+
+  if [ -f ".vercel/jovie-generated-public-files" ]; then
+    while IFS= read -r generated_file; do
+      if [ -n "$generated_file" ]; then
+        rm -f -- "$generated_file"
+      fi
+    done < ".vercel/jovie-generated-public-files"
+  fi
+
+  if [ -n "${VERCEL_GIT_COMMIT_SHA:-}" ]; then
+    local build_sha="${VERCEL_GIT_COMMIT_SHA:0:7}"
+    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" \
+      --build-env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}" \
+      --env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}" \
+      --build-env "NEXT_PUBLIC_BUILD_SHA=${build_sha}" \
+      --env "NEXT_PUBLIC_BUILD_SHA=${build_sha}" \
+      --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
@@ -130,6 +149,8 @@ try_mode() {
 
 plain_prebuilt_limit=15000
 plain_prebuilt_requested="${VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK:-false}"
+source_fallback_requested="${VERCEL_ENABLE_SOURCE_FALLBACK:-true}"
+force_source_deploy="${VERCEL_FORCE_SOURCE_DEPLOY:-false}"
 prebuilt_file_count="$(count_prebuilt_files)"
 has_prebuilt_output=true
 can_use_plain_prebuilt=true
@@ -154,18 +175,32 @@ resolve_vercel_cmd
 echo "Using Vercel CLI command: ${VERCEL_CMD[*]}"
 echo "Plain prebuilt fallback requested: $plain_prebuilt_requested"
 echo "Plain prebuilt fallback enabled: $can_use_plain_prebuilt"
+echo "Source fallback requested: $source_fallback_requested"
+echo "Force source deploy: $force_source_deploy"
+
+if [ "$force_source_deploy" = "true" ] && [ "$source_fallback_requested" != "true" ]; then
+  echo "Deploy failed: force-source and disabled source fallback are mutually exclusive." >&2
+  exit 1
+fi
 
 deploy_modes=()
 
-if [ "$has_prebuilt_output" = true ]; then
-  deploy_modes+=(tgz split-tgz)
+if [ "$has_prebuilt_output" = true ] && [ "$force_source_deploy" != "true" ]; then
+  deploy_modes+=(tgz)
 fi
 
-if [ "$can_use_plain_prebuilt" = true ]; then
+if [ "$can_use_plain_prebuilt" = true ] && [ "$force_source_deploy" != "true" ]; then
   deploy_modes+=(plain)
 fi
 
-deploy_modes+=(source)
+if [ "$force_source_deploy" = "true" ] || [ "$source_fallback_requested" = "true" ]; then
+  deploy_modes+=(source)
+fi
+
+if [ "${#deploy_modes[@]}" -eq 0 ]; then
+  echo "Deploy failed: no prebuilt output is available and source fallback is disabled." >&2
+  exit 1
+fi
 total_attempts="${#deploy_modes[@]}"
 attempt=0
 

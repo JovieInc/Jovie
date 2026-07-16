@@ -4,35 +4,38 @@ Day-to-day operations for the always-on Hermes gateway running on the dedicated 
 
 ## What This Machine Is
 
-A single-purpose orchestration node. It listens for brain dumps (Telegram + Voice Memos), persists them to gbrain, routes engineering work to **GitHub Issues** (Linear mirror optional via `TRACKER_GITHUB_ONLY`), and routes ops tasks to sub-agents. The Hermes scanner code does **zero coding** itself. The opt-in codex issue shipper can start a separate `JOVIE_AGENT_PROFILE=coder` child session for eligible open GitHub issues.
+A single-purpose orchestration node. It accepts Telegram brain dumps, persists shared company context to gbrain, routes admitted engineering work to **GitHub Issues** (Linear mirror optional via `TRACKER_GITHUB_ONLY`), and routes ops tasks to sub-agents. The selected Voice Memos path is a disabled private shadow architecture: raw audio, transcripts, classifications, and proposals do not enter shared gbrain or any outbound system. The Hermes scanner code does **zero coding** itself. The opt-in codex issue shipper can start a separate `JOVIE_AGENT_PROFILE=coder` child session for eligible open GitHub issues.
+
+> **Voice activation state: disabled.** Do not load the legacy voice-memo launchd unit, process a real memo, or treat this maintenance window as activation approval. Activation requires synthetic canaries, a reviewed manual shadow run, a production local Whisper model, and separate user authorization.
 
 ## First-Time Setup
 
+The current `scripts/hermes/bootstrap-air.sh` bootstraps every rendered Hermes launchd unit, including the legacy voice-memo watcher. Therefore the all-in-one bootstrap is blocked while private voice activation is disabled. Do not run it unless the legacy unit has first been excluded from the rendered launchd set. If the unit exists from an earlier installation, keep it unloaded:
+
 ```bash
-# On the Air, from a clone of this repo:
-./scripts/hermes/bootstrap-air.sh
+launchctl bootout gui/$(id -u)/co.jovie.hermes.voice-memo-watcher 2>/dev/null || true
 ```
 
-The bootstrap script is idempotent. It will:
+Once that exclusion is verified, the bootstrap script is idempotent. It will:
 
 1. Verify Node 22 / pnpm 9.15.4.
 2. Install (if missing): Hermes (`hermes-agent-rs`), gbrain CLI, Doppler, Tailscale, Ollama.
 3. Pull the Ollama fallback model (`qwen3:4b-q4_K_M`).
 4. Render `~/.hermes/config.yaml` from `scripts/hermes/config.air.template.yaml` + Doppler secrets.
 5. Render `~/.hermes/.env` from Doppler (and `chmod 600`).
-6. Install all launchd plists into `~/Library/LaunchAgents/` and bootstrap them.
-7. Pause for the manual GUI step (see below).
+6. Install and bootstrap the remaining Hermes launchd plists into `~/Library/LaunchAgents/`. The legacy `co.jovie.hermes.voice-memo-watcher` must be absent from this set.
+7. Pause for the non-voice manual GUI steps (see below).
 8. Run a verification checklist and print results.
 
 ## Manual GUI Steps Required
 
 These cannot be scripted; bootstrap will pause and instruct.
 
-### 1. Full Disk Access for Voice Memo watcher
+### 1. Full Disk Access for Voice Memo shadow review (deferred)
 
-System Settings → Privacy & Security → Full Disk Access → enable the `tsx` binary at `~/.hermes/bin/tsx` (or whichever interpreter the launchd plist references).
+Do not grant a watcher Full Disk Access while voice activation is disabled. During a separately authorized manual shadow review, grant access only to the exact reviewed private adapter/interpreter, then revoke it if activation is not approved.
 
-Without this, the voice-memo watcher cannot read `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/`.
+The reviewed adapter may read `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings/` and the Apple Voice Memos database only for the selected synthetic fixture or explicitly approved shadow input.
 
 ### 2. Tailscale auth
 
@@ -86,6 +89,8 @@ doppler secrets set HERMES_TELEGRAM_CHAT_ID="<telegram-chat-id>" \
 | `AIRTABLE_API_KEY` | Founder-OS profile (fundraising base) | already provisioned |
 | `SENTRY_AUTH_TOKEN` | Optional: ship Hermes errors to Sentry `hermes-air` env | already provisioned |
 | `HERMES_TELEGRAM_CHAT_ID` | Optional: Telegram private-chat allowlist + outbound target | manual after first bot message |
+| `HERMES_VOICE_ENABLE_GROQ` | Voice transcription opt-in; absent or not `1` keeps Groq disabled | manual, only after explicit approval |
+| `GROQ_API_KEY` | Used only when `HERMES_VOICE_ENABLE_GROQ=1` | optional; must not be exposed to local-only voice runs |
 
 The bootstrap script verifies every required secret is present before continuing.
 
@@ -95,8 +100,8 @@ Once installed, you should never need to interact with the Air directly. All con
 
 | To do this | Do this |
 |---|---|
-| Brain-dump an idea | Telegram the bot, or record a Voice Memo on iPhone |
-| File a bug | Voice-memo "Hermes, file a GitHub issue for ..." or type it |
+| Brain-dump an idea | Telegram the bot. You may record a Voice Memo on iPhone, but it remains in Apple Voice Memos while ingest is disabled. |
+| File a bug | Type it to the Telegram bot. Voice memos cannot directly create issues. |
 | Queue CI agent dispatch | Add the GitHub issue label `agent-ready` |
 | Queue local coding work | Leave issue open for the codex issue shipper (or add `codex` for explicit routing) |
 | Ask a strategic question | Telegram the bot; the chief profile routes |
@@ -138,6 +143,13 @@ tail -50 ~/.hermes/logs/launchd/cron-gbrain-health-summary.log \
 
 # Free-model rankings
 cat ~/.hermes/state/model-router-rankings.json | jq .
+
+# Voice watcher must remain absent while activation is disabled
+if launchctl print gui/$(id -u)/co.jovie.hermes.voice-memo-watcher >/dev/null 2>&1; then
+  echo "STOP_VOICE_WATCHER"
+else
+  echo "VOICE_DISABLED"
+fi
 ```
 
 ## Common Operations
@@ -162,6 +174,7 @@ done
 ```bash
 hermes gateway start --all
 for plist in ~/Library/LaunchAgents/co.jovie.hermes.*.plist; do
+  [[ "$plist" == *voice-memo-watcher* ]] && continue
   launchctl bootstrap gui/$(id -u) "$plist"
 done
 ```
@@ -178,18 +191,13 @@ tail -f ~/.hermes/logs/gateway.error.log
 # All cron job runs
 tail -f ~/.hermes/logs/jobs.jsonl
 
-# Voice memo ingest events
-tail -f ~/.hermes/logs/voice-memo.jsonl
+# Private voice shadow receipts (only after an authorized synthetic/manual run)
+find ~/.hermes/private/voice-ingest -maxdepth 2 -type f -print 2>/dev/null
 ```
 
 ### Re-render config from updated Doppler
 
-```bash
-./scripts/hermes/bootstrap-air.sh --reconfigure
-# then:
-hermes gateway restart --all
-launchctl kickstart -k gui/$(id -u)/co.jovie.hermes.gbrain-server
-```
+The current `--reconfigure` path can load every rendered plist, including the legacy voice watcher. Do not use it while voice activation is disabled. Update only the intended rendered non-voice configuration, then restart that explicit service. Before and after the restart, run the voice-disabled status check above.
 
 ### Run the codex issue shipper once
 
@@ -218,13 +226,13 @@ Config variables:
 
 | Variable | Default | Purpose | Update path |
 |---|---:|---|---|
-| `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN` | `3` | Max Codex issues selected per drain batch; also caps parallel agent fan-out | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
-| `HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS` | `3` | Absolute cap for concurrent coder agents inside the singleton shipper run | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
-| `HERMES_CODEX_SHIPPER_MIN_FREE_MEMORY_MB` | `4096` | Below this free-memory floor, launch at most one new coder; below half this floor, launch none | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
-| `HERMES_CODEX_SHIPPER_MAX_LOAD_PER_CPU` | `1.5` | Above this one-minute load-per-CPU threshold, launch at most one new coder; above 1.5x this threshold, launch none | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
-| `HERMES_CODEX_SHIPPER_SINGLETON_LOCK_STALE_MS` | `28800000` | Long-running shipper lock TTL; new crons skip while the owning process is alive | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
-| `HERMES_CODEX_SHIPPER_INTEGRATION_THRESHOLD` | `4` | Eligible queue depth that routes trainable issues through `integration/codex-queue` | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
-| `HERMES_CODEX_SHIPPER_AGENT` | `claude` | Local coding agent binary; `claude` keeps subagent support, `codex` is available as an explicit override | Doppler or plist env, then `./scripts/hermes/bootstrap-air.sh --reconfigure` |
+| `HERMES_CODEX_SHIPPER_MAX_ISSUES_PER_RUN` | `3` | Max Codex issues selected per drain batch; also caps parallel agent fan-out | Rendered non-voice plist env, then restart only `co.jovie.hermes.cron-codex-issue-shipper` |
+| `HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS` | `3` | Absolute cap for concurrent coder agents inside the singleton shipper run | Rendered non-voice plist env, then restart only `co.jovie.hermes.cron-codex-issue-shipper` |
+| `HERMES_CODEX_SHIPPER_MIN_FREE_MEMORY_MB` | `4096` | Below this free-memory floor, launch at most one new coder; below half this floor, launch none | Rendered non-voice plist env, then restart only `co.jovie.hermes.cron-codex-issue-shipper` |
+| `HERMES_CODEX_SHIPPER_MAX_LOAD_PER_CPU` | `1.5` | Above this one-minute load-per-CPU threshold, launch at most one new coder; above 1.5x this threshold, launch none | Rendered non-voice plist env, then restart only `co.jovie.hermes.cron-codex-issue-shipper` |
+| `HERMES_CODEX_SHIPPER_SINGLETON_LOCK_STALE_MS` | `28800000` | Long-running shipper lock TTL; new crons skip while the owning process is alive | Rendered non-voice plist env, then restart only `co.jovie.hermes.cron-codex-issue-shipper` |
+| `HERMES_CODEX_SHIPPER_INTEGRATION_THRESHOLD` | `4` | Eligible queue depth that routes trainable issues through `integration/codex-queue` | Rendered non-voice plist env, then restart only `co.jovie.hermes.cron-codex-issue-shipper` |
+| `HERMES_CODEX_SHIPPER_AGENT` | `claude` | Local coding agent binary; `claude` keeps subagent support, `codex` is available as an explicit override | Rendered non-voice plist env, then restart only `co.jovie.hermes.cron-codex-issue-shipper` |
 
 Control labels:
 
@@ -253,8 +261,8 @@ Ship now / Re-evaluate when / Then:
 2. Tail gateway log: `tail -100 ~/.hermes/logs/gateway.error.log`
 3. Run the config sentinel: `tsx scripts/hermes/jobs/agent-config-health.ts`
 4. Confirm the supported Hermes gateway command works: `hermes gateway status`
-5. Re-run bootstrap: `./scripts/hermes/bootstrap-air.sh` (idempotent)
-6. If config is corrupt: `mv ~/.hermes/config.yaml ~/.hermes/config.yaml.bak && ./scripts/hermes/bootstrap-air.sh --reconfigure`
+5. Restart the gateway with `hermes gateway restart --all`.
+6. Do not use bootstrap or `--reconfigure` as recovery while voice activation is disabled; both can load the legacy watcher. Restore a known-good `~/.hermes/config.yaml`, then start only the explicit non-voice units using the guarded loop under "Re-enable after stop."
 
 ### Agents keep failing after Telegram dispatch
 
@@ -270,9 +278,18 @@ schema-clobbered `memorySearch` blocks in `~/.openclaw/openclaw.json`, Vercel AI
 
 ### Voice memo ingest stopped working
 
-1. Verify Full Disk Access in System Settings → Privacy & Security (re-grant if you upgraded macOS).
-2. Check the dedupe ledger isn't claiming the file: `grep <uuid> ~/.hermes/state/voice-memos-seen.json`.
-3. Run the handler manually with the file: `tsx scripts/hermes/jobs/voice-memo-ingest.ts --file <path>`.
+Voice ingest is intentionally disabled. Do not restart the legacy watcher or run `scripts/hermes/jobs/voice-memo-ingest.ts` manually.
+
+Before activation can be considered:
+
+1. Confirm all private roots resolve beneath a non-symlinked `~/.hermes/private/`, with `0700` directories and `0600` files.
+2. Confirm the dedicated store is `~/.hermes/private/voice-brain/`, embeddings are disabled, and the adapter runs from a neutral private working directory. Its gbrain subprocess environment must remove `GBRAIN_DATABASE_URL`, `DATABASE_URL`, `SUPABASE_DB_URL`, `SUPABASE_DATABASE_URL`, `GBRAIN_SOURCE`, `GBRAIN_REPO`, `GBRAIN_REPO_PATH`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `VOYAGE_API_KEY`, `ZEROENTROPY_API_KEY`, `COHERE_API_KEY`, `GOOGLE_API_KEY`, `GEMINI_API_KEY`, and `GROQ_API_KEY` before adding only the dedicated private configuration.
+3. Confirm the pre-write gbrain repo-path check is empty and the post-write receipt is exactly `written: false, skipped: no_repo_configured`.
+4. Confirm the read-only/query-only Apple database chain checks `CloudRecordings.db` in the recordings directory and then its parent, unless `HERMES_VOICE_MEMOS_DB` supplies the reviewed path. It must query `ZCLOUDRECORDING` by exact `ZPATH`, read `ZUNIQUEID` and `ZTRANSCRIPTION`, accept one row only, confine the source to the recordings root, and require source-to-staged SHA-256 equality. Missing database, schema, transcript, or row may fall back; ambiguity, path escape, or hash mismatch must fail closed.
+5. Confirm local Ollama classification uses a literal loopback endpoint (`http://127.0.0.1:11434/api/chat` by default) and the locally installed `gemma3:4b` model by default. Failure must produce `mixed`, `highly_sensitive`, and zero proposals.
+6. Confirm local Whisper is installed and is the default fallback. Groq must remain unavailable unless both `HERMES_VOICE_ENABLE_GROQ=1` and its key are deliberately supplied.
+7. Run synthetic canaries, then one explicitly approved manual shadow input. Verify no raw shared gbrain, GitHub, Telegram, dispatch, repository, or executor output.
+8. Present the receipts for user review. Only separate activation authorization may install or load a watcher.
 
 ### Cost monitor killed everything
 
@@ -282,10 +299,14 @@ This is intentional. Something escalated to a paid model. Investigate:
 cat ~/.hermes/logs/cost.jsonl | jq 'select(.cost > 0)' | tail -20
 ```
 
-Once you understand the cause, fix it (likely in `free-model-router.ts` rankings), then resume:
+Once you understand the cause, fix it (likely in `free-model-router.ts` rankings), then resume only the non-voice services:
 
 ```bash
-./scripts/hermes/bootstrap-air.sh --resume-after-cost-kill
+hermes gateway start --all
+for plist in ~/Library/LaunchAgents/co.jovie.hermes.*.plist; do
+  [[ "$plist" == *voice-memo-watcher* ]] && continue
+  launchctl bootstrap gui/$(id -u) "$plist"
+done
 ```
 
 ### gbrain unreachable from Pro
@@ -338,10 +359,11 @@ Removes all launchd plists, drops `~/.hermes/`, leaves Doppler and Tailscale alo
 | `~/.hermes/.env` | Secrets (chmod 600) | regenerable |
 | `~/.hermes/logs/` | All Hermes logs | rotate weekly via launchd |
 | `~/.hermes/logs/codex-issue-shipper/` | Coder prompts and run logs for `codex` issue dispatches | operator-managed; prune if large |
-| `~/.hermes/state/voice-memos-seen.json` | Dedupe ledger | rebuildable (worst case: re-ingest 1 day) |
+| `~/.hermes/private/voice-ingest/` | Content-addressed audio, chunks, transcripts, classifications, proposals, and receipts | private backup only; never shared gbrain or repo |
+| `~/.hermes/private/voice-brain/` | Dedicated no-embedding PGlite store for private voice records | private backup only; never shared gbrain or repo |
 | `~/.hermes/state/heavy-job.lock` | Semaphore for Ollama vs whisper | ephemeral |
 | `~/.hermes/state/model-router-rankings.json` | Free-model rankings | regenerable nightly |
 | `~/.gbrain/data/*.pglite` | gbrain durable store | **back up nightly** (rsync to Pro) |
 | `~/Library/LaunchAgents/co.jovie.hermes.*.plist` | launchd units | regenerable via bootstrap |
 
-The only thing worth backing up is gbrain. Everything else is regenerable from this repo + Doppler.
+Back up shared gbrain and, only under the user's private-data policy, the private voice roots. Never copy private voice backups into the repository, shared gbrain, GitHub, Telegram, or general company backup paths.

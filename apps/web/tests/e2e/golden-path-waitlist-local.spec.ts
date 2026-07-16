@@ -12,7 +12,7 @@ test.use({
 
 type StreamChunk = Record<string, unknown>;
 
-const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
+const COMPOSER_TEXTAREA = '[aria-label="Chat Message Input"]';
 
 function uiStreamBody(chunks: readonly StreamChunk[]) {
   return `${chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`;

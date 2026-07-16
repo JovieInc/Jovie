@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { AudienceTableLoadingShell } from '@/components/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
+import { PageShell } from '@/components/organisms/PageShell';
 import { DashboardSegmentSkeleton } from '@/components/shell/DashboardSegmentSkeleton';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
@@ -25,6 +26,26 @@ import {
   isTasksShellRoute,
   resolveAppShellRequestPath,
 } from './shell-route-matches';
+
+function SettingsShellLoading() {
+  return (
+    <PageShell
+      maxWidth='wide'
+      frame='none'
+      contentPadding='none'
+      scroll='page'
+      surfaceClassName='pb-10'
+      data-testid='settings-route-skeleton'
+    >
+      <div className='flex items-start gap-8'>
+        <div aria-hidden className='w-52 shrink-0 max-md:hidden' />
+        <div className='min-w-0 max-w-(--app-shell-content-max-form) flex-1'>
+          <SettingsLoading />
+        </div>
+      </div>
+    </PageShell>
+  );
+}
 
 /**
  * Shell-level loading state shown during cross-section navigation
@@ -63,7 +84,7 @@ export default async function ShellLoading() {
   }
 
   if (isSettingsShellRoute(pathname)) {
-    return <SettingsLoading />;
+    return <SettingsShellLoading />;
   }
 
   if (isPresenceShellRoute(pathname)) {

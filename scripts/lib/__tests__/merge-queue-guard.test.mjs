@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   bisectBatchFailure,
+  ciWorkflowHasMergeGroupTrigger,
   compareRatchetCounts,
   detectChangedFileOverlap,
   detectIssueOverlap,
@@ -11,6 +12,7 @@ import {
   isAutonomousBranch,
   MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
+  NATIVE_QUEUE_POLICY,
   parseMergeQueueTimeline,
   parseRequiredStatusChecksFromYaml,
   preQueueFreshnessDecision,
@@ -370,18 +372,73 @@ describe('aggregate required checks', () => {
     );
 
     const result = validateMergeQueueRepoConfig({
+      backend: 'native',
       branchProtectionYaml,
       ciWorkflowYaml,
     });
 
     expect(result.errors).toEqual([]);
     expect(result.ok).toBe(true);
+    expect(ciWorkflowHasMergeGroupTrigger(ciWorkflowYaml)).toBe(true);
+    expect(result.warnings).toEqual([]);
     expect(parseRequiredStatusChecksFromYaml(branchProtectionYaml)).toEqual([
       'CI / PR Ready',
       'CI / Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
     ]);
+
+    for (const bypass_actors of [
+      '{}',
+      '\n  - actor_id: 158384',
+      '\n  - actor_id: 2934433',
+    ]) {
+      const unsafe = validateMergeQueueRepoConfig({
+        backend: 'native',
+        branchProtectionYaml: branchProtectionYaml.replace(
+          'bypass_actors: []',
+          `bypass_actors: ${bypass_actors}`
+        ),
+        ciWorkflowYaml,
+      });
+      expect(unsafe.errors).toContain(
+        'branch-protection.yml native bypass_actors must be an empty array'
+      );
+    }
+  });
+
+  it('keeps Storybook A11y path-gated as a leaf and blocking through PR Ready', () => {
+    const branchProtectionYaml = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.branchProtection),
+      'utf8'
+    );
+    const ciWorkflowYaml = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.ciWorkflow),
+      'utf8'
+    );
+    const visualWorkflowYaml = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/visual-a11y.yml'),
+      'utf8'
+    );
+    const storybookBlock = extractWorkflowJobBlock(
+      ciWorkflowYaml,
+      'ci-storybook-a11y'
+    );
+    const prReadyBlock = extractWorkflowJobBlock(ciWorkflowYaml, 'ci-pr-ready');
+
+    expect(
+      parseRequiredStatusChecksFromYaml(branchProtectionYaml)
+    ).not.toContain('Storybook A11y');
+    expect(storybookBlock).toMatch(/run_storybook_a11y == 'true'/);
+    expect(storybookBlock).toMatch(/pnpm --filter @jovie\/web test:a11y/);
+    expect(prReadyBlock).toMatch(/ci-storybook-a11y/);
+    expect(prReadyBlock).toMatch(
+      /STORYBOOK_A11Y_RESULT.*needs\.ci-storybook-a11y\.result/
+    );
+    expect(prReadyBlock).toMatch(
+      /STORYBOOK_A11Y_RESULT.*!= "success".*!= "skipped"/
+    );
+    expect(visualWorkflowYaml).not.toMatch(/^\s+pull_request:/m);
   });
 
   it('keeps merge-queue enroll hot path free of pytest/Python bootstrap (GH-13630)', () => {
@@ -428,6 +485,118 @@ describe('aggregate required checks', () => {
     const result = validateLiveMergeQueueRuleset(liveRuleset);
     expect(result.ok).toBe(true);
     expect(result.hasGraphiteBypass).toBe(true);
+  });
+
+  it('fails closed when native source wiring omits the queue event and retains Graphite bypass', () => {
+    const unsafe = validateMergeQueueRepoConfig({
+      backend: 'native',
+      branchProtectionYaml: `
+        rules:
+          - type: non_fast_forward
+        bypass_actors:
+          - actor_id: 158384
+      `,
+      ciWorkflowYaml: 'on: pull_request',
+    });
+
+    expect(unsafe.ok).toBe(false);
+    expect(unsafe.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('must enable GitHub native merge_queue'),
+        expect.stringContaining('must handle merge_group'),
+        expect.stringContaining('bypass_actors must be an empty array'),
+      ])
+    );
+  });
+
+  it('validates native live ruleset shape and rejects Graphite bypass residue', () => {
+    const requiredStatusChecks = {
+      type: 'required_status_checks',
+      parameters: {
+        strict_required_status_checks_policy: false,
+        required_status_checks: [
+          'PR Ready',
+          'Migration Guard',
+          'Fork PR Gate',
+          'PR Size Guard',
+        ].map(context => ({ context })),
+      },
+    };
+    const nativeRules = [
+      { type: 'pull_request' },
+      requiredStatusChecks,
+      { type: 'merge_queue', parameters: NATIVE_QUEUE_POLICY },
+    ];
+    const result = validateLiveMergeQueueRuleset(
+      {
+        bypass_actors: [],
+        rules: nativeRules,
+      },
+      { backend: 'native' }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      hasGraphiteBypass: false,
+      hasNativeMergeQueue: true,
+    });
+
+    for (const bypass_actors of [undefined, {}]) {
+      const malformed = validateLiveMergeQueueRuleset(
+        { bypass_actors, rules: nativeRules },
+        { backend: 'native' }
+      );
+      expect(malformed.errors).toContain(
+        'live ruleset bypass_actors must be an array'
+      );
+    }
+
+    for (const actor_id of [158384, 2934433]) {
+      const unsafeBypass = validateLiveMergeQueueRuleset(
+        {
+          bypass_actors: [{ actor_id, actor_type: 'Integration' }],
+          rules: nativeRules,
+        },
+        { backend: 'native' }
+      );
+      expect(unsafeBypass.errors).toContain(
+        'live native ruleset bypass_actors must be empty'
+      );
+    }
+
+    const unsafe = validateLiveMergeQueueRuleset(
+      {
+        bypass_actors: [{ actor_id: 158384, actor_type: 'Integration' }],
+        rules: [
+          requiredStatusChecks,
+          {
+            type: 'merge_queue',
+            parameters: {
+              ...NATIVE_QUEUE_POLICY,
+              max_entries_to_build: 99,
+              merge_method: 'MERGE',
+            },
+          },
+        ],
+      },
+      { backend: 'native' }
+    );
+    expect(unsafe.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('SQUASH'),
+        expect.stringContaining('max_entries_to_build'),
+        expect.stringContaining('bypass_actors must be empty'),
+      ])
+    );
+  });
+
+  it('rejects unknown backend names instead of falling back to Graphite', () => {
+    const result = validateLiveMergeQueueRuleset(
+      { bypass_actors: [], rules: [] },
+      { backend: 'other' }
+    );
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain('unknown merge queue backend: other');
   });
 });
 

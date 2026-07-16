@@ -54,6 +54,72 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Build bounded review bundle
+        id: review-bundle
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MERGE_TRIGGER: ${{ github.event.action }}
+        run: |
+          BUNDLE_PATH="$(mktemp "${RUNNER_TEMP}/jovie-review-bundle.XXXXXX")"
+          export BUNDLE_PATH
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+
+          base_sha = os.environ["BASE_SHA"]
+          head_sha = os.environ["HEAD_SHA"]
+          diff_range = f"{base_sha}...{head_sha}"
+          max_diff_bytes = 120_000
+          test_path = re.compile(r"(^|/)(test|tests|__tests__|fixtures|mocks)(/|$)|(^|/).*\.(test|spec)\.[^.]+$")
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True)
+
+          changed_files = git("diff", "--name-only", "--diff-filter=ACMRD", diff_range).splitlines()
+          non_test_loc = 0
+          for row in git("diff", "--numstat", "--diff-filter=ACMRD", diff_range).splitlines():
+              added, deleted, path = row.split("\t", 2)
+              if not test_path.search(path):
+                  non_test_loc += sum(int(value) for value in (added, deleted) if value.isdigit())
+
+          diff = subprocess.check_output([
+              "git", "--no-pager", "diff", "--no-ext-diff", "--no-color",
+              "--unified=40", "--binary", diff_range,
+          ])
+          truncated = len(diff) > max_diff_bytes
+          if truncated:
+              diff = diff[:max_diff_bytes] + b"\n\n[review bundle diff truncated at 120000 bytes]\n"
+
+          metadata = {
+              "bundle_version": 1,
+              "pr_number": os.environ["PR_NUMBER"],
+              "base_branch": os.environ["BASE_BRANCH"],
+              "base_sha": base_sha,
+              "head_sha": head_sha,
+              "merge_trigger": os.environ["MERGE_TRIGGER"],
+              "changed_files": changed_files,
+              "non_test_loc": non_test_loc,
+              "blame_pr": os.environ.get("PR_NUMBER") or "unavailable",
+              "blame_commit": head_sha or "unavailable",
+              "diff_context_lines": 40,
+              "diff_max_bytes": max_diff_bytes,
+              "diff_truncated": truncated,
+          }
+          with open(os.environ["BUNDLE_PATH"], "wb") as bundle:
+              bundle.write(b"# Jovie structured review bundle\n")
+              bundle.write(json.dumps(metadata, indent=2, sort_keys=True).encode())
+              bundle.write(b"\n\n## Normalized diff\n\n")
+              bundle.write(diff)
+          print(f"Review bundle: {os.environ['BUNDLE_PATH']}")
+          print(f"Changed files: {len(changed_files)}; non-test LOC: {non_test_loc}; diff truncated: {truncated}")
+          PY
+          echo "path=$BUNDLE_PATH" >> "$GITHUB_OUTPUT"
+
       - name: Set up Bun (for gbrain CLI/MCP)
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
@@ -80,7 +146,7 @@ jobs:
 
       - name: Claude review
         continue-on-error: true
-        uses: anthropics/claude-code-action@a92e7c70a4da9793dc164451d829089dc057a464 # v1
+        uses: anthropics/claude-code-action@e90deca47693f9457b72f2b53c17d7c445a87342 # v1
         env:
           GBRAIN_CONNECTION: ${{ secrets.GBRAIN_CONNECTION }}
         with:
@@ -107,13 +173,40 @@ jobs:
             knowledge of the WHOLE codebase and company — not just this diff. If
             gbrain is unavailable, say so in one line and review from the diff alone.
 
-            Then review the diff (use `gh pr diff ${{ github.event.pull_request.number }}`) for, in priority order:
+            Then review the exact normalized diff in the bounded bundle at
+            `${{ steps.review-bundle.outputs.path }}`. It includes deterministic
+            provenance metadata (PR/base/head/blame commit, changed files, and
+            non-test LOC) followed by the diff. Use `gh pr diff` only if you need
+            to investigate context not included in the bundle; do not substitute
+            a different diff for the bundled review input.
             1. Correctness bugs and regressions.
             2. Security / auth / data-loss risks.
             3. Violations of an established decision or convention — CITE the gbrain
                source (page/slug) when you flag one. This is the unique value: catch
                things a single-PR reviewer can't know.
             4. Missing tests on non-trivial logic.
+
+            SCOPE GOVERNOR — classify every accepted finding before proposing a fix:
+            - `in-scope blocker`: a correctness, security, data-loss, or regression
+              issue directly in the PR's original files and intent that must be fixed.
+            - `follow-up`: valid but non-blocking work that can be deferred safely.
+            - `stop-and-escalate`: out-of-scope, ambiguous/high-risk work, or a decision
+              that needs a maintainer rather than an automatic patch.
+            Label every accepted finding with exactly one of those strings. Do not
+            silently turn a follow-up or stop-and-escalate finding into a patch.
+
+            SCOPE BUDGET: Treat the PR's initial changed-file count and non-test LOC as
+            its original scope. Never expand beyond 2x either budget without explicit
+            approval in the PR description or a maintainer comment containing the
+            exact token `scope-approved`. Without that token, classify the finding as
+            `stop-and-escalate` and do not propose edits outside the budget. Test-only
+            additions needed to verify an in-scope fix do not count as non-test LOC.
+
+            TWO-CYCLE PAUSE: Inspect the PR timeline for review-triggered fix cycles
+            (a review finding followed by a patch and another review). After two such
+            cycles without convergence, pause before another edit: reclassify every
+            remaining finding, mark unresolved/ambiguous items `stop-and-escalate`,
+            and ask for a maintainer decision. Never attempt a third automatic fix.
 
             BE HIGH-SIGNAL — this must not become noise:
             - Only comment on things that genuinely matter. No nitpicks, no style
@@ -122,5 +215,9 @@ jobs:
               line saying so.
             - Defer taste/UX/product/copy judgments to human reviewers — do not opine on those.
 
-            Post ONE concise PR review. Each finding: file:line, the issue, why it
-            matters (cite gbrain if relevant), and a concrete fix.
+            Post ONE concise PR review. Start with a `Scope governor` line stating the
+            original files/non-test LOC budget, whether the 2x budget is exceeded, and
+            whether the two-cycle pause applies. Each accepted finding must include:
+            `Classification: in-scope blocker|follow-up|stop-and-escalate`, plus
+            file:line, the issue, why it matters (cite gbrain if relevant), and a
+            concrete fix only when its classification permits one.

@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getDeterministicDevTestAuthPersonaUserId } from '@/lib/auth/dev-test-auth-identity';
 import {
+  DEFAULT_TEST_CREATOR_USER_ID,
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
   TEST_AUTH_BYPASS_MODE,
@@ -117,6 +119,30 @@ describe('test-mode auth bypass', () => {
               : null,
       })
     ).toBe('user_cookie_header');
+  });
+
+  it('uses the persisted creator UUID when no explicit user id is configured', () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('E2E_BETTER_AUTH_USER_ID', '');
+    vi.stubEnv('E2E_CLERK_USER_ID', '');
+    vi.stubEnv('TEST_CLERK_USER_ID', '');
+
+    expect(
+      resolveTestBypassUserId({
+        get: (name: string) => {
+          if (name === 'host') {
+            return 'localhost:3100';
+          }
+          if (name === TEST_MODE_HEADER) {
+            return TEST_AUTH_BYPASS_MODE;
+          }
+          return null;
+        },
+      })
+    ).toBe(DEFAULT_TEST_CREATOR_USER_ID);
+    expect(DEFAULT_TEST_CREATOR_USER_ID).toBe(
+      getDeterministicDevTestAuthPersonaUserId('creator')
+    );
   });
 
   it('allows bypass markers on private development hosts', () => {

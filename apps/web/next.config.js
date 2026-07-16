@@ -419,10 +419,11 @@ const nextConfig = {
   env: {
     // Build-time env vars — these get inlined into client bundles by Next.js
     NEXT_PUBLIC_APP_VERSION: APP_VERSION,
-    NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(
-      0,
-      7
-    ),
+    NEXT_PUBLIC_BUILD_SHA: (
+      process.env.NEXT_PUBLIC_BUILD_SHA ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      ''
+    ).slice(0, 7),
     NEXT_PUBLIC_CI: process.env.CI === 'true' ? 'true' : 'false',
   },
   // Keep @statsig/statsig-node-core external so Next.js does not webpack-bundle
@@ -435,6 +436,7 @@ const nextConfig = {
   // See JOV-2322.
   serverExternalPackages: ['@statsig/statsig-node-core'],
   experimental: {
+    cpus: process.env.GITHUB_ACTIONS === 'true' ? 2 : undefined,
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
     // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup
@@ -522,6 +524,7 @@ function exposeBaseStaticConfigForTooling(config) {
   }
 
   return Object.assign(config, {
+    experimental: nextConfig.experimental,
     images: nextConfig.images,
     redirects: nextConfig.redirects,
     rewrites: nextConfig.rewrites,

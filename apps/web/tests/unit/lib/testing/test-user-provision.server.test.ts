@@ -44,6 +44,27 @@ describe('test-user-provision.server', () => {
     vi.stubEnv('CLERK_SECRET_KEY', 'sk_test_123');
   });
 
+  it('derives a stable schema-valid UUID for each Better Auth test persona', async () => {
+    const { getDeterministicTestBetterAuthUserId } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+    const uuidPattern =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+    const actorId = getDeterministicTestBetterAuthUserId(
+      'Browse-Ready+Clerk_Test@Jov.ie'
+    );
+
+    expect(actorId).toMatch(uuidPattern);
+    expect(actorId).toBe(
+      getDeterministicTestBetterAuthUserId('browse-ready+clerk_test@jov.ie')
+    );
+    expect(actorId).not.toBe(
+      getDeterministicTestBetterAuthUserId('browse+clerk_test@jov.ie')
+    );
+    expect('ba_dev_browse_ready_clerk_test_jov_ie').not.toMatch(uuidPattern);
+  });
+
   it('returns a deterministic id for allowlisted browse emails (no Clerk API)', async () => {
     const { ensureClerkTestUser } = await import(
       '@/lib/testing/test-user-provision.server'
