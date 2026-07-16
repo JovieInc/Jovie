@@ -10,7 +10,6 @@ export const MERGE_QUEUE_BACKENDS = Object.freeze(['graphite', 'native']);
 const DEFAULT_REPOSITORY = 'JovieInc/Jovie';
 const DEFAULT_RULESET_ID = '10512119';
 const DEFAULT_BASE_BRANCH = 'main';
-const GRAPHITE_BYPASS_ACTOR_ID = '158384';
 const CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
 const NATIVE_MUTATION_AUTHORIZATIONS = new Set([
   'merge-queue-autoenroll',
@@ -228,13 +227,6 @@ export function validateNativePreflightEvidence({
   );
   const bypassActors = ruleset?.bypass_actors;
   const hasValidBypassActors = Array.isArray(bypassActors);
-  const graphiteBypassPresent = hasValidBypassActors
-    ? bypassActors.some(
-        actor =>
-          actor?.actor_type === 'Integration' &&
-          String(actor?.actor_id) === GRAPHITE_BYPASS_ACTOR_ID
-      )
-    : false;
   const validations = {
     [`ruleset id must be ${rulesetId}`]:
       String(ruleset?.id ?? '') === String(rulesetId),
@@ -257,8 +249,8 @@ export function validateNativePreflightEvidence({
       ruleset?.rules?.find(rule => rule?.type === 'required_status_checks')
         ?.parameters?.strict_required_status_checks_policy === false,
     'ruleset bypass_actors must be an array': hasValidBypassActors,
-    'Graphite bypass actor must be absent before native enrollment':
-      !graphiteBypassPresent,
+    'ruleset bypass_actors must be empty before native enrollment':
+      !hasValidBypassActors || bypassActors.length === 0,
     [`repository default branch must be ${baseBranch}`]:
       repository?.default_branch === baseBranch,
     'repository auto-merge must be enabled':
