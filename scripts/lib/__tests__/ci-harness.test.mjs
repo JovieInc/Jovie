@@ -154,7 +154,6 @@ describe('ci-harness manifest', () => {
           PREVIEW_RESULT: previewResult,
         })
       ).toBe(status);
-
     const pathChanges = extractWorkflowJobBlock(workflow, 'ci-path-changes');
     // biome-ignore format: unique command-file path stays compact for the integration-train cap
     const exactHeadOutput = resolve(process.env.RUNNER_TEMP || process.env.TMPDIR || '/tmp', `ci-exact-head-${process.pid}-${Date.now()}`);
@@ -193,7 +192,6 @@ describe('ci-harness manifest', () => {
     unlinkSync(exactHeadOutput);
     expect(neonDecision.status).toBe(0);
     expect(neonCommandFile).toContain('needs_db=true');
-
     const evidenceStatus = (intended, result) =>
       runWorkflowBash(
         prReady,

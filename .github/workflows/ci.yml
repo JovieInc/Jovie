@@ -618,8 +618,8 @@ jobs:
             git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES"
           elif [[ "$EVENT_NAME" == "merge_group" ]]; then
             DIFF_BASE="${{ github.event.merge_group.base_sha }}"
-            git fetch origin "${{ github.event.merge_group.base_sha }}" --depth=1
-            git diff --name-only "$DIFF_BASE...${{ github.event.merge_group.head_sha }}" > "$CHANGED_FILES"
+            git fetch --no-tags --depth=1 origin "$DIFF_BASE"
+            git diff --name-only "$DIFF_BASE" "${{ github.event.merge_group.head_sha }}" > "$CHANGED_FILES"
           elif [[ "$EVENT_NAME" == "push" ]]; then
             DIFF_BASE="HEAD~1"
             git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES" 2>/dev/null || git show --pretty="" --name-only HEAD > "$CHANGED_FILES"
