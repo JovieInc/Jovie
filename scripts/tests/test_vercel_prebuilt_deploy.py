@@ -445,35 +445,57 @@ def test_staging_job_budget_contains_deploy_and_readiness_steps() -> None:
     )
 
 
-def test_reusable_vercel_artifact_contains_traced_runtime_dependencies() -> None:
+def _staging_build_step(workflow: str) -> str:
+    staging = workflow[
+        workflow.index("  deploy-staging:") : workflow.index(
+            "  canary-health-gate:"
+        )
+    ]
+    return staging[
+        staging.index(
+            "- name: Build (preview target for staging verification)"
+        ) : staging.index("- name: Package build output for provenance attestation")
+    ]
+
+
+def test_staging_build_runs_in_job_and_materializes_trace_closure() -> None:
     workflow = CI_WORKFLOW.read_text()
-    producer = workflow[
-        workflow.index("- name: Vercel build (deploy artifact)") : workflow.index(
-            "- name: Upload vercel build artifact"
+    staging = workflow[
+        workflow.index("  deploy-staging:") : workflow.index(
+            "  canary-health-gate:"
         )
     ]
 
-    assert "apps/web/.next/standalone/apps/web/.next/node_modules" in producer
-    snapshot_index = producer.index("vercel-runtime-node-modules.tar.gz")
-    build_index = producer.index("./node_modules/.bin/vercel build")
-    restore_index = producer.index(
-        "tar -xzf /tmp/vercel-runtime-node-modules.tar.gz"
+    # The staging artifact is built and deployed in the same job, so the
+    # JOV-4087 cross-job producer/upload/download/restore chain is gone and
+    # traced runtime dependencies never leave the workspace.
+    assert "download-artifact" not in staging
+    assert "restore_vercel_build" not in staging
+    assert "vercel-runtime-node-modules.tar.gz" not in staging
+
+    build_step = _staging_build_step(workflow)
+
+    # The in-job artifact is the thing canary verifies, so the build always
+    # runs (no step-level if:) and cannot be skipped by artifact state.
+    assert "if:" not in build_step.split("run: |", 1)[0]
+    assert "./node_modules/.bin/vercel build" in build_step
+
+    # Vercel's function trace references the generated robots response at its
+    # public-file path even though the source route is app/robots.ts, so the
+    # build materializes it and records it for the deploy script's cleanup.
+    assert "test -f apps/web/.next/server/app/robots.txt.body" in build_step
+    assert (
+        "cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt"
+        in build_step
     )
-    assert snapshot_index < build_index < restore_index
-    assert "apps/web/.next/node_modules" in producer
-    assert "import-in-the-middle-*" in producer
-    assert "apps/web/.next/server/chunks" in producer
-    assert "apps/web/.next/server \\" in producer
-    assert "apps/web/.next/server/edge \\" not in producer
-    for metadata_file in (
-        "BUILD_ID",
-        "app-path-routes-manifest.json",
-        "build-manifest.json",
-        "package.json",
-        "prerender-manifest.json",
-        "required-server-files.json",
-    ):
-        assert f"apps/web/.next/{metadata_file}" in producer
+    assert ".vercel/jovie-generated-public-files" in build_step
+
+    deploy_step = staging[
+        staging.index("- name: Deploy (staging preview, prebuilt)") :
+    ]
+    # Fail-closed: a source fallback would silently discard the in-job
+    # artifact and repeat the slow server build.
+    assert "VERCEL_ENABLE_SOURCE_FALLBACK: 'false'" in deploy_step
 
 
 def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
@@ -484,18 +506,18 @@ def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
     )
     expected_secret = "CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}"
 
-    producer = workflow[
-        workflow.index("- name: Vercel build (deploy artifact)") : workflow.index(
-            "- name: Upload vercel build artifact"
-        )
-    ]
     staging = workflow[
         workflow.index("  deploy-staging:") : workflow.index(
             "  canary-health-gate:"
         )
     ]
-    assert expected_publishable in producer
-    assert expected_secret in producer
+    build_step = _staging_build_step(workflow)
+
+    # The in-job staging build must sign Clerk tokens with staging keys.
+    assert expected_publishable in build_step
+    assert expected_secret in build_step
+    # The prebuilt deploy step also receives them so CLI-side env resolution
+    # cannot fall back to production keys.
     assert staging.count(expected_publishable) >= 2
     assert staging.count(expected_secret) >= 2
 
