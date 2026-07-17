@@ -1159,7 +1159,7 @@ jobs:
     # Shared Next.js build for a11y + layout-guard — build once, test twice.
     # On PRs to main: always runs (non-fork) for build validation. Part of the merge gate.
     # Merge groups rebuild the synthetic combined head to catch integration failures.
-    # On main push: always runs for full coverage + JOV-4087 vercel deploy artifact.
+    # On main push: always runs for full coverage.
     # Fork PRs are excluded (no secrets) — skipped via fork-pr-gate.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') }}
     # Production deploy artifacts must not wait behind the saturated fixed PR
@@ -1271,124 +1271,6 @@ jobs:
           path: /tmp/nextjs-build.tar
           retention-days: 1
           if-no-files-found: error
-
-      # JOV-4087: produce .vercel/output once on main so deploy-staging can skip
-      # its own vercel build (~3–5 min). Keep turbo `.next` artifact untouched for
-      # downstream test jobs. Soft-fail so a Vercel CLI blip cannot red the merge gate.
-      - name: Pull Vercel env (preview) for deploy artifact
-        id: vercel_pull
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        continue-on-error: true
-        timeout-minutes: 10
-        run: |
-          set -euo pipefail
-          scope_args=()
-          if [ -n "${VERCEL_ORG_ID:-}" ]; then
-            scope_args=(--scope "$VERCEL_ORG_ID")
-          fi
-          for i in {1..3}; do
-            if ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
-              break
-            fi
-            echo "Vercel pull attempt $i failed, retrying in 10s..."
-            sleep 10
-            if [ $i -eq 3 ]; then exit 1; fi
-          done
-          for env_file in .vercel/.env.preview.local .vercel/.env.local; do
-            if [ -f "$env_file" ]; then
-              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
-              mv "${env_file}.tmp" "$env_file"
-            fi
-          done
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
-      - name: Vercel build (deploy artifact)
-        id: vercel_build
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.vercel_pull.outcome == 'success' }}
-        continue-on-error: true
-        timeout-minutes: 10
-        run: |
-          set -euo pipefail
-          scope_args=()
-          if [ -n "${VERCEL_ORG_ID:-}" ]; then
-            scope_args=(--scope "$VERCEL_ORG_ID")
-          fi
-          # `vercel build` replaces the standalone tree. Snapshot the traced
-          # runtime first, then restore it at the repo-relative paths recorded
-          # in the generated function configs.
-          test -d apps/web/.next/standalone/apps/web/.next/node_modules
-          tar -czf /tmp/vercel-runtime-node-modules.tar.gz \
-            -C apps/web/.next/standalone/apps/web/.next node_modules
-          # Do NOT inherit NEXT_PUBLIC_CLERK_MOCK from the turbo build step —
-          # deploy artifact must match staging preview compile flags.
-          for i in {1..3}; do
-            if env -u TURBO_REMOTE_ONLY -u NEXT_PUBLIC_CLERK_MOCK -u NEXT_PUBLIC_CLERK_PROXY_DISABLED \
-              ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
-              break
-            fi
-            echo "Vercel build attempt $i failed, retrying in 10s..."
-            sleep 10
-            if [ $i -eq 3 ]; then exit 1; fi
-          done
-          # Generated function configs reference chunks across the complete
-          # Next server tree, not only edge assets. Preserve that trace root so
-          # the prebuilt upload is closed over every generated server file.
-          test -d apps/web/.next/server/chunks
-          rm -rf apps/web/.next/node_modules
-          tar -xzf /tmp/vercel-runtime-node-modules.tar.gz -C apps/web/.next
-          find apps/web/.next/node_modules -maxdepth 1 -type d \
-            -name 'import-in-the-middle-*' -print -quit | grep -q .
-          # Vercel's function trace references the generated robots response at
-          # its public-file path even though the source route is app/robots.ts.
-          # Materialize it only inside the deploy artifact; the deploy helper
-          # removes generated public files before any source fallback.
-          test -f apps/web/.next/server/app/robots.txt.body
-          cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt
-          printf '%s\n' 'apps/web/public/robots.txt' \
-            > .vercel/jovie-generated-public-files
-          tar -czf /tmp/vercel-build-output.tar.gz -C . \
-            .vercel/output \
-            .vercel/jovie-generated-public-files \
-            apps/web/public/robots.txt \
-            apps/web/.next/BUILD_ID \
-            apps/web/.next/app-path-routes-manifest.json \
-            apps/web/.next/build-manifest.json \
-            apps/web/.next/package.json \
-            apps/web/.next/prerender-manifest.json \
-            apps/web/.next/required-server-files.json \
-            apps/web/.next/server \
-            apps/web/.next/node_modules
-          tar -tzf /tmp/vercel-build-output.tar.gz \
-            apps/web/.next/package.json >/dev/null
-          tar -tzf /tmp/vercel-build-output.tar.gz \
-            apps/web/.next/server/chunks >/dev/null
-          tar -tzf /tmp/vercel-build-output.tar.gz \
-            apps/web/.next/node_modules >/dev/null
-          tar -tzf /tmp/vercel-build-output.tar.gz \
-            apps/web/public/robots.txt >/dev/null
-          echo "vercel_artifact=true" >> "$GITHUB_OUTPUT"
-        env:
-          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
-          COREPACK_ENABLE_STRICT: 0
-          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
-      - name: Upload vercel build artifact
-        if: ${{ steps.vercel_build.outputs.vercel_artifact == 'true' }}
-        continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: vercel-build-output-${{ github.run_id }}
-          path: /tmp/vercel-build-output.tar.gz
-          retention-days: 1
-          if-no-files-found: warn
 
   ci-layout-guard:
     name: Layout Guard
@@ -5282,7 +5164,7 @@ jobs:
           fi
 
   deploy-staging:
-    # deploy-gate already needs ci-build-public (JOV-4087 vercel artifact producer).
+    # deploy-gate already needs ci-build-public.
     needs: [deploy-gate]
     # Fast main path: merge on deterministic checks, deploy a production build to
     # a preview URL, verify it on staging, then promote only if it passes.
@@ -5373,39 +5255,9 @@ jobs:
         # merge commit message. The Slack drift notification in deploy-notify
         # fires when verify fails but deploy proceeds (bypass alert).
         continue-on-error: ${{ contains(github.event.head_commit.message, '[skip-schema-verify]') }}
-      # JOV-4087: reuse vercel build from ci-build-public when available.
-      - name: Download vercel build artifact
-        id: download_vercel_build
-        continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: vercel-build-output-${{ github.run_id }}
-          path: /tmp
-
-      - name: Restore vercel build output from artifact
-        id: restore_vercel_build
-        if: steps.download_vercel_build.outcome == 'success'
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          if [ -f /tmp/vercel-build-output.tar.gz ]; then
-            mkdir -p .vercel
-            tar -xzf /tmp/vercel-build-output.tar.gz -C .
-            if [ -d .vercel/output ]; then
-              echo "restored=true" >> "$GITHUB_OUTPUT"
-              echo "Restored .vercel/output from ci-build-public artifact (JOV-4087)"
-            else
-              echo "restored=false" >> "$GITHUB_OUTPUT"
-              echo "::warning::vercel artifact missing .vercel/output after extract"
-            fi
-          else
-            echo "restored=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::vercel-build-output tar not found after download"
-          fi
-
       - name: Pull env (staging preview)
-        # Always pull project metadata/env; needed even when prebuilt output is restored
-        # (deploy CLI reads .vercel/project.json).
+        # Always pull project metadata/env; the deploy CLI reads
+        # .vercel/project.json even for prebuilt deploys.
         timeout-minutes: 10
         run: |
           scope_args=()
@@ -5431,10 +5283,9 @@ jobs:
       - name: Check signup readiness (staging deploy env)
         run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=stg --source=env
       - name: Build (preview target for staging verification)
-        # Skip when JOV-4087 artifact restored successfully.
-        if: steps.restore_vercel_build.outputs.restored != 'true'
         timeout-minutes: 10
         run: |
+          set -euo pipefail
           scope_args=()
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
             scope_args=(--scope "$VERCEL_ORG_ID")
@@ -5447,6 +5298,12 @@ jobs:
             sleep 10
             if [ $i -eq 3 ]; then exit 1; fi
           done
+          # Vercel's function trace references the generated robots response at
+          # its public-file path even though the source route is app/robots.ts.
+          test -f apps/web/.next/server/app/robots.txt.body
+          cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt
+          printf '%s\n' 'apps/web/public/robots.txt' \
+            > .vercel/jovie-generated-public-files
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
@@ -5456,11 +5313,7 @@ jobs:
       - name: Package build output for provenance attestation
         run: |
           set -euo pipefail
-          if [ -f /tmp/vercel-build-output.tar.gz ] && [ "${{ steps.restore_vercel_build.outputs.restored }}" = "true" ]; then
-            echo "Using downloaded vercel-build-output.tar.gz for attestation"
-          else
-            tar -czf /tmp/vercel-build-output.tar.gz -C . .vercel/output
-          fi
+          tar -czf /tmp/vercel-build-output.tar.gz -C . .vercel/output
       - name: Attest build provenance (SLSA Level 2)
         id: attest
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
@@ -5519,7 +5372,7 @@ jobs:
           # The closed staging artifact contains more than Vercel's 15k plain
           # upload limit. Give the archive path the full prebuilt budget.
           VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'false'
-          # The restored artifact is the thing canary verifies. A source
+          # The in-job prebuilt artifact is the thing canary verifies. A source
           # fallback would silently discard it and repeat the slow server build.
           VERCEL_ENABLE_SOURCE_FALLBACK: 'false'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}

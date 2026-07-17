@@ -336,7 +336,6 @@ describe('deploy workflow Vercel env resolution', () => {
   it('passes the exact GitHub SHA into every external Vercel build and source deploy', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const buildShaEnv = 'VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}';
-    const buildJob = getJobBlock(workflow, 'ci-build-public');
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
     const deployStep = getStepBlock(
       stagingJob,
@@ -347,9 +346,6 @@ describe('deploy workflow Vercel env resolution', () => {
       'utf8'
     );
 
-    expect(getStepBlock(buildJob, 'Vercel build (deploy artifact)')).toContain(
-      buildShaEnv
-    );
     expect(
       getStepBlock(
         stagingJob,
@@ -454,8 +450,13 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(deployScript).toContain('VERCEL_FORCE_SOURCE_DEPLOY');
   });
 
-  it('uses the restored prebuilt and refuses source-cache substitution', () => {
+  it('builds the staging prebuilt in-job and refuses source-cache substitution', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
+    const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const buildStep = getStepBlock(
+      stagingJob,
+      'Build (preview target for staging verification)'
+    );
     const deployStep = getStepBlock(
       workflow,
       'Deploy (staging preview, prebuilt)'
@@ -463,21 +464,28 @@ describe('deploy workflow Vercel env resolution', () => {
 
     expect(deployStep).not.toContain('VERCEL_FORCE_SOURCE_DEPLOY');
     expect(deployStep).toContain("VERCEL_ENABLE_SOURCE_FALLBACK: 'false'");
+    expect(stagingJob).not.toContain('download_vercel_build');
+    expect(stagingJob).not.toContain('restore_vercel_build');
+    expect(buildStep).toContain('jovie-generated-public-files');
+    expect(buildStep).not.toContain('steps.restore_vercel_build');
   });
 
   it('packages generated public trace files and budgets remote fallback readiness', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
-    const buildJob = getJobBlock(workflow, 'ci-build-public');
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const buildStep = getStepBlock(
+      stagingJob,
+      'Build (preview target for staging verification)'
+    );
     const readinessStep = getStepBlock(
       stagingJob,
       'Wait for staging deployment readiness'
     );
 
-    expect(buildJob).toContain(
+    expect(buildStep).toContain(
       'cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt'
     );
-    expect(buildJob).toContain('.vercel/jovie-generated-public-files');
+    expect(buildStep).toContain('.vercel/jovie-generated-public-files');
     expect(readinessStep).toContain('--timeout 20m');
     expect(readinessStep).toContain('BUILDING|QUEUED|INITIALIZING)');
     expect(readinessStep).toContain('handing off to retrying canary');
@@ -1509,7 +1517,7 @@ describe('CI PR neon migrate workflow', () => {
 });
 
 describe('production promotion exact-artifact contract', () => {
-  it('deploys the restored staging prebuilt without a source fallback', () => {
+  it('deploys the in-job staging prebuilt without a source fallback', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const deployStep = getStepBlock(
       workflow,
