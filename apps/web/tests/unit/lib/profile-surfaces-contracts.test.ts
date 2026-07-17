@@ -5,6 +5,7 @@ import {
   type MonitoringCandidate,
   redactLockedRank,
   selectDefaultMonitoredSurfaceIds,
+  selectRetirableSurfaceIds,
 } from '@/lib/profile-surfaces/contracts';
 
 describe('canonicalizeSurfaceUrl', () => {
@@ -63,6 +64,19 @@ describe('redactLockedRank', () => {
     expect(redactLockedRank(false, 2)).toBe(2);
   });
 });
+
+describe('selectRetirableSurfaceIds', () => {
+  it('retires only surfaces absent from current evidence and live sources', () => {
+    expect(
+      selectRetirableSurfaceIds(
+        ['current', 'stale', 'still-live'],
+        ['current'],
+        ['current', 'still-live']
+      )
+    ).toEqual(['stale']);
+  });
+});
+
 describe('selectDefaultMonitoredSurfaceIds', () => {
   const candidate = (
     input: Partial<MonitoringCandidate> & Pick<MonitoringCandidate, 'id'>

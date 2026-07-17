@@ -18,6 +18,16 @@ export const PROFILE_QUALIFICATION_STATUSES = [
 export type ProfileQualificationStatus =
   (typeof PROFILE_QUALIFICATION_STATUSES)[number];
 
+export function selectRetirableSurfaceIds(
+  knownSurfaceIds: readonly string[],
+  currentSurfaceIds: readonly string[],
+  liveSourceSurfaceIds: readonly string[]
+): string[] {
+  const current = new Set(currentSurfaceIds);
+  const live = new Set(liveSourceSurfaceIds);
+  return knownSurfaceIds.filter(id => !current.has(id) && !live.has(id));
+}
+
 const TRACKING_PARAMS = new Set([
   'fbclid',
   'gclid',

@@ -18,6 +18,7 @@ import {
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
 import { buildSurfaceCandidates } from './candidates';
+import { selectRetirableSurfaceIds } from './contracts';
 
 /** Reconcile one artist after canonical social/DSP writes or bounded backfill. */
 export async function reconcileProfileSurfaces(
@@ -170,14 +171,17 @@ export async function reconcileProfileSurfaces(
       });
   }
 
-  const activeSurfaceIds = reconciled.map(row => row.id);
-  if (activeSurfaceIds.length > 0) {
+  const currentSurfaceIds = reconciled.map(row => row.id);
+  const knownSurfaceIds = [
+    ...new Set([...existingRows.map(row => row.id), ...currentSurfaceIds]),
+  ];
+  if (knownSurfaceIds.length > 0) {
     await db
       .update(profileSurfaceSources)
       .set({ isLive: false })
       .where(
         and(
-          inArray(profileSurfaceSources.surfaceId, activeSurfaceIds),
+          inArray(profileSurfaceSources.surfaceId, knownSurfaceIds),
           lt(profileSurfaceSources.lastSeenAt, startedAt)
         )
       );
@@ -211,14 +215,19 @@ export async function reconcileProfileSurfaces(
     .from(profileSurfaceSources)
     .where(
       and(
-        inArray(profileSurfaceSources.surfaceId, activeSurfaceIds),
+        inArray(profileSurfaceSources.surfaceId, knownSurfaceIds),
         eq(profileSurfaceSources.isLive, true)
       )
     );
   const surfacesWithSources = [
     ...new Set(liveSourceRows.map(row => row.surfaceId)),
   ];
-  if (activeSurfaceIds.length > surfacesWithSources.length) {
+  const surfaceIdsToRetire = selectRetirableSurfaceIds(
+    knownSurfaceIds,
+    currentSurfaceIds,
+    surfacesWithSources
+  );
+  if (surfaceIdsToRetire.length > 0) {
     await db
       .update(profileSurfaces)
       .set({
@@ -228,8 +237,8 @@ export async function reconcileProfileSurfaces(
       })
       .where(
         and(
-          inArray(profileSurfaces.id, activeSurfaceIds),
-          notInArray(profileSurfaces.id, surfacesWithSources)
+          inArray(profileSurfaces.id, surfaceIdsToRetire),
+          notInArray(profileSurfaces.id, currentSurfaceIds)
         )
       );
   }
