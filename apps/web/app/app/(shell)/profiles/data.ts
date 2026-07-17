@@ -21,6 +21,7 @@ import { resolveProfileSearchMarket } from '@/lib/profile-search/market';
 import {
   type ProfileQualificationStatus,
   type ProfileSurfaceKind,
+  redactLockedRank,
   selectDefaultMonitoredSurfaceIds,
 } from '@/lib/profile-surfaces/contracts';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
@@ -355,8 +356,11 @@ export async function loadProfilesWorkspaceData(input: {
             : preference === 'paused'
               ? 'paused'
               : 'locked',
-      rank,
-      previousRank: rankFor(surface.id, previousRun?.id),
+      rank: redactLockedRank(locked, rank),
+      previousRank: redactLockedRank(
+        locked,
+        rankFor(surface.id, previousRun?.id)
+      ),
       lastObservedAt: surface.lastObservedAt?.toISOString() ?? null,
       primaryIssue,
       primaryAction:
