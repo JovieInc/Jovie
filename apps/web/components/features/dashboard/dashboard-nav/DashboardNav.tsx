@@ -249,14 +249,6 @@ export function DashboardNav(_: DashboardNavProps) {
         };
       }
 
-      if (shellChatV1Enabled && !isInSettings && item.id === 'artist-profile') {
-        return {
-          ...item,
-          name: artistName || item.name,
-          href: APP_ROUTES.CHAT_PROFILE_PANEL,
-        };
-      }
-
       return item;
     };
 
@@ -299,10 +291,8 @@ export function DashboardNav(_: DashboardNavProps) {
   }, [
     canAccessTasksWorkspace,
     isPlanGateLoading,
-    artistName,
     artistSettingsLabel,
     inboxHomeEnabled,
-    isInSettings,
     shellChatV1Enabled,
     taskStats,
     tasksSeenAt,

@@ -72,6 +72,11 @@ export type ProfileWorkspaceRow =
   | ProfileWorkspaceConnectorRow;
 
 export interface ProfilesWorkspaceData {
+  readonly artist: {
+    readonly name: string;
+    readonly username: string;
+    readonly avatarUrl: string | null;
+  };
   readonly rows: ProfileWorkspaceRow[];
   readonly monitoringLimit: number | null;
   readonly monitoredCount: number;
@@ -214,7 +219,11 @@ export async function loadProfilesWorkspaceData(input: {
     latestRuns,
   ] = await Promise.all([
     db
-      .select({ username: creatorProfiles.username })
+      .select({
+        username: creatorProfiles.username,
+        displayName: creatorProfiles.displayName,
+        avatarUrl: creatorProfiles.avatarUrl,
+      })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, input.profileId))
       .limit(1),
@@ -385,6 +394,12 @@ export async function loadProfilesWorkspaceData(input: {
   const currentResults = rankRows.filter(row => row.runId === latestRun?.id);
 
   return {
+    artist: {
+      name:
+        profileRows[0]?.displayName?.trim() || profileRows[0]?.username || '',
+      username: profileRows[0]?.username ?? '',
+      avatarUrl: profileRows[0]?.avatarUrl ?? null,
+    },
     rows: [...surfaceRows, ...connectors],
     monitoringLimit,
     monitoredCount: activeExternalIds.size,
