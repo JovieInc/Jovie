@@ -1837,6 +1837,25 @@ jobs:
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
           SKIP_SKILLS_CATALOG_SYNC: '1'
 
+      - name: Pin Chrome for Lighthouse CI
+        # chrome-launcher only discovers system Chrome via PATH/CHROME_PATH, and
+        # ephemeral runners vary in what they ship. Point lhci at the baked
+        # Playwright Chromium so runs don't flake on runner image drift. If no
+        # candidate matches, leave CHROME_PATH unset (never export a literal
+        # unmatched glob) and let chrome-launcher fall back to system Chrome.
+        run: |
+          CHROME_BIN=""
+          for root in "${PLAYWRIGHT_BROWSERS_PATH:-}" /opt/ms-playwright "$HOME/.cache/ms-playwright"; do
+            [ -n "$root" ] || continue
+            CHROME_BIN="$(find "$root" -maxdepth 3 -type f -path '*/chrome-linux*/chrome' 2>/dev/null | head -1 || true)"
+            [ -n "$CHROME_BIN" ] && break
+          done
+          if [ -n "$CHROME_BIN" ]; then
+            echo "CHROME_PATH=$CHROME_BIN" >> "$GITHUB_ENV"
+          else
+            echo "No Playwright Chromium found; leaving CHROME_PATH unset for chrome-launcher fallback."
+          fi
+
       - name: Run Lighthouse CI (public launch thresholds)
         run: |
           cd apps/web

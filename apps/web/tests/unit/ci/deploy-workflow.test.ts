@@ -1000,6 +1000,35 @@ describe('CI public lighthouse workflow', () => {
     expect(runStep).not.toContain('http://127.0.0.1:3000');
   });
 
+  it('pins CHROME_PATH to the baked Playwright Chromium before running lhci', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const lighthouseJob = getJobBlock(workflow, 'ci-lighthouse-pr');
+    const pinStep = getStepBlock(lighthouseJob, 'Pin Chrome for Lighthouse CI');
+
+    // chrome-launcher only resolves system Chrome via PATH/CHROME_PATH, so the
+    // job must point lhci at the baked Playwright Chromium explicitly.
+    expect(pinStep).toContain('PLAYWRIGHT_BROWSERS_PATH');
+    expect(pinStep).toContain('/opt/ms-playwright');
+    expect(pinStep).toContain("-path '*/chrome-linux*/chrome'");
+    expect(pinStep).toContain(
+      'echo "CHROME_PATH=$CHROME_BIN" >> "$GITHUB_ENV"'
+    );
+    // Guard: when no glob matches, CHROME_PATH must stay unset — never export
+    // a literal unmatched glob path for chrome-launcher to choke on.
+    expect(pinStep).toContain('if [ -n "$CHROME_BIN" ]');
+    expect(pinStep).not.toContain('CHROME_PATH=$(ls');
+
+    // The pin must land before the lhci-invoking step.
+    const pinIndex = lighthouseJob.indexOf(
+      '- name: Pin Chrome for Lighthouse CI'
+    );
+    const runIndex = lighthouseJob.indexOf(
+      '- name: Run Lighthouse CI (public launch thresholds)'
+    );
+    expect(pinIndex).toBeGreaterThanOrEqual(0);
+    expect(runIndex).toBeGreaterThan(pinIndex);
+  });
+
   it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const lighthouseJob = getJobBlock(workflow, 'ci-lighthouse-pr');
