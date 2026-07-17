@@ -14,16 +14,14 @@ describe('presence redirect routes', () => {
     redirectMock.mockClear();
   });
 
-  it('redirects the canonical presence route to artist profile music settings', async () => {
+  it('redirects the canonical presence route to the unified profiles workspace', async () => {
     const { default: PresencePage } = await import(
       '../../../app/app/(shell)/presence/page'
     );
 
     PresencePage();
 
-    expect(redirectMock).toHaveBeenCalledWith(
-      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`
-    );
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.PROFILES);
   });
 
   it('redirects the legacy dashboard presence route to the same destination', async () => {
@@ -33,8 +31,6 @@ describe('presence redirect routes', () => {
 
     LegacyPresencePage();
 
-    expect(redirectMock).toHaveBeenCalledWith(
-      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`
-    );
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.PROFILES);
   });
 });
