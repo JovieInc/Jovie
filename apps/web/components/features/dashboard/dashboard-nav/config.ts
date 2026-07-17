@@ -99,6 +99,15 @@ export const artistProfileNavItem: NavItem = {
   description: 'Monitor your artist profiles, sources, and connectors',
 };
 
+export function filterProfilesWorkspaceNavigation(
+  items: readonly NavItem[],
+  profilesWorkspaceEnabled: boolean
+): NavItem[] {
+  return profilesWorkspaceEnabled
+    ? [...items]
+    : items.filter(item => item.id !== artistProfileNavItem.id);
+}
+
 export const touringNavItem: NavItem = {
   name: 'Touring',
   href: APP_ROUTES.SETTINGS_TOURING,

@@ -1,20 +1,25 @@
 /** Resolve a trailing ISO alpha-2 token; US state-style locations map to US. */
 export function resolveProfileSearchMarket(location: string | null) {
-  const tokens =
-    location
-      ?.toUpperCase()
-      .split(/[,\s]+/)
-      .filter(Boolean) ?? [];
-  const country = [...tokens].reverse().find(token => /^[A-Z]{2}$/.test(token));
-  if (
-    country &&
-    location?.includes(',') &&
-    US_STATE_CODES.has(country) &&
-    tokens.at(-1) === country
-  ) {
-    return 'US';
+  const normalized = location?.trim().toUpperCase();
+  if (!normalized) return 'US';
+
+  const commaParts = normalized
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean);
+  const trailingPart = commaParts.at(-1) ?? normalized;
+
+  if (trailingPart === 'USA' || trailingPart === 'UNITED STATES') return 'US';
+  if (/^[A-Z]{2}$/.test(trailingPart)) {
+    return US_STATE_CODES.has(trailingPart) && commaParts.length >= 2
+      ? 'US'
+      : trailingPart;
   }
-  return country ?? 'US';
+
+  const trailingToken = normalized.split(/\s+/).at(-1);
+  return trailingToken && /^[A-Z]{2}$/.test(trailingToken)
+    ? trailingToken
+    : 'US';
 }
 
 const US_STATE_CODES = new Set([

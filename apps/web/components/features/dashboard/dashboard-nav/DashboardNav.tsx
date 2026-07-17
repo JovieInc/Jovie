@@ -38,6 +38,7 @@ import {
   adminNavigationSections,
   artistProfileNavItem,
   artistSettingsNavigation,
+  filterProfilesWorkspaceNavigation,
   inboxNavItem,
   newThreadNavItem,
   primaryNavigation,
@@ -170,6 +171,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const queryClient = useQueryClient();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const inboxHomeEnabled = useAppFlag('INBOX_HOME');
+  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
   const [threadReadAtById, setThreadReadAtById] =
     useState<Record<string, string>>(readThreadReadState);
   const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(
@@ -270,7 +272,9 @@ export function DashboardNav(_: DashboardNavProps) {
           key: 'artist',
           label: artistSettingsLabel,
           items: [
-            decorateItem(artistProfileNavItem),
+            ...(profilesWorkspaceEnabled
+              ? [decorateItem(artistProfileNavItem)]
+              : []),
             decorateItem(touringNavItem),
             ...(audienceItem ? [decorateItem(audienceItem)] : []),
             ...(tasksItem ? [decorateItem(tasksItem)] : []),
@@ -284,7 +288,10 @@ export function DashboardNav(_: DashboardNavProps) {
         key: 'primary',
         items: [
           ...(inboxHomeEnabled ? [decorateItem(inboxNavItem)] : []),
-          ...primaryNavigation.map(decorateItem),
+          ...filterProfilesWorkspaceNavigation(
+            primaryNavigation,
+            profilesWorkspaceEnabled
+          ).map(decorateItem),
         ],
       },
     ];
@@ -293,6 +300,7 @@ export function DashboardNav(_: DashboardNavProps) {
     isPlanGateLoading,
     artistSettingsLabel,
     inboxHomeEnabled,
+    profilesWorkspaceEnabled,
     shellChatV1Enabled,
     taskStats,
     tasksSeenAt,

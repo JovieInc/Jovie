@@ -4,6 +4,8 @@ import { resolveProfileSearchMarket } from '@/lib/profile-search/market';
 describe('resolveProfileSearchMarket', () => {
   it.each([
     ['Los Angeles, CA, US', 'US'],
+    ['San Francisco, CA, United States', 'US'],
+    ['New York, NY, USA', 'US'],
     ['Los Angeles, CA', 'US'],
     ['London, GB', 'GB'],
     ['Berlin DE', 'DE'],

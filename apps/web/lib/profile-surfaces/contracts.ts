@@ -134,6 +134,11 @@ export interface MonitoringCandidate {
   readonly userPaused?: boolean;
 }
 
+export interface MonitoringPreferenceSeed {
+  readonly surfaceId: string;
+  readonly state: string;
+}
+
 /** Rank observations outside the account monitoring allowance are not exposed. */
 export function redactLockedRank(
   locked: boolean,
@@ -177,6 +182,27 @@ export function selectDefaultMonitoredSurfaceIds(
 
   return (limit === null ? ordered : ordered.slice(0, Math.max(0, limit))).map(
     candidate => candidate.id
+  );
+}
+
+/** Fill only unused monitoring capacity without reactivating existing rows. */
+export function selectAdditionalMonitoredSurfaceIds(
+  candidates: readonly MonitoringCandidate[],
+  existingPreferences: readonly MonitoringPreferenceSeed[],
+  limit: number | null
+): string[] {
+  const existingSurfaceIds = new Set(
+    existingPreferences.map(preference => preference.surfaceId)
+  );
+  const activeCount = existingPreferences.filter(
+    preference => preference.state === 'active'
+  ).length;
+  const remainingLimit =
+    limit === null ? null : Math.max(0, limit - activeCount);
+
+  return selectDefaultMonitoredSurfaceIds(
+    candidates.filter(candidate => !existingSurfaceIds.has(candidate.id)),
+    remainingLimit
   );
 }
 

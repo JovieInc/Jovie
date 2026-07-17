@@ -4,6 +4,7 @@ import {
   isSharedProfileHost,
   type MonitoringCandidate,
   redactLockedRank,
+  selectAdditionalMonitoredSurfaceIds,
   selectDefaultMonitoredSurfaceIds,
   selectRetirableSurfaceIds,
 } from '@/lib/profile-surfaces/contracts';
@@ -131,5 +132,25 @@ describe('selectDefaultMonitoredSurfaceIds', () => {
       'b',
     ]);
     expect(selectDefaultMonitoredSurfaceIds(candidates, -1)).toEqual([]);
+  });
+
+  it('seeds only unused capacity and leaves paused rows untouched', () => {
+    const candidates = [
+      candidate({ id: 'active' }),
+      candidate({ id: 'paused', platform: 'tiktok' }),
+      candidate({ id: 'new', platform: 'youtube' }),
+      candidate({ id: 'overflow', platform: 'facebook' }),
+    ];
+
+    expect(
+      selectAdditionalMonitoredSurfaceIds(
+        candidates,
+        [
+          { surfaceId: 'active', state: 'active' },
+          { surfaceId: 'paused', state: 'paused' },
+        ],
+        2
+      )
+    ).toEqual(['new']);
   });
 });

@@ -22,9 +22,10 @@ import {
   type ProfileQualificationStatus,
   type ProfileSurfaceKind,
   redactLockedRank,
-  selectDefaultMonitoredSurfaceIds,
+  selectAdditionalMonitoredSurfaceIds,
 } from '@/lib/profile-surfaces/contracts';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
+import { resolveSocialShortcutPlatforms } from '@/lib/social/shortcut-platforms';
 import type { SettingsConnectorState } from '../settings/connectors/connectors-data';
 import { loadSettingsConnectorsData } from '../settings/connectors/connectors-data';
 
@@ -92,7 +93,7 @@ async function ensureWorkspaceSeeded(input: {
   readonly monitoringLimit: number | null;
 }) {
   await reconcileProfileSurfaces(input.profileId);
-  const [profile, surfaces] = await Promise.all([
+  const [profile, surfaces, existingPreferences] = await Promise.all([
     db
       .select({
         displayName: creatorProfiles.displayName,
@@ -118,16 +119,32 @@ async function ensureWorkspaceSeeded(input: {
           drizzleSql`${profileSurfaces.retiredAt} IS NULL`
         )
       ),
+    db
+      .select({
+        surfaceId: profileSurfaceMonitoringPreferences.surfaceId,
+        state: profileSurfaceMonitoringPreferences.state,
+      })
+      .from(profileSurfaceMonitoringPreferences)
+      .where(
+        and(
+          eq(profileSurfaceMonitoringPreferences.userId, input.databaseUserId),
+          eq(
+            profileSurfaceMonitoringPreferences.creatorProfileId,
+            input.profileId
+          )
+        )
+      ),
   ]);
   if (!profile?.displayName) return;
 
-  const selectedIds = selectDefaultMonitoredSurfaceIds(
+  const selectedIds = selectAdditionalMonitoredSurfaceIds(
     surfaces.map(surface => ({
       ...surface,
       kind: surface.kind as ProfileSurfaceKind,
       qualificationStatus:
         surface.qualificationStatus as ProfileQualificationStatus,
     })),
+    existingPreferences,
     input.monitoringLimit
   );
   if (selectedIds.length > 0) {
@@ -306,19 +323,20 @@ export async function loadProfilesWorkspaceData(input: {
       .filter(preference => preference.state === 'active')
       .map(preference => preference.surfaceId)
   );
-  const socialSourceRows = await db
-    .select({ surfaceId: profileSurfaceSources.surfaceId })
-    .from(profileSurfaceSources)
-    .where(
-      and(
-        inArray(
-          profileSurfaceSources.surfaceId,
-          surfaces.map(surface => surface.id)
-        ),
-        eq(profileSurfaceSources.sourceType, 'social_link'),
-        eq(profileSurfaceSources.isLive, true)
-      )
-    );
+  const surfaceIds = surfaces.map(surface => surface.id);
+  const socialSourceRows =
+    surfaceIds.length === 0
+      ? []
+      : await db
+          .select({ surfaceId: profileSurfaceSources.surfaceId })
+          .from(profileSurfaceSources)
+          .where(
+            and(
+              inArray(profileSurfaceSources.surfaceId, surfaceIds),
+              eq(profileSurfaceSources.sourceType, 'social_link'),
+              eq(profileSurfaceSources.isLive, true)
+            )
+          );
   const socialSourceIds = new Set(socialSourceRows.map(row => row.surfaceId));
 
   const surfaceRows: ProfileWorkspaceSurfaceRow[] = surfaces.map(surface => {
@@ -340,7 +358,9 @@ export async function loadProfilesWorkspaceData(input: {
                 : 'Not measured'
               : 'No issues';
     const trackedUrl =
-      socialSourceIds.has(surface.id) && profileRows[0]?.username
+      socialSourceIds.has(surface.id) &&
+      resolveSocialShortcutPlatforms(surface.platform) &&
+      profileRows[0]?.username
         ? new URL(
             `/${encodeURIComponent(profileRows[0].username)}/s/${encodeURIComponent(surface.platform)}`,
             publicEnv.NEXT_PUBLIC_PROFILE_URL
