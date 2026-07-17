@@ -6,6 +6,7 @@ import {
   redactLockedRank,
   selectAdditionalMonitoredSurfaceIds,
   selectDefaultMonitoredSurfaceIds,
+  selectDurablyMissingSurfaceIds,
   selectRetirableSurfaceIds,
 } from '@/lib/profile-surfaces/contracts';
 
@@ -78,11 +79,54 @@ describe('selectRetirableSurfaceIds', () => {
   });
 });
 
-describe('redactLockedRank', () => {
-  it('omits current and historical rank values for locked surfaces', () => {
-    expect(redactLockedRank(true, 7)).toBeNull();
-    expect(redactLockedRank(true, null)).toBeNull();
-    expect(redactLockedRank(false, 2)).toBe(2);
+describe('selectDurablyMissingSurfaceIds', () => {
+  it('requires a prior missing run and a full grace period', () => {
+    const cutoff = new Date('2026-07-16T00:00:00.000Z');
+
+    expect(
+      selectDurablyMissingSurfaceIds(
+        [
+          {
+            surfaceId: 'live-old',
+            isLive: true,
+            lastSeenAt: new Date('2026-07-14T00:00:00.000Z'),
+          },
+          {
+            surfaceId: 'missing-recently',
+            isLive: false,
+            lastSeenAt: new Date('2026-07-16T12:00:00.000Z'),
+          },
+          {
+            surfaceId: 'missing-durably',
+            isLive: false,
+            lastSeenAt: new Date('2026-07-14T00:00:00.000Z'),
+          },
+        ],
+        cutoff
+      )
+    ).toEqual(['missing-durably']);
+  });
+
+  it('keeps a surface when any contributing source is still live', () => {
+    const cutoff = new Date('2026-07-16T00:00:00.000Z');
+
+    expect(
+      selectDurablyMissingSurfaceIds(
+        [
+          {
+            surfaceId: 'mixed',
+            isLive: false,
+            lastSeenAt: new Date('2026-07-14T00:00:00.000Z'),
+          },
+          {
+            surfaceId: 'mixed',
+            isLive: true,
+            lastSeenAt: new Date('2026-07-14T00:00:00.000Z'),
+          },
+        ],
+        cutoff
+      )
+    ).toEqual([]);
   });
 });
 

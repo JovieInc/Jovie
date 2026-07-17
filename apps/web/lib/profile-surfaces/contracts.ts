@@ -28,6 +28,33 @@ export function selectRetirableSurfaceIds(
   return knownSurfaceIds.filter(id => !current.has(id) && !live.has(id));
 }
 
+export interface SurfaceSourceState {
+  readonly surfaceId: string;
+  readonly isLive: boolean;
+  readonly lastSeenAt: Date;
+}
+
+/** Require a prior missing run plus a time grace before destructive retirement. */
+export function selectDurablyMissingSurfaceIds(
+  sources: readonly SurfaceSourceState[],
+  missingBefore: Date
+): string[] {
+  const sourcesBySurface = new Map<string, SurfaceSourceState[]>();
+  for (const source of sources) {
+    const existing = sourcesBySurface.get(source.surfaceId) ?? [];
+    existing.push(source);
+    sourcesBySurface.set(source.surfaceId, existing);
+  }
+
+  return [...sourcesBySurface.entries()]
+    .filter(([, surfaceSources]) =>
+      surfaceSources.every(
+        source => !source.isLive && source.lastSeenAt <= missingBefore
+      )
+    )
+    .map(([surfaceId]) => surfaceId);
+}
+
 const TRACKING_PARAMS = new Set([
   'fbclid',
   'gclid',

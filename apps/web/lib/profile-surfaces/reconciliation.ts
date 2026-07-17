@@ -18,7 +18,12 @@ import {
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
 import { buildSurfaceCandidates } from './candidates';
-import { selectRetirableSurfaceIds } from './contracts';
+import {
+  selectDurablyMissingSurfaceIds,
+  selectRetirableSurfaceIds,
+} from './contracts';
+
+const RETIREMENT_GRACE_MS = 24 * 60 * 60 * 1000;
 
 /** Reconcile one artist after canonical social/DSP writes or bounded backfill. */
 export async function reconcileProfileSurfaces(
@@ -175,6 +180,17 @@ export async function reconcileProfileSurfaces(
   const knownSurfaceIds = [
     ...new Set([...existingRows.map(row => row.id), ...currentSurfaceIds]),
   ];
+  const previousSourceRows =
+    knownSurfaceIds.length === 0
+      ? []
+      : await db
+          .select({
+            surfaceId: profileSurfaceSources.surfaceId,
+            isLive: profileSurfaceSources.isLive,
+            lastSeenAt: profileSurfaceSources.lastSeenAt,
+          })
+          .from(profileSurfaceSources)
+          .where(inArray(profileSurfaceSources.surfaceId, knownSurfaceIds));
   if (knownSurfaceIds.length > 0) {
     await db
       .update(profileSurfaceSources)
@@ -222,11 +238,17 @@ export async function reconcileProfileSurfaces(
   const surfacesWithSources = [
     ...new Set(liveSourceRows.map(row => row.surfaceId)),
   ];
+  const durablyMissingSurfaceIds = new Set(
+    selectDurablyMissingSurfaceIds(
+      previousSourceRows,
+      new Date(startedAt.getTime() - RETIREMENT_GRACE_MS)
+    )
+  );
   const surfaceIdsToRetire = selectRetirableSurfaceIds(
     knownSurfaceIds,
     currentSurfaceIds,
     surfacesWithSources
-  );
+  ).filter(surfaceId => durablyMissingSurfaceIds.has(surfaceId));
   if (surfaceIdsToRetire.length > 0) {
     await db
       .update(profileSurfaces)
