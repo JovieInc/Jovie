@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ProfilesWorkspaceData } from './data';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
 
@@ -75,12 +76,13 @@ describe('ProfilesWorkspace', () => {
   it('filters the unified table without exposing locked rank values', () => {
     render(<ProfilesWorkspace data={data} />);
 
+    expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
     expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.queryByText('7')).not.toBeInTheDocument();
     expect(screen.getByText('1 of 5 monitored')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dsps' }));
+    fireEvent.click(screen.getByRole('button', { name: 'DSP' }));
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
 

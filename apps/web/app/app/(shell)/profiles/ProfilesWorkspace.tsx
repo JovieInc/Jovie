@@ -47,7 +47,7 @@ const FILTERS: ReadonlyArray<{
   label: string;
 }> = [
   { id: 'all', label: 'All' },
-  { id: 'dsp', label: 'Dsps' },
+  { id: 'dsp', label: 'DSP' },
   { id: 'social', label: 'Social' },
   { id: 'source', label: 'Sources' },
   { id: 'connector', label: 'Connectors' },
@@ -258,9 +258,7 @@ export function ProfilesWorkspace({
   data,
 }: Readonly<{ data: ProfilesWorkspaceData | null }>) {
   const [filter, setFilter] = useState<ProfilesWorkspaceFilter>('all');
-  const [selected, setSelected] = useState<ProfileWorkspaceRow | null>(
-    data?.rows[0] ?? null
-  );
+  const [selected, setSelected] = useState<ProfileWorkspaceRow | null>(null);
   const rows = useMemo(
     () => filterProfileWorkspaceRows(data?.rows ?? [], filter),
     [data?.rows, filter]
@@ -270,7 +268,7 @@ export function ProfilesWorkspace({
       columnHelper.accessor('label', {
         header: 'Profile',
         size: 9999,
-        minSize: 220,
+        minSize: 180,
         cell: context => {
           const row = context.row.original;
           return (
@@ -298,7 +296,7 @@ export function ProfilesWorkspace({
       }),
       columnHelper.accessor('primaryIssue', {
         header: 'Primary Issue',
-        size: 190,
+        size: 160,
       }),
       columnHelper.display({
         id: 'rank',
@@ -344,7 +342,7 @@ export function ProfilesWorkspace({
   );
 
   useRegisterRightPanel(
-    data ? (
+    data && selected ? (
       <ProfilesRail
         data={data}
         row={selected}
@@ -406,7 +404,7 @@ export function ProfilesWorkspace({
         getRowId={row => row.id}
         onRowClick={setSelected}
         rowHeight={56}
-        minWidth='860px'
+        minWidth='700px'
         getRowClassName={row =>
           cn(
             'cursor-pointer',
