@@ -20,7 +20,10 @@ export function IdentityPageClient() {
     setPending(true);
     setError(null);
     try {
-      const result = await authClient.signIn.social({ provider: 'apple' });
+      const result = await authClient.signIn.social({
+        provider: 'apple',
+        callbackURL: window.location.href,
+      });
       if (result.error) {
         setError('Apple sign in could not be started. Try again.');
         setPending(false);

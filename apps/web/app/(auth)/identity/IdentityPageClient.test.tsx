@@ -38,6 +38,11 @@ vi.mock('@/lib/auth/client', () => ({
 describe('IdentityPageClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState(
+      {},
+      '',
+      '/identity?response_type=code&client_id=logyourbody-ios&redirect_uri=logyourbody%3A%2F%2Foauth&scope=openid+profile+email+offline_access&state=oauth-state&code_challenge=pkce-challenge&code_challenge_method=S256&exp=123&sig=signed'
+    );
     signInSocial.mockResolvedValue({ data: {}, error: null });
   });
 
@@ -55,15 +60,32 @@ describe('IdentityPageClient', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('starts Apple through Better Auth', async () => {
+  it('returns from Apple to the complete pending OAuth transaction', async () => {
     render(<IdentityPageClient />);
     fireEvent.click(
       screen.getByRole('button', { name: 'Continue with Apple' })
     );
 
     await waitFor(() =>
-      expect(signInSocial).toHaveBeenCalledWith({ provider: 'apple' })
+      expect(signInSocial).toHaveBeenCalledWith({
+        provider: 'apple',
+        callbackURL: window.location.href,
+      })
     );
+
+    const callbackURL = new URL(signInSocial.mock.calls[0]?.[0].callbackURL);
+    expect(callbackURL.pathname).toBe('/identity');
+    expect(Object.fromEntries(callbackURL.searchParams)).toEqual({
+      response_type: 'code',
+      client_id: 'logyourbody-ios',
+      redirect_uri: 'logyourbody://oauth',
+      scope: 'openid profile email offline_access',
+      state: 'oauth-state',
+      code_challenge: 'pkce-challenge',
+      code_challenge_method: 'S256',
+      exp: '123',
+      sig: 'signed',
+    });
   });
 
   it('shows a recoverable error when Apple cannot start', async () => {
