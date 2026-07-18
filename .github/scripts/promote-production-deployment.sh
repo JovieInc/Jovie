@@ -153,7 +153,12 @@ fetch_rollout() {
 }
 
 rollout_is_active() {
-  jq -e '. != null and .activeStage != null' >/dev/null 2>&1 <<<"$1"
+  # Terminal records can retain activeStage; unknown states must stay fail-closed.
+  jq -e '
+    . != null and
+    .state != "COMPLETE" and
+    .state != "ABORTED"
+  ' >/dev/null 2>&1 <<<"$1"
 }
 
 rollout_target_id() {

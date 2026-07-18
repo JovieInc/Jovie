@@ -608,7 +608,9 @@ if [ "$cmd" = "rolling-release" ] && [ "$2" = "fetch" ]; then
   fi
 
   rollout='null'
-  if [ "$FAKE_SCENARIO" = "foreign" ]; then
+  if [ "$FAKE_SCENARIO" = "foreign-complete" ]; then
+    rollout='{"state":"COMPLETE","currentCanaryPercentage":100,"activeStage":{"index":2,"isFinalStage":true,"targetPercentage":100},"canaryDeployment":{"id":"dpl_foreign"}}'
+  elif [ "$FAKE_SCENARIO" = "foreign" ]; then
     rollout='{"activeStage":{"targetPercentage":10},"canaryDeployment":{"id":"dpl_foreign"}}'
   elif [ "$FAKE_SCENARIO" = "rolling" ] &&
     grep -q '^promote ' "$VERCEL_CALL_LOG" &&
@@ -731,6 +733,18 @@ def test_promotion_controller_rejects_foreign_rollout_without_mutation(
     assert (tmp_path / "github-output").read_text().strip() == (
         "failure_subtype=production_promotion_foreign_rollout"
     )
+
+
+def test_promotion_controller_ignores_completed_foreign_rollout_record(
+    tmp_path: Path,
+) -> None:
+    result = _run_promotion_controller(tmp_path, "foreign-complete")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert calls.count("promote dpl_target") == 1
+    assert "rolling-release complete" not in calls
+    assert "rolling-release abort" not in calls
 
 
 def test_promotion_controller_aborts_timed_out_owned_rollout_and_stops(
