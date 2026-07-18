@@ -1,15 +1,15 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ArtistProfileSpecWall } from '@/components/marketing/artist-profile';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
-import { ARTIST_PROFILE_SPEC_TILES } from '@/data/artistProfileFeatures';
+import { ARTIST_PROFILE_TRUTH_TILES } from '@/data/artistProfileFeatures';
 
 describe('ArtistProfileSpecWall', () => {
-  it('renders the compact eight-tile spec wall without legacy slop copy', () => {
+  it('renders the compact ten-tile product truth wall without legacy slop copy', () => {
     render(
       <ArtistProfileSpecWall
         specWall={ARTIST_PROFILE_COPY.specWall}
-        tiles={ARTIST_PROFILE_SPEC_TILES}
+        truthTiles={ARTIST_PROFILE_TRUTH_TILES}
       />
     );
 
@@ -24,50 +24,22 @@ describe('ArtistProfileSpecWall', () => {
       )
     ).toBeInTheDocument();
 
+    expect(screen.getAllByTestId('artist-profile-truth-tile')).toHaveLength(10);
+
     const headings = screen.getAllByRole('heading', { level: 3 });
     const titles = headings.map(heading => heading.textContent);
 
-    expect(titles).toEqual([
-      'Audience Quality Filtering',
-      'Rich Analytics',
-      'Geo Insights',
-      'Always in Sync',
-      'Activate Creators',
-      'Press-Ready Assets',
-      'UTM Builder',
-      'Blazing Fast',
-    ]);
+    expect(titles).toEqual(ARTIST_PROFILE_TRUTH_TILES.map(tile => tile.title));
 
-    for (const title of titles) {
-      const card = screen
-        .getByRole('heading', { name: title ?? '' })
-        .closest('article');
-      expect(card).not.toBeNull();
-
-      if (!card) {
-        continue;
-      }
-
-      expect(within(card).getByRole('img')).toBeInTheDocument();
-    }
-
-    const audienceQualityCard = screen
-      .getByRole('heading', { name: 'Audience Quality Filtering' })
-      .closest('article');
-
-    expect(audienceQualityCard).not.toBeNull();
-
-    if (audienceQualityCard) {
-      expect(
-        within(audienceQualityCard).getByRole('img', {
-          name: 'Audience Quality Filtering Preview',
-        })
-      ).toBeInTheDocument();
-      expect(
-        within(audienceQualityCard).getByText('Actual Fans')
-      ).toBeInTheDocument();
-    }
-
+    expect(screen.queryByText('Details that matter.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Built from 15 years of music marketing experience, obsessing over the details that make a profile convert.'
+      )
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Audience Quality Filtering')
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Power features')).not.toBeInTheDocument();
     expect(screen.queryByText('Opinionated design')).not.toBeInTheDocument();
     expect(screen.queryByText('Product philosophy')).not.toBeInTheDocument();

@@ -13,6 +13,7 @@ import {
 import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import type { ArtistProfileTruthTile } from '@/data/artistProfileFeatures';
 import type { MarketingFeatureTile } from '@/data/marketingFeatureTiles';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
@@ -36,7 +37,8 @@ type AccentStyle = CSSProperties & {
 
 interface ArtistProfileSpecWallProps {
   readonly specWall: ArtistProfileLandingCopy['specWall'];
-  readonly tiles: readonly MarketingFeatureTile[];
+  readonly tiles?: readonly MarketingFeatureTile[];
+  readonly truthTiles?: readonly ArtistProfileTruthTile[];
 }
 
 function ScreenshotCrop({
@@ -344,10 +346,47 @@ function ArtistProfilePowerFeatureTile({
 export function ArtistProfileSpecWall({
   specWall,
   tiles,
+  truthTiles,
 }: Readonly<ArtistProfileSpecWallProps>) {
+  if (truthTiles) {
+    return (
+      <ArtistProfileSectionShell width='page'>
+        <div className='mx-auto max-w-public-content'>
+          <ArtistProfileSectionHeader
+            align='left'
+            headline={specWall.headline}
+            body={specWall.subhead}
+            className='max-w-3xl'
+            bodyClassName='max-w-xl'
+          />
+
+          <ol className='mt-10 grid border-t border-subtle sm:grid-cols-2 lg:grid-cols-5'>
+            {truthTiles.map((tile, index) => (
+              <li
+                key={tile.id}
+                data-testid='artist-profile-truth-tile'
+                className='min-h-44 border-b border-subtle p-5 sm:border-r sm:[&:nth-child(2n)]:border-r-0 lg:border-r lg:[&:nth-child(5n)]:border-r-0'
+              >
+                <p className='font-mono text-3xs text-tertiary-token'>
+                  {String(index + 1).padStart(2, '0')}
+                </p>
+                <h3 className='mt-8 text-sm font-semibold text-primary-token'>
+                  {tile.title}
+                </h3>
+                <p className='mt-3 text-app leading-relaxed text-secondary-token'>
+                  {tile.body}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </ArtistProfileSectionShell>
+    );
+  }
+
   return (
     <ArtistProfileSectionShell width='page' containerClassName='max-w-none'>
-      <div className='mx-auto max-w-(--linear-content-max)'>
+      <div className='mx-auto max-w-public-content'>
         <ArtistProfileSectionHeader
           align='left'
           headline={specWall.headline}
@@ -358,7 +397,7 @@ export function ArtistProfileSpecWall({
         />
 
         <div className='mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-4 xl:gap-4'>
-          {tiles.map(tile => (
+          {(tiles ?? []).map(tile => (
             <ArtistProfilePowerFeatureTile key={tile.id} tile={tile} />
           ))}
         </div>

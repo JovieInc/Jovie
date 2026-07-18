@@ -9,12 +9,14 @@ interface ArtistProfileFinalCtaProps {
   readonly finalCta: ArtistProfileLandingCopy['finalCta'];
   readonly ctaHref?: string;
   readonly roomy?: boolean;
+  readonly showSignature?: boolean;
 }
 
 export function ArtistProfileFinalCta({
   finalCta,
   ctaHref = APP_ROUTES.SIGNUP,
   roomy = false,
+  showSignature = false,
 }: Readonly<ArtistProfileFinalCtaProps>) {
   return (
     <ArtistProfileSectionShell
@@ -37,6 +39,11 @@ export function ArtistProfileFinalCta({
       <p className={cn(SHELL_LEAD_CLASS, 'mx-auto mt-5 max-w-[34rem] sm:mt-6')}>
         {finalCta.subhead}
       </p>
+      {showSignature ? (
+        <p className='mt-5 font-mono text-xs tracking-tight text-tertiary-token'>
+          {finalCta.signature}
+        </p>
+      ) : null}
       <div className='mt-8'>
         <ShellCtaButton
           href={ctaHref}
