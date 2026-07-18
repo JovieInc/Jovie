@@ -1559,6 +1559,11 @@ jobs:
           export HOSTNAME=localhost
 
           OVERFLOW_PORT=$((3210 + ${{ strategy.job-index }}))
+          # Pin app/auth URLs to this shard's isolated port — the shared build
+          # artifact bakes localhost:3100, which no longer matches this lane.
+          export NEXT_PUBLIC_APP_URL="http://localhost:$OVERFLOW_PORT"
+          export BETTER_AUTH_URL="http://localhost:$OVERFLOW_PORT"
+          export NEXT_PUBLIC_BETTER_AUTH_URL="http://localhost:$OVERFLOW_PORT"
           PORT="$OVERFLOW_PORT" node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
 
@@ -3577,9 +3582,12 @@ jobs:
           export SPOTIFY_CLIENT_ID="${{ secrets.SPOTIFY_CLIENT_ID }}"
           export SPOTIFY_CLIENT_SECRET="${{ secrets.SPOTIFY_CLIENT_SECRET }}"
           export MUSICFETCH_API_TOKEN="${{ secrets.MUSICFETCH_API_TOKEN }}"
-          export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
-          export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
-
+          # Deliberately NO UPSTASH_REDIS_REST_URL/TOKEN here: the OTP rate
+          # limiter's IP key collapses to 127.0.0.1 in this lane, so one shared
+          # Upstash bucket (3 sends/60s) is raced by every external dev/agent
+          # run — OTP send returned 429 and the code step never rendered.
+          # Without Redis, secondary storage falls back to per-process memory
+          # and this lane's OTP sends stay deterministic.
           PORT=3250 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
@@ -3603,7 +3611,6 @@ jobs:
           BASE_URL=http://localhost:3250 E2E_SKIP_WEB_SERVER=1 pnpm --filter @jovie/web run test:e2e:golden-path:ci
         env:
           # The runner also needs the database and deterministic E2E OTP flag.
-          # UPSTASH_* is optional; the spec degrades to the in-memory limiter.
           DATABASE_URL: ${{ env.DATABASE_URL }}
           E2E_TEST_MODE: '1'
           BETTER_AUTH_URL: http://localhost:3250
@@ -3615,8 +3622,8 @@ jobs:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           MUSICFETCH_API_TOKEN: ${{ secrets.MUSICFETCH_API_TOKEN }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          # UPSTASH_* intentionally unset (see the note above server start):
+          # per-process in-memory limiting keeps OTP sends deterministic.
 
       - name: Upload Playwright Artifacts on Failure
         if: failure()
