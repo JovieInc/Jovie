@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 const POST_UPDATE_VERIFY_DELAYS_MS = [0, 250, 500, 1000, 2000];
+const NO_MUTATION = { mutationAttempted: false, mutationApplied: false };
 
 const UPDATE_PULL_REQUEST_BRANCH_MUTATION = `
   mutation UpdatePullRequestBranch(
@@ -185,6 +186,7 @@ export async function tryGitHubRebase({
 }) {
   if (dryRun) {
     return {
+      ...NO_MUTATION,
       ok: true,
       updated: true,
       dryRun: true,
@@ -199,6 +201,7 @@ export async function tryGitHubRebase({
     before = await fetchPrSnapshot(repo, pr.number, ghJsonImpl);
   } catch (error) {
     return {
+      ...NO_MUTATION,
       ok: false,
       conflict: false,
       category: 'snapshot_failure',
@@ -212,6 +215,7 @@ export async function tryGitHubRebase({
     before.headRefName !== pr.headRefName
   ) {
     return {
+      ...NO_MUTATION,
       ok: false,
       conflict: false,
       category: 'stale_pr',
@@ -221,6 +225,7 @@ export async function tryGitHubRebase({
   }
   if (expectedBaseRefName && before.baseRefName !== expectedBaseRefName) {
     return {
+      ...NO_MUTATION,
       ok: false,
       conflict: false,
       category: 'stale_base',
@@ -230,6 +235,7 @@ export async function tryGitHubRebase({
   }
   if (!before.id || !before.headRefOid) {
     return {
+      ...NO_MUTATION,
       ok: false,
       conflict: false,
       category: 'snapshot_failure',
@@ -239,6 +245,7 @@ export async function tryGitHubRebase({
   }
   if (before.mergeable === 'CONFLICTING') {
     return {
+      ...NO_MUTATION,
       ok: false,
       conflict: true,
       category: 'conflict',
@@ -265,6 +272,8 @@ export async function tryGitHubRebase({
     const after = await tryFetchPrSnapshot(repo, pr.number, ghJsonImpl);
     return {
       ...classifyGitHubRebaseFailure({ error, before, after }),
+      mutationAttempted: true,
+      mutationApplied: false,
       baseRefName: before.baseRefName,
       expectedHeadOid: before.headRefOid,
       observedHeadOid: after?.headRefOid ?? null,
@@ -272,6 +281,12 @@ export async function tryGitHubRebase({
   }
 
   const mutated = mutation?.data?.updatePullRequestBranch?.pullRequest;
+  const mutationState = {
+    mutationAttempted: true,
+    mutationApplied: Boolean(
+      mutated?.headRefOid && mutated.headRefOid !== before.headRefOid
+    ),
+  };
   if (
     !mutated?.headRefOid ||
     mutated.id !== before.id ||
@@ -279,6 +294,7 @@ export async function tryGitHubRebase({
     mutated.headRefName !== before.headRefName
   ) {
     return {
+      ...mutationState,
       ok: false,
       conflict: false,
       category: 'verification_failure',
@@ -300,6 +316,7 @@ export async function tryGitHubRebase({
   const after = verification.snapshot;
   if (verification.identityChanged || verification.headChanged) {
     return {
+      ...mutationState,
       ok: false,
       conflict: false,
       category: 'verification_failure',
@@ -312,6 +329,7 @@ export async function tryGitHubRebase({
   }
   if (!verification.converged || !after?.headRefOid) {
     return {
+      ...mutationState,
       ok: false,
       conflict: false,
       category: 'verification_failure',
@@ -324,6 +342,7 @@ export async function tryGitHubRebase({
   if (after.headRefOid === before.headRefOid) {
     if (after.mergeable === 'CONFLICTING') {
       return {
+        ...mutationState,
         ok: false,
         conflict: true,
         category: 'conflict',
@@ -334,6 +353,7 @@ export async function tryGitHubRebase({
       };
     }
     return {
+      ...mutationState,
       ok: true,
       updated: false,
       conflict: false,
@@ -346,6 +366,7 @@ export async function tryGitHubRebase({
   }
 
   return {
+    ...mutationState,
     ok: true,
     updated: true,
     conflict: false,

@@ -808,6 +808,8 @@ describe('exact-head GitHub Update Branch rebase', () => {
     expect(result).toMatchObject({
       ok: true,
       updated: true,
+      mutationAttempted: true,
+      mutationApplied: true,
       conflict: false,
       expectedHeadOid: ORIGINAL_HEAD,
       observedHeadOid: UPDATED_HEAD,
@@ -863,6 +865,8 @@ describe('exact-head GitHub Update Branch rebase', () => {
 
     expect(result).toMatchObject({
       ok: false,
+      mutationAttempted: true,
+      mutationApplied: true,
       conflict: false,
       category: 'verification_failure',
       expectedHeadOid: ORIGINAL_HEAD,
@@ -889,6 +893,8 @@ describe('exact-head GitHub Update Branch rebase', () => {
 
     expect(result).toMatchObject({
       ok: false,
+      mutationAttempted: true,
+      mutationApplied: false,
       conflict: false,
       category: 'stale_head',
       expectedHeadOid: ORIGINAL_HEAD,
@@ -1001,6 +1007,8 @@ describe('remediation mutations', () => {
       listBlockedAgentPrsImpl: async () => [blockedPr()],
       rebaseImpl: async () => ({
         ok: false,
+        mutationAttempted: true,
+        mutationApplied: false,
         conflict: false,
         category: 'transient',
         reason: 'GitHub rebase transient: HTTP 503',
@@ -1011,6 +1019,45 @@ describe('remediation mutations', () => {
     });
 
     expect(summary.applied).toBe(0);
+    expect(summary.mutationBudgetUsed).toBe(1);
+    expect(labelPrImpl).not.toHaveBeenCalled();
+    expect(commentPrImpl).not.toHaveBeenCalled();
+  });
+
+  it('stops after one attempted but unverified mutation', async () => {
+    const rebaseImpl = vi.fn(async () => ({
+      ok: false,
+      mutationAttempted: true,
+      mutationApplied: true,
+      conflict: false,
+      category: 'verification_failure',
+      reason: 'updated head did not converge before timeout',
+    }));
+    const labelPrImpl = vi.fn();
+    const commentPrImpl = vi.fn();
+
+    const summary = await remediateBlockedPrs(
+      { ...options, maxPerRun: 1 },
+      {
+        listBlockedAgentPrsImpl: async () => [
+          blockedPr(),
+          blockedPr({ number: 124, headRefName: 'codex/next-candidate' }),
+        ],
+        rebaseImpl,
+        labelPrImpl,
+        commentPrImpl,
+        nowMs: Date.parse('2026-07-18T00:00:00Z'),
+      }
+    );
+
+    expect(rebaseImpl).toHaveBeenCalledOnce();
+    expect(summary).toMatchObject({ applied: 0, mutationBudgetUsed: 1 });
+    expect(summary.results).toHaveLength(1);
+    expect(summary.results[0]).toMatchObject({
+      mutationAttempted: true,
+      mutationApplied: true,
+      consumedBudget: true,
+    });
     expect(labelPrImpl).not.toHaveBeenCalled();
     expect(commentPrImpl).not.toHaveBeenCalled();
   });
@@ -1027,6 +1074,8 @@ describe('remediation mutations', () => {
       rebaseImpl: async () => ({
         ok: true,
         updated: false,
+        mutationAttempted: true,
+        mutationApplied: false,
         conflict: false,
         category: 'no_change',
         reason: 'GitHub reports the pull request branch is already current',
@@ -1086,6 +1135,8 @@ describe('remediation mutations', () => {
       rebaseImpl: async () => ({
         ok: true,
         updated: true,
+        mutationAttempted: true,
+        mutationApplied: true,
         conflict: false,
         category: 'updated',
         baseRefName: 'main',

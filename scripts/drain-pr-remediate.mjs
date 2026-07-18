@@ -154,6 +154,7 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
 
   const results = [];
   let applied = 0;
+  let mutationBudgetUsed = 0;
 
   console.log('=== REMEDIATE (BLOCKED agent PRs → rebase onto main) ===');
   console.log(
@@ -161,9 +162,9 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
   );
 
   for (const pr of blocked) {
-    if (applied >= options.maxPerRun) {
+    if (mutationBudgetUsed >= options.maxPerRun) {
       console.log(
-        `  cap reached (${options.maxPerRun}/run); remaining candidates skipped`
+        `  mutation cap reached (${mutationBudgetUsed}/${options.maxPerRun}); remaining candidates skipped`
       );
       break;
     }
@@ -196,6 +197,10 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
       dryRun: options.dryRun,
     });
     const baseRef = rebase.baseRefName ?? options.baseRef;
+    const consumedBudget = options.dryRun
+      ? Boolean(rebase.updated)
+      : Boolean(rebase.mutationAttempted);
+    if (consumedBudget) mutationBudgetUsed += 1;
 
     const item = {
       number: pr.number,
@@ -212,6 +217,9 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
       category: rebase.category ?? null,
       expectedHeadOid: rebase.expectedHeadOid ?? null,
       observedHeadOid: rebase.observedHeadOid ?? null,
+      mutationAttempted: Boolean(rebase.mutationAttempted),
+      mutationApplied: Boolean(rebase.mutationApplied),
+      consumedBudget,
     };
     results.push(item);
 
@@ -267,9 +275,15 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
   }
 
   console.log(
-    `=== remediate done (applied=${applied}, dryRun=${options.dryRun}) ===`
+    `=== remediate done (applied=${applied}, mutationBudgetUsed=${mutationBudgetUsed}, dryRun=${options.dryRun}) ===`
   );
-  return { blocked: blocked.length, applied, results, dryRun: options.dryRun };
+  return {
+    blocked: blocked.length,
+    applied,
+    mutationBudgetUsed,
+    results,
+    dryRun: options.dryRun,
+  };
 }
 
 async function main() {
