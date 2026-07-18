@@ -1205,12 +1205,20 @@ JSON
         assert "CI / PR Ready (missing)" in result.stdout
         assert "[dry-run] would +merge-queue on #889" not in result.stdout
 
-    def test_drain_remediate_script_exists(self) -> None:
+    def test_drain_remediate_uses_exact_head_github_rebase(self) -> None:
         remediate = _REPO_ROOT / "scripts" / "drain-pr-remediate.mjs"
+        update_branch = _REPO_ROOT / "scripts" / "lib" / "github-update-branch.mjs"
         assert remediate.is_file()
-        content = remediate.read_text(encoding="utf-8")
+        assert update_branch.is_file()
+        content = remediate.read_text(encoding="utf-8") + update_branch.read_text(
+            encoding="utf-8"
+        )
         assert "listBlockedAgentPrs" in content
-        assert "force-with-lease" in content
+        assert "updatePullRequestBranch" in content
+        assert "expectedHeadOid" in content
+        assert "updateMethod: REBASE" in content
+        assert "force-with-lease" not in content
+        assert "repo', 'clone" not in content
 
     def test_gtmq_drafts_bypass_ordinary_label_mutations_but_fail_closed_without_sources(
         self, tmp_path: Path

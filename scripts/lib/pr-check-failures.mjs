@@ -345,6 +345,7 @@ export async function listBlockedAgentPrs(repo, { limit = 200 } = {}) {
       title: pr.title,
       headRefName: pr.headRefName,
       updatedAt: pr.updatedAt,
+      labels: pr.labels,
       failures,
     });
   }
