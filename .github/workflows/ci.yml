@@ -5841,7 +5841,7 @@ jobs:
 
       - name: Promote staged production deployment
         id: promote
-        timeout-minutes: 10
+        timeout-minutes: 15
         env:
           PRODUCTION_DEPLOYMENT_ID: ${{ steps.stage-production.outputs.production_deployment_id }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
