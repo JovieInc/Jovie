@@ -29,6 +29,7 @@ const REQUIRED_NATIVE_STATE_FIELDS =
   );
 const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS}}}}`;
 const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:100,after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
+const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{pushAllowances(first:100){totalCount nodes{actor{__typename ... on App{id name slug} ... on User{id login name} ... on Team{id name slug}}}}}}}}`;
 const DEQUEUE_PULL_REQUEST_MUTATION = `mutation DequeuePullRequest($id:ID!){dequeuePullRequest(input:{id:$id}){mergeQueueEntry{id}}}`;
 const DISABLE_AUTO_MERGE_MUTATION = `mutation DisablePullRequestAutoMerge($pullRequestId:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId}){pullRequest{id}}}`;
 
@@ -209,6 +210,7 @@ export function validateNativePreflightEvidence({
   ruleset,
   repository,
   workflowYaml,
+  branchProtectionRef,
   rulesetId = DEFAULT_RULESET_ID,
   baseBranch = DEFAULT_BASE_BRANCH,
 } = {}) {
@@ -227,6 +229,63 @@ export function validateNativePreflightEvidence({
   );
   const bypassActors = ruleset?.bypass_actors;
   const hasValidBypassActors = Array.isArray(bypassActors);
+  const hasBranchProtectionRef =
+    typeof branchProtectionRef === 'object' &&
+    branchProtectionRef !== null &&
+    !Array.isArray(branchProtectionRef);
+  const hasBranchProtectionRuleField =
+    hasBranchProtectionRef &&
+    Object.hasOwn(branchProtectionRef, 'branchProtectionRule');
+  const branchProtectionRule = hasBranchProtectionRuleField
+    ? branchProtectionRef.branchProtectionRule
+    : undefined;
+  const hasBranchProtectionRuleShape =
+    branchProtectionRule === null ||
+    (typeof branchProtectionRule === 'object' &&
+      !Array.isArray(branchProtectionRule));
+  const hasExactBranchProtectionEvidence =
+    hasBranchProtectionRef &&
+    branchProtectionRef.name === baseBranch &&
+    hasBranchProtectionRuleField &&
+    hasBranchProtectionRuleShape;
+  const pushAllowances =
+    branchProtectionRule === null
+      ? { totalCount: 0, nodes: [] }
+      : branchProtectionRule?.pushAllowances;
+  const allowanceCount = pushAllowances?.totalCount;
+  const allowanceNodes = pushAllowances?.nodes;
+  const allowanceActorIdentities = Array.isArray(allowanceNodes)
+    ? allowanceNodes.map(({ actor } = {}) => {
+        const type =
+          typeof actor?.__typename === 'string' ? actor.__typename : 'Unknown';
+        const identity =
+          actor?.login ??
+          actor?.slug ??
+          actor?.name ??
+          actor?.id ??
+          'unidentified';
+        return `${type}:${identity}`;
+      })
+    : [];
+  const hasValidPushAllowances =
+    hasExactBranchProtectionEvidence &&
+    typeof pushAllowances === 'object' &&
+    pushAllowances !== null &&
+    !Array.isArray(pushAllowances) &&
+    Number.isSafeInteger(allowanceCount) &&
+    allowanceCount >= 0 &&
+    Array.isArray(allowanceNodes) &&
+    allowanceNodes.length === Math.min(allowanceCount, 100) &&
+    allowanceNodes.every(({ actor } = {}) => {
+      const identity = actor?.login ?? actor?.slug ?? actor?.name ?? actor?.id;
+      return (
+        typeof actor?.__typename === 'string' &&
+        actor.__typename.length > 0 &&
+        typeof identity === 'string' &&
+        identity.length > 0
+      );
+    });
+  const classicRestrictionDetails = allowanceActorIdentities.join(', ');
   const validations = {
     [`ruleset id must be ${rulesetId}`]:
       String(ruleset?.id ?? '') === String(rulesetId),
@@ -259,6 +318,12 @@ export function validateNativePreflightEvidence({
       repository?.allow_squash_merge === true,
     'CI workflow must handle merge_group checks_requested':
       workflowHasMergeGroup,
+    [`classic branch protection evidence must include exact refs/heads/${baseBranch} branchProtectionRule`]:
+      hasExactBranchProtectionEvidence,
+    [`classic branch protection pushAllowances for refs/heads/${baseBranch} must include a non-negative integer totalCount and identified actor nodes`]:
+      !hasExactBranchProtectionEvidence || hasValidPushAllowances,
+    [`classic branch protection for refs/heads/${baseBranch} must not restrict pushes; found ${Number.isSafeInteger(allowanceCount) ? allowanceCount : 'unknown'} allowance(s): ${classicRestrictionDetails || 'unidentified'}`]:
+      !hasValidPushAllowances || allowanceCount === 0,
   };
   for (const [message, condition] of Object.entries(validations)) {
     if (!condition) errors.push(message);
@@ -272,6 +337,8 @@ export function validateNativePreflightEvidence({
       requiredChecks,
       rulesetId: ruleset?.id ?? null,
       workflowHasMergeGroup,
+      classicPushAllowanceCount: hasValidPushAllowances ? allowanceCount : null,
+      classicPushAllowanceActors: allowanceActorIdentities,
     },
   };
 }
@@ -285,7 +352,7 @@ export async function preflightMergeQueue({
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
 
-  parseRepositorySlug(repository);
+  const { owner, name } = parseRepositorySlug(repository);
   const ruleset = await runGhJson(
     runner,
     ['api', `repos/${repository}/rulesets/${rulesetId}`],
@@ -306,10 +373,24 @@ export async function preflightMergeQueue({
     ],
     'reading the live CI workflow'
   );
+  const branchProtectionPayload = assertGraphqlResponse(
+    await runGhJson(
+      runner,
+      graphqlArgs(BRANCH_PROTECTION_QUERY, {
+        owner,
+        name,
+        refName: `refs/heads/${baseBranch}`,
+      }),
+      'reading classic branch protection push allowances'
+    ),
+    'reading classic branch protection push allowances'
+  );
+  const branchProtectionRef = branchProtectionPayload?.data?.repository?.ref;
   const validation = validateNativePreflightEvidence({
     ruleset,
     repository: repositoryEvidence,
     workflowYaml,
+    branchProtectionRef,
     rulesetId,
     baseBranch,
   });

@@ -36,6 +36,10 @@ on:
   merge_group:
     types: [checks_requested]
 `;
+const VALID_BRANCH_PROTECTION_REF = Object.freeze({
+  name: 'main',
+  branchProtectionRule: null,
+});
 function prState(overrides = {}) {
   return {
     id: PR_ID,
@@ -62,6 +66,7 @@ function createNativeRunner({
   ruleset = VALID_RULESET,
   repository = VALID_REPOSITORY,
   workflow = VALID_WORKFLOW,
+  branchProtectionRef = VALID_BRANCH_PROTECTION_REF,
   states = [],
   listPages = null,
 } = {}) {
@@ -78,6 +83,9 @@ function createNativeRunner({
     }
 
     const query = queryText(args);
+    if (query.includes('MergeQueueBranchProtection')) {
+      return ok({ data: { repository: { ref: branchProtectionRef } } });
+    }
     if (query.includes('MergeQueueOpenPullRequestStates')) {
       return ok(
         listPages ?? [
@@ -233,6 +241,112 @@ describe('queue workflow mutation safety', () => {
 });
 
 describe('native live preflight', () => {
+  it.each([
+    ['no classic rule', VALID_BRANCH_PROTECTION_REF],
+    [
+      'an unrestricted classic rule',
+      {
+        name: 'main',
+        branchProtectionRule: {
+          pushAllowances: { totalCount: 0, nodes: [] },
+        },
+      },
+    ],
+  ])('accepts %s', (_label, branchProtectionRef) => {
+    const result = validateNativePreflightEvidence({
+      ruleset: VALID_RULESET,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.evidence.classicPushAllowanceCount).toBe(0);
+  });
+
+  it.each([
+    ['App', { __typename: 'App', id: 'A_1', slug: 'graphite-app' }],
+    ['User', { __typename: 'User', id: 'U_1', login: 'octocat' }],
+    ['Team', { __typename: 'Team', id: 'T_1', slug: 'release-engineering' }],
+  ])('rejects a classic %s push allowance with actor identity', (_kind, actor) => {
+    const result = validateNativePreflightEvidence({
+      ruleset: VALID_RULESET,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: {
+        name: 'main',
+        branchProtectionRule: {
+          pushAllowances: {
+            totalCount: 1,
+            nodes: [{ actor }],
+          },
+        },
+      },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.stringContaining(
+        `${actor.__typename}:${actor.login ?? actor.slug}`
+      )
+    );
+  });
+
+  it.each([
+    ['missing ref evidence', undefined],
+    ['missing branchProtectionRule', { name: 'main' }],
+    ['missing pushAllowances', { name: 'main', branchProtectionRule: {} }],
+    [
+      'malformed totalCount',
+      {
+        name: 'main',
+        branchProtectionRule: {
+          pushAllowances: { totalCount: '0', nodes: [] },
+        },
+      },
+    ],
+    [
+      'missing actor identity',
+      {
+        name: 'main',
+        branchProtectionRule: {
+          pushAllowances: { totalCount: 1, nodes: [{ actor: null }] },
+        },
+      },
+    ],
+  ])('fails closed on %s', (_label, branchProtectionRef) => {
+    const result = validateNativePreflightEvidence({
+      ruleset: VALID_RULESET,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.stringContaining('classic branch protection')
+    );
+  });
+
+  it('queries the exact protected ref and includes push-allowance actors', async () => {
+    const runner = createNativeRunner();
+    const result = await preflightMergeQueue({
+      backend: 'native',
+      repository: REPOSITORY,
+      runner,
+    });
+    expect(result).toMatchObject({
+      ready: true,
+      classicPushAllowanceCount: 0,
+    });
+    const protectionCall = runner.mock.calls.find(([args]) =>
+      queryText(args).includes('MergeQueueBranchProtection')
+    )?.[0];
+    expect(protectionCall).toEqual(
+      expect.arrayContaining(['-f', 'refName=refs/heads/main'])
+    );
+    expect(queryText(protectionCall)).toContain(
+      'branchProtectionRule{pushAllowances(first:100){totalCount nodes{actor{__typename'
+    );
+  });
+
   it.each([
     undefined,
     {},
