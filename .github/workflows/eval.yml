@@ -3,9 +3,10 @@
 # Runs the golden-case Promptfoo suite on PRs that touch prompt/eval infra.
 # Lane order: deterministic (no spend) first, then budget-capped judge lane.
 #
-# BUDGET_CAP_USD (repo variable, default 0.50):
+# BUDGET_CAP_USD (repo variable, default 0.50 outside pull requests):
 #   - "0" skips the judge lane entirely (no LLM spend)
 #   - Any positive value allows the judge lane when OPENAI_API_KEY is set
+# Pull requests always force this value to 0 so their gate is deterministic.
 
 name: Eval Gate
 
@@ -34,7 +35,7 @@ env:
   PROMPTFOO_DISABLE_TELEMETRY: '1'
   PROMPTFOO_DISABLE_UPDATE: '1'
   PROMPTFOO_NO_TESTCASE_ASSERT_WARNING: '1'
-  BUDGET_CAP_USD: ${{ vars.BUDGET_CAP_USD || '0.50' }}
+  BUDGET_CAP_USD: ${{ github.event_name == 'pull_request' && '0' || vars.BUDGET_CAP_USD || '0.50' }}
 
 jobs:
   eval:

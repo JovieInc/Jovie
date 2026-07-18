@@ -1,9 +1,9 @@
 # Automation Audit — Crons, Agent Workflows, KPI Alignment
 
 > **Issue:** JOV-1901
-> **Date:** 2026-05-07
+> **Date:** 2026-07-18 control-plane refresh (original audit: 2026-05-07)
 > **Scope:** Production crons (`vercel.json` + `apps/web/app/api/cron/**`), GitHub Actions agent workflows
-> **Constraint:** Read-only audit. No cron frequencies or workflow triggers were changed.
+> **Status:** Living current-state inventory. Trigger claims below were re-checked against `.github/workflows/`; this refresh also records the bounded schedule changes made during the CI throughput repair.
 
 ---
 
@@ -79,34 +79,36 @@ These routes exist in the codebase but have **no entry in `vercel.json`**. They 
 
 | Workflow | File | Trigger | What It Does | Usage Pattern | Recommendation |
 |----------|------|---------|--------------|--------------|----------------|
-| **Linear AI Orchestrator** | `linear-ai-orchestrator.yml` | `repository_dispatch` (Linear webhook → `linear_todo_ready` / `linear_plan_ready`) + `workflow_dispatch` | Waits for CodeRabbit plan on Linear issue, spawns Claude Code to implement, pushes branch, opens PR, syncs Linear status | Per-issue dispatch; capacity-gated at 5 open agent PRs | **Keep** — core agentic ops loop; directly compounds solo founder throughput |
-| **Linear AI Dispatcher** | `linear-ai-dispatcher.yml` | Scheduled every 15 min + `workflow_dispatch` | Polls Linear for `automated`-labeled Todo issues in "Design V1 Rollout / Flag Hardening" project, dispatches up to 2 per cycle | Scheduled retry loop with capacity awareness | **Keep — review project scope** — currently hardcoded to "Design V1 Rollout / Flag Hardening"; confirm this is still the right project target for current KPIs |
+| **GitHub AI Orchestrator** | `github-ai-orchestrator.yml` | GitHub issue receives `agent-ready` + `workflow_dispatch` replay | Implements one eligible GitHub issue, pushes a branch, and opens a PR; capacity-gated at 5 open agent PRs | Event-driven | **Keep** — current issue-to-PR implementation loop |
+| **GitHub AI Dispatcher** | `github-ai-dispatcher.yml` | `workflow_dispatch` only | Scans `agent-ready` GitHub issues and dispatches bounded orchestrator replays | Manual recovery | **Manual-only** — no active polling schedule |
+| **Linear AI Dispatcher** | retired (workflow removed) | none | Legacy scheduled Linear polling loop | none | **Retired** — no active `linear-ai-dispatcher.yml` exists |
 | **Hermes CLI Worker** | `hermes-cli-worker.yml` | `repository_dispatch` (`hermes_cli_worker`) + `workflow_dispatch` | Runs a self-hosted CLI worker (codex-cli, claude-code, or ruflo) on Hermes tasks; supports kinds: investigation, bug_patch, code_review, qa, triage, support_draft | Recently shipped (PR #8092); triggered on-demand | **Keep — enable if self-hosted runner is ready** — requires `[self-hosted, hermes]` runner. Verify runner is operational before routing work here. |
-| **Agent Pipeline** | `agent-pipeline.yml` | `workflow_run` (CI or Scope Judge completes) | Unified: (1) fixes agent PRs after CI failures (up to 5 attempts/SHA), (2) auto-approves + enables auto-merge when all gates pass | Triggered on every agent PR CI completion | **Keep** — essential quality gate and throughput accelerator; systemic failure detection prevents runaway fix loops |
-| **Scope Judge** | `scope-judge.yml` | `pull_request` (opened/synchronized/ready_for_review) | Calls OpenAI GPT-4o-mini to compare PR diff against Linear ticket intent; posts commit status | Runs on every agent branch PR event | **Keep — OpenRouter substitution candidate** — see Section 4 |
-| **Main Autofix** | `main-autofix.yml` | `workflow_run` (Main CI health monitor completes with failure) | Fetches failed CI logs + diff, calls Claude Code to fix root cause, opens auto-merge PR; 3-attempt cap, escalates to `needs-human` after | Event-driven on red main detection | **Keep** — reduces solo-founder interrupt burden when main goes red |
-| **Main CI Health Monitor** | `main-ci-health-monitor.yml` | Scheduled at `7,22,37,52 * * * *` (every ~15 min, offset from top-of-minute) | Detects stalled or failing CI on main; dispatches autofix if needed; alerts on systemic failures | Always-on monitoring | **Keep** |
+| **Agent Pipeline** | `agent-pipeline.yml` | `workflow_run` (CI completes) | Unified: (1) fixes agent PRs after CI failures (up to 5 attempts/SHA), (2) auto-approves + enables auto-merge when all gates pass | Triggered on every agent PR CI completion | **Keep** — essential quality gate and throughput accelerator; systemic failure detection prevents runaway fix loops |
+| **Main Autofix** | `main-autofix.yml` | `workflow_run` after an unhealthy Main CI monitor + guarded `workflow_dispatch` | Runs only after CI `run_attempt >= 2` and positive proof that no exact-SHA repair owner exists; records workflow-bound ownership before fixed-runner work, counts only recent durable ownership (never healthy/skipped workflow invocation) toward cross-SHA escalation, gives orphaned markers a 30-minute consistency grace, counts cancelled/expired leases toward a 3-attempt cap, and terminally acknowledges no-PR outcomes | Event-driven after the one-shot rerun | **Keep** — bounded exact-SHA ownership prevents repair fanout, timeout loops, and permanent deadlock |
+| **Main CI Health Monitor** | `main-ci-health-monitor.yml` | `8,28,48 * * * *` UTC + manual | Detects stalled/failing main CI, issues one failed-job rerun, suppresses duplicate schedule alerts/dispatch for active or terminal exact-SHA repair, and durably deduplicates repair-state uncertainty notification | Every 20 min, hosted | **Keep** |
 | **Sentry Autofix** | `sentry-autofix.yml` | `repository_dispatch` (`sentry-issue`) | Receives Sentry error payload, calls Claude Code to fix root cause, opens auto-merge PR with dedup | Event-driven; fires when Sentry webhook delivers | **Keep** — directly compounds product stability KPI |
-| **Nightly Tests** | `nightly-tests.yml` | Scheduled `0 2 * * *` PT | Runs Knip dead-code audit, full unit test suite, E2E suite (including Design V1 canary and full-surface chaos), Slack alerts on failure | Daily | **Keep** — only place full E2E and dead-code audits run; flags regressions before they compound |
-| **Nightly Testing Agent** | `nightly-testing-agent.yml` | Scheduled `30 2 * * *` PT | Risk-ranked target selection, unit telemetry normalization, Stryker mutation hotspots, commits `docs/NIGHTLY_TESTING_AGENT_REPORT.md`, publishes Redis ops snapshot for `/app/admin/ops` | Daily | **Keep** — deterministic, LLM-free regression intelligence loop (JOV-1870) |
-| **Synthetic Monitoring** | `agent-tick.yml` (manual mirror: `synthetic-monitoring.yml`) | Every 10 min via Agent Tick + manual dispatch | Front-door, Better Auth production account, onboarding, and public-profile canaries against `jov.ie`; the account canary creates one exact throwaway identity and transactionally proves zero residue | Always-on production health | **Keep** — essential for solo founder not to miss production incidents |
+| **Nightly Tests** | `nightly-tests.yml` | `30 23 * * *` America/Los_Angeles + manual | Runs Knip dead-code audit, full unit test suite, E2E suite (including Design V1 canary and full-surface chaos), Slack alerts on failure | Daily; at least a 90-minute buffer before the 09:00 UTC screenshot/Tuesday harness lanes | **Keep** — only place full E2E and dead-code audits run; flags regressions before they compound |
+| **Nightly Testing Agent** | `nightly-testing-agent.yml` | Scheduled `30 4 * * *` PT | Risk-ranked target selection, unit telemetry normalization, Stryker mutation hotspots, commits `docs/NIGHTLY_TESTING_AGENT_REPORT.md`, publishes Redis ops snapshot for `/app/admin/ops` | Daily | **Keep** — deterministic, LLM-free regression intelligence loop (JOV-1870) |
+| **Synthetic Monitoring** | `synthetic-monitoring.yml` | Every 6 hours + manual dispatch | Front-door, Better Auth production account, onboarding, and public-profile canaries against `jov.ie`; the account canary creates one exact throwaway identity and transactionally proves zero residue | Independent production health lane | **Keep** — isolated from the retired Agent Tick monolith and outside deploy-blocking CI |
+| **Cost Anomaly Gate** | `cost-anomaly-gate.yml` | `workflow_dispatch` only | Dry-run/anomaly evaluation and optional rollback path | Dormant as continuous monitoring while Sentry query credentials are unavailable | **Manual-only** — it is not an active schedule or continuous defense |
 | **Linear Sync on Merge** | `linear-sync-on-merge.yml` | `pull_request` (closed) | Extracts Linear issue marker from merged PR, transitions issue to Done, posts merge SHA comment | Per-merge | **Keep** — closes the Linear state loop for all merged PRs, not just agent ones |
 | **Auto-PR on Agent Push** | `auto-pr-on-push.yml` | `push` to `codex/**`, `codegen-bot/**`, `linear/**`, `claude/**`, `*/jov-**` | Creates draft PR when agent pushes branch without an existing PR; extracts Linear ticket ID | Per-push | **Keep** — closes the gap where agents push but leave no PR |
-| **Agent PR Verify Ready** | `agent-pr-verify-ready.yml` | `pull_request` (opened/synchronized/reopened) | Unprivileged verification gate for agent draft PRs | Per-PR | **Keep** |
-| **Neon Scheduled Cleanup** | `neon-scheduled-cleanup.yml` | Scheduled every 4 hours | Cleans up orphaned Neon ephemeral branches from E2E / nightly runs | Every 4h | **Keep** — prevents Neon branch accumulation |
+| **Agent PR Verify Ready** | retired (workflow disabled and removed) | none | Duplicated source-PR verification and promoted drafts from stale event runs | none | **Retired** — canonical `CI / PR Ready` plus the current-head Auto-Ready controller own this transition without a second CI fanout |
+| **Auto-Resolve Conflicts** | retired (workflow disabled and removed) | none | Merged `main` into PR branches from label events | none | **Retired** — conflict remediation uses the exact-head GitHub Update Branch `REBASE` path; no automatic merge commit or force-push controller remains |
+| **Neon Scheduled Cleanup** | `neon-scheduled-cleanup.yml` | `workflow_dispatch` only | Cleans up orphaned Neon ephemeral branches from E2E / nightly runs | Manual | **Manual-only** — no active schedule |
 | **Neon Ephemeral Branch Cleanup** | `neon-ephemeral-branch-cleanup.yml` | Event-driven (PR close) | Deletes Neon branch created for a PR when PR closes | Per-PR close | **Keep** |
 | **Periodic Evals** | `evals-periodic.yml` | `workflow_dispatch` with typed `RUN_LIVE_EVALS` confirmation | Runs legacy live LLM eval tests; builds Docker image | Manual-only, concurrency 1 | **Keep manual-only** — no scheduled live-eval spend; verify coverage before any scheduled trigger returns |
 | **CI** | `ci.yml` | `push`/`pull_request` + merge queue | Main CI pipeline: build, typecheck, lint, tests, deploy staging, canary health gate, promote production | Per-PR and per-push | **Keep** |
-| **Sentry Error Gate** | `sentry-error-gate.yml` | `workflow_run` (CI deploy completes) | 5-minute soak watching Sentry for error spikes post-deploy; triggers rollback if spike detected | Per-deploy | **Keep** |
-| **Canary Health Gate** | `canary-health-gate.yml` | Called by CI | Verifies staging health before production promotion | Per-deploy | **Keep** |
-| **CodeQL** | `codeql.yml` | Push/PR/schedule | GitHub-native static analysis security scan | Periodic | **Keep** |
-| **Security** | `security.yml` | Push/PR/schedule | Additional security scanning | Periodic | **Keep** |
-| **SonarCloud** | `sonarcloud.yml` | Push/PR | Code quality + security analysis | Per-PR | **Keep** |
+| **Sentry Error Gate** | `sentry-error-gate.yml` | Reusable `workflow_call` | 5-minute soak watching Sentry for error spikes post-deploy; triggers rollback if spike detected | Called by deploy flow | **Keep** |
+| **Canary Health Gate** | `canary-health-gate.yml` | Reusable `workflow_call` | Verifies staging health before production promotion | Called by CI deploy flow | **Keep** |
+| **CodeQL** | `codeql.yml` | `push: main`, `36 5 * * *` UTC, manual | GitHub-native static analysis security scan | Post-merge + nightly | **Keep** |
+| **Security** | `security.yml` | `push: main`, `5 6 * * *` UTC, manual | Additional security scanning | Post-merge + nightly | **Keep** |
+| **SonarCloud** | `sonarcloud.yml` | `0 7 * * *` UTC + manual | Code quality + security analysis | Nightly | **Keep** |
 | **Actionlint** | `actionlint.yml` | Push/PR | Lints `.github/workflows/*.yml` for errors | Per-PR | **Keep** |
 | **Desktop Release** | `desktop-release.yml` | Push/tag | Electron app build and auto-update CI | Per-release | **Keep** |
 | **iOS CI** | `ios-ci.yml` | Push/PR | iOS app build | Per-PR | **Keep** |
-| **E2E Full Matrix** | `e2e-full-matrix.yml` | `workflow_dispatch` + `testing` label PRs | Full E2E matrix run across browsers | On-demand / labeled PRs | **Keep — label-gated correctly** |
-| **Screenshots** | `screenshots.yml` | Push/PR | Visual regression screenshots | Per-PR | **Keep** |
+| **E2E Full Matrix** | `e2e-full-matrix.yml` | `15 15 * * 1` UTC + manual | Full E2E matrix run across browsers | Weekly / on-demand | **Keep** |
+| **Screenshots** | `screenshots.yml` | path-filtered `push: main`, `0 9 * * *` UTC, manual | Generates product screenshots and opens/updates the screenshot PR | Post-merge + daily | **Keep** |
 | **Fork PR Gate** | `fork-pr-gate.yml` | `pull_request` from fork | Safety gate for external fork PRs | Per-fork-PR | **Keep** |
 
 ---
@@ -119,7 +121,7 @@ Founder priorities (current cycle): **product stability → design system transf
 
 | Automation | KPI Impact | Mechanism |
 |------------|-----------|-----------|
-| `linear-ai-orchestrator` + `linear-ai-dispatcher` | Agentic ops lock, design system transfer | Fully automated Linear → implementation → PR pipeline; frees the founder from hands-on coding for every flagged issue |
+| `github-ai-orchestrator` | Agentic ops lock, design system transfer | Event-driven GitHub issue → implementation → PR pipeline |
 | `main-autofix` + `main-ci-health-monitor` | Product stability | Catches and fixes red main without founder interrupt; 3-attempt cap prevents runaway |
 | `sentry-autofix` | Product stability | Closes the production-error → fix loop automatically; each Sentry issue that gets auto-fixed is one fewer interrupt for the founder |
 | `agent-pipeline` (auto-approve + auto-merge) | All KPIs | Reduces PR review queue backlog; agent-generated code flows to production without founder bottleneck when quality gates pass |
@@ -154,13 +156,12 @@ There is no workflow that reports the weekly health of the agent pipeline itself
 | `generate-insights` | Unknown (check `lib/services/insights/insight-generator.ts`) | `google/gemini-flash-1.5:free` or `meta-llama/llama-3.1-8b-instruct:free` | Maybe — flag for review | Insights are a Pro feature; output quality matters. Free models are worth A/B testing against current output before switching. |
 | `summarize-interviews` | Claude Haiku (`summarize-interviews` comment) | `google/gemini-flash-1.5:free` | Likely yes for internal interviews | Summarization is a structured extract task; free Gemini Flash handles it well. Use for internal/admin interviews; keep Haiku for user-facing summaries if quality bar is high. |
 | `generate-playlist` | Unknown (check `lib/playlists/pipeline.ts`) | `meta-llama/llama-3.1-8b-instruct:free` | Maybe | Playlist concept generation is creative; output quality is visible to admins. Test before switching. |
-| `scope-judge` (`scope-judge.yml`) | `openai/gpt-oss-20b:free` via OpenRouter | Already routed | Yes — low stakes | Scope alignment is a pass/fail classification task; the workflow reads `OPENROUTER_API_KEY` and calls OpenRouter's chat completions endpoint. Per-PR cost stays on a free-model route while preserving the existing `scope-judge` status context. |
 | `linear-ai-orchestrator` (Claude Code action) | Claude Sonnet (Anthropic) | Not substitutable | No | Full code implementation requires strong reasoning. Claude Code OAuth token is a different billing vector (Anthropic usage, not OpenAI). Do not substitute. |
 | `main-autofix` (Claude Code action) | Claude Sonnet (Anthropic) | Not substitutable | No | Red-main fix requires strong code reasoning; wrong fixes compound the problem. Do not substitute. |
 | `sentry-autofix` (Claude Code action) | Claude Sonnet (Anthropic) | Not substitutable | No | Same as above. |
 | `agent-pipeline` fix job (Claude Code action) | Claude Sonnet (Anthropic) | Not substitutable | No | Same as above. |
 
-**Summary:** The clear OpenRouter free-model win has been landed in the `scope-judge` workflow. The LLM-using cron routes are worth testing with free models on a staging branch before committing.
+**Summary:** The remaining LLM-using cron routes are worth testing with free models on a staging branch before committing.
 
 ---
 
@@ -175,8 +176,7 @@ There is no workflow that reports the weekly health of the agent pipeline itself
 | `frequent` → `pixelRetry` / `pixel-forwarding` | FB/Google/TikTok pixel endpoints | Up to 500 events | 48 (minute ≥30 runs) | Up to 24,000 pixel forwards | O(pixel events) | Low — batch forwarding, not per-user API calls |
 | `generate-insights` | LLM API | Per eligible profile | 1 | O(Pro+ users with clicks) | O(users) | **Monitor as Pro user count grows** |
 | `summarize-interviews` | Claude Haiku | Per pending interview | 0 (not scheduled!) | 0 | O(interviews) | Currently zero cost (not running) |
-| `scope-judge` | OpenRouter free model | 1 per agent PR | ~10-20/day (estimate) | 10-20 calls | O(agent PRs) | Low; free-model route, blocks only on the `OPENROUTER_API_KEY` secret |
-| `synthetic-monitoring` | Jovie, Vercel, Cloudflare OTP, Resend, Neon | Per run: one email, two Vercel lookups, two build-info reads, bounded OTP polling, scoped account/session DB writes + cleanup, and a max-5 stale-canary reconciliation query | 144/day (every 10 min) | 144 emails/day plus bounded API/DB traffic; Playwright retries only on failure | O(1) | Low but no longer read-only; monitor Resend volume and cleanup failures |
+| `synthetic-monitoring` | Jovie, Vercel, Cloudflare OTP, Resend, Neon | Per run: one email, two Vercel lookups, two build-info reads, bounded OTP polling, scoped account/session DB writes + cleanup, and a max-5 stale-canary reconciliation query | 4/day (every 6 hours) | 4 emails/day plus bounded API/DB traffic; Playwright retries only on failure | O(1) | Low but no longer read-only; monitor Resend volume and cleanup failures |
 
 ### Quiet cost concern
 

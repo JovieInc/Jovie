@@ -2,7 +2,8 @@ name: Nightly Testing Agent
 
 on:
   schedule:
-    - cron: '30 2 * * *'
+    # Starts well after the consolidated 23:30 deep suite has released its runner.
+    - cron: '30 4 * * *'
       timezone: 'America/Los_Angeles'
   workflow_dispatch:
     inputs:
@@ -29,7 +30,7 @@ concurrency:
 jobs:
   context:
     name: Build Agent Context
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -108,8 +109,11 @@ jobs:
 
   mutation-hotspots:
     name: Mutation Hotspots
-    needs: [context]
-    if: ${{ github.event_name == 'schedule' || inputs.run_mutation }}
+    needs: [context, deterministic]
+    if: >-
+      always() &&
+      needs.context.result == 'success' &&
+      (github.event_name == 'schedule' || inputs.run_mutation)
     runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 50
     steps:
@@ -178,7 +182,7 @@ jobs:
     name: Emit Agent Report
     needs: [context, deterministic, mutation-hotspots, candidate-validation]
     if: always()
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'

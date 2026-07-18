@@ -1,5 +1,8 @@
 """Regression tests for self-hosted agent workflow hygiene."""
+import os
 import re
+import subprocess
+import textwrap
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -186,10 +189,8 @@ def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> 
 
     assert "runs-on: ubuntu-latest" in block
     assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block
-    assert (
-        "if: github.event_name != 'workflow_run' || "
-        "github.event.workflow_run.conclusion != 'cancelled'"
-    ) in block
+    assert "github.event.workflow_run.event == 'pull_request'" in block
+    assert "github.event.workflow_run.conclusion != 'cancelled'" in block
     assert (
         "group: pr-conflict-handler-${{ github.repository }}-"
         "${{ github.event_name == 'workflow_dispatch' && "
@@ -202,6 +203,265 @@ def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> 
     assert 'if [[ "${{ github.event_name }}" == "workflow_dispatch"' in block
     assert '"${{ inputs.apply }}" == "true"' in block
     assert 'MODE="--apply"' in block
+
+
+def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
+    """Main/merge-group completions must not wake PR fleet controllers."""
+    for workflow, job_name in (
+        ("merge-queue-autoenroll.yml", "enroll"),
+        ("auto-ready-agent-drafts.yml", "auto-ready"),
+        ("pr-conflict-handler.yml", "plan"),
+    ):
+        block = _job_block(workflow, job_name)
+        assert "github.event.workflow_run.event == 'pull_request'" in block, workflow
+        assert "github.event.workflow_run.conclusion != 'cancelled'" in block, workflow
+
+    pipeline = _job_block("agent-pipeline.yml", "guard")
+    assert "github.event.workflow_run.event == 'pull_request'" in pipeline
+    assert 'if [[ "$PR_HEAD_SHA" != "$HEAD_SHA" ]]' in pipeline
+    assert "workflow_run.pull_requests[0].number" in pipeline
+    assert "pulls?state=open" not in pipeline
+
+
+def test_agent_pipeline_retry_budget_is_durable() -> None:
+    """Each remediation run must record the attempt its guard counted."""
+    fix = _job_block("agent-pipeline.yml", "fix")
+    assert "Record bounded remediation attempt" in fix
+    assert 'ATTEMPT_LABEL="agent-fix-${TRIGGER_TYPE}-${SHORT_SHA}-${ATTEMPT}"' in fix
+    assert '"labels[]=$ATTEMPT_LABEL"' in fix
+
+
+def test_conflict_paths_never_merge_or_force_push_pr_branches() -> None:
+    """Conflict repair uses the shared exact-head GitHub REBASE mutation only."""
+    fleet = (REPO_ROOT / "scripts/pr-conflict-handler.mjs").read_text(
+        encoding="utf-8"
+    )
+
+    assert not (WORKFLOWS / "auto-resolve-conflicts.yml").exists()
+    assert not (REPO_ROOT / ".github/scripts/resolve-pr-conflict.mjs").exists()
+    assert not (WORKFLOWS / "agent-pr-verify-ready.yml").exists()
+    assert "tryGitHubRebase" in fleet
+    assert "git merge" not in fleet
+    assert "force-with-lease" not in fleet
+    assert "gh pr update-branch" not in fleet
+
+
+def test_standalone_health_monitors_have_independent_bounded_schedules() -> None:
+    """Critical monitors must not depend on the disabled Agent Tick monolith."""
+    schedules = {
+        "main-ci-health-monitor.yml": "'8,28,48 * * * *'",
+        "runner-health-monitor.yml": "'2,12,22,32,42,52 * * * *'",
+        "synthetic-monitoring.yml": "'17 */6 * * *'",
+    }
+    for workflow, cron in schedules.items():
+        content = (WORKFLOWS / workflow).read_text(encoding="utf-8")
+        assert "schedule:" in content, workflow
+        assert cron in content, workflow
+
+    for workflow, job_name in (
+        ("main-ci-health-monitor.yml", "monitor"),
+        ("main-ci-health-monitor.yml", "auto-rerun"),
+        ("runner-health-monitor.yml", "monitor"),
+    ):
+        assert "runs-on: ubuntu-latest" in _job_block(workflow, job_name)
+
+
+def test_main_autofix_waits_for_rerun_and_exact_sha_repair_ownership() -> None:
+    """Schedule ticks must not dispatch or alert repeatedly for owned failures."""
+    evaluator = (
+        REPO_ROOT / ".github/actions/eval-main-health/action.yml"
+    ).read_text(encoding="utf-8")
+    autofix = (WORKFLOWS / "main-autofix.yml").read_text(encoding="utf-8")
+
+    assert "const failingRunAttempt = Number(latestFailure?.run_attempt ?? 0)" in evaluator
+    assert "failingRunAttempt < 2" in evaluator
+    assert "autofixSkipReason = 'awaiting_one_shot_rerun'" in evaluator
+    assert "repairInFlight = openPulls.some" in evaluator
+    assert "run.head_sha === failingSha" in evaluator
+    assert "github.rest.repos.listCommitStatusesForRef" in evaluator
+    assert "github.rest.repos.getCommit" in evaluator
+    assert "latestFailure.head_sha !== currentMainSha" in evaluator
+    assert "ownedAttempts >= autofixAttemptLimit" in evaluator
+    assert "withinLease(latestOwnershipStatus.created_at)" in evaluator
+    assert "uncertain:repair_state_unavailable" in evaluator
+    assert "status.context === 'main-autofix/ownership'" in evaluator
+    assert "description.match(/^owned:run-" in evaluator
+    assert "description.startsWith('terminal:')" in evaluator
+    assert "const recentAttemptShas = new Set([currentFailingSha])" in evaluator
+    assert "(status.description ?? '').startsWith('owned:')" in evaluator
+    assert "candidateStatuses = await github.paginate" in evaluator
+    assert "if (r.head_sha) recentShas.add(r.head_sha)" not in evaluator
+    assert "autofixSkipReason = 'repair_in_flight'" in evaluator
+    assert "autofixSkipReason = 'repair_marker_owned'" in evaluator
+    assert "autofixSkipReason = 'terminal_repair_recorded'" in evaluator
+    assert "autofixSkipReason = 'repair_state_unavailable'" in evaluator
+    assert "const shouldAlert =" in evaluator
+    assert "(repairStateKnown || firstUncertaintyAlert)" in evaluator
+    assert "failingRunAttempt === 1" in evaluator
+    assert autofix.count("context: 'main-autofix/ownership'") == 2
+    assert "Record exact-SHA repair ownership" in autofix
+    assert "Finalize exact-SHA repair ownership" in autofix
+    assert "terminal:no_changes" in autofix
+    assert "released:pr-${prNumber}" in autofix
+    assert "forcing autofix" not in autofix
+    assert "dispatch_target_not_current_failure" in autofix
+
+    for workflow, job_name in (
+        ("main-ci-health-monitor.yml", "monitor"),
+        ("main-autofix.yml", "evaluate"),
+        ("agent-tick.yml", "main-ci-health"),
+    ):
+        assert "statuses: write" in _job_block(workflow, job_name)
+
+    landing_sweep = _job_block("agent-tick.yml", "landing-sweep")
+    assert "statuses: read" in landing_sweep
+    assert "statuses: write" not in landing_sweep
+
+
+def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
+    """A hold arriving after promotion restores the exact PR to draft."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    state_file = tmp_path / "state"
+    state_file.write_text("draft", encoding="utf-8")
+    call_log = tmp_path / "calls.log"
+    fake_gh = fake_bin / "gh"
+    fake_gh.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            printf '%s\\n' "$*" >> {call_log}
+            if [[ "$1 $2" == "pr list" ]]; then
+              printf '%s\\n' '[{{"n":42,"t":"race guard","draft":true,"m":"MERGEABLE","ms":"CLEAN","head":"codex/race","oid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","L":[]}}]'
+            elif [[ "$1 $2" == "pr view" ]]; then
+              phase="$(cat {state_file})"
+              if [[ "$phase" == "ready" ]]; then
+                printf '%s\\n' '{{"draft":false,"head":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","branch":"codex/race","labels":["gated"],"mergeable":"MERGEABLE","state":"OPEN"}}'
+              elif [[ "$phase" == "restored" ]]; then
+                printf '%s\\n' '{{"draft":true,"head":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","branch":"codex/race","labels":["gated"],"mergeable":"MERGEABLE","state":"OPEN"}}'
+              else
+                printf '%s\\n' '{{"draft":true,"head":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","branch":"codex/race","labels":[],"mergeable":"MERGEABLE","state":"OPEN"}}'
+              fi
+            elif [[ "$1 $2" == "pr checks" ]]; then
+              printf '%s\\n' '[{{"bucket":"pass","state":"SUCCESS","name":"PR Ready"}},{{"bucket":"pass","state":"SUCCESS","name":"Migration Guard"}},{{"bucket":"pass","state":"SUCCESS","name":"Fork PR Gate"}},{{"bucket":"pass","state":"SUCCESS","name":"PR Size Guard"}}]'
+            elif [[ "$1 $2" == "pr ready" ]]; then
+              if [[ " $* " == *" --undo "* ]]; then
+                printf '%s\\n' restored > {state_file}
+              else
+                printf '%s\\n' ready > {state_file}
+              fi
+            elif [[ "$1" == "api" ]]; then
+              :
+            elif [[ "$1 $2" == "pr comment" ]]; then
+              :
+            else
+              printf 'unexpected fake gh invocation: %s\\n' "$*" >&2
+              exit 2
+            fi
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_gh.chmod(0o755)
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "REPO": "JovieInc/Jovie",
+            "GH_RETRY_ATTEMPTS": "1",
+            "ATTEMPT_COOLDOWN_HOURS": "0",
+            "JOVIE_AGENT_PROFILE": "coder",
+        }
+    )
+    result = subprocess.run(
+        ["bash", str(REPO_ROOT / "scripts/auto-ready-agent-drafts.sh")],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "compensated: restored #42 to draft" in result.stdout
+    assert state_file.read_text(encoding="utf-8").strip() == "restored"
+    calls = call_log.read_text(encoding="utf-8")
+    assert "pr ready 42 -R JovieInc/Jovie" in calls
+    assert "pr ready 42 -R JovieInc/Jovie --undo" in calls
+
+
+def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:
+    """Setup, parser, and canary failures must all reach alerting before red."""
+    workflow = (WORKFLOWS / "synthetic-monitoring.yml").read_text(
+        encoding="utf-8"
+    )
+    parse = _step_block("synthetic-monitoring.yml", "Parse test results")
+    alert = _step_block("synthetic-monitoring.yml", "Send Slack Alert on Failure")
+    preserve = _step_block("synthetic-monitoring.yml", "Fail job if tests failed")
+
+    assert "if: ${{ always() }}" in parse
+    failure_safe = (
+        "always() && (failure() || "
+        "steps.test-results.outputs.test_status != 'passed')"
+    )
+    assert failure_safe in alert
+    assert failure_safe in preserve
+    assert workflow.index("Send Slack Alert on Failure") < workflow.index(
+        "Fail job if tests failed"
+    )
+
+
+def test_live_model_work_never_fans_out_from_pull_requests() -> None:
+    """PR evals stay deterministic; live-model spend belongs off the PR path."""
+    real_model = (WORKFLOWS / "eval-real-model.yml").read_text(encoding="utf-8")
+    deterministic = (WORKFLOWS / "eval.yml").read_text(encoding="utf-8")
+
+    assert "pull_request:" not in real_model
+    assert "pnpm exec vitest run" in real_model
+    assert "github.event_name == 'pull_request' && '0'" in deterministic
+
+
+def test_deep_lanes_are_staggered_and_bounded() -> None:
+    """Scheduled exhaustive coverage should not fan out across the runner pool."""
+    full_matrix = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
+    nightly_agent = (WORKFLOWS / "nightly-testing-agent.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "max-parallel: 1" in full_matrix
+    assert "needs: [context, deterministic]" in nightly_agent
+    assert "'30 4 * * *'" in nightly_agent
+
+    nightly = (WORKFLOWS / "nightly-tests.yml").read_text(encoding="utf-8")
+    screenshots = (WORKFLOWS / "screenshots.yml").read_text(encoding="utf-8")
+    harness = (WORKFLOWS / "agent-harness-health-report.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "'30 23 * * *'" in nightly
+    assert "'0 9 * * *'" in screenshots
+    assert "'0 9 * * 2'" in harness
+
+
+def test_cost_monitoring_docs_match_dispatch_only_workflow() -> None:
+    """Docs must not advertise an inactive 15-minute rollback monitor."""
+    workflow = (WORKFLOWS / "cost-anomaly-gate.yml").read_text(encoding="utf-8")
+    cost_docs = (REPO_ROOT / "docs/COST_MONITORING.md").read_text(
+        encoding="utf-8"
+    )
+    audit = (REPO_ROOT / "docs/AUTOMATION_AUDIT.md").read_text(
+        encoding="utf-8"
+    )
+
+    trigger_block = workflow.split("on:", 1)[1].split("# Prevent", 1)[0]
+    assert "workflow_dispatch:" in trigger_block
+    assert "schedule:" not in trigger_block
+    assert "runs every 15 minutes" not in cost_docs
+    assert "`workflow_dispatch`-only" in cost_docs
+    assert "Cost Anomaly Gate" in audit
+    assert "Manual-only" in audit
 
 
 def test_auto_pr_compares_trigger_branch_without_executing_its_checkout() -> None:

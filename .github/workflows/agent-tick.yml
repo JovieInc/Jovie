@@ -401,6 +401,7 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
+      statuses: write
     outputs:
       should_alert: ${{ steps.evaluate.outputs.should_alert }}
       failed_run_id: ${{ steps.evaluate.outputs.failed_run_id }}

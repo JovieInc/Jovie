@@ -45,7 +45,11 @@ permissions:
 jobs:
   enroll:
     if: >-
-      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'cancelled')
+      github.event_name != 'workflow_run' ||
+      (
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion != 'cancelled'
+      )
     # API-only fleet controller. ubuntu-latest deterministically includes gh;
     # the heterogeneous self-hosted fast pool does not.
     runs-on: ubuntu-latest

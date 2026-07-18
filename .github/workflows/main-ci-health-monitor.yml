@@ -1,7 +1,14 @@
 name: Main CI health monitor
 
 on:
+  schedule:
+    # Hosted API monitor, offset from runner routing and cost checks.
+    - cron: '8,28,48 * * * *'
   workflow_dispatch:
+
+concurrency:
+  group: main-ci-health-monitor
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -9,11 +16,12 @@ permissions:
 jobs:
   monitor:
     name: Detect stalled or failing CI on main
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
       pull-requests: read
+      statuses: write
     outputs:
       should_alert: ${{ steps.evaluate.outputs.should_alert }}
       summary: ${{ steps.evaluate.outputs.summary }}
@@ -23,11 +31,17 @@ jobs:
       needs_autofix: ${{ steps.evaluate.outputs.needs_autofix }}
       autofix_skip_reason: ${{ steps.evaluate.outputs.autofix_skip_reason }}
       failing_run_id: ${{ steps.evaluate.outputs.failing_run_id }}
+      failing_run_attempt: ${{ steps.evaluate.outputs.failing_run_attempt }}
+      repair_attempt: ${{ steps.evaluate.outputs.repair_attempt }}
       failing_sha: ${{ steps.evaluate.outputs.failing_sha }}
       failing_short_sha: ${{ steps.evaluate.outputs.failing_short_sha }}
       last_green_sha: ${{ steps.evaluate.outputs.last_green_sha }}
       failed_job_names: ${{ steps.evaluate.outputs.failed_job_names }}
       systemic: ${{ steps.evaluate.outputs.systemic }}
+      repair_in_flight: ${{ steps.evaluate.outputs.repair_in_flight }}
+      repair_marker_owned: ${{ steps.evaluate.outputs.repair_marker_owned }}
+      repair_terminal: ${{ steps.evaluate.outputs.repair_terminal }}
+      repair_state_known: ${{ steps.evaluate.outputs.repair_state_known }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -84,7 +98,7 @@ jobs:
     name: Auto-rerun failed deploy (self-healing)
     needs: monitor
     if: ${{ always() && needs.monitor.outputs.should_alert == 'true' && needs.monitor.outputs.failed_run_id != '' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     permissions:
       actions: write
     steps:

@@ -9,10 +9,10 @@ This document covers the cost-anomaly defense layer. It exists because of a real
 | Layer | Mechanism | Coverage | Defense Type |
 |---|---|---|---|
 | **1** | Provider-native spend caps | All providers | **Hard circuit-breaker** — provider stops billing |
-| **2** | `cost-anomaly-gate.yml` | Vercel deployments | **Auto-rollback** — reverts deploy on event-volume spike |
+| **2** | `cost-anomaly-gate.yml` | Vercel deployments | **Manual-only at present** — rollback implementation exists, but no schedule is active |
 | **3** | Provider usage ledger (future) | Per-provider attribution | Per-provider day-over-day anomaly detection |
 
-**Layers 1 and 2 are independent.** If Layer 2's monitoring breaks, Layer 1 still caps your spend. If Layer 1's cap is set too high, Layer 2 catches the spike sooner.
+**Only Layer 1 is a continuous defense today.** Layer 2 is `workflow_dispatch`-only while `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` are unavailable; it must not be described or operated as a 15-minute monitor until those credentials are configured and the schedule is explicitly restored.
 
 ---
 
@@ -65,7 +65,9 @@ This is the primary defense. Walk this checklist on initial setup and re-verify 
 
 ## Layer 2: Cost Anomaly Gate Workflow
 
-`.github/workflows/cost-anomaly-gate.yml` runs every 15 minutes against production. It queries Sentry for total event volume over the last hour and compares against a 4-week same-hour-of-week baseline. On anomaly: triggers `vercel rollback --yes`, posts to Slack, opens a GitHub issue.
+`.github/workflows/cost-anomaly-gate.yml` currently runs only by manual `workflow_dispatch`. When dispatched, it queries Sentry for total event volume over the last hour and compares against a 4-week same-hour-of-week baseline. On an anomaly, the selected dry-run mode can alert only; non-dry-run mode can invoke `vercel rollback --yes`, post to Slack, and open a GitHub issue.
+
+The continuous schedule is intentionally absent. Restore a staggered hosted schedule only after all three Sentry query credentials are configured and a manual dry-run proves the query, alert, and rollback-status paths.
 
 ### Why event volume?
 
@@ -88,12 +90,12 @@ This is a proxy metric, not a direct cost metric. If the runaway is in something
 ### Calibration procedure (run on initial setup)
 
 1. **Deploy the workflow with `dry_run` defaulted to `true`**. The current default is already `true`.
-2. **Watch Slack for 1-2 weeks.** Note any "Cost Anomaly Detected (DRY RUN)" alerts. Each one would have triggered a rollback in production.
+2. **Run representative manual dry-runs.** Note any "Cost Anomaly Detected (DRY RUN)" alerts and validate them against Sentry before enabling a schedule.
 3. **Investigate every alert.** Was it a real anomaly or a false positive?
    - **Real anomaly with a known cause** (release-day notification fan-out, traffic spike from press): adjust `threshold_multiplier` upward or document as expected.
    - **False positive** (stable traffic, just baseline drift): adjust `threshold_multiplier` upward.
-4. **When you go a full week with zero false positives**, edit `.github/workflows/cost-anomaly-gate.yml` and change the default of `DRY_RUN` from `'true'` to `'false'`.
-5. **Verify rollback path** before flipping: run `gh workflow run cost-anomaly-gate.yml -f dry_run=false -f threshold_multiplier=0 -f absolute_floor=0` in a maintenance window. This forces a synthetic anomaly. Confirm `vercel rollback --yes` actually reverts production. Roll forward immediately afterward.
+4. **After a scheduled dry-run calibration window has been explicitly enabled and completes with zero unacceptable false positives**, change the default of `DRY_RUN` from `'true'` to `'false'` in a reviewed PR.
+5. **Verify rollback path** before flipping: run `gh workflow run cost-anomaly-gate.yml -f dry_run=false -f threshold_multiplier=0 -f absolute_floor=0` in an authorized maintenance window. This forces a synthetic anomaly. Confirm `vercel rollback --yes` actually reverts production. Roll forward immediately afterward.
 
 ### When the gate fires (on-call runbook)
 
@@ -152,12 +154,12 @@ This is finer-grained than Layer 2 but slower to react (daily vs every-15-min). 
 ### Initial setup (one-time)
 
 - [ ] Layer 1: walk the checklist above. Screenshot every cap. Attach to the setup PR.
-- [ ] Layer 2: confirm `cost-anomaly-gate.yml` is scheduled (`gh workflow list | grep cost-anomaly`).
+- [ ] Layer 2: confirm `cost-anomaly-gate.yml` remains manual-only until the required Sentry query credentials are configured.
 - [ ] Layer 2: trigger a dry-run manually and confirm Slack message arrives:
   ```bash
   gh workflow run cost-anomaly-gate.yml -f dry_run=true -f threshold_multiplier=0 -f absolute_floor=0
   ```
-- [ ] Layer 2: confirm the workflow's required secrets exist: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `SLACK_WEBHOOK_URL`. (All exist already, used by `sentry-error-gate.yml`.)
+- [ ] Layer 2: before any scheduled activation, confirm the workflow's required secrets exist: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `SLACK_WEBHOOK_URL`. The three Sentry query credentials are the current activation blocker.
 
 ### Ongoing (quarterly)
 
