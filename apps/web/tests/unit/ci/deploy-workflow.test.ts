@@ -1006,6 +1006,58 @@ describe('CI E2E smoke workflow', () => {
   });
 });
 
+describe('CI Golden Path Neon workflow', () => {
+  it('prefers pooled endpoints and verifies connectivity before migrations', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const goldenPathJob = getJobBlock(workflow, 'ci-golden-path');
+    const sharedResolver = getStepBlock(
+      goldenPathJob,
+      'Resolve DATABASE_URL from Neon artifact'
+    );
+    const fallbackResolver = getStepBlock(
+      goldenPathJob,
+      'Resolve DATABASE_URL (fallback Neon ephemeral)'
+    );
+
+    expect(sharedResolver).toContain('candidate_json_key: db_url_pooled');
+    expect(sharedResolver).toContain('fallback_json_key: db_url');
+    expect(fallbackResolver).toContain(
+      'candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}'
+    );
+    expect(fallbackResolver).toContain(
+      'fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}'
+    );
+
+    const failClosedStep = getStepBlock(
+      goldenPathJob,
+      'Fail if Neon DB URL is missing (Golden Path)'
+    );
+    const verifyDbStep = getStepBlock(
+      goldenPathJob,
+      'Verify Neon DB connectivity (fail-fast)'
+    );
+    const failClosedIndex = goldenPathJob.indexOf(
+      '- name: Fail if Neon DB URL is missing (Golden Path)'
+    );
+    const verifyIndex = goldenPathJob.indexOf(
+      '- name: Verify Neon DB connectivity (fail-fast)'
+    );
+    const migrateIndex = goldenPathJob.indexOf(
+      '- name: Run migrations (ephemeral Neon)'
+    );
+
+    expect(failClosedStep).toContain(
+      'Refusing to run Golden Path against staging/production DBs'
+    );
+    expect(failClosedStep).toContain('if [[ -z "$DATABASE_URL" ]]; then');
+    expect(failClosedStep).toContain('exit 1');
+    expect(verifyDbStep).toContain('tests/e2e/verify-neon-db-connectivity.ts');
+    expect(failClosedIndex).toBeGreaterThanOrEqual(0);
+    expect(verifyIndex).toBeGreaterThan(failClosedIndex);
+    expect(migrateIndex).toBeGreaterThan(verifyIndex);
+  });
+});
+
 describe('CI public lighthouse workflow', () => {
   it('pins the standalone server and browser to one loopback origin', () => {
     const workflow = readFileSync(workflowPath, 'utf8');

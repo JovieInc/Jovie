@@ -3487,8 +3487,8 @@ jobs:
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
-          candidate_json_key: db_url
-          fallback_json_key: db_url_pooled
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
 
       - name: Export DATABASE_URL (shared ephemeral branch)
         if: needs.neon-db.result == 'success'
@@ -3510,14 +3510,26 @@ jobs:
         id: resolve-golden-path-fallback-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
       - name: Export DATABASE_URL (fallback ephemeral branch)
         if: needs.neon-db.result != 'success'
         run: echo "DATABASE_URL=${{ steps.resolve-golden-path-fallback-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Fail if Neon DB URL is missing (Golden Path)
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "No Neon ephemeral DATABASE_URL available. Refusing to run Golden Path against staging/production DBs."
+            exit 1
+          fi
+
+      - name: Verify Neon DB connectivity (fail-fast)
+        run: pnpm --filter=@jovie/web exec tsx tests/e2e/verify-neon-db-connectivity.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
 
       - name: Run migrations (ephemeral Neon)
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
