@@ -107,6 +107,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           MERGE_QUEUE_BACKEND: ${{ vars.MERGE_QUEUE_BACKEND }}
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll
         run: |
           if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]; then
             echo "::error::Merge Queue Auto-Enroll requires MERGE_QUEUE_BACKEND=native" >&2

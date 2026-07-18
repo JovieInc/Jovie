@@ -254,6 +254,12 @@ describe('queue workflow mutation safety', () => {
     expect(rebasePreflight).toContain(
       'node scripts/merge-queue-backend.mjs preflight'
     );
+    expect(rebasePreflight).toContain(
+      'MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll'
+    );
+    expect(rebasePreflight).toContain(
+      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
     expect(
       drain.indexOf('node scripts/merge-queue-backend.mjs preflight')
     ).toBeLessThan(
@@ -271,6 +277,7 @@ describe('native live preflight', () => {
       branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
     });
     expect(result.ok).toBe(true);
+    expect(result.evidence.bypassActorsVisible).toBe(true);
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceCount');
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceActors');
   });
@@ -363,6 +370,32 @@ describe('native live preflight', () => {
     expect(result.errors).toContain('ruleset bypass_actors must be an array');
   });
 
+  it('allows unavailable bypass actors only for an explicit controller preflight', () => {
+    const result = validateNativePreflightEvidence({
+      ruleset: { ...structuredClone(VALID_RULESET), bypass_actors: undefined },
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      allowUnavailableBypassActors: true,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.evidence.bypassActorsVisible).toBe(false);
+  });
+
+  it.each([
+    null,
+    {},
+  ])('rejects a visible malformed bypass_actors value in controller mode', bypass_actors => {
+    const result = validateNativePreflightEvidence({
+      ruleset: { ...structuredClone(VALID_RULESET), bypass_actors },
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      allowUnavailableBypassActors: true,
+    });
+    expect(result.errors).toContain('ruleset bypass_actors must be an array');
+  });
+
   it.each([
     158384, 2934433,
   ])('rejects non-empty bypass_actors including actor %s', actor_id => {
@@ -373,10 +406,78 @@ describe('native live preflight', () => {
       },
       repository: VALID_REPOSITORY,
       workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      allowUnavailableBypassActors: true,
     });
     expect(result.errors).toContain(
       'ruleset bypass_actors must be empty before native enrollment'
     );
+  });
+
+  it('keeps direct preflight strict while an explicit controller can proceed', async () => {
+    const ruleset = structuredClone(VALID_RULESET);
+    delete ruleset.bypass_actors;
+    await expect(
+      preflightMergeQueue({
+        backend: 'native',
+        repository: REPOSITORY,
+        runner: createNativeRunner({ ruleset }),
+      })
+    ).rejects.toMatchObject({ code: 'native_preflight_failed' });
+    await expect(
+      preflightMergeQueue({
+        backend: 'native',
+        repository: REPOSITORY,
+        runner: createNativeRunner({ ruleset }),
+        allowUnavailableBypassActors: true,
+      })
+    ).resolves.toMatchObject({
+      ready: true,
+      bypassActorsVisible: false,
+    });
+  });
+
+  it('derives controller visibility only from the exact CLI authorization', async () => {
+    const ruleset = structuredClone(VALID_RULESET);
+    delete ruleset.bypass_actors;
+    await expect(
+      runCli(['preflight'], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'test-fixture',
+        },
+        runner: createNativeRunner({ ruleset }),
+        write: vi.fn(),
+      })
+    ).rejects.toMatchObject({ code: 'native_preflight_failed' });
+
+    await expect(
+      runCli(['preflight'], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner: createNativeRunner({ ruleset }),
+        write: vi.fn(),
+      })
+    ).resolves.toMatchObject({ ready: true, bypassActorsVisible: false });
+
+    await expect(
+      runCli(['enroll', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner: createNativeRunner({
+          ruleset,
+          states: [prState({ autoMergeRequest: AUTO_MERGE })],
+        }),
+        write: vi.fn(),
+      })
+    ).resolves.toMatchObject({ changed: false });
   });
 
   it('reports every unsafe activation condition instead of partially enabling native mode', () => {
