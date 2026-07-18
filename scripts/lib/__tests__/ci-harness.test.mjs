@@ -227,6 +227,53 @@ describe('ci-harness manifest', () => {
       );
   });
 
+  it('skips no-op unit matrices before runner allocation without weakening PR Ready', () => {
+    const workflow = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+      'utf8'
+    );
+    const unitTests = extractWorkflowJobBlock(workflow, 'ci-unit-tests');
+    expect(unitTests).toContain(
+      "needs.ci-path-changes.outputs.run_test == 'true'"
+    );
+    expect(
+      unitTests.indexOf("needs.ci-path-changes.outputs.run_test == 'true'")
+    ).toBeLessThan(unitTests.indexOf('runs-on:'));
+
+    const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
+    expect(prReady).toContain(
+      'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
+    );
+    // biome-ignore format: exhaustive source PR Ready unit-result contract
+    for (const [unitResult, runTest, status] of [
+      ['success', 'true', 0],
+      ['success', 'false', 0],
+      ['failure', 'true', 1],
+      ['failure', 'false', 1],
+      ['cancelled', 'true', 1],
+      ['cancelled', 'false', 1],
+      ['skipped', 'true', 1],
+      ['skipped', 'false', 0],
+    ]) {
+      expect(
+        runWorkflowBash(
+          prReady,
+          /^ {10}if \[\[ "\$UNIT_RESULT"[\s\S]*?^ {10}fi/m,
+          { UNIT_RESULT: unitResult, RUN_TEST: runTest }
+        ).status,
+        `${unitResult}; run_test=${runTest}`
+      ).toBe(status);
+    }
+
+    const summary = extractWorkflowJobBlock(workflow, 'ci-summary');
+    expect(summary).toContain(
+      'UNIT_RUN_FULL_CI: ${{ needs.ci-path-changes.outputs.run_test }}'
+    );
+    expect(summary).not.toContain(
+      'UNIT_RUN_FULL_CI: ${{ needs.ci-unit-tests.outputs.run_full_ci }}'
+    );
+  });
+
   it('defaults bare merge queue checks to the active Graphite backend', () => {
     const { MERGE_QUEUE_BACKEND: _ignored, ...env } = process.env;
     // biome-ignore format: executable CLI regression stays compact for the integration-train cap

@@ -2862,8 +2862,8 @@ jobs:
     needs: [ci-path-changes]
     # Runs on PRs to main, merge-group combined heads, main pushes, and manual dispatch.
     # Parallel with typecheck/build for faster CI.
-    # Path-gated: skips test execution when no test-relevant files changed.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
+    # Job-level path gate: no test-relevant diff means no matrix runners are allocated.
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && needs.ci-path-changes.outputs.run_test == 'true' && (github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
     # When CI_UNIT_RUNNER routes to the 10-slot autoscaled ephemeral pool, one
     # PR uses 5 slots, two PRs use all 10, and a third queues behind natural
     # pool backpressure. The hosted fallback retains the original 3-shard cap
@@ -4460,6 +4460,7 @@ jobs:
           ADMIN_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-admin-pr.result }}"
           HAS_TESTING_LABEL="${{ contains(github.event.pull_request.labels.*.name, 'testing') }}"
           HAS_LAUNCH_CANDIDATE_LABEL="${{ contains(github.event.pull_request.labels.*.name, 'launch-candidate') }}"
+          RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
           RUN_E2E="${{ needs.ci-path-changes.outputs.run_e2e }}"
           RUN_GOLDEN_PATH="${{ needs.ci-path-changes.outputs.run_golden_path }}"
           RUN_PUBLIC_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_public_lighthouse }}"
@@ -4554,8 +4555,8 @@ jobs:
             exit 1
           fi
 
-          # Unit tests must succeed (or be skipped when path-gated with no test files changed)
-          if [[ "$UNIT_RESULT" != "success" && "$UNIT_RESULT" != "skipped" ]]; then
+          # Unit tests may skip only when path detection selected no test-relevant files.
+          if [[ "$UNIT_RESULT" != "success" && ("$UNIT_RESULT" != "skipped" || "$RUN_TEST" == "true") ]]; then
             echo "❌ Unit tests did not pass (result: $UNIT_RESULT)"
             echo "Likely fix: run the failing Vitest file locally or pnpm --filter=@jovie/web run test:fast."
             exit 1
@@ -4814,7 +4815,7 @@ jobs:
           E2E_SMOKE_RUN_FULL_CI: ${{ needs.ci-e2e-smoke.outputs.run_full_ci }}
           MIGRATION_GUARD_RUN_FULL_CI: ${{ needs.drizzle-migration-guard.outputs.run_full_ci }}
           PR_MIGRATE_RUN_FULL_CI: ${{ needs.ci-pr-neon-migrate.outputs.run_full_ci }}
-          UNIT_RUN_FULL_CI: ${{ needs.ci-unit-tests.outputs.run_full_ci }}
+          UNIT_RUN_FULL_CI: ${{ needs.ci-path-changes.outputs.run_test }}
           PR_PREVIEW_URL: ${{ needs.ci-pr-vercel-preview.outputs.deployment_url }}
           RISK_LEVEL: ${{ needs.ci-risk-classifier.outputs.risk_level }}
           RISK_REQUIRES_SMOKE: ${{ needs.ci-risk-classifier.outputs.requires_smoke }}
