@@ -28,7 +28,6 @@ interface ArtistProfileLandingPageProps {
   readonly socialProof: ArtistProfileSocialProofData;
   readonly flags: ArtistProfileSectionFlags;
   readonly payFlowVideoUrl?: string;
-  readonly showForgeUiMarketingUpdates?: boolean;
 }
 
 export function ArtistProfileLandingPage({
@@ -38,7 +37,6 @@ export function ArtistProfileLandingPage({
   socialProof,
   flags,
   payFlowVideoUrl,
-  showForgeUiMarketingUpdates = false,
 }: Readonly<ArtistProfileLandingPageProps>) {
   if (!flags.FULL_PAGE) {
     return (
@@ -67,7 +65,6 @@ export function ArtistProfileLandingPage({
           adaptive={copy.adaptive}
           phoneCaption={copy.hero.phoneCaption}
           phoneSubcaption={copy.hero.phoneSubcaption}
-          showForgeUiMarketingUpdates={showForgeUiMarketingUpdates}
         />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.outcomes}>
