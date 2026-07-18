@@ -3584,12 +3584,13 @@ jobs:
           export SPOTIFY_CLIENT_ID="${{ secrets.SPOTIFY_CLIENT_ID }}"
           export SPOTIFY_CLIENT_SECRET="${{ secrets.SPOTIFY_CLIENT_SECRET }}"
           export MUSICFETCH_API_TOKEN="${{ secrets.MUSICFETCH_API_TOKEN }}"
-          # Deliberately NO UPSTASH_REDIS_REST_URL/TOKEN here: the OTP rate
-          # limiter's IP key collapses to 127.0.0.1 in this lane, so one shared
-          # Upstash bucket (3 sends/60s) is raced by every external dev/agent
-          # run — OTP send returned 429 and the code step never rendered.
-          # Without Redis, secondary storage falls back to per-process memory
-          # and this lane's OTP sends stay deterministic.
+          # UPSTASH_REDIS_* MUST stay set in this lane: the anonymous onboarding
+          # chat limiters are requireRedis and fail CLOSED (429) without Redis.
+          # The loopback-IP shared-bucket OTP race is handled app-side instead —
+          # deterministic +e2e test emails are exempt from the OTP send limit.
+          export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
+          export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
+
           PORT=3250 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
@@ -3624,8 +3625,8 @@ jobs:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           MUSICFETCH_API_TOKEN: ${{ secrets.MUSICFETCH_API_TOKEN }}
-          # UPSTASH_* intentionally unset (see the note above server start):
-          # per-process in-memory limiting keeps OTP sends deterministic.
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Upload Playwright Artifacts on Failure
         if: failure()

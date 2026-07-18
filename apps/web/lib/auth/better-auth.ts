@@ -33,10 +33,16 @@ import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { generateAppleClientSecret } from './apple-client-secret';
 import { provisionAppUser } from './provision';
-import { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
+import {
+  AUTH_RATE_LIMIT_RULES,
+  isDeterministicTestOtpEmail,
+} from './rate-limit-rules';
 import { secondaryStorage } from './secondary-storage';
 
-export { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
+export {
+  AUTH_RATE_LIMIT_RULES,
+  isDeterministicTestOtpEmail,
+} from './rate-limit-rules';
 
 /**
  * Better Auth server instance (Clerk → Better Auth migration; see
@@ -48,23 +54,6 @@ export { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
  */
 
 export const DETERMINISTIC_TEST_OTP = '424242';
-
-/**
- * Deterministic E2E OTP gate (triple-guarded, plan security row 11):
- * requires E2E_TEST_MODE=1, hard-blocked on production deploys, and only for
- * the repo's canonical test-email shapes (`…+e2e…@` / `…+clerk_test…@`,
- * optionally with a trailing `+suffix` segment as used by
- * tests/helpers/clerk-auth.ts).
- */
-const TEST_OTP_EMAIL_PATTERN = /\+(e2e|clerk_test)(\+[^@]*)?@/i;
-
-export function isDeterministicTestOtpEmail(email: string): boolean {
-  return (
-    env.E2E_TEST_MODE === '1' &&
-    env.VERCEL_ENV !== 'production' &&
-    TEST_OTP_EMAIL_PATTERN.test(email)
-  );
-}
 
 /**
  * Trusted origins: production + staging + local dev + native deep-link

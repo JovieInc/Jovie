@@ -60,6 +60,7 @@ vi.mock('@/lib/auth/provision', () => ({
 }));
 vi.mock('@/lib/auth/rate-limit-rules', () => ({
   AUTH_RATE_LIMIT_RULES: {},
+  isDeterministicTestOtpEmail: () => false,
 }));
 vi.mock('@/lib/auth/secondary-storage', () => ({
   secondaryStorage: {},
