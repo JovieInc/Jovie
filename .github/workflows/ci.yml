@@ -5611,6 +5611,37 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-node-pnpm
+      # Production runtime config comes from the isolated Doppler `prd`
+      # service token. Vercel remains the deployment control plane only.
+      - uses: ./.github/actions/setup-doppler
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN_PRD }}
+      - name: Configure production deployment credentials
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("$key")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing required production deployment credentials: ${missing[*]}"
+            exit 1
+          fi
+
+          # Write after setup-doppler so runtime config cannot override the
+          # repository-scoped deployment identity used by Vercel CLI steps.
+          {
+            printf 'VERCEL_TOKEN=%s\n' "$VERCEL_TOKEN"
+            printf 'VERCEL_ORG_ID=%s\n' "$VERCEL_ORG_ID"
+            printf 'VERCEL_PROJECT_ID=%s\n' "$VERCEL_PROJECT_ID"
+          } >> "$GITHUB_ENV"
       - name: Verify production domains are on canonical Vercel project
         id: domain-guard
         env:
@@ -5650,6 +5681,28 @@ jobs:
             fail_stage "Missing production deployment inputs: ${missing[*]}" missing_creds
           fi
 
+          required_runtime_env=(
+            NEXT_PUBLIC_BETTER_AUTH_URL
+            BETTER_AUTH_SECRET
+            DATABASE_URL
+            SESSION_SECRET
+            AI_GATEWAY_API_KEY
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY
+            TURNSTILE_SECRET_KEY
+          )
+          missing_runtime_env=()
+          runtime_env_args=()
+          for key in "${required_runtime_env[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              missing_runtime_env+=("$key")
+            else
+              runtime_env_args+=(--env "${key}=${!key}")
+            fi
+          done
+          if [ "${#missing_runtime_env[@]}" -gt 0 ]; then
+            fail_stage "Missing production runtime env: ${missing_runtime_env[*]}" production_artifact_failed
+          fi
+
           expected="${GITHUB_SHA:0:7}"
           scope_args=(--scope "$VERCEL_ORG_ID")
           rm -rf .vercel/output .vercel/.env.preview.local .vercel/.env.production.local .vercel/.env.local
@@ -5667,7 +5720,7 @@ jobs:
           done
 
           if ! pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts \
-            --target=prd --source=vercel-file; then
+            --target=prd --source=env; then
             fail_stage "Production signup configuration is incomplete." production_artifact_failed
           fi
 
@@ -5687,6 +5740,7 @@ jobs:
             --prebuilt --archive=tgz --prod --skip-domain --format=json \
             --env "VERCEL_GIT_COMMIT_SHA=${GITHUB_SHA}" \
             --env "NEXT_PUBLIC_BUILD_SHA=${expected}" \
+            "${runtime_env_args[@]}" \
             --meta "githubCommitSha=${GITHUB_SHA}" \
             --token "$VERCEL_TOKEN" "${scope_args[@]}")"; then
             fail_stage "Production prebuilt deployment failed." production_artifact_failed
