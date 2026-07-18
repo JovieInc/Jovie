@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Artist profiles now adapt to release, touring, and live-support moments:** one music-native link brings listening, tickets, support, fan capture, setup guidance, and product truth into a clearer responsive journey.
 - **[internal] Production Sentry gate secret binding:** the post-deploy error-rate gate now runs inside the protected production environment, so its API token is available without crossing a nested reusable-workflow boundary.
 - **[internal] Fixed-pool unit routing:** healthy runner heartbeats now select the fixed CI pool through a non-sensitive route token, preserving hosted fail-closed fallback without GitHub suppressing the runner decision.
 - **Vercel preview authentication stays on the preview domain:** Better Auth now derives its server URL from each request using exact production, staging, local, deployment, and branch host allowlists; arbitrary `*.vercel.app` hosts fail closed instead of redirecting previews to a static environment URL.

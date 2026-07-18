@@ -154,6 +154,22 @@ test.describe('Artist Profiles Landing', () => {
     );
   });
 
+  test('singular artist-profile alias preserves the canonical experience', async ({
+    page,
+  }) => {
+    await page.goto('/artist-profile', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    await expect(
+      page.getByRole('heading', {
+        name: /the link your music deserves\./i,
+      })
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('artist-profile-section-adaptive')
+    ).toHaveCount(1);
+  });
+
   test('hero stays intact on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
 
