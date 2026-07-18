@@ -877,7 +877,9 @@ jobs:
     # Run for push to main or any selected evidence lane that needs ephemeral DB credentials.
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || needs.ci-path-changes.outputs.run_golden_path == 'true' || contains(github.event.pull_request.labels.*.name, 'launch-candidate') || (contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true')))) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    # 5m was warm-store-only: the admission probe needs @neondatabase/serverless
+    # from the installed tree, and a cold pnpm install alone runs ~5m.
+    timeout-minutes: 10
     concurrency:
       group: neon-endpoint-pool-neon-db-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
       cancel-in-progress: false
