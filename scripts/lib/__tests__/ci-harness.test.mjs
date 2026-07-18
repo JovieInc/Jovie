@@ -227,7 +227,7 @@ describe('ci-harness manifest', () => {
       );
   });
 
-  it('skips no-op unit matrices before runner allocation without weakening PR Ready', () => {
+  it('runs unit matrices on integration heads while source PR Ready accepts the intentional skip', () => {
     const workflow = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/ci.yml'),
       'utf8'
@@ -239,12 +239,43 @@ describe('ci-harness manifest', () => {
     expect(
       unitTests.indexOf("needs.ci-path-changes.outputs.run_test == 'true'")
     ).toBeLessThan(unitTests.indexOf('runs-on:'));
+    expect(unitTests).toContain("github.event_name == 'merge_group'");
+    expect(unitTests).toContain(
+      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    );
+    expect(unitTests).toContain("github.event_name == 'workflow_dispatch'");
+    expect(unitTests).not.toContain("github.event_name == 'pull_request'");
 
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
-    expect(prReady).toContain(
+    expect(prReady).not.toContain(
       'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
     );
     // biome-ignore format: exhaustive source PR Ready unit-result contract
+    for (const [unitResult, status] of [
+      ['success', 0],
+      ['skipped', 0],
+      ['failure', 1],
+      ['cancelled', 1],
+      ['neutral', 1],
+    ]) {
+      expect(
+        runWorkflowBash(
+          prReady,
+          /^ {10}if \[\[ "\$UNIT_RESULT"[\s\S]*?^ {10}fi/m,
+          { UNIT_RESULT: unitResult }
+        ).status,
+        unitResult
+      ).toBe(status);
+    }
+
+    const mergeReady = extractWorkflowJobBlock(
+      workflow,
+      'ci-merge-group-ready'
+    );
+    expect(mergeReady).toContain(
+      'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
+    );
+    // biome-ignore format: exhaustive merge-group unit-result/path-selection contract
     for (const [unitResult, runTest, status] of [
       ['success', 'true', 0],
       ['success', 'false', 0],
@@ -254,11 +285,12 @@ describe('ci-harness manifest', () => {
       ['cancelled', 'false', 1],
       ['skipped', 'true', 1],
       ['skipped', 'false', 0],
+      ['neutral', 'false', 1],
     ]) {
       expect(
         runWorkflowBash(
-          prReady,
-          /^ {10}if \[\[ "\$UNIT_RESULT"[\s\S]*?^ {10}fi/m,
+          mergeReady,
+          /^ {10}if \[\[ "\$UNIT_RESULT" != "success" \]\]; then[\s\S]*?^ {12}echo "Unit Tests legitimately skipped[^\n]*"[\s\S]*?^ {10}fi/m,
           { UNIT_RESULT: unitResult, RUN_TEST: runTest }
         ).status,
         `${unitResult}; run_test=${runTest}`
@@ -266,7 +298,8 @@ describe('ci-harness manifest', () => {
     }
 
     const summary = extractWorkflowJobBlock(workflow, 'ci-summary');
-    expect(summary).toContain(
+    expect(summary).toContain("UNIT_RUN_FULL_CI: 'false'");
+    expect(summary).not.toContain(
       'UNIT_RUN_FULL_CI: ${{ needs.ci-path-changes.outputs.run_test }}'
     );
     expect(summary).not.toContain(

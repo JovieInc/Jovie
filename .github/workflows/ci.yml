@@ -2860,10 +2860,10 @@ jobs:
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
     needs: [ci-path-changes]
-    # Runs on PRs to main, merge-group combined heads, main pushes, and manual dispatch.
-    # Parallel with typecheck/build for faster CI.
-    # Job-level path gate: no test-relevant diff means no matrix runners are allocated.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && needs.ci-path-changes.outputs.run_test == 'true' && (github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
+    # Runs test-relevant shards on merge-group combined heads, main pushes, and
+    # manual dispatch. Source PRs defer unit evidence to the combined queue head.
+    # Job-level gating prevents source and no-op diffs from allocating matrix runners.
+    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && needs.ci-path-changes.outputs.run_test == 'true' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
     # When CI_UNIT_RUNNER routes to the 10-slot autoscaled ephemeral pool, one
     # PR uses 5 slots, two PRs use all 10, and a third queues behind natural
     # pool backpressure. The hosted fallback retains the original 3-shard cap
@@ -2929,15 +2929,14 @@ jobs:
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "main: Running web unit suite through Turbo without coverage; nightly coverage audit uploads Codecov coverage"
             pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
-          elif [[ "${{ github.event_name }}" == "merge_group" || -n "${{ github.base_ref }}" ]]; then
-            echo "🔍 PR/merge group: Running affected test suite"
-            # Run affected tests against the PR base or merge-group base SHA.
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            echo "🔍 Merge group: Running affected test suite"
+            # Run affected tests against the merge-group base SHA.
             pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           else
-            echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"
-            # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
-            # so we can't determine changed files. Run critical + interaction tests only to avoid OOM
-            # from the full test suite. The PR event covers changed-file tests.
+            echo "🔍 Manual dispatch: Running critical + interaction tests (no base_ref available)"
+            # Non-main manual dispatches have no base_ref. Run the critical and
+            # interaction suites; main dispatches take the full-suite branch above.
             # --passWithNoTests: some shards may have no files matching the filter
             pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction" $OUTPUT_FLAG
           fi
@@ -4460,7 +4459,6 @@ jobs:
           ADMIN_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-admin-pr.result }}"
           HAS_TESTING_LABEL="${{ contains(github.event.pull_request.labels.*.name, 'testing') }}"
           HAS_LAUNCH_CANDIDATE_LABEL="${{ contains(github.event.pull_request.labels.*.name, 'launch-candidate') }}"
-          RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
           RUN_E2E="${{ needs.ci-path-changes.outputs.run_e2e }}"
           RUN_GOLDEN_PATH="${{ needs.ci-path-changes.outputs.run_golden_path }}"
           RUN_PUBLIC_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_public_lighthouse }}"
@@ -4555,11 +4553,16 @@ jobs:
             exit 1
           fi
 
-          # Unit tests may skip only when path detection selected no test-relevant files.
-          if [[ "$UNIT_RESULT" != "success" && ("$UNIT_RESULT" != "skipped" || "$RUN_TEST" == "true") ]]; then
+          # Source PR unit tests are intentionally deferred to the merge-group
+          # combined head. A success remains acceptable for in-flight runs from
+          # the prior workflow revision; every other result fails closed.
+          if [[ "$UNIT_RESULT" != "success" && "$UNIT_RESULT" != "skipped" ]]; then
             echo "❌ Unit tests did not pass (result: $UNIT_RESULT)"
             echo "Likely fix: run the failing Vitest file locally or pnpm --filter=@jovie/web run test:fast."
             exit 1
+          fi
+          if [[ "$UNIT_RESULT" == "skipped" ]]; then
+            echo "Source PR unit tests are intentionally deferred to the merge-group combined head."
           fi
 
           # A11y (axe) must succeed when it runs (skipped when no public UI paths changed).
@@ -4652,7 +4655,7 @@ jobs:
             echo "Risk classifier blocks unattended auto-merge for this PR. Human review may still merge after required evidence is present."
           fi
 
-          echo "All intended PR checks passed: fast gate, unit tests, a11y, Storybook a11y, layout, preview, smoke, Golden Path, and Lighthouse evidence"
+          echo "All intended source PR checks passed; unit tests are enforced on the merge-group combined head."
 
   ci-summary:
     name: PR Summary
@@ -4815,7 +4818,8 @@ jobs:
           E2E_SMOKE_RUN_FULL_CI: ${{ needs.ci-e2e-smoke.outputs.run_full_ci }}
           MIGRATION_GUARD_RUN_FULL_CI: ${{ needs.drizzle-migration-guard.outputs.run_full_ci }}
           PR_MIGRATE_RUN_FULL_CI: ${{ needs.ci-pr-neon-migrate.outputs.run_full_ci }}
-          UNIT_RUN_FULL_CI: ${{ needs.ci-path-changes.outputs.run_test }}
+          # Source PR unit selection is intentionally deferred to the merge-group head.
+          UNIT_RUN_FULL_CI: 'false'
           PR_PREVIEW_URL: ${{ needs.ci-pr-vercel-preview.outputs.deployment_url }}
           RISK_LEVEL: ${{ needs.ci-risk-classifier.outputs.risk_level }}
           RISK_REQUIRES_SMOKE: ${{ needs.ci-risk-classifier.outputs.requires_smoke }}
