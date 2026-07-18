@@ -47,22 +47,109 @@ valid_current_json() {
   ' >/dev/null 2>&1
 }
 
-inspect_current() {
+valid_rollout_json() {
+  jq -e 'type == "object" or . == null' >/dev/null 2>&1
+}
+
+validate_vercel_json() {
+  case "$1" in
+    current) valid_current_json ;;
+    rollout) valid_rollout_json ;;
+    *) return 1 ;;
+  esac
+}
+
+extract_vercel_json() {
+  local raw="$1"
+  local schema="$2"
+  local candidate=""
+
+  if validate_vercel_json "$schema" <<<"$raw"; then
+    printf '%s\n' "$raw"
+    return 0
+  fi
+
+  # Vercel CLI 54.14.5 sends `rolling-release fetch` JSON through its
+  # stderr-backed output manager. The first JSON line is prefixed with `> `.
+  candidate="$(sed -n '/^> /,$p' <<<"$raw" | sed '1s/^> //')"
+  if [ -n "$candidate" ] && validate_vercel_json "$schema" <<<"$candidate"; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
+  # Keep accepting raw JSON written to stdout after CLI status lines. This is
+  # the shape used by `inspect --format=json` and older rollout fixtures.
+  candidate="$(sed -n '/^[[:space:]]*{/,$p' <<<"$raw")"
+  if [ -n "$candidate" ] && validate_vercel_json "$schema" <<<"$candidate"; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+  candidate="$(sed -n '/^[[:space:]]*null[[:space:]]*$/,$p' <<<"$raw")"
+  if [ -n "$candidate" ] && validate_vercel_json "$schema" <<<"$candidate"; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
+  return 1
+}
+
+safe_vercel_failure_reason() {
+  local raw="$1"
+  local error_json=""
+  local reason=""
+
+  error_json="$(extract_vercel_json "$raw" rollout || true)"
+  if [ -n "$error_json" ]; then
+    reason="$(jq -r '
+      if type == "object" then (.reason // .error.code // .code // "")
+      else ""
+      end
+    ' <<<"$error_json" 2>/dev/null || true)"
+  fi
+
+  case "$reason" in
+    api_error | forbidden | invalid_token | not_found | not_linked | project_not_found | rate_limited | timeout | unauthorized)
+      printf '%s\n' "$reason"
+      ;;
+    *)
+      printf 'unclassified\n'
+      ;;
+  esac
+}
+
+read_vercel_json() {
+  local operation="$1"
+  local schema="$2"
+  shift 2
+
+  local raw=""
   local result=""
-  if ! result="$(vercel inspect jov.ie --format=json 2>/dev/null)" ||
-    ! valid_current_json <<<"$result"; then
+  local status=0
+  local reason=""
+
+  raw="$(vercel "$@" 2>&1)" || status=$?
+  if [ "$status" -ne 0 ]; then
+    reason="$(safe_vercel_failure_reason "$raw")"
+    echo "Vercel ${operation} failed (exit ${status}, reason=${reason})." >&2
     return 1
   fi
+
+  if ! result="$(extract_vercel_json "$raw" "$schema")"; then
+    echo "Vercel ${operation} returned malformed JSON (${#raw} captured bytes)." >&2
+    return 1
+  fi
+
   printf '%s\n' "$result"
 }
 
+inspect_current() {
+  read_vercel_json "inspect current" current \
+    inspect jov.ie --format=json
+}
+
 fetch_rollout() {
-  local result=""
-  if ! result="$(vercel rolling-release fetch 2>/dev/null)" ||
-    ! jq -e 'type == "object" or . == null' >/dev/null 2>&1 <<<"$result"; then
-    return 1
-  fi
-  printf '%s\n' "$result"
+  read_vercel_json "rolling-release fetch" rollout \
+    rolling-release fetch
 }
 
 rollout_is_active() {

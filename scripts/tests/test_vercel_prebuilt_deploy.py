@@ -567,6 +567,14 @@ printf '%s\n' "$*" >> "$VERCEL_CALL_LOG"
 cmd="$1"
 
 if [ "$cmd" = "inspect" ]; then
+  printf '%s\n' \
+    'Vercel CLI 54.14.5 (Node.js 22.23.1)' \
+    'Fetching deployment "jov.ie" in test-team' >&2
+  if [ "$FAKE_SCENARIO" = "inspect-error" ]; then
+    printf '%s\n' \
+      '{"status":"error","reason":"api_error","message":"do-not-leak-sensitive-marker"}' >&2
+    exit 1
+  fi
   if [ "$FAKE_SCENARIO" = "malformed" ]; then
     echo '{}'
     exit 0
@@ -586,18 +594,39 @@ if [ "$cmd" = "inspect" ]; then
 fi
 
 if [ "$cmd" = "rolling-release" ] && [ "$2" = "fetch" ]; then
+  printf '%s\n' \
+    'Vercel CLI 54.14.5 (Node.js 22.23.1)' \
+    'Retrieving project…' >&2
+  if [ "$FAKE_SCENARIO" = "rollout-error" ]; then
+    printf '%s\n' \
+      '{"status":"error","reason":"api_error","message":"do-not-leak-sensitive-marker"}' >&2
+    exit 1
+  fi
+  if [ "$FAKE_SCENARIO" = "rollout-malformed" ]; then
+    printf '%s\n' '> do-not-leak-sensitive-marker' >&2
+    exit 0
+  fi
+
+  rollout='null'
   if [ "$FAKE_SCENARIO" = "foreign" ]; then
-    echo '{"activeStage":{"targetPercentage":10},"canaryDeployment":{"id":"dpl_foreign"}}'
+    rollout='{"activeStage":{"targetPercentage":10},"canaryDeployment":{"id":"dpl_foreign"}}'
   elif [ "$FAKE_SCENARIO" = "rolling" ] &&
     grep -q '^promote ' "$VERCEL_CALL_LOG" &&
     ! grep -q '^rolling-release complete ' "$VERCEL_CALL_LOG"; then
-    echo '{"activeStage":{"targetPercentage":10},"canaryDeployment":{"id":"dpl_target"}}'
+    rollout='{"activeStage":{"targetPercentage":10},"canaryDeployment":{"id":"dpl_target"}}'
   elif [ "$FAKE_SCENARIO" = "owned-timeout" ] &&
     grep -q '^promote ' "$VERCEL_CALL_LOG" &&
     ! grep -q '^rolling-release abort ' "$VERCEL_CALL_LOG"; then
-    echo '{"activeStage":{"targetPercentage":10},"default":{"targetDeploymentId":"dpl_target"}}'
+    rollout='{"activeStage":{"targetPercentage":10},"default":{"targetDeploymentId":"dpl_target"}}'
+  fi
+
+  if [ "$FAKE_SCENARIO" = "legacy-stdout" ]; then
+    printf '%s\n' "$rollout"
   else
-    echo 'null'
+    # Vercel CLI 54.14.5 uses its stderr-backed output manager for this
+    # machine-readable response. Only the first JSON line has the `> ` prefix.
+    printf '> ' >&2
+    jq . <<<"$rollout" >&2
   fi
   exit 0
 fi
@@ -656,6 +685,16 @@ def test_promotion_controller_promotes_once_and_requires_terminal_current(
     calls = (tmp_path / "vercel-calls").read_text()
     assert calls.count("promote dpl_target") == 1
     assert "Production Current is terminal on dpl_target" in result.stdout
+
+
+def test_promotion_controller_accepts_legacy_rollout_json_on_stdout(
+    tmp_path: Path,
+) -> None:
+    result = _run_promotion_controller(tmp_path, "legacy-stdout")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert calls.count("promote dpl_target") == 1
 
 
 def test_promotion_controller_observes_nonzero_promote_without_resubmitting(
@@ -718,6 +757,43 @@ def test_promotion_controller_fails_closed_on_malformed_preflight(
     assert (tmp_path / "github-output").read_text().strip() == (
         "failure_subtype=production_promotion_state_invalid"
     )
+    assert "promote dpl_target" not in (tmp_path / "vercel-calls").read_text()
+
+
+def test_promotion_controller_reports_safe_inspect_failure_reason(
+    tmp_path: Path,
+) -> None:
+    result = _run_promotion_controller(tmp_path, "inspect-error")
+
+    assert result.returncode == 1
+    assert "Vercel inspect current failed (exit 1, reason=api_error)." in result.stderr
+    assert "do-not-leak-sensitive-marker" not in result.stderr
+    assert "rolling-release fetch" not in (tmp_path / "vercel-calls").read_text()
+    assert "promote dpl_target" not in (tmp_path / "vercel-calls").read_text()
+
+
+def test_promotion_controller_reports_safe_rollout_failure_reason(
+    tmp_path: Path,
+) -> None:
+    result = _run_promotion_controller(tmp_path, "rollout-error")
+
+    assert result.returncode == 1
+    assert (
+        "Vercel rolling-release fetch failed (exit 1, reason=api_error)."
+        in result.stderr
+    )
+    assert "do-not-leak-sensitive-marker" not in result.stderr
+    assert "promote dpl_target" not in (tmp_path / "vercel-calls").read_text()
+
+
+def test_promotion_controller_reports_safe_malformed_rollout_shape(
+    tmp_path: Path,
+) -> None:
+    result = _run_promotion_controller(tmp_path, "rollout-malformed")
+
+    assert result.returncode == 1
+    assert "Vercel rolling-release fetch returned malformed JSON" in result.stderr
+    assert "do-not-leak-sensitive-marker" not in result.stderr
     assert "promote dpl_target" not in (tmp_path / "vercel-calls").read_text()
 
 

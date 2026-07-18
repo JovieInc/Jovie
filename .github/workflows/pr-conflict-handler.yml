@@ -45,11 +45,14 @@ defaults:
 
 jobs:
   plan:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'cancelled'
     name: Classify and plan PR freshness
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     concurrency:
-      group: pr-conflict-handler-${{ github.repository }}
-      cancel-in-progress: false
+      # CI-completion audits are read-only and supersedable. Operator dispatches
+      # serialize separately so an incoming CI event cannot cancel manual apply.
+      group: pr-conflict-handler-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && 'operator' || 'audit' }}
+      cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

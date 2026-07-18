@@ -180,6 +180,30 @@ def test_gh_fleet_controllers_use_hosted_cli_contract() -> None:
         assert "run: gh --version" in block, (workflow, job_name)
 
 
+def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> None:
+    """CI-completion audits may supersede each other, never operator runs."""
+    block = _job_block("pr-conflict-handler.yml", "plan")
+
+    assert "runs-on: ubuntu-latest" in block
+    assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block
+    assert (
+        "if: github.event_name != 'workflow_run' || "
+        "github.event.workflow_run.conclusion != 'cancelled'"
+    ) in block
+    assert (
+        "group: pr-conflict-handler-${{ github.repository }}-"
+        "${{ github.event_name == 'workflow_dispatch' && "
+        "'operator' || 'audit' }}"
+    ) in block
+    assert (
+        "cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}"
+        in block
+    )
+    assert 'if [[ "${{ github.event_name }}" == "workflow_dispatch"' in block
+    assert '"${{ inputs.apply }}" == "true"' in block
+    assert 'MODE="--apply"' in block
+
+
 def test_auto_pr_compares_trigger_branch_without_executing_its_checkout() -> None:
     """The pushed branch is controller input; current main supplies helpers."""
     block = _job_block("auto-pr-on-push.yml", "open-pr")
