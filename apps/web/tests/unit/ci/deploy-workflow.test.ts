@@ -336,7 +336,6 @@ describe('deploy workflow Vercel env resolution', () => {
   it('passes the exact GitHub SHA into every external Vercel build and source deploy', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const buildShaEnv = 'VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}';
-    const buildJob = getJobBlock(workflow, 'ci-build-public');
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
     const deployStep = getStepBlock(
       stagingJob,
@@ -347,9 +346,6 @@ describe('deploy workflow Vercel env resolution', () => {
       'utf8'
     );
 
-    expect(getStepBlock(buildJob, 'Vercel build (deploy artifact)')).toContain(
-      buildShaEnv
-    );
     expect(
       getStepBlock(
         stagingJob,
@@ -454,8 +450,13 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(deployScript).toContain('VERCEL_FORCE_SOURCE_DEPLOY');
   });
 
-  it('uses the restored prebuilt and refuses source-cache substitution', () => {
+  it('builds the staging prebuilt in-job and refuses source-cache substitution', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
+    const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const buildStep = getStepBlock(
+      stagingJob,
+      'Build (preview target for staging verification)'
+    );
     const deployStep = getStepBlock(
       workflow,
       'Deploy (staging preview, prebuilt)'
@@ -463,21 +464,28 @@ describe('deploy workflow Vercel env resolution', () => {
 
     expect(deployStep).not.toContain('VERCEL_FORCE_SOURCE_DEPLOY');
     expect(deployStep).toContain("VERCEL_ENABLE_SOURCE_FALLBACK: 'false'");
+    expect(stagingJob).not.toContain('download_vercel_build');
+    expect(stagingJob).not.toContain('restore_vercel_build');
+    expect(buildStep).toContain('jovie-generated-public-files');
+    expect(buildStep).not.toContain('steps.restore_vercel_build');
   });
 
   it('packages generated public trace files and budgets remote fallback readiness', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
-    const buildJob = getJobBlock(workflow, 'ci-build-public');
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const buildStep = getStepBlock(
+      stagingJob,
+      'Build (preview target for staging verification)'
+    );
     const readinessStep = getStepBlock(
       stagingJob,
       'Wait for staging deployment readiness'
     );
 
-    expect(buildJob).toContain(
+    expect(buildStep).toContain(
       'cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt'
     );
-    expect(buildJob).toContain('.vercel/jovie-generated-public-files');
+    expect(buildStep).toContain('.vercel/jovie-generated-public-files');
     expect(readinessStep).toContain('--timeout 20m');
     expect(readinessStep).toContain('BUILDING|QUEUED|INITIALIZING)');
     expect(readinessStep).toContain('handing off to retrying canary');
@@ -917,7 +925,13 @@ describe('CI E2E smoke workflow', () => {
 
   it('pins Better Auth to the local standalone origin for smoke and golden-path jobs', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
-    const localOrigin = 'http://localhost:3100';
+    // Shared build artifact feeds multiple lanes on one self-hosted machine, so
+    // each lane serves on its own loopback port; the baked-in public build URL
+    // stays on the legacy default and is overridden by lane runtime exports.
+    const sharedOrigin = 'http://localhost:3100';
+    const e2eSmokeOrigin = 'http://localhost:3240';
+    const goldenPathOrigin = 'http://localhost:3250';
+    const extendedSmokeOrigin = 'http://localhost:3260';
     const sharedBuild = getStepBlock(
       getJobBlock(workflow, 'ci-build-public'),
       'Build app (public routes only — no secrets needed)'
@@ -926,50 +940,62 @@ describe('CI E2E smoke workflow', () => {
     const extendedSmokeJob = getJobBlock(workflow, 'ci-smoke-required');
 
     expect(sharedBuild).toContain(
-      `NEXT_PUBLIC_BETTER_AUTH_URL: ${localOrigin}`
+      `NEXT_PUBLIC_BETTER_AUTH_URL: ${sharedOrigin}`
     );
-    expect(sharedBuild).toContain(`NEXT_PUBLIC_APP_URL: ${localOrigin}`);
+    expect(sharedBuild).toContain(`NEXT_PUBLIC_APP_URL: ${sharedOrigin}`);
     expect(sharedBuild).toContain("NEXT_PUBLIC_E2E_MODE: '1'");
     const goldenBuild = getStepBlock(
       goldenPathJob,
       'Build real-Clerk golden-path artifact'
     );
     expect(goldenBuild).toContain(
-      `NEXT_PUBLIC_BETTER_AUTH_URL: ${localOrigin}`
+      `NEXT_PUBLIC_BETTER_AUTH_URL: ${goldenPathOrigin}`
     );
-    expect(goldenBuild).toContain(`NEXT_PUBLIC_APP_URL: ${localOrigin}`);
+    expect(goldenBuild).toContain(`NEXT_PUBLIC_APP_URL: ${goldenPathOrigin}`);
     const extendedBuild = getStepBlock(
       extendedSmokeJob,
       'Extract or rebuild for smoke tests'
     );
     expect(extendedBuild).toContain(
-      `NEXT_PUBLIC_BETTER_AUTH_URL: ${localOrigin}`
+      `NEXT_PUBLIC_BETTER_AUTH_URL: ${extendedSmokeOrigin}`
     );
-    expect(extendedBuild).toContain(`NEXT_PUBLIC_APP_URL: ${localOrigin}`);
+    expect(extendedBuild).toContain(
+      `NEXT_PUBLIC_APP_URL: ${extendedSmokeOrigin}`
+    );
     expect(extendedBuild).toContain("NEXT_PUBLIC_E2E_MODE: '1'");
 
     const standaloneSteps = [
-      getStepBlock(
-        getJobBlock(workflow, 'ci-e2e-smoke'),
-        'Run E2E Smoke (Chromium)'
-      ),
-      getStepBlock(goldenPathJob, 'Run Golden Path (Chromium, Better Auth)'),
-      getStepBlock(extendedSmokeJob, 'Run Required Smoke Tests'),
+      {
+        origin: e2eSmokeOrigin,
+        step: getStepBlock(
+          getJobBlock(workflow, 'ci-e2e-smoke'),
+          'Run E2E Smoke (Chromium)'
+        ),
+      },
+      {
+        origin: goldenPathOrigin,
+        step: getStepBlock(
+          goldenPathJob,
+          'Run Golden Path (Chromium, Better Auth)'
+        ),
+      },
+      {
+        origin: extendedSmokeOrigin,
+        step: getStepBlock(extendedSmokeJob, 'Run Required Smoke Tests'),
+      },
     ];
 
-    for (const step of standaloneSteps) {
-      expect(step).toContain(`export BETTER_AUTH_URL=${localOrigin}`);
-      expect(step).toContain(
-        `export NEXT_PUBLIC_BETTER_AUTH_URL=${localOrigin}`
-      );
+    for (const { origin, step } of standaloneSteps) {
+      expect(step).toContain(`export BETTER_AUTH_URL=${origin}`);
+      expect(step).toContain(`export NEXT_PUBLIC_BETTER_AUTH_URL=${origin}`);
       expect(step).toContain('export HOSTNAME=localhost');
-      expect(step).toContain(`export NEXT_PUBLIC_APP_URL=${localOrigin}`);
-      expect(step).toContain(`BETTER_AUTH_URL: ${localOrigin}`);
-      expect(step).toContain(`NEXT_PUBLIC_BETTER_AUTH_URL: ${localOrigin}`);
+      expect(step).toContain(`export NEXT_PUBLIC_APP_URL=${origin}`);
+      expect(step).toContain(`BETTER_AUTH_URL: ${origin}`);
+      expect(step).toContain(`NEXT_PUBLIC_BETTER_AUTH_URL: ${origin}`);
       expect(step).toContain('SESSION_SECRET: ${{ secrets.SESSION_SECRET }}');
     }
 
-    for (const step of [standaloneSteps[0], standaloneSteps[2]]) {
+    for (const { step } of [standaloneSteps[0], standaloneSteps[2]]) {
       expect(step).toContain(
         'export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"'
       );
@@ -977,6 +1003,58 @@ describe('CI E2E smoke workflow', () => {
         'export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"'
       );
     }
+  });
+});
+
+describe('CI Golden Path Neon workflow', () => {
+  it('prefers pooled endpoints and verifies connectivity before migrations', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const goldenPathJob = getJobBlock(workflow, 'ci-golden-path');
+    const sharedResolver = getStepBlock(
+      goldenPathJob,
+      'Resolve DATABASE_URL from Neon artifact'
+    );
+    const fallbackResolver = getStepBlock(
+      goldenPathJob,
+      'Resolve DATABASE_URL (fallback Neon ephemeral)'
+    );
+
+    expect(sharedResolver).toContain('candidate_json_key: db_url_pooled');
+    expect(sharedResolver).toContain('fallback_json_key: db_url');
+    expect(fallbackResolver).toContain(
+      'candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}'
+    );
+    expect(fallbackResolver).toContain(
+      'fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}'
+    );
+
+    const failClosedStep = getStepBlock(
+      goldenPathJob,
+      'Fail if Neon DB URL is missing (Golden Path)'
+    );
+    const verifyDbStep = getStepBlock(
+      goldenPathJob,
+      'Verify Neon DB connectivity (fail-fast)'
+    );
+    const failClosedIndex = goldenPathJob.indexOf(
+      '- name: Fail if Neon DB URL is missing (Golden Path)'
+    );
+    const verifyIndex = goldenPathJob.indexOf(
+      '- name: Verify Neon DB connectivity (fail-fast)'
+    );
+    const migrateIndex = goldenPathJob.indexOf(
+      '- name: Run migrations (ephemeral Neon)'
+    );
+
+    expect(failClosedStep).toContain(
+      'Refusing to run Golden Path against staging/production DBs'
+    );
+    expect(failClosedStep).toContain('if [[ -z "$DATABASE_URL" ]]; then');
+    expect(failClosedStep).toContain('exit 1');
+    expect(verifyDbStep).toContain('tests/e2e/verify-neon-db-connectivity.ts');
+    expect(failClosedIndex).toBeGreaterThanOrEqual(0);
+    expect(verifyIndex).toBeGreaterThan(failClosedIndex);
+    expect(migrateIndex).toBeGreaterThan(verifyIndex);
   });
 });
 
@@ -1066,7 +1144,7 @@ describe('CI public lighthouse workflow', () => {
       'name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
     );
     expect(resolveDbStep).toContain(
-      'connection_file: /tmp/neon-db-connection/connection.json'
+      'connection_file: ${{ runner.temp }}/neon-db-connection/connection.json'
     );
     // credential_source only fills missing username/password; ephemeral host
     // still comes from the neon-db artifact (see resolve-neon-database-url).
@@ -1172,7 +1250,7 @@ describe('CI mobile overflow workflow', () => {
       'name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
     );
     expect(resolveDbStep).toContain(
-      'connection_file: /tmp/neon-db-connection/connection.json'
+      'connection_file: ${{ runner.temp }}/neon-db-connection/connection.json'
     );
     expect(resolveDbStep).not.toContain('credential_source_url');
     expect(verifyDbStep).toContain('tests/e2e/verify-neon-db-connectivity.ts');
@@ -1437,7 +1515,7 @@ describe('CI public a11y workflow', () => {
       "if: steps.check_changes.outputs.run_full_ci == 'true'"
     );
     expect(resolveDbStep).toContain(
-      'connection_file: /tmp/neon-db-connection/connection.json'
+      'connection_file: ${{ runner.temp }}/neon-db-connection/connection.json'
     );
     expect(exportStep).toContain(
       "if: steps.check_changes.outputs.run_full_ci == 'true'"
@@ -1492,7 +1570,7 @@ describe('CI PR neon migrate workflow', () => {
       'name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
     );
     expect(resolveDbStep).toContain(
-      'connection_file: /tmp/neon-db-connection/connection.json'
+      'connection_file: ${{ runner.temp }}/neon-db-connection/connection.json'
     );
     expect(resolveDbStep).toContain('candidate_json_key: db_url');
     expect(resolveDbStep).not.toContain('credential_source_url');
@@ -1509,7 +1587,7 @@ describe('CI PR neon migrate workflow', () => {
 });
 
 describe('production promotion exact-artifact contract', () => {
-  it('deploys the restored staging prebuilt without a source fallback', () => {
+  it('deploys the in-job staging prebuilt without a source fallback', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const deployStep = getStepBlock(
       workflow,

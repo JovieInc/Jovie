@@ -50,6 +50,12 @@ jobs:
     # the heterogeneous self-hosted fast pool does not.
     runs-on: ubuntu-latest
     steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
       - name: Checkout main policy code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -59,7 +65,7 @@ jobs:
         run: gh --version
       - name: Enroll clean PRs
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
@@ -79,6 +85,12 @@ jobs:
       github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
       - name: Checkout main policy code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -92,7 +104,7 @@ jobs:
           node-version-file: '.nvmrc'
       - name: Preflight native queue cutover
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           MERGE_QUEUE_BACKEND: ${{ vars.MERGE_QUEUE_BACKEND }}
         run: |
@@ -103,7 +115,7 @@ jobs:
           node scripts/merge-queue-backend.mjs preflight
       - name: Rebase blocked agent PRs onto main (Phase 2)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           DRAIN_REMEDIATE_APPLY: '1'
           DRAIN_REMEDIATE_MAX_PER_RUN: '3'
