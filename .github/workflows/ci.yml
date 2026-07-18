@@ -1097,14 +1097,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         id: resolve-drizzle-neon-db-url
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url
           fallback_json_key: db_url_pooled
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
@@ -1250,15 +1250,22 @@ jobs:
       - name: Verify build output exists
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          if [ ! -d "apps/web/.next" ]; then
-            echo "::error::Build output directory apps/web/.next does not exist — build may have used remote cache without producing local output"
-            exit 1
-          fi
+          # Fail closed on a partial tree: remote-cache hits or tar truncation can
+          # leave apps/web/.next present without the files lanes actually run.
+          for required in \
+            apps/web/.next/BUILD_ID \
+            apps/web/.next/standalone/apps/web/server.js \
+            apps/web/.next/standalone/apps/web/.next/BUILD_ID; do
+            if [ ! -f "$required" ]; then
+              echo "::error::Build output missing $required — build may have used remote cache without producing local output"
+              exit 1
+            fi
+          done
           echo "Build output verified: $(du -sh apps/web/.next | cut -f1)"
 
       - name: Package build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: tar -cf /tmp/nextjs-build.tar -C apps/web .next
+        run: tar -cf "${{ runner.temp }}/nextjs-build.tar" -C apps/web .next
 
       - name: Upload build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1270,7 +1277,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: /tmp/nextjs-build.tar
+          path: ${{ runner.temp }}/nextjs-build.tar
           retention-days: 1
           if-no-files-found: error
 
@@ -1333,7 +1340,7 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: /tmp/nextjs-build-download
+          path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Require combined-head build artifact
         if: github.event_name == 'merge_group' && steps.download.outcome != 'success'
@@ -1343,7 +1350,7 @@ jobs:
 
       - name: Extract build artifact
         if: steps.download.outcome == 'success'
-        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+        run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Run deterministic layout behavior guard
         if: steps.download.outcome == 'success'
@@ -1354,7 +1361,7 @@ jobs:
           LAYOUT_GUARD_MANIFEST=$(node ../../.github/scripts/layout-guard-manifest.mjs)
           mapfile -t LAYOUT_GUARD_SPECS <<< "$LAYOUT_GUARD_MANIFEST"
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
+          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "::error::Layout Guard standalone server entrypoint is missing."
             exit 1
           fi
@@ -1362,15 +1369,16 @@ jobs:
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           export HOSTNAME=localhost
-          export NEXT_PUBLIC_APP_URL=http://localhost:3100
+          export NEXT_PUBLIC_APP_URL=http://localhost:3230
 
-          PORT=3100 node .next/standalone/apps/web/server.js &
+          PORT=3230 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
 
           SERVER_READY=false
           for attempt in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
+            if curl -sf http://localhost:3230 > /dev/null 2>&1; then
               SERVER_READY=true
               break
             fi
@@ -1385,7 +1393,7 @@ jobs:
 
           pnpm exec playwright test "${LAYOUT_GUARD_SPECS[@]}" --config=playwright.config.noauth.ts --project=chromium --reporter=line
         env:
-          BASE_URL: http://localhost:3100
+          BASE_URL: http://localhost:3230
           SMOKE_ONLY: '1'
           CI: true
           HUD_KIOSK_TOKEN: layout-guard-ci
@@ -1429,7 +1437,7 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         # Use only the ephemeral branch credentials from the neon-db artifact.
@@ -1438,7 +1446,7 @@ jobs:
         id: resolve-mobile-overflow-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url_pooled
           fallback_json_key: db_url
 
@@ -1500,11 +1508,11 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: /tmp/nextjs-build-download
+          path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
         if: steps.download-build.outcome == 'success'
-        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+        run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Build app fallback
         if: steps.download-build.outcome != 'success'
@@ -1523,7 +1531,7 @@ jobs:
         run: |
           cd apps/web
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
+          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "Standalone server not found - mobile overflow guard cannot start."
             exit 1
           fi
@@ -1550,12 +1558,14 @@ jobs:
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
           export HOSTNAME=localhost
 
-          PORT=3100 node .next/standalone/apps/web/server.js &
+          OVERFLOW_PORT=$((3210 + ${{ strategy.job-index }}))
+          PORT="$OVERFLOW_PORT" node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
 
           SERVER_READY=false
           for attempt in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
+            if curl -sf "http://localhost:$OVERFLOW_PORT" > /dev/null 2>&1; then
               SERVER_READY=true
               break
             fi
@@ -1570,9 +1580,8 @@ jobs:
 
           # The lane uses the deterministic test-auth bypass, so use the
           # no-auth config and avoid its unrelated legacy Clerk setup project.
-          pnpm exec playwright test tests/e2e/mobile-overflow.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
+          BASE_URL="http://localhost:$OVERFLOW_PORT" pnpm exec playwright test tests/e2e/mobile-overflow.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
         env:
-          BASE_URL: http://localhost:3100
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           # Match ci-e2e-smoke: standalone is production-built; VERCEL_ENV=development
@@ -1636,7 +1645,7 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         # Prefer ephemeral branch host from neon-db artifact. credential_source
@@ -1646,7 +1655,7 @@ jobs:
         id: resolve-lighthouse-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url_pooled
           fallback_json_key: db_url
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
@@ -1707,11 +1716,11 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: /tmp/nextjs-build-download
+          path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
         if: steps.download-build.outcome == 'success'
-        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+        run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Build app fallback for public Lighthouse
         if: steps.download-build.outcome != 'success'
@@ -1760,7 +1769,7 @@ jobs:
           export BETTER_AUTH_URL=http://localhost:3000
           export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
+          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "Standalone server not found - public Lighthouse cannot start."
             exit 1
           fi
@@ -1771,6 +1780,7 @@ jobs:
           echo "Waiting for standalone server..."
           SERVER_READY=false
           for i in {1..30}; do
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -s http://localhost:3000 > /dev/null; then
               echo "Server is ready!"
               SERVER_READY=true
@@ -1900,11 +1910,11 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: /tmp/nextjs-build-download
+          path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success'
-        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+        run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Build app fallback for dashboard Lighthouse
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome != 'success'
@@ -1930,7 +1940,7 @@ jobs:
           export NEXT_PUBLIC_CLERK_MOCK=1
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
+          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "Standalone server not found — dashboard Lighthouse cannot start."
             exit 1
           fi
@@ -1942,6 +1952,7 @@ jobs:
           echo "Waiting for standalone server..."
           SERVER_READY=false
           for i in {1..30}; do
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -s http://localhost:3000 > /dev/null; then
               SERVER_READY=true
               break
@@ -2008,14 +2019,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-onboarding-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url_pooled
           fallback_json_key: db_url
 
@@ -2043,11 +2054,11 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: /tmp/nextjs-build-download
+          path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
         if: steps.download-build.outcome == 'success'
-        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+        run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Build app fallback for onboarding Lighthouse
         if: steps.download-build.outcome != 'success'
@@ -2072,7 +2083,7 @@ jobs:
           export NEXT_PUBLIC_CLERK_MOCK=1
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
+          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "Standalone server not found — onboarding Lighthouse cannot start."
             exit 1
           fi
@@ -2084,6 +2095,7 @@ jobs:
           echo "Waiting for standalone server..."
           SERVER_READY=false
           for i in {1..30}; do
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -s http://localhost:3000 > /dev/null; then
               SERVER_READY=true
               break
@@ -2141,14 +2153,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-admin-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url_pooled
           fallback_json_key: db_url
 
@@ -2175,11 +2187,11 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: /tmp/nextjs-build-download
+          path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
         if: steps.download-build.outcome == 'success'
-        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+        run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Build app fallback for admin Lighthouse
         if: steps.download-build.outcome != 'success'
@@ -2204,7 +2216,7 @@ jobs:
           export NEXT_PUBLIC_CLERK_MOCK=1
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
+          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "Standalone server not found — admin Lighthouse cannot start."
             exit 1
           fi
@@ -2216,6 +2228,7 @@ jobs:
           echo "Waiting for standalone server..."
           SERVER_READY=false
           for i in {1..30}; do
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -s http://localhost:3000 > /dev/null; then
               SERVER_READY=true
               break
@@ -2276,14 +2289,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-chat-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url_pooled
           fallback_json_key: db_url
 
@@ -2310,11 +2323,11 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: /tmp/nextjs-build-download
+          path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
         if: steps.download-build.outcome == 'success'
-        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+        run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Build app fallback for chat Lighthouse
         if: steps.download-build.outcome != 'success'
@@ -2339,7 +2352,7 @@ jobs:
           export NEXT_PUBLIC_CLERK_MOCK=1
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
+          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "Standalone server not found — chat Lighthouse cannot start."
             exit 1
           fi
@@ -2351,6 +2364,7 @@ jobs:
           echo "Waiting for standalone server..."
           SERVER_READY=false
           for i in {1..30}; do
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
             if curl -s http://localhost:3000 > /dev/null; then
               SERVER_READY=true
               break
@@ -2416,14 +2430,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         id: resolve-pr-neon-db-url
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url
           fallback_json_key: db_url_pooled
 
@@ -2936,14 +2950,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
         id: resolve-a11y-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url_pooled
           fallback_json_key: db_url
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
@@ -2971,11 +2985,11 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: /tmp/nextjs-build-download
+          path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+        run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -3008,21 +3022,22 @@ jobs:
           }
           trap cleanup EXIT
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
+          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "Standalone server not found - public axe audit cannot start."
             exit 1
           fi
 
           # Keep absolute URLs on loopback (GHA HOSTNAME is the runner machine name).
           export HOSTNAME=localhost
-          export NEXT_PUBLIC_APP_URL=http://localhost:3100
+          export NEXT_PUBLIC_APP_URL=http://localhost:3220
 
-          PORT=3100 node .next/standalone/apps/web/server.js &
+          PORT=3220 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
 
           SERVER_READY=false
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
+            if curl -sf http://localhost:3220 > /dev/null 2>&1; then
               SERVER_READY=true
               break
             fi
@@ -3036,7 +3051,7 @@ jobs:
 
           pnpm exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium --reporter=line
         env:
-          BASE_URL: http://localhost:3100
+          BASE_URL: http://localhost:3220
           SMOKE_ONLY: '1'
           CI: true
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -3075,14 +3090,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
         continue-on-error: true
 
       - name: Resolve DATABASE_URL from Neon artifact
         id: resolve-a11y-authed-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url_pooled
           fallback_json_key: db_url
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
@@ -3109,14 +3124,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: /tmp/nextjs-build-download
+          path: ${{ runner.temp }}/nextjs-build-download
         continue-on-error: true
 
       - name: Extract or rebuild
         if: env.DATABASE_URL != ''
         run: |
-          if [ -f /tmp/nextjs-build-download/nextjs-build.tar ]; then
-            tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+          if [ -f "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" ]; then
+            tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
           else
             pnpm turbo build --filter=@jovie/web
           fi
@@ -3148,7 +3163,7 @@ jobs:
           cleanup() { kill "$SERVER_PID" 2>/dev/null || true; }
           trap cleanup EXIT
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
+          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "::error::Standalone server not found for authenticated a11y."
             exit 1
           fi
@@ -3163,10 +3178,11 @@ jobs:
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
           export HOSTNAME=localhost
 
-          PORT=3100 node .next/standalone/apps/web/server.js &
+          PORT=3270 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then break; fi
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
+            if curl -sf http://localhost:3270 > /dev/null 2>&1; then break; fi
             sleep 1
           done
 
@@ -3175,7 +3191,7 @@ jobs:
             tests/e2e/chat-axe.spec.ts \
             --config=playwright.config.ts --project=chromium
         env:
-          BASE_URL: http://localhost:3100
+          BASE_URL: http://localhost:3270
           CI: true
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -3241,14 +3257,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result == 'success'
         id: resolve-e2e-smoke-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url
           fallback_json_key: db_url_pooled
 
@@ -3306,11 +3322,11 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: /tmp/nextjs-build-download
+          path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+        run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       - name: Materialize standalone assets (PR smoke)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -3324,7 +3340,7 @@ jobs:
         run: |
           cd apps/web
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
+          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "::error::Standalone server not found — ci-build-public artifact is required for PR smoke"
             exit 1
           fi
@@ -3368,17 +3384,18 @@ jobs:
           # absolute URL construction and can rewrite redirects to 0.0.0.0 / non-loopback
           # hosts, which breaks claim flows and test-auth trusted-host checks.
           export HOSTNAME=localhost
-          export NEXT_PUBLIC_APP_URL=http://localhost:3100
-          export BETTER_AUTH_URL=http://localhost:3100
-          export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100
+          export NEXT_PUBLIC_APP_URL=http://localhost:3240
+          export BETTER_AUTH_URL=http://localhost:3240
+          export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3240
 
-          PORT=3100 node .next/standalone/apps/web/server.js &
+          PORT=3240 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
 
           SERVER_READY=false
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
+            if curl -sf http://localhost:3240 > /dev/null 2>&1; then
               SERVER_READY=true
               break
             fi
@@ -3391,11 +3408,11 @@ jobs:
           fi
 
           cd "$GITHUB_WORKSPACE"
-          CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --reporter=line
+          CI=true BASE_URL=http://localhost:3240 pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
-          BETTER_AUTH_URL: http://localhost:3100
-          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
+          BETTER_AUTH_URL: http://localhost:3240
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3240
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
@@ -3455,14 +3472,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         if: needs.neon-db.result == 'success'
         id: resolve-golden-path-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url
           fallback_json_key: db_url_pooled
 
@@ -3512,8 +3529,8 @@ jobs:
         run: pnpm turbo build --filter=@jovie/web --force
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_PUBLIC_APP_URL: http://localhost:3100
-          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
+          NEXT_PUBLIC_APP_URL: http://localhost:3250
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3250
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -3527,7 +3544,7 @@ jobs:
         run: |
           cd apps/web
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
+          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
             echo "::error::Standalone server not found — ci-build-public artifact is required for the golden path"
             exit 1
           fi
@@ -3547,11 +3564,11 @@ jobs:
           # The loopback-only server gate also requires this explicit flag before
           # it will bypass Turnstile for the first anonymous request.
           export PUBLIC_NOAUTH_SMOKE=1
-          export NEXT_PUBLIC_APP_URL=http://localhost:3100
-          export BETTER_AUTH_URL=http://localhost:3100
-          export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100
+          export NEXT_PUBLIC_APP_URL=http://localhost:3250
+          export BETTER_AUTH_URL=http://localhost:3250
+          export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3250
           # GHA HOSTNAME is the runner machine name; pin loopback so BA redirects
-          # and form origin checks stay on localhost:3100.
+          # and form origin checks stay on localhost:3250.
           export HOSTNAME=localhost
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
@@ -3563,13 +3580,14 @@ jobs:
           export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
           export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
 
-          PORT=3100 node .next/standalone/apps/web/server.js &
+          PORT=3250 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
 
           SERVER_READY=false
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
+            if curl -sf http://localhost:3250 > /dev/null 2>&1; then
               SERVER_READY=true
               break
             fi
@@ -3582,14 +3600,14 @@ jobs:
           fi
 
           cd "$GITHUB_WORKSPACE"
-          BASE_URL=http://localhost:3100 E2E_SKIP_WEB_SERVER=1 pnpm --filter @jovie/web run test:e2e:golden-path:ci
+          BASE_URL=http://localhost:3250 E2E_SKIP_WEB_SERVER=1 pnpm --filter @jovie/web run test:e2e:golden-path:ci
         env:
           # The runner also needs the database and deterministic E2E OTP flag.
           # UPSTASH_* is optional; the spec degrades to the in-memory limiter.
           DATABASE_URL: ${{ env.DATABASE_URL }}
           E2E_TEST_MODE: '1'
-          BETTER_AUTH_URL: http://localhost:3100
-          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
+          BETTER_AUTH_URL: http://localhost:3250
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3250
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
@@ -3786,14 +3804,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         id: resolve-e2e-migrate-neon-db-url
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url
           fallback_json_key: db_url_pooled
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
@@ -3862,13 +3880,13 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         id: resolve-e2e-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url
           fallback_json_key: db_url_pooled
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
@@ -4997,13 +5015,13 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/neon-db-connection
+          path: ${{ runner.temp }}/neon-db-connection
 
       - name: Resolve DATABASE_URL from Neon artifact
         id: resolve-smoke-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          connection_file: /tmp/neon-db-connection/connection.json
+          connection_file: ${{ runner.temp }}/neon-db-connection/connection.json
           candidate_json_key: db_url_pooled
           fallback_json_key: db_url
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
@@ -5029,14 +5047,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: /tmp/nextjs-build-download
+          path: ${{ runner.temp }}/nextjs-build-download
         continue-on-error: true
 
       - name: Extract or rebuild for smoke tests
         run: |
-          if [ -f /tmp/nextjs-build-download/nextjs-build.tar ]; then
+          if [ -f "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" ]; then
             echo "Reusing build artifact (saves ~3-4 min)"
-            tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+            tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
           else
             echo "Build artifact not available, building from scratch"
             pnpm turbo build --filter=@jovie/web
@@ -5047,8 +5065,8 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_PUBLIC_APP_URL: http://localhost:3100
-          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
+          NEXT_PUBLIC_APP_URL: http://localhost:3260
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3260
           # Keep rebuild fallback equivalent to the shared ci-build artifact.
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
           # NEXT_PUBLIC_* must be present at build time for standalone smoke runs.
@@ -5070,9 +5088,9 @@ jobs:
           export NODE_ENV=test
           export VERCEL_ENV=development
           export HOSTNAME=localhost
-          export NEXT_PUBLIC_APP_URL=http://localhost:3100
-          export BETTER_AUTH_URL=http://localhost:3100
-          export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3100
+          export NEXT_PUBLIC_APP_URL=http://localhost:3260
+          export BETTER_AUTH_URL=http://localhost:3260
+          export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3260
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
           export NEXT_PUBLIC_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
           export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
@@ -5090,14 +5108,15 @@ jobs:
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
           export URL_ENCRYPTION_KEY="smoke-preview-url-encryption-key"
           export AI_GATEWAY_API_KEY="smoke-preview-ai-gateway-key"
-          PORT=3100 node .next/standalone/apps/web/server.js &
+          PORT=3260 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
 
           # Wait for server readiness
           SERVER_READY=false
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
+            if curl -sf http://localhost:3260 > /dev/null 2>&1; then
               SERVER_READY=true
               break
             fi
@@ -5112,14 +5131,14 @@ jobs:
           # Run smoke tests with BASE_URL set (skips Playwright webServer config)
           cd "$GITHUB_WORKSPACE"
           set +e
-          CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --reporter=line
+          CI=true BASE_URL=http://localhost:3260 pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --reporter=line
           EXIT_CODE=$?
           set -e
           exit $EXIT_CODE
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
-          BETTER_AUTH_URL: http://localhost:3100
-          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
+          BETTER_AUTH_URL: http://localhost:3260
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3260
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
           TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
