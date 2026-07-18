@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { ServerEnvSchema } from '@/lib/env-server-schema';
 import { __test__ } from '@/lib/env-validation-rules';
 
 const { checkBetterAuthUrlOrigin } = __test__;
@@ -9,17 +10,20 @@ function runRule(input: {
   readonly vercelEnv: string;
   readonly appUrl?: string;
   readonly vercelUrl?: string;
+  readonly vercelBranchUrl?: string;
 }) {
   const original = {
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     VERCEL_URL: process.env.VERCEL_URL,
+    VERCEL_BRANCH_URL: process.env.VERCEL_BRANCH_URL,
   };
 
   process.env.NEXT_PUBLIC_BETTER_AUTH_URL = input.publicBetterAuthUrl;
   process.env.NEXT_PUBLIC_APP_URL = input.appUrl;
   process.env.VERCEL_URL = input.vercelUrl;
+  process.env.VERCEL_BRANCH_URL = input.vercelBranchUrl;
 
   try {
     return checkBetterAuthUrlOrigin({
@@ -111,5 +115,54 @@ describe('checkBetterAuthUrlOrigin', () => {
     });
     expect(issue?.type).toBe('critical');
     expect(issue?.message).toMatch(/must be production/i);
+  });
+
+  it('accepts the exact Vercel deployment host in preview', () => {
+    const issue = runRule({
+      betterAuthUrl: 'https://jovie-preview-abc.vercel.app',
+      publicBetterAuthUrl: 'https://jovie-preview-abc.vercel.app',
+      vercelEnv: 'preview',
+      vercelUrl: 'jovie-preview-abc.vercel.app',
+    });
+    expect(issue).toBeNull();
+  });
+
+  it('accepts the exact Vercel branch host in preview', () => {
+    const issue = runRule({
+      betterAuthUrl: 'https://jovie-git-auth-jovie.vercel.app',
+      publicBetterAuthUrl: 'https://jovie-git-auth-jovie.vercel.app',
+      vercelEnv: 'preview',
+      vercelUrl: 'jovie-preview-abc.vercel.app',
+      vercelBranchUrl: 'jovie-git-auth-jovie.vercel.app',
+    });
+    expect(issue).toBeNull();
+  });
+
+  it('rejects arbitrary Vercel hosts in preview', () => {
+    const issue = runRule({
+      betterAuthUrl: 'https://attacker-project.vercel.app',
+      publicBetterAuthUrl: 'https://attacker-project.vercel.app',
+      vercelEnv: 'preview',
+      vercelUrl: 'jovie-preview-abc.vercel.app',
+      vercelBranchUrl: 'jovie-git-auth-jovie.vercel.app',
+    });
+    expect(issue?.type).toBe('critical');
+    expect(issue?.message).toMatch(/not allowed/i);
+  });
+});
+
+describe('VERCEL_BRANCH_URL schema', () => {
+  it('accepts a Vercel hostname without a scheme', () => {
+    const result = ServerEnvSchema.safeParse({
+      VERCEL_BRANCH_URL: 'jovie-git-auth-jovie.vercel.app',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a URL with a scheme', () => {
+    const result = ServerEnvSchema.safeParse({
+      VERCEL_BRANCH_URL: 'https://jovie-git-auth-jovie.vercel.app',
+    });
+    expect(result.success).toBe(false);
   });
 });
