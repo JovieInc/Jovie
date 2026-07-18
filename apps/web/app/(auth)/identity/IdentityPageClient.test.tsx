@@ -41,7 +41,7 @@ describe('IdentityPageClient', () => {
     window.history.replaceState(
       {},
       '',
-      '/identity?response_type=code&client_id=logyourbody-ios&redirect_uri=logyourbody%3A%2F%2Foauth&scope=openid+profile+email+offline_access&state=oauth-state&code_challenge=pkce-challenge&code_challenge_method=S256&exp=123&sig=signed'
+      '/identity?response_type=code&client_id=logyourbody-ios&redirect_uri=logyourbody%3A%2F%2Foauth&scope=openid+profile+email+offline_access&state=oauth-state&code_challenge=pkce-challenge&code_challenge_method=S256&exp=123&ba_param=state&ba_param=sig&sig=signed'
     );
     signInSocial.mockResolvedValue({ data: {}, error: null });
   });
@@ -84,8 +84,13 @@ describe('IdentityPageClient', () => {
       code_challenge: 'pkce-challenge',
       code_challenge_method: 'S256',
       exp: '123',
+      ba_param: 'sig',
       sig: 'signed',
     });
+    expect(callbackURL.searchParams.getAll('ba_param')).toEqual([
+      'state',
+      'sig',
+    ]);
   });
 
   it('shows a recoverable error when Apple cannot start', async () => {
@@ -98,5 +103,20 @@ describe('IdentityPageClient', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Apple sign in could not be started. Try again.'
     );
+  });
+
+  it('shows the same recoverable error when the auth client throws', async () => {
+    signInSocial.mockRejectedValue(new Error('network unavailable'));
+    render(<IdentityPageClient />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Continue with Apple' })
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Apple sign in could not be started. Try again.'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Continue with Apple' })
+    ).toBeEnabled();
   });
 });
