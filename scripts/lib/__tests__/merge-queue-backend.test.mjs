@@ -263,77 +263,59 @@ describe('queue workflow mutation safety', () => {
 });
 
 describe('native live preflight', () => {
-  it.each([
-    ['no classic rule', VALID_BRANCH_PROTECTION_REF],
-    [
-      'an unrestricted classic rule',
-      {
-        name: 'main',
-        branchProtectionRule: {
-          pushAllowances: { totalCount: 0, nodes: [] },
-        },
-      },
-    ],
-  ])('accepts %s', (_label, branchProtectionRef) => {
+  it('accepts an exact ref with no classic branch-protection rule', () => {
     const result = validateNativePreflightEvidence({
       ruleset: VALID_RULESET,
       repository: VALID_REPOSITORY,
       workflowYaml: VALID_WORKFLOW,
-      branchProtectionRef,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
     });
     expect(result.ok).toBe(true);
-    expect(result.evidence.classicPushAllowanceCount).toBe(0);
+    expect(result.evidence).not.toHaveProperty('classicPushAllowanceCount');
+    expect(result.evidence).not.toHaveProperty('classicPushAllowanceActors');
   });
 
   it.each([
-    ['App', { __typename: 'App', id: 'A_1', slug: 'graphite-app' }],
-    ['User', { __typename: 'User', id: 'U_1', login: 'octocat' }],
-    ['Team', { __typename: 'Team', id: 'T_1', slug: 'release-engineering' }],
-  ])('rejects a classic %s push allowance with actor identity', (_kind, actor) => {
+    ['an unrestricted classic rule', { id: 'BPR_unrestricted' }],
+    [
+      'a classic rule with legacy push allowances',
+      {
+        id: 'BPR_restricted',
+        pushAllowances: { totalCount: 0, nodes: [] },
+      },
+    ],
+  ])('rejects %s as a dual control plane', (_label, branchProtectionRule) => {
     const result = validateNativePreflightEvidence({
       ruleset: VALID_RULESET,
       repository: VALID_REPOSITORY,
       workflowYaml: VALID_WORKFLOW,
       branchProtectionRef: {
         name: 'main',
-        branchProtectionRule: {
-          pushAllowances: {
-            totalCount: 1,
-            nodes: [{ actor }],
-          },
-        },
+        branchProtectionRule,
       },
     });
     expect(result.ok).toBe(false);
     expect(result.errors).toContainEqual(
-      expect.stringContaining(
-        `${actor.__typename}:${actor.login ?? actor.slug}`
-      )
+      expect.stringContaining(`found rule ${branchProtectionRule.id}`)
+    );
+    expect(result.errors).toContainEqual(
+      expect.stringContaining('dual control planes')
     );
   });
 
   it.each([
     ['missing ref evidence', undefined],
+    ['null ref evidence', null],
+    ['malformed ref evidence', []],
+    ['missing ref name', { branchProtectionRule: null }],
+    ['wrong ref name', { name: 'develop', branchProtectionRule: null }],
     ['missing branchProtectionRule', { name: 'main' }],
-    ['missing pushAllowances', { name: 'main', branchProtectionRule: {} }],
+    ['classic rule without an id', { name: 'main', branchProtectionRule: {} }],
     [
-      'malformed totalCount',
-      {
-        name: 'main',
-        branchProtectionRule: {
-          pushAllowances: { totalCount: '0', nodes: [] },
-        },
-      },
+      'classic rule with a malformed id',
+      { name: 'main', branchProtectionRule: { id: 123 } },
     ],
-    [
-      'missing actor identity',
-      {
-        name: 'main',
-        branchProtectionRule: {
-          pushAllowances: { totalCount: 1, nodes: [{ actor: null }] },
-        },
-      },
-    ],
+    ['malformed classic rule', { name: 'main', branchProtectionRule: 'BPR' }],
   ])('fails closed on %s', (_label, branchProtectionRef) => {
     const result = validateNativePreflightEvidence({
       ruleset: VALID_RULESET,
@@ -347,17 +329,16 @@ describe('native live preflight', () => {
     );
   });
 
-  it('queries the exact protected ref and includes push-allowance actors', async () => {
+  it('queries only the exact ref and non-sensitive classic-rule identity', async () => {
     const runner = createNativeRunner();
     const result = await preflightMergeQueue({
       backend: 'native',
       repository: REPOSITORY,
       runner,
     });
-    expect(result).toMatchObject({
-      ready: true,
-      classicPushAllowanceCount: 0,
-    });
+    expect(result).toMatchObject({ ready: true });
+    expect(result).not.toHaveProperty('classicPushAllowanceCount');
+    expect(result).not.toHaveProperty('classicPushAllowanceActors');
     const protectionCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('MergeQueueBranchProtection')
     )?.[0];
@@ -365,8 +346,9 @@ describe('native live preflight', () => {
       expect.arrayContaining(['-f', 'refName=refs/heads/main'])
     );
     expect(queryText(protectionCall)).toContain(
-      'branchProtectionRule{pushAllowances(first:100){totalCount nodes{actor{__typename'
+      'ref(qualifiedName:$refName){name branchProtectionRule{id}}'
     );
+    expect(queryText(protectionCall)).not.toContain('pushAllowances');
   });
 
   it.each([
