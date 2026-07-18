@@ -114,7 +114,7 @@ test.describe('Artist Profiles Landing', () => {
 
   test('final CTA renders with claim form', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: /don't lose your next fan\./i })
+      page.getByRole('heading', { name: /claim your profile\./i })
     ).toBeVisible();
     await expect(
       page.getByTestId('final-cta-action').getByText(/claim your profile/i)
@@ -166,10 +166,10 @@ test.describe('Artist Profiles Landing', () => {
     await expect(adaptiveHeading).toBeVisible();
     await expect(adaptiveSubcaption).toBeVisible();
     await expect(
-      page.getByRole('tab', { name: 'Drive Streams' })
+      page.getByRole('tab', { name: 'Upcoming Release' })
     ).toBeVisible();
     await expect(
-      page.getByText('Keep the latest music one tap away.')
+      page.getByText('Before a drop, your profile becomes a countdown.')
     ).toBeVisible();
     await expectFullyInViewport(page, adaptivePhone);
 
@@ -177,16 +177,16 @@ test.describe('Artist Profiles Landing', () => {
     const viewportHeight = await getViewportHeight(page);
     expect(trustRect.top).toBeGreaterThanOrEqual(viewportHeight);
 
-    const contactTab = page.getByRole('tab', { name: 'Contact' });
-    await expect(contactTab).toBeVisible();
-    await contactTab.click();
+    const supportTab = page.getByRole('tab', { name: 'Live Support' });
+    await expect(supportTab).toBeVisible();
+    await supportTab.click();
     await expect(
-      page.getByText('Keep booking, management, and press one tap away.')
+      page.getByText(
+        'At the merch table, one scan becomes support and capture.'
+      )
     ).toBeVisible();
     await expect(
-      page.getByAltText(
-        'Jovie artist profile showing contact access for booking and press.'
-      )
+      page.getByAltText('Jovie artist profile showing direct support options.')
     ).toBeVisible();
 
     const trustTop = await getDocumentY(trust);
@@ -235,7 +235,7 @@ test.describe('Artist Profiles Landing', () => {
     await expect(adaptiveHeading).toBeVisible();
     await expect(page.getByText('Adapts to every fan.')).toBeVisible();
     await expect(
-      page.getByRole('tab', { name: 'Drive Streams' })
+      page.getByRole('tab', { name: 'Upcoming Release' })
     ).toBeVisible();
     await expectFullyInViewport(page, phone);
 
@@ -358,12 +358,12 @@ test.describe('Artist Profiles Landing', () => {
     ).toBeVisible();
     await expect(
       specWallSection.getByRole('heading', {
-        name: 'Details that matter.',
+        name: 'Built for artists.',
       })
     ).toBeVisible();
     await expect(
       specWallSection.getByText(
-        'Built from 15 years of music marketing experience, obsessing over the details that make a profile convert.'
+        'The product truth behind one fast, music-native profile—kept compact on purpose.'
       )
     ).toBeVisible();
     await expect(

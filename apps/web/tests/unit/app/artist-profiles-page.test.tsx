@@ -362,8 +362,9 @@ describe('ArtistProfilesPage', () => {
     expect(
       screen.getByRole('button', {
         name:
-          ARTIST_PROFILE_COPY.adaptive.modes.find(mode => mode.id === 'contact')
-            ?.label ?? 'Contact',
+          ARTIST_PROFILE_COPY.adaptive.modes.find(
+            mode => mode.id === 'live-support'
+          )?.label ?? 'Live Support',
       })
     ).toBeInTheDocument();
     expect(screen.getAllByTestId('artist-profile-outcome-card')).toHaveLength(
@@ -372,7 +373,9 @@ describe('ArtistProfilesPage', () => {
     expect(
       screen.getAllByTestId('artist-profile-monetization-card')
     ).toHaveLength(4);
-    expect(screen.getByText('And 24 others.')).toBeInTheDocument();
+    expect(
+      screen.getByText(ARTIST_PROFILE_COPY.howItWorks.sync.otherProvidersLabel)
+    ).toBeInTheDocument();
   });
 
   it('omits optional social proof and FAQ sections when their flags are off', async () => {
