@@ -10,6 +10,8 @@ export const MERGE_QUEUE_BACKENDS = Object.freeze(['graphite', 'native']);
 const DEFAULT_REPOSITORY = 'JovieInc/Jovie';
 const DEFAULT_RULESET_ID = '10512119';
 const DEFAULT_BASE_BRANCH = 'main';
+const DEFAULT_ENROLLMENT_POSTCONDITION_ATTEMPTS = 6;
+const DEFAULT_ENROLLMENT_POSTCONDITION_DELAY_MS = 2_000;
 const CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
 const NATIVE_MUTATION_AUTHORIZATIONS = new Set([
   'merge-queue-autoenroll',
@@ -153,6 +155,32 @@ async function attemptGh(runner, args, description) {
     return error;
   }
 }
+
+function errorEvidence(error) {
+  const candidate =
+    typeof error === 'object' && error !== null ? error : undefined;
+  return {
+    code:
+      typeof candidate?.code === 'string' ? candidate.code : 'unknown_error',
+    message: error instanceof Error ? error.message : String(error),
+    details:
+      typeof candidate?.details === 'object' && candidate.details !== null
+        ? candidate.details
+        : {},
+  };
+}
+
+function errorSummary(error) {
+  const evidence = errorEvidence(error);
+  const stderr =
+    typeof evidence.details.stderr === 'string'
+      ? evidence.details.stderr.trim()
+      : '';
+  return stderr ? `${evidence.message}: ${stderr}` : evidence.message;
+}
+
+const sleep = milliseconds =>
+  new Promise(resolve => setTimeout(resolve, milliseconds));
 
 export function createGhRunner({ env = process.env, spawn = spawnSync } = {}) {
   return async args => {
@@ -538,6 +566,25 @@ function assertEnrollCandidate(state, expectedHeadOid) {
   }
 }
 
+async function pollEnrollmentPostcondition({
+  stateOptions,
+  expectedHeadOid,
+  attempts,
+  delayMs,
+  wait,
+}) {
+  let state;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    state = await readPullRequestQueueState(stateOptions);
+    if (enrollmentPostcondition(state, expectedHeadOid)) {
+      return { attempts: attempt, state };
+    }
+    assertEnrollCandidate(state, expectedHeadOid);
+    if (attempt < attempts) await wait(delayMs);
+  }
+  return { attempts, state };
+}
+
 export async function enrollPullRequest({
   backend,
   repository = DEFAULT_REPOSITORY,
@@ -547,6 +594,9 @@ export async function enrollPullRequest({
   number,
   expectedHeadOid,
   runner = createGhRunner(),
+  postconditionAttempts = DEFAULT_ENROLLMENT_POSTCONDITION_ATTEMPTS,
+  postconditionDelayMs = DEFAULT_ENROLLMENT_POSTCONDITION_DELAY_MS,
+  wait = sleep,
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
   const parsedNumber = parsePullRequestNumber(number);
@@ -587,19 +637,36 @@ export async function enrollPullRequest({
     args,
     `enrolling PR #${parsedNumber} with ${resolvedBackend}`
   );
-  const after = await readPullRequestQueueState(stateOptions);
-  if (enrollmentPostcondition(after, expectedHead)) {
+  const observation = await pollEnrollmentPostcondition({
+    stateOptions,
+    expectedHeadOid: expectedHead,
+    attempts: postconditionAttempts,
+    delayMs: postconditionDelayMs,
+    wait,
+  });
+  if (enrollmentPostcondition(observation.state, expectedHead)) {
     return {
       backend: resolvedBackend,
       changed: true,
+      postconditionAttempts: observation.attempts,
       reconciledAfterCommandError: Boolean(mutationError),
-      state: after,
+      state: observation.state,
     };
   }
+  const mutationErrorDetails = mutationError
+    ? errorEvidence(mutationError)
+    : null;
+  const mutationFailure = mutationError
+    ? `; mutation error: ${errorSummary(mutationError)}`
+    : '';
   throw backendError(
     'enrollment_postcondition_failed',
-    `Could not prove PR #${parsedNumber} is enrolled at ${expectedHead}`,
-    { mutationError: mutationError?.message ?? null, state: after }
+    `Could not prove PR #${parsedNumber} is enrolled at ${expectedHead} after ${observation.attempts} authoritative reads${mutationFailure}`,
+    {
+      mutationError: mutationErrorDetails,
+      postconditionAttempts: observation.attempts,
+      state: observation.state,
+    }
   );
 }
 

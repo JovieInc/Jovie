@@ -70,6 +70,7 @@ function createNativeRunner({
   branchProtectionRef = VALID_BRANCH_PROTECTION_REF,
   states = [],
   listPages = null,
+  mergeResult = ok(),
 } = {}) {
   const stateQueue = [...states];
   const restResponses = new Map([
@@ -113,7 +114,7 @@ function createNativeRunner({
       query.includes('disablePullRequestAutoMerge')
     )
       return ok({ data: {} });
-    if (args[0] === 'pr' && args[1] === 'merge') return ok();
+    if (args[0] === 'pr' && args[1] === 'merge') return mergeResult;
     throw new Error(`Unexpected gh command: ${args.join(' ')}`);
   });
 }
@@ -538,6 +539,70 @@ describe('native enrollment', () => {
         HEAD,
       ])
     );
+  });
+
+  it('polls through stale reads until the exact-head enrollment is authoritative', async () => {
+    const wait = vi.fn(async () => {});
+    const runner = createNativeRunner({
+      states: [
+        prState(),
+        prState(),
+        prState(),
+        prState({
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+    });
+
+    await expect(
+      enroll(runner, {
+        postconditionAttempts: 6,
+        postconditionDelayMs: 2_000,
+        wait,
+      })
+    ).resolves.toMatchObject({
+      changed: true,
+      postconditionAttempts: 3,
+      state: { headRefOid: HEAD, queued: true },
+    });
+    expect(wait).toHaveBeenCalledTimes(2);
+    expect(wait).toHaveBeenNthCalledWith(1, 2_000);
+    expect(wait).toHaveBeenNthCalledWith(2, 2_000);
+  });
+
+  it('fails closed with mutation stderr after bounded authoritative reads', async () => {
+    const wait = vi.fn(async () => {});
+    const runner = createNativeRunner({
+      states: [prState(), prState(), prState()],
+      mergeResult: {
+        code: 1,
+        stdout: '',
+        stderr: 'GraphQL: Pull request head SHA changed',
+      },
+    });
+
+    await expect(
+      enroll(runner, {
+        postconditionAttempts: 2,
+        postconditionDelayMs: 2_000,
+        wait,
+      })
+    ).rejects.toMatchObject({
+      code: 'enrollment_postcondition_failed',
+      message: expect.stringContaining(
+        'mutation error: enrolling PR #14359 with native failed with exit code 1: GraphQL: Pull request head SHA changed'
+      ),
+      details: {
+        mutationError: {
+          code: 'gh_command_failed',
+          details: { stderr: 'GraphQL: Pull request head SHA changed' },
+        },
+        postconditionAttempts: 2,
+        state: { headRefOid: HEAD, queued: false },
+      },
+    });
+    expect(wait).toHaveBeenCalledTimes(1);
   });
 
   it('refuses a changed head before invoking the enrollment mutation', async () => {
