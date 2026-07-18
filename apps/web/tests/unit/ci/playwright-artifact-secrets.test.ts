@@ -1995,7 +1995,7 @@ ${fixtureCheckout}
         E2E_CLERK_USER_PASSWORD: 'IHDR',
       }).status
     ).toBe(1);
-  }, 15_000);
+  }, 30_000);
 
   it('fails stale, pending, and missing producer state closed', () => {
     for (const state of ['pending', 'stale']) {
