@@ -32,30 +32,18 @@ async function getViewportHeight(page: import('@playwright/test').Page) {
   return viewport?.height ?? 0;
 }
 
-async function getDocumentY(
+async function expectFullyInViewport(
+  page: import('@playwright/test').Page,
   locator: import('@playwright/test').Locator
-): Promise<number> {
-  return locator.evaluate(
-    el => window.scrollY + el.getBoundingClientRect().top
+) {
+  const box = await locator.boundingBox();
+  const viewportHeight = await getViewportHeight(page);
+
+  expect(box).not.toBeNull();
+  expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
+  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
+    viewportHeight
   );
-}
-
-async function scrollToY(page: import('@playwright/test').Page, top: number) {
-  await page.evaluate(nextTop => {
-    window.scrollTo({ top: nextTop, behavior: 'instant' });
-  }, top);
-  await page.waitForTimeout(180);
-}
-
-async function getClientRect(locator: import('@playwright/test').Locator) {
-  return locator.evaluate(el => {
-    const rect = el.getBoundingClientRect();
-    return {
-      top: rect.top,
-      bottom: rect.bottom,
-      height: rect.height,
-    };
-  });
 }
 
 const MODE_TRANSITION_SETTLE_MS = 400;
@@ -102,36 +90,6 @@ function expectStableGeometry(
       `${surface} ${key} shifted`
     ).toBeLessThanOrEqual(GEOMETRY_TOLERANCE_PX);
   }
-}
-
-async function expectFullyInViewport(
-  page: import('@playwright/test').Page,
-  locator: import('@playwright/test').Locator
-) {
-  const box = await locator.boundingBox();
-  const viewportHeight = await getViewportHeight(page);
-
-  expect(box).not.toBeNull();
-  expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
-  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
-    viewportHeight
-  );
-}
-
-async function expectNotPartiallyVisible(
-  page: import('@playwright/test').Page,
-  locator: import('@playwright/test').Locator
-) {
-  const box = await locator.boundingBox();
-  if (!box) {
-    return;
-  }
-
-  const viewportHeight = await getViewportHeight(page);
-  const intersectsViewport = box.y < viewportHeight && box.y + box.height > 0;
-  const fullyVisible = box.y >= 0 && box.y + box.height <= viewportHeight;
-
-  expect(intersectsViewport && !fullyVisible).toBe(false);
 }
 
 test.describe('Artist Profiles Landing', () => {
@@ -185,114 +143,66 @@ test.describe('Artist Profiles Landing', () => {
     await expectFullyInViewport(page, page.getByTestId('homepage-claim-form'));
   });
 
-  test('top story stays legible through the desktop hero-to-adaptive handoff', async ({
+  test('adaptive profile exposes four moment-based modes without layout shift', async ({
     page,
   }) => {
-    const heroHeading = page.getByRole('heading', {
-      name: /the link your music deserves\./i,
-    });
-    const claimForm = page.getByTestId('homepage-claim-form');
-    const adaptiveHeading = page.getByRole('heading', { name: 'One profile.' });
-    const adaptiveSubcaption = page.getByText('Adapts to every fan.');
     const adaptiveSection = page.getByTestId('artist-profile-section-adaptive');
-    const trust = page.getByTestId('homepage-trust');
-    const adaptivePhone = adaptiveSection.getByRole('img').first();
-    const phone = page.getByAltText(
-      "Jovie artist profile showing Tim White's live profile view."
+    await adaptiveSection.scrollIntoViewIfNeeded();
+
+    await expect(
+      adaptiveSection.getByRole('heading', {
+        name: 'One profile that adapts to every fan.',
+      })
+    ).toBeVisible();
+    await expect(adaptiveSection.getByRole('tab')).toHaveCount(4);
+
+    const initialHeight = await adaptiveSection.evaluate(
+      element => element.getBoundingClientRect().height
     );
+    const modes = [
+      {
+        label: 'Upcoming Release',
+        headline: 'Before a drop, your profile becomes a countdown.',
+        screenshotAlt:
+          'Jovie artist profile showing an upcoming release and pre-save state.',
+      },
+      {
+        label: 'Release Day',
+        headline:
+          'When the song is live, fans go straight to the right service.',
+        screenshotAlt:
+          'Jovie artist profile showing a release-day listen view.',
+      },
+      {
+        label: 'Touring',
+        headline: "When you're on the road, nearby dates come first.",
+        screenshotAlt:
+          'Jovie artist profile showing nearby shows and ticket paths.',
+      },
+      {
+        label: 'Live Support',
+        headline: 'At the merch table, one scan becomes support and capture.',
+        screenshotAlt: 'Jovie artist profile showing direct support options.',
+      },
+    ] as const;
 
-    await expect(heroHeading).toBeVisible();
-    await expect(claimForm).toBeVisible();
-    await expectFullyInViewport(page, claimForm);
-    await expect(phone).toBeVisible();
+    for (const mode of modes) {
+      const tab = adaptiveSection.getByRole('tab', { name: mode.label });
+      await expect(tab).toBeVisible();
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+      await expect(
+        adaptiveSection.getByText(mode.headline, { exact: true })
+      ).toBeVisible();
+      await expect(
+        adaptiveSection.getByAltText(mode.screenshotAlt)
+      ).toBeVisible();
 
-    const adaptiveTop = await getDocumentY(adaptiveSection);
-    await scrollToY(page, Math.max(0, adaptiveTop - 20));
-
-    await expect(adaptiveHeading).toBeVisible();
-    await expect(adaptiveSubcaption).toBeVisible();
-    await expect(
-      page.getByRole('tab', { name: 'Upcoming Release' })
-    ).toBeVisible();
-    await expect(
-      page.getByText('Before a drop, your profile becomes a countdown.')
-    ).toBeVisible();
-    await expectFullyInViewport(page, adaptivePhone);
-
-    const trustRect = await getClientRect(trust);
-    const viewportHeight = await getViewportHeight(page);
-    expect(trustRect.top).toBeGreaterThanOrEqual(viewportHeight);
-
-    const supportTab = page.getByRole('tab', { name: 'Live Support' });
-    await expect(supportTab).toBeVisible();
-    await supportTab.click();
-    await expect(
-      page.getByText(
-        'At the merch table, one scan becomes support and capture.'
-      )
-    ).toBeVisible();
-    await expect(
-      page.getByAltText('Jovie artist profile showing direct support options.')
-    ).toBeVisible();
-
-    const trustTop = await getDocumentY(trust);
-    await scrollToY(page, Math.max(0, trustTop - 220));
-    await expect(trust).toBeVisible();
-
-    const trustBoxDuringOverlay = await trust.boundingBox();
-    const adaptivePhoneBoxDuringOverlay = await adaptivePhone.boundingBox();
-    expect(trustBoxDuringOverlay).not.toBeNull();
-    expect(adaptivePhoneBoxDuringOverlay).not.toBeNull();
-    expect(trustBoxDuringOverlay?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(
-      (adaptivePhoneBoxDuringOverlay?.y ?? 0) +
-        (adaptivePhoneBoxDuringOverlay?.height ?? 0)
-    );
-
-    await scrollToY(page, Math.max(0, trustTop - 40));
-    await expect(trust).toBeVisible();
-    await expectNotPartiallyVisible(page, adaptivePhone);
-  });
-
-  test('top story stays legible on mobile without a clipped adaptive phone state', async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/artist-profiles', { waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
-
-    const heroHeading = page.getByRole('heading', {
-      name: /the link your music deserves\./i,
-    });
-    const adaptiveHeading = page.getByRole('heading', { name: 'One profile.' });
-    const adaptiveSection = page.getByTestId('artist-profile-section-adaptive');
-    const trust = page.getByTestId('homepage-trust');
-    const phone = page.getByAltText(
-      "Jovie artist profile showing Tim White's live profile view."
-    );
-
-    await expect(heroHeading).toBeVisible();
-    await expect(page.getByTestId('homepage-claim-form')).toBeVisible();
-    await expectFullyInViewport(page, page.getByTestId('homepage-claim-form'));
-    await expect(phone).toBeVisible();
-
-    const adaptiveTop = await getDocumentY(adaptiveSection);
-    await scrollToY(page, Math.max(0, adaptiveTop - 36));
-
-    await expect(adaptiveHeading).toBeVisible();
-    await expect(page.getByText('Adapts to every fan.')).toBeVisible();
-    await expect(
-      page.getByRole('tab', { name: 'Upcoming Release' })
-    ).toBeVisible();
-    await expectFullyInViewport(page, phone);
-
-    const trustRect = await getClientRect(trust);
-    const viewportHeight = await getViewportHeight(page);
-    expect(trustRect.top).toBeGreaterThanOrEqual(viewportHeight);
-
-    const trustTop = await getDocumentY(trust);
-    await scrollToY(page, Math.max(0, trustTop - 80));
-    await expect(trust).toBeVisible();
-    await expectNotPartiallyVisible(page, phone);
+      const selectedHeight = await adaptiveSection.evaluate(
+        element => element.getBoundingClientRect().height
+      );
+      expect(Math.abs(selectedHeight - initialHeight)).toBeLessThanOrEqual(1);
+    }
   });
 
   test('adaptive mode changes preserve desktop and mobile geometry', async ({
@@ -379,12 +289,11 @@ test.describe('Artist Profiles Landing', () => {
     }
   });
 
-  test('outcomes section comes right after the trust strip and keeps a stable grid across breakpoints', async ({
+  test('five fan outcomes keep a stable rail across breakpoints', async ({
     page,
   }) => {
     await expectNoHorizontalOverflow(page);
 
-    const trust = page.getByTestId('artist-profile-section-trust');
     const outcomesSection = page.getByTestId('artist-profile-section-outcomes');
     const captureSection = page.getByTestId('artist-profile-section-capture');
     const grid = page.getByTestId('artist-profile-outcomes-grid');
@@ -394,21 +303,21 @@ test.describe('Artist Profiles Landing', () => {
     await expect(grid).toBeVisible();
     await expect(scroller).toBeHidden();
     await expect(
-      outcomesSection.getByRole('heading', { name: /drive streams/i })
-    ).toBeVisible();
-    await expect(
-      outcomesSection.getByRole('heading', { name: /sell out/i })
-    ).toBeVisible();
-    await expect(
-      outcomesSection
-        .getByTestId('artist-profile-drive-streams-live-card')
-        .getByText('Tim White')
-    ).toBeVisible();
-    await expect(
-      outcomesSection
-        .getByTestId('artist-profile-drive-streams-live-card')
-        .getByText('w/ Cosmic Gate')
-    ).toBeVisible();
+      outcomesSection.getByTestId('artist-profile-outcome-card')
+    ).toHaveCount(5);
+    for (const title of [
+      'Straight to listen',
+      'Local dates first',
+      'Support without friction',
+      'Capture the fan',
+      'Keep one link everywhere',
+    ]) {
+      await expect(
+        outcomesSection.getByRole('heading', { name: title })
+      ).toBeVisible();
+    }
+    await expect(outcomesSection.getByText('Tim White')).toHaveCount(2);
+    await expect(outcomesSection.getByText('w/ Cosmic Gate')).toHaveCount(2);
     await expect(
       outcomesSection.getByTestId('artist-profile-drive-streams-live-card')
     ).toBeVisible();
@@ -419,10 +328,12 @@ test.describe('Artist Profiles Landing', () => {
       outcomesSection.getByTestId('artist-profile-sell-out-tour-card')
     ).toBeVisible();
     await expect(page.getByText('Wired to my latest release')).toHaveCount(0);
-    const trustTop = await getDocumentY(trust);
-    const outcomesTop = await getDocumentY(outcomesSection);
-    const captureTop = await getDocumentY(captureSection);
-    expect(outcomesTop).toBeGreaterThan(trustTop);
+    const outcomesTop = await outcomesSection.evaluate(
+      element => element.getBoundingClientRect().top + window.scrollY
+    );
+    const captureTop = await captureSection.evaluate(
+      element => element.getBoundingClientRect().top + window.scrollY
+    );
     expect(captureTop).toBeGreaterThan(outcomesTop);
 
     const startScrollY = await page.evaluate(() => window.scrollY);
@@ -447,8 +358,8 @@ test.describe('Artist Profiles Landing', () => {
     await expect(mobileGrid).toBeVisible();
     await expect(mobileScroller).toBeHidden();
     await expect(
-      page.getByRole('heading', { name: /drive streams/i })
-    ).toBeVisible();
+      mobileOutcomesSection.getByTestId('artist-profile-outcome-card')
+    ).toHaveCount(5);
 
     await expectNoHorizontalOverflow(page);
   });
