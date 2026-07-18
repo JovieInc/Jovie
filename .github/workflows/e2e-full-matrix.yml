@@ -2,8 +2,8 @@ name: E2E Full Browser Matrix
 
 on:
   schedule:
-    # Run every Monday at 6:00 AM UTC
-    - cron: '0 6 * * 1'
+    # Weekly deep matrix, well after the daily/nightly suites have drained.
+    - cron: '15 15 * * 1'
   workflow_dispatch:
     inputs:
       test_filter:
@@ -26,6 +26,8 @@ jobs:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     strategy:
       fail-fast: false
+      # Preserve both browsers without occupying two self-hosted runners at once.
+      max-parallel: 1
       matrix:
         browser: [chromium, firefox]
     steps:
@@ -139,7 +141,7 @@ jobs:
     name: Notify Results
     needs: [e2e-full-matrix]
     if: ${{ always() && github.event_name == 'schedule' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     steps:
       - name: Slack notification on failure
         if: ${{ needs.e2e-full-matrix.result == 'failure' }}

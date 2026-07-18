@@ -123,11 +123,76 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
       echo "    !! missing exact head SHA for native enrollment of #$n" >&2
       return 1
     fi
+    expected_head="$(printf '%s' "$head_oid" | tr '[:upper:]' '[:lower:]')"
     if ! node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid" >/dev/null; then
       echo "    !! native enrollment/postcondition failed for #$n" >&2
       return 1
     fi
-    label "$n" merge-queue
+
+    # Labels do not change the head SHA, so expected-head protection alone
+    # cannot close the hard-gate race. Re-read after native enrollment and
+    # compensate immediately if a gated/held label appeared while the queue
+    # mutation was in flight.
+    if ! current="$(gh_retry pr view "$n" -R "$REPO" \
+      --json state,isDraft,mergeable,labels,headRefOid 2>/dev/null)"; then
+      echo "    !! could not refresh #$n after native enrollment; compensating" >&2
+      if ! remove_held_queue_label_strict "$n"; then
+        echo "    !! CRITICAL: could not compensate uncertain native enrollment for #$n" >&2
+        return 1
+      fi
+      return 2
+    fi
+    if ! jq -e --arg expected_head "$expected_head" '
+      .state == "OPEN"
+      and (.isDraft | not)
+      and .mergeable == "MERGEABLE"
+      and ((.headRefOid // "") | ascii_downcase) == $expected_head
+      and ([.labels[].name] | any(
+        . == "needs-human" or . == "hold" or . == "gated"
+        or . == "queue-deferred" or . == "needs-conflict-resolution"
+        or . == "fast"
+      ) | not)
+    ' <<<"$current" >/dev/null; then
+      echo "    ⏸ eligibility changed during native enrollment for #$n; compensating"
+      if ! remove_held_queue_label_strict "$n"; then
+        echo "    !! CRITICAL: could not compensate held native enrollment for #$n" >&2
+        return 1
+      fi
+      return 2
+    fi
+
+    if ! gh_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
+      echo "    !! failed to add native intent label for #$n; compensating" >&2
+      if ! remove_held_queue_label_strict "$n"; then
+        echo "    !! CRITICAL: could not compensate unlabeled native enrollment for #$n" >&2
+      fi
+      return 1
+    fi
+
+    # Final label+head proof catches a hard gate racing with the audit-label
+    # write. The labeled event is a later safety net; this controller does not
+    # rely on that event to repair its own mutation.
+    if ! current="$(gh_retry pr view "$n" -R "$REPO" \
+      --json state,isDraft,mergeable,labels,headRefOid 2>/dev/null)" \
+      || ! jq -e --arg expected_head "$expected_head" '
+        .state == "OPEN"
+        and (.isDraft | not)
+        and .mergeable == "MERGEABLE"
+        and ((.headRefOid // "") | ascii_downcase) == $expected_head
+        and ([.labels[].name] | index("merge-queue"))
+        and ([.labels[].name] | any(
+          . == "needs-human" or . == "hold" or . == "gated"
+          or . == "queue-deferred" or . == "needs-conflict-resolution"
+          or . == "fast"
+        ) | not)
+      ' <<<"$current" >/dev/null; then
+      echo "    ⏸ eligibility changed while recording native enrollment for #$n; compensating"
+      if ! remove_held_queue_label_strict "$n"; then
+        echo "    !! CRITICAL: could not compensate final native eligibility failure for #$n" >&2
+        return 1
+      fi
+      return 2
+    fi
     echo "    +native-queue on #$n at $head_oid"
     return 0
   fi

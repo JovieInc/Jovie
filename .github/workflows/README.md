@@ -70,7 +70,7 @@ Ship now / Re-evaluate when / Then:
 
 ## Agent Landing Sweep
 
-The `agent-landing-sweep.yml` workflow runs every 15 minutes as a scheduled fallback for the event-driven approve job in `agent-pipeline.yml`. It sweeps open, non-draft agent PRs and enables auto-merge on any that pass all guardrails:
+The `agent-landing-sweep.yml` workflow is manual-only. When explicitly dispatched, it sweeps open, non-draft agent PRs and enables auto-merge on any that pass all guardrails:
 
 - CI PR Ready check passed
 - Scope judge passed
@@ -80,7 +80,7 @@ The `agent-landing-sweep.yml` workflow runs every 15 minutes as a scheduled fall
 - Has `automerge`, `auto-approved`, or `ai:ready-to-merge` label
 - Queue pressure below threshold (12 PRs already queued)
 
-This catches PRs that the event-driven pipeline missed due to delivery delays or race conditions.
+Use it as an operator recovery tool when the event-driven pipeline missed delivery; it is not an active polling loop.
 
 ## GitHub AI Automation
 
@@ -92,7 +92,7 @@ The GitHub-native agent path uses two workflows:
   - Capacity controls: new agent work is deferred when 5 agent PRs are already open
 
 - **`github-ai-dispatcher.yml`**
-  - Trigger: every 15 minutes + `workflow_dispatch`
+  - Trigger: `workflow_dispatch` only
   - Behavior: scans open `agent-ready` issues without status labels, dispatches the orchestrator when capacity allows
 
 - **`linear-sync-on-merge.yml`** (parallel-run mirror only)
@@ -101,17 +101,26 @@ The GitHub-native agent path uses two workflows:
 
 ## Main CI Health Monitor
 
-The `main-ci-health-monitor.yml` workflow runs every 15 minutes and alerts `#alerts-production` when:
+The `main-ci-health-monitor.yml` workflow runs at `8,28,48 * * * *` UTC (every 20 minutes) and alerts `#alerts-production` when:
 
-- A `ci.yml` run on `main` is queued/in-progress for more than 30 minutes
-- The latest `main` CI run failed and remains unresolved for over 30 minutes
+- A `ci.yml` run on `main` is queued/in-progress for more than 45 minutes
+- The latest `main` CI run failed and remains unresolved for over 45 minutes
 - No successful `main` CI has occurred for 3+ hours while merged PRs are waiting
 
-This closes the silent-failure gap when merge queue passes but `main` post-merge CI is blocked.
+It issues at most one failed-job rerun before autofix becomes eligible at
+`run_attempt >= 2`. Before fixed-runner repair begins, Main Autofix records a
+durable exact-SHA commit-status owner. Active workflows/PRs and terminal markers
+suppress duplicate Slack alerts and dispatch only while that SHA remains red;
+a newer main SHA or green rerun wins automatically. An authoritatively active
+workflow owns the SHA until its bounded workflow timeout makes it terminal; an
+orphaned marker gets only a 30-minute consistency grace lease. Three expired,
+cancelled, or otherwise terminal leases become a terminal escalation.
+Repair-state API uncertainty is alerted at most once per SHA when its
+acknowledgment can be persisted.
 
 ## Synthetic Monitoring
 
-The `synthetic-monitoring.yml` workflow runs golden path tests against jov.ie on a schedule to catch production issues.
+The `synthetic-monitoring.yml` workflow runs production canaries against jov.ie at `17 */6 * * *` UTC plus manual dispatch.
 
 ## Neon Database
 

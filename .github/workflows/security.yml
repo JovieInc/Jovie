@@ -14,7 +14,7 @@ on:
   push:
     branches: ['main']
   schedule:
-    - cron: '0 6 * * *' # Nightly at 06:00 UTC
+    - cron: '5 6 * * *' # Offset from other deep scheduled lanes
   workflow_dispatch:
 
 # Default permissions - each job specifies its own required permissions
@@ -160,7 +160,7 @@ jobs:
 
   trivy:
     name: Trivy Vulnerability Scanning
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     # Heavy full-tree scan stays off the PR path (post-merge on main + nightly).
     # Only the fast diff-scoped secret scans (gitleaks/trufflehog) gate PRs.
     if: github.event_name != 'pull_request'
@@ -189,7 +189,7 @@ jobs:
 
   scorecard:
     name: OSSF Scorecard Supply Chain Security
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     # Scorecard only runs on main branch push and schedule to avoid token issues on PRs
     if: github.event_name != 'pull_request'
     permissions:
@@ -218,7 +218,7 @@ jobs:
 
   commit-signature-check:
     name: Commit Signature Verification
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     # Run on every push to main so unsigned agent-authored merges are surfaced immediately.
     # This is observability only — blocking unsigned commits requires enabling
     # "Require signed commits" in branch protection settings (human/admin action).

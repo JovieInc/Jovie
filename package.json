@@ -200,7 +200,7 @@
     "ds:offscale": "node scripts/ds-offscale-report.mjs",
     "ds:llms-manifest": "node scripts/generate-llms-design-manifest.mjs",
     "ds:llms-manifest:check": "node scripts/generate-llms-design-manifest.mjs --check",
-    "ci:control:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-harness.test.mjs lib/__tests__/ci-duration-ratchet.test.mjs lib/__tests__/ci-branching-guard.test.mjs lib/__tests__/merge-queue-guard.test.mjs lib/__tests__/ci-metrics-compute.test.mjs",
+    "ci:control:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-harness.test.mjs lib/__tests__/ci-duration-ratchet.test.mjs lib/__tests__/ci-branching-guard.test.mjs lib/__tests__/merge-queue-guard.test.mjs lib/__tests__/ci-metrics-compute.test.mjs lib/__tests__/auto-ready-agent-drafts.test.mjs lib/__tests__/eval-main-health-action.test.mjs lib/__tests__/pr-check-failures.test.mjs lib/__tests__/pr-conflict-handler.test.mjs",
     "gate-ladder:validate": "node scripts/gate-ladder/validate.mjs",
     "gate-ladder:list": "node scripts/gate-ladder/run.mjs --list",
     "gate-ladder:test": "node --test scripts/gate-ladder/gate-ladder.test.mjs"

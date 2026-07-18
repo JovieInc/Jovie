@@ -14,4 +14,4 @@ When the gardening agent runs, it should update the claim and freshness marker t
 
 ## CI gate note
 
-Agent PRs targeting `main` from `codex/`, `claude/`, `linear/`, or `codegen-bot/` branches must pass the **Agent PR Verify Ready** gate. That gate requires a valid `agent-run-artifact` HTML comment in the PR body or a PR comment, with `sourceRunId` matching the PR head SHA and recorded evidence for `gstack.qa.exhaustive`, `gstack.review`, and `gstack.ship`.
+The former **Agent PR Verify Ready** workflow is retired because it duplicated source-PR CI and could promote a newer draft from a stale run. Canonical `CI / PR Ready` evidence plus the current-head Auto-Ready controller now own draft promotion.

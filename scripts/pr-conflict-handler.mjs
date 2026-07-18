@@ -1,17 +1,14 @@
 #!/usr/bin/env node
-import { execFile, execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fetchOpenPrsRest } from './lib/github-open-prs-rest.mjs';
+import { tryGitHubRebase } from './lib/github-update-branch.mjs';
 import {
   buildPlan,
   DEFAULT_BLOCKED_LABEL,
   DEFAULT_MANUAL_REBASE_LABEL,
   DEFAULT_REQUIRED_CHECKS,
   formatPlan,
-  isSafeAutoResolvableConflict,
 } from './lib/pr-conflict-handler.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -95,7 +92,7 @@ Classifies open PRs and plans safe freshness actions. Defaults to read-only dry-
 
 Options:
   --dry-run                    Print classification/order/actions without mutations (default)
-  --apply                      Execute safe mutations (labels, update-branch, guarded rebase)
+  --apply                      Execute safe mutations (labels, exact-head GitHub rebase)
   --repo OWNER/REPO            Repository (default: JovieInc/Jovie)
   --max-concurrent N           Cap CI-heavy retriggers including in-flight CI (default: 2)
   --limit N                    Max open PRs to inspect (default: 200)
@@ -211,93 +208,6 @@ async function addLabel(repo, number, label) {
   );
 }
 
-async function updateBranch(repo, number) {
-  await execFileAsync(
-    'gh',
-    ['pr', 'update-branch', String(number), '--repo', repo],
-    {
-      encoding: 'utf8',
-    }
-  );
-}
-
-function runGit(args, cwd) {
-  return execFileSync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-}
-
-function runGh(args, cwd) {
-  return execFileSync('gh', args, {
-    cwd,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-}
-
-function conflictedPaths(cwd) {
-  const output = runGit(['diff', '--name-only', '--diff-filter=U'], cwd);
-  return output
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean);
-}
-
-function trySafeRebase({ repo, pr }) {
-  const workdir = mkdtempSync(join(tmpdir(), `jovie-pr-${pr.number}-rebase-`));
-  try {
-    // gh repo clone wires up token-based auth (GH_TOKEN) so the later
-    // --force-with-lease push works in CI without embedding credentials.
-    runGh(['repo', 'clone', repo, '.', '--', '--no-tags'], workdir);
-    runGit(
-      ['fetch', 'origin', pr.baseRefName, pr.headRefName, '--depth', '50'],
-      workdir
-    );
-    runGit(
-      ['checkout', '-B', pr.headRefName, `origin/${pr.headRefName}`],
-      workdir
-    );
-    try {
-      runGit(['rebase', `origin/${pr.baseRefName}`], workdir);
-    } catch (_error) {
-      const paths = conflictedPaths(workdir);
-      if (!isSafeAutoResolvableConflict(paths)) {
-        runGit(['rebase', '--abort'], workdir);
-        return {
-          ok: false,
-          label: true,
-          reason: `non-trivial conflict paths: ${paths.join(', ') || 'unknown'}`,
-        };
-      }
-      runGit(['checkout', '--theirs', 'pnpm-lock.yaml'], workdir);
-      execFileSync(
-        'corepack',
-        ['pnpm', 'install', '--lockfile-only', '--ignore-scripts'],
-        {
-          cwd: workdir,
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'pipe'],
-        }
-      );
-      runGit(['add', 'pnpm-lock.yaml'], workdir);
-      runGit(['rebase', '--continue'], workdir);
-    }
-    runGit(
-      ['push', '--force-with-lease', 'origin', `HEAD:${pr.headRefName}`],
-      workdir
-    );
-    return {
-      ok: true,
-      label: false,
-      reason: 'rebased and pushed with --force-with-lease',
-    };
-  } finally {
-    rmSync(workdir, { recursive: true, force: true });
-  }
-}
-
 async function executePlan(plan, options) {
   if (options.dryRun) return [];
   const results = [];
@@ -323,12 +233,14 @@ async function executePlan(plan, options) {
       } else if (item.action === 'label_needs_manual_rebase' && item.label) {
         await addLabel(options.repo, item.number, item.label);
         results.push({ pr: item.number, ok: true, action: item.action });
-      } else if (item.action === 'update_branch') {
-        await updateBranch(options.repo, item.number);
-        results.push({ pr: item.number, ok: true, action: item.action });
-      } else if (item.action === 'attempt_rebase_safe_autoresolve') {
-        const result = trySafeRebase({ repo: options.repo, pr: item.pr });
-        if (!result.ok && result.label) {
+      } else if (item.action === 'request_github_rebase') {
+        const result = await tryGitHubRebase({
+          repo: options.repo,
+          pr: item.pr,
+          expectedBaseRefName: item.pr.baseRefName,
+          dryRun: false,
+        });
+        if (!result.ok && result.conflict) {
           await addLabel(options.repo, item.number, options.manualRebaseLabel);
         }
         results.push({ pr: item.number, action: item.action, ...result });

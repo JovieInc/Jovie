@@ -15,9 +15,17 @@ inputs:
     required: false
     default: '60'
   autofix-cross-sha-limit:
-    description: If this many distinct SHAs triggered autofix within the window, escalate to human instead of dispatching.
+    description: If this many distinct SHAs record durable autofix ownership within the window, escalate to human instead of dispatching.
     required: false
     default: '2'
+  autofix-ownership-lease-minutes:
+    description: Consistency grace for an owned marker whose referenced workflow is not yet visible.
+    required: false
+    default: '30'
+  autofix-attempt-limit:
+    description: Maximum durable ownership attempts for one failing SHA.
+    required: false
+    default: '3'
 
 outputs:
   should_alert:
@@ -44,6 +52,12 @@ outputs:
   failing_run_id:
     description: Run ID of the unresolved failing run (for autofix to fetch logs).
     value: ${{ steps.evaluate.outputs.failing_run_id }}
+  failing_run_attempt:
+    description: Current attempt number of the unresolved failing run.
+    value: ${{ steps.evaluate.outputs.failing_run_attempt }}
+  repair_attempt:
+    description: Next bounded autofix ownership attempt for the failing SHA.
+    value: ${{ steps.evaluate.outputs.repair_attempt }}
   failing_sha:
     description: Commit SHA of the failing main run.
     value: ${{ steps.evaluate.outputs.failing_sha }}
@@ -57,8 +71,20 @@ outputs:
     description: Comma-separated names of failed jobs in the failing run.
     value: ${{ steps.evaluate.outputs.failed_job_names }}
   systemic:
-    description: true if multiple distinct SHAs triggered autofix within the cross-SHA window.
+    description: true if multiple distinct SHAs record durable autofix ownership within the cross-SHA window.
     value: ${{ steps.evaluate.outputs.systemic }}
+  repair_in_flight:
+    description: true when an exact-SHA autofix workflow or PR is already active.
+    value: ${{ steps.evaluate.outputs.repair_in_flight }}
+  repair_marker_owned:
+    description: true when a durable exact-SHA autofix ownership marker suppresses duplicate repair.
+    value: ${{ steps.evaluate.outputs.repair_marker_owned }}
+  repair_terminal:
+    description: true when the exact-SHA autofix outcome is terminal.
+    value: ${{ steps.evaluate.outputs.repair_terminal }}
+  repair_state_known:
+    description: true when workflow, PR, and durable marker repair-state lookups succeeded.
+    value: ${{ steps.evaluate.outputs.repair_state_known }}
 
 runs:
   using: composite
@@ -71,24 +97,17 @@ runs:
         NO_SUCCESS_THRESHOLD_HOURS: ${{ inputs.no-success-threshold-hours }}
         AUTOFIX_CROSS_SHA_WINDOW_MINUTES: ${{ inputs.autofix-cross-sha-window-minutes }}
         AUTOFIX_CROSS_SHA_LIMIT: ${{ inputs.autofix-cross-sha-limit }}
+        AUTOFIX_OWNERSHIP_LEASE_MINUTES: ${{ inputs.autofix-ownership-lease-minutes }}
+        AUTOFIX_ATTEMPT_LIMIT: ${{ inputs.autofix-attempt-limit }}
       with:
         script: |
           const thresholdMinutes = Number(process.env.STUCK_THRESHOLD_MINUTES ?? '30');
           const noSuccessHours = Number(process.env.NO_SUCCESS_THRESHOLD_HOURS ?? '3');
           const crossShaWindowMinutes = Number(process.env.AUTOFIX_CROSS_SHA_WINDOW_MINUTES ?? '60');
           const crossShaLimit = Number(process.env.AUTOFIX_CROSS_SHA_LIMIT ?? '2');
+          const ownershipLeaseMinutes = Number(process.env.AUTOFIX_OWNERSHIP_LEASE_MINUTES ?? '30');
+          const autofixAttemptLimit = Number(process.env.AUTOFIX_ATTEMPT_LIMIT ?? '3');
           const now = Date.now();
-
-          const runsResponse = await github.rest.actions.listWorkflowRuns({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            workflow_id: 'ci.yml',
-            branch: 'main',
-            event: 'push',
-            per_page: 50,
-          });
-
-          const runs = runsResponse.data.workflow_runs ?? [];
 
           const defaults = {
             should_alert: 'false',
@@ -99,17 +118,44 @@ runs:
             needs_autofix: 'false',
             autofix_skip_reason: '',
             failing_run_id: '',
+            failing_run_attempt: '',
+            repair_attempt: '',
             failing_sha: '',
             failing_short_sha: '',
             last_green_sha: '',
             failed_job_names: '',
             systemic: 'false',
+            repair_in_flight: 'false',
+            repair_marker_owned: 'false',
+            repair_terminal: 'false',
+            repair_state_known: 'true',
           };
 
           const emit = (overrides) => {
             const out = { ...defaults, ...overrides };
             for (const [k, v] of Object.entries(out)) core.setOutput(k, v);
           };
+
+          let runs = [];
+          try {
+            const runsResponse = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'ci.yml',
+              branch: 'main',
+              event: 'push',
+              per_page: 50,
+            });
+            runs = runsResponse.data.workflow_runs ?? [];
+          } catch (err) {
+            core.warning(`Could not inspect main CI runs: ${err.message}`);
+            emit({
+              summary: 'Main CI state is unavailable.',
+              details: 'Repair dispatch and Slack notification are suppressed because no exact failing SHA could be proven.',
+              repair_state_known: 'false',
+            });
+            return;
+          }
 
           if (runs.length === 0) {
             emit({ summary: 'No CI runs found on main.', details: 'The monitor did not find any `ci.yml` push runs on main.' });
@@ -129,6 +175,168 @@ runs:
             run.status === 'completed' &&
             ['failure', 'timed_out', 'startup_failure', 'action_required'].includes(run.conclusion ?? '')
           );
+          const failingRunAttempt = Number(latestFailure?.run_attempt ?? 0);
+
+          // A schedule tick is discovery, not authorization to launch another
+          // repair. Prove that no exact-SHA workflow, PR, or bounded ownership
+          // lease already owns the failure. API uncertainty fails closed for
+          // dispatch and uses a once-per-SHA durable notification marker.
+          const activeStatuses = new Set([
+            'queued',
+            'in_progress',
+            'waiting',
+            'pending',
+            'requested',
+          ]);
+          const withinLease = (timestamp) => {
+            const parsed = timestamp ? Date.parse(timestamp) : Number.NaN;
+            if (Number.isNaN(parsed)) return false;
+            const ageMinutes = (now - parsed) / (1000 * 60);
+            return ageMinutes >= 0 && ageMinutes <= ownershipLeaseMinutes;
+          };
+
+          let repairInFlight = false;
+          let repairMarkerOwnedFound = false;
+          let repairTerminalFound = false;
+          let uncertaintyAckFound = false;
+          let markerStateKnown = true;
+          let workflowStateKnown = true;
+          let repairStateKnown = true;
+          let autofixRuns = [];
+          let repairAttempt = 1;
+          let currentMainSha = '';
+
+          try {
+            const mainCommit = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'main',
+            });
+            currentMainSha = mainCommit.data.sha ?? '';
+            if (!/^[0-9a-f]{40}$/.test(currentMainSha)) {
+              throw new Error('main commit lookup returned an invalid SHA');
+            }
+          } catch (err) {
+            repairStateKnown = false;
+            core.warning(`Could not verify current main SHA: ${err.message}`);
+          }
+
+          if (latestFailure?.head_sha) {
+            const failingSha = latestFailure.head_sha;
+            try {
+              const openPulls = await github.paginate(github.rest.pulls.list, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                base: 'main',
+                per_page: 100,
+              });
+              repairInFlight = openPulls.some((pull) => {
+                const labels = (pull.labels ?? []).map((label) =>
+                  typeof label === 'string' ? label : label.name
+                );
+                if (!labels.includes('autofix')) return false;
+                const body = pull.body ?? '';
+                return body.includes(`Failing SHA:** \`${failingSha}\``);
+              });
+            } catch (err) {
+              repairStateKnown = false;
+              core.warning(`Could not inspect open autofix PRs: ${err.message}`);
+            }
+
+            try {
+              autofixRuns = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'main-autofix.yml',
+                per_page: 50,
+              });
+              const activeExactShaRepair = autofixRuns.some((run) =>
+                Number(run.id) !== Number(context.runId) &&
+                run.head_sha === failingSha &&
+                activeStatuses.has(run.status ?? '')
+              );
+              repairInFlight ||= activeExactShaRepair;
+            } catch (err) {
+              workflowStateKnown = false;
+              repairStateKnown = false;
+              core.warning(`Could not inspect active autofix workflows: ${err.message}`);
+            }
+
+            try {
+              const statuses = await github.paginate(
+                github.rest.repos.listCommitStatusesForRef,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: failingSha,
+                  per_page: 100,
+                }
+              );
+              const ownershipStatuses = statuses
+                .filter(
+                  (status) =>
+                    status.context === 'main-autofix/ownership' &&
+                    status.state === 'success'
+                )
+                .sort((left, right) => {
+                  const leftTime = Date.parse(left.created_at ?? '');
+                  const rightTime = Date.parse(right.created_at ?? '');
+                  if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime)) {
+                    const timeOrder = rightTime - leftTime;
+                    if (timeOrder !== 0) return timeOrder;
+                  } else if (!Number.isNaN(rightTime)) {
+                    return 1;
+                  } else if (!Number.isNaN(leftTime)) {
+                    return -1;
+                  }
+                  return Number(right.id ?? 0) - Number(left.id ?? 0);
+                });
+              const ownedAttempts = ownershipStatuses.filter((status) =>
+                (status.description ?? '').startsWith('owned:')
+              ).length;
+              repairAttempt = ownedAttempts + 1;
+
+              const latestOwnershipStatus = ownershipStatuses[0];
+              const description = latestOwnershipStatus?.description ?? '';
+              repairTerminalFound = description.startsWith('terminal:');
+              uncertaintyAckFound = description.startsWith('uncertain:');
+
+              const ownedMatch = description.match(/^owned:run-(\d+):attempt-(\d+)$/);
+              if (ownedMatch && workflowStateKnown) {
+                const ownedRunId = Number(ownedMatch[1]);
+                const ownedRun = autofixRuns.find(
+                  (run) => Number(run.id) === ownedRunId
+                );
+                const activeOwnedRun = Boolean(
+                  ownedRun &&
+                  ownedRun.head_sha === failingSha &&
+                  activeStatuses.has(ownedRun.status ?? '')
+                );
+                // Authoritative active workflow state always wins, even after
+                // a long queue wait. A fresh orphan gets a short consistency
+                // grace lease; terminal/wrong-SHA runs do not.
+                const freshOrphan =
+                  !ownedRun && withinLease(latestOwnershipStatus.created_at);
+                repairMarkerOwnedFound = activeOwnedRun || freshOrphan;
+              }
+
+              // A terminal/missing/expired lease counts as an attempt. Once the
+              // bounded budget is exhausted, the durable status history itself
+              // becomes the exact-SHA terminal escalation.
+              if (
+                ownedAttempts >= autofixAttemptLimit &&
+                !repairInFlight &&
+                !repairMarkerOwnedFound
+              ) {
+                repairTerminalFound = true;
+              }
+            } catch (err) {
+              markerStateKnown = false;
+              repairStateKnown = false;
+              core.warning(`Could not inspect durable autofix ownership: ${err.message}`);
+            }
+          }
 
           const hasNewerActiveMainRun = (() => {
             if (!activeRun || !latestFailure) return false;
@@ -151,6 +359,9 @@ runs:
 
           const failedForTooLong = (() => {
             if (!latestFailure) return false;
+            // GitHub may intentionally skip CI for a paths-ignored main commit.
+            // Never redispatch repair for the older failed SHA after main moved.
+            if (currentMainSha && latestFailure.head_sha !== currentMainSha) return false;
             // A newer CI run is already in progress for main. Let it finish before
             // treating the previous failed run as unresolved.
             if (hasNewerActiveMainRun && !staleRun) return false;
@@ -165,15 +376,21 @@ runs:
           const successCutoff = latestSuccess?.updated_at ?? latestSuccess?.created_at;
           let mergedCount = 0;
 
-          const pulls = await github.paginate(github.rest.pulls.list, {
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            state: 'closed',
-            base: 'main',
-            sort: 'updated',
-            direction: 'desc',
-            per_page: 100,
-          });
+          let pulls = [];
+          try {
+            pulls = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              base: 'main',
+              sort: 'updated',
+              direction: 'desc',
+              per_page: 100,
+            });
+          } catch (err) {
+            repairStateKnown = false;
+            core.warning(`Could not inspect recently merged PRs: ${err.message}`);
+          }
 
           for (const pull of pulls) {
             if (!pull.merged_at) continue;
@@ -197,15 +414,14 @@ runs:
           if (failedForTooLong && latestFailure) reasons.push(`Latest main CI run #${latestFailure.run_number} is ${latestFailure.conclusion} and unresolved for more than ${thresholdMinutes} minutes.`);
           if (noSuccessForTooLong) reasons.push(`No successful main CI in over ${noSuccessHours} hours while ${mergedCount} merged PR(s) are waiting.`);
 
-          const shouldAlert = reasons.length > 0;
+          const detectedIssue = reasons.length > 0;
+          // Durable markers are effective only while this exact SHA remains red.
+          // A newer SHA or a successful rerun naturally recovers without a
+          // marker cleanup mutation.
+          const repairMarkerOwned = detectedIssue && repairMarkerOwnedFound;
+          const repairTerminal = detectedIssue && repairTerminalFound;
+          const repairOwned = repairInFlight || repairMarkerOwned || repairTerminal;
           const runUrl = staleRun?.html_url ?? latestFailure?.html_url ?? defaults.run_url;
-
-          const out = {
-            should_alert: shouldAlert ? 'true' : 'false',
-            summary: shouldAlert ? 'Main CI health issue detected.' : defaults.summary,
-            details: shouldAlert ? reasons.join('\n') : defaults.details,
-            run_url: runUrl,
-          };
 
           // Monitor self-heal: only emit failed_run_id when it's safe to --rerun --failed.
           // Rules: failure is unresolved, no staleRun racing a newer push, and the failed jobs
@@ -226,19 +442,202 @@ runs:
               failedJobNames = failedNames.join(',');
               canaryOrSentryFailed = failedNames.some((n) => /canary|sentry/i.test(n));
             } catch (err) {
+              repairStateKnown = false;
               core.warning(`Could not fetch jobs for run ${latestFailure.id}: ${err.message}`);
             }
           }
 
-          const safeToRerun = failedForTooLong && !staleRun && latestFailure && !canaryOrSentryFailed;
+          // Cross-SHA escalation is based on durable repair attempts, not on
+          // main-autofix workflow invocation. The workflow also runs for
+          // healthy/skipped monitor completions, so its run history alone is
+          // not evidence that another SHA consumed repair capacity.
+          let systemic = false;
+          const crossShaEligible =
+            failedForTooLong &&
+            latestFailure &&
+            !canaryOrSentryFailed &&
+            !staleRun &&
+            failingRunAttempt >= 2 &&
+            !repairTerminal &&
+            !repairMarkerOwned &&
+            !repairInFlight &&
+            repairStateKnown;
+
+          if (crossShaEligible) {
+            const windowCutoff = now - crossShaWindowMinutes * 60 * 1000;
+            const currentFailingSha = latestFailure.head_sha.toLowerCase();
+            const recentAttemptShas = new Set([currentFailingSha]);
+
+            if (recentAttemptShas.size >= crossShaLimit) {
+              systemic = true;
+            } else {
+              const candidateRepairShas = [];
+              const seenCandidateShas = new Set();
+              const maxCrossShaCandidates = 50;
+              let candidateHistoryTruncated = false;
+
+              for (const run of autofixRuns) {
+                if (Number(run.id) === Number(context.runId)) continue;
+                const runCreatedAt = Date.parse(run.created_at ?? '');
+                if (
+                  Number.isNaN(runCreatedAt) ||
+                  runCreatedAt < windowCutoff ||
+                  runCreatedAt > now
+                ) {
+                  continue;
+                }
+
+                const candidateSha = (run.head_sha ?? '').toLowerCase();
+                if (!/^[0-9a-f]{40}$/.test(candidateSha)) continue;
+                if (
+                  candidateSha === currentFailingSha ||
+                  seenCandidateShas.has(candidateSha)
+                ) {
+                  continue;
+                }
+
+                seenCandidateShas.add(candidateSha);
+                if (candidateRepairShas.length >= maxCrossShaCandidates) {
+                  candidateHistoryTruncated = true;
+                  break;
+                }
+                candidateRepairShas.push(candidateSha);
+              }
+
+              for (const candidateSha of candidateRepairShas) {
+                let candidateStatuses;
+                try {
+                  candidateStatuses = await github.paginate(
+                    github.rest.repos.listCommitStatusesForRef,
+                    {
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      ref: candidateSha,
+                      per_page: 100,
+                    }
+                  );
+                } catch (err) {
+                  repairStateKnown = false;
+                  core.warning(
+                    `Could not inspect cross-SHA durable autofix ownership for ${candidateSha.slice(0, 7)}: ${err.message}`
+                  );
+                  break;
+                }
+
+                const hasRecentOwnedMarker = candidateStatuses.some((status) => {
+                  if (
+                    status.context !== 'main-autofix/ownership' ||
+                    status.state !== 'success' ||
+                    !(status.description ?? '').startsWith('owned:')
+                  ) {
+                    return false;
+                  }
+                  const markerCreatedAt = Date.parse(status.created_at ?? '');
+                  return (
+                    !Number.isNaN(markerCreatedAt) &&
+                    markerCreatedAt >= windowCutoff &&
+                    markerCreatedAt <= now
+                  );
+                });
+
+                if (hasRecentOwnedMarker) recentAttemptShas.add(candidateSha);
+                if (recentAttemptShas.size >= crossShaLimit) {
+                  systemic = true;
+                  break;
+                }
+              }
+
+              if (!systemic && repairStateKnown && candidateHistoryTruncated) {
+                repairStateKnown = false;
+                core.warning(
+                  `Cross-SHA repair history exceeded the bounded ${maxCrossShaCandidates}-SHA lookup; repair dispatch is blocked.`
+                );
+              }
+            }
+          }
+
+          // Alert API uncertainty once per exact SHA when the durable marker API
+          // is available. If even marker persistence is unavailable, warn in the
+          // run but suppress Slack rather than emit an unbounded 20-minute loop.
+          let firstUncertaintyAlert = false;
+          if (
+            detectedIssue &&
+            !repairOwned &&
+            !repairStateKnown &&
+            !uncertaintyAckFound &&
+            markerStateKnown &&
+            latestFailure?.head_sha
+          ) {
+            try {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: latestFailure.head_sha,
+                state: 'success',
+                context: 'main-autofix/ownership',
+                description: 'uncertain:repair_state_unavailable',
+                target_url: runUrl,
+              });
+              firstUncertaintyAlert = true;
+            } catch (err) {
+              core.warning(`Could not persist repair-state alert deduplication: ${err.message}`);
+            }
+          }
+
+          // An exact-SHA repair owner or terminal disposition suppresses both
+          // alert and dispatch. Unknown state alerts only when its once-per-SHA
+          // acknowledgment was durably recorded above.
+          const shouldAlert =
+            detectedIssue &&
+            !repairOwned &&
+            (repairStateKnown || firstUncertaintyAlert);
+          let summary = defaults.summary;
+          let details = defaults.details;
+
+          if (shouldAlert && repairStateKnown) {
+            summary = 'Main CI health issue detected.';
+            details = reasons.join('\n');
+          } else if (firstUncertaintyAlert) {
+            summary = 'Main CI health issue detected, but repair state is unavailable.';
+            details = `${reasons.join('\n')}\nRepair dispatch is blocked, and this exact-SHA uncertainty alert was durably acknowledged to prevent notification loops.`;
+          } else if (detectedIssue && repairInFlight) {
+            summary = 'Main CI repair already in flight.';
+            details = `An exact-SHA autofix workflow or PR already owns ${latestFailure?.head_sha?.slice(0, 7) ?? 'the failing revision'}; duplicate schedule alerts and dispatch are suppressed.`;
+          } else if (repairMarkerOwned) {
+            summary = 'Main CI repair already has a valid ownership lease.';
+            details = `A bounded exact-SHA autofix lease owns ${latestFailure?.head_sha?.slice(0, 7) ?? 'the failing revision'}; duplicate schedule alerts and dispatch are suppressed.`;
+          } else if (repairTerminal) {
+            summary = 'Main CI failure already has a terminal repair disposition.';
+            details = `Autofix recorded or exhausted a terminal outcome for ${latestFailure?.head_sha?.slice(0, 7) ?? 'the failing revision'}; duplicate schedule alerts and dispatch are suppressed until main advances or CI recovers.`;
+          } else if (detectedIssue && !repairStateKnown) {
+            summary = 'Main CI repair state is unavailable.';
+            details = uncertaintyAckFound
+              ? 'The exact-SHA repair-state uncertainty was already acknowledged; duplicate Slack notification is suppressed.'
+              : 'Repair dispatch is blocked. Slack notification is suppressed because durable deduplication could not be proven.';
+          }
+
+          const out = {
+            should_alert: shouldAlert ? 'true' : 'false',
+            summary,
+            details,
+            run_url: runUrl,
+          };
+
+          const safeToRerun =
+            failedForTooLong &&
+            !staleRun &&
+            latestFailure &&
+            !canaryOrSentryFailed &&
+            failingRunAttempt === 1 &&
+            repairStateKnown &&
+            !repairOwned;
 
           // Autofix eligibility — separate from monitor's one-shot rerun.
-          // Dispatch autofix when: failure is unresolved, not canary/sentry, and either the
-          // one-shot rerun already happened (run_attempt >= 2) or the failure category was
-          // never rerun-eligible in the first place.
+          // Dispatch only after the one-shot rerun has failed (run_attempt >= 2)
+          // and repair-state lookups positively prove no exact-SHA repair or
+          // durable ownership marker exists.
           let needsAutofix = false;
           let autofixSkipReason = '';
-          let systemic = false;
 
           if (!failedForTooLong || !latestFailure) {
             // No eligible failure — leave needs_autofix=false silently.
@@ -246,37 +645,20 @@ runs:
             autofixSkipReason = 'canary_or_sentry_gate_failed';
           } else if (staleRun) {
             autofixSkipReason = 'newer_commit_in_progress';
+          } else if (failingRunAttempt < 2) {
+            autofixSkipReason = 'awaiting_one_shot_rerun';
+          } else if (repairTerminal) {
+            autofixSkipReason = 'terminal_repair_recorded';
+          } else if (repairMarkerOwned) {
+            autofixSkipReason = 'repair_marker_owned';
+          } else if (repairInFlight) {
+            autofixSkipReason = 'repair_in_flight';
+          } else if (!repairStateKnown) {
+            autofixSkipReason = 'repair_state_unavailable';
+          } else if (systemic) {
+            autofixSkipReason = 'systemic_multiple_shas_failing';
           } else {
-            // Check for systemic across distinct SHAs.
-            try {
-              const autofixRuns = await github.paginate(github.rest.actions.listWorkflowRuns, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                workflow_id: 'main-autofix.yml',
-                per_page: 50,
-              });
-              const windowCutoff = now - crossShaWindowMinutes * 60 * 1000;
-              const recentShas = new Set();
-              for (const r of autofixRuns) {
-                if (Date.parse(r.created_at) < windowCutoff) continue;
-                if (r.head_sha) recentShas.add(r.head_sha);
-              }
-              // Include the current failing SHA in the set. Escalate when the count
-              // (including this SHA) reaches the limit — so limit=2 means "the 2nd
-              // distinct SHA in the window is the one that triggers escalation".
-              const thisSha = latestFailure.head_sha;
-              recentShas.add(thisSha);
-              if (recentShas.size >= crossShaLimit) {
-                systemic = true;
-                autofixSkipReason = 'systemic_multiple_shas_failing';
-              }
-            } catch (err) {
-              core.warning(`Could not check cross-SHA autofix history: ${err.message}`);
-            }
-
-            if (!systemic) {
-              needsAutofix = true;
-            }
+            needsAutofix = true;
           }
 
           Object.assign(out, {
@@ -284,11 +666,17 @@ runs:
             needs_autofix: needsAutofix ? 'true' : 'false',
             autofix_skip_reason: autofixSkipReason,
             failing_run_id: latestFailure ? String(latestFailure.id) : '',
+            failing_run_attempt: latestFailure ? String(failingRunAttempt) : '',
+            repair_attempt: latestFailure ? String(repairAttempt) : '',
             failing_sha: latestFailure?.head_sha ?? '',
             failing_short_sha: latestFailure?.head_sha ? latestFailure.head_sha.slice(0, 7) : '',
             last_green_sha: latestSuccess?.head_sha ?? '',
             failed_job_names: failedJobNames,
             systemic: systemic ? 'true' : 'false',
+            repair_in_flight: repairInFlight ? 'true' : 'false',
+            repair_marker_owned: repairMarkerOwned ? 'true' : 'false',
+            repair_terminal: repairTerminal ? 'true' : 'false',
+            repair_state_known: repairStateKnown ? 'true' : 'false',
           });
 
           emit(out);

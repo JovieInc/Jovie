@@ -10,6 +10,7 @@ Run with:
 from __future__ import annotations
 
 import os
+import shutil
 import stat
 import subprocess
 import textwrap
@@ -944,6 +945,94 @@ JSON
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "eligibility changed; refusing enrollment for #655" in result.stdout
         assert "[dry-run] would +merge-queue on #655" not in result.stdout
+
+    def test_native_enrollment_compensates_when_gated_label_races_mutation(
+        self, tmp_path: Path
+    ) -> None:
+        head = "a" * 40
+        real_node = shutil.which("node")
+        assert real_node is not None
+        backend_log = tmp_path / "backend.log"
+        read_count = tmp_path / "read-count"
+        read_count.write_text("0", encoding="utf-8")
+
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1" == *"scripts/merge-queue-backend.mjs" ]]; then
+                  command_name="$2"
+                  echo "$command_name" >> "{backend_log}"
+                  case "$command_name" in
+                    preflight) exit 0 ;;
+                    list-state)
+                      echo '{{"901":{{"number":901,"headRefOid":"{head}","queued":false}}}}'
+                      exit 0
+                      ;;
+                    enroll|dequeue) exit 0 ;;
+                  esac
+                fi
+                exec "{real_node}" "$@"
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(
+            fake_node.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":901,"t":"Gate races enrollment","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/jov-901-race","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"CI / PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"CI / Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  count=$(cat "{read_count}")
+                  count=$((count + 1))
+                  echo "$count" > "{read_count}"
+                  if [[ "$count" -eq 1 ]]; then
+                    echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"{head}","labels":[]}}'
+                  else
+                    echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"{head}","labels":[{{"name":"gated"}}]}}'
+                  fi
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  echo "unexpected label mutation: $*" >&2
+                  exit 9
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env="MERGE_QUEUE_BACKEND=native MERGE_QUEUE_NATIVE_AUTHORIZATION=merge-queue-autoenroll",
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "eligibility changed during native enrollment" in result.stdout
+        assert backend_log.read_text(encoding="utf-8").splitlines().count("enroll") == 1
+        assert backend_log.read_text(encoding="utf-8").splitlines().count("dequeue") == 1
 
     @pytest.mark.parametrize("edit_exit", [0, 1])
     def test_held_dequeue_fails_when_removal_is_not_proven(
