@@ -120,6 +120,8 @@ hermes gateway status
 # gbrain health
 TAILSCALE_IP="$(tailscale ip -4 | head -1)"
 curl -sf "http://${TAILSCALE_IP}:7801/health" && echo "OK" || echo "DOWN"
+# The HTTP endpoint is the liveness authority. `gbrain doctor` is diagnostic only:
+# cold CLI/PGLite migration drift must not page a healthy HTTP server by itself.
 gbrain doctor --fast --json | jq .health_score
 
 # Resident memory of all Hermes-related processes
@@ -140,6 +142,8 @@ tail -50 ~/.hermes/logs/launchd/cron-agent-config-health.err.log
 gbrain search "ops/gbrain-health/latest" --limit 3
 tail -50 ~/.hermes/logs/launchd/cron-gbrain-health-summary.log \
   ~/.hermes/logs/launchd/cron-gbrain-health-summary.err.log
+# The daily summary also alerts when an indexed source is older than 48h
+# (24h for code sources) or more than one `gbrain serve` process is running.
 
 # Free-model rankings
 cat ~/.hermes/state/model-router-rankings.json | jq .
