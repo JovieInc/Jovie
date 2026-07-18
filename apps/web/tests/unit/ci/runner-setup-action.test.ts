@@ -29,6 +29,16 @@ describe('self-hosted runner setup action', () => {
     expect(action).toContain('pnpm install --frozen-lockfile');
   });
 
+  it('installs the pinned pnpm directly instead of downgrading a pnpm 11 bootstrap', () => {
+    expect(action).toContain(
+      'uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0'
+    );
+    expect(action).not.toContain(
+      'pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271'
+    );
+    expect(action).toContain('dest: ${{ runner.temp }}/setup-pnpm');
+  });
+
   it('restores an exact baked installed tree and falls back when no marker exists', () => {
     expect(action).toContain(
       'node .github/runner-image/verify-prerequisites.mjs --component dependencies'

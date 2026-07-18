@@ -543,6 +543,61 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(buildStep).toContain('vercel build');
   });
 
+  it('loads production runtime config from Doppler without yielding Vercel deployment identity', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const promoteJob = getJobBlock(workflow, 'promote-production');
+    const configureStep = getStepBlock(
+      promoteJob,
+      'Configure production deployment credentials'
+    );
+    const stageStep = getStepBlock(
+      promoteJob,
+      'Build and stage production deployment'
+    );
+    const dopplerIndex = promoteJob.indexOf(
+      '- uses: ./.github/actions/setup-doppler'
+    );
+    const configureIndex = promoteJob.indexOf(
+      '- name: Configure production deployment credentials'
+    );
+    const domainGuardIndex = promoteJob.indexOf(
+      '- name: Verify production domains are on canonical Vercel project'
+    );
+    const runtimeKeys = [
+      'NEXT_PUBLIC_BETTER_AUTH_URL',
+      'BETTER_AUTH_SECRET',
+      'DATABASE_URL',
+      'SESSION_SECRET',
+      'AI_GATEWAY_API_KEY',
+      'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
+      'TURNSTILE_SECRET_KEY',
+    ];
+
+    expect(dopplerIndex).toBeGreaterThanOrEqual(0);
+    expect(configureIndex).toBeGreaterThan(dopplerIndex);
+    expect(domainGuardIndex).toBeGreaterThan(configureIndex);
+    expect(promoteJob).toContain(
+      'doppler-token: ${{ secrets.DOPPLER_TOKEN_PRD }}'
+    );
+    expect(configureStep).toContain(
+      'Missing required production deployment credentials:'
+    );
+    for (const key of ['VERCEL_TOKEN', 'VERCEL_ORG_ID', 'VERCEL_PROJECT_ID']) {
+      expect(configureStep).toContain(`${key}: \${{ secrets.${key} }}`);
+      expect(configureStep).toContain(`printf '${key}=%s\\n'`);
+    }
+
+    expect(stageStep).toContain('--target=prd --source=env');
+    expect(stageStep).not.toContain('--target=prd --source=vercel-file');
+    expect(stageStep).toContain('required_runtime_env=(');
+    expect(stageStep).toContain('Missing production runtime env:');
+    expect(stageStep).toContain('runtime_env_args+=(--env "${key}=${!key}")');
+    expect(stageStep).toContain('"${runtime_env_args[@]}"');
+    for (const key of runtimeKeys) {
+      expect(stageStep).toContain(key);
+    }
+  });
+
   it('verifies production promotion through the canonical public alias', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const promoteJob = getJobBlock(workflow, 'promote-production');
@@ -1636,7 +1691,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(deployIndex).toBeGreaterThan(buildIndex);
     expect(inspectIndex).toBeGreaterThan(deployIndex);
     expect(canaryIndex).toBeGreaterThan(inspectIndex);
-    expect(stageStep).toContain('--target=prd --source=vercel-file');
+    expect(stageStep).toContain('--target=prd --source=env');
+    expect(stageStep).not.toContain('--target=prd --source=vercel-file');
     expect(stageStep).toContain('VERCEL_GIT_COMMIT_SHA="$GITHUB_SHA"');
     expect(stageStep).toContain('NEXT_PUBLIC_BUILD_SHA="$expected"');
     expect(stageStep).toContain('--meta "githubCommitSha=${GITHUB_SHA}"');
