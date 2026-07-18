@@ -108,13 +108,13 @@ describe('screenshot registry', () => {
     }
   });
 
-  it('registers the power features section screenshot scenario', () => {
+  it('registers the product truth section screenshot scenario', () => {
     const scenario = SCREENSHOT_SCENARIOS.find(
       currentScenario =>
-        currentScenario.id === 'artist-profile-power-features-section-desktop'
+        currentScenario.id === 'artist-profile-spec-wall-section-desktop'
     );
 
-    expect(scenario?.title).toBe('Artist Profile Details That Matter Section');
+    expect(scenario?.title).toBe('Artist Profile Product Truth Section');
     expect(scenario?.route).toBe('/artist-profiles');
     expect(scenario?.captureSelector).toBe(
       '[data-testid="artist-profile-section-spec-wall"]'
