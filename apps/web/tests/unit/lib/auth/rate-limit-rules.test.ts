@@ -5,19 +5,27 @@ import {
 } from '@/lib/auth/rate-limit-rules';
 
 const OTP_SEND_PATH = '/email-otp/send-verification-otp' as const;
+const OTP_SIGN_IN_PATH = '/sign-in/email-otp' as const;
+const OTP_PATHS = [OTP_SEND_PATH, OTP_SIGN_IN_PATH] as const;
 
-function makeOtpSendRequest(body: unknown): Request {
-  return new Request(`http://localhost/api/auth${OTP_SEND_PATH}`, {
+function makeOtpRequest(
+  path: (typeof OTP_PATHS)[number],
+  body: unknown
+): Request {
+  return new Request(`http://localhost/api/auth${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 }
 
-async function resolveOtpSendRule(request: Request) {
-  const rule = AUTH_RATE_LIMIT_RULES[OTP_SEND_PATH];
+async function resolveOtpRule(
+  path: (typeof OTP_PATHS)[number],
+  request: Request
+) {
+  const rule = AUTH_RATE_LIMIT_RULES[path];
   if (typeof rule !== 'function') {
-    throw new Error('expected the OTP send rule to be a function');
+    throw new Error(`expected the ${path} rule to be a function`);
   }
   return rule(request);
 }
@@ -40,6 +48,12 @@ describe('Better Auth rate-limit policy', () => {
       window: 60,
       max: 10,
     });
+  });
+
+  it('uses a function rule for both email-OTP send and sign-in paths', () => {
+    for (const path of OTP_PATHS) {
+      expect(typeof AUTH_RATE_LIMIT_RULES[path]).toBe('function');
+    }
   });
 });
 
@@ -83,7 +97,7 @@ describe('isDeterministicTestOtpEmail', () => {
   });
 });
 
-describe('OTP send rate-limit rule', () => {
+describe.each(OTP_PATHS)('email-OTP rate-limit rule (%s)', path => {
   beforeEach(() => {
     vi.unstubAllEnvs();
   });
@@ -91,8 +105,8 @@ describe('OTP send rate-limit rule', () => {
   it('disables limiting for deterministic E2E test emails under the guard', async () => {
     vi.stubEnv('E2E_TEST_MODE', '1');
     vi.stubEnv('VERCEL_ENV', 'development');
-    const request = makeOtpSendRequest({ email: 'artist+e2e@example.com' });
-    await expect(resolveOtpSendRule(request)).resolves.toBe(false);
+    const request = makeOtpRequest(path, { email: 'artist+e2e@example.com' });
+    await expect(resolveOtpRule(path, request)).resolves.toBe(false);
     // The rule must leave the body intact for Better Auth's own parser.
     await expect(request.json()).resolves.toEqual({
       email: 'artist+e2e@example.com',
@@ -103,7 +117,7 @@ describe('OTP send rate-limit rule', () => {
     vi.stubEnv('E2E_TEST_MODE', '1');
     vi.stubEnv('VERCEL_ENV', 'development');
     await expect(
-      resolveOtpSendRule(makeOtpSendRequest({ email: 'fan@example.com' }))
+      resolveOtpRule(path, makeOtpRequest(path, { email: 'fan@example.com' }))
     ).resolves.toEqual({ window: 60, max: 3 });
   });
 
@@ -111,8 +125,9 @@ describe('OTP send rate-limit rule', () => {
     vi.stubEnv('E2E_TEST_MODE', '');
     vi.stubEnv('VERCEL_ENV', 'development');
     await expect(
-      resolveOtpSendRule(
-        makeOtpSendRequest({ email: 'artist+e2e@example.com' })
+      resolveOtpRule(
+        path,
+        makeOtpRequest(path, { email: 'artist+e2e@example.com' })
       )
     ).resolves.toEqual({ window: 60, max: 3 });
   });
@@ -121,8 +136,9 @@ describe('OTP send rate-limit rule', () => {
     vi.stubEnv('E2E_TEST_MODE', '1');
     vi.stubEnv('VERCEL_ENV', 'production');
     await expect(
-      resolveOtpSendRule(
-        makeOtpSendRequest({ email: 'artist+e2e@example.com' })
+      resolveOtpRule(
+        path,
+        makeOtpRequest(path, { email: 'artist+e2e@example.com' })
       )
     ).resolves.toEqual({ window: 60, max: 3 });
   });
@@ -131,10 +147,10 @@ describe('OTP send rate-limit rule', () => {
     vi.stubEnv('E2E_TEST_MODE', '1');
     vi.stubEnv('VERCEL_ENV', 'development');
     await expect(
-      resolveOtpSendRule(makeOtpSendRequest('not-json{{'))
+      resolveOtpRule(path, makeOtpRequest(path, 'not-json{{'))
     ).resolves.toEqual({ window: 60, max: 3 });
     await expect(
-      resolveOtpSendRule(makeOtpSendRequest({ type: 'sign-in' }))
+      resolveOtpRule(path, makeOtpRequest(path, { type: 'sign-in' }))
     ).resolves.toEqual({ window: 60, max: 3 });
   });
 });
