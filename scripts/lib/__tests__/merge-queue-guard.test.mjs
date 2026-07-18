@@ -767,6 +767,7 @@ function ghSequence({
   before = snapshot(),
   mutation = mutationSnapshot(),
   after = snapshot({ headRefOid: UPDATED_HEAD }),
+  afterSequence = null,
   mutationError = null,
 } = {}) {
   const calls = [];
@@ -775,7 +776,9 @@ function ghSequence({
     calls.push(args);
     if (args[0] === 'pr' && args[1] === 'view') {
       snapshotCalls += 1;
-      return snapshotCalls === 1 ? before : after;
+      if (snapshotCalls === 1) return before;
+      const snapshots = afterSequence ?? [after];
+      return snapshots[Math.min(snapshotCalls - 2, snapshots.length - 1)];
     }
     if (args[0] === 'api' && args[1] === 'graphql') {
       if (mutationError) throw mutationError;
@@ -818,6 +821,56 @@ describe('exact-head GitHub Update Branch rebase', () => {
     expect(gh.calls.flat().join(' ')).not.toMatch(
       /repo clone|force-with-lease|git push/
     );
+  });
+
+  it('polls through a stale post-mutation read until the exact updated head is visible', async () => {
+    const sleepImpl = vi.fn(async () => {});
+    const gh = ghSequence({
+      afterSequence: [snapshot(), snapshot({ headRefOid: UPDATED_HEAD })],
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      sleepImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      updated: true,
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: UPDATED_HEAD,
+    });
+    expect(sleepImpl).toHaveBeenCalledOnce();
+    expect(sleepImpl).toHaveBeenCalledWith(250);
+  });
+
+  it('fails closed when the updated head never becomes visible', async () => {
+    const sleepImpl = vi.fn(async () => {});
+    const gh = ghSequence({ afterSequence: [snapshot()] });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      sleepImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      conflict: false,
+      category: 'verification_failure',
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: ORIGINAL_HEAD,
+    });
+    expect(sleepImpl.mock.calls.map(([delayMs]) => delayMs)).toEqual([
+      250, 500, 1000, 2000,
+    ]);
   });
 
   it('treats a concurrent head update as stale, never as a conflict', async () => {
@@ -958,6 +1011,39 @@ describe('remediation mutations', () => {
     });
 
     expect(summary.applied).toBe(0);
+    expect(labelPrImpl).not.toHaveBeenCalled();
+    expect(commentPrImpl).not.toHaveBeenCalled();
+  });
+
+  it('clears a stale conflict label on a verified no-op without queue churn', async () => {
+    const labelPrImpl = vi.fn();
+    const removeLabelPrImpl = vi.fn();
+    const commentPrImpl = vi.fn();
+
+    const summary = await remediateBlockedPrs(options, {
+      listBlockedAgentPrsImpl: async () => [
+        blockedPr({ labels: [{ name: 'needs-conflict-resolution' }] }),
+      ],
+      rebaseImpl: async () => ({
+        ok: true,
+        updated: false,
+        conflict: false,
+        category: 'no_change',
+        reason: 'GitHub reports the pull request branch is already current',
+      }),
+      labelPrImpl,
+      removeLabelPrImpl,
+      commentPrImpl,
+      nowMs: Date.parse('2026-07-18T00:00:00Z'),
+    });
+
+    expect(summary.applied).toBe(0);
+    expect(removeLabelPrImpl).toHaveBeenCalledOnce();
+    expect(removeLabelPrImpl).toHaveBeenCalledWith(
+      'JovieInc/Jovie',
+      123,
+      'needs-conflict-resolution'
+    );
     expect(labelPrImpl).not.toHaveBeenCalled();
     expect(commentPrImpl).not.toHaveBeenCalled();
   });

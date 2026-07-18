@@ -229,6 +229,13 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
     }
 
     if (!rebase.updated) {
+      if (!options.dryRun && hasConflictLabel) {
+        await removeLabelPrImpl(
+          options.repo,
+          pr.number,
+          'needs-conflict-resolution'
+        );
+      }
       console.log(`    - ${rebase.reason}`);
       continue;
     }

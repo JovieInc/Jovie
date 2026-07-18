@@ -3,6 +3,8 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+const POST_UPDATE_VERIFY_DELAYS_MS = [0, 250, 500, 1000, 2000];
+
 const UPDATE_PULL_REQUEST_BRANCH_MUTATION = `
   mutation UpdatePullRequestBranch(
     $pullRequestId: ID!
@@ -134,12 +136,52 @@ async function tryFetchPrSnapshot(repo, prNumber, ghJsonImpl) {
   }
 }
 
+function sleep(delayMs) {
+  return new Promise(resolve => setTimeout(resolve, delayMs));
+}
+
+async function pollForUpdatedHead({
+  repo,
+  prNumber,
+  before,
+  mutated,
+  ghJsonImpl,
+  sleepImpl,
+}) {
+  let lastSnapshot = null;
+
+  for (const delayMs of POST_UPDATE_VERIFY_DELAYS_MS) {
+    if (delayMs > 0) await sleepImpl(delayMs);
+
+    const snapshot = await tryFetchPrSnapshot(repo, prNumber, ghJsonImpl);
+    if (!snapshot) continue;
+    lastSnapshot = snapshot;
+
+    if (
+      snapshot.id !== before.id ||
+      snapshot.baseRefName !== before.baseRefName ||
+      snapshot.headRefName !== before.headRefName
+    ) {
+      return { snapshot, identityChanged: true };
+    }
+    if (snapshot.headRefOid === mutated.headRefOid) {
+      return { snapshot, converged: true };
+    }
+    if (snapshot.headRefOid !== before.headRefOid) {
+      return { snapshot, headChanged: true };
+    }
+  }
+
+  return { snapshot: lastSnapshot, timedOut: true };
+}
+
 export async function tryGitHubRebase({
   repo,
   pr,
   expectedBaseRefName,
   dryRun,
   ghJsonImpl = ghJson,
+  sleepImpl = sleep,
 }) {
   if (dryRun) {
     return {
@@ -230,8 +272,12 @@ export async function tryGitHubRebase({
   }
 
   const mutated = mutation?.data?.updatePullRequestBranch?.pullRequest;
-  const after = await tryFetchPrSnapshot(repo, pr.number, ghJsonImpl);
-  if (!mutated?.headRefOid || !after?.headRefOid) {
+  if (
+    !mutated?.headRefOid ||
+    mutated.id !== before.id ||
+    mutated.baseRefName !== before.baseRefName ||
+    mutated.headRefName !== before.headRefName
+  ) {
     return {
       ok: false,
       conflict: false,
@@ -239,18 +285,20 @@ export async function tryGitHubRebase({
       baseRefName: before.baseRefName,
       expectedHeadOid: before.headRefOid,
       reason:
-        'GitHub rebase returned without a verifiable post-update head; refusing enrollment mutation',
+        'GitHub rebase returned without a verifiable PR identity, base, or head; refusing enrollment mutation',
     };
   }
-  if (
-    mutated.id !== before.id ||
-    after.id !== before.id ||
-    mutated.baseRefName !== before.baseRefName ||
-    after.baseRefName !== before.baseRefName ||
-    mutated.headRefName !== before.headRefName ||
-    after.headRefName !== before.headRefName ||
-    mutated.headRefOid !== after.headRefOid
-  ) {
+
+  const verification = await pollForUpdatedHead({
+    repo,
+    prNumber: pr.number,
+    before,
+    mutated,
+    ghJsonImpl,
+    sleepImpl,
+  });
+  const after = verification.snapshot;
+  if (verification.identityChanged || verification.headChanged) {
     return {
       ok: false,
       conflict: false,
@@ -260,6 +308,17 @@ export async function tryGitHubRebase({
       observedHeadOid: after.headRefOid,
       reason:
         'PR identity, base, or head changed after GitHub rebase; refusing enrollment mutation',
+    };
+  }
+  if (!verification.converged || !after?.headRefOid) {
+    return {
+      ok: false,
+      conflict: false,
+      category: 'verification_failure',
+      baseRefName: before.baseRefName,
+      expectedHeadOid: before.headRefOid,
+      observedHeadOid: after?.headRefOid ?? null,
+      reason: `GitHub rebase head was not visible after ${POST_UPDATE_VERIFY_DELAYS_MS.length} bounded verification reads; refusing enrollment mutation`,
     };
   }
   if (after.headRefOid === before.headRefOid) {
