@@ -102,7 +102,7 @@ jobs:
     # It gives fork PRs the bot credential required to update the required gate.
     if: >-
       (github.event_name == 'pull_request_target' && github.actor != 'copilot-swe-agent[bot]' && github.actor != 'dependabot[bot]') ||
-      (github.event_name == 'pull_request_review' && github.event.review.user.type != 'Bot')
+      (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == true && github.event.review.state == 'approved' && github.event.review.user.type != 'Bot')
     runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 3
     permissions: {}

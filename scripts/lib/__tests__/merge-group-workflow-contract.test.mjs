@@ -67,6 +67,8 @@ describe('merge_group workflow contract', () => {
 
   it('fans real combined-head checks into PR Ready without PR metadata or deploy evidence', () => {
     const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
+    const sourceAggregate = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
+    const unitTests = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(aggregate).toContain(
       "github.event_name == 'merge_group' && 'PR Ready'"
     );
@@ -85,6 +87,24 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain(
       'Unit Tests legitimately skipped because path detection selected no test-relevant files.'
     );
+    expect(aggregate).toContain(
+      'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
+    );
+    expect(sourceAggregate).not.toContain(
+      'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
+    );
+    expect(sourceAggregate).toContain(
+      'Source PR unit tests are intentionally deferred to the merge-group combined head.'
+    );
+    expect(unitTests).toContain(
+      "needs.ci-path-changes.outputs.run_test == 'true'"
+    );
+    expect(unitTests).toContain("github.event_name == 'merge_group'");
+    expect(unitTests).toContain(
+      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    );
+    expect(unitTests).toContain("github.event_name == 'workflow_dispatch'");
+    expect(unitTests).not.toContain("github.event_name == 'pull_request'");
     expect(aggregate).not.toMatch(
       /github\.event\.pull_request|github\.(base_ref|head_ref)/
     );
@@ -178,6 +198,23 @@ describe('merge_group workflow contract', () => {
     const deployNotify = getJobBlock(CI_WORKFLOW, 'deploy-notify');
     expect(deployNotify).toContain("github.event_name == 'push'");
     expect(deployNotify).toContain("github.ref == 'refs/heads/main'");
+  });
+
+  it('allocates review-event fork-gate runners only for approved main-bound forks', () => {
+    const controller = getJobBlock(FORK_GATE_WORKFLOW, 'fork-gate');
+    const jobCondition = controller.match(
+      /^    if: >-\n([\s\S]*?)^    runs-on:/m
+    )?.[1];
+    expect(jobCondition).toBeTruthy();
+    for (const requirement of [
+      "github.event_name == 'pull_request_review'",
+      "github.event.pull_request.base.ref == 'main'",
+      'github.event.pull_request.head.repo.fork == true',
+      "github.event.review.state == 'approved'",
+      "github.event.review.user.type != 'Bot'",
+    ]) {
+      expect(jobCondition).toContain(requirement);
+    }
   });
 
   it('emits the metadata-only required contexts on the combined head', () => {

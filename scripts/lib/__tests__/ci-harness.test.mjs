@@ -227,6 +227,86 @@ describe('ci-harness manifest', () => {
       );
   });
 
+  it('runs unit matrices on integration heads while source PR Ready accepts the intentional skip', () => {
+    const workflow = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+      'utf8'
+    );
+    const unitTests = extractWorkflowJobBlock(workflow, 'ci-unit-tests');
+    expect(unitTests).toContain(
+      "needs.ci-path-changes.outputs.run_test == 'true'"
+    );
+    expect(
+      unitTests.indexOf("needs.ci-path-changes.outputs.run_test == 'true'")
+    ).toBeLessThan(unitTests.indexOf('runs-on:'));
+    expect(unitTests).toContain("github.event_name == 'merge_group'");
+    expect(unitTests).toContain(
+      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    );
+    expect(unitTests).toContain("github.event_name == 'workflow_dispatch'");
+    expect(unitTests).not.toContain("github.event_name == 'pull_request'");
+
+    const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
+    expect(prReady).not.toContain(
+      'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
+    );
+    // biome-ignore format: exhaustive source PR Ready unit-result contract
+    for (const [unitResult, status] of [
+      ['success', 0],
+      ['skipped', 0],
+      ['failure', 1],
+      ['cancelled', 1],
+      ['neutral', 1],
+    ]) {
+      expect(
+        runWorkflowBash(
+          prReady,
+          /^ {10}if \[\[ "\$UNIT_RESULT"[\s\S]*?^ {10}fi/m,
+          { UNIT_RESULT: unitResult }
+        ).status,
+        unitResult
+      ).toBe(status);
+    }
+
+    const mergeReady = extractWorkflowJobBlock(
+      workflow,
+      'ci-merge-group-ready'
+    );
+    expect(mergeReady).toContain(
+      'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
+    );
+    // biome-ignore format: exhaustive merge-group unit-result/path-selection contract
+    for (const [unitResult, runTest, status] of [
+      ['success', 'true', 0],
+      ['success', 'false', 0],
+      ['failure', 'true', 1],
+      ['failure', 'false', 1],
+      ['cancelled', 'true', 1],
+      ['cancelled', 'false', 1],
+      ['skipped', 'true', 1],
+      ['skipped', 'false', 0],
+      ['neutral', 'false', 1],
+    ]) {
+      expect(
+        runWorkflowBash(
+          mergeReady,
+          /^ {10}if \[\[ "\$UNIT_RESULT" != "success" \]\]; then[\s\S]*?^ {12}echo "Unit Tests legitimately skipped[^\n]*"[\s\S]*?^ {10}fi/m,
+          { UNIT_RESULT: unitResult, RUN_TEST: runTest }
+        ).status,
+        `${unitResult}; run_test=${runTest}`
+      ).toBe(status);
+    }
+
+    const summary = extractWorkflowJobBlock(workflow, 'ci-summary');
+    expect(summary).toContain("UNIT_RUN_FULL_CI: 'false'");
+    expect(summary).not.toContain(
+      'UNIT_RUN_FULL_CI: ${{ needs.ci-path-changes.outputs.run_test }}'
+    );
+    expect(summary).not.toContain(
+      'UNIT_RUN_FULL_CI: ${{ needs.ci-unit-tests.outputs.run_full_ci }}'
+    );
+  });
+
   it('defaults bare merge queue checks to the active Graphite backend', () => {
     const { MERGE_QUEUE_BACKEND: _ignored, ...env } = process.env;
     // biome-ignore format: executable CLI regression stays compact for the integration-train cap
