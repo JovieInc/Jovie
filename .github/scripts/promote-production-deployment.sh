@@ -4,7 +4,9 @@ set -euo pipefail
 deploy_id="${PRODUCTION_DEPLOYMENT_ID:-}"
 vercel_cli="${VERCEL_CLI:-./node_modules/.bin/vercel}"
 poll_seconds="${PRODUCTION_PROMOTION_POLL_SECONDS:-5}"
-settle_attempts="${PRODUCTION_PROMOTION_SETTLE_ATTEMPTS:-36}"
+# Production holds at 10% for five minutes. The eight-minute default leaves
+# three minutes for Vercel's asynchronous rollout state to converge.
+settle_attempts="${PRODUCTION_PROMOTION_SETTLE_ATTEMPTS:-96}"
 cleanup_attempts="${PRODUCTION_PROMOTION_CLEANUP_ATTEMPTS:-12}"
 promote_timeout="${PRODUCTION_PROMOTION_CLI_TIMEOUT:-3m}"
 

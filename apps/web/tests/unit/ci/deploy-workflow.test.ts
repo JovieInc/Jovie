@@ -1744,10 +1744,43 @@ describe('production promotion exact-artifact contract', () => {
     expect(smokeJob).not.toContain('Wait for CDN propagation');
   });
 
-  it('keeps promotion ownership checks and cleanup hard-bounded', () => {
+  it('keeps promotion ownership and live rollout horizon hard-bounded', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
     const controller = readFileSync(productionPromotionControllerPath, 'utf8');
+    const promotionJob = getJobBlock(workflow, 'promote-production');
+    const promotionStep = getStepBlock(
+      promotionJob,
+      'Promote staged production deployment'
+    );
+    const defaultPollSeconds = Number(
+      controller.match(/PRODUCTION_PROMOTION_POLL_SECONDS:-([0-9]+)}/)?.[1]
+    );
+    const defaultSettleAttempts = Number(
+      controller.match(/PRODUCTION_PROMOTION_SETTLE_ATTEMPTS:-([0-9]+)}/)?.[1]
+    );
+    const defaultPromoteTimeoutMinutes = Number(
+      controller.match(/PRODUCTION_PROMOTION_CLI_TIMEOUT:-([0-9]+)m}/)?.[1]
+    );
+    const promotionStepTimeoutMinutes = Number(
+      promotionStep.match(/timeout-minutes:\s*([0-9]+)/)?.[1]
+    );
+    // Vercel durations are minutes; production holds 10% traffic for 5 minutes.
+    const liveAutomaticStageSeconds = 5 * 60;
+    const apiConvergenceBufferSeconds = 3 * 60;
+    const shellAndApiBufferSeconds = 60;
 
-    expect(controller).toContain('PRODUCTION_PROMOTION_SETTLE_ATTEMPTS:-36');
+    expect(defaultPollSeconds).toBe(5);
+    expect(defaultSettleAttempts).toBe(96);
+    expect(defaultPollSeconds * defaultSettleAttempts).toBeGreaterThanOrEqual(
+      liveAutomaticStageSeconds + apiConvergenceBufferSeconds
+    );
+    expect(defaultPromoteTimeoutMinutes).toBe(3);
+    expect(promotionStepTimeoutMinutes).toBe(15);
+    expect(promotionStepTimeoutMinutes * 60).toBeGreaterThanOrEqual(
+      defaultPromoteTimeoutMinutes * 60 +
+        defaultPollSeconds * defaultSettleAttempts +
+        shellAndApiBufferSeconds
+    );
     expect(controller).toContain('PRODUCTION_PROMOTION_CLEANUP_ATTEMPTS:-12');
     expect(controller).toContain('rolling-release fetch');
     expect(controller).toContain('rollout_target_id');
