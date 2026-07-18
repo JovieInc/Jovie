@@ -180,6 +180,23 @@ describe('merge_group workflow contract', () => {
     expect(deployNotify).toContain("github.ref == 'refs/heads/main'");
   });
 
+  it('allocates review-event fork-gate runners only for approved main-bound forks', () => {
+    const controller = getJobBlock(FORK_GATE_WORKFLOW, 'fork-gate');
+    const jobCondition = controller.match(
+      /^    if: >-\n([\s\S]*?)^    runs-on:/m
+    )?.[1];
+    expect(jobCondition).toBeTruthy();
+    for (const requirement of [
+      "github.event_name == 'pull_request_review'",
+      "github.event.pull_request.base.ref == 'main'",
+      'github.event.pull_request.head.repo.fork == true',
+      "github.event.review.state == 'approved'",
+      "github.event.review.user.type != 'Bot'",
+    ]) {
+      expect(jobCondition).toContain(requirement);
+    }
+  });
+
   it('emits the metadata-only required contexts on the combined head', () => {
     expect(FORK_GATE_WORKFLOW).toMatch(
       /merge_group:\n\s+types: \[checks_requested\]/
