@@ -74,19 +74,14 @@ jobs:
     env:
       REFRESH_MODE: ${{ github.event_name != 'pull_request' && 'true' || 'false' }}
       SNAPSHOT_DIR: apps/web/tests/e2e/__snapshots__
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
     steps:
-      - name: Generate Jovie Bot token (refresh only)
-        id: app-token
-        if: env.REFRESH_MODE == 'true'
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          token: ${{ steps.app-token.outputs.token || github.token }}
           fetch-depth: 1
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -161,6 +156,7 @@ jobs:
 
           cleanup() {
             kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
           }
           trap cleanup EXIT
 
@@ -192,13 +188,13 @@ jobs:
           fi
 
           # Public marketing/auth baselines (JOV-4060)
-          pnpm exec playwright test tests/e2e/visual-regression.spec.ts \
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/visual-regression.spec.ts \
             --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
 
           # Admin surfaces (JOV-4062) — same server, refresh heals stale admin baselines.
           # Compare stays informational with the public suite (continue-on-error on PRs).
           E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=admin \
-            pnpm exec playwright test tests/e2e/admin-visual-regression.spec.ts \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/admin-visual-regression.spec.ts \
             --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
         env:
           BASE_URL: http://localhost:3100
@@ -211,12 +207,14 @@ jobs:
           URL_ENCRYPTION_KEY: visual-regression-ci-url-encryption-key
           AI_GATEWAY_API_KEY: visual-regression-ci
 
-      - name: Upload Playwright report on failure
-        if: steps.visual.outcome == 'failure'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - name: Upload Playwright results on failure
+        if: ${{ always() && steps.visual.outcome == 'failure' && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/playwright-report/
+          path: apps/web/test-results/
+          allow-images: 'true'
+          allow-markdown: 'true'
           retention-days: 7
 
       - name: Check for baseline changes (refresh only)
@@ -232,6 +230,14 @@ jobs:
             git status --short "$SNAPSHOT_DIR"
           fi
 
+      - name: Generate Jovie Bot token (refresh only)
+        id: app-token
+        if: env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Create or update baseline PR (refresh only)
         if: env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true'
         env:
@@ -241,6 +247,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           BRANCH="visual-baselines/auto-update"
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
 
           EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number \
             -q '.[0].number' 2>/dev/null || true)
@@ -256,7 +263,7 @@ jobs:
           PUSHED=false
           for ATTEMPT in 1 2 3; do
             set +e
-            PUSH_OUTPUT=$(git push --force origin "$BRANCH" 2>&1)
+            PUSH_OUTPUT=$(git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push --force origin "$BRANCH" 2>&1)
             PUSH_EXIT=$?
             set -e
 

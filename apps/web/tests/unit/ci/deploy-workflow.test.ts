@@ -842,7 +842,7 @@ describe('canary health gate workflow', () => {
     expect(authSmokeStep).toContain('auth_smoke_attempt=1');
     expect(authSmokeStep).toContain('auth_smoke_max_attempts=3');
     expect(authSmokeStep).toContain(
-      'until CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do'
+      'until CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do'
     );
     expect(authSmokeStep).toContain(
       'Public auth controls failed after ${auth_smoke_max_attempts} attempts.'
@@ -1231,9 +1231,9 @@ describe('CI public lighthouse workflow', () => {
       'Upload public Lighthouse mobile artifacts on failure'
     );
     expect(failureArtifactStep).toContain(
-      'if: ${{ failure() && matrix.shard == 1 }}'
+      "if: ${{ failure() && matrix.shard == 1 && hashFiles('apps/web/test-results/**') != '' }}"
     );
-    expect(failureArtifactStep).toContain('apps/web/playwright-report/');
+    expect(failureArtifactStep).not.toContain('apps/web/playwright-report/');
     expect(failureArtifactStep).toContain('apps/web/test-results/');
   });
 

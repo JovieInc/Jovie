@@ -1292,6 +1292,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 8
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - name: Reset workspace git state (self-hosted)
         if: runner.environment != 'github-hosted'
@@ -1311,6 +1312,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           clean: true
+          persist-credentials: false
 
       - name: Materialize full tree (self-hosted)
         if: runner.environment != 'github-hosted'
@@ -1393,7 +1395,7 @@ jobs:
             exit 1
           fi
 
-          pnpm exec playwright test "${LAYOUT_GUARD_SPECS[@]}" --config=playwright.config.noauth.ts --project=chromium --reporter=line
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test "${LAYOUT_GUARD_SPECS[@]}" --config=playwright.config.noauth.ts --project=chromium --reporter=line
         env:
           BASE_URL: http://localhost:3230
           SMOKE_ONLY: '1'
@@ -1403,11 +1405,11 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
 
       - name: Upload Playwright Report on Failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/playwright-report/
+          path: apps/web/test-results/
           retention-days: 3
 
   ci-mobile-overflow:
@@ -1416,6 +1418,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 45
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
       fail-fast: false
       # The expanded runner pool supports two widths while the third remains
@@ -1427,6 +1430,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -1587,7 +1591,7 @@ jobs:
 
           # The lane uses the deterministic test-auth bypass, so use the
           # no-auth config and avoid its unrelated legacy Clerk setup project.
-          BASE_URL="http://localhost:$OVERFLOW_PORT" pnpm exec playwright test tests/e2e/mobile-overflow.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
+          BASE_URL="http://localhost:$OVERFLOW_PORT" node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/mobile-overflow.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -1614,12 +1618,11 @@ jobs:
           PLAYWRIGHT_WORKERS: '1'
 
       - name: Upload Playwright Artifacts on Failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 3
 
@@ -1632,6 +1635,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing'))) && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true') }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true' }
     strategy:
       fail-fast: false
       # The expanded runner pool supports both CPU-heavy shards concurrently.
@@ -1641,6 +1645,8 @@ jobs:
         shard: [0, 1]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Setup Playwright (Chromium)
@@ -1812,7 +1818,7 @@ jobs:
           if [ "${{ matrix.shard }}" = "1" ]; then
             mkdir -p tests/.auth
             echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-            pnpm exec playwright test tests/e2e/profile-mobile-viewport-stability.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/profile-mobile-viewport-stability.spec.ts --config=playwright.config.noauth.ts --project=chromium --reporter=line
           fi
         env:
           CI: true
@@ -1828,13 +1834,13 @@ jobs:
           AI_GATEWAY_API_KEY: lighthouse-public-ci
 
       - name: Upload public Lighthouse mobile artifacts on failure
-        if: ${{ failure() && matrix.shard == 1 }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() && matrix.shard == 1 && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            apps/web/playwright-report/
             apps/web/test-results/
+          allow-images: 'true'
           retention-days: 3
 
   ci-lighthouse-dashboard-pr:
@@ -2712,10 +2718,12 @@ jobs:
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     continue-on-error: true
     timeout-minutes: 10
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Check for production auth credentials
         id: check-creds
@@ -2745,7 +2753,7 @@ jobs:
 
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          CI=true BASE_URL=https://jov.ie pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
+          CI=true BASE_URL=https://jov.ie node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
         env:
           E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
           E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
@@ -2755,12 +2763,11 @@ jobs:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
       - name: Upload Playwright Artifacts on Failure
-        if: failure() && steps.check-creds.outputs.skip != 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() && steps.check-creds.outputs.skip != 'true' && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: post-deploy-auth-smoke-${{ github.run_id }}
           path: |
-            apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 3
 
@@ -2848,6 +2855,10 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
+      - name: Setup Playwright warm path
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/setup-playwright
+
       - name: Load quarantined unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
         id: quarantine
@@ -2921,10 +2932,12 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true')) && needs.ci-build-public.outputs.has_artifact == 'true') }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Check for relevant changes
         id: check_changes
@@ -3056,7 +3069,7 @@ jobs:
             exit 1
           fi
 
-          pnpm exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium --reporter=line
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium --reporter=line
         env:
           BASE_URL: http://localhost:3220
           SMOKE_ONLY: '1'
@@ -3067,11 +3080,11 @@ jobs:
           AI_GATEWAY_API_KEY: a11y-public-ci
 
       - name: Upload Playwright Report on Failure
-        if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/playwright-report/
+          path: apps/web/test-results/
           retention-days: 3
 
   # Authenticated a11y (JOV-4061): dashboard + chat axe suites that previously
@@ -3086,10 +3099,12 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -3193,7 +3208,7 @@ jobs:
             sleep 1
           done
 
-          pnpm exec playwright test \
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test \
             tests/e2e/a11y.spec.ts \
             tests/e2e/chat-axe.spec.ts \
             --config=playwright.config.ts --project=chromium
@@ -3215,12 +3230,11 @@ jobs:
           AI_GATEWAY_API_KEY: a11y-authed-ci
 
       - name: Upload Playwright Report on Failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 7
           if-no-files-found: error
@@ -3235,6 +3249,7 @@ jobs:
     if: ${{ always() && needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'))) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     concurrency:
       group: neon-endpoint-pool-ci-e2e-smoke-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
       cancel-in-progress: false
@@ -3244,6 +3259,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Check for relevant changes
         id: check_changes
@@ -3415,7 +3431,7 @@ jobs:
           fi
 
           cd "$GITHUB_WORKSPACE"
-          CI=true BASE_URL=http://localhost:3240 pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --reporter=line
+          CI=true BASE_URL=http://localhost:3240 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           BETTER_AUTH_URL: http://localhost:3240
@@ -3428,12 +3444,11 @@ jobs:
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Upload Playwright Artifacts on Failure
-        if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 3
 
@@ -3460,6 +3475,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.ci-path-changes.outputs.run_golden_path == 'true' || contains(github.event.pull_request.labels.*.name, 'launch-candidate') || contains(github.event.pull_request.labels.*.name, 'testing')) && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'))) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 25
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     # Scope pending replacement to one PR. GitHub replaces the older pending job in
     # a constant concurrency group even when cancel-in-progress is false, which can
     # cancel a required check before it obtains a runner. Golden-path cleanup only
@@ -3471,6 +3487,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -3623,7 +3640,7 @@ jobs:
           fi
 
           cd "$GITHUB_WORKSPACE"
-          BASE_URL=http://localhost:3250 E2E_SKIP_WEB_SERVER=1 pnpm --filter @jovie/web run test:e2e:golden-path:ci
+          BASE_URL=http://localhost:3250 E2E_SKIP_WEB_SERVER=1 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter @jovie/web run test:e2e:golden-path:ci
         env:
           # The runner also needs the database and deterministic E2E OTP flag.
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -3641,12 +3658,11 @@ jobs:
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Upload Playwright Artifacts on Failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 3
 
@@ -3668,6 +3684,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     concurrency:
       group: neon-endpoint-pool-ci-admin-smoke-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
       cancel-in-progress: false
@@ -3675,6 +3692,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Check for relevant changes
         id: check_changes
@@ -3766,19 +3784,18 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         # dashboard-pages-health is temporarily quarantined in apps/web/tests/quarantine.json due to JOV-782 flakiness.
-        run: pnpm --filter=@jovie/web exec playwright test tests/e2e/dashboard-pages-health.spec.ts --grep "Admin Pages Health Check" --project=chromium
+        run: node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/dashboard-pages-health.spec.ts --grep "Admin Pages Health Check" --project=chromium
 
       - name: Skip notification (quarantined)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.run_admin_smoke != 'true'
         run: echo "Skipping admin smoke; admin spec is quarantined."
 
       - name: Upload Playwright Artifacts on Failure
-        if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 3
 
@@ -3878,6 +3895,7 @@ jobs:
     if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')))) }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
       fail-fast: true
       # Cap E2E shard concurrency (preview env + Playwright is heavy).
@@ -3888,6 +3906,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 2
+          persist-credentials: false
 
       - name: Set shard env
         run: |
@@ -3995,7 +4014,7 @@ jobs:
           # `e2e:smoke:tagged` runs every `-g @smoke` test across the suite,
           # sharded and quarantine-filtered. The focused PR-fast lane lives in
           # the separate `ci-e2e-smoke` job (playwright.config.smoke.ts).
-          cd apps/web && pnpm e2e:smoke:tagged --trace=retain-on-failure --project=chromium --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm e2e:smoke:tagged --trace=off --project=chromium --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Auth Smoke (PR Gate)
         if: ${{ matrix.shard == 1 && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && hashFiles('apps/web/tests/e2e/smoke-auth.spec.ts') != '' }}
@@ -4023,7 +4042,7 @@ jobs:
           # Optional: enable deterministic spotify-only UI check
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         run: |
-          cd apps/web && pnpm --filter=@jovie/web run e2e:auth-smoke --project=chromium
+          cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web run e2e:auth-smoke --project=chromium
 
       - name: E2E Full (Main Branch)
         if: ${{ github.ref == 'refs/heads/main' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
@@ -4048,7 +4067,7 @@ jobs:
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          cd apps/web && pnpm playwright test --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Quarantine (retries)
         if: ${{ matrix.shard == 1 && steps.quarantine.outputs.has_quarantine == 'true' }}
@@ -4069,19 +4088,11 @@ jobs:
           SENTRY_RELEASE: ${{ github.sha }}
         run: |
           RETRIES=$(jq -r '.retryBudget.quarantineE2eRetries // 2' apps/web/tests/quarantine.json)
-          cd apps/web && pnpm playwright test --retries="$RETRIES" ${{ steps.quarantine.outputs.quarantined_specs }}
-
-      - name: Upload Playwright Report on Failure
-        if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ${{ github.job }}-shard-${{ matrix.shard }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/playwright-report/
-          retention-days: 7
+          cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --retries="$RETRIES" ${{ steps.quarantine.outputs.quarantined_specs }}
 
       - name: Upload Playwright Test Results on Failure
-        if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: ${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
@@ -5026,10 +5037,12 @@ jobs:
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     environment: Preview – jovie
     timeout-minutes: 20
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -5153,7 +5166,7 @@ jobs:
           # Run smoke tests with BASE_URL set (skips Playwright webServer config)
           cd "$GITHUB_WORKSPACE"
           set +e
-          CI=true BASE_URL=http://localhost:3260 pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --reporter=line
+          CI=true BASE_URL=http://localhost:3260 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --reporter=line
           EXIT_CODE=$?
           set -e
           exit $EXIT_CODE
@@ -5180,12 +5193,11 @@ jobs:
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
       - name: Upload Playwright Artifacts on Failure
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: smoke-required-report-${{ github.run_id }}
           path: |
-            apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 3
 
@@ -5922,7 +5934,7 @@ jobs:
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           attempt=1
           max_attempts=3
-          until CI=true SMOKE_ONLY=1 BASE_URL="https://jov.ie" pnpm exec playwright test tests/e2e/oauth-providers.spec.ts --project=chromium --reporter=line; do
+          until CI=true SMOKE_ONLY=1 BASE_URL="https://jov.ie" node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/oauth-providers.spec.ts --project=chromium --reporter=line; do
             if [ "$attempt" -ge "$max_attempts" ]; then
               echo "oauth_status=failed" >> "$GITHUB_OUTPUT"
               echo "❌ Production OAuth probe failed after ${max_attempts} attempts — Google/Apple reject Clerk's redirect_uri."

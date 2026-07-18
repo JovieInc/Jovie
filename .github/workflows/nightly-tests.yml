@@ -113,10 +113,12 @@ jobs:
     environment: Preview – jovie
     runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 45
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -218,7 +220,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1' }}
         run: |
           cd apps/web
-          pnpm run qa:routes
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm run qa:routes
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
@@ -230,10 +232,14 @@ jobs:
         if: ${{ github.event_name == 'schedule' || (github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1') }}
         run: |
           cd apps/web
-          pnpm playwright test tests/e2e/nightly/full-surface-chaos.spec.ts --config=playwright.config.nightly.ts --project=chromium
-          if [ -f test-results/nightly-results.json ]; then
-            cp test-results/nightly-results.json test-results/full-surface-chaos-report.json
-          fi
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- bash -c "
+            pnpm playwright test tests/e2e/nightly/full-surface-chaos.spec.ts --config=playwright.config.nightly.ts --project=chromium
+            status=\$?
+            if [ -f test-results/nightly-results.json ]; then
+              cp test-results/nightly-results.json test-results/full-surface-chaos-report.json || exit \$?
+            fi
+            exit \"\$status\"
+          "
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
@@ -258,13 +264,14 @@ jobs:
           fi
 
       - name: Run nightly E2E tests
+        id: nightly-e2e
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.suite != 'design-v1' }}
         run: |
           cd apps/web
           if [ -n "${{ github.event.inputs.test_filter }}" ]; then
-            pnpm playwright test "${{ github.event.inputs.test_filter }}" --config=playwright.config.nightly.ts --project=chromium --reporter=line
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test "${{ github.event.inputs.test_filter }}" --config=playwright.config.nightly.ts --project=chromium
           else
-            pnpm playwright test --config=playwright.config.nightly.ts --project=chromium --reporter=line --grep-invert=@full-surface-chaos
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --config=playwright.config.nightly.ts --project=chromium --grep-invert=@full-surface-chaos
           fi
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
@@ -275,38 +282,30 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
-      - name: Upload Playwright Report on Failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: nightly-e2e-report-${{ github.run_id }}
-          path: apps/web/playwright-report/
-          retention-days: 7
-
       - name: Upload Test Results on Failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && steps.nightly-e2e.outcome == 'failure' && hashFiles('apps/web/test-results/nightly-results.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: nightly-e2e-results-${{ github.run_id }}
-          path: apps/web/test-results/
+          path: apps/web/test-results/nightly-results.json
           retention-days: 7
 
       - name: Upload route QA ledger
-        if: ${{ always() && (github.event_name == 'schedule' || github.event.inputs.test_filter == '') }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1' && hashFiles('apps/web/test-results/route-qa/nightly-route-qa/route-matrix.json') != '' && hashFiles('apps/web/test-results/route-qa/nightly-route-qa/findings-ledger.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: nightly-route-qa-${{ github.run_id }}
-          path: apps/web/test-results/route-qa/nightly-route-qa/
-          if-no-files-found: ignore
+          path: |
+            apps/web/test-results/route-qa/nightly-route-qa/route-matrix.json
+            apps/web/test-results/route-qa/nightly-route-qa/findings-ledger.json
           retention-days: 7
 
       - name: Upload full surface chaos report
-        if: ${{ always() && (github.event_name == 'schedule' || github.event.inputs.test_filter == '') }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && (github.event_name == 'schedule' || (github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1')) && hashFiles('apps/web/test-results/full-surface-chaos-report.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: full-surface-chaos-${{ github.run_id }}
           path: apps/web/test-results/full-surface-chaos-report.json
-          if-no-files-found: ignore
           retention-days: 7
 
       - name: Cleanup Clerk E2E test users
