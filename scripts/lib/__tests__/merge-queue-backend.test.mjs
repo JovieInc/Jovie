@@ -9,6 +9,7 @@ import {
   runCli,
   validateNativePreflightEvidence,
 } from '../../merge-queue-backend.mjs';
+import { extractWorkflowJobBlock } from '../merge-queue-guard.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -208,22 +209,43 @@ describe('queue workflow mutation safety', () => {
     );
   });
 
-  it('requires native configuration and ruleset preflight before autoenroll mutations', () => {
+  it('requires native configuration, app auth, and preflight before autoenroll mutations', () => {
     const workflow = readRepoFile(
       '.github/workflows/merge-queue-autoenroll.yml'
     );
+    const enrollJob = extractWorkflowJobBlock(workflow, 'enroll');
+    const rebaseJob = extractWorkflowJobBlock(workflow, 'rebase');
     const enroll = workflowStep(workflow, 'Enroll clean PRs');
     const rebasePreflight = workflowStep(
       workflow,
       'Preflight native queue cutover'
     );
+    const rebaseMutation = workflowStep(
+      workflow,
+      'Rebase blocked agent PRs onto main (Phase 2)'
+    );
     const drain = readRepoFile('scripts/drain-pr-queue.sh');
+    const tokenAction =
+      'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1';
 
     expect(workflow).toContain(
       'MERGE_QUEUE_BACKEND: ${{ vars.MERGE_QUEUE_BACKEND }}'
     );
     expect(workflow).not.toContain("MERGE_QUEUE_BACKEND || 'graphite'");
     expect(workflow).toContain('  rebase:\n    needs: enroll\n');
+    for (const job of [enrollJob, rebaseJob]) {
+      expect(job).toContain(tokenAction);
+      expect(job).toContain('id: app-token');
+      expect(job).toContain('app-id: ${{ vars.JOVIE_BOT_APP_ID }}');
+      expect(job).toContain(
+        'private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
+      );
+      expect(job).not.toContain('secrets.GITHUB_TOKEN');
+    }
+    for (const step of [enroll, rebasePreflight, rebaseMutation]) {
+      expect(step).toContain('GH_TOKEN: ${{ steps.app-token.outputs.token }}');
+      expect(step).not.toContain('secrets.GITHUB_TOKEN');
+    }
     expect(enroll).toContain('if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]');
     expect(enroll).toContain('bash scripts/drain-pr-queue.sh');
     expect(rebasePreflight).toContain(
