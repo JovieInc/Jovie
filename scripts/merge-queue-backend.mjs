@@ -213,6 +213,7 @@ export function validateNativePreflightEvidence({
   branchProtectionRef,
   rulesetId = DEFAULT_RULESET_ID,
   baseBranch = DEFAULT_BASE_BRANCH,
+  allowUnavailableBypassActors = false,
 } = {}) {
   const errors = [];
   const mergeQueueRule = ruleset?.rules?.find(
@@ -229,6 +230,9 @@ export function validateNativePreflightEvidence({
   );
   const bypassActors = ruleset?.bypass_actors;
   const hasValidBypassActors = Array.isArray(bypassActors);
+  const bypassActorsVisible = bypassActors !== undefined;
+  const unavailableBypassActorsAllowed =
+    allowUnavailableBypassActors === true && !bypassActorsVisible;
   const hasBranchProtectionRef =
     typeof branchProtectionRef === 'object' &&
     branchProtectionRef !== null &&
@@ -275,7 +279,8 @@ export function validateNativePreflightEvidence({
     'source required checks must be loose; merge_group validates latest main':
       ruleset?.rules?.find(rule => rule?.type === 'required_status_checks')
         ?.parameters?.strict_required_status_checks_policy === false,
-    'ruleset bypass_actors must be an array': hasValidBypassActors,
+    'ruleset bypass_actors must be an array':
+      hasValidBypassActors || unavailableBypassActorsAllowed,
     'ruleset bypass_actors must be empty before native enrollment':
       !hasValidBypassActors || bypassActors.length === 0,
     [`repository default branch must be ${baseBranch}`]:
@@ -303,6 +308,7 @@ export function validateNativePreflightEvidence({
       requiredChecks,
       rulesetId: ruleset?.id ?? null,
       workflowHasMergeGroup,
+      bypassActorsVisible,
     },
   };
 }
@@ -312,6 +318,7 @@ export async function preflightMergeQueue({
   repository = DEFAULT_REPOSITORY,
   rulesetId = DEFAULT_RULESET_ID,
   baseBranch = DEFAULT_BASE_BRANCH,
+  allowUnavailableBypassActors = false,
   runner = createGhRunner(),
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
@@ -357,6 +364,7 @@ export async function preflightMergeQueue({
     branchProtectionRef,
     rulesetId,
     baseBranch,
+    allowUnavailableBypassActors,
   });
   if (!validation.ok) {
     throw backendError(
@@ -535,6 +543,7 @@ export async function enrollPullRequest({
   repository = DEFAULT_REPOSITORY,
   rulesetId = DEFAULT_RULESET_ID,
   baseBranch = DEFAULT_BASE_BRANCH,
+  allowUnavailableBypassActors = false,
   number,
   expectedHeadOid,
   runner = createGhRunner(),
@@ -554,6 +563,7 @@ export async function enrollPullRequest({
     repository,
     rulesetId,
     baseBranch,
+    allowUnavailableBypassActors,
     runner,
   });
 
@@ -681,14 +691,17 @@ export async function runCli(
   const repository = env.REPO ?? env.GITHUB_REPOSITORY ?? DEFAULT_REPOSITORY;
   const rulesetId = env.MERGE_QUEUE_RULESET_ID ?? DEFAULT_RULESET_ID;
   const baseBranch = env.MERGE_QUEUE_BASE_BRANCH ?? DEFAULT_BASE_BRANCH;
+  const allowUnavailableBypassActors =
+    env.MERGE_QUEUE_NATIVE_AUTHORIZATION === 'merge-queue-autoenroll';
   const [command, ...args] = argv;
   const options = { backend, repository, rulesetId, baseBranch, runner };
+  const preflightOptions = { ...options, allowUnavailableBypassActors };
   const commands = {
-    preflight: () => preflightMergeQueue(options),
+    preflight: () => preflightMergeQueue(preflightOptions),
     'list-state': () => listPullRequestQueueStates(options),
     enroll: () =>
       enrollPullRequest({
-        ...options,
+        ...preflightOptions,
         number: args[0],
         expectedHeadOid: args[1],
       }),
