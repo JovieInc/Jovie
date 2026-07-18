@@ -553,12 +553,15 @@ jobs:
     name: Production Synthetic Monitoring
     runs-on: ${{ vars.CI_FAST_RUNNER }}
     timeout-minutes: 20
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true' }
     permissions:
       contents: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
@@ -602,7 +605,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-auth-ui-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-auth-ui.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-auth-ui
+          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-auth-ui.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-auth-ui
         continue-on-error: true
 
       - name: Run Golden Path Health + Performance
@@ -615,7 +618,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-golden-path-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
+          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
         continue-on-error: true
 
       - name: Run Onboarding Robot Full Synthetic
@@ -628,7 +631,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/onboarding-robot-full-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.full.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/onboarding-robot-full
+          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.full.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/onboarding-robot-full
         continue-on-error: true
 
       - name: Run Legacy OTP Signup Canary
@@ -642,7 +645,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-legacy-otp-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-legacy-otp.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-legacy-otp
+          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-legacy-otp.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-legacy-otp
         continue-on-error: true
 
       - name: Run Better Auth Production Account Canary
@@ -660,7 +663,7 @@ jobs:
           SYNTHETIC_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-better-auth-account-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-better-auth-account.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-better-auth-account
+          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-better-auth-account.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-better-auth-account
         continue-on-error: true
 
       - name: Run Public Profile Smoke Test
@@ -673,16 +676,16 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/public-profile-smoke-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
+          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
         continue-on-error: true
 
       - name: Upload Public Profile Smoke Screenshots
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && hashFiles('apps/web/test-results/public-profile-smoke-*.png') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: public-profile-smoke-screenshots
           path: apps/web/test-results/public-profile-smoke-*.png
-          if-no-files-found: ignore
+          allow-images: 'true'
           retention-days: 14
 
       - name: Parse test results
@@ -701,13 +704,13 @@ jobs:
           NODE
 
       - name: Upload test results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        if: ${{ always() && hashFiles('apps/web/test-results/*-results.json') != '' }}
         with:
           name: synthetic-test-results
           path: |
             apps/web/test-results/
-            apps/web/playwright-report/
+            !apps/web/test-results/public-profile-smoke-*.png
           retention-days: 30
 
       - name: Fail job if tests failed

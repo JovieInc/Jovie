@@ -3,9 +3,10 @@
  *
  * On any failed/timed-out test, writes a compact, redacted JSON "failure packet"
  * next to the Playwright artifacts so a production smoke run surfaces a single
- * glanceable diagnosis instead of a wall of HTML report. Wired into
- * playwright.synthetic.config.ts (the deployed-URL harness), alongside the
- * trace/video/screenshot the config already retains on failure.
+ * glanceable diagnosis without an HTML report. Wired into
+ * playwright.synthetic.config.ts (the deployed-URL harness). CI deliberately
+ * disables trace, video, and screenshots so public artifacts cannot retain
+ * credentials or authenticated data; local runs may still attach them.
  *
  * Packet shape:
  *   { route, failedStep, status, screenshotPath, videoPath, tracePath,
@@ -13,8 +14,8 @@
  *
  * consoleErrors/failedRequests are read from optional test attachments named
  * `journey-console-errors` / `journey-failed-requests` (JSON arrays). When a
- * spec doesn't attach them, the failing assertion text in `errors[]` plus the
- * trace carry the detail. Secrets/PII are redacted from all strings.
+ * spec doesn't attach them, the redacted failing assertion text in `errors[]`
+ * carries the detail. Attachment paths remain optional for local runs.
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';

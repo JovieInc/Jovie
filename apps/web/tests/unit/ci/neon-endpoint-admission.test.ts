@@ -434,7 +434,9 @@ describe('Neon endpoint admission', () => {
     expect(visualWorkflow).toContain(
       'uses: ./.github/actions/neon-create-branch-with-retry'
     );
-    expect(visualWorkflow).toContain('path: apps/web/playwright-report/');
+    // Safe Playwright upload path only — never raw playwright-report HTML.
+    expect(visualWorkflow).toContain('path: apps/web/test-results/');
+    expect(visualWorkflow).not.toContain('path: apps/web/playwright-report/');
     expect(action).toContain('create-branch-with-capacity-retry.sh');
     expect(action).not.toMatch(/env:\s*\n\s+run:/);
     expect(action).not.toContain('create-branch-attempt-1');

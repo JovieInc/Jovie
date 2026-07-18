@@ -592,6 +592,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -617,7 +618,7 @@ jobs:
           # The HTTP canary uses Vercel bypass headers above. This browser smoke
           # primes Vercel's bypass cookie by URL query instead of headers so
           # Clerk still reaches its normal interactive ready state.
-          until CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do
+          until CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do
             if [ "$auth_smoke_attempt" -ge "$auth_smoke_max_attempts" ]; then
               echo "❌ Public auth controls failed after ${auth_smoke_max_attempts} attempts."
               exit 1

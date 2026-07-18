@@ -1,14 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const isCI = !!process.env.CI;
+
 export default defineConfig({
+  captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
   fullyParallel: false,
   workers: 1,
   use: {
     baseURL: 'http://localhost:3000',
     headless: false,
-    trace: 'on-first-retry',
-    video: 'retain-on-failure',
+    trace: isCI ? 'off' : 'on-first-retry',
+    video: isCI ? 'off' : 'retain-on-failure',
     storageState: 'tests/.auth/user.json',
   },
   projects: [

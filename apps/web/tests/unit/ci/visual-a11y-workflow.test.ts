@@ -68,8 +68,13 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     const authenticatedA11yJob = getJobBlock(workflow, 'ci-a11y-authed');
 
     expect(authenticatedA11yJob).not.toContain('--reporter=line');
+    expect(authenticatedA11yJob).toContain(
+      'uses: ./.github/actions/upload-safe-playwright-artifact'
+    );
     expect(authenticatedA11yJob).toContain('path: |');
-    expect(authenticatedA11yJob).toContain('apps/web/playwright-report/');
+    // HTML playwright-report can embed webServer.env secrets — upload
+    // only sanitized test-results via the safe artifact action.
+    expect(authenticatedA11yJob).not.toContain('apps/web/playwright-report/');
     expect(authenticatedA11yJob).toContain('apps/web/test-results/');
     expect(authenticatedA11yJob).toContain('if-no-files-found: error');
   });

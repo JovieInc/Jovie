@@ -6,7 +6,10 @@
  */
 import { defineConfig, devices } from '@playwright/test';
 
+const isCI = !!process.env.CI;
+
 export default defineConfig({
+  captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
   testMatch: /dropdown-parity\.spec\.ts/,
   fullyParallel: false,
@@ -17,7 +20,7 @@ export default defineConfig({
 
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:3001',
-    trace: 'retain-on-failure',
+    trace: isCI ? 'off' : 'retain-on-failure',
     // No storageState — our test overrides to empty anyway
     storageState: { cookies: [], origins: [] },
   },

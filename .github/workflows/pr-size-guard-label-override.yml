@@ -75,7 +75,7 @@ jobs:
               break
             fi
             if [[ "$attempt" -eq 3 ]] || ! grep -qiE \
-              'rate limit|HTTP 403|HTTP 429|HTTP 5[0-9][0-9]' "$api_error"; then
+              "rate limit|HTTP 403|HTTP 429|HTTP 5[0-9][0-9]|invalid character '<'" "$api_error"; then
               cat "$api_error" >&2
               exit 1
             fi
