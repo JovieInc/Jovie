@@ -1,0 +1,134 @@
+#!/usr/bin/env node
+/**
+ * Fail-closed contract for the CI/release incident prevention ledger.
+ *
+ * The ledger is deliberately data-only: remediation code stays with its
+ * stage owner, while this contract prevents an incident from being declared
+ * handled without executable regression evidence, operations documentation,
+ * canonical-template propagation, and a fresh-scaffold proof.
+ */
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+export const REQUIRED_INCIDENT_IDS = [
+  'ci-release/source-pr-queue-evidence',
+  'ci-release/duplicate-ci-retry-loop',
+  'ci-release/legacy-merge-queue-label',
+  'ci-release/async-update-branch-bounds',
+  'ci-release/superseded-run-capacity',
+  'ci-release/runner-heartbeat-routing',
+  'ci-release/runner-image-prerequisites',
+  'ci-release/cache-artifact-fanout',
+  'ci-release/runner-emergency-headroom',
+  'ci-release/sentry-read-gate-scopes',
+  'ci-release/doppler-sync-freshness',
+  'ci-release/vercel-immutable-probe',
+  'ci-release/seo-redirect-auth-html',
+  'ci-release/lighthouse-assertion-matches',
+  'ci-release/bypass-secret-containment',
+  'ci-release/production-workflow-provenance',
+  'ci-release/production-evidence-freshness',
+  'ci-release/controller-loop-bounds',
+  'ci-release/gbrain-readiness-diagnosis',
+  'ci-release/coordination-query-bounds',
+  'ci-release/admin-secret-log-redaction',
+];
+
+const REQUIRED_STAGES = new Set([
+  'source-pr',
+  'merge-group',
+  'main-release',
+  'post-deploy',
+  'scheduled-control-plane',
+  'operator-bootstrap',
+]);
+
+function nonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function localPath(value) {
+  return nonEmptyString(value) && !value.startsWith('/') && !value.includes('..');
+}
+
+function requireExistingPath(value, label, errors) {
+  if (!localPath(value)) {
+    errors.push(`${label} must be a repository-relative path`);
+  } else if (!existsSync(resolve(value))) {
+    errors.push(`${label} does not exist: ${value}`);
+  }
+}
+
+export function validateIncidentLedger(ledger) {
+  const errors = [];
+  if (!ledger || ledger.schemaVersion !== 1 || !Array.isArray(ledger.incidents)) {
+    return { ok: false, errors: ['ledger must contain schemaVersion 1 and an incidents array'] };
+  }
+
+  const seen = new Set();
+  for (const incident of ledger.incidents) {
+    const id = incident?.id;
+    if (!nonEmptyString(id)) {
+      errors.push('incident id is required');
+      continue;
+    }
+    if (seen.has(id)) errors.push(`duplicate incident id: ${id}`);
+    seen.add(id);
+    if (!nonEmptyString(incident.failureMode)) errors.push(`${id}: failureMode is required`);
+
+    const regression = incident.regression;
+    if (!regression || !['test', 'verifier'].includes(regression.kind)) {
+      errors.push(`${id}: regression.kind must be test or verifier`);
+    }
+    if (!nonEmptyString(regression?.command)) errors.push(`${id}: regression.command is required`);
+    requireExistingPath(regression?.path, `${id}: regression.path`, errors);
+
+    if (!REQUIRED_STAGES.has(incident.ciStageOwner?.stage)) {
+      errors.push(`${id}: ciStageOwner.stage is not a supported CI stage`);
+    }
+    if (!nonEmptyString(incident.ciStageOwner?.owner)) {
+      errors.push(`${id}: ciStageOwner.owner is required`);
+    }
+
+    requireExistingPath(incident.documentation?.operator, `${id}: documentation.operator`, errors);
+    requireExistingPath(incident.documentation?.postmortem, `${id}: documentation.postmortem`, errors);
+    requireExistingPath(incident.templatePropagation?.path, `${id}: templatePropagation.path`, errors);
+    if (!nonEmptyString(incident.templatePropagation?.source)) {
+      errors.push(`${id}: templatePropagation.source is required`);
+    }
+    requireExistingPath(incident.scaffoldProof?.path, `${id}: scaffoldProof.path`, errors);
+    if (!nonEmptyString(incident.scaffoldProof?.command)) {
+      errors.push(`${id}: scaffoldProof.command is required`);
+    }
+  }
+
+  for (const id of REQUIRED_INCIDENT_IDS) {
+    if (!seen.has(id)) errors.push(`required incident missing: ${id}`);
+  }
+  for (const id of seen) {
+    if (!REQUIRED_INCIDENT_IDS.includes(id)) errors.push(`unregistered incident id: ${id}`);
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+function main() {
+  const ledgerPath = process.argv[2] ?? '.github/ci-harness/ci-release-incidents.json';
+  let ledger;
+  try {
+    ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+  } catch (error) {
+    console.error(`Unable to read incident ledger ${ledgerPath}: ${error.message}`);
+    process.exitCode = 1;
+    return;
+  }
+  const result = validateIncidentLedger(ledger);
+  if (!result.ok) {
+    console.error('CI release incident contract is invalid:');
+    for (const error of result.errors) console.error(`- ${error}`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`CI release incident contract valid (${ledger.incidents.length} incidents).`);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) main();

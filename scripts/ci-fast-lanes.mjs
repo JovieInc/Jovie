@@ -229,6 +229,7 @@ function runStructural() {
 
   const parts = [
     'pnpm ci:harness:check',
+    'pnpm ci:incident-contract:validate',
     'pnpm ci:control:test',
     'pnpm ci:branching-guard:validate',
     'pnpm ci:merge-queue:check',
