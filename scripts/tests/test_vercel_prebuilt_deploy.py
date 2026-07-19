@@ -873,17 +873,44 @@ def _write_fake_alias_tools(tmp_path: Path) -> tuple[Path, Path]:
     fake_bin.mkdir()
     fake_curl = fake_bin / "curl"
     fake_curl.write_text(
-        "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n"
-        "printf '%s\\n' \"$*\" >> \"$CURL_CALL_LOG\"\n"
-        "printf '{\"commitSha\":\"%s\",\"environment\":\"production\"}\\n200\\n' \"$FAKE_BUILD_SHA\"\n"
+        r'''#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$CURL_CALL_LOG"
+call_index="$(wc -l < "$CURL_CALL_LOG" | tr -d ' ')"
+IFS=',' read -r -a observations <<< "${FAKE_CURL_SEQUENCE:-match}"
+observation="${observations[$((call_index - 1))]:-match}"
+build_sha="$FAKE_BUILD_SHA"
+build_environment="$FAKE_BUILD_ENVIRONMENT"
+
+case "$observation" in
+  match) ;;
+  stale-sha) build_sha="old1234" ;;
+  wrong-environment) build_environment="preview" ;;
+  transient) exit 28 ;;
+  *)
+    echo "Unknown fake curl observation: $observation" >&2
+    exit 2
+    ;;
+esac
+
+printf '{"commitSha":"%s","environment":"%s"}\n200\n' \
+  "$build_sha" "$build_environment"
+'''
     )
     fake_curl.chmod(0o755)
     return fake_vercel, fake_bin
 
 
 def _run_alias_verifier(
-    tmp_path: Path, *, current_id: str, build_sha: str
+    tmp_path: Path,
+    *,
+    current_id: str,
+    build_sha: str,
+    max_attempts: int = 1,
+    required_rounds: int = 1,
+    max_transient_failures: int = 0,
+    curl_sequence: str = "match",
+    build_environment: str = "production",
 ) -> subprocess.CompletedProcess[str]:
     fake_vercel, fake_bin = _write_fake_alias_tools(tmp_path)
     env = {
@@ -891,16 +918,19 @@ def _run_alias_verifier(
         "PATH": f"{fake_bin}:{os.environ['PATH']}",
         "EXPECTED_COMMIT_SHA": "new5678full",
         "EXPECTED_PRODUCTION_DEPLOYMENT_ID": "dpl_target",
-        "PRODUCTION_ALIAS_MAX_ATTEMPTS": "1",
-        "PRODUCTION_ALIAS_REQUIRED_ROUNDS": "1",
+        "PRODUCTION_ALIAS_MAX_ATTEMPTS": str(max_attempts),
+        "PRODUCTION_ALIAS_REQUIRED_ROUNDS": str(required_rounds),
+        "PRODUCTION_ALIAS_MAX_TRANSIENT_FAILURES": str(max_transient_failures),
         "PRODUCTION_ALIAS_RETRY_SECONDS": "0",
         "VERCEL_CLI": str(fake_vercel),
         "VERCEL_TOKEN": "token",
         "VERCEL_ORG_ID": "team_test",
         "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
         "CURL_CALL_LOG": str(tmp_path / "curl-calls"),
+        "FAKE_CURL_SEQUENCE": curl_sequence,
         "FAKE_CURRENT_ID": current_id,
         "FAKE_BUILD_SHA": build_sha,
+        "FAKE_BUILD_ENVIRONMENT": build_environment,
         "GITHUB_OUTPUT": str(tmp_path / "github-output"),
     }
     return subprocess.run(
@@ -912,6 +942,12 @@ def _run_alias_verifier(
         timeout=10,
         check=False,
     )
+
+
+def _alias_observation_sequence(
+    *attempts: tuple[str, str, str],
+) -> str:
+    return ",".join(observation for attempt in attempts for observation in attempt)
 
 
 def test_alias_verifier_requires_exact_id_sha_and_all_rolling_routes(
@@ -927,6 +963,112 @@ def test_alias_verifier_requires_exact_id_sha_and_all_rolling_routes(
     assert "vcrrForceStable=true" in curl_calls
     assert "vcrrForceCanary=true" in curl_calls
     assert "x-vercel-protection-bypass" not in curl_calls
+
+
+def test_alias_verifier_replays_production_transients_with_independent_proof(
+    tmp_path: Path,
+) -> None:
+    # Exact route-observation pattern from production run 29686884512. The
+    # legacy global streak never exceeded one clean round, even though every
+    # response that arrived identified the exact Production deployment.
+    observations = _alias_observation_sequence(
+        ("match", "match", "match"),
+        ("transient", "match", "match"),
+        ("match", "match", "match"),
+        ("transient", "match", "match"),
+        ("transient", "match", "match"),
+        ("match", "match", "match"),
+        ("transient", "match", "match"),
+        ("transient", "match", "match"),
+        ("transient", "match", "transient"),
+        ("match", "match", "match"),
+        ("match", "match", "transient"),
+        ("match", "match", "match"),
+        ("match", "match", "transient"),
+        ("match", "match", "transient"),
+        ("match", "match", "match"),
+    )
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id="dpl_target",
+        build_sha="new5678",
+        max_attempts=15,
+        required_rounds=3,
+        max_transient_failures=2,
+        curl_sequence=observations,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "attempt 6/15 production-alias/canary" in result.stdout
+    assert len((tmp_path / "curl-calls").read_text().splitlines()) == 18
+
+
+def test_alias_verifier_requires_every_latest_observation_to_be_exact(
+    tmp_path: Path,
+) -> None:
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id="dpl_target",
+        build_sha="new5678",
+        max_attempts=3,
+        required_rounds=2,
+        max_transient_failures=2,
+        curl_sequence=_alias_observation_sequence(
+            ("match", "match", "match"),
+            ("match", "transient", "match"),
+            ("transient", "match", "match"),
+        ),
+    )
+
+    assert result.returncode == 1
+    assert "attempt 3/3 production-alias/plain: HTTP 000" in result.stdout
+
+
+def test_alias_verifier_resets_proof_on_observed_identity_mismatch(
+    tmp_path: Path,
+) -> None:
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id="dpl_target",
+        build_sha="new5678",
+        max_attempts=5,
+        required_rounds=3,
+        max_transient_failures=2,
+        curl_sequence=_alias_observation_sequence(
+            ("match", "match", "match"),
+            ("match", "match", "match"),
+            ("wrong-environment", "match", "match"),
+            ("match", "match", "match"),
+            ("match", "match", "match"),
+        ),
+    )
+
+    assert result.returncode == 1
+    assert "environment=preview" in result.stdout
+
+
+def test_alias_verifier_resets_proof_after_bounded_transport_unknowns(
+    tmp_path: Path,
+) -> None:
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id="dpl_target",
+        build_sha="new5678",
+        max_attempts=6,
+        required_rounds=3,
+        max_transient_failures=2,
+        curl_sequence=_alias_observation_sequence(
+            ("match", "match", "match"),
+            ("match", "match", "match"),
+            ("transient", "match", "match"),
+            ("transient", "match", "match"),
+            ("transient", "match", "match"),
+            ("match", "match", "match"),
+        ),
+    )
+
+    assert result.returncode == 1
+    assert "attempt 6/6 production-alias/plain: HTTP 200" in result.stdout
 
 
 def test_alias_verifier_rejects_stale_sha_even_on_expected_deployment(
