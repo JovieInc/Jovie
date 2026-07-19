@@ -2,13 +2,10 @@ name: Runner Heartbeat
 
 on:
   # GitHub cron delivery is best-effort and can be delayed well past its nominal
-  # interval. Probe every combined candidate and direct main generation so the
-  # hosted CI router can await current, exact evidence instead of inheriting a
-  # stale scheduled result.
+  # interval. Scheduled, direct-main, and manual probes retain monitoring while
+  # phase 0 prevents merge-group candidates from consuming the fixed pool.
   push:
     branches: [main]
-  merge_group:
-    types: [checks_requested]
   schedule:
     - cron: '*/10 * * * *'
   workflow_dispatch:
@@ -19,8 +16,8 @@ permissions:
 concurrency:
   group: runner-heartbeat
   # A saturated/offline pool retains only the newest queued probe. The hosted
-  # observer and per-run CI route treat queued/in-progress, stale, malformed,
-  # or API-uncertain evidence as down and select hosted unit capacity.
+  # observer treats queued/in-progress, stale, malformed, or API-uncertain
+  # evidence as down. Unit capacity remains explicitly hosted in phase 0.
   cancel-in-progress: true
 
 jobs:
