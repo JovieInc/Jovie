@@ -25,7 +25,7 @@ node scripts/ci-release-incident-contract.mjs
 The command is fail-closed. For each `ci-release/*` entry it requires a
 deterministic regression/verifier, CI-stage owner, operator documentation,
 canonical `JovieInc/ci` propagation, and a clean-scaffold assertion. The
-postmortem’s 26 indexed incidents are therefore reviewable without relying on
+postmortem’s 29 indexed incidents are therefore reviewable without relying on
 the absence of a visible outage.
 
 ## What happened
@@ -94,6 +94,102 @@ behavior is represented by the stable ledger invariant and verifier. Until
 then, an entry remains a required contract rather than permission to claim the
 underlying repair is complete.
 
+## Evidence timeline
+
+| Time (UTC) | Evidence | Interpretation | Boundary |
+| --- | --- | --- | --- |
+| 2026-07-18 | Active-drain topology evidence recorded source-PR latency of 20–55 minutes and source fanout into build, preview, Neon, E2E, Lighthouse, a11y, Storybook, and layout. | Source admission carried integration and production-depth work. | Phase A topology input; not a production-success receipt. |
+| 2026-07-18 | Repair sequence assigned exact merge-group provenance, deterministic source PR policy, post-merge/prod evidence, artifact publication, runner routing, and bounded monitors in that order. | This establishes the canonical Phase A/B topology below. | Planning evidence only until exact heads pass their own checks. |
+| 2026-07-19 | #14495 at `72f0d8657ef923742828bbd890c92ab69a3be4c7` remained open and blocked. | Async Update Branch is an upstream boundary, not a closed action. | No completion claim from this postmortem. |
+| 2026-07-19 | Draft #14496 documentation/index head was `ca057e2f4e39d5eb7570f531519b46f5615a4a0f`. | Operator/index evidence is reviewable but does not enforce CI alone. | Parent of the contract stack. |
+| 2026-07-19 | Draft #14497 at `f59068c1345b4565b316e0b401b1cf76d8bc0f36` used #14496 as its base. | #14497 is a strict child stack, not duplicate documentation. | Verify/land #14496 before #14497; do not independently retarget it. |
+| 2026-07-19 | PR-files indexing expected exact current-main `cf57…`, while stale PR REST/Actions reported `85f…`; the stale count was 32,993/232 versus actual 17/~829 after exclusions. | Files-derived admission/metrics were reading a stale head/base view and overstating scope. | Bind REST/GraphQL head/base first; mismatch is bounded `index_pending` observation only, never bypass/rerun/mutate. |
+| Pending | Warm-runner and production-probe repair owners/exact heads are unconfirmed. | Their proof cannot be inferred from a generic heartbeat, HTTP 200, or this contract. | Unresolved upstream boundary until named owner publishes exact-head receipts. |
+
+## Impact and detection
+
+**Impact.** The drain consumed finite runner capacity with duplicate and superseded work, increased source-PR required-green latency, and could confuse protected/login responses or stale markers with production evidence. Controller, coordination, and logging failures could compound without owner-specific stops.
+
+**Detection.** Exact-run and queue-state inspection exposed cancelled/retried work, diverging source/merge-group/main paths, uncertain runner routing, and probe responses that did not prove the intended public artifact. The contract makes these deterministic regressions; it does not retroactively make an unrelated run healthy.
+
+The same discipline applies to PR-files indexing: the expected current-main was
+`cf57…`, but stale PR REST/Actions state reported `85f…`, producing a false
+32,993/232 view instead of actual 17/~829 after exclusions. Before consuming a
+files endpoint, bind its REST/GraphQL head and base to the requested pair. A
+mismatch becomes bounded `index_pending` observation; it must never bypass a
+gate, rerun work, or mutate queue/deploy/controller state.
+
+Pre-push scope selection follows the same fail-closed provenance rule. A new
+branch may use affected scope only after it resolves the push destination and
+upstream default and proves exact-main sole-parent/merge-base ancestry.
+Divergent, unknown, or force-push targets run full verification. This invariant
+does not change the current hook.
+
+Toolchain selection is equally fail-closed: Node 26 is rejected before tests;
+Node 22.23.1 and pnpm 9.15.4 must propagate into nested execution, and the
+receipt records resolved versions. This invariant changes neither the current
+hook nor push behavior.
+
+## Root causes and contributing causes
+
+### Root causes
+
+1. Lifecycle boundaries were not enforced as a system: source admission, exact merge-group integration, and main/post-deploy evidence could demand or reuse each other’s proof.
+2. Provenance/capability was inferred from convenient signals—labels, moving refs, status codes, uploads, and generic heartbeats—rather than exact head, immutable binding, scope, and content assertions.
+3. Prevention was not inherited as one executable contract through the canonical template and a clean scaffold.
+
+### Contributing causes
+
+- Legacy label-driven Graphite behavior coexisted with native queue enrollment.
+- Retry/cancellation and matrix scheduling retained capacity after work was superseded.
+- Image, secret-sync, and probe prerequisites lacked one fail-closed attestation.
+- Controllers and coordination did not consistently bound retries, deadlines, concurrency, and terminal ownership.
+- Concurrent repairs made an open upstream branch easy to mistake for landed prevention.
+
+## Canonical Phase A/B topology
+
+**Phase A — admission and exact integration.** Source `pull_request` runs deterministic required admission contexts on every applicable PR (or one stable aggregate). `merge_group` owns exact combined-head unit/build/layout evidence. Native mode never reads or writes `merge-queue`; Graphite is selected only through an explicit backend.
+
+**Phase B — main release and post-deploy proof.** Main promotion requires exact current-main/workflow provenance, then one serialized production-mutation owner deploys and probes immutable public output. Sentry read scope, Doppler freshness, redirect/content assertions, Lighthouse matches, and marker freshness are separate gates. Heavy/nondeterministic work stays post-merge, scheduled, or explicitly dispatched.
+
+**Cross-cutting control plane.** Runner capacity/image provenance, controller termination, GBrain recovery/coordination, agent identity, and secret-log redaction apply to both phases but cannot replace a Phase A or B receipt.
+
+## Action register
+
+“Contract stack” means #14497 supplies ledger/verifier wiring after #14496; it does not mean a named upstream repair landed. Every row closes only when its acceptance evidence passes on its owner’s exact head and the canonical scaffold check succeeds.
+
+| ID | Phase / owner | Status | Acceptance evidence | Dependency / boundary |
+| --- | --- | --- | --- | --- |
+| `ci-release/source-pr-queue-evidence` | A / CI control plane | Contract stack | Source regression and stable required context. | #14497 after #14496. |
+| `ci-release/duplicate-ci-retry-loop` | A / trigger admission | Contract stack | One authoritative event/ref route. | #14497 after #14496. |
+| `ci-release/legacy-merge-queue-label` | A / queue enrollment | Contract stack | Native label absent; Graphite explicit. | Native queue owner. |
+| `ci-release/async-update-branch-bounds` | A / PR mutation | Upstream open | Exact head, structured result, bounded subprocess. | #14495 open/blocked at `72f0d865…`. |
+| `ci-release/pr-files-index-head-base-staleness` | A / PR files/index admission | Upstream dedicated repair | Merged immutable SHA and behavioral receipt prove REST/GraphQL head/base bind before files; mismatch is bounded `index_pending` only. | Dedicated exact-main coder; required before Phase-B release; this docs lane implements no runtime repair. |
+| `ci-release/prepush-exact-main-scope-selection` | A / pre-push scope selection | Contract dependency | Exact-main branch resolves destination/upstream default and proves sole parent/merge-base before affected scope; divergent, unknown, or force targets run full verification. | Current hook untouched; canonical pre-push owner must provide merged immutable SHA and behavioral receipt. |
+| `ci-release/prepush-toolchain-runtime-contract` | A / pre-push toolchain | Contract dependency | Node 26 rejects before tests; Node 22.23.1/pnpm 9.15.4 propagate nested and receipt records versions. | Current hook/push behavior untouched; toolchain owner must provide merged immutable SHA and behavioral receipt. |
+| `ci-release/superseded-run-capacity` | A / capacity | Contract stack | Superseded work releases capacity. | Capacity owner. |
+| `ci-release/runner-heartbeat-routing` | A / runner routing | Upstream unresolved | Fresh heartbeat or hosted fallback. | Warm-runner owner/head unresolved. |
+| `ci-release/runner-image-prerequisites` | A / runner image | Upstream unresolved | Marker, service PATH, Playwright attested. | Warm-runner owner/head unresolved. |
+| `ci-release/runner-image-source-sha-provenance` | A / image provenance | Upstream unresolved | Source SHA equals approved source. | Warm-runner owner/head unresolved. |
+| `ci-release/cache-artifact-fanout` | A / artifact cache | Contract stack | Fanout/upload budget enforced. | Artifact owner. |
+| `ci-release/runner-emergency-headroom` | A / scheduler | Contract stack | Matrix leaves emergency reservation. | Capacity owner. |
+| `ci-release/sentry-read-gate-scopes` | B / error gate | Contract stack | Read scope distinct from upload. | Production-probe owner/head unresolved. |
+| `ci-release/doppler-sync-freshness` | B / secret distribution | Contract stack | Current attributed freshness/capability. | Secret distribution owner. |
+| `ci-release/vercel-immutable-probe` | B / public probe | Upstream unresolved | Immutable public artifact, not SSO. | Production-probe owner/head unresolved. |
+| `ci-release/seo-redirect-auth-html` | B / SEO | Upstream unresolved | Reject cross-origin/login HTML. | Production-probe owner/head unresolved. |
+| `ci-release/lighthouse-assertion-matches` | B / Lighthouse | Upstream unresolved | Immutable target and non-zero assertions. | Production-probe owner/head unresolved. |
+| `ci-release/bypass-secret-containment` | B / probe security | Contract stack | All five egress surfaces secret-free. | Production-probe owner/head unresolved. |
+| `ci-release/production-workflow-provenance` | B / production admission | Contract stack | Authorized run matches workflow SHA. | Production mutation owner. |
+| `ci-release/production-evidence-freshness` | B / production verification | Contract stack | Main, provenance, deploy markers current. | Production mutation owner. |
+| `ci-release/controller-loop-bounds` | Cross / remediation | Contract stack | Idempotency, cap, terminal stop. | Controller owner. |
+| `ci-release/gbrain-readiness-diagnosis` | Cross / readiness | Contract stack | Ready, registration, lock, DB/DNS diagnosis. | GBrain owner. |
+| `ci-release/gbrain-pool-recovery` | Cross / recovery | Contract stack | Bounded local-pool/upstream recovery. | GBrain owner; no restart claim. |
+| `ci-release/coordination-query-bounds` | Cross / coordination | Contract stack | Deadline/concurrency fails closed. | Coordination owner. |
+| `ci-release/admin-secret-log-redaction` | Cross / logging | Contract stack | Persistent-log fixture rejects credentials. | Service logging owner. |
+| `ci-release/gbrain-admin-secret-log-redaction` | Cross / GBrain admin | Contract stack | No-secret fixture and token-free rotation receipt. | GBrain admin; no token exposure. |
+| `ci-release/agent-task-identity-context-drift` | Cross / delivery | Contract stack | Final receipt matches assigned identity/objective. | Agent delivery owner. |
+| `ci-release/secret-scan-synthetic-merge-base` | A / secret scan | Contract stack | Parents, merge tree, TOCTOU regression. | Merge-group owner. |
+
 ## Operator response model
 
 1. Identify the affected `ci-release/*` id in the incident index.
@@ -128,8 +224,9 @@ then update this indexed postmortem. Do not create repo-local parallel policy.
 
 ## Verification receipts required for closure
 
-- The incident-contract verifier reports all 26 stable IDs, including separate
-  runner-image provenance and GBrain token/recovery contracts.
+- The incident-contract verifier reports all 29 stable IDs, including runner-
+  image provenance, GBrain token/recovery, PR-files head/base-staleness, and
+  pre-push exact-main scope-selection/toolchain-runtime contracts.
 - Each listed regression/verifier succeeds in its owning CI stage.
 - The shared `JovieInc/ci` template/bootstrap change is reviewed with its
   consumer caller evidence.
