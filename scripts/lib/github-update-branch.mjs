@@ -150,6 +150,7 @@ async function pollForUpdatedHead({
   sleepImpl,
 }) {
   let lastSnapshot = null;
+  const mutationReturnedUpdatedHead = mutated.headRefOid !== before.headRefOid;
 
   for (const delayMs of POST_UPDATE_VERIFY_DELAYS_MS) {
     if (delayMs > 0) await sleepImpl(delayMs);
@@ -165,12 +166,28 @@ async function pollForUpdatedHead({
     ) {
       return { snapshot, identityChanged: true };
     }
-    if (snapshot.headRefOid === mutated.headRefOid) {
+    if (
+      mutationReturnedUpdatedHead &&
+      snapshot.headRefOid === mutated.headRefOid
+    ) {
       return { snapshot, converged: true };
     }
     if (snapshot.headRefOid !== before.headRefOid) {
+      if (!mutationReturnedUpdatedHead) {
+        return { snapshot, converged: true, asynchronousUpdate: true };
+      }
       return { snapshot, headChanged: true };
     }
+  }
+
+  // GitHub can acknowledge updatePullRequestBranch with the original head and
+  // create the rebased commit asynchronously. Only classify a true no-op after
+  // every bounded verification read still observes that original head.
+  if (
+    !mutationReturnedUpdatedHead &&
+    lastSnapshot?.headRefOid === before.headRefOid
+  ) {
+    return { snapshot: lastSnapshot, converged: true };
   }
 
   return { snapshot: lastSnapshot, timedOut: true };
@@ -314,9 +331,14 @@ export async function tryGitHubRebase({
     sleepImpl,
   });
   const after = verification.snapshot;
+  const verifiedMutationState = {
+    ...mutationState,
+    mutationApplied:
+      mutationState.mutationApplied || verification.asynchronousUpdate === true,
+  };
   if (verification.identityChanged || verification.headChanged) {
     return {
-      ...mutationState,
+      ...verifiedMutationState,
       ok: false,
       conflict: false,
       category: 'verification_failure',
@@ -329,7 +351,7 @@ export async function tryGitHubRebase({
   }
   if (!verification.converged || !after?.headRefOid) {
     return {
-      ...mutationState,
+      ...verifiedMutationState,
       ok: false,
       conflict: false,
       category: 'verification_failure',
@@ -342,7 +364,7 @@ export async function tryGitHubRebase({
   if (after.headRefOid === before.headRefOid) {
     if (after.mergeable === 'CONFLICTING') {
       return {
-        ...mutationState,
+        ...verifiedMutationState,
         ok: false,
         conflict: true,
         category: 'conflict',
@@ -353,7 +375,7 @@ export async function tryGitHubRebase({
       };
     }
     return {
-      ...mutationState,
+      ...verifiedMutationState,
       ok: true,
       updated: false,
       conflict: false,
@@ -366,7 +388,7 @@ export async function tryGitHubRebase({
   }
 
   return {
-    ...mutationState,
+    ...verifiedMutationState,
     ok: true,
     updated: true,
     conflict: false,

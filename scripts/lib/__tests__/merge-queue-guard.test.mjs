@@ -784,6 +784,16 @@ function mutationSnapshot() {
   };
 }
 
+function asynchronousMutationSnapshot() {
+  return {
+    data: {
+      updatePullRequestBranch: {
+        pullRequest: snapshot(),
+      },
+    },
+  };
+}
+
 function blockedPr(overrides = {}) {
   return {
     number: 123,
@@ -880,6 +890,66 @@ describe('exact-head GitHub Update Branch rebase', () => {
     });
     expect(sleepImpl).toHaveBeenCalledOnce();
     expect(sleepImpl).toHaveBeenCalledWith(250);
+  });
+
+  it('waits for an asynchronous rebase when the mutation initially returns the original head', async () => {
+    const sleepImpl = vi.fn(async () => {});
+    const gh = ghSequence({
+      mutation: asynchronousMutationSnapshot(),
+      afterSequence: [snapshot(), snapshot({ headRefOid: UPDATED_HEAD })],
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      sleepImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      updated: true,
+      mutationAttempted: true,
+      mutationApplied: true,
+      conflict: false,
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: UPDATED_HEAD,
+    });
+    expect(sleepImpl).toHaveBeenCalledOnce();
+    expect(sleepImpl).toHaveBeenCalledWith(250);
+  });
+
+  it('only reports a same-head mutation as no change after bounded verification', async () => {
+    const sleepImpl = vi.fn(async () => {});
+    const gh = ghSequence({
+      mutation: asynchronousMutationSnapshot(),
+      afterSequence: [snapshot()],
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      sleepImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      updated: false,
+      mutationAttempted: true,
+      mutationApplied: false,
+      conflict: false,
+      category: 'no_change',
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: ORIGINAL_HEAD,
+    });
+    expect(sleepImpl.mock.calls.map(([delayMs]) => delayMs)).toEqual([
+      250, 500, 1000, 2000,
+    ]);
   });
 
   it('fails closed when the updated head never becomes visible', async () => {
