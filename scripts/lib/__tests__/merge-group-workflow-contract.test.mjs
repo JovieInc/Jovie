@@ -31,6 +31,14 @@ const CLAUDE_REVIEW_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/claude-review.yml'),
   'utf8'
 );
+const MEMBER_POLICY = readFileSync(
+  resolve(REPO_ROOT, 'scripts/lib/merge-group-member-policy.mjs'),
+  'utf8'
+);
+const BRANCH_RULESET = readFileSync(
+  resolve(REPO_ROOT, '.github/rulesets/branch-protection.yml'),
+  'utf8'
+);
 const EVENT = JSON.parse(
   readFileSync(
     resolve(import.meta.dirname, 'fixtures/merge-group-checks-requested.json'),
@@ -313,6 +321,8 @@ describe('merge_group workflow contract', () => {
     expect(forkGate).toContain("github.event_name == 'merge_group'");
     expect(forkGate).toContain('ref: ${{ github.event.merge_group.base_sha }}');
     expect(forkGate).toContain('persist-credentials: false');
+    expect(forkGate).toContain('contents: read');
+    expect(forkGate).toContain('pull-requests: read');
     expect(forkGate).toContain('GH_TOKEN: ${{ github.token }}');
     expect(forkGate).not.toContain('actions/create-github-app-token');
     expect(forkGate).not.toContain('secrets.');
@@ -334,6 +344,8 @@ describe('merge_group workflow contract', () => {
       'ref: ${{ github.event.merge_group.base_sha }}'
     );
     expect(sizeGuard).toContain('persist-credentials: false');
+    expect(SIZE_GUARD_WORKFLOW).toContain('contents: read');
+    expect(SIZE_GUARD_WORKFLOW).toContain('pull-requests: read');
     expect(sizeGuard).toContain('GH_TOKEN: ${{ github.token }}');
     expect(sizeGuard).not.toContain('actions/create-github-app-token');
     expect(sizeGuard).not.toContain('secrets.');
@@ -346,6 +358,15 @@ describe('merge_group workflow contract', () => {
     expect(getJobBlock(SIZE_GUARD_WORKFLOW, 'size')).toContain(
       "github.event_name == 'pull_request'"
     );
+    expect(MEMBER_POLICY).toContain('fetchComparison');
+    expect(MEMBER_POLICY).toContain('fetchPullRequest');
+    expect(MEMBER_POLICY).not.toContain("githubRequest('/graphql'");
+    expect(MEMBER_POLICY).not.toContain('mergeQueue(');
+    const maxMembers = BRANCH_RULESET.match(
+      /^\s*max_entries_to_merge:\s*(\d+)$/m
+    )?.[1];
+    expect(maxMembers).toBeTruthy();
+    expect(MEMBER_POLICY).toContain(`const MAX_GROUP_MEMBERS = ${maxMembers};`);
   });
 
   it('keeps source and combined-head lanes deterministic and free of privileged secrets', () => {

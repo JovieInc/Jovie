@@ -4,7 +4,8 @@ import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const GENERATED_PR_TRAILER_PATTERN = /\(#(\d+)\)$/;
-const ACTIVE_GROUP_STATES = new Set(['AWAITING_CHECKS', 'LOCKED', 'MERGEABLE']);
+// Fail closed at the checked-in native queue's max_entries_to_merge ceiling.
+const MAX_GROUP_MEMBERS = 10;
 const SIZE_BYPASS_LABELS = new Set(['big-pr', 'codemod']);
 const COLLABORATOR_ASSOCIATIONS = new Set(['COLLABORATOR', 'MEMBER', 'OWNER']);
 const OPINIONATED_REVIEW_STATES = new Set([
@@ -51,6 +52,21 @@ function generatedPullRequestNumber(commit) {
   return requireInteger(Number(match[1]), 'synthetic pull request number');
 }
 
+function requireGitHubGeneratedCommit(commit) {
+  const committer = commit?.commit?.committer;
+  const verification = commit?.commit?.verification;
+  if (
+    committer?.name !== 'GitHub' ||
+    committer?.email !== 'noreply@github.com' ||
+    verification?.verified !== true ||
+    verification?.reason !== 'valid'
+  ) {
+    fail(
+      `synthetic commit ${commit?.sha ?? 'unknown'} is not verified GitHub-generated evidence`
+    );
+  }
+}
+
 export function validateMergeGroupEvent(event) {
   if (event?.action !== 'checks_requested')
     fail('unexpected merge_group action');
@@ -85,13 +101,13 @@ export function validateMergeGroupEvent(event) {
  * Resolve every PR represented by one exact merge_group head.
  *
  * GitHub's merge_group payload deliberately exposes only base/head refs and
- * SHAs. For an ALLGREEN/SQUASH queue, the exact base..head first-parent range
- * contains one GitHub-generated squash commit per member. We cross-prove each
- * generated commit's final (#PR) trailer against the live GraphQL merge queue
- * entry with the same generated head commit. Nothing is inferred from the
- * single-PR-looking gh-readonly-queue ref.
+ * SHAs. The exact base..head first-parent range contains one GitHub-generated
+ * commit per member, whose final (#PR) trailer identifies that member. Current
+ * PR metadata is fetched through the REST API after discovery; the unprivileged
+ * merge_group token cannot read the live mergeQueue GraphQL field, and this
+ * combined-head workflow must never receive a privileged App secret.
  */
-export function resolveMergeGroupMembers({ event, comparison, queue }) {
+export function resolveMergeGroupMembers({ event, comparison }) {
   const { baseSha, headSha } = validateMergeGroupEvent(event);
 
   if (
@@ -106,45 +122,11 @@ export function resolveMergeGroupMembers({ event, comparison, queue }) {
   ) {
     fail('compare API did not return the exact base..head range');
   }
-
-  const configuration = queue?.configuration;
-  if (
-    configuration?.mergeMethod !== 'SQUASH' ||
-    configuration?.mergingStrategy !== 'ALLGREEN'
-  ) {
-    fail('live merge queue is not ALLGREEN/SQUASH');
-  }
-
-  const connection = queue?.entries;
-  if (
-    !connection ||
-    connection.pageInfo?.hasNextPage !== false ||
-    !Array.isArray(connection.nodes) ||
-    connection.totalCount !== connection.nodes.length
-  ) {
-    fail('merge queue entry discovery is incomplete or malformed');
-  }
-  if (
-    !Number.isInteger(configuration.maximumEntriesToMerge) ||
-    comparison.commits.length > configuration.maximumEntriesToMerge
-  ) {
-    fail('merge group exceeds the live maximumEntriesToMerge policy');
-  }
-
-  const entriesByPullRequest = new Map();
-  for (const entry of connection.nodes) {
-    const number = requireInteger(
-      entry?.pullRequest?.number,
-      'merge queue pull request number'
-    );
-    if (entriesByPullRequest.has(number)) {
-      fail(`merge queue contains duplicate PR #${number}`);
-    }
-    entriesByPullRequest.set(number, entry);
+  if (comparison.commits.length > MAX_GROUP_MEMBERS) {
+    fail(`merge group exceeds trusted ${MAX_GROUP_MEMBERS}-member bound`);
   }
 
   let parentSha = baseSha;
-  let previousPosition = 0;
   const seenNumbers = new Set();
   const members = comparison.commits.map(commit => {
     const commitSha = requireSha(commit?.sha, 'synthetic commit sha');
@@ -158,51 +140,16 @@ export function resolveMergeGroupMembers({ event, comparison, queue }) {
         `synthetic commit ${commitSha} is not the expected first-parent link`
       );
     }
+    requireGitHubGeneratedCommit(commit);
 
     const number = generatedPullRequestNumber(commit);
     if (seenNumbers.has(number)) fail(`merge group repeats PR #${number}`);
     seenNumbers.add(number);
 
-    const entry = entriesByPullRequest.get(number);
-    if (!entry) fail(`PR #${number} is absent from the live merge queue`);
-    const position = requireInteger(
-      entry.position,
-      `PR #${number} queue position`
-    );
-    if (
-      position <= previousPosition ||
-      (previousPosition > 0 && position !== previousPosition + 1)
-    ) {
-      fail(`PR #${number} is out of merge queue order`);
-    }
-    if (!ACTIVE_GROUP_STATES.has(entry.state)) {
-      fail(
-        `PR #${number} has non-buildable queue state ${entry.state ?? 'missing'}`
-      );
-    }
-    if (
-      entry.baseCommit?.oid !== parentSha ||
-      entry.headCommit?.oid !== commitSha
-    ) {
-      fail(
-        `PR #${number} queue commit evidence does not match the synthetic chain`
-      );
-    }
-    if (
-      entry.pullRequest.baseRefName !== 'main' ||
-      !SHA_PATTERN.test(String(entry.pullRequest.headRefOid ?? ''))
-    ) {
-      fail(`PR #${number} has malformed live head metadata`);
-    }
-
     parentSha = commitSha;
-    previousPosition = position;
     return {
       number,
-      position,
-      queueState: entry.state,
       syntheticHeadSha: commitSha,
-      sourceHeadSha: entry.pullRequest.headRefOid,
     };
   });
 
@@ -226,10 +173,10 @@ export function assertCurrentPullRequest(member, pr) {
     pr?.number !== member.number ||
     pr?.state !== 'open' ||
     pr?.base?.ref !== 'main' ||
-    pr?.head?.sha !== member.sourceHeadSha ||
+    !SHA_PATTERN.test(String(pr?.head?.sha ?? '')) ||
     typeof pr?.head?.repo?.fork !== 'boolean'
   ) {
-    fail(`PR #${member.number} changed after merge queue discovery`);
+    fail(`PR #${member.number} changed or is malformed after group discovery`);
   }
   labelsFor(pr);
 }
@@ -417,50 +364,6 @@ async function githubPages(path, { token, maxPages = 30 } = {}) {
   fail(`GitHub API pagination exceeded ${maxPages} pages for ${path}`);
 }
 
-async function fetchQueue({ owner, name, branch, token }) {
-  const query = `
-    query QueueMembers($owner: String!, $name: String!, $branch: String!) {
-      repository(owner: $owner, name: $name) {
-        mergeQueue(branch: $branch) {
-          configuration {
-            maximumEntriesToMerge
-            mergeMethod
-            mergingStrategy
-          }
-          entries(first: 100) {
-            totalCount
-            pageInfo { hasNextPage }
-            nodes {
-              position
-              state
-              baseCommit { oid }
-              headCommit { oid }
-              pullRequest {
-                number
-                baseRefName
-                headRefOid
-              }
-            }
-          }
-        }
-      }
-    }
-  `;
-  const result = await githubRequest('/graphql', {
-    token,
-    method: 'POST',
-    body: { query, variables: { owner, name, branch } },
-  });
-  if (result.data?.errors?.length) {
-    fail(
-      `GitHub GraphQL error: ${result.data.errors[0]?.message ?? 'unknown error'}`
-    );
-  }
-  const queue = result.data?.data?.repository?.mergeQueue;
-  if (!queue) fail('GitHub GraphQL returned no merge queue');
-  return queue;
-}
-
 async function fetchPullRequest(repository, number, token) {
   const result = await githubRequest(`/repos/${repository}/pulls/${number}`, {
     token,
@@ -492,14 +395,10 @@ async function runPolicy() {
   if (!token || !eventPath) fail('GH_TOKEN and GITHUB_EVENT_PATH are required');
 
   const event = JSON.parse(await readFile(eventPath, 'utf8'));
-  const { baseSha, branch, headSha, name, owner, repository } =
-    validateMergeGroupEvent(event);
+  const { baseSha, headSha, repository } = validateMergeGroupEvent(event);
 
-  const [comparison, queue] = await Promise.all([
-    fetchComparison(repository, baseSha, headSha, token),
-    fetchQueue({ owner, name, branch, token }),
-  ]);
-  const members = resolveMergeGroupMembers({ event, comparison, queue });
+  const comparison = await fetchComparison(repository, baseSha, headSha, token);
+  const members = resolveMergeGroupMembers({ event, comparison });
   const pullRequests = await Promise.all(
     members.map(member => fetchPullRequest(repository, member.number, token))
   );
