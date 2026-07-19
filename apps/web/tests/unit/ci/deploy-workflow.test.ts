@@ -2771,15 +2771,25 @@ describe('production promotion exact-artifact contract', () => {
     expect(controller).toContain(
       'Ignoring marker with invalid exact-generation content'
     );
-    expect(controller).toContain('marker_candidate_count');
-    expect(health).toContain('marker_candidate_count');
+    expect(controller).toContain('jq -e --arg marker_name "$marker_name"');
+    expect(health).toContain('jq -e --arg marker_name "$marker_name"');
+    expect(controller).toContain('.name == $marker_name');
+    expect(health).toContain('.name == $marker_name');
+    expect(controller).toContain(
+      "marker_presence_count=\"$(jq '.artifacts | length'"
+    );
+    expect(health).toContain(
+      "marker_presence_count=\"$(jq '.artifacts | length'"
+    );
+    expect(controller).toContain('.expired == false');
+    expect(health).toContain('.expired == false');
     expect(controller).toContain('refusing duplicate deployment');
     expect(health).toContain('refusing automated replay');
     expect(controller.indexOf('done <<<"$marker_candidates"')).toBeLessThan(
-      controller.indexOf('if [ "$marker_candidate_count" -gt 0 ]')
+      controller.indexOf('if [ "$marker_presence_count" -gt 0 ]')
     );
     expect(health.indexOf('done <<<"$marker_candidates"')).toBeLessThan(
-      health.indexOf('if [ "$marker_candidate_count" -gt 0 ]')
+      health.indexOf('if [ "$marker_presence_count" -gt 0 ]')
     );
     expect(controller).toContain('.head_sha == $sha');
     expect(health).toContain('.head_sha == $sha');
@@ -2790,5 +2800,22 @@ describe('production promotion exact-artifact contract', () => {
       'Authenticated smoke was skipped because no complete credential pair is configured'
     );
     expect(controller).toContain('credentials_configured=false');
+  });
+
+  it('fails closed on expired-only or wrong-name production marker listings', () => {
+    const workflows = [
+      readFileSync(productionControllerWorkflowPath, 'utf8'),
+      readFileSync(productionControllerHealthPath, 'utf8'),
+    ];
+
+    for (const workflow of workflows) {
+      expect(workflow).toContain('jq -e --arg marker_name "$marker_name"');
+      expect(workflow).toContain('.name == $marker_name');
+      expect(workflow).toContain(
+        "marker_presence_count=\"$(jq '.artifacts | length'"
+      );
+      expect(workflow).toContain('.expired == false');
+      expect(workflow).toContain('if [ "$marker_presence_count" -gt 0 ]');
+    }
   });
 });

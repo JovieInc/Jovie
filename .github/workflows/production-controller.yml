@@ -124,12 +124,12 @@ jobs:
             marker_name="production-generation-verified-$EXPECTED_SHA"
             artifacts_json="$(gh api \
               "repos/$REPOSITORY/actions/artifacts?name=$marker_name&per_page=100")"
-            jq -e '
+            jq -e --arg marker_name "$marker_name" '
               type == "object" and (.artifacts | type == "array") and
               all(.artifacts[];
                 type == "object" and
                 (.id | type == "number" and . > 0) and
-                (.name | type == "string") and
+                .name == $marker_name and
                 (.expired | type == "boolean") and
                 (.created_at | type == "string" and length > 0) and
                 (.workflow_run.id | type == "number" and . > 0)
@@ -150,13 +150,11 @@ jobs:
               | sort_by(.created_at, .id) | reverse
               | .[] | "\(.id)\t\(.workflow_run.id)"
             ' <<<"$artifacts_json")"
-            marker_candidate_count="$(jq --arg sha "$EXPECTED_SHA" '[
-              .artifacts[]
-              | select(
-                  .expired == false and
-                  .name == ("production-generation-verified-" + $sha)
-                )
-            ] | length' <<<"$artifacts_json")"
+            # Any exact-name history is durable evidence that this generation
+            # may already have mutated production. Expired-only evidence cannot
+            # authorize a duplicate deployment; only a truly empty validated
+            # listing permits the first deployment.
+            marker_presence_count="$(jq '.artifacts | length' <<<"$artifacts_json")"
             while IFS=$'\t' read -r marker_artifact_id marker_run_id; do
               [ -n "$marker_run_id" ] || continue
               [[ "$marker_artifact_id" =~ ^[1-9][0-9]*$ ]] &&
@@ -183,10 +181,12 @@ jobs:
                 exit 1
               }
               jq -e \
+                --argjson run_id "$marker_run_id" \
                 --arg sha "$EXPECTED_SHA" \
                 --arg repo "$REPOSITORY" \
                 --argjson workflow_id "$controller_workflow_id" '
                 type == "object" and
+                .id == $run_id and
                 .workflow_id == $workflow_id and
                 (.display_title | startswith("Production Controller " + $sha + " from CI ")) and
                 .path == ".github/workflows/production-controller.yml" and
@@ -260,7 +260,7 @@ jobs:
               echo "::notice::Exact production generation $EXPECTED_SHA is already verified; neutral."
               exit 0
             done <<<"$marker_candidates"
-            if [ "$marker_candidate_count" -gt 0 ]; then
+            if [ "$marker_presence_count" -gt 0 ]; then
               echo "::error::Production markers exist for current main, but none has exact provable controller evidence; refusing duplicate deployment."
               exit 1
             fi

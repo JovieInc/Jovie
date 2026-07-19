@@ -68,12 +68,12 @@ jobs:
           marker_name="production-generation-verified-$current_sha"
           artifacts_json="$(gh api \
             "repos/$REPOSITORY/actions/artifacts?name=$marker_name&per_page=100")"
-          jq -e '
+          jq -e --arg marker_name "$marker_name" '
             type == "object" and (.artifacts | type == "array") and
             all(.artifacts[];
               type == "object" and
               (.id | type == "number" and . > 0) and
-              (.name | type == "string") and
+              .name == $marker_name and
               (.expired | type == "boolean") and
               (.created_at | type == "string" and length > 0) and
               (.workflow_run.id | type == "number" and . > 0)
@@ -86,10 +86,10 @@ jobs:
             )] | sort_by(.created_at, .id) | reverse |
             .[] | "\(.id)\t\(.workflow_run.id)"
           ' <<<"$artifacts_json")"
-          marker_candidate_count="$(jq --arg name "$marker_name" '[
-            .artifacts[]
-            | select(.name == $name and .expired == false)
-          ] | length' <<<"$artifacts_json")"
+          # Any exact-name history is durable evidence that this generation may
+          # already have mutated production. Expired-only evidence must require
+          # manual recovery; only a truly empty validated listing can replay.
+          marker_presence_count="$(jq '.artifacts | length' <<<"$artifacts_json")"
           while IFS=$'\t' read -r marker_artifact_id marker_run_id; do
             [ -n "$marker_run_id" ] || continue
             [[ "$marker_artifact_id" =~ ^[1-9][0-9]*$ ]] &&
@@ -116,9 +116,11 @@ jobs:
               exit 1
             }
             if ! jq -e \
+              --argjson run_id "$marker_run_id" \
               --arg sha "$current_sha" \
               --arg repo "$REPOSITORY" \
               --argjson workflow_id "$controller_workflow_id" '
+              .id == $run_id and
               .workflow_id == $workflow_id and
               (.display_title | startswith("Production Controller " + $sha + " from CI ")) and
               .path == ".github/workflows/production-controller.yml" and
@@ -182,7 +184,7 @@ jobs:
               fi
             fi
           done <<<"$marker_candidates"
-          if [ "$marker_candidate_count" -gt 0 ]; then
+          if [ "$marker_presence_count" -gt 0 ]; then
             echo "::error::Production markers exist for current main, but none has exact provable controller evidence; refusing automated replay."
             exit 1
           fi
