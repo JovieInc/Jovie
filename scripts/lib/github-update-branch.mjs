@@ -28,38 +28,6 @@ const UPDATE_PULL_REQUEST_BRANCH_MUTATION = `
   }
 `;
 
-const VERIFY_ASYNC_UPDATE_TRANSITION_QUERY = `
-  query VerifyAsyncUpdateTransition(
-    $owner: String!
-    $name: String!
-    $prNumber: Int!
-  ) {
-    viewer {
-      login
-    }
-    repository(owner: $owner, name: $name) {
-      pullRequest(number: $prNumber) {
-        timelineItems(last: 50, itemTypes: [HEAD_REF_FORCE_PUSHED_EVENT]) {
-          nodes {
-            ... on HeadRefForcePushedEvent {
-              createdAt
-              actor {
-                login
-              }
-              beforeCommit {
-                oid
-              }
-              afterCommit {
-                oid
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-`;
-
 async function ghJson(args) {
   const { stdout } = await execFileAsync('gh', args, {
     encoding: 'utf8',
@@ -157,7 +125,7 @@ async function fetchPrSnapshot(repo, prNumber, ghJsonImpl) {
     '-R',
     repo,
     '--json',
-    'id,state,isDraft,baseRefName,headRefName,headRefOid,mergeable,updatedAt',
+    'id,state,isDraft,baseRefName,headRefName,headRefOid,mergeable',
   ]);
 }
 
@@ -173,52 +141,6 @@ function sleep(delayMs) {
   return new Promise(resolve => setTimeout(resolve, delayMs));
 }
 
-async function hasExactAsyncUpdateTransition({
-  repo,
-  prNumber,
-  before,
-  observedHeadOid,
-  ghJsonImpl,
-}) {
-  const [owner, name, ...extra] = repo.split('/');
-  if (!owner || !name || extra.length > 0 || !before.updatedAt) return false;
-
-  let proof;
-  try {
-    proof = await ghJsonImpl([
-      'api',
-      'graphql',
-      '-f',
-      `query=${VERIFY_ASYNC_UPDATE_TRANSITION_QUERY}`,
-      '-f',
-      `owner=${owner}`,
-      '-f',
-      `name=${name}`,
-      '-F',
-      `prNumber=${prNumber}`,
-    ]);
-  } catch {
-    return false;
-  }
-
-  const viewerLogin = proof?.data?.viewer?.login;
-  const snapshotTime = Date.parse(before.updatedAt);
-  const events =
-    proof?.data?.repository?.pullRequest?.timelineItems?.nodes ?? [];
-  if (!viewerLogin || !Number.isFinite(snapshotTime)) return false;
-
-  return events.some(event => {
-    const eventTime = Date.parse(event?.createdAt);
-    return (
-      event?.actor?.login === viewerLogin &&
-      event?.beforeCommit?.oid === before.headRefOid &&
-      event?.afterCommit?.oid === observedHeadOid &&
-      Number.isFinite(eventTime) &&
-      eventTime >= snapshotTime
-    );
-  });
-}
-
 async function pollForUpdatedHead({
   repo,
   prNumber,
@@ -228,7 +150,6 @@ async function pollForUpdatedHead({
   sleepImpl,
 }) {
   let lastSnapshot = null;
-  let unverifiedAsyncHead = null;
   const mutationReturnedUpdatedHead = mutated.headRefOid !== before.headRefOid;
 
   for (const delayMs of POST_UPDATE_VERIFY_DELAYS_MS) {
@@ -245,9 +166,6 @@ async function pollForUpdatedHead({
     ) {
       return { snapshot, identityChanged: true };
     }
-    if (unverifiedAsyncHead && snapshot.headRefOid !== unverifiedAsyncHead) {
-      return { snapshot, headChanged: true };
-    }
     if (
       mutationReturnedUpdatedHead &&
       snapshot.headRefOid === mutated.headRefOid
@@ -256,39 +174,24 @@ async function pollForUpdatedHead({
     }
     if (snapshot.headRefOid !== before.headRefOid) {
       if (!mutationReturnedUpdatedHead) {
-        unverifiedAsyncHead = snapshot.headRefOid;
-        const exactTransition = await hasExactAsyncUpdateTransition({
-          repo,
-          prNumber,
-          before,
-          observedHeadOid: snapshot.headRefOid,
-          ghJsonImpl,
-        });
-        if (exactTransition) {
-          return { snapshot, converged: true, asynchronousUpdate: true };
-        }
-        continue;
+        return {
+          snapshot,
+          headChanged: true,
+          asynchronousUpdateIndeterminate: true,
+        };
       }
       return { snapshot, headChanged: true };
     }
   }
 
-  // GitHub can acknowledge updatePullRequestBranch with the original head and
-  // create the rebased commit asynchronously. Only classify a true no-op after
-  // every bounded verification read still observes that original head.
-  if (
-    !mutationReturnedUpdatedHead &&
-    !unverifiedAsyncHead &&
-    lastSnapshot?.headRefOid === before.headRefOid
-  ) {
-    return { snapshot: lastSnapshot, converged: true };
-  }
-
-  if (unverifiedAsyncHead) {
+  // A same-head mutation response is ambiguous: GitHub may still create the
+  // rebased commit after this window. Never turn elapsed polling into a
+  // successful no-op or enroll a later head without causal integration proof.
+  if (!mutationReturnedUpdatedHead) {
     return {
       snapshot: lastSnapshot,
-      headChanged: true,
-      unverifiedAsyncTransition: true,
+      timedOut: true,
+      asynchronousUpdateIndeterminate: true,
     };
   }
 
@@ -433,11 +336,7 @@ export async function tryGitHubRebase({
     sleepImpl,
   });
   const after = verification.snapshot;
-  const verifiedMutationState = {
-    ...mutationState,
-    mutationApplied:
-      mutationState.mutationApplied || verification.asynchronousUpdate === true,
-  };
+  const verifiedMutationState = mutationState;
   if (verification.identityChanged || verification.headChanged) {
     return {
       ...verifiedMutationState,
@@ -447,8 +346,8 @@ export async function tryGitHubRebase({
       baseRefName: before.baseRefName,
       expectedHeadOid: before.headRefOid,
       observedHeadOid: after.headRefOid,
-      reason: verification.unverifiedAsyncTransition
-        ? 'PR head changed without an exact authenticated GitHub Update Branch transition; refusing enrollment mutation'
+      reason: verification.asynchronousUpdateIndeterminate
+        ? 'GitHub acknowledged the rebase without a new head; a later head change is not causally attributable to that mutation, so enrollment is refused'
         : 'PR identity, base, or head changed after GitHub rebase; refusing enrollment mutation',
     };
   }
@@ -461,32 +360,9 @@ export async function tryGitHubRebase({
       baseRefName: before.baseRefName,
       expectedHeadOid: before.headRefOid,
       observedHeadOid: after?.headRefOid ?? null,
-      reason: `GitHub rebase head was not visible after ${POST_UPDATE_VERIFY_DELAYS_MS.length} bounded verification reads; refusing enrollment mutation`,
-    };
-  }
-  if (after.headRefOid === before.headRefOid) {
-    if (after.mergeable === 'CONFLICTING') {
-      return {
-        ...verifiedMutationState,
-        ok: false,
-        conflict: true,
-        category: 'conflict',
-        baseRefName: before.baseRefName,
-        expectedHeadOid: before.headRefOid,
-        observedHeadOid: after.headRefOid,
-        reason: 'GitHub rebase left the head unchanged and confirmed conflicts',
-      };
-    }
-    return {
-      ...verifiedMutationState,
-      ok: true,
-      updated: false,
-      conflict: false,
-      category: 'no_change',
-      baseRefName: before.baseRefName,
-      expectedHeadOid: before.headRefOid,
-      observedHeadOid: after.headRefOid,
-      reason: 'GitHub reports the pull request branch is already current',
+      reason: verification.asynchronousUpdateIndeterminate
+        ? `GitHub acknowledged the rebase without a new head; bounded verification ended after ${POST_UPDATE_VERIFY_DELAYS_MS.length} reads, so the result remains indeterminate and enrollment is refused`
+        : `GitHub rebase head was not visible after ${POST_UPDATE_VERIFY_DELAYS_MS.length} bounded verification reads; refusing enrollment mutation`,
     };
   }
 
