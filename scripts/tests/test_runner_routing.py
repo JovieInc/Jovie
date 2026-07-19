@@ -67,6 +67,9 @@ def _fake_gh(tmp_path: Path) -> Path:
             if [[ -n "${FAKE_GH_SLEEP_SECONDS:-}" ]]; then
               sleep "$FAKE_GH_SLEEP_SECONDS"
             fi
+            if [[ -n "${FAKE_GH_INVOCATION_MARKER:-}" ]]; then
+              printf 'invoked\n' >> "$FAKE_GH_INVOCATION_MARKER"
+            fi
             if [[ -n "${FAKE_GH_ERROR:-}" ]]; then
               echo "$FAKE_GH_ERROR" >&2
               exit 1
@@ -136,20 +139,27 @@ def _run_query(
     timeout_seconds: str = "20",
     expected_event: str = "",
     expected_sha: str = "",
+    github_actions_context: bool = False,
+    invocation_marker: Optional[Path] = None,
 ) -> tuple[subprocess.CompletedProcess[str], dict[str, str]]:
     tmp_path.mkdir(parents=True, exist_ok=True)
-    _fake_gh(tmp_path)
+    fake_gh = _fake_gh(tmp_path)
     if runs_json is None or jobs_json is None:
         exact_runs, exact_jobs = _exact_evidence()
         runs_json = exact_runs if runs_json is None else runs_json
         jobs_json = exact_jobs if jobs_json is None else jobs_json
     output = tmp_path / "github-output"
     env = os.environ.copy()
+    # Fixture injection is deliberately unavailable to production Actions
+    # invocations. The test subprocess opts out of that parent context and
+    # passes the exact helper path instead of relying on PATH resolution.
+    env.pop("GITHUB_ACTIONS", None)
     env.update(
         {
-            "PATH": f"{tmp_path}:{env['PATH']}",
             "GH_REPO": "JovieInc/Jovie",
             "GITHUB_OUTPUT": str(output),
+            "HEARTBEAT_GH_TEST_HELPER": str(fake_gh),
+            "HEARTBEAT_GH_TEST_MODE": "1",
             "HEARTBEAT_MAX_AGE_SECONDS": "900",
             "HEARTBEAT_API_TIMEOUT_SECONDS": timeout_seconds,
             "HEARTBEAT_EXPECTED_EVENT": expected_event,
@@ -158,8 +168,13 @@ def _run_query(
             "FAKE_JOBS_JSON": jobs_json,
             "FAKE_GH_ERROR": api_error,
             "FAKE_GH_SLEEP_SECONDS": sleep_seconds,
+            "FAKE_GH_INVOCATION_MARKER": (
+                str(invocation_marker) if invocation_marker is not None else ""
+            ),
         }
     )
+    if github_actions_context:
+        env["GITHUB_ACTIONS"] = "true"
     result = subprocess.run(
         ["bash", str(_QUERY_SCRIPT)],
         cwd=_REPO_ROOT,
@@ -253,6 +268,25 @@ def test_exact_fresh_run_and_job_prove_fixed_runner_health(tmp_path: Path) -> No
     assert outputs["health"] == "up", outputs
     assert outputs["probe_state"] == "healthy"
     assert "run 29672288797 attempt 1" in outputs["evidence"]
+
+
+def test_production_actions_context_cannot_authorize_test_gh_helper(
+    tmp_path: Path,
+) -> None:
+    marker = tmp_path / "fake-gh-invoked"
+    result, outputs = _run_query(
+        tmp_path,
+        github_actions_context=True,
+        invocation_marker=marker,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert outputs == {
+        "health": "down",
+        "probe_state": "uncertain",
+        "evidence": "heartbeat gh test helper is not authorized",
+    }
+    assert not marker.exists()
 
 
 def test_current_exact_queued_or_in_progress_probe_is_the_only_retryable_state(
@@ -587,7 +621,11 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     assert "fixed|hosted" in route
     assert "runner_class='hosted'" in route
     assert "runner: ${{ steps.route.outputs.runner }}" not in route
-    assert query.count('timeout "${HEARTBEAT_API_TIMEOUT_SECONDS}s" gh api') == 2
+    assert 'GH_API_COMMAND=(gh api)' in query
+    assert 'GH_API_COMMAND=(bash "$HEARTBEAT_GH_TEST_HELPER" api)' in query
+    assert query.count("heartbeat_gh_api") == 3
+    assert "eval " not in query
+    assert '"${GITHUB_ACTIONS:-}" == "true"' in query
     assert 'head_repository.full_name == $repo' in query
     assert '.[0].run_id == $run_id' in query
     assert '.[0].head_sha == $head_sha' in query

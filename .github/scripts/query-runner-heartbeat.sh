@@ -7,6 +7,7 @@ HEARTBEAT_MAX_AGE_SECONDS="${HEARTBEAT_MAX_AGE_SECONDS:-1500}"
 HEARTBEAT_API_TIMEOUT_SECONDS="${HEARTBEAT_API_TIMEOUT_SECONDS:-20}"
 HEARTBEAT_EXPECTED_SHA="${HEARTBEAT_EXPECTED_SHA:-}"
 HEARTBEAT_EXPECTED_EVENT="${HEARTBEAT_EXPECTED_EVENT:-}"
+HEARTBEAT_GH_TEST_HELPER="${HEARTBEAT_GH_TEST_HELPER:-}"
 
 emit_health() {
   local health="$1"
@@ -25,6 +26,25 @@ emit_health() {
 degrade() {
   emit_health down "$1" "$2"
   exit 0
+}
+
+# Production always executes the installed GitHub CLI directly. Tests may
+# inject one exact, user-owned fixture script, but never from an Actions job:
+# this keeps the seam deterministic without making production command input
+# configurable or evaluating shell text from the environment.
+GH_API_COMMAND=(gh api)
+if [[ -n "$HEARTBEAT_GH_TEST_HELPER" ]]; then
+  if [[ "${GITHUB_ACTIONS:-}" == "true" || "${HEARTBEAT_GH_TEST_MODE:-}" != "1" ]]; then
+    degrade uncertain "heartbeat gh test helper is not authorized"
+  fi
+  if [[ "$HEARTBEAT_GH_TEST_HELPER" != /* || "${HEARTBEAT_GH_TEST_HELPER##*/}" != "gh" || ! -f "$HEARTBEAT_GH_TEST_HELPER" || -L "$HEARTBEAT_GH_TEST_HELPER" || ! -r "$HEARTBEAT_GH_TEST_HELPER" || ! -O "$HEARTBEAT_GH_TEST_HELPER" ]]; then
+    degrade uncertain "heartbeat gh test helper path is malformed"
+  fi
+  GH_API_COMMAND=(bash "$HEARTBEAT_GH_TEST_HELPER" api)
+fi
+
+heartbeat_gh_api() {
+  timeout "${HEARTBEAT_API_TIMEOUT_SECONDS}s" "${GH_API_COMMAND[@]}" "$@"
 }
 
 if ! [[ "$GH_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
@@ -59,9 +79,7 @@ fi
 
 # Fail closed to hosted capacity on every API, schema, identity, or freshness
 # uncertainty. Never echo raw API responses or credentials into evidence.
-if ! runs_json="$(timeout "${HEARTBEAT_API_TIMEOUT_SECONDS}s" gh api \
-  "$RUNS_ENDPOINT" \
-  2>/dev/null)"; then
+if ! runs_json="$(heartbeat_gh_api "$RUNS_ENDPOINT" 2>/dev/null)"; then
   degrade uncertain "heartbeat Actions API is unavailable"
 fi
 if ! jq -e --argjson max_runs "$MAX_RUNS" '
@@ -80,54 +98,46 @@ if [[ "$run_count" != "1" ]]; then
 fi
 
 run_record="$(jq -c '.workflow_runs[0]' <<<"$runs_json")"
-if ! jq -e --arg repo "$GH_REPO" '
+if ! jq -e \
+  --arg repo "$GH_REPO" \
+  --arg expected_event "$HEARTBEAT_EXPECTED_EVENT" \
+  --arg expected_sha "$HEARTBEAT_EXPECTED_SHA" \
+  --argjson strict "$STRICT_EXPECTATION" '
   type == "object" and
   (.id | type == "number" and . > 0) and
   (.run_attempt | type == "number" and . > 0) and
   .name == "Runner Heartbeat" and
   .path == ".github/workflows/runner-heartbeat.yml" and
   .head_repository.full_name == $repo and
-  (.head_sha | type == "string") and
-  (.head_branch | type == "string") and
-  (.event | type == "string") and
+  (.head_sha | type == "string" and test("^[0-9a-f]{40}$")) and
+  (
+    if $strict then
+      .head_sha == $expected_sha and
+      .event == $expected_event and
+      (
+        ($expected_event == "push" and .head_branch == "main") or
+        ($expected_event == "merge_group" and (.head_branch | startswith("gh-readonly-queue/main/")))
+      )
+    else
+      .head_branch == "main" and
+      (.event == "schedule" or .event == "workflow_dispatch" or .event == "push")
+    end
+  ) and
   (.status | type == "string") and
   ((.conclusion // "") | type == "string") and
   (.updated_at | type == "string") and
   (.html_url | type == "string")
 ' >/dev/null <<<"$run_record"; then
-  degrade uncertain "latest heartbeat run shape is malformed or unauthorized"
+  degrade uncertain "latest heartbeat run identity is malformed or unauthorized"
 fi
 
 run_id="$(jq -r '.id' <<<"$run_record")"
 run_attempt="$(jq -r '.run_attempt' <<<"$run_record")"
 head_sha="$(jq -r '.head_sha' <<<"$run_record")"
-head_branch="$(jq -r '.head_branch' <<<"$run_record")"
-event="$(jq -r '.event' <<<"$run_record")"
 status="$(jq -r '.status' <<<"$run_record")"
 conclusion="$(jq -r '.conclusion // ""' <<<"$run_record")"
 observed_at="$(jq -r '.updated_at' <<<"$run_record")"
 run_url="$(jq -r '.html_url' <<<"$run_record")"
-if ! [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]; then
-  degrade uncertain "latest heartbeat commit identity is malformed"
-fi
-if [[ "$STRICT_EXPECTATION" == "true" ]]; then
-  if [[ "$head_sha" != "$HEARTBEAT_EXPECTED_SHA" || "$event" != "$HEARTBEAT_EXPECTED_EVENT" ]]; then
-    degrade uncertain "latest heartbeat run does not match the expected event and commit"
-  fi
-  if [[ "$event" == "push" && "$head_branch" != "main" ]]; then
-    degrade uncertain "latest push heartbeat branch is unauthorized"
-  fi
-  if [[ "$event" == "merge_group" && "$head_branch" != gh-readonly-queue/main/* ]]; then
-    degrade uncertain "latest merge-group heartbeat ref is unauthorized"
-  fi
-elif [[ "$head_branch" != "main" ]]; then
-  degrade uncertain "latest heartbeat branch is unauthorized"
-else
-  case "$event" in
-    schedule|workflow_dispatch|push) ;;
-    *) degrade uncertain "latest heartbeat event is unauthorized" ;;
-  esac
-fi
 if [[ "$run_url" != "https://github.com/$GH_REPO/actions/runs/$run_id" ]]; then
   degrade uncertain "latest heartbeat run URL is malformed"
 fi
@@ -170,7 +180,7 @@ case "$status" in
     ;;
 esac
 
-if ! jobs_json="$(timeout "${HEARTBEAT_API_TIMEOUT_SECONDS}s" gh api \
+if ! jobs_json="$(heartbeat_gh_api \
   --paginate --slurp \
   "repos/$GH_REPO/actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100" \
   2>/dev/null)"; then
