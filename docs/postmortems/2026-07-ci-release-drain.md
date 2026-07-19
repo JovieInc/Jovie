@@ -25,7 +25,7 @@ node scripts/ci-release-incident-contract.mjs
 The command is fail-closed. For each `ci-release/*` entry it requires a
 deterministic regression/verifier, CI-stage owner, operator documentation,
 canonical `JovieInc/ci` propagation, and a clean-scaffold assertion. The
-postmortem’s 29 indexed incidents are therefore reviewable without relying on
+postmortem’s 39 indexed incidents are therefore reviewable without relying on
 the absence of a visible outage.
 
 ## What happened
@@ -130,6 +130,17 @@ Node 22.23.1 and pnpm 9.15.4 must propagate into nested execution, and the
 receipt records resolved versions. This invariant changes neither the current
 hook nor push behavior.
 
+## Production-control additions
+
+Production evidence is valid only when its transport, deployment identity,
+environment, browser route handling, artifact intake, and content assertions
+are each independently safe. The ten incidents below prohibit secret-bearing
+curl argv, first-page deployment selection, all-skip auth smoke success, 200
+not-found/empty public routes, staging or preview substitution, unsafe
+Lighthouse evidence files, third-party cookie forwarding, unawaited Playwright
+routes, and timeouts extended indefinitely by progress. Each remains
+fail-closed and is inherited through the canonical fresh-scaffold contract.
+
 ## Root causes and contributing causes
 
 ### Root causes
@@ -179,6 +190,16 @@ hook nor push behavior.
 | `ci-release/seo-redirect-auth-html` | B / SEO | Upstream unresolved | Reject cross-origin/login HTML. | Production-probe owner/head unresolved. |
 | `ci-release/lighthouse-assertion-matches` | B / Lighthouse | Upstream unresolved | Immutable target and non-zero assertions. | Production-probe owner/head unresolved. |
 | `ci-release/bypass-secret-containment` | B / probe security | Contract stack | All five egress surfaces secret-free. | Production-probe owner/head unresolved. |
+| `ci-release/bypass-secret-curl-argv` | B / production probe security | Contract dependency | Guardrail rejects secret-bearing curl argv before probe; regression proves redacted transport. | Production-control owner must provide merged immutable SHA and behavioral receipt. |
+| `ci-release/ready-deployment-pagination-exact-identity` | B / deployment readiness | Contract dependency | Bounded pagination finds exact immutable deployment identity or fails closed. | Production-control owner must provide merged immutable SHA and behavioral receipt. |
+| `ci-release/configured-auth-smoke-all-skip` | B / authenticated smoke | Contract dependency | Configured suite fails when all routes skip; configured route executes or reports unavailable. | Production-control owner must provide merged immutable SHA and behavioral receipt. |
+| `ci-release/tim-route-not-found-200` | B / Tim route probe | Contract dependency | Route identity/body assertion rejects not-found surface despite 200. | Production-control owner must provide merged immutable SHA and behavioral receipt. |
+| `ci-release/public-route-2xx-empty-body` | B / public probe | Contract dependency | Status, content type, and non-empty body assertion all pass. | Production-control owner must provide merged immutable SHA and behavioral receipt. |
+| `ci-release/staging-preview-environment-bypass` | B / production admission | Contract dependency | Expected production environment identity is bound; staging/preview substitution fails. | Production-control owner must provide merged immutable SHA and behavioral receipt. |
+| `ci-release/lighthouse-evidence-symlink-fifo-manifest` | B / Lighthouse evidence | Contract dependency | Manifest permits only declared regular files; symlink/FIFO mismatch fails. | Production-control owner must provide merged immutable SHA and behavioral receipt. |
+| `ci-release/bypass-cookie-third-party-mask` | B / probe security | Contract dependency | Cookie stays first-party and is masked in all receipts. | Production-control owner must provide merged immutable SHA and behavioral receipt. |
+| `ci-release/playwright-route-promise-await` | B / browser probe | Contract dependency | Delayed/rejected route promise is awaited and fails deterministically. | Production-control owner must provide merged immutable SHA and behavioral receipt. |
+| `ci-release/fetch-absolute-timeout` | B / probe transport | Contract dependency | Absolute deadline defeats redirect/stream progress extension. | Production-control owner must provide merged immutable SHA and behavioral receipt. |
 | `ci-release/production-workflow-provenance` | B / production admission | Contract stack | Authorized run matches workflow SHA. | Production mutation owner. |
 | `ci-release/production-evidence-freshness` | B / production verification | Contract stack | Main, provenance, deploy markers current. | Production mutation owner. |
 | `ci-release/controller-loop-bounds` | Cross / remediation | Contract stack | Idempotency, cap, terminal stop. | Controller owner. |
@@ -224,9 +245,10 @@ then update this indexed postmortem. Do not create repo-local parallel policy.
 
 ## Verification receipts required for closure
 
-- The incident-contract verifier reports all 29 stable IDs, including runner-
-  image provenance, GBrain token/recovery, PR-files head/base-staleness, and
-  pre-push exact-main scope-selection/toolchain-runtime contracts.
+- The incident-contract verifier reports all 39 stable IDs, including runner-
+  image provenance, GBrain token/recovery, pre-push contracts, and distinct
+  production-control transport, deployment, environment, evidence, browser,
+  cookie, content, and timeout contracts.
 - Each listed regression/verifier succeeds in its owning CI stage.
 - The shared `JovieInc/ci` template/bootstrap change is reviewed with its
   consumer caller evidence.
