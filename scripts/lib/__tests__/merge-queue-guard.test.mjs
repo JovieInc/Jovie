@@ -760,6 +760,8 @@ describe('merge queue telemetry parser', () => {
 const ORIGINAL_HEAD = 'a'.repeat(40);
 const UPDATED_HEAD = 'b'.repeat(40);
 const RACING_HEAD = 'c'.repeat(40);
+const SNAPSHOT_UPDATED_AT = '2026-07-19T16:00:00Z';
+const TRANSITION_CREATED_AT = '2026-07-19T16:00:01Z';
 
 function snapshot(overrides = {}) {
   return {
@@ -770,6 +772,7 @@ function snapshot(overrides = {}) {
     headRefName: 'tim/jov-123-example',
     headRefOid: ORIGINAL_HEAD,
     mergeable: 'MERGEABLE',
+    updatedAt: SNAPSHOT_UPDATED_AT,
     ...overrides,
   };
 }
@@ -794,6 +797,35 @@ function asynchronousMutationSnapshot() {
   };
 }
 
+function asyncTransitionProof(overrides = {}) {
+  const viewerLogin = overrides.viewerLogin ?? 'jovie-bot[bot]';
+  return {
+    data: {
+      viewer: { login: viewerLogin },
+      repository: {
+        pullRequest: {
+          timelineItems: {
+            nodes: [
+              {
+                createdAt: overrides.createdAt ?? TRANSITION_CREATED_AT,
+                actor: {
+                  login: overrides.actorLogin ?? viewerLogin,
+                },
+                beforeCommit: {
+                  oid: overrides.beforeHeadOid ?? ORIGINAL_HEAD,
+                },
+                afterCommit: {
+                  oid: overrides.afterHeadOid ?? UPDATED_HEAD,
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+  };
+}
+
 function blockedPr(overrides = {}) {
   return {
     number: 123,
@@ -811,9 +843,12 @@ function ghSequence({
   after = snapshot({ headRefOid: UPDATED_HEAD }),
   afterSequence = null,
   mutationError = null,
+  transitionProof = asyncTransitionProof(),
+  transitionProofSequence = null,
 } = {}) {
   const calls = [];
   let snapshotCalls = 0;
+  let transitionProofCalls = 0;
   const ghJsonImpl = vi.fn(async args => {
     calls.push(args);
     if (args[0] === 'pr' && args[1] === 'view') {
@@ -823,8 +858,13 @@ function ghSequence({
       return snapshots[Math.min(snapshotCalls - 2, snapshots.length - 1)];
     }
     if (args[0] === 'api' && args[1] === 'graphql') {
-      if (mutationError) throw mutationError;
-      return mutation;
+      if (args.join('\n').includes('updatePullRequestBranch')) {
+        if (mutationError) throw mutationError;
+        return mutation;
+      }
+      transitionProofCalls += 1;
+      const proofs = transitionProofSequence ?? [transitionProof];
+      return proofs[Math.min(transitionProofCalls - 1, proofs.length - 1)];
     }
     throw new Error(`unexpected gh args: ${args.join(' ')}`);
   });
@@ -892,6 +932,41 @@ describe('exact-head GitHub Update Branch rebase', () => {
     expect(sleepImpl).toHaveBeenCalledWith(250);
   });
 
+  it('fails closed when an asynchronous head lacks the exact authenticated transition', async () => {
+    const sleepImpl = vi.fn(async () => {});
+    const gh = ghSequence({
+      mutation: asynchronousMutationSnapshot(),
+      afterSequence: [snapshot({ headRefOid: RACING_HEAD })],
+      transitionProof: asyncTransitionProof({
+        actorLogin: 'other-actor',
+        afterHeadOid: RACING_HEAD,
+      }),
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      sleepImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      mutationAttempted: true,
+      mutationApplied: false,
+      conflict: false,
+      category: 'verification_failure',
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: RACING_HEAD,
+    });
+    expect(result.reason).toContain('without an exact authenticated');
+    expect(sleepImpl.mock.calls.map(([delayMs]) => delayMs)).toEqual([
+      250, 500, 1000, 2000,
+    ]);
+  });
+
   it('waits for an asynchronous rebase when the mutation initially returns the original head', async () => {
     const sleepImpl = vi.fn(async () => {});
     const gh = ghSequence({
@@ -919,6 +994,9 @@ describe('exact-head GitHub Update Branch rebase', () => {
     });
     expect(sleepImpl).toHaveBeenCalledOnce();
     expect(sleepImpl).toHaveBeenCalledWith(250);
+    expect(
+      gh.calls.some(args => args.join('\n').includes('beforeCommit'))
+    ).toBe(true);
   });
 
   it('only reports a same-head mutation as no change after bounded verification', async () => {
