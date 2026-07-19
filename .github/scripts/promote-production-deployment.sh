@@ -234,7 +234,6 @@ fi
 
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   printf 'previous_production_deployment_id=%s\n' "$previous_id" >> "$GITHUB_OUTPUT"
-  printf 'previous_production_deployment_url=%s\n' "$previous_url" >> "$GITHUB_OUTPUT"
 fi
 
 echo "Current production deployment before promotion: $previous_id ($previous_url)"
@@ -250,13 +249,15 @@ if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]; then
 fi
 if [ "$current_main_sha" != "$expected_main_sha" ]; then
   if [ -n "${GITHUB_OUTPUT:-}" ]; then
-    printf 'is_current=false\n' >> "$GITHUB_OUTPUT"
+    printf 'promotion_sha=%s\n' "$current_main_sha" >> "$GITHUB_OUTPUT"
   fi
   echo "Release $expected_main_sha was superseded by $current_main_sha before production mutation."
   exit 0
 fi
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
-  printf 'is_current=true\n' >> "$GITHUB_OUTPUT"
+  # The observed SHA is public, high-entropy release identity. Unlike a boolean
+  # true, it cannot collide with a Doppler-added secret mask at the job boundary.
+  printf 'promotion_sha=%s\n' "$current_main_sha" >> "$GITHUB_OUTPUT"
 fi
 
 promotion_requested=false

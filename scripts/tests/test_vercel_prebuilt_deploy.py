@@ -652,7 +652,7 @@ exit 0
 
 
 def _run_promotion_controller(
-    tmp_path: Path, scenario: str
+    tmp_path: Path, scenario: str, *, main_sha: str | None = None
 ) -> subprocess.CompletedProcess[str]:
     fake_vercel = _write_fake_promotion_vercel(tmp_path)
     fake_gh = tmp_path / "gh"
@@ -668,7 +668,7 @@ def _run_promotion_controller(
         "FAKE_SCENARIO": scenario,
         "PRODUCTION_DEPLOYMENT_ID": "dpl_target",
         "EXPECTED_MAIN_SHA": expected_main_sha,
-        "FAKE_MAIN_SHA": expected_main_sha,
+        "FAKE_MAIN_SHA": main_sha or expected_main_sha,
         "GITHUB_REPOSITORY": "jovie/jovie",
         "GH_TOKEN": "github-token",
         "GH_CLI": str(fake_gh),
@@ -749,12 +749,26 @@ def test_promotion_controller_rejects_foreign_rollout_without_mutation(
     assert "rolling-release complete" not in calls
     outputs = (tmp_path / "github-output").read_text()
     assert "previous_production_deployment_id=dpl_previous" in outputs
-    assert (
-        "previous_production_deployment_url=https://dpl_previous.vercel.app"
-        in outputs
-    )
-    assert "is_current=true" in outputs
+    assert "previous_production_deployment_url=" not in outputs
+    assert f"promotion_sha={'a' * 40}" in outputs
+    assert "is_current=" not in outputs
     assert "failure_subtype=production_promotion_foreign_rollout" in outputs
+
+
+def test_promotion_controller_emits_observed_newer_sha_without_mutation(
+    tmp_path: Path,
+) -> None:
+    newer_sha = "b" * 40
+    result = _run_promotion_controller(
+        tmp_path, "standard", main_sha=newer_sha
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert "promote dpl_target" not in calls
+    outputs = (tmp_path / "github-output").read_text()
+    assert f"promotion_sha={newer_sha}" in outputs
+    assert "is_current=" not in outputs
 
 
 def test_promotion_controller_ignores_completed_foreign_rollout_record(

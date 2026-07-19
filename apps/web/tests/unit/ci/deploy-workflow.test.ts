@@ -1029,7 +1029,11 @@ describe('deploy workflow Vercel env resolution', () => {
       expect(block).toContain('runs-on: ubuntu-latest');
       expect(block).not.toContain('continue-on-error: true');
       expect(block).toContain(
-        'needs.production-release.outputs.production_deployment_url'
+        'needs.production-release.outputs.production_deployment_url_b64'
+      );
+      expect(block).toContain('base64 --decode');
+      expect(block).not.toContain(
+        'needs.production-release.outputs.production_deployment_url }}'
       );
       expect(block).not.toContain('verify-production-alias.sh');
     }
@@ -2138,6 +2142,10 @@ describe('production promotion exact-artifact contract', () => {
     );
     expect(stageStep).toContain('${production_deploy_url}/api/health');
     expect(stageStep).toContain('${production_deploy_url}/"');
+    expect(stageStep).toContain('production_deployment_url_b64=');
+    expect(stageStep).not.toContain(
+      'echo "production_deployment_url=$production_deploy_url"'
+    );
     expect(promoteStep).toContain(
       'bash .github/scripts/promote-production-deployment.sh'
     );
@@ -2161,15 +2169,85 @@ describe('production promotion exact-artifact contract', () => {
       "if: ${{ steps.final-current.outputs.is_current == 'true' }}"
     );
     expect(promoteJob).toContain(
-      'is_current: ${{ steps.promote.outputs.is_current }}'
+      'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha }}'
     );
-    expect(verifyStep).toContain("steps.promote.outputs.is_current == 'true'");
+    expect(verifyStep).toContain(
+      'steps.promote.outputs.promotion_sha == inputs.expected_sha'
+    );
     expect(verifyStep).toContain(
       'bash .github/scripts/verify-production-alias.sh'
     );
     expect(promoteJob).toContain('timeout-minutes: 60');
     expect(promoteJob).not.toContain('timeout-minutes: 360');
     expect(promoteJob).not.toContain('vercel promote "$deploy_url"');
+  });
+
+  it('transports production evidence without Doppler-maskable job outputs', () => {
+    const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const promotionScript = readFileSync(
+      productionPromotionControllerPath,
+      'utf8'
+    );
+    const promoteJob = getJobBlock(reusable, 'promote-production');
+    const result = getJobBlock(reusable, 'release-result');
+    const verified = getJobBlock(controller, 'production-verified');
+
+    expect(promoteJob).toContain(
+      'production_deployment_url_b64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}'
+    );
+    expect(promoteJob).toContain(
+      'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha }}'
+    );
+    expect(promoteJob).toContain(
+      'echo "superseded_sha=$current_main_sha" >> "$GITHUB_OUTPUT"'
+    );
+    expect(promoteJob).not.toMatch(/^      production_deployment_url:/m);
+    expect(promoteJob).not.toContain(
+      'is_current: ${{ steps.promote.outputs.is_current }}'
+    );
+    expect(reusable).not.toMatch(/^      previous_production_deployment_url:/m);
+    expect(promotionScript.match(/printf 'promotion_sha=%s\\n'/g)).toHaveLength(
+      2
+    );
+    expect(promotionScript).not.toContain("printf 'is_current=");
+    expect(promotionScript).not.toContain(
+      "printf 'previous_production_deployment_url="
+    );
+
+    expect(result).toContain(
+      'PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}'
+    );
+    expect(result).toContain(
+      'PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.promote-production.outputs.production_deployment_url_b64 }}'
+    );
+    expect(result).toContain('base64 --decode');
+    expect(result).toContain('^https://[A-Za-z0-9.-]+\\.vercel\\.app$');
+    expect(result).toContain(
+      'Successful production promotion omitted exact observed main SHA evidence.'
+    );
+    expect(reusable).toContain('production_deployment_url_b64:');
+    expect(reusable).not.toMatch(/^      production_deployment_url:/m);
+
+    for (const jobName of [
+      'ci-public-profile-smoke',
+      'ci-post-deploy-auth-smoke',
+      'ci-homepage-smoke',
+      'lighthouse-ci',
+    ]) {
+      const job = getJobBlock(controller, jobName);
+      expect(job).toContain(
+        'needs.production-release.outputs.production_deployment_url_b64'
+      );
+      expect(job).toContain('base64 --decode');
+    }
+    expect(verified).toContain(
+      'PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}'
+    );
+    expect(verified).toContain('base64 --decode');
+    expect(controller).not.toContain(
+      'needs.production-release.outputs.production_deployment_url }}'
+    );
   });
 
   it('neutralizes rapid main advance after staging while API uncertainty fails closed', () => {
@@ -2188,9 +2266,14 @@ describe('production promotion exact-artifact contract', () => {
     expect(finalCurrent).toContain('echo "is_current=false"');
     expect(finalCurrent).toContain('exit 0');
     expect(result).toContain(
-      'needs.promote-production.outputs.is_current }}" != "true"'
+      'PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}'
     );
-    expect(result).toContain('Superseded at production mutation; neutral.');
+    expect(result).toContain('[[ "$PROMOTION_SHA" =~ ^[0-9a-f]{40}$ ]]');
+    expect(result).toContain('[ "$PROMOTION_SHA" != "$EXPECTED_SHA" ]');
+    expect(result).toContain('Superseded at production mutation by');
+    expect(result).toContain(
+      'Successful production promotion omitted exact observed main SHA evidence.'
+    );
   });
 
   it('serializes initial runs and reruns in the same bounded FIFO lease', () => {
@@ -2240,8 +2323,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(verifiedJob).not.toContain('concurrency:');
     expect(smokeJob).not.toContain('verify-production-alias.sh');
     expect(smokeJob).toContain(
-      'needs.production-release.outputs.production_deployment_url'
+      'needs.production-release.outputs.production_deployment_url_b64'
     );
+    expect(smokeJob).toContain('base64 --decode');
     expect(smokeJob).not.toContain('Wait for CDN propagation');
   });
 
@@ -2315,9 +2399,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(verified).toContain(
       'Release generation lacks exact passing gate, canonical deployment, or SHA evidence'
     );
-    expect(reusable).toContain('production_deployment_url:');
+    expect(reusable).toContain('production_deployment_url_b64:');
     expect(result).toContain(
-      'needs.promote-production.outputs.production_deployment_url'
+      'needs.promote-production.outputs.production_deployment_url_b64'
     );
   });
 

@@ -274,13 +274,14 @@ jobs:
 
       - name: Verify production endpoints are healthy
         env:
-          PRODUCTION_BASE_URL: ${{ needs.production-release.outputs.production_deployment_url }}
+          PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
 
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
           PRODUCTION_BASE_URL="${PRODUCTION_BASE_URL%/}"
-          [[ "$PRODUCTION_BASE_URL" =~ ^https://[^/]+$ ]] || {
+          [[ "$PRODUCTION_BASE_URL" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]] || {
             echo "::error::Exact production deployment URL is missing or invalid."
             exit 1
           }
@@ -521,6 +522,12 @@ jobs:
       - name: Run production auth smoke tests
         if: steps.check-creds.outputs.skip != 'true'
         run: |
+          set -euo pipefail
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
+          [[ "$PRODUCTION_BASE_URL" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]] || {
+            echo "::error::Exact production deployment URL is missing or invalid."
+            exit 1
+          }
           cd apps/web
 
           mkdir -p tests/.auth
@@ -528,7 +535,7 @@ jobs:
           test -n "$PRODUCTION_BASE_URL"
           CI=true BASE_URL="$PRODUCTION_BASE_URL" node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
         env:
-          PRODUCTION_BASE_URL: ${{ needs.production-release.outputs.production_deployment_url }}
+          PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
           E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
           E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
@@ -553,14 +560,15 @@ jobs:
     steps:
       - name: Verify homepage renders correctly
         env:
-          PRODUCTION_BASE_URL: ${{ needs.production-release.outputs.production_deployment_url }}
+          PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           echo "Running homepage smoke test against production..."
 
           set -euo pipefail
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
           PRODUCTION_BASE_URL="${PRODUCTION_BASE_URL%/}"
-          [[ "$PRODUCTION_BASE_URL" =~ ^https://[^/]+$ ]] || {
+          [[ "$PRODUCTION_BASE_URL" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]] || {
             echo "::error::Exact production deployment URL is missing or invalid."
             exit 1
           }
@@ -639,11 +647,12 @@ jobs:
           echo "Resolved Lighthouse Chrome: $chrome_path"
       - name: Build exact-deployment Lighthouse config
         env:
-          PRODUCTION_BASE_URL: ${{ needs.production-release.outputs.production_deployment_url }}
+          PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
         run: |
           set -euo pipefail
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
           base_url="${PRODUCTION_BASE_URL%/}"
-          [[ "$base_url" =~ ^https://[^/]+$ ]] || {
+          [[ "$base_url" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]] || {
             echo "::error::Exact production deployment URL is missing or invalid."
             exit 1
           }
@@ -717,6 +726,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
+          PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
           PRODUCTION_ALIAS_MAX_ATTEMPTS: '3'
           PRODUCTION_ALIAS_REQUIRED_ROUNDS: '1'
           PRODUCTION_ALIAS_RETRY_SECONDS: '5'
@@ -741,10 +751,14 @@ jobs:
             echo "::error::Production release omitted the exact deployment ID."
             exit 1
           }
-          test -n "${{ needs.production-release.outputs.production_deployment_url }}" || {
-            echo "::error::Production release omitted the exact deployment URL."
+          production_deployment_url="$(printf '%s' "$PRODUCTION_DEPLOYMENT_URL_B64" | base64 --decode)" || {
+            echo "::error::Production release emitted malformed deployment URL evidence."
             exit 1
           }
+          if [[ ! "$production_deployment_url" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]]; then
+            echo "::error::Production release omitted the exact immutable deployment URL."
+            exit 1
+          fi
           for probe in \
             "Post-Deploy Smoke:${{ needs.ci-public-profile-smoke.result }}" \
             "Homepage Smoke:${{ needs.ci-homepage-smoke.result }}" \

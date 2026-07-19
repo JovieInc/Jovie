@@ -14,15 +14,12 @@ on:
       production_deployment_id:
         description: Exact Vercel production deployment ID.
         value: ${{ jobs.release-result.outputs.production_deployment_id }}
-      production_deployment_url:
-        description: Exact immutable Vercel production deployment URL.
-        value: ${{ jobs.release-result.outputs.production_deployment_url }}
+      production_deployment_url_b64:
+        description: Base64-encoded exact immutable Vercel production deployment URL.
+        value: ${{ jobs.release-result.outputs.production_deployment_url_b64 }}
       previous_production_deployment_id:
         description: Exact deployment ID that was canonical before promotion.
         value: ${{ jobs.release-result.outputs.previous_production_deployment_id }}
-      previous_production_deployment_url:
-        description: Immutable URL that was canonical before promotion.
-        value: ${{ jobs.release-result.outputs.previous_production_deployment_url }}
       schema_drift:
         description: Whether post-migration schema verification drifted.
         value: ${{ jobs.release-result.outputs.schema_drift }}
@@ -454,12 +451,13 @@ jobs:
       # alias convergence failures for deploy-notify and Gem diagnosis.
       failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.stage-production.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype }}
       production_deployment_id: ${{ steps.stage-production.outputs.production_deployment_id }}
-      production_deployment_url: ${{ steps.stage-production.outputs.production_deployment_url }}
+      production_deployment_url_b64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}
       previous_production_deployment_id: ${{ steps.promote.outputs.previous_production_deployment_id }}
-      previous_production_deployment_url: ${{ steps.promote.outputs.previous_production_deployment_url }}
       # The build may run for up to 30 minutes. Only the final pre-promote
       # observation owns supersession semantics for downstream/result jobs.
-      is_current: ${{ steps.promote.outputs.is_current }}
+      # The final-current fallback is populated only for a proven supersession.
+      # A current generation still requires the inner pre-mutation script proof.
+      promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -698,7 +696,8 @@ jobs:
           fi
 
           echo "production_deployment_id=$production_deploy_id" >> "$GITHUB_OUTPUT"
-          echo "production_deployment_url=$production_deploy_url" >> "$GITHUB_OUTPUT"
+          printf 'production_deployment_url_b64=%s\n' \
+            "$(printf '%s' "$production_deploy_url" | base64 | tr -d '\n')" >> "$GITHUB_OUTPUT"
 
       - name: Recheck main immediately before production promotion
         id: final-current
@@ -715,6 +714,7 @@ jobs:
           fi
           if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]]; then
             echo "::notice::Release $EXPECTED_MAIN_SHA was superseded by $current_main_sha after its staged production build; skipping production mutation."
+            echo "superseded_sha=$current_main_sha" >> "$GITHUB_OUTPUT"
             echo "is_current=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -736,7 +736,7 @@ jobs:
 
       - name: Verify canonical production deployment
         id: verify-production
-        if: ${{ steps.final-current.outputs.is_current == 'true' && steps.promote.outputs.is_current == 'true' }}
+        if: ${{ steps.final-current.outputs.is_current == 'true' && steps.promote.outputs.promotion_sha == inputs.expected_sha }}
         timeout-minutes: 8
         env:
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
@@ -748,7 +748,7 @@ jobs:
   sentry-error-gate:
     name: Sentry Error Gate (production)
     needs: [promote-production, canary-health-gate]
-    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.is_current == 'true' && needs.canary-health-gate.result == 'success' }}
+    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha && needs.canary-health-gate.result == 'success' }}
     uses: ./.github/workflows/sentry-error-gate.yml
     with:
       deployment_url: https://jov.ie
@@ -760,7 +760,7 @@ jobs:
   production-oauth-gate:
     name: Production OAuth Gate (observational)
     needs: [promote-production]
-    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.is_current == 'true' }}
+    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -937,7 +937,7 @@ jobs:
       ${{
         always() &&
         needs.promote-production.result == 'success' &&
-        needs.promote-production.outputs.is_current == 'true' &&
+        needs.promote-production.outputs.promotion_sha == inputs.expected_sha &&
         (
           needs.sentry-error-gate.outputs.gate_status == 'failed' ||
           needs.production-oauth-gate.outputs.gate_status == 'failed'
@@ -1049,9 +1049,8 @@ jobs:
     outputs:
       released: ${{ steps.result.outputs.released }}
       production_deployment_id: ${{ steps.result.outputs.production_deployment_id }}
-      production_deployment_url: ${{ steps.result.outputs.production_deployment_url }}
+      production_deployment_url_b64: ${{ steps.result.outputs.production_deployment_url_b64 }}
       previous_production_deployment_id: ${{ steps.result.outputs.previous_production_deployment_id }}
-      previous_production_deployment_url: ${{ steps.result.outputs.previous_production_deployment_url }}
       schema_drift: ${{ steps.result.outputs.schema_drift }}
       failure_subtype: ${{ steps.result.outputs.failure_subtype }}
       sentry_gate_status: ${{ steps.result.outputs.sentry_gate_status }}
@@ -1063,17 +1062,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ inputs.expected_sha }}
+          PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}
+          PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.production_deployment_id }}
+          PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.promote-production.outputs.production_deployment_url_b64 }}
+          PREVIOUS_PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.previous_production_deployment_id }}
         run: |
           set -euo pipefail
-          echo "released=false" >> "$GITHUB_OUTPUT"
-          echo "production_deployment_id=${{ needs.promote-production.outputs.production_deployment_id }}" >> "$GITHUB_OUTPUT"
-          echo "production_deployment_url=${{ needs.promote-production.outputs.production_deployment_url }}" >> "$GITHUB_OUTPUT"
-          echo "previous_production_deployment_id=${{ needs.promote-production.outputs.previous_production_deployment_id }}" >> "$GITHUB_OUTPUT"
-          echo "previous_production_deployment_url=${{ needs.promote-production.outputs.previous_production_deployment_url }}" >> "$GITHUB_OUTPUT"
-          echo "schema_drift=${{ needs.deploy-staging.outputs.schema_drift }}" >> "$GITHUB_OUTPUT"
-          echo "failure_subtype=${{ needs.promote-production.outputs.failure_subtype }}" >> "$GITHUB_OUTPUT"
-          echo "sentry_gate_status=${{ needs.sentry-error-gate.outputs.gate_status }}" >> "$GITHUB_OUTPUT"
-          echo "oauth_gate_status=${{ needs.production-oauth-gate.outputs.gate_status }}" >> "$GITHUB_OUTPUT"
+          {
+            echo "released=false"
+            echo "production_deployment_id=$PRODUCTION_DEPLOYMENT_ID"
+            echo "production_deployment_url_b64=$PRODUCTION_DEPLOYMENT_URL_B64"
+            echo "previous_production_deployment_id=$PREVIOUS_PRODUCTION_DEPLOYMENT_ID"
+            echo "schema_drift=${{ needs.deploy-staging.outputs.schema_drift }}"
+            echo "failure_subtype=${{ needs.promote-production.outputs.failure_subtype }}"
+            echo "sentry_gate_status=${{ needs.sentry-error-gate.outputs.gate_status }}"
+            echo "oauth_gate_status=${{ needs.production-oauth-gate.outputs.gate_status }}"
+          } >> "$GITHUB_OUTPUT"
 
           if [ "${{ needs.release-head.result }}" != "success" ]; then
             echo "::error::Initial main HEAD API check failed closed."
@@ -1098,10 +1102,15 @@ jobs:
             echo "Superseded before production mutation; neutral."
             exit 0
           fi
-          if [ "${{ needs.promote-production.result }}" = "success" ] &&
-            [ "${{ needs.promote-production.outputs.is_current }}" != "true" ]; then
-            echo "Superseded at production mutation; neutral."
-            exit 0
+          if [ "${{ needs.promote-production.result }}" = "success" ]; then
+            [[ "$PROMOTION_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "::error::Successful production promotion omitted exact observed main SHA evidence."
+              exit 1
+            }
+            if [ "$PROMOTION_SHA" != "$EXPECTED_SHA" ]; then
+              echo "Superseded at production mutation by $PROMOTION_SHA; neutral."
+              exit 0
+            fi
           fi
 
           sentry_status="${{ needs.sentry-error-gate.outputs.gate_status }}"
@@ -1148,14 +1157,18 @@ jobs:
             fi
           done
 
-          test -n "${{ needs.promote-production.outputs.production_deployment_id }}" || {
+          [[ "$PRODUCTION_DEPLOYMENT_ID" == dpl_* ]] || {
             echo "::error::Release completed without an exact production deployment ID."
             exit 1
           }
-          test -n "${{ needs.promote-production.outputs.production_deployment_url }}" || {
-            echo "::error::Release completed without an exact production deployment URL."
+          production_deployment_url="$(printf '%s' "$PRODUCTION_DEPLOYMENT_URL_B64" | base64 --decode)" || {
+            echo "::error::Release completed with malformed production deployment URL evidence."
             exit 1
           }
+          if [[ ! "$production_deployment_url" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]]; then
+            echo "::error::Release completed without an exact immutable production deployment URL."
+            exit 1
+          fi
 
           # Do not spend the sole production lease on deep probes for a SHA
           # that main already superseded while release gates soaked.
