@@ -8,6 +8,8 @@ describe('Lighthouse classified retry', () => {
   it.each([
     'PROTOCOL_TIMEOUT: DOMSnapshot.disable timed out',
     'Waiting for DevTools protocol response has exceeded the allotted time',
+    'CHROME_INTERSTITIAL: finalUrl=chrome-error://chromewebdata/',
+    'Navigation failed with net::ERR_CONNECTION_RESET',
   ])('classifies exact Chrome DevTools transport failures: %s', output => {
     expect(classifyLighthouseFailure(output)).toBe('transient_protocol');
   });
@@ -57,6 +59,29 @@ describe('Lighthouse classified retry', () => {
     expect(result.attempts).toBe(2);
     expect(executeAttempt).toHaveBeenCalledTimes(2);
     expect(sleep).toHaveBeenCalledWith(7);
+  });
+
+  it('stops after the configured transient retry budget', async () => {
+    const executeAttempt = vi
+      .fn()
+      .mockResolvedValue({ code: 1, output: 'chrome-error://chromewebdata/' });
+    const sleep = vi.fn().mockResolvedValue(undefined);
+
+    const result = await runWithClassifiedRetries({
+      executeAttempt,
+      maxAttempts: 2,
+      cooldownMs: 0,
+      sleep,
+      report: vi.fn(),
+    });
+
+    expect(result).toMatchObject({
+      code: 1,
+      attempts: 2,
+      failureClass: 'transient_protocol',
+    });
+    expect(executeAttempt).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledTimes(1);
   });
 
   it('fails unknown errors immediately', async () => {

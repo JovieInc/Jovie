@@ -177,7 +177,8 @@ jobs:
     name: Dispatch Claude Code fix
     needs: evaluate
     if: needs.evaluate.outputs.needs_autofix == 'true'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Model repair work is event-driven and must not occupy fixed CI capacity.
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       actions: read

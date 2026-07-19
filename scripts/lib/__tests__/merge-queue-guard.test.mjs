@@ -17,7 +17,9 @@ import {
   isAutonomousBranch,
   MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
+  NATIVE_BRANCH_PROTECTION_POLICY,
   NATIVE_QUEUE_POLICY,
+  normalizeBranchProtectionSource,
   parseMergeQueueTimeline,
   parseRequiredStatusChecksFromYaml,
   preQueueFreshnessDecision,
@@ -30,11 +32,18 @@ import {
 } from '../merge-queue-guard.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+const LIVE_NATIVE_RULESET_FIXTURE = JSON.parse(
+  readFileSync(
+    resolve(import.meta.dirname, 'fixtures/main-ruleset-10512119.json'),
+    'utf8'
+  )
+);
 
 const greenStatuses = [
   { name: 'PR Ready', conclusion: 'SUCCESS' },
   { name: 'Migration Guard', conclusion: 'SUCCESS' },
   { name: 'Fork PR Gate', state: 'SUCCESS' },
+  { name: 'PR Size Guard', state: 'SUCCESS' },
 ];
 
 function buildUiFastTrackBody({
@@ -353,6 +362,7 @@ describe('aggregate required checks', () => {
       'CI / PR Ready',
       'CI / Migration Guard',
       'Fork PR Gate',
+      'PR Size Guard',
     ]);
     expect(ok.ok).toBe(true);
 
@@ -387,11 +397,17 @@ describe('aggregate required checks', () => {
     expect(ciWorkflowHasMergeGroupTrigger(ciWorkflowYaml)).toBe(true);
     expect(result.warnings).toEqual([]);
     expect(parseRequiredStatusChecksFromYaml(branchProtectionYaml)).toEqual([
-      'CI / PR Ready',
-      'CI / Migration Guard',
+      'PR Ready',
+      'Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
     ]);
+    expect(normalizeBranchProtectionSource(branchProtectionYaml)).toEqual(
+      LIVE_NATIVE_RULESET_FIXTURE
+    );
+    expect(NATIVE_BRANCH_PROTECTION_POLICY).toEqual(
+      LIVE_NATIVE_RULESET_FIXTURE
+    );
 
     for (const bypass_actors of [
       '{}',
@@ -412,7 +428,7 @@ describe('aggregate required checks', () => {
     }
   });
 
-  it('keeps Storybook A11y path-gated as a leaf and blocking through PR Ready', () => {
+  it('keeps Storybook A11y manual and outside source PR Ready', () => {
     const branchProtectionYaml = readFileSync(
       resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.branchProtection),
       'utf8'
@@ -434,16 +450,16 @@ describe('aggregate required checks', () => {
     expect(
       parseRequiredStatusChecksFromYaml(branchProtectionYaml)
     ).not.toContain('Storybook A11y');
-    expect(storybookBlock).toMatch(/run_storybook_a11y == 'true'/);
+    expect(storybookBlock).toContain(
+      "github.event_name == 'workflow_dispatch'"
+    );
     expect(storybookBlock).toMatch(/pnpm --filter @jovie\/web test:a11y/);
-    expect(prReadyBlock).toMatch(/ci-storybook-a11y/);
-    expect(prReadyBlock).toMatch(
-      /STORYBOOK_A11Y_RESULT.*needs\.ci-storybook-a11y\.result/
-    );
-    expect(prReadyBlock).toMatch(
-      /STORYBOOK_A11Y_RESULT.*!= "success".*!= "skipped"/
-    );
+    expect(storybookBlock).not.toContain("github.event_name == 'pull_request'");
+    expect(prReadyBlock).not.toMatch(/ci-storybook-a11y|STORYBOOK_A11Y_RESULT/);
     expect(visualWorkflowYaml).not.toMatch(/^\s+pull_request:/m);
+    expect(visualWorkflowYaml).not.toMatch(/^\s+push:/m);
+    expect(visualWorkflowYaml).toMatch(/^\s+schedule:/m);
+    expect(visualWorkflowYaml).not.toContain('vars.CI_FAST_RUNNER');
   });
 
   it('keeps merge-queue enroll hot path free of pytest/Python bootstrap (GH-13630)', () => {
@@ -463,7 +479,7 @@ describe('aggregate required checks', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('validates the live ruleset shape used by Graphite merge queue', () => {
+  it('validates the legacy Graphite ruleset shape only when explicitly selected', () => {
     const liveRuleset = {
       bypass_actors: [
         {
@@ -480,6 +496,7 @@ describe('aggregate required checks', () => {
             { context: 'PR Ready' },
             { context: 'Migration Guard' },
             { context: 'Fork PR Gate', integration_id: 2934433 },
+            { context: 'PR Size Guard' },
           ],
         },
         { type: 'non_fast_forward' },
@@ -487,7 +504,9 @@ describe('aggregate required checks', () => {
       ],
     };
 
-    const result = validateLiveMergeQueueRuleset(liveRuleset);
+    const result = validateLiveMergeQueueRuleset(liveRuleset, {
+      backend: 'graphite',
+    });
     expect(result.ok).toBe(true);
     expect(result.hasGraphiteBypass).toBe(true);
   });
@@ -545,6 +564,19 @@ describe('aggregate required checks', () => {
       hasGraphiteBypass: false,
       hasNativeMergeQueue: true,
     });
+
+    for (const dormantType of ['required_signatures', 'non_fast_forward']) {
+      const unexpectedDormantRule = validateLiveMergeQueueRuleset(
+        {
+          bypass_actors: [],
+          rules: [...nativeRules, { type: dormantType }],
+        },
+        { backend: 'native' }
+      );
+      expect(unexpectedDormantRule.errors).toContain(
+        'live native ruleset unexpectedly enables dormant signature or non-fast-forward rules'
+      );
+    }
 
     for (const bypass_actors of [undefined, {}]) {
       const malformed = validateLiveMergeQueueRuleset(

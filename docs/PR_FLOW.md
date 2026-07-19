@@ -15,7 +15,8 @@ If you are an agent about to open a PR, read [Agent checklist](#agent-checklist)
   ship autonomously; the taste classifier comment is a signal for post-ship
   walkthroughs. Nothing needs a human pre-merge.
 - **Throughput ceiling is CI cost and queue reliability, not merge wiring.** Keep
-  the per-PR gate cheap; push everything heavy off the PR path.
+  the source-PR gate cheap; put deterministic integration on the exact combined
+  queue head and network/deploy/exhaustive depth after merge or on schedules.
 
 ## 1. Unit of work: one small PR → `main`
 
@@ -37,17 +38,20 @@ If you are an agent about to open a PR, read [Agent checklist](#agent-checklist)
 
 ## 2. CI is risk-tiered (the performance core)
 
-A 1-line change must not pay for a full build + CodeQL + Lighthouse + E2E. Each PR
-runs **only what it touches**; everything heavy runs post-merge or nightly.
+A 1-line source PR must not pay for a full build + CodeQL + Lighthouse + E2E.
+Source checks stay fast and deterministic; exact combined-head integration runs
+in the merge queue, while network/deploy/exhaustive depth runs later.
 
 | Tier | Jobs | Trigger |
 |---|---|---|
-| **PR gate** (must stay fast) | typecheck, lint, **affected** unit tests, structural contract, size guard, the required-check set | every PR — turbo `--affected` + remote cache |
-| **Post-merge (`main`)** | CodeQL, Trivy, Gitleaks, TruffleHog, Scorecard, deploy | `push: main` |
-| **Nightly** | SonarCloud, deep CodeQL, full E2E matrix, exhaustive suites | `schedule` |
+| **PR gate** (must stay fast) | typecheck, lint, portable iOS contract, structural contract, diff secret scan, size/fork/migration policy | every PR — deterministic, path-aware |
+| **Merge queue** | combined-head `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, path-selected model-free Promptfoo/golden evals, diff secret scan, migration policy | GitHub `merge_group` synthetic head |
+| **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
+| **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; `Production Verified` marker | successful current production release |
+| **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites | schedule, event, or explicit manual dispatch |
 
 Rules:
-- **Heavy scans never gate a PR or a `gtmq_*` merge-queue batch.** Running CodeQL
+- **Heavy scans never gate a source PR or a merge-queue batch.** Running CodeQL
   ×5 + the full security suite per-PR saturated the runner pool and made Graphite
   retry-storm itself into a 6-hour stall. CodeQL / Trivy / Scorecard scan the
   *merged* code on `main` + nightly.
@@ -55,16 +59,20 @@ Rules:
   runs on every PR (~10s, 1 slot): a leaked key on this **public** repo is scraped
   within seconds of hitting `main`, so it is EVENT-class and must be caught
   pre-merge. The full-history secret scan stays nightly.
-- **The PR gate is the only merge gate.** Keep it under a few minutes. If a lane
-  isn't required for correctness of *this* diff, path-gate it or move it off-PR.
+- **The source PR gate stays deterministic and cheap.** The merge queue is the
+  integration gate for the exact combined head. It owns affected unit shards,
+  build, and deterministic layout evidence. Preview, Neon, E2E, Lighthouse,
+  a11y, Storybook, golden-path, preview, and extended-smoke work never starts
+  from a source-PR event or risk label. Run it through a hosted manual,
+  scheduled, or repository event after the fast source gate. No PR label fans
+  out CI.
 - Remaining lever: turbo `--affected` + remote cache on the PR gate so cache-hit
   jobs finish in seconds (tracked in JOV-3461).
-- **Graphite has no separate merge-queue lane.** It is configured to run on
-  every PR directly (not draft-batch mode), so `gtmq_*` batch branches are never
-  created. CI also supports GitHub's `merge_group` event ahead of a native-queue
-  cutover: that inert compatibility lane validates the synthetic combined head
-  and emits the four required contexts without running PR-only or deployment
-  work. It does not activate the native queue; the live ruleset owns that switch.
+- **GitHub's native merge queue owns combined-head integration.** The
+  `merge_group` event validates the synthetic SHA and emits the same required
+  contexts as the source PR. Main reuses an exact successful merge-group SHA;
+  direct/admin main commits fail closed on the current run's fallback contract
+  before production promotion.
 
 ### Does my change need the heavy lane, a preview, or taste approval?
 
@@ -73,19 +81,21 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 | If your diff touches… | What happens |
 |---|---|---|
-| `auth-identity`, `billing-money`, `db-migrations`, `proxy-middleware`, `env-config`, `agent-control-plane`, CI workflows | **High risk** → smoke + preview evidence required. All surfaces are unattended-auto-merge (2026-07-06 policy). |
-| Public UI / profile surfaces | **Medium** → preview deploy + Lighthouse/a11y run. |
+| `auth-identity`, `billing-money`, `db-migrations`, `proxy-middleware`, `env-config`, `agent-control-plane`, CI workflows | **High risk signal** → routes deeper post-merge/nightly validation and names local reproduction commands; source `PR Ready` remains deterministic. |
+| Public UI / profile surfaces | **Medium risk signal** → use the hosted manual preview/deep dispatch when review evidence is needed; Lighthouse/a11y never auto-start from the source event. |
 | Design / UX / copy | **Taste-flagged** → `llm-review` label; strong LLM review + ship; classifier comment signals post-ship walkthrough. |
 | Anything else (logic, tests, docs, internal app) | Fast gate only → auto-merges when green. |
 
-- **Want a preview deploy** when it isn't auto-triggered? Add the `deploy-preview`
-  (or `testing`) label — see [`release.md`](../.claude/rules/release.md).
+- **Want a preview deploy?** Dispatch `CI` on the exact ref with
+  `run_preview_deploy=true`; external Vercel preview status remains
+  informational — see [`release.md`](../.claude/rules/release.md).
 
 ## 3. Merge: autonomous, per-PR, self-healing
 
-- **Enrollment is automatic.** `merge-queue-autoenroll` labels every mergeable,
-  non-failing, non-taste PR `merge-queue`; Graphite merges it when the gate is
-  green. You don't merge by hand.
+- **Enrollment is automatic.** `merge-queue-autoenroll` revalidates every
+  mergeable, non-failing, non-taste PR at its exact head, enrolls it in GitHub's
+  native queue, then keeps `merge-queue` only as intent/audit evidence. You
+  don't merge by hand.
 - **The queue tolerates transient state.** A PR is only dequeued on a real merge
   conflict, `needs-conflict-resolution`, or a **terminal** failing check
   (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`
@@ -96,31 +106,14 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   `evaluate` → merge → `active`) exists only to land a fix that repairs the queue
   itself, when the queue can't yet land it. It is not the normal path.
 
-### Merge-queue stall watchdog
+### Native queue reconciliation
 
-Enrollment (`drain-pr-queue.sh`) only guarantees a clean PR *gets* the
-`merge-queue` label — it doesn't watch what happens after. Measured stall
-data showed a p90 of 94 minutes and a max of 770 minutes between label and
-merge, with no rescue for a PR that stays clean and green but Graphite stops
-progressing on. `scripts/merge-queue-watchdog.sh` runs on its own `*/10`
-cron tick and rescues those PRs:
-
-- A PR must have carried `merge-queue` for at least `STALL_MINUTES` (default
-  45) before the watchdog acts on it.
-- Conflicting/dirty PRs get `needs-conflict-resolution` only — the watchdog
-  never removes `merge-queue` itself for conflicts; the next `drain-pr-queue.sh`
-  pass owns that dequeue, so the two scripts never race on the same label.
-- A terminal red required check (same definition as drain: only
-  `FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`/`STARTUP_FAILURE`) dequeues.
-- Otherwise — clean, green, and still stuck — the watchdog label-cycles
-  `merge-queue` (remove, re-add) to force Graphite to re-observe the PR.
-  Graphite is not the GitHub-native merge queue, so there is no
-  `dequeuePullRequest` GraphQL mutation to call; a label cycle is the only
-  lever available.
-- **Anti-thrash:** at most one label-cycle kick per PR per `COOLDOWN_HOURS`
-  (default 2), tracked via a hidden-marker PR comment. The enroll and
-  watchdog jobs share one concurrency group so they never mutate labels
-  concurrently.
+`drain-pr-queue.sh` reads authoritative GitHub queue state, not the audit
+label. Every enrollment uses the exact current head SHA and proves the PR is
+queued after mutation. Hard-gated, conflicting, or terminal-red entries are
+dequeued through the native API and then have their audit label removed.
+Pending, queued, and cancelled check runs are not terminal failures, preventing
+dequeue/re-enroll loops during ordinary CI cancellation or main movement.
 
 ## 4. Taste: advisory, not a gate
 
@@ -151,7 +144,10 @@ Self-hosted runners must use explicit self-hosted labels only (`jovie-runner`,
 architecture labels, machine labels). Never add GitHub-hosted labels such as
 `ubuntu-latest`, `macos-latest`, or `windows-latest` to self-hosted runners: that
 routes ordinary hosted-runner jobs onto local machines with different toolchains.
-`runner-health-monitor` fails fast if this drift reappears.
+The merge-group unit route runs on hosted capacity and selects `jovie-runner`
+only from fresh successful Runner Heartbeat evidence. Stale, malformed,
+timed-out, or API-uncertain evidence succeeds with `ubuntu-latest`; the hosted
+`runner-health-monitor` is observer-only and never mutates routing variables.
 
 ## What broke on 2026-06-22
 

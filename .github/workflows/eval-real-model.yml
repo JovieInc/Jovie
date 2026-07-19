@@ -45,6 +45,7 @@ env:
 jobs:
   real-model-eval:
     name: Golden + Adversarial (Helicone)
+    # Live-model work is scheduled/manual and never consumes fixed CI slots.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

@@ -114,7 +114,8 @@ The workflow references these repository-level secrets or variables in GitHub Ac
   - `NEON_API_KEY`
 - Variables
   - `NEON_PROJECT_ID`
-  - `CI_FAST_RUNNER`
+  - `CI_FAST_RUNNER` / `CI_UNIT_RUNNER` (inert compatibility state; merge-group
+    units select fixed or hosted capacity per run from Runner Heartbeat evidence)
   - `TURBO_TEAM`
 
 ## Operating Model

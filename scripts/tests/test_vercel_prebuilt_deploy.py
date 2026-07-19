@@ -12,6 +12,7 @@ PRODUCTION_PROMOTION_SCRIPT = (
 )
 PRODUCTION_ALIAS_SCRIPT = REPO_ROOT / ".github/scripts/verify-production-alias.sh"
 CI_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
+PRODUCTION_RELEASE_WORKFLOW = REPO_ROOT / ".github/workflows/production-release.yml"
 CANARY_WORKFLOW = REPO_ROOT / ".github/workflows/canary-health-gate.yml"
 
 
@@ -319,7 +320,7 @@ sleep 5
 
 
 def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
-    workflow = CI_WORKFLOW.read_text()
+    workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
 
     deploy_index = workflow.index("- name: Deploy (staging preview, prebuilt)")
     wait_index = workflow.index("- name: Wait for staging deployment readiness")
@@ -330,22 +331,23 @@ def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
     assert deploy_index < wait_index < canary_index < alias_job_index < promote_index
     assert "vercel inspect" in workflow[wait_index:canary_index]
     assert "--wait" in workflow[wait_index:canary_index]
-    assert "needs: [deploy-staging, canary-health-gate, alias-staging]" in workflow[
+    assert "needs: [deploy-staging, canary-health-gate, alias-staging, production-head]" in workflow[
         promote_index:
     ]
 
-    preview_deploy_index = workflow.index(
+    source_workflow = CI_WORKFLOW.read_text()
+    preview_deploy_index = source_workflow.index(
         "- name: Deploy (PR preview, fast deployment for UI-only changes)"
     )
-    preview_wait_index = workflow.index("- name: Wait for PR preview readiness")
-    assert preview_deploy_index < preview_wait_index < deploy_index
+    preview_wait_index = source_workflow.index("- name: Wait for PR preview readiness")
+    assert preview_deploy_index < preview_wait_index
 
 
 def test_pr_preview_readiness_requires_terminal_ready_state() -> None:
     workflow = CI_WORKFLOW.read_text()
     readiness = workflow[
         workflow.index("- name: Wait for PR preview readiness") : workflow.index(
-            "  # PR Lighthouse runs"
+            "  # Deep Lighthouse runs"
         )
     ]
 
@@ -365,7 +367,7 @@ def test_pr_preview_readiness_script_fails_closed_for_every_non_ready_state(
     workflow = CI_WORKFLOW.read_text()
     readiness = workflow[
         workflow.index("- name: Wait for PR preview readiness") : workflow.index(
-            "  # PR Lighthouse runs"
+            "  # Deep Lighthouse runs"
         )
     ]
     script = textwrap.dedent(readiness.split("        run: |\n", 1)[1])
@@ -420,7 +422,7 @@ exit "${WAIT_STATUS:-0}"
 
 
 def test_staging_job_budget_contains_deploy_and_readiness_steps() -> None:
-    workflow = CI_WORKFLOW.read_text()
+    workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
     staging_block = workflow[
         workflow.index("  deploy-staging:") : workflow.index(
             "  canary-health-gate:"
@@ -459,7 +461,7 @@ def _staging_build_step(workflow: str) -> str:
 
 
 def test_staging_build_runs_in_job_and_materializes_trace_closure() -> None:
-    workflow = CI_WORKFLOW.read_text()
+    workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
     staging = workflow[
         workflow.index("  deploy-staging:") : workflow.index(
             "  canary-health-gate:"
@@ -499,7 +501,7 @@ def test_staging_build_runs_in_job_and_materializes_trace_closure() -> None:
 
 
 def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
-    workflow = CI_WORKFLOW.read_text()
+    workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
     expected_publishable = (
         "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "
         "${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}"
@@ -523,7 +525,7 @@ def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
 
 
 def test_masked_deployment_url_is_encoded_across_job_boundary() -> None:
-    workflow = CI_WORKFLOW.read_text()
+    workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
     canary_workflow = CANARY_WORKFLOW.read_text()
     staging_block = workflow[
         workflow.index("  deploy-staging:") : workflow.index(
@@ -544,7 +546,7 @@ def test_masked_deployment_url_is_encoded_across_job_boundary() -> None:
 
 
 def test_readiness_gate_hands_active_deployment_to_retrying_canary() -> None:
-    workflow = CI_WORKFLOW.read_text()
+    workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
     readiness = workflow[
         workflow.index("- name: Wait for staging deployment readiness") : workflow.index(
             "- name: Encode deployment URL for downstream jobs"
@@ -583,13 +585,14 @@ if [ "$cmd" = "inspect" ]; then
   if [ "$FAKE_SCENARIO" = "owned-timeout" ]; then
     current="dpl_previous"
   elif [ "$FAKE_SCENARIO" = "rolling" ]; then
-    if grep -q '^rolling-release complete ' "$VERCEL_CALL_LOG"; then
+    fetch_count=$(grep -c '^rolling-release fetch' "$VERCEL_CALL_LOG" || true)
+    if [ "$fetch_count" -ge 3 ]; then
       current="dpl_target"
     fi
   elif grep -q '^promote ' "$VERCEL_CALL_LOG"; then
     current="dpl_target"
   fi
-  printf '{"id":"%s","readyState":"READY","target":"production"}\n' "$current"
+  printf '{"id":"%s","url":"%s.vercel.app","readyState":"READY","target":"production"}\n' "$current" "$current"
   exit 0
 fi
 
@@ -614,8 +617,8 @@ if [ "$cmd" = "rolling-release" ] && [ "$2" = "fetch" ]; then
     rollout='{"activeStage":{"targetPercentage":10},"canaryDeployment":{"id":"dpl_foreign"}}'
   elif [ "$FAKE_SCENARIO" = "rolling" ] &&
     grep -q '^promote ' "$VERCEL_CALL_LOG" &&
-    ! grep -q '^rolling-release complete ' "$VERCEL_CALL_LOG"; then
-    rollout='{"activeStage":{"targetPercentage":10},"canaryDeployment":{"id":"dpl_target"}}'
+    [[ $(grep -c '^rolling-release fetch' "$VERCEL_CALL_LOG" || true) -lt 3 ]]; then
+    rollout='{"state":"ROLLING","activeStage":{"targetPercentage":10,"duration":300},"canaryDeployment":{"id":"dpl_target"}}'
   elif [ "$FAKE_SCENARIO" = "owned-timeout" ] &&
     grep -q '^promote ' "$VERCEL_CALL_LOG" &&
     ! grep -q '^rolling-release abort ' "$VERCEL_CALL_LOG"; then
@@ -652,12 +655,25 @@ def _run_promotion_controller(
     tmp_path: Path, scenario: str
 ) -> subprocess.CompletedProcess[str]:
     fake_vercel = _write_fake_promotion_vercel(tmp_path)
+    fake_gh = tmp_path / "gh"
+    fake_gh.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "printf '%s\\n' \"${FAKE_MAIN_SHA}\"\n"
+    )
+    fake_gh.chmod(0o755)
+    expected_main_sha = "a" * 40
     env = {
         **os.environ,
         "FAKE_SCENARIO": scenario,
         "PRODUCTION_DEPLOYMENT_ID": "dpl_target",
+        "EXPECTED_MAIN_SHA": expected_main_sha,
+        "FAKE_MAIN_SHA": expected_main_sha,
+        "GITHUB_REPOSITORY": "jovie/jovie",
+        "GH_TOKEN": "github-token",
+        "GH_CLI": str(fake_gh),
         "PRODUCTION_PROMOTION_POLL_SECONDS": "0",
-        "PRODUCTION_PROMOTION_SETTLE_ATTEMPTS": "2",
+        "PRODUCTION_PROMOTION_SETTLE_ATTEMPTS": "4",
         "PRODUCTION_PROMOTION_CLEANUP_ATTEMPTS": "2",
         "PRODUCTION_PROMOTION_CLI_TIMEOUT": "1s",
         "VERCEL_CLI": str(fake_vercel),
@@ -710,14 +726,15 @@ def test_promotion_controller_observes_nonzero_promote_without_resubmitting(
     assert "without resubmitting" in result.stderr
 
 
-def test_promotion_controller_completes_only_its_exact_rolling_release(
+def test_promotion_controller_observes_automatic_rolling_release(
     tmp_path: Path,
 ) -> None:
     result = _run_promotion_controller(tmp_path, "rolling")
 
     assert result.returncode == 0, result.stdout + result.stderr
     calls = (tmp_path / "vercel-calls").read_text()
-    assert "rolling-release complete --dpl dpl_target" in calls
+    assert "rolling-release complete" not in calls
+    assert "observing owned automatic rollout" in result.stdout
     assert "rolling-release abort" not in calls
 
 
@@ -730,9 +747,26 @@ def test_promotion_controller_rejects_foreign_rollout_without_mutation(
     calls = (tmp_path / "vercel-calls").read_text()
     assert "promote dpl_target" not in calls
     assert "rolling-release complete" not in calls
-    assert (tmp_path / "github-output").read_text().strip() == (
-        "failure_subtype=production_promotion_foreign_rollout"
+    outputs = (tmp_path / "github-output").read_text()
+    assert "previous_production_deployment_id=dpl_previous" in outputs
+    assert (
+        "previous_production_deployment_url=https://dpl_previous.vercel.app"
+        in outputs
     )
+    assert "is_current=true" in outputs
+    assert "failure_subtype=production_promotion_foreign_rollout" in outputs
+
+
+def test_promotion_controller_ignores_completed_foreign_rollout_record(
+    tmp_path: Path,
+) -> None:
+    result = _run_promotion_controller(tmp_path, "foreign-complete")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert calls.count("promote dpl_target") == 1
+    assert "rolling-release complete" not in calls
+    assert "rolling-release abort" not in calls
 
 
 def test_promotion_controller_ignores_completed_foreign_rollout_record(
@@ -817,7 +851,7 @@ def _write_fake_alias_tools(tmp_path: Path) -> tuple[Path, Path]:
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
         "printf '%s\\n' \"$*\" >> \"$VERCEL_CALL_LOG\"\n"
-        "printf '{\"id\":\"%s\",\"readyState\":\"READY\",\"target\":\"production\"}\\n' \"$FAKE_CURRENT_ID\"\n"
+        "printf '{\"id\":\"%s\",\"url\":\"%s.vercel.app\",\"readyState\":\"READY\",\"target\":\"production\"}\\n' \"$FAKE_CURRENT_ID\" \"$FAKE_CURRENT_ID\"\n"
     )
     fake_vercel.chmod(0o755)
 

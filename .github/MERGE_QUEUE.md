@@ -1,136 +1,125 @@
-# Merge Queue (Graphite live; native bootstrap)
+# Merge Queue (GitHub native)
 
-`main` merges go through the **Graphite merge queue**, not GitHub's native merge queue. Graphite rebases each PR on the latest `main`, runs the required aggregate checks against the rebased commit, and merges when green — batching stack-aware so independent PRs test in parallel.
+`main` merges through GitHub's native merge queue. The live repository variable
+is `MERGE_QUEUE_BACKEND=native`, and ruleset `Main Branch Protection`
+(`10512119`) owns queue admission and combined-head validation. Graphite is a
+rollback transport only; never run both transports concurrently.
 
-> Graphite remains live until the guarded native ruleset/backend canary. Never
-> run both transports concurrently.
+## How a PR lands
 
-## How a PR gets merged
+1. Open a PR against `main`. Source CI emits the required aggregate contexts.
+2. Apply `merge-queue` when the PR is ready. Automation normally does this;
+   humans can use `gh pr edit <pr> --add-label merge-queue`.
+3. `merge-queue-autoenroll.yml` revalidates the PR's current state, hard-gate
+   labels, terminal checks, and exact head SHA. It enrolls through
+   `scripts/merge-queue-backend.mjs` and proves authoritative queue state after
+   mutation. The label remains intent/audit evidence, never queue truth.
+4. GitHub creates a synthetic `merge_group` head against current `main` and
+   waits for the same required contexts on that exact combined SHA.
+5. GitHub squash-merges the green queue entry. `linear-sync-on-merge.yml`
+   transitions its Linear issue to `Done`.
 
-1. Open a PR against `main`. CI runs the normal PR lane (`CI / PR Ready`, `CI / Migration Guard`, `Fork PR Gate`).
-2. Apply the **`merge-queue`** label (this is Graphite's enqueue trigger). Automation does this for you:
-   - Agent pipeline, Dependabot, Sentry/main autofix, screenshots, and landing sweep apply `merge-queue` after their gates pass (see `.github/workflows/`).
-   - Humans/agents can do it directly: `gh pr edit <pr> --add-label merge-queue` (or `gt merge`, or the Graphite app).
-   - If a PR is later hard-gated with `needs-human`, `hold`, or `gated`, remove
-     `merge-queue` so it stops occupying Graphite queue slots.
-   - `fast` is not a general priority label. Use it only for PRs explicitly
-     classified as emergency/hotfix/incident, or for the guarded UI fast lane
-     below. Ordinary generated branches with `fast` are gated for human review
-     by the merge-queue guard.
-3. Graphite enqueues the PR, rebases it on `main`, waits for the required checks, and squash-merges.
-4. `linear-sync-on-merge.yml` transitions the Linear issue to `Done` on merge as before.
+Do not manually merge queue-eligible PRs or use a second transport. The normal
+operator action is the intent label; the controller owns exact-head enrollment,
+dequeue compensation, and postcondition checks.
 
-While `MERGE_QUEUE_BACKEND=graphite`, do **not** use `gh pr merge --auto`; use
-the label so Graphite owns the merge.
+## Required contexts and CI stages
+
+Branch protection pins aggregate contexts only—never individual CI jobs.
+
+| Context | Source PR | Native `merge_group` |
+| --- | --- | --- |
+| `PR Ready` | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan | Path selection, risk classification, `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, diff secret scan |
+| `Migration Guard` | Path-gated migration policy | Re-emitted and evaluated on the combined head |
+| `Fork PR Gate` | Human approval policy for external forks | Revalidates every exact group member before emitting the combined-head context |
+| `PR Size Guard` | Source-diff size policy | Revalidates every exact group member before emitting the combined-head context |
+
+Preview, Neon, E2E, Lighthouse, a11y, Storybook, golden-path, and extended-smoke
+lanes are hosted manual, scheduled, repository-event, or post-merge work. They
+never start from the source-PR event and are not required source `PR Ready`
+leaves. No PR label fans out CI. Full security and CodeQL scans remain
+post-merge/nightly;
+the fast diff secret scan gates source and combined heads.
+
+## Canonical native configuration
+
+Checked-in source: `.github/rulesets/branch-protection.yml`.
+
+- Backend: `native`
+- Ruleset id: `10512119`
+- Bypass actors: none
+- Required status checks are non-strict on source PRs; the combined head owns
+  latest-`main` validation.
+- Merge method: `SQUASH`
+- Grouping strategy: `ALLGREEN`
+- Minimum entries to merge: `1`
+- Maximum entries per merge: `10`
+- Maximum entries building concurrently: `2`
+- Check response timeout: `60` minutes
+- Signed-commit and non-fast-forward rules: dormant/not applied. The checked-in
+  payload intentionally matches live ruleset `10512119`; enabling either is a
+  separate reviewed cutover, not an implicit source reapply.
+
+Verify source and live state:
+
+```bash
+pnpm ci:merge-queue:check
+pnpm ci:merge-queue:verify
+gh api repos/JovieInc/Jovie/rulesets/10512119 \
+  --jq '{bypass_actors, rules: [.rules[] | select(.type == "merge_queue" or .type == "required_status_checks")]}'
+```
+
+Bare local controller/check commands default to `native`, matching the live
+repository variable. Unknown backends fail closed. Native enrollment/dequeue
+mutations additionally require the dedicated controller authorization, so a
+bare local command cannot mutate queue state accidentally.
+
+## Reconciliation and loop prevention
+
+`drain-pr-queue.sh` reads GitHub's GraphQL queue state once per bounded drain.
+It fails closed if an open PR is missing from that authoritative snapshot.
+
+- Enrollment refreshes PR metadata immediately before mutation and binds the
+  request to a full 40-character head SHA.
+- Enrollment and dequeue prove their postconditions; failed mutations are
+  reconciled from fresh state rather than blindly retried.
+- `needs-human`, `hold`, `gated`, `queue-deferred`, conflicts, and terminal-red
+  checks remove native queue membership and the audit label.
+- Pending, queued, and cancelled checks are not terminal red. This prevents
+  cancellation churn from becoming a dequeue/re-enroll loop.
+- Main movement triggers event-driven reconciliation and bounded mechanical
+  update-branch/rebase repair for agent branches. There is no polling watchdog
+  or Graphite label-cycle loop in the native path.
+- Queue enrollment is serialized by `merge-queue-drain-mutex`; it does not
+  race another controller instance.
 
 ## Guarded UI fast lane
 
-Small visual-only PRs can use Graphite fast-track without waiting behind
-unrelated backend trains when all of the following are true: labels `ui`,
-`fast-track-ui`, `fast`, and `merge-queue`; changed files limited to UI visual
-surfaces, design docs/assets, or the directly affected UI test; PR body
-before/after screenshots plus an eligibility/checks audit trail; narrow
-typecheck, Biome/lint, and affected component/test evidence when one exists.
+Small visual-only PRs may use `ui`, `fast-track-ui`, and `fast` only when the
+repo policy classifies them as eligible and the PR includes the required visual
+and verification evidence. Auth, billing, DB/migrations, API routes,
+entitlements, data writes, security/CSP, infra, routing, package manifests, CI,
+and broad refactors fail closed out of this lane. The policy lives in
+`scripts/lib/merge-queue-guard.mjs`.
 
-The fast lane fails closed for auth, billing, DB/migrations, API routes,
-entitlements, data writes, security/CSP, infra/cron, routing behavior, package
-manifests, CI, and broad refactors. Repo-side classification lives in
-`scripts/lib/merge-queue-guard.mjs` (`uiFastTrackPolicy`), and the regression
-coverage is in `scripts/lib/__tests__/merge-queue-guard.test.mjs`.
+## Monitoring and troubleshooting
 
-## Verified configuration (2026-06-20, JOV-3291 / #11175)
+- Queue state: GitHub's repository merge queue UI or
+  `node scripts/merge-queue-backend.mjs list-state` with authenticated `gh`.
+- PR not entering: check draft/mergeability, hard-gate labels, required check
+  conclusions, controller App credentials, and the auto-enroll run.
+- Combined head red: repair the failing source PR, update its branch through the
+  controller flow, and let GitHub rebuild the queue group. Do not force a stale
+  combined head through production.
+- Queue controller refuses mutation: confirm the repository variable is exactly
+  `native`; a missing/non-native value intentionally fails the workflow closed.
+- Emergency rollback: first drain native entries, explicitly set the backend to
+  `graphite`, restore the reviewed Graphite bypass/config, and prove a canary.
+  This is an incident procedure, not a normal throughput lever.
 
-Repo-side guardrails live in `scripts/lib/merge-queue-guard.mjs` and are enforced by `pnpm ci:merge-queue:check` (Structural Contract lane). Live ruleset verification: `pnpm ci:merge-queue:verify` (needs `gh` auth).
+## Signed commits
 
-### Required checks: aggregates only
-
-Graphite and branch protection must wait on **aggregate** contexts only — never individual CI jobs (`ci-fast`, `Typecheck`, `Unit Tests`, Lighthouse lanes, …). Pinning a leaf job causes a batch failure to evict siblings instead of bisecting to the culprit.
-
-| Context | Role |
-| --- | --- |
-| `CI / PR Ready` | Single merge gate — fans in typecheck, biome, guardrails, structural contract, unit tests, risk classifier, and risk-triggered preview evidence (build is advisory) |
-| `CI / Migration Guard` | Path-gated schema/migration safety (independent aggregate) |
-| `Fork PR Gate` | Blocks unreviewed fork PRs (auto-passes for agents + team) |
-| `PR Size Guard` | Caps PR size (800 lines / 40 files); `big-pr` is mechanical-only. A documented `integration-train` may use the bounded 2500-line / 60-file policy. |
-
-**Queue CI is the PR's own CI while Graphite remains active.** Graphite runs on every PR directly (not draft-batch mode), so `gtmq_*` batch branches are never created. `ci.yml` also accepts GitHub's `merge_group` event and validates the synthetic combined head, but that path is inert until the live ruleset enables the native queue. Supporting the event before cutover prevents a required-check bootstrap gap; it does not change the active queue backend. See `docs/PR_FLOW.md` §2 and the 2026-06-22 post-mortem.
-
-### Graphite dashboard (`app.graphite.com/settings/merge-queue`) — OWL/human verify
-
-These settings have no CLI/API; confirm in the Graphite UI after any queue incident:
-
-| Setting | Expected value | Why |
-| --- | --- | --- |
-| Merge strategy | Squash | Matches `required_linear_history` + agent squash flow |
-| Merge queue label | `merge-queue` | Matches automation in `drain-pr-queue.sh`, agent pipeline |
-| Auto-enqueue rule | PRs labeled `merge-queue` | Matches auto-enroll workflow |
-| Optimistic / parallel batching | **On** | Independent PRs test in parallel under agent volume |
-| Parallel batch size | **4** | Balances throughput vs. bisection cost (tune in dashboard) |
-| Bisect on batch failure | **On** | One bad PR must not fail its siblings — isolate culprit, requeue rest |
-| CI optimization | **On** | `optimize_ci` job in `ci.yml` skips redundant PR CI Graphite re-validates |
-| Queue timeout | **≤ 60 min** | Prevents a regression from hanging the queue |
-| Max queue depth | **12** | Source-of-record: `GRAPHITE_QUEUE_POLICY.maxQueueDepth` in `scripts/lib/merge-queue-guard.mjs`; agent workflows read it via `node scripts/ci-merge-queue-check.mjs max-queue-depth` |
-| Per-agent enqueue rate | **≤ 6/hour** | Prevents one agent from flooding the queue (set in Graphite if available) |
-| Push actor | `graphite-app` | Must be able to push through protected `main` |
-
-Bisection behavior is also unit-tested in `scripts/lib/__tests__/merge-queue-guard.test.mjs` (`bisectBatchFailure`) so a single failing PR in a batch requeues siblings instead of failing the whole batch.
-
-### GitHub (ruleset `Main Branch Protection`, id `10512119`) — `gh`-configurable
-
-- Required status checks: `PR Ready`, `Migration Guard`, `Fork PR Gate`, `PR Size Guard` (strict / up-to-date). Verify live: `gh api repos/JovieInc/Jovie/rulesets/10512119 --jq '.rules[]|select(.type=="required_status_checks")|.parameters.required_status_checks[].context'`
-- `required_linear_history`, `required_signatures`, `non_fast_forward`, `deletion`, `pull_request` (0 approvals).
-- Live still has no `merge_queue` rule and grants Graphite App `158384` bypass.
-- Checked-in source adds the bounded native rule and removes bypasses; applying
-  it is a separate guarded cutover, not part of merging the bootstrap.
-
-Verify live ruleset:
-
-```bash
-gh api repos/JovieInc/Jovie/rulesets/10512119 \
-  --jq '.rules[] | select(.type=="required_status_checks") | .parameters'
-pnpm ci:merge-queue:verify
-```
-
-### Native cutover (dormant while `MERGE_QUEUE_BACKEND=graphite`)
-
-The controller defaults to Graphite. Drain Graphite, apply the reviewed
-ruleset, run `MERGE_QUEUE_BACKEND=native pnpm ci:merge-queue:verify`, set the
-repository variable, then prove one exact combined-head canary before widening.
-Rollback restores `graphite`, clears native queue/auto-merge state, restores the
-reviewed Graphite bypass/config, and proves one label-driven canary.
-
-### Signed commits (post-cutover activation vehicle)
-
-The ruleset source adds `required_signatures` so unsigned commits cannot reach
-`main`. It is review input, not an API payload: do **not** pass this YAML directly
-to `gh api`. The guarded activation vehicle must translate and validate JSON.
-
-```bash
-# Preview current ruleset
-gh api repos/JovieInc/Jovie/rulesets/10512119 --jq '.rules[] | select(.type=="required_signatures")'
-```
-
-Agent commit signing (each identity that authors merges):
-
-- **Codex / Claude / codegen agents:** enable GPG or SSH commit signing in the agent environment (`git config commit.gpgsign true` + key, or `gpg.ssh.defaultKeyCommand`).
-- **Graphite squash merges:** Graphite's merge commit must also be signed — configure signing on the Graphite push actor before enabling `required_signatures` in production.
-- **Verification:** `security.yml` runs `commit-signature-check` on every `main` push and warns when an unsigned commit lands.
-
-## Monitoring & troubleshooting
-
-- Queue status: Graphite dashboard (not the GitHub "merge queue" UI, which is now unused).
-- **PR not merging after labeling:** confirm the `merge-queue` label is applied, required checks are green, no hard-gate label (`needs-human`, `hold`, `gated`) is present, and `graphite-app` is a ruleset bypass actor. If Graphite can't push, the bypass actor is missing.
-- **Stale Graphite draft after a downstack MQ draft closes:** resubmit the
-  source PR with `gt submit --always --update-only --no-edit --no-interactive
-  --no-verify`. If the stale `gtmq_*` draft remains, cancel/retry the queue
-  entry from the Graphite dashboard. Do not close `gtmq_*` PRs from GitHub.
-- **Batch failure stalled siblings:** confirm Graphite **bisect on batch failure** is enabled in the dashboard. Repo guardrails only allow aggregate required checks — pinned leaf jobs break bisection.
-- **Want to bypass for an emergency:** use Graphite's "merge now" in the dashboard; there is no GitHub-side bypass actor for humans.
-
-## Local verification
-
-```bash
-pnpm ci:merge-queue:check          # repo source-of-record (CI Structural Contract)
-pnpm ci:merge-queue:verify         # + live GitHub ruleset when gh is authenticated
-pnpm ci:harness:test -- merge-queue-guard
-```
+Commit signing remains an audit signal, but live ruleset `10512119` does not
+currently require signatures. Keep agent signing enabled where supported and
+use `commit-signature-check` on `main`; do not claim this as an admission gate
+until an explicit ruleset cutover is verified against native squash commits.

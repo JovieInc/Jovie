@@ -3,49 +3,49 @@ name: CI
 on:
   pull_request:
     branches: [main, 'integration/**']
-  # Inert while Graphite owns landing. Keeping combined-head support on main
-  # lets GitHub native merge queue be canaried without a workflow bootstrap gap.
+  # GitHub native merge queue validates the exact synthetic combined head.
   merge_group:
     types: [checks_requested]
   push:
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - 'apps/web/public/product-screenshots/**'
   workflow_dispatch:
+    inputs:
+      run_runner_image_canary:
+        description: Build and validate the candidate fixed-runner image.
+        required: false
+        default: false
+        type: boolean
+      run_preview_deploy:
+        description: Build a bounded hosted Vercel preview for the dispatched ref.
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  # On main, scope the concurrency group per-commit so rapid merges cannot
-  # cancel each other's deploy pipelines. GitHub evaluates cancel-in-progress
-  # expressions as strings and treats "false" as truthy, which was cancelling
-  # every main CI run when the next merge landed and starving production
-  # promotion. PRs use a simple pr-N group so stale runs are auto-cancelled
-  # as soon as new commits push (JOV-4201).
+  # CI owns only source/combined-head deduplication. Production serialization
+  # lives exclusively in production-controller.yml's repo-wide FIFO lease.
+  # Main push runs use unique keys so every SHA can produce exact evidence.
   group: >-
     ${{ github.workflow }}-${{
       (github.event_name == 'pull_request')
         && format('pr-{0}', github.event.pull_request.number)
         || (github.event_name == 'merge_group'
            && format('merge-group-{0}', github.event.merge_group.head_sha)
-           || ((github.event_name == 'push' && github.ref == 'refs/heads/main')
-           && github.sha
-           || github.ref))
+           || format('run-{0}-{1}', github.run_id, github.run_attempt))
     }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
-  TURBO_CACHE: local:rw,remote:rw
-  # Larger runner for CPU-heavy jobs (typecheck, build, tests).
-  # Set to a GitHub-hosted larger runner label (e.g. "ubuntu-4core") for burst throughput,
-  # or leave as "ubuntu-latest" for default 2-core runners.
-  FAST_RUNNER: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+  # Source and synthetic combined-head code are PR-controlled. Both stages are
+  # deterministic and local-cache-only; remote Turbo credentials are available
+  # exclusively to trusted main pushes and explicit manual dispatches.
+  TURBO_TOKEN: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.TURBO_TOKEN || '' }}
+  TURBO_TEAM: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && secrets.TURBO_TEAM || '' }}
+  TURBO_CACHE: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'local:rw,remote:rw' || 'local:rw' }}
   # JOV-2497: four-slot cross-PR pool caps Neon branch *creation* (one endpoint per branch).
   # Only jobs that call neon-create-branch-with-retry use the pool — artifact consumers
   # (Lighthouse/A11y/Mobile Overflow) reuse neon-db and must NOT share the pool or
@@ -57,15 +57,15 @@ jobs:
   runner-image-offline-proof:
     name: Build and verify runner image offline
     if: >-
-      github.event_name == 'pull_request' &&
-      contains(github.event.pull_request.labels.*.name, 'runner-image-canary')
+      github.event_name == 'workflow_dispatch' &&
+      inputs.run_runner_image_canary == true
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
@@ -73,7 +73,7 @@ jobs:
         id: runner-context
         shell: bash
         env:
-          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -93,7 +93,7 @@ jobs:
       - name: Build twice and prove the dependency layer is cached
         shell: bash
         env:
-          IMAGE_TAG: jovie-runner:offline-${{ github.event.pull_request.head.sha }}
+          IMAGE_TAG: jovie-runner:offline-${{ github.sha }}
           CACHE_SCOPE: runner-image-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ steps.runner-context.outputs.sha256 }}
         run: |
           set -euo pipefail
@@ -142,7 +142,7 @@ jobs:
       - name: Verify candidate with networking disabled
         shell: bash
         env:
-          IMAGE_TAG: jovie-runner:offline-${{ github.event.pull_request.head.sha }}
+          IMAGE_TAG: jovie-runner:offline-${{ github.sha }}
         run: |
           set -euo pipefail
           docker run --rm --network none \
@@ -205,7 +205,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: runner-image-proof-${{ github.event.pull_request.head.sha }}
+          name: runner-image-proof-${{ github.sha }}
           path: runner-image-evidence/
           if-no-files-found: error
           retention-days: 14
@@ -213,8 +213,8 @@ jobs:
   runner-image-canary:
     name: Validate runner image warm paths
     if: >-
-      github.event_name == 'pull_request' &&
-      contains(github.event.pull_request.labels.*.name, 'runner-image-canary')
+      github.event_name == 'workflow_dispatch' &&
+      inputs.run_runner_image_canary == true
     needs: runner-image-offline-proof
     runs-on: [self-hosted, Linux, X64, "${{ 'jovie-runner-image-canary' }}"]
     timeout-minutes: 20
@@ -222,14 +222,14 @@ jobs:
       - name: Checkout exact PR head
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - name: Verify exact checkout
         shell: bash
         env:
-          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -286,71 +286,159 @@ jobs:
           assert_executable 'Chromium headless shell' /opt/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
           assert_executable 'FFmpeg' /opt/ms-playwright/ffmpeg-1011/ffmpeg-linux
 
-  # ── CI Optimizer + Centralized path-change detection (merged) ──────────
-  # Merged optimize_ci + ci-path-changes into one job to eliminate the serial
-  # dependency chain that added ~5 min to every CI run. Graphite CI Optimizer
-  # runs first (fail-open), then path detection.
+  # Successful root for every CI event, with one-shot proof only for push:main.
+  # Queue-proven SHAs reuse their exact merge_group gate and skip every duplicate
+  # fallback lane. Direct/admin main commits run the complete fallback contract
+  # below. API errors fail main pushes; other events emit neutral defaults so a
+  # skipped ancestor cannot cascade through Path Changes into every source gate.
+  main-queue-provenance:
+    name: Main Queue Provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      is_current: ${{ steps.verified.outputs.is_current || steps.neutral.outputs.is_current }}
+      queue_proven: ${{ steps.verified.outputs.queue_proven || steps.neutral.outputs.queue_proven }}
+      proof_run_id: ${{ steps.verified.outputs.proof_run_id || steps.neutral.outputs.proof_run_id }}
+    steps:
+      - name: Emit neutral provenance for non-main events
+        id: neutral
+        if: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
+        shell: bash
+        run: |
+          {
+            echo "is_current=false"
+            echo "queue_proven=false"
+            echo "proof_run_id="
+          } >> "$GITHUB_OUTPUT"
+      - name: Checkout exact main push
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Resolve exact queue provenance once
+        id: verified
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node .github/scripts/verify-main-release-readiness.mjs
+
+  # Select unit capacity per CI run. Repository-variable failover cannot rescue
+  # a job already queued on an offline label, and the installed App currently
+  # lacks Variables:read/write. This hosted, secretless observer therefore
+  # defaults every stale, malformed, or API-uncertain heartbeat to hosted
+  # capacity and uses the fixed pool only with fresh positive evidence.
+  ci-unit-runner-route:
+    name: Unit Runner Route
+    if: >-
+      github.event_name == 'merge_group' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      runner: ${{ steps.route.outputs.runner }}
+    steps:
+      - name: Checkout trusted runner routing policy
+        continue-on-error: true
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          fetch-depth: 1
+          sparse-checkout: .github/scripts/query-runner-heartbeat.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Query exact runner heartbeat
+        id: heartbeat
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEARTBEAT_MAX_AGE_SECONDS: '900'
+          HEARTBEAT_API_TIMEOUT_SECONDS: '20'
+        run: |
+          set -uo pipefail
+          echo "health=down" >> "$GITHUB_OUTPUT"
+          echo "evidence=trusted heartbeat helper unavailable; using hosted capacity" >> "$GITHUB_OUTPUT"
+          helper='.github/scripts/query-runner-heartbeat.sh'
+          if [ ! -x "$helper" ]; then
+            echo "::warning::Trusted heartbeat helper is absent before landing; using ubuntu-latest."
+            exit 0
+          fi
+          query_output="$RUNNER_TEMP/unit-runner-heartbeat-output"
+          : > "$query_output"
+          if GITHUB_OUTPUT="$query_output" "$helper"; then
+            cat "$query_output" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Trusted heartbeat helper failed unexpectedly; using ubuntu-latest."
+          fi
+          exit 0
+
+      - name: Select conservative unit runner route
+        id: route
+        env:
+          HEARTBEAT_HEALTH: ${{ steps.heartbeat.outputs.health }}
+          HEARTBEAT_EVIDENCE: ${{ steps.heartbeat.outputs.evidence }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner='ubuntu-latest'
+          if [ "$HEARTBEAT_HEALTH" = 'up' ]; then
+            runner='jovie-runner'
+          fi
+
+          case "$runner" in
+            jovie-runner|ubuntu-latest) ;;
+            *)
+              echo "::warning::Invalid runner route '$runner'; using ubuntu-latest."
+              runner='ubuntu-latest'
+              ;;
+          esac
+          echo "runner=$runner" >> "$GITHUB_OUTPUT"
+          echo "::notice::Unit runner route: $runner — $HEARTBEAT_EVIDENCE"
+
+  # ── Centralized deterministic path-change detection ────────────────────
+  # Source and combined heads compute their own exact diff. The former
+  # Graphite reuse action is intentionally absent: native queue provenance
+  # cannot rely on an external source-branch skip decision.
   ci-path-changes:
     name: Path Changes
+    needs: [main-queue-provenance]
+    if: >-
+      always() &&
+      (
+        github.event_name != 'push' ||
+        github.ref != 'refs/heads/main' ||
+        (
+          needs.main-queue-provenance.result == 'success' &&
+          needs.main-queue-provenance.outputs.is_current == 'true' &&
+          needs.main-queue-provenance.outputs.queue_proven != 'true'
+        )
+      )
     # Hosted-only root of the PR DAG. Self-hosted cancel/hang here cascades into
     # SKIPPED risk/ci-fast/unit leaves and a red PR Ready (JOV-3464 drain).
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      # Prefer real path detect; fall back to exact-head policy defaults so job
-      # outputs are never empty when Path Changes succeeds (empty has_code_changes
-      # was treated as docs-only and skip-cascaded ci-fast / unit leaves).
-      skip: ${{ steps.graphite_skip.outputs.skip || 'false' }}
-      run_build: ${{ steps.detect.outputs.run_build || steps.graphite_skip.outputs.run_build || 'false' }}
-      run_test: ${{ steps.detect.outputs.run_test || steps.graphite_skip.outputs.run_test || 'false' }}
-      run_test_performance: ${{ steps.detect.outputs.run_test_performance || steps.graphite_skip.outputs.run_test_performance || 'false' }}
-      run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || steps.graphite_skip.outputs.run_storybook_a11y || 'false' }}
-      run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse || steps.graphite_skip.outputs.run_public_lighthouse || 'false' }}
-      run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse || steps.graphite_skip.outputs.run_dashboard_lighthouse || 'false' }}
-      run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse || steps.graphite_skip.outputs.run_onboarding_lighthouse || 'false' }}
-      run_admin_lighthouse: ${{ steps.detect.outputs.run_admin_lighthouse || steps.graphite_skip.outputs.run_admin_lighthouse || 'false' }}
-      run_chat_lighthouse: ${{ steps.detect.outputs.run_chat_lighthouse || steps.graphite_skip.outputs.run_chat_lighthouse || 'false' }}
-      run_promptfoo_evals: ${{ steps.detect.outputs.run_promptfoo_evals || steps.graphite_skip.outputs.run_promptfoo_evals || 'false' }}
-      run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set || steps.graphite_skip.outputs.run_golden_eval_set || 'false' }}
-      run_e2e: ${{ steps.detect.outputs.run_e2e || steps.graphite_skip.outputs.run_e2e || 'false' }}
-      run_golden_path: ${{ steps.detect.outputs.run_golden_path || steps.graphite_skip.outputs.run_golden_path || 'false' }}
-      run_drizzle: ${{ steps.detect.outputs.run_drizzle || steps.graphite_skip.outputs.run_drizzle || 'false' }}
-      run_neon: ${{ steps.detect.outputs.run_neon || steps.graphite_skip.outputs.run_neon || 'false' }}
-      has_code_changes: ${{ steps.detect.outputs.has_code_changes || steps.graphite_skip.outputs.has_code_changes || 'false' }}
+      run_build: ${{ steps.detect.outputs.run_build || 'false' }}
+      run_test: ${{ steps.detect.outputs.run_test || 'false' }}
+      run_test_performance: ${{ steps.detect.outputs.run_test_performance || 'false' }}
+      run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || 'false' }}
+      run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse || 'false' }}
+      run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse || 'false' }}
+      run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse || 'false' }}
+      run_admin_lighthouse: ${{ steps.detect.outputs.run_admin_lighthouse || 'false' }}
+      run_chat_lighthouse: ${{ steps.detect.outputs.run_chat_lighthouse || 'false' }}
+      run_promptfoo_evals: ${{ steps.detect.outputs.run_promptfoo_evals || 'false' }}
+      run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set || 'false' }}
+      run_e2e: ${{ steps.detect.outputs.run_e2e || 'false' }}
+      run_golden_path: ${{ steps.detect.outputs.run_golden_path || 'false' }}
+      run_drizzle: ${{ steps.detect.outputs.run_drizzle || 'false' }}
+      run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
+      run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
+      has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
     steps:
-      - id: graphite-token
-        name: Check Graphite token configuration
-        if: github.event_name != 'merge_group'
-        env:
-          GRAPHITE_TOKEN: ${{ secrets.GRAPHITE_TOKEN }}
-        run: |
-          if [ -z "${GRAPHITE_TOKEN:-}" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::GRAPHITE_TOKEN is not configured; Graphite CI Optimizations will not scan PRs."
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - id: graphite
-        if: github.event_name != 'merge_group' && steps.graphite-token.outputs.configured == 'true'
-        continue-on-error: true
-        uses: withgraphite/graphite-ci-action@402a89bc8aa6db18ae1f9c61953d001d5f9d828f # v0.0.11
-        with:
-          graphite_token: ${{ secrets.GRAPHITE_TOKEN }}
-
-      - name: Resolve exact-head CI policy
-        id: graphite_skip
-        env:
-          GRAPHITE_SKIP_REQUESTED: ${{ steps.graphite.outputs.skip || 'false' }}
-        run: |
-          if [[ "$GRAPHITE_SKIP_REQUESTED" == "true" ]]; then
-            echo "::warning::Graphite reuse lacks verifiable exact-head evidence; running selected gates."
-          fi
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-          for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
-            echo "$t=false" >> "$GITHUB_OUTPUT"
-          done
-
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           # Blobless partial clone: full commit graph for merge-base/diff
@@ -359,6 +447,50 @@ jobs:
           # any blob that is actually needed is lazy-fetched on demand.
           fetch-depth: 0
           filter: blob:none
+      - name: Run deterministic brand safety scan
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ github.event_name }}" in
+            pull_request)
+              git fetch --no-tags origin "${{ github.base_ref }}"
+              DIFF_BASE="origin/${{ github.base_ref }}"
+              ;;
+            merge_group)
+              DIFF_BASE="${{ github.event.merge_group.base_sha }}"
+              git cat-file -e "${DIFF_BASE}^{commit}"
+              ;;
+            push)
+              DIFF_BASE="${{ github.event.before }}"
+              if [[ ! "$DIFF_BASE" =~ ^[0-9a-f]{40}$ ]] ||
+                [[ "$DIFF_BASE" == "0000000000000000000000000000000000000000" ]]; then
+                echo "::error::push.before is not a usable exact main base SHA"
+                exit 1
+              fi
+              git cat-file -e "${DIFF_BASE}^{commit}"
+              ;;
+            *)
+              echo "::error::Unsupported event for brand safety scan"
+              exit 1
+              ;;
+          esac
+
+          BRAND_CANDIDATES="$RUNNER_TEMP/brand-scrub-candidates.txt"
+          # Materialize the diff before filtering so a Git failure cannot be
+          # hidden by a no-match grep exit status.
+          git diff --name-only --diff-filter=d "$DIFF_BASE" HEAD > "$BRAND_CANDIDATES"
+          mapfile -t brand_files < <(
+            awk '
+              (/\.(md|mdx|txt)$/ || /^docs\//) &&
+              !/^(node_modules|\.cache|drizzle\/migrations)/
+            ' "$BRAND_CANDIDATES"
+          )
+          if (( ${#brand_files[@]} > 0 )); then
+            python3 scripts/brand-scrub.py "${brand_files[@]}"
+          else
+            echo "No brand-scrub paths changed."
+          fi
       - name: Detect path changes for all job types
         id: detect
         shell: bash
@@ -381,26 +513,35 @@ jobs:
               echo "::error::Could not resolve origin/${{ github.base_ref }} after fetch"
               exit 1
             fi
-            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD || true)
+            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
-              echo "Empty changed-file list vs origin/${{ github.base_ref }} — no path triggers"
-              for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
-                echo "$t=false" >> "$GITHUB_OUTPUT"
-              done
-              exit 0
+              echo "::error::Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification."
+              exit 1
             fi
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
           else
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+            PUSH_BASE_SHA="${{ github.event.before }}"
+            if [[ ! "$PUSH_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
+              [[ "$PUSH_BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+              echo "::error::push.before is not a usable exact main base SHA"
+              exit 1
+            fi
+            git cat-file -e "${PUSH_BASE_SHA}^{commit}"
+            CHANGED_FILES=$(git diff --name-only "$PUSH_BASE_SHA" HEAD)
           fi
 
-          FULL_CI_LABEL="${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}"
+          IOS_PATTERN='^(apps/ios/|fastlane/|Gemfile$|Gemfile\.lock$|scripts/ios-best-practices-lint\.sh$|\.github/workflows/ios-ci\.yml$)'
+          if echo "$CHANGED_FILES" | grep -q -E "$IOS_PATTERN"; then
+            echo "run_ios=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_ios=false" >> "$GITHUB_OUTPUT"
+          fi
 
           TEST_PERFORMANCE_PATTERN='^apps/web/scripts/test-performance-(guard\.ts|profiler(\.test)?\.ts)$'
           if echo "$CHANGED_FILES" | grep -q -E "$TEST_PERFORMANCE_PATTERN"; then
@@ -411,25 +552,15 @@ jobs:
 
           PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/)'
           PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/evals-periodic\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/tests/eval/golden/.*|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
-          if echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_INFRA_TRIGGER_PATTERN" &&
+          if [[ "${{ github.event_name }}" == "pull_request" ]] &&
+            echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_INFRA_TRIGGER_PATTERN" &&
             ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_INFRA_ALLOWED_PATTERN" | grep -q .; then
-            echo "Promptfoo eval-infrastructure-only change: running deterministic eval CI and core static checks, even if the PR has the testing label."
+            echo "Promptfoo eval-infrastructure-only source PR: deferring semantic evidence to the merge-group head."
             echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
-            echo "run_promptfoo_evals=true" >> "$GITHUB_OUTPUT"
-            echo "run_golden_eval_set=true" >> "$GITHUB_OUTPUT"
+            echo "run_promptfoo_evals=false" >> "$GITHUB_OUTPUT"
+            echo "run_golden_eval_set=false" >> "$GITHUB_OUTPUT"
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
-            done
-            exit 0
-          fi
-
-          # Force run all if the 'testing' label is present. Promptfoo eval-infra-only
-          # changes are handled above so the deterministic no-cost lane cannot fan out
-          # into Neon, Lighthouse, or Playwright work by label accident.
-          if [[ "$FULL_CI_LABEL" == "true" ]]; then
-            echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
-              echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
           fi
@@ -576,12 +707,25 @@ jobs:
           fi
 
   ci-risk-classifier:
-    # Trusted PRs need classification before their build, smoke, and preview
-    # dependencies evaluate. Forks intentionally stay on the secret-free path.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
+    # Dependency-free so fork PRs classify without waiting on a trusted job or
+    # secret. On main, only an unproven exact SHA executes the fallback lane.
+    if: >-
+      always() &&
+      (
+        github.event_name == 'pull_request' ||
+        github.event_name == 'merge_group' ||
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.main-queue-provenance.result == 'success' &&
+          needs.main-queue-provenance.outputs.is_current == 'true' &&
+          needs.main-queue-provenance.outputs.queue_proven != 'true'
+        )
+      )
     name: CI Risk Classifier
-    needs: [ci-path-changes]
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    needs: [main-queue-provenance]
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
       risk_level: ${{ steps.classify.outputs.risk_level }}
@@ -593,7 +737,8 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 2
+          fetch-depth: 0
+          filter: blob:none
       # This gate is dependency-free. Restoring the full pnpm cache can exceed
       # the three-minute latency ratchet before classification even starts.
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -613,18 +758,27 @@ jobs:
           DIFF_BASE=""
 
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            git fetch origin "$BASE_REF" --depth=1
+            git fetch --no-tags origin "$BASE_REF"
             DIFF_BASE="origin/$BASE_REF"
             git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES"
           elif [[ "$EVENT_NAME" == "merge_group" ]]; then
             DIFF_BASE="${{ github.event.merge_group.base_sha }}"
-            git fetch --no-tags --depth=1 origin "$DIFF_BASE"
+            git cat-file -e "${DIFF_BASE}^{commit}"
             git diff --name-only "$DIFF_BASE" "${{ github.event.merge_group.head_sha }}" > "$CHANGED_FILES"
           elif [[ "$EVENT_NAME" == "push" ]]; then
-            DIFF_BASE="HEAD~1"
-            git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES" 2>/dev/null || git show --pretty="" --name-only HEAD > "$CHANGED_FILES"
+            DIFF_BASE="${{ github.event.before }}"
+            if [[ ! "$DIFF_BASE" =~ ^[0-9a-f]{40}$ ]] ||
+              [[ "$DIFF_BASE" == "0000000000000000000000000000000000000000" ]]; then
+              echo "::error::push.before is not a usable exact main base SHA"
+              exit 1
+            fi
+            git cat-file -e "${DIFF_BASE}^{commit}"
+            git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES"
           elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             git ls-files > "$CHANGED_FILES"
+          else
+            echo "::error::Unsupported event for CI risk classification: $EVENT_NAME"
+            exit 1
           fi
 
           echo "Changed files for CI risk classification:"
@@ -669,6 +823,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload CI risk artifact
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ci-risk-classification-${{ github.run_id }}-${{ github.run_attempt }}
@@ -677,10 +832,10 @@ jobs:
 
   ci-env-example-guard:
     needs: [ci-path-changes]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
     name: Env Example Guard
     # Always run; fast, prevents accidental secret commits.
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -709,10 +864,23 @@ jobs:
           echo "✅ .env.example looks safe (no obvious secrets)."
 
   ci-secret-scan:
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    needs: [main-queue-provenance]
+    if: >-
+      always() &&
+      (
+        github.event_name == 'pull_request' ||
+        github.event_name == 'merge_group' ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.main-queue-provenance.result == 'success' &&
+          needs.main-queue-provenance.outputs.is_current == 'true' &&
+          needs.main-queue-provenance.outputs.queue_proven != 'true'
+        )
+      )
     name: Secret Scan (gitleaks + trufflehog)
     # Always run; fast, catches secrets in PR diffs including *.backup files (JOV-3215).
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -725,8 +893,17 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             git fetch origin "${{ github.base_ref }}"
             ./scripts/security/scan-secrets.sh ci-pr "origin/${{ github.base_ref }}"
-          else
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
             ./scripts/security/scan-secrets.sh ci-pr "${{ github.event.merge_group.base_sha }}"
+          else
+            BEFORE_SHA="${{ github.event.before }}"
+            if [[ ! "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
+              [[ "$BEFORE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+              echo "::error::push.before is not a usable exact main base SHA"
+              exit 1
+            fi
+            git cat-file -e "${BEFORE_SHA}^{commit}"
+            ./scripts/security/scan-secrets.sh ci-pr "$BEFORE_SHA"
           fi
       - name: Verify backup-file fixture coverage
         run: ./scripts/security/verify-gitleaks-coverage.sh
@@ -743,7 +920,7 @@ jobs:
     # Setup/DB work (~2m) + accepted source deploy (up to 10m) + readiness
     # verification (up to 9m) must fit without the job canceling a healthy build.
     timeout-minutes: 25
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true') }}
+    if: ${{ needs.ci-path-changes.result == 'success' }}
     env:
       # Match prior Structural Contract job so actionlint/shellcheck is hermetic.
       SHELLCHECK_OPTS: >-
@@ -782,7 +959,7 @@ jobs:
           # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
           # desktop-release-guard / version-fanout-guard on PRs.
           git fetch origin "${{ github.base_ref }}" --no-tags
-          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|scripts/lib/(ci-|merge-queue)|scripts/ci-|scripts/tests/test_vercel_prebuilt_deploy\.py)'; then
+          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|scripts/lib/(ci-|merge-queue)|scripts/ci-|scripts/brand-scrub\.py|scripts/tests/test_(brand_scrub|agent_workflow_hygiene|vercel_prebuilt_deploy)\.py)'; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -807,6 +984,7 @@ jobs:
         run: node scripts/ci-fast-lanes.mjs
       - name: Upload ci-fast lane results
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ci-fast-lanes-${{ github.run_id }}-${{ github.run_attempt }}
@@ -817,10 +995,22 @@ jobs:
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
     needs: [ci-path-changes]
-    # Deterministic gate: keep on always-available GitHub runners (see ci-biome).
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Model-free semantic gate: path-selected only on the exact combined head
+    # and direct-main fallback. Manual dispatch may run it exhaustively.
+    runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.run_promptfoo_evals == 'true')) }}
+    if: >-
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          needs.ci-path-changes.outputs.run_promptfoo_evals == 'true' &&
+          (
+            github.event_name == 'merge_group' ||
+            (github.event_name == 'push' && github.ref == 'refs/heads/main')
+          )
+        )
+      )
     env:
       JOVIE_RUN_LIVE_EVALS: '0'
       JOVIE_RUN_LIVE_HTTP_EVALS: '0'
@@ -841,10 +1031,21 @@ jobs:
   ci-golden-eval-set:
     name: Golden Eval Set (deterministic)
     needs: [ci-path-changes]
-    # Deterministic gate: keep on always-available GitHub runners (see ci-biome).
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Model-free semantic gate with the same combined-head/fallback contract.
+    runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.run_golden_eval_set == 'true')) }}
+    if: >-
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          needs.ci-path-changes.outputs.run_golden_eval_set == 'true' &&
+          (
+            github.event_name == 'merge_group' ||
+            (github.event_name == 'push' && github.ref == 'refs/heads/main')
+          )
+        )
+      )
     env:
       JOVIE_RUN_LIVE_EVALS: '0'
       JOVIE_RUN_LIVE_HTTP_EVALS: '0'
@@ -861,8 +1062,8 @@ jobs:
     name: Knip (dead code)
     # Detect unused files, dependencies, and exports
     needs: [ci-path-changes]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.has_code_changes == 'true')) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -875,8 +1076,8 @@ jobs:
     name: Neon DB
     needs: [ci-path-changes]
     # Run for push to main or any selected evidence lane that needs ephemeral DB credentials.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || needs.ci-path-changes.outputs.run_golden_path == 'true' || contains(github.event.pull_request.labels.*.name, 'launch-candidate') || (contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true')))) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
     # 5m was warm-store-only: the admission probe needs @neondatabase/serverless
     # from the installed tree, and a cold pnpm install alone runs ~5m.
     timeout-minutes: 10
@@ -890,34 +1091,9 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Check for backend changes
+      - name: Confirm manual DB evidence lane
         id: check-backend
-        if: ${{ github.event_name == 'pull_request' }}
-        env:
-          REQUIRES_GOLDEN_PATH: ${{ needs.ci-path-changes.outputs.run_golden_path }}
-          IS_LAUNCH_CANDIDATE: ${{ contains(github.event.pull_request.labels.*.name, 'launch-candidate') }}
-          REQUIRES_EXTENDED_SMOKE: ${{ contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true' }}
-        run: |
-          set -euo pipefail
-
-          if [[ "$REQUIRES_GOLDEN_PATH" == "true" || "$IS_LAUNCH_CANDIDATE" == "true" || "$REQUIRES_EXTENDED_SMOKE" == "true" ]]; then
-            echo "Selected Golden/launch/Extended Smoke evidence requires an ephemeral Neon branch"
-            echo "needs_db=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          # Check if any backend-related files changed (migrations, lib/db, API routes, etc.)
-          if echo "$CHANGED_FILES" | grep -E '^(drizzle/migrations/|apps/web/lib/db/|apps/web/app/api/)' > /dev/null; then
-            echo "Backend changes detected, Neon DB required"
-            echo "needs_db=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "No backend changes detected, skipping Neon DB creation"
-            echo "needs_db=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+        run: echo "needs_db=true" >> "$GITHUB_OUTPUT"
 
       - name: Cleanup old Neon branches (prevent limit errors)
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
@@ -1033,8 +1209,8 @@ jobs:
     name: Migration Guard
     needs: [ci-path-changes]
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && (github.event_name == 'merge_group' || github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -1071,9 +1247,9 @@ jobs:
   ci-drizzle-check:
     name: Drizzle Check
     needs: [neon-db, ci-path-changes]
-    # Drizzle check runs on push to main or PRs with testing label
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Deep evidence only. Merge-group migration policy is covered by Migration Guard.
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -1091,7 +1267,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci != 'true'
         run: |
           echo "Skipping Drizzle check as no DB/schema paths were changed."
-          echo "To force a full CI run, add the 'testing' label to the PR."
+          echo "Deep evidence runs through an explicit workflow dispatch."
           exit 0
 
       - name: Download Neon DB connection artifact
@@ -1135,8 +1311,8 @@ jobs:
     name: Integration Fast
     # Lightweight gate for integration/* PRs (agent batch lanes). Full CI runs on train PRs to main.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'integration/')) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && (always() && github.event_name == 'pull_request' && startsWith(github.event.pull_request.base.ref, 'integration/')) }}
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - name: Evaluate integration fast checks
@@ -1155,21 +1331,131 @@ jobs:
           fi
           echo "Integration fast lane passed"
 
+  # Queue and admin-fallback integration evidence stays in one hosted
+  # workspace. No Actions artifact upload/download sits on the critical path.
+  ci-build-layout:
+    name: Build + Layout (combined)
+    needs: [ci-path-changes]
+    if: >-
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name == 'merge_group' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+      - name: Build exact combined head
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          # Merge-group code is PR-controlled. This deterministic mock key is
+          # intentionally public and keeps the combined lane secret-free.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+      - name: Verify combined build output
+        run: |
+          set -euo pipefail
+          for required in \
+            apps/web/.next/BUILD_ID \
+            apps/web/.next/standalone/apps/web/server.js \
+            apps/web/.next/standalone/apps/web/.next/BUILD_ID; do
+            test -f "$required" || {
+              echo "::error::Combined build output missing $required"
+              exit 1
+            }
+          done
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+      - name: Run deterministic layout behavior guard
+        run: |
+          set -euo pipefail
+          cd apps/web
+          mapfile -t LAYOUT_GUARD_SPECS < <(node ../../.github/scripts/layout-guard-manifest.mjs)
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          export HOSTNAME=localhost
+          export NEXT_PUBLIC_APP_URL=http://localhost:3230
+
+          PORT=3230 node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          for attempt in $(seq 1 30); do
+            kill -0 "$SERVER_PID" 2>/dev/null || {
+              echo "::error::Combined-head standalone server died"
+              exit 1
+            }
+            if curl -sf http://localhost:3230 >/dev/null 2>&1; then
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                pnpm exec playwright test "${LAYOUT_GUARD_SPECS[@]}" \
+                  --config=playwright.config.noauth.ts --project=chromium --reporter=line
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Combined-head standalone server failed to start"
+          exit 1
+        env:
+          BASE_URL: http://localhost:3230
+          SMOKE_ONLY: '1'
+          CI: true
+          HUD_KIOSK_TOKEN: layout-guard-ci
+          HUD_AGENT_RUNS_FIXTURES: '1'
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+      - name: Upload combined layout failure evidence
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        continue-on-error: true
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/
+          retention-days: 3
+
+  # Full Xcode work belongs on the synthetic combined head, never the source
+  # PR. The same reusable lane is the fail-closed fallback for direct/admin
+  # main commits that touch iOS.
+  ci-ios:
+    name: iOS Build + Test (combined)
+    needs: [ci-path-changes]
+    if: >-
+      needs.ci-path-changes.result == 'success' &&
+      needs.ci-path-changes.outputs.run_ios == 'true' &&
+      (
+        github.event_name == 'merge_group' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      )
+    uses: ./.github/workflows/ios-ci.yml
+
   ci-build-public:
     name: Build (public routes)
     needs: [ci-path-changes, ci-risk-classifier]
     # Shared Next.js build for a11y + layout-guard — build once, test twice.
-    # On PRs to main: always runs (non-fork) for build validation. Part of the merge gate.
-    # Merge groups rebuild the synthetic combined head to catch integration failures.
-    # On main push: always runs for full coverage.
-    # Fork PRs are excluded (no secrets) — skipped via fork-pr-gate.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') }}
-    # Production deploy artifacts must not wait behind the saturated fixed PR
-    # runner. Keep PR builds on jovie-fixed; route main to hosted capacity.
-    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'ubuntu-latest' || vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Manual deep evidence only. Automatic source PRs and merge groups use the
+    # dedicated combined Build + Layout workspace instead.
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    # Deep review evidence uses hosted capacity and cannot consume fixed unit slots.
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
-      has_artifact: ${{ steps.check_changes.outputs.run_full_ci }}
+      artifact_required: ${{ steps.check_changes.outputs.run_full_ci }}
+      # Consumers may start only after actions/upload-artifact completed. Build
+      # selection alone is not proof that the artifact exists.
+      has_artifact: ${{ steps.publish_artifact.outputs.has_artifact || 'false' }}
     steps:
       - name: Reset workspace git state (self-hosted)
         if: runner.environment != 'github-hosted'
@@ -1270,11 +1556,12 @@ jobs:
         run: tar -cf "${{ runner.temp }}/nextjs-build.tar" -C apps/web .next
 
       - name: Upload build artifact
+        id: upload_artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        # ponytail: artifact only feeds informational downstream jobs (layout-guard,
-        # a11y), so a transient FinalizeArtifact timeout must not fail this merge gate.
-        # Build correctness is already asserted by the build + "Verify build output"
-        # steps above. Re-enable hard failure if a downstream gate ever depends on it.
+        # Keep the producer build result independent from artifact transport so
+        # main staging can proceed. The post-upload readiness output below is
+        # the only signal consumers trust, and merge-group PR Ready fails closed
+        # when a selected artifact was not published.
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -1283,14 +1570,17 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+      - name: Publish build artifact readiness
+        id: publish_artifact
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && steps.upload_artifact.outcome == 'success' }}
+        run: echo "has_artifact=true" >> "$GITHUB_OUTPUT"
+
   ci-layout-guard:
     name: Layout Guard
     needs: [ci-path-changes, ci-build-public]
-    # Blocking on PRs via ci-pr-ready (flipped from informational — Tim directive,
-    # a11y/visual gating mission 2026-07-06 / JOV-4060). Runs on PRs to main when the
-    # shared build artifact exists, plus merge-group combined heads and push:main.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Manual hosted evidence using the shared deep-lane build artifact.
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 8
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
@@ -1415,8 +1705,8 @@ jobs:
   ci-mobile-overflow:
     name: Mobile Overflow Guard (${{ matrix.width }}px)
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_public_lighthouse == 'true' && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
@@ -1627,22 +1917,20 @@ jobs:
           retention-days: 3
 
   ci-lighthouse-pr:
-    name: Lighthouse (public routes PR)
+    name: Lighthouse (public routes manual)
     needs: [ci-build-public, ci-path-changes, neon-db]
-    # Runs Lighthouse CI against the public-route build artifact on PRs.
-    # Blocks PRs when triggered (path-gated to public-route changes).
-    # Runs on push to main (post-merge validation), workflow_dispatch, or PRs with 'testing' label.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing'))) && needs.ci-build-public.outputs.has_artifact == 'true' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # Manual hosted evidence only; never starts from a source PR event.
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true' }
     strategy:
       fail-fast: false
-      # The expanded runner pool supports both CPU-heavy shards concurrently.
-      # Keep the cap explicit so future shard additions do not fan out silently.
-      max-parallel: 2
+      # Four isolated hosted servers keep the public route set below the
+      # long-process exhaustion horizon observed after eight sequential URLs.
+      max-parallel: 4
       matrix:
-        shard: [0, 1]
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -1809,12 +2097,9 @@ jobs:
 
           pnpm run test:lighthouse:public:launch
 
-          # Pin the extra mobile-viewport-stability Playwright spec to the lighter
-          # LHCI shard (shard 1 collects 9 URLs vs shard 0's 10). Both shards run
-          # in parallel and the merge gate waits on max(shard0, shard1); piling the
-          # ~1.5m spec onto the already-heavier shard 0 made it the gate long pole
-          # rebalances the only-2-way fan-out and lowers wall-clock with identical
-          # coverage.
+          # Pin the extra mobile-viewport-stability Playwright spec to one shard
+          # so the evidence remains single-owned while the route audits stay
+          # isolated across four short-lived hosted servers.
           if [ "${{ matrix.shard }}" = "1" ]; then
             mkdir -p tests/.auth
             echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
@@ -1824,7 +2109,7 @@ jobs:
           CI: true
           BASE_URL: http://localhost:3000
           PUBLIC_LIGHTHOUSE_SHARD_INDEX: ${{ matrix.shard }}
-          PUBLIC_LIGHTHOUSE_TOTAL_SHARDS: '2'
+          PUBLIC_LIGHTHOUSE_TOTAL_SHARDS: '4'
           PROFILE_MOBILE_PERF_BUDGETS: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -1844,10 +2129,10 @@ jobs:
           retention-days: 3
 
   ci-lighthouse-dashboard-pr:
-    name: Lighthouse (dashboard PR)
+    name: Lighthouse (dashboard manual)
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'launch-candidate') || (contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_dashboard_lighthouse == 'true')))) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
       group: neon-endpoint-pool-ci-lighthouse-dashboard-pr-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
@@ -1864,8 +2149,7 @@ jobs:
           RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
           RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
           RUN_DASHBOARD_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_dashboard_lighthouse }}"
-          IS_LAUNCH_CANDIDATE="${{ contains(github.event.pull_request.labels.*.name, 'launch-candidate') }}"
-          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_DASHBOARD_LIGHTHOUSE" == "true" || "$IS_LAUNCH_CANDIDATE" == "true" ]]; then
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_DASHBOARD_LIGHTHOUSE" == "true" ]]; then
             echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_full_ci=false" >> "$GITHUB_OUTPUT"
@@ -2011,10 +2295,10 @@ jobs:
             "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
 
   ci-lighthouse-onboarding-pr:
-    name: Lighthouse (onboarding PR)
+    name: Lighthouse (onboarding manual)
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (contains(github.event.pull_request.labels.*.name, 'launch-candidate') || (contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_onboarding_lighthouse == 'true')))) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -2145,11 +2429,11 @@ jobs:
           retention-days: 3
 
   ci-lighthouse-admin-pr:
-    name: Lighthouse (admin PR)
+    name: Lighthouse (admin manual)
     # Reuse the shared neon-db artifact when run_neon=true; non-DB admin PRs read DATABASE_URL_MAIN.
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_admin_lighthouse == 'true' && contains(github.event.pull_request.labels.*.name, 'testing'))) && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.neon-db.result == 'success' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -2278,14 +2562,12 @@ jobs:
           retention-days: 3
 
   ci-lighthouse-chat-pr:
-    name: Lighthouse (chat PR)
-    # Informational baseline run — first PR establishes the budget; once
-    # baselines stabilize this can be promoted to a hard gate by removing
-    # `continue-on-error` and adding the job to ci-pr-ready.needs.
+    name: Lighthouse (chat manual)
+    # Informational manual baseline; it never feeds source PR Ready.
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_chat_lighthouse == 'true' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
     continue-on-error: true
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -2414,11 +2696,11 @@ jobs:
           retention-days: 3
 
   ci-pr-neon-migrate:
-    name: DB Migrate (PR main)
+    name: DB Migrate (manual deep lane)
     needs: [neon-db, ci-path-changes]
     # Only run when drizzle/schema paths changed — skip entirely otherwise to save runners
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_drizzle == 'true') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-path-changes.outputs.run_drizzle == 'true' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 12
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -2481,313 +2763,37 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
-          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          GIT_BRANCH: manual-${{ github.run_id }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
   # Post-deploy smoke test -- deterministic curl checks against production.
   # Replaces the previous Playwright-based test that was flaky due to
   # dynamic content assertions, hydration timing, and excessive retries.
-  ci-public-profile-smoke:
-    name: Post-Deploy Smoke (Production)
-    needs: [promote-production]
-    # Run after successful deploy to production
-    if: ${{ always() && needs.promote-production.result == 'success' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 1
-
-      - uses: ./.github/actions/setup-node-pnpm
-
-      - name: Verify exact production deployment before smoke
-        timeout-minutes: 2
-        env:
-          EXPECTED_COMMIT_SHA: ${{ github.sha }}
-          EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.production_deployment_id }}
-          PRODUCTION_ALIAS_MAX_ATTEMPTS: '3'
-          PRODUCTION_ALIAS_REQUIRED_ROUNDS: '1'
-          PRODUCTION_ALIAS_RETRY_SECONDS: '5'
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-        run: bash .github/scripts/verify-production-alias.sh
-
-      - name: Verify production endpoints are healthy
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: |
-          set -euo pipefail
-
-          USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
-          COOKIE_JAR="$(mktemp)"
-          MAX_RETRIES=5
-
-          # Vercel Deployment Protection bypass
-          BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET:-}"
-          BYPASS_ARGS=()
-          if [ -n "$BYPASS_SECRET" ]; then
-            BYPASS_ARGS+=(
-              -H "x-vercel-protection-bypass: $BYPASS_SECRET"
-              -H "x-vercel-set-bypass-cookie: true"
-              -c "$COOKIE_JAR"
-              -b "$COOKIE_JAR"
-            )
-          fi
-
-          # Helper: curl with standard options, returns "body\nstatus_code"
-          # Append a cache-busting query parameter to bypass Vercel CDN edge cache,
-          # ensuring post-deploy smoke tests always hit the origin server.
-          fetch() {
-            local sep="?"
-            [[ "$1" == *"?"* ]] && sep="&"
-            curl -sS -L -A "$USER_AGENT" \
-              -H "Cache-Control: no-cache, no-store, must-revalidate" \
-              -H "Pragma: no-cache" \
-              "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${1}${sep}_cb=$(date +%s%N)" || echo -e "\n000"
-          }
-
-          # Helper: retry a check function with exponential backoff (max 5 attempts)
-          retry() {
-            local label="$1"; shift
-            local attempt=1
-            while [ $attempt -le $MAX_RETRIES ]; do
-              if "$@"; then
-                return 0
-              fi
-              if [ $attempt -lt $MAX_RETRIES ]; then
-                local delay=$((attempt * 3))
-                echo "  Retry $attempt/$MAX_RETRIES for $label in ${delay}s..."
-                sleep "$delay"
-              fi
-              attempt=$((attempt + 1))
-            done
-            echo "::error::$label failed after $MAX_RETRIES attempts"
-            return 1
-          }
-
-          FAILURES=0
-
-          # -- 1. Health API: JSON status=ok --
-          check_health() {
-            local response
-            response=$(fetch "https://jov.ie/api/health")
-            local status="${response##*$'\n'}"
-            local body="${response%$'\n'*}"
-
-            if [ "$status" != "200" ]; then
-              echo "  Health API returned HTTP $status"
-              return 1
-            fi
-
-            if ! echo "$body" | grep -q '"status":"ok"'; then
-              echo "  Health API status is not ok: $body"
-              return 1
-            fi
-
-            echo "  Health API: HTTP 200, status=ok"
-            return 0
-          }
-
-          echo "=== 1/5 Health API ==="
-          if ! retry "Health API" check_health; then
-            FAILURES=$((FAILURES + 1))
-          fi
-
-          # -- 2. Homepage: HTTP 200, >1000 chars, no error strings --
-          check_homepage() {
-            local response
-            response=$(fetch "https://jov.ie")
-            local status="${response##*$'\n'}"
-            local body="${response%$'\n'*}"
-
-            if [ "$status" != "200" ]; then
-              echo "  Homepage returned HTTP $status"
-              return 1
-            fi
-
-            if [ ${#body} -lt 1000 ]; then
-              echo "  Homepage body too short (${#body} chars)"
-              return 1
-            fi
-
-            if echo "$body" | grep -qi "application error\|internal server error\|something went wrong"; then
-              echo "  Homepage contains error message"
-              return 1
-            fi
-
-            echo "  Homepage: HTTP 200, ${#body} chars, no errors"
-            return 0
-          }
-
-          echo "=== 2/5 Homepage ==="
-          if ! retry "Homepage" check_homepage; then
-            FAILURES=$((FAILURES + 1))
-          fi
-
-          # -- 3. Public profile: HTTP 200, substantial content, no 404 markers --
-          # Warm up the database connection before checking the profile page.
-          # The health check (step 1) may use a lightweight query that doesn't
-          # fully warm Neon, so hit the profile once and discard the result.
-          fetch "https://jov.ie/tim" > /dev/null 2>&1
-          sleep 5
-
-          check_profile() {
-            local response
-            response=$(fetch "https://jov.ie/tim")
-            local status="${response##*$'\n'}"
-            local body="${response%$'\n'*}"
-
-            if [ "$status" -ge 500 ] 2>/dev/null; then
-              echo "  Profile /tim returned HTTP $status (server error)"
-              return 1
-            fi
-
-            if [ ${#body} -lt 500 ]; then
-              echo "  Profile /tim body too short (${#body} chars)"
-              return 1
-            fi
-
-            if echo "$body" | grep -qi "application error\|internal server error\|something went wrong"; then
-              echo "  Profile /tim contains error content"
-              return 1
-            fi
-
-            # "Profile not found" with HTTP 200 is a valid app response (data issue),
-            # not a code regression — warn but don't fail.
-            if echo "$body" | grep -qi "profile not found\|page could not be found"; then
-              echo "  Profile /tim: HTTP $status, profile not seeded (non-blocking warning)"
-            else
-              echo "  Profile /tim: HTTP $status, ${#body} chars, renders correctly"
-            fi
-            return 0
-          }
-
-          echo "=== 3/5 Public Profile ==="
-          if ! retry "Public Profile" check_profile; then
-            FAILURES=$((FAILURES + 1))
-          fi
-
-          # -- 4. Critical pages: /signup, /start, /pricing -- no 5xx --
-          check_critical_pages() {
-            for route in "/signup" "/start" "/pricing"; do
-              local response
-              response=$(fetch "https://jov.ie${route}")
-              local status="${response##*$'\n'}"
-              local body="${response%$'\n'*}"
-
-              if [ "$status" -ge 500 ] 2>/dev/null; then
-                echo "  Route ${route} returned HTTP $status (server error)"
-                return 1
-              fi
-              if echo "$body" | grep -qi "turnstile is not configured\|auth unavailable\|clerk is not configured"; then
-                echo "  Route ${route} contains front-door config error"
-                return 1
-              fi
-              echo "  ${route}: HTTP $status"
-            done
-            return 0
-          }
-
-          echo "=== 4/5 Critical Pages ==="
-          if ! retry "Critical Pages" check_critical_pages; then
-            FAILURES=$((FAILURES + 1))
-          fi
-
-          # -- 5. Production SEO surfaces: robots.txt + sitemap.xml --
-          echo "=== 5/5 Production SEO Surfaces ==="
-          if ! retry "Production SEO Surfaces" bash -c 'BASE_URL=https://jov.ie pnpm --filter=@jovie/web exec tsx scripts/seo-ratchet-live.ts'; then
-            FAILURES=$((FAILURES + 1))
-          fi
-
-          # -- Summary --
-          echo ""
-          if [ $FAILURES -gt 0 ]; then
-            echo "::error::Post-deploy smoke failed: $FAILURES/5 checks failed"
-            exit 1
-          fi
-          echo "Post-deploy smoke passed: 5/5 checks OK"
-
-  # Post-deploy authenticated smoke test — lightweight Playwright test against production.
-  # Verifies sign-in + dashboard load with real credentials after deploy.
-  # Non-blocking initially — promote to blocking once stable.
-  ci-post-deploy-auth-smoke:
-    name: Post-Deploy Auth Smoke (Production)
-    needs: [promote-production]
-    if: ${{ always() && needs.promote-production.result == 'success' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    continue-on-error: true
-    timeout-minutes: 10
-    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Check for production auth credentials
-        id: check-creds
-        run: |
-          if [ -z "${{ secrets.E2E_PROD_USER_EMAIL }}" ] && [ -z "${{ secrets.E2E_CLERK_USER_USERNAME }}" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "No production auth credentials configured — skipping"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: ./.github/actions/setup-node-pnpm
-        if: steps.check-creds.outputs.skip != 'true'
-
-      - name: Setup Playwright (Chromium)
-        if: steps.check-creds.outputs.skip != 'true'
-        uses: ./.github/actions/setup-playwright
-
-      - name: Wait for CDN propagation
-        if: steps.check-creds.outputs.skip != 'true'
-        run: sleep 30
-
-      - name: Run production auth smoke tests
-        if: steps.check-creds.outputs.skip != 'true'
-        run: |
-          cd apps/web
-
-          mkdir -p tests/.auth
-          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          CI=true BASE_URL=https://jov.ie node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
-        env:
-          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
-          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
-          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
-          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-
-      - name: Upload Playwright Artifacts on Failure
-        if: ${{ failure() && steps.check-creds.outputs.skip != 'true' && hashFiles('apps/web/test-results/**') != '' }}
-        uses: ./.github/actions/upload-safe-playwright-artifact
-        with:
-          name: post-deploy-auth-smoke-${{ github.run_id }}
-          path: |
-            apps/web/test-results/
-          retention-days: 3
 
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
-    needs: [ci-path-changes]
-    # Runs test-relevant shards on merge-group combined heads, main pushes, and
-    # manual dispatch. Source PRs defer unit evidence to the combined queue head.
-    # Job-level gating prevents source and no-op diffs from allocating matrix runners.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && needs.ci-path-changes.outputs.run_test == 'true' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') }}
-    # When CI_UNIT_RUNNER routes to the 10-slot autoscaled ephemeral pool, one
-    # PR uses 5 slots, two PRs use all 10, and a third queues behind natural
-    # pool backpressure. The hosted fallback retains the original 3-shard cap
-    # for burst protection when the runner override is absent or rerouted.
-    runs-on: ${{ vars.CI_UNIT_RUNNER || 'ubuntu-latest' }}
+    needs: [ci-path-changes, ci-unit-runner-route]
+    # Runs five shards on every merge-group combined head and direct-main
+    # fallback. The merge-group command remains --affected, but the matrix may
+    # never turn into a skipped placeholder. Source PRs defer unit evidence to
+    # the combined queue head.
+    if: >-
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name == 'merge_group' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        github.event_name == 'workflow_dispatch'
+      )
+    # Fresh heartbeat evidence may use the five fixed runners. Every uncertain
+    # observation routes this run to hosted capacity before the matrix is
+    # created. Two shards per candidate cap fixed-pool use at four, preserving
+    # anti-slam headroom for Runner Heartbeat and emergency work.
+    runs-on: ${{ needs.ci-unit-runner-route.outputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 40
     strategy:
       fail-fast: false
-      # Fill the ephemeral pool; preserve the hosted fallback's burst limit.
-      max-parallel: ${{ vars.CI_UNIT_RUNNER == 'jovie-ephemeral' && 5 || 3 }}
+      # Five logical shards, at most two concurrent per queue candidate.
+      max-parallel: 2
       matrix:
         shard: ['1/5', '2/5', '3/5', '4/5', '5/5']
     outputs:
@@ -2841,7 +2847,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> "$GITHUB_OUTPUT"
+        run: echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
 
       # Skip remaining steps if no relevant changes
       - name: Skip notification
@@ -2913,7 +2919,8 @@ jobs:
         run: pnpm turbo test --filter=@jovie/ui
 
       - name: Upload test results to Codecov
-        if: ${{ !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
+        # Queue evidence must not consume external service credentials.
+        if: ${{ !cancelled() && github.event_name != 'merge_group' && steps.check_changes.outputs.run_full_ci == 'true' }}
         uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -2924,15 +2931,15 @@ jobs:
 
   ci-a11y:
     name: A11y (axe)
-    # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
-    # Runs on push to main, workflow_dispatch, and PRs touching public UI paths
-    # (run_public_lighthouse gate — same paths that provision the shared Neon branch).
-    # Blocking on PRs via ci-pr-ready (JOV-4060).
+    # Manual hosted axe-core WCAG 2.1 AA evidence using the shared build artifact.
     needs: [ci-build-public, ci-path-changes, neon-db]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-path-changes.outputs.run_public_lighthouse == 'true')) && needs.ci-build-public.outputs.has_artifact == 'true') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
-    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results/**/*.json
+      PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/axe-a11y-results.json
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -2945,7 +2952,6 @@ jobs:
         run: |
           # Align with ci-build-public so public QA config changes still run the blocking lane.
           RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
-          RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
           RUN_PUBLIC_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_public_lighthouse }}"
           if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" || "$RUN_PUBLIC_LIGHTHOUSE" == "true" ]]; then
             echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
@@ -3069,7 +3075,7 @@ jobs:
             exit 1
           fi
 
-          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium --reporter=line
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium --reporter=line,json
         env:
           BASE_URL: http://localhost:3220
           SMOKE_ONLY: '1'
@@ -3084,7 +3090,7 @@ jobs:
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/test-results/
+          path: apps/web/test-results/**/*.json
           retention-days: 3
 
   # Authenticated a11y (JOV-4061): dashboard + chat axe suites that previously
@@ -3093,9 +3099,8 @@ jobs:
   ci-a11y-authed:
     name: A11y (authenticated, informational)
     needs: [ci-build-public, ci-path-changes, neon-db]
-    # Main + workflow_dispatch always (when artifact present). PRs only with
-    # 'testing' label or dashboard/chat path changes — avoids Neon tax on every UI PR.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && needs.ci-build-public.outputs.has_artifact == 'true' && (((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-path-changes.outputs.run_dashboard_lighthouse == 'true' || needs.ci-path-changes.outputs.run_chat_lighthouse == 'true'))) }}
+    # Manual hosted evidence only (when the build artifact is present).
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -3240,14 +3245,13 @@ jobs:
           if-no-files-found: error
 
   ci-e2e-smoke:
-    name: E2E Smoke (PR Fast Feedback)
+    name: E2E Smoke (manual)
     environment: Preview – jovie
-    # Gated: runs with 'testing' label or deterministic high-risk classification.
-    # Full E2E runs on merge to main anyway.
-    # Dependabot PRs cannot access NEON_API_KEY or other Preview-environment secrets.
+    # Manual hosted evidence only; never a source-PR event.
+    # The shared manual Neon producer is mandatory; no fallback branch can race it.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ always() && needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-risk-classifier.outputs.requires_smoke == 'true') && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'))) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ always() && needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.neon-db.result == 'success' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     concurrency:
@@ -3264,7 +3268,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e == 'true' || needs.ci-risk-classifier.outputs.requires_smoke == 'true' }}" >> "$GITHUB_OUTPUT"
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> "$GITHUB_OUTPUT"
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -3295,38 +3299,13 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result == 'success'
         run: echo "DATABASE_URL=${{ steps.resolve-e2e-smoke-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
-      - name: Create ephemeral Neon database branch (with retry)
-        id: neon-branch
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'
-        uses: ./.github/actions/neon-create-branch-with-retry
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: e2e-smoke-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production
-
-      - name: Resolve DATABASE_URL (fallback Neon ephemeral)
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'
-        id: resolve-e2e-smoke-fallback-neon-db-url
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-
-      - name: Export DATABASE_URL (fallback ephemeral branch)
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'
-        run: echo "DATABASE_URL=${{ steps.resolve-e2e-smoke-fallback-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
-
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
-          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          GIT_BRANCH: manual-${{ github.run_id }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Seed public QA fixtures
@@ -3351,7 +3330,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
-      - name: Materialize standalone assets (PR smoke)
+      - name: Materialize standalone assets (manual smoke)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
           # Tarred .next artifacts can omit sibling paths the standalone server needs at runtime.
@@ -3364,7 +3343,7 @@ jobs:
           cd apps/web
 
           if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
-            echo "::error::Standalone server not found — ci-build-public artifact is required for PR smoke"
+            echo "::error::Standalone server not found — ci-build-public artifact is required for manual smoke"
             exit 1
           fi
 
@@ -3377,7 +3356,7 @@ jobs:
           export SMOKE_ONLY=1
           export SENTRY_E2E_REPORTING=1
           export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
-          export SENTRY_ENVIRONMENT=ci-pr-e2e
+          export SENTRY_ENVIRONMENT=ci-manual-e2e
           export SENTRY_RELEASE="${{ github.sha }}"
           export E2E_USE_TEST_AUTH_BYPASS=1
           export VERCEL_ENV=development
@@ -3452,28 +3431,19 @@ jobs:
             apps/web/test-results/
           retention-days: 3
 
-      - name: Cleanup ephemeral Neon branch
-        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success' && steps.neon-branch.outputs.branch_id != ''
-        continue-on-error: true
-        run: |
-          curl -sS -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
-
   ci-golden-path:
-    name: Golden Path (PR)
+    name: Golden Path (manual)
     environment: Preview – jovie
     # Launch-gate job (JOV-3758): full signup -> onboarding -> music import -> live
     # public profile -> Stripe checkout journey against REAL Clerk + an ephemeral
-    # Neon branch. Required for launch-candidate PRs per docs/launch/LAUNCH_GATES.md.
+    # Manual golden-path evidence uses the isolated Neon branch.
     # Unlike ci-e2e-smoke this must NOT set NEXT_PUBLIC_CLERK_MOCK or
     # E2E_USE_TEST_AUTH_BYPASS — those make golden-path.spec.ts self-skip.
     # Path-triggered (not always-on): the spec has a 600s timeout, so always-on would
     # blow the CI budget and churn the Clerk dev-instance 100-user cap.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.ci-path-changes.outputs.run_golden_path == 'true' || contains(github.event.pull_request.labels.*.name, 'launch-candidate') || contains(github.event.pull_request.labels.*.name, 'testing')) && (needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'))) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.neon-db.result == 'success' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 25
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     # Scope pending replacement to one PR. GitHub replaces the older pending job in
@@ -3678,11 +3648,11 @@ jobs:
   ci-admin-smoke:
     name: Admin E2E Smoke
     environment: Preview – jovie
-    # Gated: only runs with 'testing' label (admin tests need auth credentials).
+    # Manual hosted evidence only (admin tests need auth credentials).
     # Removed push-to-main trigger — merge queue validates PRs before merge.
     needs: [ci-path-changes, neon-db, ci-build-public]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     concurrency:
@@ -3812,8 +3782,8 @@ jobs:
     name: E2E DB Migrate
     environment: Preview – jovie
     needs: [ci-path-changes, ci-build-public, neon-db]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -3831,7 +3801,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci != 'true'
         run: |
           echo "Skipping E2E DB migrate as no critical paths were changed."
-          echo "To force a full CI run, add the 'testing' label to the PR."
+          echo "Deep evidence runs through an explicit workflow dispatch."
           exit 0
 
       - name: Setup Node.js and pnpm
@@ -3892,8 +3862,8 @@ jobs:
     environment: Preview – jovie
     # Opt-in validation lane for risky PRs. Keep it off the main deploy critical path.
     needs: [ci-path-changes, ci-build-public, neon-db, ci-e2e-migrate]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')))) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
@@ -4103,8 +4073,8 @@ jobs:
     needs: [ci-path-changes]
     # Main keeps the post-merge guard. Internal PRs run it only when the
     # profiler, guard, or profiler regression itself changes.
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (needs.ci-path-changes.outputs.skip == 'false' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_test_performance == 'true') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -4134,18 +4104,18 @@ jobs:
         run: |
           TEST_PERFORMANCE_SUITE="full" TEST_PERFORMANCE_USE_BASELINE="true" pnpm test:guard -- --suite="full" --use-baseline
   ci-pr-vercel-preview:
-    name: Preview Deploy (PR)
-    # Preview deploys are the default QA surface for internal PRs.
-    # Keep this independent from the main deploy gate so review happens before merge.
+    name: Preview Deploy (manual)
+    # Bounded hosted evidence for an explicitly dispatched ref. It never starts
+    # from a source PR event and never feeds source PR Ready.
     needs: [ci-path-changes, ci-risk-classifier]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && (needs.ci-risk-classifier.outputs.requires_preview == 'true' || contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && inputs.run_preview_deploy == true }}
+    runs-on: ubuntu-latest
     # Build + pull env consume ~5m; Vercel prebuilt upload often needs >20m alone.
     timeout-minutes: 40
     concurrency:
       # Scope preview concurrency to a single PR/ref so unrelated PRs do not
       # evict each other's pending preview deployments from the queue.
-      group: preview-deploy-${{ github.repository }}-${{ github.event.pull_request.number || github.ref_name }}
+      group: preview-deploy-${{ github.repository }}-${{ github.ref_name }}
       cancel-in-progress: false
     outputs:
       deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
@@ -4306,26 +4276,29 @@ jobs:
             exit 1
           fi
 
-  # PR Lighthouse runs as a path-gated preview-evidence lane with stricter thresholds (0.75 perf, 0.85 a11y).
-  # Original removal was due to 0.5 thresholds being too relaxed. Updated .lighthouserc.pr.json fixes this.
-  # Production Lighthouse (in ci-build job) has even stricter thresholds (0.8 perf, 0.95 a11y).
+  # Deep Lighthouse runs only by manual dispatch. Production Lighthouse remains
+  # a separate hosted post-deploy release probe.
 
   ci-merge-group-ready:
     name: ${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}
-    # Source PRs retain the A11y evidence that required Neon. Combined heads run
-    # the shared-artifact Layout Guard without creating a second Neon branch.
+    # Combined heads require deterministic gates, five unit shards, one hosted
+    # build/layout workspace, and path-selected iOS evidence. Deep browser lanes
+    # never provision Neon from this event.
     needs:
       [
         ci-path-changes,
         ci-risk-classifier,
         ci-fast,
         ci-unit-tests,
-        ci-build-public,
-        ci-layout-guard,
+        ci-build-layout,
+        ci-ios,
+        ci-promptfoo-evals,
+        ci-golden-eval-set,
         ci-secret-scan,
+        drizzle-migration-guard,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - name: Evaluate combined-head checks
@@ -4336,12 +4309,15 @@ jobs:
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
-          BUILD_RESULT="${{ needs.ci-build-public.result }}"
-          BUILD_HAS_ARTIFACT="${{ needs.ci-build-public.outputs.has_artifact }}"
-          LAYOUT_RESULT="${{ needs.ci-layout-guard.result }}"
+          BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
+          IOS_RESULT="${{ needs.ci-ios.result }}"
+          PROMPTFOO_RESULT="${{ needs.ci-promptfoo-evals.result }}"
+          GOLDEN_EVAL_RESULT="${{ needs.ci-golden-eval-set.result }}"
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
-          RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
-
+          MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
+          RUN_IOS="${{ needs.ci-path-changes.outputs.run_ios }}"
+          RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
+          RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
           {
             echo "### Merge group ready"
             echo
@@ -4354,11 +4330,14 @@ jobs:
             echo "| CI Risk Classifier | $RISK_RESULT |"
             echo "| ci-fast | $FAST_RESULT |"
             echo "| Unit Tests | $UNIT_RESULT |"
-            echo "| Build (public routes) | $BUILD_RESULT |"
-            echo "| Layout Guard | $LAYOUT_RESULT |"
+            echo "| Build + Layout (same hosted workspace) | $BUILD_LAYOUT_RESULT |"
+            echo "| iOS Build + Test | $IOS_RESULT |"
+            echo "| Promptfoo Evals (path-selected) | $PROMPTFOO_RESULT |"
+            echo "| Golden Eval Set (path-selected) | $GOLDEN_EVAL_RESULT |"
             echo "| Secret Scan | $SECRET_RESULT |"
+            echo "| Migration Guard | $MIGRATION_RESULT |"
             echo
-            echo "Source-PR A11y evidence is inherited; merge groups do not provision Neon."
+            echo "Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon."
           } >> "$GITHUB_STEP_SUMMARY"
 
           for gate in \
@@ -4366,7 +4345,8 @@ jobs:
             "CI Risk Classifier:$RISK_RESULT" \
             "ci-fast:$FAST_RESULT" \
             "Secret Scan:$SECRET_RESULT" \
-            "Build (public routes):$BUILD_RESULT"; do
+            "Migration Guard:$MIGRATION_RESULT" \
+            "Build + Layout:$BUILD_LAYOUT_RESULT"; do
             name="${gate%%:*}"
             result="${gate#*:}"
             if [[ "$result" != "success" ]]; then
@@ -4376,27 +4356,42 @@ jobs:
           done
 
           if [[ "$UNIT_RESULT" != "success" ]]; then
-            if [[ "$UNIT_RESULT" != "skipped" || "$RUN_TEST" == "true" ]]; then
-              echo "::error::Unit Tests did not pass on the merge-group combined head (result: $UNIT_RESULT; run_test=$RUN_TEST)"
-              exit 1
-            fi
-            echo "Unit Tests legitimately skipped because path detection selected no test-relevant files."
+            echo "::error::Five affected Unit Test shards did not pass on the merge-group combined head (result: $UNIT_RESULT)"
+            exit 1
           fi
 
-          if [[ "$LAYOUT_RESULT" != "success" ]]; then
-            if [[ "$LAYOUT_RESULT" != "skipped" || "$BUILD_HAS_ARTIFACT" == "true" ]]; then
-              echo "::error::Layout Guard did not pass on the merge-group combined head (result: $LAYOUT_RESULT; build_artifact=$BUILD_HAS_ARTIFACT)"
+          if [[ "$RUN_IOS" == "true" && "$IOS_RESULT" != "success" ]]; then
+            echo "::error::iOS Build + Test did not pass for an iOS-changing combined head (result: $IOS_RESULT)"
+            exit 1
+          fi
+          if [[ "$RUN_IOS" != "true" && "$IOS_RESULT" != "skipped" ]]; then
+            echo "::error::iOS Build + Test ran without an iOS path selection (result: $IOS_RESULT)"
+            exit 1
+          fi
+
+          for selected_gate in \
+            "Promptfoo Evals:$RUN_PROMPTFOO:$PROMPTFOO_RESULT" \
+            "Golden Eval Set:$RUN_GOLDEN_EVAL:$GOLDEN_EVAL_RESULT"; do
+            name="${selected_gate%%:*}"
+            selection_and_result="${selected_gate#*:}"
+            selected="${selection_and_result%%:*}"
+            result="${selection_and_result#*:}"
+            if [[ "$selected" == "true" && "$result" != "success" ]]; then
+              echo "::error::$name did not pass for a selected combined head (result: $result)"
               exit 1
             fi
-            echo "Layout Guard legitimately skipped because no shared build artifact was required."
-          fi
+            if [[ "$selected" != "true" && "$result" != "skipped" ]]; then
+              echo "::error::$name ran without path selection (result: $result)"
+              exit 1
+            fi
+          done
 
           echo "All required combined-head checks passed."
   ci-storybook-a11y:
     name: Storybook A11y
     needs: [ci-path-changes]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && needs.ci-path-changes.outputs.run_storybook_a11y == 'true' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -4409,275 +4404,66 @@ jobs:
         run: pnpm --filter @jovie/web test:a11y
   ci-pr-ready:
     name: ${{ github.event_name == 'pull_request' && 'PR Ready' || 'PR Ready (source inactive)' }}
-    # THE single aggregate merge gate (docs/PR_FLOW.md, merge-queue-guard.mjs
-    # REQUIRED_MERGE_STATUSES). Branch protection and every enqueue automation
-    # (drain-pr-queue.sh, agent-pipeline, agent-landing-sweep, agent-tick,
-    # pr-conflict-handler) key on this one check-run name. Individual leaves
-    # still report separately for at-a-glance failure visibility; this job only
-    # fans them in so the required-check set stays one stable context instead
-    # of N shard-named contexts that drift (removing it in #13610 left main
-    # requiring only Migration Guard + Fork PR Gate + PR Size Guard and let
-    # red-unit-test PRs merge — do not remove without updating the ruleset AND
-    # all five automation consumers in the same PR).
-    needs:
-      [
-        ci-path-changes,
-        ci-risk-classifier,
-        ci-fast,
-        ci-unit-tests,
-        ci-build-public,
-        neon-db,
-        ci-pr-vercel-preview,
-        ci-e2e-smoke,
-        ci-golden-path,
-        ci-smoke-required,
-        ci-lighthouse-pr,
-        ci-lighthouse-dashboard-pr,
-        ci-lighthouse-onboarding-pr,
-        ci-lighthouse-admin-pr,
-        ci-a11y,
-        ci-storybook-a11y,
-        ci-layout-guard,
-        ci-secret-scan,
-      ]
-    # always() makes selected failed, skipped, or cancelled leaves observable
-    # instead of inheriting GitHub's implicit successful-needs condition.
+    # The source-branch aggregate is intentionally small and deterministic.
+    # GitHub's merge_group producer reuses the same required context name for
+    # combined-head unit/build/layout evidence. Migration Guard, Fork PR Gate,
+    # and PR Size Guard remain separately required ruleset contexts.
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Evaluate required PR checks
+      - name: Evaluate deterministic source PR checks
+        shell: bash
         run: |
+          set -euo pipefail
           PATH_RESULT="${{ needs.ci-path-changes.result }}"
           FAST_RESULT="${{ needs.ci-fast.result }}"
-          UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
-          BUILD_RESULT="${{ needs.ci-build-public.result }}"
-          BUILD_HAS_ARTIFACT="${{ needs.ci-build-public.outputs.has_artifact }}"
-          NEON_RESULT="${{ needs.neon-db.result }}"
-          A11Y_RESULT="${{ needs.ci-a11y.result }}"
-          STORYBOOK_A11Y_RESULT="${{ needs.ci-storybook-a11y.result }}"
-          LAYOUT_GUARD_RESULT="${{ needs.ci-layout-guard.result }}"
           SECRET_SCAN_RESULT="${{ needs.ci-secret-scan.result }}"
-          GRAPHITE_SKIP="${{ needs.ci-path-changes.outputs.skip }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
-          RISK_REQUIRES_SMOKE="${{ needs.ci-risk-classifier.outputs.requires_smoke }}"
-          RISK_REQUIRES_PREVIEW="${{ needs.ci-risk-classifier.outputs.requires_preview }}"
-          RISK_BLOCKS_UNATTENDED="${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
-          PREVIEW_RESULT="${{ needs.ci-pr-vercel-preview.result }}"
-          E2E_SMOKE_RESULT="${{ needs.ci-e2e-smoke.result }}"
-          GOLDEN_PATH_RESULT="${{ needs.ci-golden-path.result }}"
-          EXTENDED_SMOKE_RESULT="${{ needs.ci-smoke-required.result }}"
-          PUBLIC_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-pr.result }}"
-          DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
-          ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
-          ADMIN_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-admin-pr.result }}"
-          HAS_TESTING_LABEL="${{ contains(github.event.pull_request.labels.*.name, 'testing') }}"
-          HAS_LAUNCH_CANDIDATE_LABEL="${{ contains(github.event.pull_request.labels.*.name, 'launch-candidate') }}"
-          RUN_E2E="${{ needs.ci-path-changes.outputs.run_e2e }}"
-          RUN_GOLDEN_PATH="${{ needs.ci-path-changes.outputs.run_golden_path }}"
-          RUN_PUBLIC_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_public_lighthouse }}"
-          RUN_DASHBOARD_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_dashboard_lighthouse }}"
-          RUN_ONBOARDING_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_onboarding_lighthouse }}"
-          RUN_ADMIN_LIGHTHOUSE="${{ needs.ci-path-changes.outputs.run_admin_lighthouse }}"
-          IS_DEPENDABOT="${{ github.event.pull_request.user.login == 'dependabot[bot]' }}"
-          HAS_CODE_CHANGES="${{ needs.ci-path-changes.outputs.has_code_changes }}"
-          echo "ci-path-changes: $PATH_RESULT (has_code_changes=$HAS_CODE_CHANGES)"
-          echo "ci-fast: $FAST_RESULT"
-          echo "ci-unit-tests: $UNIT_RESULT"
-          echo "ci-build-public: $BUILD_RESULT (has_artifact=$BUILD_HAS_ARTIFACT)"
-          echo "neon-db: $NEON_RESULT"
-          echo "ci-a11y: $A11Y_RESULT"
-          echo "ci-storybook-a11y: $STORYBOOK_A11Y_RESULT"
-          echo "ci-layout-guard: $LAYOUT_GUARD_RESULT"
-          echo "ci-secret-scan: $SECRET_SCAN_RESULT"
-          echo "ci-risk-classifier: $RISK_RESULT ($RISK_LEVEL; rules: ${RISK_RULES:-none})"
-          echo "ci-pr-vercel-preview: $PREVIEW_RESULT"
-          echo "ci-e2e-smoke: $E2E_SMOKE_RESULT"
-          echo "ci-golden-path: $GOLDEN_PATH_RESULT"
-          echo "ci-smoke-required: $EXTENDED_SMOKE_RESULT"
-          echo "ci-lighthouse-pr: $PUBLIC_LIGHTHOUSE_RESULT"
-          echo "ci-lighthouse-dashboard-pr: $DASHBOARD_LIGHTHOUSE_RESULT"
-          echo "ci-lighthouse-onboarding-pr: $ONBOARDING_LIGHTHOUSE_RESULT"
-          echo "ci-lighthouse-admin-pr: $ADMIN_LIGHTHOUSE_RESULT"
 
           {
             echo "### PR Ready"
+            echo
+            echo "Source PRs run deterministic fast checks only. Unit, build, and layout integration evidence runs on the merge-group combined head."
             echo
             echo "| Gate | Result | Next local command |"
             echo "| --- | --- | --- |"
             echo "| Path Changes | $PATH_RESULT | re-run workflow if cancelled/failed |"
             echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
-            echo "| Unit Tests | $UNIT_RESULT | \`pnpm --filter=@jovie/web run test:fast\` |"
-            echo "| Build (public routes) | $BUILD_RESULT (has_artifact=$BUILD_HAS_ARTIFACT) | \`pnpm run build:web\` |"
-            echo "| Neon DB | $NEON_RESULT | inspect the selected ephemeral-database prerequisite |"
-            echo "| A11y (axe) | $A11Y_RESULT | \`pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium\` |"
-            echo "| Storybook A11y | $STORYBOOK_A11Y_RESULT | \`pnpm --filter @jovie/web test:a11y\` |"
-            echo "| Layout Guard | $LAYOUT_GUARD_RESULT | \`pnpm exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium\` |"
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
-            echo "| Preview Deploy | $PREVIEW_RESULT | \`pnpm run build:web\` |"
-            echo "| E2E Smoke | $E2E_SMOKE_RESULT | \`pnpm run test:web:smoke\` |"
-            echo "| Golden Path | $GOLDEN_PATH_RESULT | \`pnpm --filter @jovie/web run test:e2e:golden-path:ci\` |"
-            echo "| Extended Smoke | $EXTENDED_SMOKE_RESULT | inspect the failing Playwright spec |"
-            echo "| Public Lighthouse | $PUBLIC_LIGHTHOUSE_RESULT | \`pnpm --filter=@jovie/web run test:lighthouse:public:launch\` |"
-            echo "| Dashboard Lighthouse | $DASHBOARD_LIGHTHOUSE_RESULT | \`pnpm --filter=@jovie/web run test:lighthouse:dashboard:pr\` |"
-            echo "| Onboarding Lighthouse | $ONBOARDING_LIGHTHOUSE_RESULT | \`pnpm --filter=@jovie/web run test:lighthouse:onboarding:pr\` |"
-            echo "| Admin Lighthouse | $ADMIN_LIGHTHOUSE_RESULT | \`pnpm --filter=@jovie/web run test:lighthouse:admin:pr\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
+            echo "Heavy evidence is manual, scheduled, or event-driven and never starts from this source-PR gate."
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # Fail closed first when the path DAG root never completed — leaves
-          # (including risk classifier) are SKIPPED in that case, which must not
-          # look like a docs-only green path.
           if [[ "$PATH_RESULT" != "success" ]]; then
             echo "❌ Path Changes did not succeed (result: $PATH_RESULT)"
-            echo "Leaf gates (CI Risk Classifier, ci-fast, Unit Tests, …) were skipped because the path DAG root did not finish."
-            echo "Likely fix: re-run the failed jobs / workflow. Path Changes is hosted ubuntu-latest to avoid self-hosted cancel cascades."
             exit 1
           fi
-
           if [[ "$SECRET_SCAN_RESULT" != "success" ]]; then
             echo "❌ Secret Scan did not pass (result: $SECRET_SCAN_RESULT)"
             exit 1
           fi
-
-          if [[ "$GRAPHITE_SKIP" == "true" ]]; then
-            echo "❌ Unverified Graphite reuse reached PR Ready instead of exact-head gates."
-            exit 1
-          fi
-
           if [[ "$RISK_RESULT" != "success" ]]; then
             echo "❌ CI risk classifier did not pass (result: $RISK_RESULT)"
-            echo "Likely fix: run pnpm ci:harness:check and inspect .github/ci-harness/manifest.json."
             exit 1
           fi
 
-          # Code PRs must run ci-fast (not skip). Docs-only may skip when
-          # has_code_changes=false from a successful Path Changes detect.
-          if [[ "$HAS_CODE_CHANGES" == "true" ]]; then
-            if [[ "$FAST_RESULT" != "success" ]]; then
-              echo "❌ ci-fast did not pass (result: $FAST_RESULT) on a code-changing PR"
-              echo "Likely fix: pnpm run typecheck && pnpm run biome:check (see ci-fast step summary for the failing lane)."
-              exit 1
-            fi
-          elif [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
+          if [[ "$FAST_RESULT" != "success" ]]; then
             echo "❌ ci-fast did not pass (result: $FAST_RESULT)"
-            echo "Likely fix: pnpm run typecheck && pnpm run biome:check (see ci-fast step summary for the failing lane)."
             exit 1
           fi
 
-          # Source PR unit tests are intentionally deferred to the merge-group
-          # combined head. A success remains acceptable for in-flight runs from
-          # the prior workflow revision; every other result fails closed.
-          if [[ "$UNIT_RESULT" != "success" && "$UNIT_RESULT" != "skipped" ]]; then
-            echo "❌ Unit tests did not pass (result: $UNIT_RESULT)"
-            echo "Likely fix: run the failing Vitest file locally or pnpm --filter=@jovie/web run test:fast."
-            exit 1
-          fi
-          if [[ "$UNIT_RESULT" == "skipped" ]]; then
-            echo "Source PR unit tests are intentionally deferred to the merge-group combined head."
-          fi
-
-          # A11y (axe) must succeed when it runs (skipped when no public UI paths changed).
-          if [[ "$A11Y_RESULT" != "success" && "$A11Y_RESULT" != "skipped" ]]; then
-            echo "❌ A11y (axe) audit did not pass (result: $A11Y_RESULT)"
-            echo "Likely fix: download the a11y-axe-report artifact from this run and fix the WCAG violations it lists."
-            exit 1
-          fi
-
-          # Storybook A11y is path-gated, but a relevant failure is part of the
-          # aggregate PR Ready contract. Keep the leaf unpinned so irrelevant
-          # PRs never wait for a check that intentionally does not run.
-          if [[ "$STORYBOOK_A11Y_RESULT" != "success" && "$STORYBOOK_A11Y_RESULT" != "skipped" ]]; then
-            echo "❌ Storybook A11y did not pass (result: $STORYBOOK_A11Y_RESULT)"
-            echo "Likely fix: run pnpm --filter @jovie/web test:a11y and fix the first failing story or browser import."
-            exit 1
-          fi
-
-          # Layout Guard must succeed when it runs (skipped when the shared build artifact is absent).
-          if [[ "$LAYOUT_GUARD_RESULT" != "success" && "$LAYOUT_GUARD_RESULT" != "skipped" ]]; then
-            echo "❌ Layout Guard did not pass (result: $LAYOUT_GUARD_RESULT)"
-            echo "Likely fix: run pnpm exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts locally and repair the failing deterministic layout behavior."
-            exit 1
-          fi
-
-          # Build is non-blocking (throughput philosophy): corrections are cheap, waiting is expensive.
-          # Build correctness is also validated by Vercel preview deploy + post-merge push CI.
-          if [[ "$BUILD_RESULT" != "success" && "$BUILD_RESULT" != "skipped" ]]; then
-            echo "::warning::ci-build-public did not pass (result: $BUILD_RESULT) — non-blocking per throughput policy"
-            echo "Build failure will be corrected post-merge or in a follow-up PR."
-          fi
-
-          if [[ "$RISK_REQUIRES_PREVIEW" == "true" && "$PREVIEW_RESULT" != "success" ]]; then
-            if [[ "$IS_DEPENDABOT" == "true" && "$PREVIEW_RESULT" == "skipped" && "$BUILD_RESULT" == "success" && "$BUILD_HAS_ARTIFACT" == "true" ]]; then
-              echo "Dependabot preview unavailable; accepting the successful exact-head build output."
-            else
-              echo "❌ Risk classifier requires preview evidence, but Preview Deploy result was $PREVIEW_RESULT"
-              exit 1
-            fi
-          fi
-
-          require_evidence() {
-            local intended="$1"
-            local result="$2"
-            local name="$3"
-            if [[ "$intended" == "true" && "$result" != "success" ]]; then
-              echo "❌ $name was required for this PR, but result was $result"
-              exit 1
-            fi
-          }
-
-          E2E_SMOKE_INTENDED=false
-          if [[ "$RISK_REQUIRES_SMOKE" == "true" || ("$HAS_TESTING_LABEL" == "true" && "$RUN_E2E" == "true") ]]; then
-            E2E_SMOKE_INTENDED=true
-          fi
-          GOLDEN_PATH_INTENDED=false
-          if [[ "$RUN_GOLDEN_PATH" == "true" || "$HAS_LAUNCH_CANDIDATE_LABEL" == "true" ]]; then
-            GOLDEN_PATH_INTENDED=true
-          fi
-          EXTENDED_SMOKE_INTENDED=false
-          if [[ "$HAS_TESTING_LABEL" == "true" && "$RUN_E2E" == "true" ]]; then
-            EXTENDED_SMOKE_INTENDED=true
-          fi
-          PUBLIC_LIGHTHOUSE_INTENDED=false
-          if [[ "$HAS_TESTING_LABEL" == "true" && "$RUN_PUBLIC_LIGHTHOUSE" == "true" ]]; then
-            PUBLIC_LIGHTHOUSE_INTENDED=true
-          fi
-          DASHBOARD_LIGHTHOUSE_INTENDED=false
-          if [[ "$HAS_LAUNCH_CANDIDATE_LABEL" == "true" || ("$HAS_TESTING_LABEL" == "true" && "$RUN_DASHBOARD_LIGHTHOUSE" == "true") ]]; then
-            DASHBOARD_LIGHTHOUSE_INTENDED=true
-          fi
-          ONBOARDING_LIGHTHOUSE_INTENDED=false
-          if [[ "$HAS_LAUNCH_CANDIDATE_LABEL" == "true" || ("$HAS_TESTING_LABEL" == "true" && "$RUN_ONBOARDING_LIGHTHOUSE" == "true") ]]; then
-            ONBOARDING_LIGHTHOUSE_INTENDED=true
-          fi
-          ADMIN_LIGHTHOUSE_INTENDED=false
-          if [[ "$HAS_TESTING_LABEL" == "true" && "$RUN_ADMIN_LIGHTHOUSE" == "true" ]]; then
-            ADMIN_LIGHTHOUSE_INTENDED=true
-          fi
-
-          require_evidence "$E2E_SMOKE_INTENDED" "$E2E_SMOKE_RESULT" "E2E Smoke (PR Fast Feedback)"
-          require_evidence "$GOLDEN_PATH_INTENDED" "$GOLDEN_PATH_RESULT" "Golden Path (PR)"
-          require_evidence "$EXTENDED_SMOKE_INTENDED" "$EXTENDED_SMOKE_RESULT" "Extended Smoke (Preview)"
-          require_evidence "$PUBLIC_LIGHTHOUSE_INTENDED" "$PUBLIC_LIGHTHOUSE_RESULT" "Lighthouse (public routes PR)"
-          require_evidence "$DASHBOARD_LIGHTHOUSE_INTENDED" "$DASHBOARD_LIGHTHOUSE_RESULT" "Lighthouse (dashboard PR)"
-          require_evidence "$ONBOARDING_LIGHTHOUSE_INTENDED" "$ONBOARDING_LIGHTHOUSE_RESULT" "Lighthouse (onboarding PR)"
-          require_evidence "$ADMIN_LIGHTHOUSE_INTENDED" "$ADMIN_LIGHTHOUSE_RESULT" "Lighthouse (admin PR)"
-
-          if [[ "$RISK_BLOCKS_UNATTENDED" == "true" ]]; then
-            echo "Risk classifier blocks unattended auto-merge for this PR. Human review may still merge after required evidence is present."
-          fi
-
-          echo "All intended source PR checks passed; unit tests are enforced on the merge-group combined head."
-
+          echo "All deterministic source PR checks passed."
   ci-summary:
-    name: PR Summary
-    # Informational only (posts a PR comment).
-    # where the comment target is a synthetic batch PR, not the source PR a human reviews.
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && github.event_name == 'pull_request') }}
+    name: Manual Evidence Summary
+    # Collect the manual deep-lane artifact after every selected job settles.
+    # It never starts on a source PR or merge-group event.
+    if: ${{ always() && github.event_name == 'workflow_dispatch' }}
     permissions:
       actions: read
       pull-requests: write
@@ -4709,7 +4495,7 @@ jobs:
       - ci-lighthouse-admin-pr
       - ci-a11y
     # Keep this informational tail off the saturated ephemeral unit-test pool.
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Reset workspace git state (self-hosted)
@@ -4764,7 +4550,6 @@ jobs:
           RISK_RULES: ${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}
           CI_HARNESS_JOB_CI_RISK_CLASSIFIER: ${{ needs.ci-risk-classifier.result }}
           CI_HARNESS_JOB_CI_FAST: ${{ needs.ci-fast.result }}
-          CI_HARNESS_JOB_CI_STRUCTURAL_CONTRACT: ${{ needs.ci-fast.result }}
           CI_HARNESS_JOB_CI_UNIT_TESTS: ${{ needs.ci-unit-tests.result }}
           CI_HARNESS_JOB_CI_BUILD_PUBLIC: ${{ needs.ci-build-public.result }}
           CI_HARNESS_JOB_CI_LIGHTHOUSE_PR: ${{ needs.ci-lighthouse-pr.result }}
@@ -4801,7 +4586,7 @@ jobs:
               requiresPreview: $requiresPreview,
               blocksUnattendedAutoMerge: $blocksUnattended,
               matchedRules: ($rules | split(",") | map(select(length > 0) | {id: ., title: ., level: $riskLevel, files: []})),
-              recommendedLabels: ((if $requiresSmoke then ["testing"] else [] end) + (if $blocksUnattended then ["needs-human"] else [] end))
+              recommendedLabels: (if $blocksUnattended then ["needs-human"] else [] end)
             }' > "$RISK_JSON"
 
           node scripts/ci-harness.mjs emit-artifact \
@@ -4828,6 +4613,7 @@ jobs:
           path: ${{ runner.temp }}/ci-harness/ci-harness.v1.json
           retention-days: 14
       - name: Post CI summary to PR
+        if: ${{ github.event_name == 'pull_request' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           BUILD_RUN_FULL_CI: ${{ needs.ci-path-changes.outputs.run_build }}
@@ -5031,10 +4817,10 @@ jobs:
   # Extended smoke validation for risky changes.
   # This remains available for opt-in PR validation but does not block production deploys.
   ci-smoke-required:
-    name: Extended Smoke (Preview)
+    name: Extended Smoke (manual)
     needs: [ci-path-changes, ci-build-public, neon-db, ci-e2e-tests]
-    if: ${{ needs.ci-path-changes.outputs.skip == 'false' && (always() && ((github.event_name == 'workflow_dispatch' && needs.neon-db.result == 'success') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login && github.event.pull_request.user.login != 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true'))) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    if: ${{ needs.ci-path-changes.result == 'success' && always() && github.event_name == 'workflow_dispatch' && needs.neon-db.result == 'success' }}
+    runs-on: ubuntu-latest
     environment: Preview – jovie
     timeout-minutes: 20
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
@@ -5201,1120 +4987,135 @@ jobs:
             apps/web/test-results/
           retention-days: 3
 
-  # Homepage smoke test checks CURRENT production state (informational only).
-  # NOT a deploy blocker — if prod is degraded we still need to be able to ship fixes.
-  # Post-deploy verification is handled by canary-health-gate.
-  ci-homepage-smoke:
-    name: Homepage Smoke (Informational)
-    needs: [ci-build-public]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    continue-on-error: true
-    timeout-minutes: 5
-    steps:
-      - name: Verify homepage renders correctly
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: |
-          echo "Running homepage smoke test against production..."
+  # Homepage smoke is a blocking probe of the immutable production deployment.
 
-          USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
-          COOKIE_JAR="$(mktemp)"
-
-          # Vercel Deployment Protection bypass for automation
-          BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET:-}"
-          BYPASS_ARGS=()
-          if [ -n "$BYPASS_SECRET" ]; then
-            BYPASS_ARGS+=(
-              -H "x-vercel-protection-bypass: $BYPASS_SECRET"
-              -H "x-vercel-set-bypass-cookie: true"
-              -c "$COOKIE_JAR"
-              -b "$COOKIE_JAR"
-            )
-          fi
-
-          # Check homepage
-          response=$(curl -sS -L -A "$USER_AGENT" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "https://jov.ie" || echo "\n000")
-          status="${response##*$'\n'}"
-          body="${response%$'\n'*}"
-
-          if [ "$status" != "200" ]; then
-            echo "❌ Homepage returned HTTP $status"
-            exit 1
-          fi
-
-          if [ ${#body} -lt 1000 ]; then
-            echo "❌ Homepage body too short (${#body} chars) - likely broken"
-            exit 1
-          fi
-
-          if echo "$body" | grep -qi "application error\|internal server error\|something went wrong"; then
-            echo "❌ Homepage contains error message"
-            exit 1
-          fi
-
-          # Check critical pages (/sign-up, /pricing)
-          for route in "/sign-up" "/pricing"; do
-            route_response=$(curl -sS -L -A "$USER_AGENT" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "https://jov.ie${route}" || echo "\n000")
-            route_status="${route_response##*$'\n'}"
-
-            if [ "$route_status" -ge 500 ]; then
-              echo "❌ Route ${route} returned HTTP $route_status (server error)"
-              exit 1
-            fi
-          done
-
-          echo "✅ Homepage smoke passed"
-
-  # Intermediate commits on main do not need to ship on their own. During
-  # merge-queue bursts, N commits can land in quick succession and each one
-  # would otherwise consume a full ~15 min deploy-chain slot against the
-  # shared production-deploy concurrency group, starving the tip. This gate
-  # runs first: only the commit that is still origin/main tip at gate time
-  # proceeds to deploy-staging. Older intermediates short-circuit cleanly.
-  deploy-gate:
-    name: Deploy Gate (HEAD-only)
-    needs: [ci-path-changes, ci-build-public]
-    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    outputs:
-      is_head: ${{ steps.check.outputs.is_head }}
-    steps:
-      - name: Check if SHA is still main HEAD
-        id: check
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          tip=$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // ""' 2>/dev/null || true)
-          if [ -z "$tip" ]; then
-            echo "::warning::Could not resolve origin/main tip; defaulting to proceed"
-            echo "is_head=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [ "$tip" = "${{ github.sha }}" ]; then
-            echo "::notice::SHA ${{ github.sha }} is main HEAD — proceeding with deploy"
-            echo "is_head=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Skipping deploy — ${{ github.sha }} is behind main HEAD ($tip). The newer commit will promote."
-            echo "is_head=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  deploy-staging:
-    # deploy-gate already needs ci-build-public.
-    needs: [deploy-gate]
-    # Fast main path: merge on deterministic checks, deploy a production build to
-    # a preview URL, verify it on staging, then promote only if it passes.
-    # Intermediate commits (not main HEAD at gate time) skip so they don't
-    # saturate the production-deploy concurrency slot.
-    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() && needs.deploy-gate.outputs.is_head == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    # Deploy concurrency: serialize main deploys instead of cancelling them.
-    # Cancelling in-progress main deploys during merge bursts can starve
-    # production promotion and leave main without a completed deploy run.
-    concurrency:
-      group: production-deploy
-      cancel-in-progress: false
-    permissions:
-      contents: read
-      actions: read
-      # Required for SLSA build-provenance attestation
-      attestations: write
-      id-token: write
-    outputs:
-      migration_status: ${{ steps.migrate.outcome }}
-      preflight_status: ${{ steps.preflight.outcome }}
-      # Note: if deploy is cancelled before verify completes, outcome is '' (not 'failure'),
-      # so no drift warning fires. This is acceptable — the cancelled deploy didn't ship.
-      schema_drift: ${{ steps.verify.outcome == 'failure' }}
-      deploy_url: ${{ steps.deploy.outputs.deploy_url }}
-      deploy_url_b64: ${{ steps.encode_deploy_url.outputs.deploy_url_b64 }}
-    environment:
-      name: Staging – jovie
-      url: https://staging.jov.ie
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: ./.github/actions/setup-node-pnpm
-      # Main deploys to staging with the isolated Doppler `stg` service token.
-      # Doppler owns runtime config; GitHub owns the existing Vercel control-plane
-      # credentials used only to pull, deploy, and alias the staging build.
-      - uses: ./.github/actions/setup-doppler
-        with:
-          doppler-token: ${{ secrets.DOPPLER_TOKEN_STG }}
-      - name: Configure staging deployment credentials
-        shell: bash
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          # Write after setup-doppler so a runtime config cannot override the
-          # repository-scoped deployment identity for later Vercel CLI steps.
-          {
-            printf 'VERCEL_TOKEN=%s\n' "$VERCEL_TOKEN"
-            printf 'VERCEL_ORG_ID=%s\n' "$VERCEL_ORG_ID"
-            printf 'VERCEL_PROJECT_ID=%s\n' "$VERCEL_PROJECT_ID"
-          } >> "$GITHUB_ENV"
-      - name: Verify staging deploy control-plane credentials
-        shell: bash
-        run: |
-          missing=()
-          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
-            if [ -z "${!key:-}" ]; then
-              missing+=("$key")
-            fi
-          done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Missing required staging deployment credentials: ${missing[*]}"
-            exit 1
-          fi
-      - name: Cancel stale Vercel preview deployments
-        run: node .github/scripts/cancel-stale-vercel-previews.mjs
-      - name: DB safety check (staging preflight)
-        id: preflight
-        run: pnpm --filter=@jovie/web exec tsx scripts/drizzle-migrate-preflight.ts
-        env:
-          GIT_BRANCH: main
-          ALLOW_PROD_MIGRATIONS: 'true'
-      - name: DB migrate (staging - Drizzle)
-        id: migrate
-        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
-        env:
-          GIT_BRANCH: main
-          ALLOW_PROD_MIGRATIONS: 'true'
-        continue-on-error: false
-      - name: DB verify (post-migration schema check)
-        id: verify
-        run: pnpm --filter=@jovie/web run drizzle:verify:ci
-        # Blocks deploy by default — missing columns = broken staging.
-        # To bypass in emergencies, include [skip-schema-verify] in the
-        # merge commit message. The Slack drift notification in deploy-notify
-        # fires when verify fails but deploy proceeds (bypass alert).
-        continue-on-error: ${{ contains(github.event.head_commit.message, '[skip-schema-verify]') }}
-      - name: Pull env (staging preview)
-        # Always pull project metadata/env; the deploy CLI reads
-        # .vercel/project.json even for prebuilt deploys.
-        timeout-minutes: 10
-        run: |
-          scope_args=()
-          if [ -n "${VERCEL_ORG_ID:-}" ]; then
-            scope_args=(--scope "$VERCEL_ORG_ID")
-          fi
-          for i in {1..3}; do
-            if ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
-              break
-            fi
-            echo "Vercel pull attempt $i failed, retrying in 10s..."
-            sleep 10
-            if [ $i -eq 3 ]; then exit 1; fi
-          done
-      - name: Strip deprecated Turbo env overrides (staging preview)
-        run: |
-          for env_file in .vercel/.env.preview.local .vercel/.env.local; do
-            if [ -f "$env_file" ]; then
-              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
-              mv "${env_file}.tmp" "$env_file"
-            fi
-          done
-      - name: Check signup readiness (staging deploy env)
-        run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=stg --source=env
-      - name: Build (preview target for staging verification)
-        timeout-minutes: 10
-        run: |
-          set -euo pipefail
-          scope_args=()
-          if [ -n "${VERCEL_ORG_ID:-}" ]; then
-            scope_args=(--scope "$VERCEL_ORG_ID")
-          fi
-          for i in {1..3}; do
-            if env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
-              break
-            fi
-            echo "Vercel build attempt $i failed, retrying in 10s..."
-            sleep 10
-            if [ $i -eq 3 ]; then exit 1; fi
-          done
-          # Vercel's function trace references the generated robots response at
-          # its public-file path even though the source route is app/robots.ts.
-          test -f apps/web/.next/server/app/robots.txt.body
-          cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt
-          printf '%s\n' 'apps/web/public/robots.txt' \
-            > .vercel/jovie-generated-public-files
-        env:
-          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
-          COREPACK_ENABLE_STRICT: 0
-          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
-      - name: Package build output for provenance attestation
-        run: |
-          set -euo pipefail
-          tar -czf /tmp/vercel-build-output.tar.gz -C . .vercel/output
-      - name: Attest build provenance (SLSA Level 2)
-        id: attest
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
-        with:
-          subject-path: /tmp/vercel-build-output.tar.gz
-          # ponytail: attests the vercel build output; attestation is SLSA L2 (hosted
-          # runner + signed provenance). L3 requires hermetic build — upgrade when
-          # Vercel builds become reproducible/isolated.
-      - name: Deploy (staging preview, prebuilt)
-        timeout-minutes: 10
-        id: deploy
-        run: |
-          required_runtime_env=(
-            VERCEL_AUTOMATION_BYPASS_SECRET
-            NEXT_PUBLIC_BETTER_AUTH_URL
-            BETTER_AUTH_SECRET
-            BETTER_AUTH_URL
-            DATABASE_URL
-            SESSION_SECRET
-            AI_GATEWAY_API_KEY
-            NEXT_PUBLIC_TURNSTILE_SITE_KEY
-            TURNSTILE_SECRET_KEY
-          )
-
-          missing_runtime_env=()
-          for key in "${required_runtime_env[@]}"; do
-            if [ -z "${!key:-}" ]; then
-              missing_runtime_env+=("$key")
-            fi
-          done
-
-          if [ "${#missing_runtime_env[@]}" -gt 0 ]; then
-            echo "Missing staging preview runtime env: ${missing_runtime_env[*]}"
-            exit 1
-          fi
-
-          for i in {1..3}; do
-            if bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
-              --env VERCEL_AUTOMATION_BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET}" \
-              --env NEXT_PUBLIC_BETTER_AUTH_URL="${NEXT_PUBLIC_BETTER_AUTH_URL}" \
-              --env BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET}" \
-              --env BETTER_AUTH_URL="${BETTER_AUTH_URL}" \
-              --env DATABASE_URL="${DATABASE_URL}" \
-              --env SESSION_SECRET="${SESSION_SECRET}" \
-              --env AI_GATEWAY_API_KEY="${AI_GATEWAY_API_KEY}" \
-              --env NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY}" \
-              --env TURNSTILE_SECRET_KEY="${TURNSTILE_SECRET_KEY}"; then
-              break
-            fi
-            echo "Vercel deploy attempt $i failed, retrying in 10s..."
-            sleep 10
-            if [ $i -eq 3 ]; then exit 1; fi
-          done
-        env:
-          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
-          # The closed staging artifact contains more than Vercel's 15k plain
-          # upload limit. Give the archive path the full prebuilt budget.
-          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'false'
-          # The in-job prebuilt artifact is the thing canary verifies. A source
-          # fallback would silently discard it and repeat the slow server build.
-          VERCEL_ENABLE_SOURCE_FALLBACK: 'false'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
-
-      - name: Wait for staging deployment readiness
-        timeout-minutes: 21
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
-        run: |
-          inspect_wait_status=0
-          ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
-            --wait \
-            --timeout 20m \
-            --token "$VERCEL_TOKEN" \
-            --scope "$VERCEL_ORG_ID" || inspect_wait_status=$?
-          deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
-            --format=json \
-            --token "$VERCEL_TOKEN" \
-            --scope "$VERCEL_ORG_ID")"
-          deployment_state="$(jq -r '(.readyState // .state // .status // "unknown") | ascii_upcase' \
-            <<<"$deployment_json")"
-          echo "Current deployment state: $deployment_state"
-          case "$deployment_state" in
-            READY)
-              ;;
-            BUILDING|QUEUED|INITIALIZING)
-              echo "::warning::Vercel is still $deployment_state after readiness wait (status $inspect_wait_status); handing off to retrying canary."
-              ;;
-            *)
-              echo "::error::Vercel deployment entered terminal state $deployment_state."
-              exit 1
-              ;;
-          esac
-
-      - name: Encode deployment URL for downstream jobs
-        id: encode_deploy_url
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
-        run: |
-          printf 'deploy_url_b64=%s\n' "$(printf '%s' "$DEPLOYMENT_URL" | base64 | tr -d '\n')" \
-            >> "$GITHUB_OUTPUT"
-
-  canary-health-gate:
-    name: Canary Health Gate (staging)
-    needs: [deploy-staging]
-    if: ${{ always() && needs.deploy-staging.result == 'success' }}
-    concurrency:
-      group: production-deploy
-      cancel-in-progress: false
-    uses: ./.github/workflows/canary-health-gate.yml
-    with:
-      # Verify the exact deployment produced by deploy-staging instead of the
-      # shared staging alias. Merge-queue traffic can retarget staging.jov.ie
-      # while this gate is still retrying, which produces false negatives even
-      # when the freshly deployed preview is healthy.
-      deployment_url_b64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
-      commit_sha: ${{ github.sha }}
-      fallback_health_url: /api/health
-    secrets:
-      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-  alias-staging:
-    name: Alias verified preview to staging.jov.ie
-    needs: [deploy-staging, canary-health-gate]
-    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    concurrency:
-      group: production-deploy
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Alias verified deployment
-        env:
-          DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
-          test -n "$deployment_url"
-          ./node_modules/.bin/vercel alias set "$deployment_url" staging.jov.ie \
-            --token "$VERCEL_TOKEN" \
-            --scope "$VERCEL_ORG_ID"
-
-  promote-production:
-    name: Promote to Production
-    needs: [deploy-staging, canary-health-gate, alias-staging]
-    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    concurrency:
-      group: production-deploy
-      cancel-in-progress: false
-    environment:
-      name: Production – jovie
-      url: https://jov.ie
-    outputs:
-      # Emitted when promote-production exits non-zero so deploy-notify can
-      # distinguish silent-no-op regressions from generic promote failures.
-      # Values distinguish production artifact, promotion state, and canonical
-      # alias convergence failures for deploy-notify and Gem diagnosis.
-      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.stage-production.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype }}
-      production_deployment_id: ${{ steps.stage-production.outputs.production_deployment_id }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: ./.github/actions/setup-node-pnpm
-      # Production runtime config comes from the isolated Doppler `prd`
-      # service token. Vercel remains the deployment control plane only.
-      - uses: ./.github/actions/setup-doppler
-        with:
-          doppler-token: ${{ secrets.DOPPLER_TOKEN_PRD }}
-      - name: Configure production deployment credentials
-        shell: bash
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          set -euo pipefail
-          missing=()
-          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
-            if [ -z "${!key:-}" ]; then
-              missing+=("$key")
-            fi
-          done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Missing required production deployment credentials: ${missing[*]}"
-            exit 1
-          fi
-
-          # Write after setup-doppler so runtime config cannot override the
-          # repository-scoped deployment identity used by Vercel CLI steps.
-          {
-            printf 'VERCEL_TOKEN=%s\n' "$VERCEL_TOKEN"
-            printf 'VERCEL_ORG_ID=%s\n' "$VERCEL_ORG_ID"
-            printf 'VERCEL_PROJECT_ID=%s\n' "$VERCEL_PROJECT_ID"
-          } >> "$GITHUB_ENV"
-      - name: Verify production domains are on canonical Vercel project
-        id: domain-guard
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          if ! node .github/scripts/verify-vercel-production-domains.mjs; then
-            echo "failure_subtype=domain_project_mismatch" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-      - name: Build and stage production deployment
-        id: stage-production
-        timeout-minutes: 30
-        env:
-          GITHUB_SHA: ${{ github.sha }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: |
-          set -euo pipefail
-
-          fail_stage() {
-            echo "::error::$1"
-            echo "failure_subtype=$2" >> "$GITHUB_OUTPUT"
-            exit 1
-          }
-
-          missing=()
-          for key in GITHUB_SHA VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
-            if [ -z "${!key:-}" ]; then
-              missing+=("$key")
-            fi
-          done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            fail_stage "Missing production deployment inputs: ${missing[*]}" missing_creds
-          fi
-
-          required_runtime_env=(
-            NEXT_PUBLIC_BETTER_AUTH_URL
-            BETTER_AUTH_SECRET
-            DATABASE_URL
-            SESSION_SECRET
-            AI_GATEWAY_API_KEY
-            NEXT_PUBLIC_TURNSTILE_SITE_KEY
-            TURNSTILE_SECRET_KEY
-          )
-          missing_runtime_env=()
-          runtime_env_args=()
-          for key in "${required_runtime_env[@]}"; do
-            if [ -z "${!key:-}" ]; then
-              missing_runtime_env+=("$key")
-            else
-              runtime_env_args+=(--env "${key}=${!key}")
-            fi
-          done
-          if [ "${#missing_runtime_env[@]}" -gt 0 ]; then
-            fail_stage "Missing production runtime env: ${missing_runtime_env[*]}" production_artifact_failed
-          fi
-
-          expected="${GITHUB_SHA:0:7}"
-          scope_args=(--scope "$VERCEL_ORG_ID")
-          rm -rf .vercel/output .vercel/.env.preview.local .vercel/.env.production.local .vercel/.env.local
-
-          if ! ./node_modules/.bin/vercel pull --yes --environment=production \
-            --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
-            fail_stage "Unable to pull the Production environment." production_artifact_failed
-          fi
-
-          for env_file in .vercel/.env.production.local .vercel/.env.local; do
-            if [ -f "$env_file" ]; then
-              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
-              mv "${env_file}.tmp" "$env_file"
-            fi
-          done
-
-          if ! pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts \
-            --target=prd --source=env; then
-            fail_stage "Production signup configuration is incomplete." production_artifact_failed
-          fi
-
-          if ! env -u TURBO_REMOTE_ONLY \
-            VERCEL_GIT_COMMIT_SHA="$GITHUB_SHA" \
-            NEXT_PUBLIC_BUILD_SHA="$expected" \
-            ./node_modules/.bin/vercel build --prod \
-              --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
-            fail_stage "Production Vercel build failed." production_artifact_failed
-          fi
-          if [ ! -f .vercel/output/config.json ]; then
-            fail_stage "Production build did not create .vercel/output/config.json." production_artifact_failed
-          fi
-
-          deploy_json=""
-          if ! deploy_json="$(./node_modules/.bin/vercel deploy \
-            --prebuilt --archive=tgz --prod --skip-domain --format=json \
-            --env "VERCEL_GIT_COMMIT_SHA=${GITHUB_SHA}" \
-            --env "NEXT_PUBLIC_BUILD_SHA=${expected}" \
-            "${runtime_env_args[@]}" \
-            --meta "githubCommitSha=${GITHUB_SHA}" \
-            --token "$VERCEL_TOKEN" "${scope_args[@]}")"; then
-            fail_stage "Production prebuilt deployment failed." production_artifact_failed
-          fi
-          if ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$deploy_json"; then
-            fail_stage "Production deploy returned malformed JSON." production_artifact_failed
-          fi
-
-          production_deploy_id="$(jq -r '.id // .deployment.id // ""' <<<"$deploy_json")"
-          production_deploy_url="$(jq -r '.url // .deployment.url // ""' <<<"$deploy_json")"
-          if [[ "$production_deploy_url" != *://* && "$production_deploy_url" == *.vercel.app ]]; then
-            production_deploy_url="https://${production_deploy_url}"
-          fi
-          production_deploy_url="${production_deploy_url%/}"
-          if [[ "$production_deploy_id" != dpl_* ]] ||
-            [[ "$production_deploy_url" != https://*.vercel.app ]]; then
-            fail_stage "Production deploy returned an invalid deployment ID or URL." production_artifact_failed
-          fi
-          echo "Staged production deployment: ${production_deploy_id} (${production_deploy_url})"
-
-          inspect_wait_status=0
-          ./node_modules/.bin/vercel inspect "$production_deploy_id" \
-            --wait --timeout 15m --token "$VERCEL_TOKEN" "${scope_args[@]}" ||
-            inspect_wait_status=$?
-          if ! production_deploy_json="$(./node_modules/.bin/vercel inspect \
-            "$production_deploy_id" --format=json --token "$VERCEL_TOKEN" \
-            "${scope_args[@]}")" ||
-            ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$production_deploy_json"; then
-            fail_stage "Unable to inspect the staged production deployment." staged_production_not_ready
-          fi
-
-          inspected_id="$(jq -r '.id // ""' <<<"$production_deploy_json")"
-          production_deploy_state="$(jq -r \
-            '(.readyState // .state // .status // "unknown") | ascii_upcase' \
-            <<<"$production_deploy_json")"
-          production_deploy_target="$(jq -r '(.target // "") | ascii_downcase' \
-            <<<"$production_deploy_json")"
-          if [ "$inspected_id" != "$production_deploy_id" ] ||
-            [ "$production_deploy_state" != "READY" ] ||
-            [ "$production_deploy_target" != "production" ]; then
-            fail_stage "Staged production deployment is not the exact READY Production target (wait status ${inspect_wait_status})." staged_production_not_ready
-          fi
-
-          bypass_args=()
-          if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
-            bypass_args+=(-H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}")
-          fi
-          fetch_staged() {
-            local url="$1"
-            local separator="?"
-            [[ "$url" == *"?"* ]] && separator="&"
-            STAGED_RESPONSE="$(curl -sS -L --connect-timeout 5 --max-time 15 \
-              -A "Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)" \
-              -H "Cache-Control: no-cache, no-store, must-revalidate" \
-              "${bypass_args[@]}" -w "\n%{http_code}" \
-              "${url}${separator}_cb=$(date +%s%N)" \
-              2>/dev/null || printf '\n000')"
-            STAGED_STATUS="${STAGED_RESPONSE##*$'\n'}"
-            STAGED_BODY="${STAGED_RESPONSE%$'\n'*}"
-          }
-
-          fetch_staged "${production_deploy_url}/api/health/build-info"
-          staged_sha="$(printf '%s' "$STAGED_BODY" | jq -r '.commitSha // ""' 2>/dev/null || echo "")"
-          staged_environment="$(printf '%s' "$STAGED_BODY" | jq -r '.environment // ""' 2>/dev/null || echo "")"
-          if [ "$STAGED_STATUS" != "200" ] ||
-            [ "$staged_sha" != "$expected" ] ||
-            [ "$staged_environment" != "production" ]; then
-            fail_stage "Staged production build-info canary failed (HTTP ${STAGED_STATUS}, SHA ${staged_sha:-<empty>}, environment ${staged_environment:-<empty>})." staged_production_canary_failed
-          fi
-
-          fetch_staged "${production_deploy_url}/api/health"
-          staged_health="$(printf '%s' "$STAGED_BODY" | jq -r '.status // ""' 2>/dev/null || echo "")"
-          if [ "$STAGED_STATUS" != "200" ] || [ "$staged_health" != "ok" ]; then
-            fail_stage "Staged production health canary failed (HTTP ${STAGED_STATUS})." staged_production_canary_failed
-          fi
-
-          fetch_staged "${production_deploy_url}/"
-          if [ "$STAGED_STATUS" != "200" ] ||
-            [ "${#STAGED_BODY}" -lt 1000 ] ||
-            printf '%s' "$STAGED_BODY" | grep -qiE 'application error|internal server error|something went wrong'; then
-            fail_stage "Staged production homepage canary failed (HTTP ${STAGED_STATUS}, ${#STAGED_BODY} bytes)." staged_production_canary_failed
-          fi
-
-          echo "production_deployment_id=$production_deploy_id" >> "$GITHUB_OUTPUT"
-          echo "production_deployment_url=$production_deploy_url" >> "$GITHUB_OUTPUT"
-
-      - name: Promote staged production deployment
-        id: promote
-        timeout-minutes: 15
-        env:
-          PRODUCTION_DEPLOYMENT_ID: ${{ steps.stage-production.outputs.production_deployment_id }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: bash .github/scripts/promote-production-deployment.sh
-
-      - name: Verify canonical production deployment
-        id: verify-production
-        timeout-minutes: 8
-        env:
-          EXPECTED_COMMIT_SHA: ${{ github.sha }}
-          EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ steps.stage-production.outputs.production_deployment_id }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-        run: bash .github/scripts/verify-production-alias.sh
-
-  sentry-error-gate:
-    name: Sentry Error Gate (production)
-    needs: [promote-production, canary-health-gate]
-    if: ${{ always() && needs.promote-production.result == 'success' && needs.canary-health-gate.result == 'success' }}
-    uses: ./.github/workflows/sentry-error-gate.yml
-    with:
-      deployment_url: https://jov.ie
-      soak_minutes: 5
-      baseline_window_minutes: 30
-      threshold_multiplier: 3
-      min_baseline_errors: 5
-    secrets:
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  production-oauth-gate:
-    name: Production OAuth Gate (rollback on auth break)
-    needs: [promote-production]
-    if: ${{ always() && needs.promote-production.result == 'success' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 1
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Setup Playwright (Chromium)
-        uses: ./.github/actions/setup-playwright
-
-      - name: Hard probe — Better Auth handler reachable (GET /api/auth/ok)
-        id: ba-health
-        run: |
-          # Plan Phase 11 (Clerk → Better Auth migration): a deterministic 200
-          # from `/api/auth/ok` proves the BA handler mounted on prod before
-          # the OAuth provider redirect_uri probe runs. A 404 means the
-          # catch-all `/api/auth/[...all]` shadowed the static route, or the
-          # deploy broke auth stitching. Separate axis from the OAuth provider
-          # probe: catches handler-wired-wrong without depending on
-          # Google/Apple console state.
-          ok_url="https://jov.ie/api/auth/ok"
-          attempt=1
-          max_attempts=3
-          until curl --fail --silent --show-error -o /dev/null -w "%{http_code}\n" "$ok_url" | grep -q '^200$'; do
-            if [ "$attempt" -ge "$max_attempts" ]; then
-              echo "ba_health=failed" >> "$GITHUB_OUTPUT"
-              echo "❌ $ok_url did not return 200 after ${max_attempts} attempts."
-              exit 1
-            fi
-            sleep_seconds=$((attempt * 15))
-            echo "⚠️ $ok_url not 200 on attempt ${attempt}/${max_attempts}; retrying in ${sleep_seconds}s..."
-            sleep "$sleep_seconds"
-            attempt=$((attempt + 1))
-          done
-          echo "ba_health=passed" >> "$GITHUB_OUTPUT"
-          echo "✅ $ok_url returned 200 (Better Auth handler healthy)"
-
-      - name: Probe production Google + Apple OAuth redirect URIs
-        id: oauth-probe
-        run: |
-          # Hits the Google + Apple authorize endpoints with the EXACT redirect_uri
-          # Better Auth hands them (https://jov.ie/api/auth/callback/<provider>)
-          # and fails ONLY on a real provider rejection
-          # (redirect_uri_mismatch / invalid_request). This is the gap the
-          # staging canary cannot cover: production runs a different app host
-          # + different OAuth clients than staging.
-          cd apps/web
-          mkdir -p tests/.auth
-          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          attempt=1
-          max_attempts=3
-          until CI=true SMOKE_ONLY=1 BASE_URL="https://jov.ie" node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/oauth-providers.spec.ts --project=chromium --reporter=line; do
-            if [ "$attempt" -ge "$max_attempts" ]; then
-              echo "oauth_status=failed" >> "$GITHUB_OUTPUT"
-              echo "❌ Production OAuth probe failed after ${max_attempts} attempts — Google/Apple reject Clerk's redirect_uri."
-              exit 1
-            fi
-            sleep_seconds=$((attempt * 15))
-            echo "⚠ OAuth probe attempt ${attempt}/${max_attempts} failed; retrying in ${sleep_seconds}s..."
-            sleep "$sleep_seconds"
-            attempt=$((attempt + 1))
-          done
-          echo "oauth_status=passed" >> "$GITHUB_OUTPUT"
-          echo "✅ Production Google + Apple accept Better Auth's redirect_uri"
-      - name: Auto-rollback on confirmed auth break
-        # Roll back ONLY on a confirmed auth regression (oauth_status=failed OR
-        # ba_health=failed), never on an infra/setup failure — a spurious
-        # rollback of a healthy deploy is worse than a one-cycle delay.
-        if: ${{ failure() && (steps.oauth-probe.outputs.oauth_status == 'failed' || steps.ba-health.outputs.ba_health == 'failed') }}
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          echo "Production OAuth gate FAILED. Triggering auto-rollback..."
-          ./node_modules/.bin/vercel rollback --yes --token "$VERCEL_TOKEN" 2>&1 || {
-            echo "Auto-rollback failed or not supported. Manual intervention required."
-            exit 1
-          }
-          echo "Auto-rollback completed"
-      - name: Slack alert on OAuth failure
-        if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          curl -sS -X POST "$SLACK_WEBHOOK_URL" \
-            -H 'Content-Type: application/json' \
-            -d "$(jq -n \
-              --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-              '{
-                text: "🚨 Production Auth Gate FAILED — Better Auth handler unreachable OR Google/Apple reject redirect_uri. Auto-rollback triggered.",
-                attachments: [{
-                  color: "danger",
-                  fields: [
-                    {title: "Fix", value: "If BA handler 404s: catch-all /api/auth/[...all] shadowed /api/auth/ok or auth stitching broke. If OAuth probe failed: re-sync Google/Apple consoles via the /auth-console-sync skill (app host likely changed).", short: false},
-                    {title: "Run", value: $run_url, short: false}
-                  ]
-                }]
-              }')" || echo "Slack alert failed (non-fatal)"
-
-  deploy-notify:
-    name: Notify production deploy
-    needs: [deploy-staging, canary-health-gate, promote-production, sentry-error-gate, production-oauth-gate]
+  main-release-ready:
+    name: Main Release Ready
+    needs:
+      [
+        main-queue-provenance,
+        ci-path-changes,
+        ci-risk-classifier,
+        ci-fast,
+        ci-secret-scan,
+        drizzle-migration-guard,
+        ci-unit-tests,
+        ci-build-layout,
+        ci-ios,
+        ci-promptfoo-evals,
+        ci-golden-eval-set,
+      ]
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      release_authorized: ${{ steps.ready.outputs.release_authorized }}
+      evidence_mode: ${{ steps.ready.outputs.evidence_mode }}
     steps:
-      - name: Resolve failure provenance
-        id: failure-provenance
-        if: ${{ always() }}
+      - name: Evaluate exact queue proof or complete fallback
+        id: ready
+        shell: bash
         run: |
           set -euo pipefail
+          echo "release_authorized=false" >> "$GITHUB_OUTPUT"
+          PROVENANCE_RESULT="${{ needs.main-queue-provenance.result }}"
+          IS_CURRENT="${{ needs.main-queue-provenance.outputs.is_current }}"
+          QUEUE_PROVEN="${{ needs.main-queue-provenance.outputs.queue_proven }}"
 
-          job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
-
-          echo "job_name=${{ github.job }}" >> "$GITHUB_OUTPUT"
-          echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
-
-      - name: Slack notify (production deploy)
-        if: ${{ needs.promote-production.result == 'success' && needs.canary-health-gate.result == 'success' && (needs.sentry-error-gate.result == 'success' || needs.sentry-error-gate.result == 'skipped') && (needs.production-oauth-gate.result == 'success' || needs.production-oauth-gate.result == 'skipped') && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
-        with:
-          status: custom
-          channel: '#alerts-production'
-          author_name: 'Deploy'
-          custom_payload: |
-            {
-              "text": "✅ Production deployed: jov.ie",
-              "attachments": [
-                {
-                  "color": "good",
-                  "fields": [
-                    { "title": "Branch", "value": "main", "short": true },
-                    { "title": "Workflow", "value": "CI", "short": true },
-                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-      - name: Slack notify (schema drift warning)
-        if: ${{ needs.deploy-staging.result == 'success' && needs.deploy-staging.outputs.schema_drift == 'true' && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
-        with:
-          status: custom
-          channel: '#alerts-production'
-          author_name: 'Schema Drift'
-          custom_payload: |
-            {
-              "text": "⚠️ Schema drift detected — deploy succeeded but Drizzle schema does not match the database",
-              "attachments": [
-                {
-                  "color": "warning",
-                  "fields": [
-                    { "title": "Action Required", "value": "Generate missing migrations or remove orphaned schema definitions", "short": false },
-                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-      - name: Classify failure type
-        id: classify-failure
-        if: ${{ always() && (needs.deploy-staging.result == 'failure' || needs.canary-health-gate.result == 'failure' || needs.promote-production.result == 'failure' || needs.sentry-error-gate.result == 'failure' || needs.deploy-staging.result == 'cancelled' || needs.canary-health-gate.result == 'cancelled' || needs.promote-production.result == 'cancelled') }}
-        run: |
-          # Determine failure type for accurate Slack notification
-          MIGRATION_STATUS="${{ needs.deploy-staging.outputs.migration_status }}"
-          PREFLIGHT_STATUS="${{ needs.deploy-staging.outputs.preflight_status }}"
-          DEPLOY_RESULT="${{ needs.deploy-staging.result }}"
-          CANARY_RESULT="${{ needs.canary-health-gate.result }}"
-          PROMOTE_RESULT="${{ needs.promote-production.result }}"
-          SENTRY_RESULT="${{ needs.sentry-error-gate.result }}"
-
-          # Treat cancellation of any deploy-chain job as alert-worthy.
-          # Without this, runs cancelled mid-flight by merge-queue or
-          # concurrency would silently succeed without any notification.
-          if [ "$DEPLOY_RESULT" = "cancelled" ] || [ "$CANARY_RESULT" = "cancelled" ] || [ "$PROMOTE_RESULT" = "cancelled" ]; then
-            echo "failure_type=cancelled" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=⛔" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Deploy cancelled mid-flight" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=Deploy chain was cancelled before production promotion completed (deploy=$DEPLOY_RESULT canary=$CANARY_RESULT promote=$PROMOTE_RESULT)" >> "$GITHUB_OUTPUT"
+          if [ "$PROVENANCE_RESULT" != "success" ]; then
+            echo "::error::Main queue provenance failed closed ($PROVENANCE_RESULT)."
+            exit 1
+          fi
+          if [ "$IS_CURRENT" != "true" ]; then
+            echo "evidence_mode=superseded" >> "$GITHUB_OUTPUT"
+            echo "Superseded main run is neutral."
             exit 0
           fi
 
-          # Distinguish the silent-no-op regression (production kept old SHA
-          # even though vercel promote exited 0) from a generic promote failure.
-          PROMOTE_SUBTYPE="${{ needs.promote-production.outputs.failure_subtype }}"
-          if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "domain_project_mismatch" ]; then
-            echo "failure_type=promote_domain_project_mismatch" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=🧭" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Production domains are on the wrong Vercel project" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=One or more public production domains are missing from the canonical Vercel project or have incorrect redirect wiring. Production promotion was blocked before deploy." >> "$GITHUB_OUTPUT"
+          PATH_RESULT="${{ needs.ci-path-changes.result }}"
+          RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
+          FAST_RESULT="${{ needs.ci-fast.result }}"
+          SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
+          MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
+          UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
+          BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
+          IOS_RESULT="${{ needs.ci-ios.result }}"
+          PROMPTFOO_RESULT="${{ needs.ci-promptfoo-evals.result }}"
+          GOLDEN_EVAL_RESULT="${{ needs.ci-golden-eval-set.result }}"
+          RUN_IOS="${{ needs.ci-path-changes.outputs.run_ios }}"
+          RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
+          RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
+
+          if [ "$QUEUE_PROVEN" = "true" ]; then
+            # A queue-proven main SHA must not duplicate unit/build/fallback work.
+            for lane in \
+              "Path Changes:$PATH_RESULT" \
+              "CI Risk Classifier:$RISK_RESULT" \
+              "ci-fast:$FAST_RESULT" \
+              "Secret Scan:$SECRET_RESULT" \
+              "Migration Guard:$MIGRATION_RESULT" \
+              "Unit Tests:$UNIT_RESULT" \
+              "Build + Layout:$BUILD_LAYOUT_RESULT" \
+              "iOS Build + Test:$IOS_RESULT" \
+              "Promptfoo Evals:$PROMPTFOO_RESULT" \
+              "Golden Eval Set:$GOLDEN_EVAL_RESULT"; do
+              name="${lane%%:*}"
+              result="${lane#*:}"
+              if [ "$result" != "skipped" ]; then
+                echo "::error::Queue-proven main duplicated $name (result $result)."
+                exit 1
+              fi
+            done
+            echo "evidence_mode=merge_group" >> "$GITHUB_OUTPUT"
+            echo "release_authorized=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          if [ "$PROMOTE_RESULT" = "failure" ] && [[ "$PROMOTE_SUBTYPE" =~ ^(production_artifact_failed|staged_production_not_ready|staged_production_canary_failed)$ ]]; then
-            echo "failure_type=promote_staged_production_failed" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=🏗️" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Staged Production deployment failed" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=The exact Production-target prebuilt artifact did not build, become READY, or pass its direct canary. The verified Preview deployment was not promoted." >> "$GITHUB_OUTPUT"
-            exit 0
+          # Direct/admin main fallback is intentionally unconditional: five unit
+          # shards and the combined hosted build+layout may never be represented
+          # by a skipped placeholder.
+          for lane in \
+            "Path Changes:$PATH_RESULT" \
+            "CI Risk Classifier:$RISK_RESULT" \
+            "ci-fast:$FAST_RESULT" \
+            "Secret Scan:$SECRET_RESULT" \
+            "Migration Guard:$MIGRATION_RESULT" \
+            "Unit Tests (five shards):$UNIT_RESULT" \
+            "Build + Layout:$BUILD_LAYOUT_RESULT"; do
+            name="${lane%%:*}"
+            result="${lane#*:}"
+            if [ "$result" != "success" ]; then
+              echo "::error::Main fallback $name did not pass (result $result)."
+              exit 1
+            fi
+          done
+
+          if [ "$RUN_IOS" = "true" ]; then
+            if [ "$IOS_RESULT" != "success" ]; then
+              echo "::error::Main fallback iOS Build + Test did not pass (result $IOS_RESULT)."
+              exit 1
+            fi
+          elif [ "$IOS_RESULT" != "skipped" ]; then
+            echo "::error::Main fallback ran iOS Build + Test without an iOS path selection (result $IOS_RESULT)."
+            exit 1
           fi
 
-          if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "production_alias_not_updated" ]; then
-            echo "failure_type=promote_production_alias_not_updated" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=🪞" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Canonical production alias did not converge" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=The staged Production deployment was READY, but cache-busted jov.ie stable/canary routes did not all serve its deployment ID and exact runtime SHA." >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          for selected_gate in \
+            "Promptfoo Evals:$RUN_PROMPTFOO:$PROMPTFOO_RESULT" \
+            "Golden Eval Set:$RUN_GOLDEN_EVAL:$GOLDEN_EVAL_RESULT"; do
+            name="${selected_gate%%:*}"
+            selection_and_result="${selected_gate#*:}"
+            selected="${selection_and_result%%:*}"
+            result="${selection_and_result#*:}"
+            if [ "$selected" = "true" ] && [ "$result" != "success" ]; then
+              echo "::error::Main fallback $name did not pass (result $result)."
+              exit 1
+            fi
+            if [ "$selected" != "true" ] && [ "$result" != "skipped" ]; then
+              echo "::error::Main fallback ran $name without path selection (result $result)."
+              exit 1
+            fi
+          done
 
-          if [ "$PROMOTE_RESULT" = "failure" ] && [[ "$PROMOTE_SUBTYPE" =~ ^production_promotion_ ]]; then
-            echo "failure_type=promote_production_state_blocked" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=🚦" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Production promotion state is blocked" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=Vercel reported foreign, malformed, failed, or unverified rolling-release state. The bounded controller did not submit a second mutation or touch a foreign rollout." >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "no_match" ]; then
-            echo "failure_type=promote_no_match" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=🕳️" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Promote found no matching deployment for this SHA" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=Vercel API returned no READY deployment for github.sha. Production was NOT promoted. This is the silent-no-op state we previously caught only by eyeballing /api/health/build-info." >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "verify_mismatch" ]; then
-            echo "failure_type=promote_verify_mismatch" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=🪞" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Promoted deployment reports mismatched runtime SHA" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=The Vercel API matched a deployment to github.sha via meta.githubCommitSha, but that deployment's /api/health/build-info returned 200 with a different commitSha across all retries. Check deployment/runtime integrity (meta.githubCommitSha vs the runtime VERCEL_GIT_COMMIT_SHA env)." >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "verify_probe_failed" ]; then
-            echo "failure_type=promote_verify_probe_failed" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=📡" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Post-promote verification probe failed" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=/api/health/build-info never returned a parseable 200 across the retry window. Cannot confirm whether production flipped. Check edge/CDN/origin health." >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "missing_creds" ]; then
-            echo "failure_type=promote_missing_creds" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=🔑" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Promote missing Vercel credentials" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=VERCEL_TOKEN / VERCEL_PROJECT_ID / GITHUB_SHA unset inside promote-production. Check repo secrets." >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [ "$PREFLIGHT_STATUS" = "failure" ]; then
-            echo "failure_type=migration_preflight" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=🚨" >> "$GITHUB_OUTPUT"
-            echo "failure_title=DATABASE MIGRATION PREFLIGHT FAILED" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=Migration preflight check failed - deployment was BLOCKED before any changes were made" >> "$GITHUB_OUTPUT"
-          elif [ "$MIGRATION_STATUS" = "failure" ]; then
-            echo "failure_type=migration" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=🚨" >> "$GITHUB_OUTPUT"
-            echo "failure_title=DATABASE MIGRATION FAILED" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=Migration failed on production database - deployment was BLOCKED (no code deployed)" >> "$GITHUB_OUTPUT"
-          elif [ "$DEPLOY_RESULT" = "failure" ]; then
-            echo "failure_type=deploy" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=🔥" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Staging deploy failed" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=Vercel preview deployment failed before production promotion" >> "$GITHUB_OUTPUT"
-          elif [ "$CANARY_RESULT" = "failure" ]; then
-            echo "failure_type=canary" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=⚠️" >> "$GITHUB_OUTPUT"
-            echo "failure_title=CANARY HEALTH CHECK FAILED" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=Staging health check failed - production was NOT updated" >> "$GITHUB_OUTPUT"
-          elif [ "$PROMOTE_RESULT" = "failure" ]; then
-            echo "failure_type=promote" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=🔥" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Production promotion failed" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=Verified staging deploy could not be promoted to production" >> "$GITHUB_OUTPUT"
-          elif [ "$SENTRY_RESULT" = "failure" ]; then
-            echo "failure_type=sentry" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=📈" >> "$GITHUB_OUTPUT"
-            echo "failure_title=SENTRY ERROR SPIKE DETECTED" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=Post-deploy error rate exceeded threshold - auto-rollback triggered" >> "$GITHUB_OUTPUT"
-          else
-            echo "failure_type=unknown" >> "$GITHUB_OUTPUT"
-            echo "failure_emoji=❓" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Production deploy failed" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=Unknown failure - check workflow logs" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Slack notify (migration failure - CRITICAL)
-        if: ${{ always() && steps.classify-failure.outputs.failure_type == 'migration' && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
-        with:
-          status: custom
-          channel: '#alerts-critical'
-          author_name: 'Deploy'
-          custom_payload: |
-            {
-              "text": "🚨 DATABASE MIGRATION FAILED - Production deploy BLOCKED: jov.ie",
-              "attachments": [
-                {
-                  "color": "danger",
-                  "fields": [
-                    { "title": "Status", "value": "🛑 DEPLOYMENT BLOCKED - No code was deployed", "short": false },
-                    { "title": "Failure", "value": "Database migration failed", "short": true },
-                    { "title": "Branch", "value": "main", "short": true },
-                    { "title": "Action Required", "value": "Fix migration and re-run pipeline", "short": false },
-                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-      - name: Slack notify (migration preflight failure - CRITICAL)
-        if: ${{ always() && steps.classify-failure.outputs.failure_type == 'migration_preflight' && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
-        with:
-          status: custom
-          channel: '#alerts-critical'
-          author_name: 'Deploy'
-          custom_payload: |
-            {
-              "text": "🚨 MIGRATION PREFLIGHT FAILED - Production deploy BLOCKED: jov.ie",
-              "attachments": [
-                {
-                  "color": "danger",
-                  "fields": [
-                    { "title": "Status", "value": "🛑 DEPLOYMENT BLOCKED - Preflight safety check failed", "short": false },
-                    { "title": "Failure", "value": "Migration preflight validation failed", "short": true },
-                    { "title": "Branch", "value": "main", "short": true },
-                    { "title": "Action Required", "value": "Check migration journal integrity and database state", "short": false },
-                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-      - name: Slack notify (canary failure - URGENT)
-        if: ${{ always() && steps.classify-failure.outputs.failure_type == 'canary' && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
-        with:
-          status: custom
-          channel: '#alerts-critical'
-          author_name: 'Deploy'
-          custom_payload: |
-            {
-              "text": "⚠️ STAGING HEALTH CHECK FAILED - Production was NOT updated: staging.jov.ie",
-              "attachments": [
-                {
-                  "color": "warning",
-                  "fields": [
-                    { "title": "Status", "value": "⚠️ STAGING verification failed before promotion", "short": false },
-                    { "title": "Failure", "value": "Canary health gate failed", "short": true },
-                    { "title": "Branch", "value": "main", "short": true },
-                    { "title": "Action Required", "value": "Check https://staging.jov.ie or the preview deployment logs - production is still unchanged", "short": false },
-                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-      - name: Slack notify (sentry error spike - URGENT)
-        if: ${{ always() && steps.classify-failure.outputs.failure_type == 'sentry' && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
-        with:
-          status: custom
-          channel: '#alerts-critical'
-          author_name: 'Deploy'
-          custom_payload: |
-            {
-              "text": "📈 SENTRY ERROR SPIKE — Auto-rollback triggered: jov.ie",
-              "attachments": [
-                {
-                  "color": "danger",
-                  "fields": [
-                    { "title": "Status", "value": "📈 Error rate spiked post-deploy — auto-rollback triggered", "short": false },
-                    { "title": "Branch", "value": "main", "short": true },
-                    { "title": "Action Required", "value": "Check Sentry for new errors, verify rollback succeeded", "short": false },
-                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-      - name: Slack notify (general deploy failure)
-        if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'promote' || steps.classify-failure.outputs.failure_type == 'promote_domain_project_mismatch' || steps.classify-failure.outputs.failure_type == 'promote_staged_production_failed' || steps.classify-failure.outputs.failure_type == 'promote_production_alias_not_updated' || steps.classify-failure.outputs.failure_type == 'promote_production_state_blocked' || steps.classify-failure.outputs.failure_type == 'promote_no_match' || steps.classify-failure.outputs.failure_type == 'promote_verify_mismatch' || steps.classify-failure.outputs.failure_type == 'promote_verify_probe_failed' || steps.classify-failure.outputs.failure_type == 'promote_missing_creds' || steps.classify-failure.outputs.failure_type == 'cancelled' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
-        with:
-          status: custom
-          channel: '#alerts-critical'
-          author_name: 'Deploy'
-          custom_payload: |
-            {
-              "text": "${{ steps.classify-failure.outputs.failure_emoji }} ${{ steps.classify-failure.outputs.failure_title }}: jov.ie",
-              "attachments": [
-                {
-                  "color": "danger",
-                  "fields": [
-                    { "title": "Detail", "value": "${{ steps.classify-failure.outputs.failure_detail }}", "short": false },
-                    { "title": "Branch", "value": "main", "short": true },
-                    { "title": "Failing job", "value": "${{ steps.failure-provenance.outputs.job_name }}", "short": true },
-                    { "title": "Failing job URL", "value": "<${{ steps.failure-provenance.outputs.job_url }}|View job>", "short": false },
-                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  # Lighthouse CI - runs after production deploy to check performance on homepage + public profiles
-  lighthouse-ci:
-    name: Lighthouse CI (Production)
-    needs: [promote-production]
-    # Run after successful deploy (tests homepage + /tim profile)
-    # Informational only -- performance regressions should not block deploys
-    if: ${{ always() && needs.promote-production.result == 'success' }}
-    continue-on-error: true
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Run Lighthouse CI against production
-        run: node scripts/lighthouse-retry.mjs -- pnpm --filter web exec lhci autorun --config=.lighthouserc.json
+          echo "evidence_mode=fallback" >> "$GITHUB_OUTPUT"
+          echo "release_authorized=true" >> "$GITHUB_OUTPUT"

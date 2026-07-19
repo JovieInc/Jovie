@@ -1,26 +1,18 @@
-# Brand-scrub gate — blocks competitor analysis & private strategy docs from landing
-# in this public repo. See scripts/brand-scrub.py and issue #11024.
+# Scheduled brand-scrub audit for competitor analysis and private strategy docs
+# in this public repo. Source diffs are enforced in ci-fast. See
+# scripts/brand-scrub.py and issue #11024.
 #
 # Two checks:
 #   1. brand-scrub: flags changed files in blocked strategy-doc paths or with competitor brand names.
-#   2. brand-scrub-unit-tests: runs scripts/tests/test_brand_scrub.py on every push.
+#   2. brand-scrub-unit-tests: validates the scrubber on scheduled/manual runs.
 #
-# Exit 1 from brand-scrub.py causes the CI job to fail, blocking PR merge.
+# Exit 1 from brand-scrub.py fails the audit and pages the owning workflow.
 name: Brand Scrub
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - '**.md'
-      - '**.mdx'
-      - '**.txt'
-      - 'docs/**'
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/brand-scrub.py'
-      - 'scripts/tests/test_brand_scrub.py'
+  schedule:
+    - cron: '17 9 * * 2'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -28,7 +20,7 @@ permissions:
 jobs:
   brand-scrub:
     name: Brand Scrub (blocking)
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -45,7 +37,7 @@ jobs:
         run: |
           # --diff-filter=d excludes deleted files: removing a blocked-path doc is
           # the desired action, not a violation, and a deleted file can't be scanned.
-          git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD \
+          git diff --name-only --diff-filter=d HEAD~1 HEAD \
             | grep -E '\.(md|mdx|txt)$|^docs/' \
             | grep -v -E '^(node_modules|\.cache|drizzle/migrations)' \
             > /tmp/changed_files.txt || true
@@ -71,7 +63,7 @@ jobs:
 
   brand-scrub-unit-tests:
     name: brand-scrub.py unit tests
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

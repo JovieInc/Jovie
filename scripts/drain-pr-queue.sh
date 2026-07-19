@@ -24,7 +24,7 @@
 #   DRAIN_MUTATION_AUTHORIZATION  required for every live mutation run
 #   DRAIN_EXPECT_GH  optional exact gh path assertion used by test fixtures
 #   DRAIN_MAX_SECONDS  hard wall-clock budget between GitHub calls (default 900)
-#   MERGE_QUEUE_BACKEND  graphite (default) or native; unknown values fail closed
+#   MERGE_QUEUE_BACKEND  native (default) or graphite rollback; unknown values fail closed
 set -euo pipefail
 
 DRY_RUN="${DRY_RUN:-0}"
@@ -49,7 +49,7 @@ fi
 source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 
 REPO="${REPO:-JovieInc/Jovie}"
-MERGE_QUEUE_BACKEND="${MERGE_QUEUE_BACKEND:-graphite}"
+MERGE_QUEUE_BACKEND="${MERGE_QUEUE_BACKEND:-native}"
 case "$MERGE_QUEUE_BACKEND" in
   graphite | native) ;;
   *)

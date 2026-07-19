@@ -4,7 +4,10 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { NATIVE_QUEUE_POLICY } from './lib/merge-queue-guard.mjs';
 
-export const DEFAULT_MERGE_QUEUE_BACKEND = 'graphite';
+// The live repository variable and active ruleset both use GitHub native.
+// Keep bare read-only/local callers aligned with that canon; mutations still
+// require the dedicated native authorization below.
+export const DEFAULT_MERGE_QUEUE_BACKEND = 'native';
 export const MERGE_QUEUE_BACKENDS = Object.freeze(['graphite', 'native']);
 
 const DEFAULT_REPOSITORY = 'JovieInc/Jovie';

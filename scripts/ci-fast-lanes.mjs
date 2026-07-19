@@ -52,6 +52,12 @@ const LANES = [
     run: runGuardrails,
   },
   {
+    id: 'ios-fast',
+    name: 'iOS Fast Contract',
+    nextLocalCommand: 'pnpm run ios:lint',
+    run: runIosFast,
+  },
+  {
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
@@ -192,6 +198,25 @@ function runGuardrails() {
   return { code: 0, output: combined };
 }
 
+function runIosFast() {
+  const files = changedFiles([
+    'apps/ios/**',
+    'fastlane/**',
+    'Gemfile',
+    'Gemfile.lock',
+    'scripts/ios-best-practices-lint.sh',
+    '.github/workflows/ios-ci.yml',
+  ]);
+  if (files && files.length === 0) {
+    return {
+      code: 0,
+      output: 'No iOS contract files changed\n',
+      skipped: true,
+    };
+  }
+  return shell('pnpm run ios:lint');
+}
+
 function runStructural() {
   if (process.env.CI_FAST_SKIP_STRUCTURAL === 'true') {
     return {
@@ -222,7 +247,7 @@ function runStructural() {
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
     // Optional: structural regression tests need pytest; soft-skip if unavailable.
-    'if command -v pytest >/dev/null 2>&1; then pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py -v; elif python3 -c "import pytest" 2>/dev/null; then python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py -v; else echo "pytest not installed — skip structural regressions"; fi',
+    'if command -v pytest >/dev/null 2>&1; then pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py -v; elif python3 -c "import pytest" 2>/dev/null; then python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py -v; else echo "pytest not installed — skip structural regressions"; fi',
   ];
 
   let combined = '';

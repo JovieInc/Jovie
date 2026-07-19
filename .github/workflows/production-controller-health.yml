@@ -1,0 +1,338 @@
+name: Production Controller Health
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+concurrency:
+  group: production-controller-health
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    name: Recover one failed controller attempt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Evaluate exact current production controller
+        id: evaluate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "needs_manual=false" >> "$GITHUB_OUTPUT"
+          echo "recovery_reason=not_required" >> "$GITHUB_OUTPUT"
+          current_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact current main for controller recovery."
+            exit 1
+          }
+          echo "current_sha=$current_sha" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${current_sha:0:7}" >> "$GITHUB_OUTPUT"
+
+          marker_name="production-generation-verified-$current_sha"
+          artifacts_json="$(gh api \
+            "repos/$REPOSITORY/actions/artifacts?name=$marker_name&per_page=100")"
+          jq -e 'type == "object" and (.artifacts | type == "array")' \
+            >/dev/null <<<"$artifacts_json"
+          marker_candidates="$(jq -r --arg name "$marker_name" '
+            [.artifacts[] | select(
+              .name == $name and .expired == false
+            )] | sort_by(.created_at, .id) | reverse |
+            .[] | "\(.id)\t\(.workflow_run.id)"
+          ' <<<"$artifacts_json")"
+          while IFS=$'\t' read -r marker_artifact_id marker_run_id; do
+            [ -n "$marker_run_id" ] || continue
+            [[ "$marker_artifact_id" =~ ^[1-9][0-9]*$ ]] &&
+              [[ "$marker_run_id" =~ ^[1-9][0-9]*$ ]] || {
+              echo "::error::Production marker run identity is malformed."
+              exit 1
+            }
+            marker_run="$(gh api "repos/$REPOSITORY/actions/runs/$marker_run_id")"
+            if ! jq -e --arg sha "$current_sha" '
+              .name == "Production Controller" and
+              (.display_title | startswith("Production Controller " + $sha + " from CI ")) and
+              .path == ".github/workflows/production-controller.yml" and
+              .status == "completed" and .conclusion == "success" and
+              (.run_attempt | type == "number" and . >= 1)
+            ' >/dev/null <<<"$marker_run"; then
+              continue
+            fi
+            marker_attempt="$(jq -r '.run_attempt' <<<"$marker_run")"
+            marker_jobs="$(gh api --paginate --slurp \
+              "repos/$REPOSITORY/actions/runs/$marker_run_id/attempts/$marker_attempt/jobs?per_page=100")"
+            jq -e 'type == "array" and length > 0 and all(.[]; (.jobs | type == "array"))' \
+              >/dev/null <<<"$marker_jobs"
+            verified_count="$(jq '
+              [.[] | .jobs[]? | select(
+                .name == "Production Verified" and .status == "completed" and
+                .conclusion == "success"
+              )] | length
+            ' <<<"$marker_jobs")"
+            if [ "$verified_count" = "1" ]; then
+              marker_archive="$RUNNER_TEMP/production-marker-${marker_artifact_id}.zip"
+              marker_json="$RUNNER_TEMP/production-marker-${marker_artifact_id}.json"
+              gh api "repos/$REPOSITORY/actions/artifacts/$marker_artifact_id/zip" \
+                > "$marker_archive"
+              if unzip -p "$marker_archive" production-generation-verified.json \
+                  > "$marker_json" 2>/dev/null &&
+                jq -e --arg sha "$current_sha" --arg run "$marker_run_id" '
+                  .sha == $sha and .controllerRun == $run and
+                  (.deploymentId | type == "string" and startswith("dpl_"))
+                ' >/dev/null "$marker_json"; then
+                echo "Current main $current_sha already has verified production evidence."
+                exit 0
+              fi
+            fi
+          done <<<"$marker_candidates"
+
+          ci_runs_json="$(gh api --paginate --slurp \
+            "repos/$REPOSITORY/actions/workflows/ci.yml/runs?event=push&branch=main&head_sha=$current_sha&per_page=100")"
+          jq -e '
+            type == "array" and length > 0 and
+            all(.[]; type == "object" and (.workflow_runs | type == "array"))
+          ' >/dev/null <<<"$ci_runs_json"
+          source_ci="$(jq -c --arg sha "$current_sha" --arg repo "$REPOSITORY" '
+            [.[] | .workflow_runs[] | select(
+              .head_sha == $sha and .head_branch == "main" and
+              .name == "CI" and .path == ".github/workflows/ci.yml" and
+              .event == "push" and .head_repository.full_name == $repo and
+              .status == "completed" and .conclusion == "success"
+            )] | unique_by(.id) | sort_by(.updated_at, .id) | last // empty
+          ' <<<"$ci_runs_json")"
+          if [ -z "$source_ci" ]; then
+            echo "Current main has no exact completed successful CI attempt yet."
+            exit 0
+          fi
+          source_ci_id="$(jq -r '.id // empty' <<<"$source_ci")"
+          source_ci_attempt="$(jq -r '.run_attempt // empty' <<<"$source_ci")"
+          source_ci_updated="$(jq -r '.updated_at // empty' <<<"$source_ci")"
+          source_ci_url="$(jq -r '.html_url // empty' <<<"$source_ci")"
+          [[ "$source_ci_id" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$source_ci_attempt" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$source_ci_url" == https://github.com/* ]] &&
+            [ -n "$source_ci_updated" ] || {
+            echo "::error::Exact successful CI source identity is malformed."
+            exit 1
+          }
+          expected_title="Production Controller $current_sha from CI $source_ci_id attempt $source_ci_attempt"
+
+          runs_json="$(gh api --paginate --slurp \
+            "repos/$REPOSITORY/actions/workflows/production-controller.yml/runs?branch=main&per_page=100")"
+          jq -e '
+            type == "array" and length > 0 and
+            all(.[]; type == "object" and (.workflow_runs | type == "array"))
+          ' >/dev/null <<<"$runs_json"
+          run_record="$(jq -c --arg title "$expected_title" --arg repo "$REPOSITORY" '
+            [.[] | .workflow_runs[] | select(
+              .head_branch == "main" and
+              .name == "Production Controller" and
+              .display_title == $title and
+              .path == ".github/workflows/production-controller.yml" and
+              .event == "workflow_run" and
+              .head_repository.full_name == $repo
+            )] | unique_by(.id) | sort_by(.created_at, .id) | last // empty
+          ' <<<"$runs_json")"
+          if [ -z "$run_record" ]; then
+            source_epoch="$(date -u -d "$source_ci_updated" +%s)"
+            [[ "$source_epoch" =~ ^[1-9][0-9]*$ ]] || {
+              echo "::error::Could not parse exact CI completion time."
+              exit 1
+            }
+            age_seconds=$(($(date +%s) - source_epoch))
+            if [ "$age_seconds" -lt 900 ]; then
+              echo "Controller event is still inside the 15-minute event-delivery grace."
+              exit 0
+            fi
+            echo "run_url=$source_ci_url" >> "$GITHUB_OUTPUT"
+            if [ "$source_ci_attempt" -ge 2 ]; then
+              echo "::warning::No exact controller arrived after the one bounded CI event replay."
+              echo "needs_manual=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$source_ci_attempt" -ne 1 ]; then
+              echo "::error::Exact CI event-replay boundary is invalid."
+              exit 1
+            fi
+
+            # Re-read the exact source run before mutation. A successful replay
+            # advances this same run identity to attempt 2, which is the durable
+            # idempotency boundary for a missing workflow_run delivery.
+            source_boundary="$(gh api "repos/$REPOSITORY/actions/runs/$source_ci_id")"
+            jq -e --arg sha "$current_sha" --arg repo "$REPOSITORY" \
+              --argjson id "$source_ci_id" '
+              .id == $id and .run_attempt == 1 and
+              .head_sha == $sha and .head_branch == "main" and
+              .name == "CI" and .path == ".github/workflows/ci.yml" and
+              .event == "push" and .head_repository.full_name == $repo and
+              .status == "completed" and .conclusion == "success"
+            ' >/dev/null <<<"$source_boundary" || {
+              echo "Exact CI source is no longer eligible for its one event replay."
+              exit 0
+            }
+
+            boundary_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+            [[ "$boundary_sha" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "::error::Could not resolve exact main at the CI event-replay boundary."
+              exit 1
+            }
+            if [ "$boundary_sha" != "$current_sha" ]; then
+              echo "CI event replay was superseded by $boundary_sha; neutral."
+              exit 0
+            fi
+
+            gh run rerun "$source_ci_id"
+            echo "Replayed exact successful CI run $source_ci_id once to redeliver the controller event."
+            exit 0
+          fi
+
+          run_id="$(jq -r '.id // empty' <<<"$run_record")"
+          run_attempt="$(jq -r '.run_attempt // empty' <<<"$run_record")"
+          status="$(jq -r '.status // empty' <<<"$run_record")"
+          conclusion="$(jq -r '.conclusion // empty' <<<"$run_record")"
+          html_url="$(jq -r '.html_url // empty' <<<"$run_record")"
+          [[ "$run_id" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$run_attempt" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$html_url" == https://github.com/* ]] || {
+            echo "::error::Controller recovery evidence is malformed."
+            exit 1
+          }
+          echo "run_url=$html_url" >> "$GITHUB_OUTPUT"
+
+          if [ "$status" != "completed" ]; then
+            [ "$status" = "queued" ] || [ "$status" = "in_progress" ] || {
+              echo "::error::Controller has unknown status $status."
+              exit 1
+            }
+            echo "Controller run $run_id is still $status."
+            exit 0
+          fi
+          if [ "$conclusion" = "success" ]; then
+            echo "::warning::Controller succeeded without a verified marker; manual evidence review required."
+            echo "recovery_reason=missing_verified_marker" >> "$GITHUB_OUTPUT"
+            echo "needs_manual=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          case "$conclusion" in
+            failure | timed_out | startup_failure | cancelled) ;;
+            *)
+              echo "::warning::Controller concluded $conclusion; automatic recovery is not authorized."
+              echo "recovery_reason=unsupported_controller_conclusion" >> "$GITHUB_OUTPUT"
+              echo "needs_manual=true" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+
+          # A controller retry can repeat the production mutation. Prove that
+          # this exact attempt never entered centralized rollback before
+          # authorizing it. Any rollback activity or uncertain job evidence is
+          # terminal for automation: an operator must inspect production truth.
+          if ! controller_jobs="$(gh api --paginate --slurp \
+            "repos/$REPOSITORY/actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100")"; then
+            echo "::warning::Could not read exact controller rollback evidence; refusing automatic recovery."
+            echo "recovery_reason=rollback_evidence_uncertain" >> "$GITHUB_OUTPUT"
+            echo "needs_manual=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! jq -e '
+            type == "array" and length > 0 and
+            all(.[]; type == "object" and (.jobs | type == "array"))
+          ' >/dev/null <<<"$controller_jobs"; then
+            echo "::warning::Exact controller rollback evidence is malformed; refusing automatic recovery."
+            echo "recovery_reason=rollback_evidence_uncertain" >> "$GITHUB_OUTPUT"
+            echo "needs_manual=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          rollback_jobs="$(jq -c '
+            [
+              .[] | .jobs[]? |
+              select(
+                (.name | type) == "string" and
+                (.name | endswith("Centralized production rollback"))
+              )
+            ] | unique_by(.id)
+          ' <<<"$controller_jobs")"
+          rollback_job_count="$(jq 'length' <<<"$rollback_jobs")"
+          if [ "$rollback_job_count" != "1" ]; then
+            echo "::warning::Expected exactly one centralized rollback job, found $rollback_job_count; refusing automatic recovery."
+            echo "recovery_reason=rollback_evidence_uncertain" >> "$GITHUB_OUTPUT"
+            echo "needs_manual=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! jq -e '
+            .[0] |
+            (.id | type == "number" and . > 0) and
+            (.status == "completed") and
+            (.conclusion == "skipped")
+          ' >/dev/null <<<"$rollback_jobs"; then
+            rollback_status="$(jq -r '.[0].status // "unknown"' <<<"$rollback_jobs")"
+            rollback_conclusion="$(jq -r '.[0].conclusion // "unknown"' <<<"$rollback_jobs")"
+            echo "::warning::Centralized rollback was $rollback_status/$rollback_conclusion; this controller attempt is terminal and must not be rerun."
+            echo "recovery_reason=terminal_rollback" >> "$GITHUB_OUTPUT"
+            echo "needs_manual=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$run_attempt" -ge 2 ]; then
+            echo "::warning::Controller run $run_id already used its one automatic retry."
+            echo "recovery_reason=retry_exhausted" >> "$GITHUB_OUTPUT"
+            echo "needs_manual=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          boundary_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          [[ "$boundary_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact main at controller recovery boundary."
+            exit 1
+          }
+          if [ "$boundary_sha" != "$current_sha" ]; then
+            echo "Controller recovery was superseded by $boundary_sha; neutral."
+            exit 0
+          fi
+
+          if [ "$conclusion" = "cancelled" ]; then
+            gh run rerun "$run_id"
+          else
+            gh run rerun "$run_id" --failed
+          fi
+          echo "Requested the sole automatic recovery for controller run $run_id."
+
+      - name: Open one manual-recovery incident
+        if: ${{ steps.evaluate.outputs.needs_manual == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHORT_SHA: ${{ steps.evaluate.outputs.short_sha }}
+          RUN_URL: ${{ steps.evaluate.outputs.run_url }}
+          RECOVERY_REASON: ${{ steps.evaluate.outputs.recovery_reason }}
+        run: |
+          set -euo pipefail
+          title="[Production Controller] Manual recovery required for $SHORT_SHA"
+          gh label create incident --force \
+            --description "Production incident requiring investigation" --color "d93f0b"
+          issues_json="$(gh issue list --state open --label incident --limit 100 \
+            --json number,title)"
+          jq -e 'type == "array"' >/dev/null <<<"$issues_json"
+          existing="$(jq --arg title "$title" '[.[] | select(.title == $title)] | length' \
+            <<<"$issues_json")"
+          if [ "$existing" -gt 0 ]; then
+            echo "Manual recovery incident already open for $SHORT_SHA."
+            exit 0
+          fi
+          if [ "$RECOVERY_REASON" = "terminal_rollback" ]; then
+            detail="Centralized rollback activity makes this controller attempt terminal. It must not be rerun until an operator verifies canonical production."
+          elif [ "$RECOVERY_REASON" = "rollback_evidence_uncertain" ]; then
+            detail="Exact centralized rollback evidence was unavailable or ambiguous. Fail closed: do not rerun until an operator verifies canonical production."
+          else
+            detail="The bounded automatic recovery is unavailable or exhausted. Inspect the exact controller run before any manual rerun."
+          fi
+          gh issue create --title "$title" --label incident \
+            --body "$detail Exact controller run: $RUN_URL"

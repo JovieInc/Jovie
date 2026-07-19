@@ -11,12 +11,6 @@
 name: Eval Gate
 
 on:
-  pull_request:
-    paths:
-      - 'apps/web/prompts/**'
-      - 'apps/web/promptfooconfig.yaml'
-      - 'apps/web/tests/eval/golden/**'
-      - '.github/workflows/eval.yml'
   workflow_dispatch:
 
 permissions:
@@ -40,7 +34,8 @@ env:
 jobs:
   eval:
     name: Promptfoo Eval Gate
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Judge/model work is manual and hosted; it cannot consume fixed CI slots.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

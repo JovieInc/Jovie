@@ -11,8 +11,8 @@ permissions:
 concurrency:
   group: runner-heartbeat
   # A saturated/offline pool retains only the newest queued probe. The hosted
-  # observer treats queued/in-progress or stale success as down; its separate
-  # two-check debounce prevents a single busy interval from flipping routing.
+  # observer and per-run CI route treat queued/in-progress, stale, malformed,
+  # or API-uncertain evidence as down and select hosted unit capacity.
   cancel-in-progress: true
 
 jobs:

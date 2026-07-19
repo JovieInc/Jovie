@@ -10,6 +10,10 @@ inputs:
     description: How long without a successful main run (while PRs are merging) before alerting.
     required: false
     default: '3'
+  completed-failure-grace-minutes:
+    description: Short grace after a terminal failed run before recovery starts.
+    required: false
+    default: '5'
   autofix-cross-sha-window-minutes:
     description: Window for detecting systemic failures across distinct SHAs.
     required: false
@@ -53,11 +57,14 @@ outputs:
     description: Run ID of the unresolved failing run (for autofix to fetch logs).
     value: ${{ steps.evaluate.outputs.failing_run_id }}
   failing_run_attempt:
-    description: Current attempt number of the unresolved failing run.
+    description: Exact attempt number of the unresolved failing run.
     value: ${{ steps.evaluate.outputs.failing_run_attempt }}
   repair_attempt:
     description: Next bounded autofix ownership attempt for the failing SHA.
     value: ${{ steps.evaluate.outputs.repair_attempt }}
+  alert_key:
+    description: Stable run/attempt/condition key for notification deduplication.
+    value: ${{ steps.evaluate.outputs.alert_key }}
   failing_sha:
     description: Commit SHA of the failing main run.
     value: ${{ steps.evaluate.outputs.failing_sha }}
@@ -95,6 +102,7 @@ runs:
       env:
         STUCK_THRESHOLD_MINUTES: ${{ inputs.stuck-threshold-minutes }}
         NO_SUCCESS_THRESHOLD_HOURS: ${{ inputs.no-success-threshold-hours }}
+        COMPLETED_FAILURE_GRACE_MINUTES: ${{ inputs.completed-failure-grace-minutes }}
         AUTOFIX_CROSS_SHA_WINDOW_MINUTES: ${{ inputs.autofix-cross-sha-window-minutes }}
         AUTOFIX_CROSS_SHA_LIMIT: ${{ inputs.autofix-cross-sha-limit }}
         AUTOFIX_OWNERSHIP_LEASE_MINUTES: ${{ inputs.autofix-ownership-lease-minutes }}
@@ -103,6 +111,7 @@ runs:
         script: |
           const thresholdMinutes = Number(process.env.STUCK_THRESHOLD_MINUTES ?? '30');
           const noSuccessHours = Number(process.env.NO_SUCCESS_THRESHOLD_HOURS ?? '3');
+          const completedFailureGraceMinutes = Number(process.env.COMPLETED_FAILURE_GRACE_MINUTES ?? '5');
           const crossShaWindowMinutes = Number(process.env.AUTOFIX_CROSS_SHA_WINDOW_MINUTES ?? '60');
           const crossShaLimit = Number(process.env.AUTOFIX_CROSS_SHA_LIMIT ?? '2');
           const ownershipLeaseMinutes = Number(process.env.AUTOFIX_OWNERSHIP_LEASE_MINUTES ?? '30');
@@ -120,6 +129,7 @@ runs:
             failing_run_id: '',
             failing_run_attempt: '',
             repair_attempt: '',
+            alert_key: '',
             failing_sha: '',
             failing_short_sha: '',
             last_green_sha: '',
@@ -176,6 +186,8 @@ runs:
             ['failure', 'timed_out', 'startup_failure', 'action_required'].includes(run.conclusion ?? '')
           );
           const failingRunAttempt = Number(latestFailure?.run_attempt ?? 0);
+          const attemptEvidenceTrusted =
+            Number.isInteger(failingRunAttempt) && failingRunAttempt >= 1;
 
           // A schedule tick is discovery, not authorization to launch another
           // repair. Prove that no exact-SHA workflow, PR, or bounded ownership
@@ -368,7 +380,7 @@ runs:
             const failedAt = latestFailure.updated_at ?? latestFailure.created_at;
             if (!failedAt) return false;
             const failedAgeMinutes = (now - Date.parse(failedAt)) / (1000 * 60);
-            if (failedAgeMinutes <= thresholdMinutes) return false;
+            if (failedAgeMinutes <= completedFailureGraceMinutes) return false;
             if (!latestSuccess) return true;
             return Date.parse(latestSuccess.created_at) < Date.parse(latestFailure.created_at);
           })();
@@ -411,7 +423,7 @@ runs:
 
           const reasons = [];
           if (staleRun) reasons.push(`CI run #${staleRun.run_number} has been ${staleRun.status} for more than ${thresholdMinutes} minutes.`);
-          if (failedForTooLong && latestFailure) reasons.push(`Latest main CI run #${latestFailure.run_number} is ${latestFailure.conclusion} and unresolved for more than ${thresholdMinutes} minutes.`);
+          if (failedForTooLong && latestFailure) reasons.push(`Latest main CI run #${latestFailure.run_number} is ${latestFailure.conclusion} and unresolved for more than ${completedFailureGraceMinutes} minutes.`);
           if (noSuccessForTooLong) reasons.push(`No successful main CI in over ${noSuccessHours} hours while ${mergedCount} merged PR(s) are waiting.`);
 
           const detectedIssue = reasons.length > 0;
@@ -428,6 +440,7 @@ runs:
           // are not canary/sentry gates (those own their own rollback path).
           let canaryOrSentryFailed = false;
           let failedJobNames = '';
+          let jobsEvidenceTrusted = !latestFailure;
           if (latestFailure) {
             try {
               const jobsResp = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
@@ -441,6 +454,7 @@ runs:
                 .map((j) => j.name);
               failedJobNames = failedNames.join(',');
               canaryOrSentryFailed = failedNames.some((n) => /canary|sentry/i.test(n));
+              jobsEvidenceTrusted = true;
             } catch (err) {
               repairStateKnown = false;
               core.warning(`Could not fetch jobs for run ${latestFailure.id}: ${err.message}`);
@@ -627,6 +641,8 @@ runs:
             failedForTooLong &&
             !staleRun &&
             latestFailure &&
+            jobsEvidenceTrusted &&
+            attemptEvidenceTrusted &&
             !canaryOrSentryFailed &&
             failingRunAttempt === 1 &&
             repairStateKnown &&
@@ -641,6 +657,10 @@ runs:
 
           if (!failedForTooLong || !latestFailure) {
             // No eligible failure — leave needs_autofix=false silently.
+          } else if (!attemptEvidenceTrusted) {
+            autofixSkipReason = 'run_attempt_unavailable';
+          } else if (!jobsEvidenceTrusted) {
+            autofixSkipReason = 'job_evidence_unavailable';
           } else if (canaryOrSentryFailed) {
             autofixSkipReason = 'canary_or_sentry_gate_failed';
           } else if (staleRun) {
@@ -661,13 +681,22 @@ runs:
             needsAutofix = true;
           }
 
+          const relevantRun = staleRun ?? latestFailure;
+          const relevantAttempt = Number(relevantRun?.run_attempt ?? Number.NaN);
+          const alertKey = relevantRun
+            ? `run-${relevantRun.id}-attempt-${Number.isInteger(relevantAttempt) && relevantAttempt >= 1 ? relevantAttempt : 'unknown'}-${staleRun ? 'stale' : 'failed'}`
+            : '';
+
           Object.assign(out, {
             failed_run_id: safeToRerun ? String(latestFailure.id) : '',
             needs_autofix: needsAutofix ? 'true' : 'false',
             autofix_skip_reason: autofixSkipReason,
             failing_run_id: latestFailure ? String(latestFailure.id) : '',
-            failing_run_attempt: latestFailure ? String(failingRunAttempt) : '',
+            failing_run_attempt: attemptEvidenceTrusted
+              ? String(failingRunAttempt)
+              : '',
             repair_attempt: latestFailure ? String(repairAttempt) : '',
+            alert_key: shouldAlert ? alertKey : '',
             failing_sha: latestFailure?.head_sha ?? '',
             failing_short_sha: latestFailure?.head_sha ? latestFailure.head_sha.slice(0, 7) : '',
             last_green_sha: latestSuccess?.head_sha ?? '',

@@ -19,7 +19,7 @@ jobs:
   e2e-full-matrix:
     name: E2E (Chrome + Firefox)
     environment: Preview – jovie
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
       E2E_FULL_MATRIX: '1'

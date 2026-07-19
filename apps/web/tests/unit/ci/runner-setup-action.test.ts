@@ -162,7 +162,7 @@ describe('baked runner prerequisite contract', () => {
   const runnerImageCanaryStart = ciWorkflow.indexOf('  runner-image-canary:');
   const runnerImageCanary = ciWorkflow.slice(
     runnerImageCanaryStart,
-    ciWorkflow.indexOf('  # ── CI Optimizer', runnerImageCanaryStart)
+    ciWorkflow.indexOf('  main-queue-provenance:', runnerImageCanaryStart)
   );
   const patchedDependencyPaths = [
     ...(
@@ -375,11 +375,13 @@ describe('baked runner prerequisite contract', () => {
   it('dispatches an exact-SHA canary only to the dedicated image label', () => {
     expect(runnerImageCanaryStart).toBeGreaterThan(-1);
     expect(runnerImageCanary).toContain(
-      "contains(github.event.pull_request.labels.*.name, 'runner-image-canary')"
+      "github.event_name == 'workflow_dispatch'"
     );
     expect(runnerImageCanary).toContain(
-      'ref: ${{ github.event.pull_request.head.sha }}'
+      'inputs.run_runner_image_canary == true'
     );
+    expect(runnerImageCanary).toContain('ref: ${{ github.sha }}');
+    expect(runnerImageCanary).not.toContain('github.event.pull_request');
     expect(runnerImageCanary).toContain(
       `runs-on: [self-hosted, Linux, X64, "\${{ 'jovie-runner-image-canary' }}"]`
     );
@@ -415,8 +417,12 @@ describe('baked runner prerequisite contract', () => {
     expect(runnerImageOfflineProofStart).toBeGreaterThan(-1);
     expect(runnerImageOfflineProof).toContain('runs-on: ubuntu-24.04');
     expect(runnerImageOfflineProof).toContain(
-      "contains(github.event.pull_request.labels.*.name, 'runner-image-canary')"
+      "github.event_name == 'workflow_dispatch'"
     );
+    expect(runnerImageOfflineProof).toContain(
+      'inputs.run_runner_image_canary == true'
+    );
+    expect(runnerImageOfflineProof).not.toContain('github.event.pull_request');
     expect(runnerImageOfflineProof).toContain(
       '.github/runner-image/build-context.sh "$EXPECTED_SHA"'
     );
@@ -449,7 +455,7 @@ describe('baked runner prerequisite contract', () => {
       'runner-image-evidence/cache-proof.json'
     );
     expect(runnerImageOfflineProof).toContain(
-      'name: runner-image-proof-${{ github.event.pull_request.head.sha }}'
+      'name: runner-image-proof-${{ github.sha }}'
     );
     expect(runnerImageOfflineProof).toContain(
       'rm -f runner-image-evidence/context.tar'

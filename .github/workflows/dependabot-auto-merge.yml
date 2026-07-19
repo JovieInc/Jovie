@@ -15,7 +15,8 @@ permissions: {}
 jobs:
   auto-merge:
     if: github.actor == 'dependabot[bot]' && github.event.pull_request.draft == false
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Metadata and queue-intent API calls must not consume a fixed test runner.
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
@@ -26,7 +27,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Add to Graphite merge queue (patch + minor)
+      - name: Request native merge-queue enrollment (patch + minor)
         if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -34,7 +35,8 @@ jobs:
         run: |
           echo "Dependency: ${{ steps.meta.outputs.dependency-names }}"
           echo "Update type: ${{ steps.meta.outputs.update-type }}"
-          # Graphite enqueues by label; native auto-merge retired
+          # The label is durable intent; Merge Queue Auto-Enroll owns the
+          # exact-head GitHub native queue mutation.
           gh pr edit --add-label "merge-queue" "$PR_URL"
 
       - name: Note major bump requires manual review

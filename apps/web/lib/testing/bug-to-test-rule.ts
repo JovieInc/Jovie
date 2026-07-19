@@ -1,4 +1,4 @@
-const TEST_FILE_PATTERN = /\.(test|spec)\.(t|j)sx?$/i;
+const TEST_FILE_PATTERN = /\.(test|spec)\.[cm]?[jt]sx?$/i;
 
 const BUG_FIX_COMMIT_PATTERN = /^fix(\(|:)/i;
 const BUG_FIX_BRANCH_PATTERN = /^(fix\/|.*\/fix-)/i;

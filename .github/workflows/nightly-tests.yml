@@ -110,7 +110,7 @@ jobs:
       github.event.inputs.suite == 'e2e' ||
       github.event.inputs.suite == 'design-v1'
     environment: Preview – jovie
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:

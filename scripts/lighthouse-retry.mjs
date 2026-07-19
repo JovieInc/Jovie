@@ -5,6 +5,9 @@ import { pathToFileURL } from 'node:url';
 const TRANSIENT_PROTOCOL_PATTERNS = [
   /\bPROTOCOL_TIMEOUT\b/i,
   /Waiting for DevTools protocol response has exceeded the allotted time/i,
+  /\bCHROME_INTERSTITIAL\b/i,
+  /chrome-error:\/\/chromewebdata\//i,
+  /\bERR_(?:CONNECTION_(?:REFUSED|RESET|CLOSED)|EMPTY_RESPONSE)\b/i,
 ];
 
 const DETERMINISTIC_ASSERTION_PATTERNS = [

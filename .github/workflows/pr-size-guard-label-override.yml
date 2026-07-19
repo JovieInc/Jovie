@@ -29,7 +29,9 @@ concurrency:
 jobs:
   override:
     name: PR Size Guard Label Override
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    # API-only controller work must not compete with merge-group unit shards on
+    # the fixed jovie-runner pool.
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

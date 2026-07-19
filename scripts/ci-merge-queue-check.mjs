@@ -9,13 +9,14 @@ import {
   validateMergeQueueEnrollHotPath,
   validateMergeQueueRepoConfig,
 } from './lib/merge-queue-guard.mjs';
+import { DEFAULT_MERGE_QUEUE_BACKEND } from './merge-queue-backend.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 
 function configuredBackend() {
-  // Match the live controller until the guarded repository-variable cutover.
-  // Native source validation must remain an explicit opt-in before then.
-  const backend = process.env.MERGE_QUEUE_BACKEND?.trim() || 'graphite';
+  // Match the live repository variable/ruleset for bare local and CI callers.
+  const backend =
+    process.env.MERGE_QUEUE_BACKEND?.trim() || DEFAULT_MERGE_QUEUE_BACKEND;
   if (backend !== 'graphite' && backend !== 'native') {
     throw new Error(`Unknown MERGE_QUEUE_BACKEND: ${backend}`);
   }

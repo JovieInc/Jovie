@@ -1,22 +1,10 @@
 name: iOS CI
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "apps/ios/**"
-      - "fastlane/**"
-      - "Gemfile"
-      - "Gemfile.lock"
-      - ".github/workflows/ios-ci.yml"
-  push:
-    branches: [main]
-    paths:
-      - "apps/ios/**"
-      - "fastlane/**"
-      - "Gemfile"
-      - "Gemfile.lock"
-      - ".github/workflows/ios-ci.yml"
+  # Full Xcode work is called by ci.yml only for an iOS-changing merge-group
+  # combined head or an unproven direct-main fallback. Source PRs receive the
+  # portable iOS contract inside ci-fast.
+  workflow_call:
   workflow_dispatch:
 
 permissions:
