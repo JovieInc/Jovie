@@ -5,7 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 TARGET_PLIST="${TARGET_PLIST:-$IOS_DIR/Jovie/Configuration.local.plist}"
 
-CLERK_PUBLISHABLE_KEY="${CLERK_PUBLISHABLE_KEY:-${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-pk_test_ci_placeholder}}"
 API_BASE_URL="${API_BASE_URL:-http://localhost:3100}"
 WEB_BASE_URL="${WEB_BASE_URL:-$API_BASE_URL}"
 SENTRY_DSN="${JOVIE_IOS_SENTRY_DSN:-${NEXT_PUBLIC_SENTRY_DSN_DEV:-${NEXT_PUBLIC_SENTRY_DSN:-${SENTRY_DSN_DEV:-${SENTRY_DSN:-}}}}}"
@@ -24,7 +23,6 @@ mkdir -p "$(dirname "$TARGET_PLIST")"
 # avoid breakage from a broken Homebrew python on PATH (e.g. pyexpat/libexpat
 # symbol mismatch with python@3.14).
 /usr/bin/plutil -create xml1 "$TARGET_PLIST"
-/usr/bin/plutil -insert ClerkPublishableKey    -string "$CLERK_PUBLISHABLE_KEY"    "$TARGET_PLIST"
 /usr/bin/plutil -insert ApiBaseUrl             -string "$API_BASE_URL"             "$TARGET_PLIST"
 /usr/bin/plutil -insert WebBaseUrl             -string "$WEB_BASE_URL"             "$TARGET_PLIST"
 /usr/bin/plutil -insert SentryDsn              -string "$SENTRY_DSN"               "$TARGET_PLIST"

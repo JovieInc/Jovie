@@ -11,6 +11,10 @@ const productionControllerWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/production-controller.yml'
 );
+const productionControllerRunLiveFixturePath = resolve(
+  repoRoot,
+  'apps/web/tests/unit/ci/fixtures/production-controller-run-live-shape.json'
+);
 const productionReleaseWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/production-release.yml'
@@ -32,6 +36,19 @@ const visualA11yWorkflowPath = resolve(
   '.github/workflows/visual-a11y.yml'
 );
 const iosWorkflowPath = resolve(repoRoot, '.github/workflows/ios-ci.yml');
+const iosTestFlightWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/ios-testflight.yml'
+);
+const iosTestFlightEnvValidatorPath = resolve(
+  repoRoot,
+  'apps/ios/scripts/validate-testflight-env.sh'
+);
+const iosTestFlightArtifactValidatorPath = resolve(
+  repoRoot,
+  'apps/ios/scripts/validate-testflight-artifact.sh'
+);
+const fastlanePath = resolve(repoRoot, 'fastlane/Fastfile');
 const ciFastLanesPath = resolve(repoRoot, 'scripts/ci-fast-lanes.mjs');
 const canaryWorkflowPath = resolve(
   repoRoot,
@@ -449,6 +466,36 @@ function previewRobotsPolicyValid(
   );
 }
 
+function runTestFlightMarkerBootstrapGate(
+  authorizationJob: string,
+  candidateCount: number,
+  acceptedBaseline: string
+) {
+  const functionName = 'testflight_marker_history_allows_legacy_bootstrap';
+  const start = authorizationJob.indexOf(`          ${functionName}() {`);
+  const end = authorizationJob.indexOf('\n          }', start);
+  expect(start).toBeGreaterThan(0);
+  expect(end).toBeGreaterThan(start);
+
+  const source = authorizationJob
+    .slice(start, end + '\n          }'.length)
+    .split('\n')
+    .map(line => line.replace(/^ {10}/, ''))
+    .join('\n');
+
+  return spawnSync(
+    'bash',
+    [
+      '-c',
+      `${source}\n${functionName} "$1" "$2"`,
+      'marker-gate',
+      String(candidateCount),
+      acceptedBaseline,
+    ],
+    { encoding: 'utf8' }
+  );
+}
+
 describe('deploy workflow Vercel env resolution', () => {
   it('gives every main SHA CI evidence and a production-controller opportunity', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -469,6 +516,260 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(controllerTrigger).not.toContain('paths-ignore:');
     expect(workflow).not.toContain('  production-release:');
     expect(workflow).not.toContain('  production-verified:');
+  });
+
+  it('authorizes TestFlight only after exact production proof without duplicating Xcode tests', () => {
+    const testflight = readFileSync(iosTestFlightWorkflowPath, 'utf8');
+    const envValidator = readFileSync(iosTestFlightEnvValidatorPath, 'utf8');
+    const artifactValidator = readFileSync(
+      iosTestFlightArtifactValidatorPath,
+      'utf8'
+    );
+    const fastlane = readFileSync(fastlanePath, 'utf8');
+    const trigger = testflight.slice(0, testflight.indexOf('\npermissions:'));
+    const workflowHeader = testflight.slice(0, testflight.indexOf('\njobs:'));
+    const authorization = getJobBlock(testflight, 'authorize-release');
+    const beta = getJobBlock(testflight, 'beta');
+    const uploadMarker = getJobBlock(testflight, 'record-upload');
+
+    expect(trigger).toContain('workflow_dispatch:');
+    expect(trigger).toContain('workflow_run:');
+    expect(trigger).toContain('workflows: [Production Controller]');
+    expect(trigger).toContain('types: [completed]');
+    expect(trigger).toContain('branches: [main]');
+    expect(trigger).not.toMatch(/^  push:/m);
+    expect(workflowHeader).toContain('group: ios-testflight');
+    expect(workflowHeader).toContain('cancel-in-progress: false');
+    expect(workflowHeader).not.toContain('github.ref');
+
+    expect(authorization).toContain(
+      "github.event.workflow_run.conclusion == 'success'"
+    );
+    expect(authorization).toContain(
+      '.path == ".github/workflows/production-controller.yml"'
+    );
+    expect(authorization).toContain(
+      'actions/workflows/production-controller.yml'
+    );
+    expect(authorization).toContain('.name == "Production Controller"');
+    expect(authorization).toContain(
+      '(.workflow_id | tostring) == $workflow_id'
+    );
+    expect(authorization).toContain('test("^Production Controller " + $sha +');
+    expect(authorization).not.toMatch(
+      /\.event == "workflow_run" and\n\s+\.name == "Production Controller"/
+    );
+    expect(authorization).toContain('.name == "Production Verified"');
+    expect(authorization).toContain('.head_sha == $sha');
+    expect(authorization).toContain('.conclusion == "success"');
+    expect(authorization).toContain('commits/main');
+    expect(authorization).toContain('status=completed');
+    expect(authorization).toContain(
+      'production-generation-verified-$expected_sha'
+    );
+    expect(authorization).toContain('.controllerRun == $run');
+    expect(
+      authorization.indexOf('prove_existing_production_marker "$release_sha"')
+    ).toBeLessThan(
+      authorization.indexOf(
+        'if [ "$EVENT_NAME" = "workflow_dispatch" ]; then\n            exit 0'
+      )
+    );
+    expect(authorization).toContain(
+      'actions/runs/$run_id/attempts/$attempt/jobs?per_page=100'
+    );
+    expect(authorization).toContain('.name == "Upload Internal TestFlight"');
+    expect(authorization).toContain(
+      'actions/artifacts?name=$marker_name&per_page=100'
+    );
+    expect(
+      authorization.indexOf('marker_name="testflight-upload-verified"')
+    ).toBeLessThan(
+      authorization.indexOf(
+        'actions/workflows/ios-testflight.yml/runs?branch=main&status=completed&per_page=100'
+      )
+    );
+    const legacyHistory = authorization.slice(
+      authorization.indexOf(
+        'actions/workflows/ios-testflight.yml/runs?branch=main&status=completed&per_page=100'
+      )
+    );
+    expect(legacyHistory).toContain(
+      '(.workflow_id | tostring) == $workflow_id'
+    );
+    expect(legacyHistory).not.toContain(
+      '.display_title == ("iOS TestFlight " + .head_sha)'
+    );
+    const completedRunSelection = legacyHistory.slice(
+      0,
+      legacyHistory.indexOf(
+        '# The marker job can fail after App Store Connect has accepted beta'
+      )
+    );
+    expect(completedRunSelection).toContain('.status == "completed"');
+    expect(completedRunSelection).not.toContain('.conclusion == "success"');
+    expect(legacyHistory).toContain('for attempt in $(seq 1 "$run_attempt")');
+    expect(legacyHistory).toContain('run_has_upload=true');
+    expect(authorization).toContain(
+      'actions/runs/$run_id/attempts/$upload_attempt'
+    );
+    expect(authorization).toContain('(.id | tostring) == $job');
+    expect(authorization).toContain('.uploadRunAttempt');
+    expect(authorization).toContain('.uploadJob');
+    expect(authorization).toContain(
+      'No proven TestFlight upload baseline exists; treating this as the first verified release.'
+    );
+    expect(authorization).not.toContain(
+      'No exact successful TestFlight upload was found in the bounded run history.'
+    );
+    expect(authorization).toContain('if [ "$beta_count" = "1" ]');
+    expect(authorization).toContain('baseline_sha="$run_sha"');
+    expect(authorization).toContain('break');
+    expect(authorization).toContain('already_released=true');
+    expect(authorization).toContain(
+      'git merge-base --is-ancestor "$BASELINE_SHA" "$RELEASE_SHA"'
+    );
+    expect(authorization).toContain('.github/workflows/ios-ci.yml');
+    expect(authorization).toContain('.github/workflows/ios-testflight.yml');
+    expect(authorization).toContain(
+      'git diff --name-only "$BASELINE_SHA" "$RELEASE_SHA" -- "${release_paths[@]}"'
+    );
+    expect(authorization).not.toContain('--diff-filter=d');
+    expect(readFileSync(workflowPath, 'utf8')).toContain(
+      '.github/workflows/ios-(ci|testflight)\\.yml'
+    );
+    expect(readFileSync(ciFastLanesPath, 'utf8')).toContain(
+      "'.github/workflows/ios-testflight.yml'"
+    );
+
+    expect(beta).toContain('needs: [authorize-release]');
+    expect(beta).toContain(
+      "needs.authorize-release.outputs.should_release == 'true'"
+    );
+    expect(beta).toContain(
+      'ref: ${{ needs.authorize-release.outputs.release_sha }}'
+    );
+    expect(beta).toContain('bundle exec fastlane ios beta');
+    expect(beta).not.toContain('bundle exec fastlane ios ios_tests');
+    expect(beta).not.toContain('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
+    expect(beta).toContain('GH_TOKEN: ${{ github.token }}');
+
+    expect(uploadMarker).toContain("needs.beta.result == 'success'");
+    expect(uploadMarker.match(/^    steps:$/gm)).toHaveLength(1);
+    expect(uploadMarker).toContain('for attempt in $(seq 1 "$RUN_ATTEMPT")');
+    expect(uploadMarker).toContain('upload_attempt="$attempt"');
+    expect(uploadMarker).toContain(
+      'No successful exact TestFlight upload job exists in this run.'
+    );
+    expect(uploadMarker).toContain('actions/workflows/ios-testflight.yml');
+    expect(uploadMarker).toContain('.name == "iOS TestFlight"');
+    expect(uploadMarker).toContain('(.workflow_id | tostring) == $workflow_id');
+    expect(uploadMarker).toContain(
+      '.display_title == ("iOS TestFlight " + $sha)'
+    );
+    expect(uploadMarker).not.toMatch(
+      /\.run_attempt \| tostring\) == \$attempt and\n\s+\.name == "iOS TestFlight"/
+    );
+    expect(uploadMarker).toContain(
+      '.path == ".github/workflows/ios-testflight.yml"'
+    );
+    expect(uploadMarker).toContain('.name == "Upload Internal TestFlight"');
+    expect(uploadMarker).toContain('workflowRun: $workflow_run');
+    expect(uploadMarker).toContain('uploadRunAttempt: $upload_attempt');
+    expect(uploadMarker).toContain('uploadJob: $upload_job');
+    expect(uploadMarker).toContain('name: testflight-upload-verified');
+    expect(uploadMarker).toContain('retention-days: 90');
+
+    expect(envValidator).toContain('CLERK_ASSOCIATED_DOMAIN');
+    expect(envValidator).not.toContain('CLERK_PUBLISHABLE_KEY');
+    expect(fastlane).not.toContain('require_env!("CLERK_PUBLISHABLE_KEY")');
+    expect(fastlane).toContain('def verify_release_sha_is_current_main!');
+    expect(fastlane).toContain('repos/#{repository}/commits/main');
+    const finalMainCheck = fastlane.lastIndexOf(
+      'verify_release_sha_is_current_main!'
+    );
+    expect(fastlane.indexOf('gym(')).toBeLessThan(finalMainCheck);
+    expect(finalMainCheck).toBeLessThan(
+      fastlane.indexOf('upload_to_testflight(')
+    );
+    expect(artifactValidator).toContain(
+      'still embeds retired ClerkPublishableKey'
+    );
+  });
+
+  it('fails closed on unprovable stable TestFlight marker history', () => {
+    const testflight = readFileSync(iosTestFlightWorkflowPath, 'utf8');
+    const authorization = getJobBlock(testflight, 'authorize-release');
+    const legacyLookup =
+      'actions/workflows/ios-testflight.yml/runs?branch=main&status=completed&per_page=100';
+    const gateCall = 'if ! testflight_marker_history_allows_legacy_bootstrap';
+
+    expect(authorization).toContain(
+      'marker_candidate_count="$(jq --arg name "$marker_name"'
+    );
+    expect(authorization).toContain(gateCall);
+    expect(authorization.indexOf(gateCall)).toBeLessThan(
+      authorization.indexOf(legacyLookup)
+    );
+    expect(authorization).toContain(
+      'Stable TestFlight markers exist, but none fully proves a successful upload.'
+    );
+    expect(authorization).toContain(
+      'Ignoring malformed TestFlight upload marker artifact $artifact_id.'
+    );
+
+    const olderValid = runTestFlightMarkerBootstrapGate(
+      authorization,
+      2,
+      'a'.repeat(40)
+    );
+    expect(olderValid.status).toBe(0);
+
+    const allUnprovable = runTestFlightMarkerBootstrapGate(
+      authorization,
+      2,
+      ''
+    );
+    expect(allUnprovable.status).not.toBe(0);
+
+    const trueZero = runTestFlightMarkerBootstrapGate(authorization, 0, '');
+    expect(trueZero.status).toBe(0);
+  });
+
+  it('cross-proves workflow identity instead of comparing run-name to workflow name', () => {
+    const fixture = JSON.parse(
+      readFileSync(productionControllerRunLiveFixturePath, 'utf8')
+    ) as {
+      run: {
+        name: string;
+        display_title: string;
+        path: string;
+        workflow_id: number;
+        head_sha: string;
+      };
+      workflow: { id: number; name: string; path: string };
+    };
+    const authorization = getJobBlock(
+      readFileSync(iosTestFlightWorkflowPath, 'utf8'),
+      'authorize-release'
+    );
+
+    expect(fixture.run.name).toBe(fixture.run.display_title);
+    expect(fixture.run.name).not.toBe(fixture.workflow.name);
+    expect(fixture.run.workflow_id).toBe(fixture.workflow.id);
+    expect(fixture.run.path).toBe(fixture.workflow.path);
+    expect(fixture.run.display_title).toMatch(
+      new RegExp(
+        `^Production Controller ${fixture.run.head_sha} from CI [1-9][0-9]* attempt [1-9][0-9]*$`
+      )
+    );
+    expect(authorization).toContain(
+      'production_controller_workflow_id="$(jq -r'
+    );
+    expect(authorization).toContain("'.id | tostring'");
+    expect(authorization).toContain(
+      '(.workflow_id | tostring) == $workflow_id'
+    );
   });
 
   it('keeps the dependency-free risk classifier off dependency caches', () => {
@@ -918,7 +1219,11 @@ describe('deploy workflow Vercel env resolution', () => {
       expect(block).toContain('runs-on: ubuntu-latest');
       expect(block).not.toContain('continue-on-error: true');
       expect(block).toContain(
-        'needs.production-release.outputs.production_deployment_url'
+        'needs.production-release.outputs.production_deployment_url_b64'
+      );
+      expect(block).toContain('base64 --decode');
+      expect(block).not.toContain(
+        'needs.production-release.outputs.production_deployment_url }}'
       );
       expect(block).not.toContain('verify-production-alias.sh');
     }
@@ -2027,6 +2332,10 @@ describe('production promotion exact-artifact contract', () => {
     );
     expect(stageStep).toContain('${production_deploy_url}/api/health');
     expect(stageStep).toContain('${production_deploy_url}/"');
+    expect(stageStep).toContain('production_deployment_url_b64=');
+    expect(stageStep).not.toContain(
+      'echo "production_deployment_url=$production_deploy_url"'
+    );
     expect(promoteStep).toContain(
       'bash .github/scripts/promote-production-deployment.sh'
     );
@@ -2050,15 +2359,92 @@ describe('production promotion exact-artifact contract', () => {
       "if: ${{ steps.final-current.outputs.is_current == 'true' }}"
     );
     expect(promoteJob).toContain(
-      'is_current: ${{ steps.promote.outputs.is_current }}'
+      'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha || steps.mutation-head.outputs.superseded_sha }}'
     );
-    expect(verifyStep).toContain("steps.promote.outputs.is_current == 'true'");
+    expect(verifyStep).toContain(
+      'steps.promote.outputs.promotion_sha == inputs.expected_sha'
+    );
     expect(verifyStep).toContain(
       'bash .github/scripts/verify-production-alias.sh'
     );
     expect(promoteJob).toContain('timeout-minutes: 60');
     expect(promoteJob).not.toContain('timeout-minutes: 360');
     expect(promoteJob).not.toContain('vercel promote "$deploy_url"');
+  });
+
+  it('transports production evidence without Doppler-maskable job outputs', () => {
+    const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const promotionScript = readFileSync(
+      productionPromotionControllerPath,
+      'utf8'
+    );
+    const promoteJob = getJobBlock(reusable, 'promote-production');
+    const mutationHead = getStepBlock(
+      promoteJob,
+      'Recheck main immediately before production mutation'
+    );
+    const result = getJobBlock(reusable, 'release-result');
+    const verified = getJobBlock(controller, 'production-verified');
+
+    expect(promoteJob).toContain(
+      'production_deployment_url_b64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}'
+    );
+    expect(promoteJob).toContain(
+      'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha || steps.mutation-head.outputs.superseded_sha }}'
+    );
+    expect(mutationHead).toContain(
+      'echo "superseded_sha=$current_sha" >> "$GITHUB_OUTPUT"'
+    );
+    expect(promoteJob).toContain(
+      'echo "superseded_sha=$current_main_sha" >> "$GITHUB_OUTPUT"'
+    );
+    expect(promoteJob).not.toMatch(/^      production_deployment_url:/m);
+    expect(promoteJob).not.toContain(
+      'is_current: ${{ steps.promote.outputs.is_current }}'
+    );
+    expect(reusable).not.toMatch(/^      previous_production_deployment_url:/m);
+    expect(promotionScript.match(/printf 'promotion_sha=%s\\n'/g)).toHaveLength(
+      2
+    );
+    expect(promotionScript).not.toContain("printf 'is_current=");
+    expect(promotionScript).not.toContain(
+      "printf 'previous_production_deployment_url="
+    );
+
+    expect(result).toContain(
+      'PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}'
+    );
+    expect(result).toContain(
+      'PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.promote-production.outputs.production_deployment_url_b64 }}'
+    );
+    expect(result).toContain('base64 --decode');
+    expect(result).toContain('^https://[A-Za-z0-9.-]+\\.vercel\\.app$');
+    expect(result).toContain(
+      'Successful production promotion omitted exact observed main SHA evidence.'
+    );
+    expect(reusable).toContain('production_deployment_url_b64:');
+    expect(reusable).not.toMatch(/^      production_deployment_url:/m);
+
+    for (const jobName of [
+      'ci-public-profile-smoke',
+      'ci-post-deploy-auth-smoke',
+      'ci-homepage-smoke',
+      'lighthouse-ci',
+    ]) {
+      const job = getJobBlock(controller, jobName);
+      expect(job).toContain(
+        'needs.production-release.outputs.production_deployment_url_b64'
+      );
+      expect(job).toContain('base64 --decode');
+    }
+    expect(verified).toContain(
+      'PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}'
+    );
+    expect(verified).toContain('base64 --decode');
+    expect(controller).not.toContain(
+      'needs.production-release.outputs.production_deployment_url }}'
+    );
   });
 
   it('neutralizes rapid main advance after staging while API uncertainty fails closed', () => {
@@ -2077,9 +2463,14 @@ describe('production promotion exact-artifact contract', () => {
     expect(finalCurrent).toContain('echo "is_current=false"');
     expect(finalCurrent).toContain('exit 0');
     expect(result).toContain(
-      'needs.promote-production.outputs.is_current }}" != "true"'
+      'PROMOTION_SHA: ${{ needs.promote-production.outputs.promotion_sha }}'
     );
-    expect(result).toContain('Superseded at production mutation; neutral.');
+    expect(result).toContain('[[ "$PROMOTION_SHA" =~ ^[0-9a-f]{40}$ ]]');
+    expect(result).toContain('[ "$PROMOTION_SHA" != "$EXPECTED_SHA" ]');
+    expect(result).toContain('Superseded at production mutation by');
+    expect(result).toContain(
+      'Successful production promotion omitted exact observed main SHA evidence.'
+    );
   });
 
   it('serializes initial runs and reruns in the same bounded FIFO lease', () => {
@@ -2129,8 +2520,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(verifiedJob).not.toContain('concurrency:');
     expect(smokeJob).not.toContain('verify-production-alias.sh');
     expect(smokeJob).toContain(
-      'needs.production-release.outputs.production_deployment_url'
+      'needs.production-release.outputs.production_deployment_url_b64'
     );
+    expect(smokeJob).toContain('base64 --decode');
     expect(smokeJob).not.toContain('Wait for CDN propagation');
   });
 
@@ -2204,9 +2596,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(verified).toContain(
       'Release generation lacks exact passing gate, canonical deployment, or SHA evidence'
     );
-    expect(reusable).toContain('production_deployment_url:');
+    expect(reusable).toContain('production_deployment_url_b64:');
     expect(result).toContain(
-      'needs.promote-production.outputs.production_deployment_url'
+      'needs.promote-production.outputs.production_deployment_url_b64'
     );
   });
 
@@ -2330,6 +2722,18 @@ describe('production promotion exact-artifact contract', () => {
     expect(controller).toContain(
       'run-name: Production Controller ${{ github.event.workflow_run.head_sha }} from CI'
     );
+    expect(controller).toContain('actions/workflows/production-controller.yml');
+    expect(health).toContain('actions/workflows/production-controller.yml');
+    expect(controller).toContain('actions/workflows/ci.yml');
+    expect(health).toContain('actions/workflows/ci.yml');
+    expect(controller.match(/\.name == "Production Controller"/g)).toHaveLength(
+      1
+    );
+    expect(health.match(/\.name == "Production Controller"/g)).toHaveLength(1);
+    expect(controller.match(/\.name == "CI"/g)).toHaveLength(1);
+    expect(health.match(/\.name == "CI"/g)).toHaveLength(1);
+    expect(controller).toContain('.workflow_id == $workflow_id');
+    expect(health).toContain('.workflow_id == $workflow_id');
     expect(health).toContain('.display_title == $title');
     expect(health.match(/GH_REPO: \${{ github\.repository }}/g)).toHaveLength(
       2
@@ -2367,10 +2771,51 @@ describe('production promotion exact-artifact contract', () => {
     expect(controller).toContain(
       'Ignoring marker with invalid exact-generation content'
     );
+    expect(controller).toContain('jq -e --arg marker_name "$marker_name"');
+    expect(health).toContain('jq -e --arg marker_name "$marker_name"');
+    expect(controller).toContain('.name == $marker_name');
+    expect(health).toContain('.name == $marker_name');
+    expect(controller).toContain(
+      "marker_presence_count=\"$(jq '.artifacts | length'"
+    );
+    expect(health).toContain(
+      "marker_presence_count=\"$(jq '.artifacts | length'"
+    );
+    expect(controller).toContain('.expired == false');
+    expect(health).toContain('.expired == false');
+    expect(controller).toContain('refusing duplicate deployment');
+    expect(health).toContain('refusing automated replay');
+    expect(controller.indexOf('done <<<"$marker_candidates"')).toBeLessThan(
+      controller.indexOf('if [ "$marker_presence_count" -gt 0 ]')
+    );
+    expect(health.indexOf('done <<<"$marker_candidates"')).toBeLessThan(
+      health.indexOf('if [ "$marker_presence_count" -gt 0 ]')
+    );
+    expect(controller).toContain('.head_sha == $sha');
+    expect(health).toContain('.head_sha == $sha');
+    expect(controller).toContain('.head_repository.full_name == $repo');
+    expect(health).toContain('.head_repository.full_name == $repo');
     expect(controller).toContain('actions/artifacts/$marker_artifact_id/zip');
     expect(controller).toContain(
       'Authenticated smoke was skipped because no complete credential pair is configured'
     );
     expect(controller).toContain('credentials_configured=false');
+  });
+
+  it('fails closed on expired-only or wrong-name production marker listings', () => {
+    const workflows = [
+      readFileSync(productionControllerWorkflowPath, 'utf8'),
+      readFileSync(productionControllerHealthPath, 'utf8'),
+    ];
+
+    for (const workflow of workflows) {
+      expect(workflow).toContain('jq -e --arg marker_name "$marker_name"');
+      expect(workflow).toContain('.name == $marker_name');
+      expect(workflow).toContain(
+        "marker_presence_count=\"$(jq '.artifacts | length'"
+      );
+      expect(workflow).toContain('.expired == false');
+      expect(workflow).toContain('if [ "$marker_presence_count" -gt 0 ]');
+    }
   });
 });

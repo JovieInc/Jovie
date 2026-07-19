@@ -120,12 +120,73 @@ describe('merge_group workflow contract', () => {
     expect(route).toContain('[ "$HEARTBEAT_HEALTH" = \'up\' ]');
     expect(route).toContain("runner='ubuntu-latest'");
     expect(route).toContain('jovie-runner|ubuntu-latest');
-    expect(units).toContain('needs: [ci-path-changes, ci-unit-runner-route]');
+    expect(units).toContain('ci-unit-runner-route');
+    expect(units).toContain('ci-merge-group-admission');
     expect(units).toContain(
       "runs-on: ${{ needs.ci-unit-runner-route.outputs.runner || 'ubuntu-latest' }}"
     );
     expect(units).not.toContain('vars.CI_UNIT_RUNNER');
     expect(units).toContain('max-parallel: 2');
+  });
+
+  it('admits expensive queue lanes only while exact external gates are green', () => {
+    const admission = getJobBlock(CI_WORKFLOW, 'ci-merge-group-admission');
+    expect(admission).toContain('needs: [ci-path-changes]');
+    expect(admission).toContain("github.event_name == 'merge_group'");
+    expect(admission).toContain('runs-on: ubuntu-latest');
+    expect(admission).toContain('timeout-minutes: 2');
+    expect(admission).toContain('checks: read');
+    expect(admission).toContain('contents: read');
+    expect(admission).toContain('ref: main');
+    expect(admission).not.toContain(
+      'ref: ${{ github.event.merge_group.base_sha }}'
+    );
+    expect(admission).toContain('persist-credentials: false');
+    expect(admission).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(admission).toContain(
+      'run: node scripts/lib/merge-group-admission.mjs'
+    );
+    expect(admission).not.toContain('secrets.');
+
+    for (const jobId of [
+      'ci-fast',
+      'ci-unit-tests',
+      'ci-build-layout',
+      'ci-ios',
+      'ci-promptfoo-evals',
+      'ci-golden-eval-set',
+    ]) {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      expect(job, jobId).toContain('ci-merge-group-admission');
+      expect(job, jobId).toContain('always()');
+      expect(job, jobId).toContain("github.event_name != 'merge_group'");
+      expect(job, jobId).toContain(
+        "needs.ci-merge-group-admission.result == 'success'"
+      );
+    }
+
+    const ciFast = getJobBlock(CI_WORKFLOW, 'ci-fast');
+    expect(ciFast).toContain("github.event_name != 'merge_group'");
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    expect(units).toContain("needs.ci-unit-runner-route.result == 'success'");
+    expect(units).toContain(
+      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    );
+    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    expect(buildLayout).toContain(
+      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    );
+
+    for (const jobId of [
+      'ci-unit-runner-route',
+      'ci-risk-classifier',
+      'ci-secret-scan',
+      'drizzle-migration-guard',
+    ]) {
+      expect(getJobBlock(CI_WORKFLOW, jobId), jobId).not.toContain(
+        'ci-merge-group-admission'
+      );
+    }
   });
 
   it('fans real combined-head checks into PR Ready without PR metadata or deploy evidence', () => {
@@ -400,6 +461,7 @@ describe('merge_group workflow contract', () => {
     const activeJobs = [
       'ci-unit-runner-route',
       'ci-path-changes',
+      'ci-merge-group-admission',
       'ci-risk-classifier',
       'ci-fast',
       'ci-build-layout',

@@ -46,8 +46,8 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
           TRIGGER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          TRIGGER_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
           TRIGGER_RUN_EVENT: ${{ github.event.workflow_run.event }}
-          TRIGGER_RUN_NAME: ${{ github.event.workflow_run.name }}
           TRIGGER_RUN_PATH: ${{ github.event.workflow_run.path }}
           TRIGGER_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           TRIGGER_RUN_STATUS: ${{ github.event.workflow_run.status }}
@@ -66,8 +66,8 @@ jobs:
           echo "expected_sha=$EXPECTED_SHA" >> "$GITHUB_OUTPUT"
           [[ "$TRIGGER_RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
             [[ "$TRIGGER_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$TRIGGER_WORKFLOW_ID" =~ ^[1-9][0-9]*$ ]] &&
             [ "$TRIGGER_RUN_EVENT" = "push" ] &&
-            [ "$TRIGGER_RUN_NAME" = "CI" ] &&
             [ "$TRIGGER_RUN_PATH" = ".github/workflows/ci.yml" ] &&
             [ "$TRIGGER_HEAD_BRANCH" = "main" ] &&
             [ "$TRIGGER_RUN_STATUS" = "completed" ] &&
@@ -77,24 +77,64 @@ jobs:
             exit 1
           }
 
-            current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
-            [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
-              echo "::error::Could not resolve exact current main while authorizing production."
-              exit 1
-            }
-            if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-              echo "::notice::Controller generation $EXPECTED_SHA was superseded by $current_main_sha before production authorization."
-              exit 0
-            fi
-            echo "is_current=true" >> "$GITHUB_OUTPUT"
+          ci_workflow_json="$(gh api "repos/$REPOSITORY/actions/workflows/ci.yml")"
+          jq -e '
+            type == "object" and
+            (.id | type == "number" and . > 0) and
+            .name == "CI" and
+            .path == ".github/workflows/ci.yml" and
+            .state == "active"
+          ' >/dev/null <<<"$ci_workflow_json" || {
+            echo "::error::Authoritative CI workflow identity is malformed."
+            exit 1
+          }
+          ci_workflow_id="$(jq -r '.id' <<<"$ci_workflow_json")"
+          if [ "$TRIGGER_WORKFLOW_ID" != "$ci_workflow_id" ]; then
+            echo "::error::workflow_run did not originate from the authoritative CI workflow."
+            exit 1
+          fi
+
+          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact current main while authorizing production."
+            exit 1
+          }
+          if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
+            echo "::notice::Controller generation $EXPECTED_SHA was superseded by $current_main_sha before production authorization."
+            exit 0
+          fi
+          echo "is_current=true" >> "$GITHUB_OUTPUT"
 
             # The marker records production truth independently of best-effort
             # notification delivery. Cross-prove its completed controller run
             # and exact Production Verified job before treating a rerun as done.
+            controller_workflow_json="$(gh api \
+              "repos/$REPOSITORY/actions/workflows/production-controller.yml")"
+            jq -e '
+              type == "object" and
+              (.id | type == "number" and . > 0) and
+              .name == "Production Controller" and
+              .path == ".github/workflows/production-controller.yml" and
+              .state == "active"
+            ' >/dev/null <<<"$controller_workflow_json" || {
+              echo "::error::Authoritative Production Controller workflow identity is malformed."
+              exit 1
+            }
+            controller_workflow_id="$(jq -r '.id' <<<"$controller_workflow_json")"
             marker_name="production-generation-verified-$EXPECTED_SHA"
             artifacts_json="$(gh api \
               "repos/$REPOSITORY/actions/artifacts?name=$marker_name&per_page=100")"
-            jq -e 'type == "object" and (.artifacts | type == "array")' \
+            jq -e --arg marker_name "$marker_name" '
+              type == "object" and (.artifacts | type == "array") and
+              all(.artifacts[];
+                type == "object" and
+                (.id | type == "number" and . > 0) and
+                .name == $marker_name and
+                (.expired | type == "boolean") and
+                (.created_at | type == "string" and length > 0) and
+                (.workflow_run.id | type == "number" and . > 0)
+              )
+            ' \
               >/dev/null <<<"$artifacts_json" || {
               echo "::error::GitHub returned malformed production marker evidence."
               exit 1
@@ -110,6 +150,11 @@ jobs:
               | sort_by(.created_at, .id) | reverse
               | .[] | "\(.id)\t\(.workflow_run.id)"
             ' <<<"$artifacts_json")"
+            # Any exact-name history is durable evidence that this generation
+            # may already have mutated production. Expired-only evidence cannot
+            # authorize a duplicate deployment; only a truly empty validated
+            # listing permits the first deployment.
+            marker_presence_count="$(jq '.artifacts | length' <<<"$artifacts_json")"
             while IFS=$'\t' read -r marker_artifact_id marker_run_id; do
               [ -n "$marker_run_id" ] || continue
               [[ "$marker_artifact_id" =~ ^[1-9][0-9]*$ ]] &&
@@ -118,11 +163,37 @@ jobs:
                 exit 1
               }
               marker_run_json="$(gh api "repos/$REPOSITORY/actions/runs/$marker_run_id")"
-              jq -e --arg sha "$EXPECTED_SHA" '
+              jq -e '
                 type == "object" and
-                .name == "Production Controller" and
+                (.id | type == "number" and . > 0) and
+                (.workflow_id | type == "number" and . > 0) and
+                (.run_attempt | type == "number" and . >= 1) and
+                (.display_title | type == "string") and
+                (.path | type == "string") and
+                (.head_sha | type == "string") and
+                (.head_branch | type == "string") and
+                (.head_repository.full_name | type == "string") and
+                (.event | type == "string") and
+                (.status | type == "string") and
+                (.conclusion | type == "string")
+              ' >/dev/null <<<"$marker_run_json" || {
+                echo "::error::GitHub returned malformed Production Controller run evidence."
+                exit 1
+              }
+              jq -e \
+                --argjson run_id "$marker_run_id" \
+                --arg sha "$EXPECTED_SHA" \
+                --arg repo "$REPOSITORY" \
+                --argjson workflow_id "$controller_workflow_id" '
+                type == "object" and
+                .id == $run_id and
+                .workflow_id == $workflow_id and
                 (.display_title | startswith("Production Controller " + $sha + " from CI ")) and
                 .path == ".github/workflows/production-controller.yml" and
+                .head_sha == $sha and
+                .head_branch == "main" and
+                .head_repository.full_name == $repo and
+                .event == "workflow_run" and
                 .status == "completed" and
                 .conclusion == "success" and
                 (.run_attempt | type == "number" and . >= 1)
@@ -135,14 +206,34 @@ jobs:
                 "repos/$REPOSITORY/actions/runs/$marker_run_id/attempts/$marker_run_attempt/jobs?per_page=100")"
               jq -e '
                 type == "array" and length > 0 and
-                all(.[]; type == "object" and (.jobs | type == "array"))
+                all(.[];
+                  type == "object" and (.jobs | type == "array") and
+                  all(.jobs[];
+                    type == "object" and
+                    (.id | type == "number" and . > 0) and
+                    (.run_id | type == "number" and . > 0) and
+                    (.run_attempt | type == "number" and . >= 1) and
+                    (.name | type == "string") and
+                    (.head_sha | type == "string") and
+                    (.head_branch | type == "string") and
+                    (.status | type == "string") and
+                    (.conclusion | type == "string")
+                  )
+                )
               ' >/dev/null <<<"$marker_jobs_json" || {
                 echo "::error::GitHub returned malformed verified-generation job evidence."
                 exit 1
               }
-              marker_job_count="$(jq '
+              marker_job_count="$(jq \
+                --arg sha "$EXPECTED_SHA" \
+                --argjson run_id "$marker_run_id" \
+                --argjson run_attempt "$marker_run_attempt" '
                 [.[] | .jobs[]? | select(
                   .name == "Production Verified" and
+                  .run_id == $run_id and
+                  .run_attempt == $run_attempt and
+                  .head_sha == $sha and
+                  .head_branch == "main" and
                   .status == "completed" and
                   .conclusion == "success"
                 )] | length
@@ -169,6 +260,10 @@ jobs:
               echo "::notice::Exact production generation $EXPECTED_SHA is already verified; neutral."
               exit 0
             done <<<"$marker_candidates"
+            if [ "$marker_presence_count" -gt 0 ]; then
+              echo "::error::Production markers exist for current main, but none has exact provable controller evidence; refusing duplicate deployment."
+              exit 1
+            fi
 
             # Reruns retain a run ID but increment run_attempt. Read the exact
             # attempt endpoint carried by workflow_run so attempt N can never
@@ -179,14 +274,15 @@ jobs:
               --arg sha "$EXPECTED_SHA" \
               --arg repo "$REPOSITORY" \
               --arg run_id "$TRIGGER_RUN_ID" \
-              --arg run_attempt "$TRIGGER_RUN_ATTEMPT" '
+              --arg run_attempt "$TRIGGER_RUN_ATTEMPT" \
+              --argjson workflow_id "$ci_workflow_id" '
                 type == "object" and
                 (.id | tostring) == $run_id and
                 (.run_attempt | tostring) == $run_attempt and
+                .workflow_id == $workflow_id and
                 .head_sha == $sha and
                 .event == "push" and
                 .head_branch == "main" and
-                .name == "CI" and
                 .path == ".github/workflows/ci.yml" and
                 .head_repository.full_name == $repo and
                 .status == "completed" and
@@ -210,12 +306,18 @@ jobs:
               echo "::error::GitHub returned malformed exact CI job evidence."
               exit 1
             }
-            evidence_count="$(jq --arg sha "$EXPECTED_SHA" '
+            evidence_count="$(jq \
+              --arg sha "$EXPECTED_SHA" \
+              --argjson run_id "$source_run_id" \
+              --argjson run_attempt "$source_run_attempt" '
               [
                 .[].jobs[]
                 | select(
                     .name == "Main Release Ready" and
+                    .run_id == $run_id and
+                    .run_attempt == $run_attempt and
                     .head_sha == $sha and
+                    .head_branch == "main" and
                     .status == "completed" and
                     .conclusion == "success"
                   )
@@ -274,13 +376,14 @@ jobs:
 
       - name: Verify production endpoints are healthy
         env:
-          PRODUCTION_BASE_URL: ${{ needs.production-release.outputs.production_deployment_url }}
+          PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
 
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
           PRODUCTION_BASE_URL="${PRODUCTION_BASE_URL%/}"
-          [[ "$PRODUCTION_BASE_URL" =~ ^https://[^/]+$ ]] || {
+          [[ "$PRODUCTION_BASE_URL" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]] || {
             echo "::error::Exact production deployment URL is missing or invalid."
             exit 1
           }
@@ -521,6 +624,12 @@ jobs:
       - name: Run production auth smoke tests
         if: steps.check-creds.outputs.skip != 'true'
         run: |
+          set -euo pipefail
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
+          [[ "$PRODUCTION_BASE_URL" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]] || {
+            echo "::error::Exact production deployment URL is missing or invalid."
+            exit 1
+          }
           cd apps/web
 
           mkdir -p tests/.auth
@@ -528,7 +637,7 @@ jobs:
           test -n "$PRODUCTION_BASE_URL"
           CI=true BASE_URL="$PRODUCTION_BASE_URL" node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
         env:
-          PRODUCTION_BASE_URL: ${{ needs.production-release.outputs.production_deployment_url }}
+          PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
           E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
           E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
@@ -553,14 +662,15 @@ jobs:
     steps:
       - name: Verify homepage renders correctly
         env:
-          PRODUCTION_BASE_URL: ${{ needs.production-release.outputs.production_deployment_url }}
+          PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           echo "Running homepage smoke test against production..."
 
           set -euo pipefail
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
           PRODUCTION_BASE_URL="${PRODUCTION_BASE_URL%/}"
-          [[ "$PRODUCTION_BASE_URL" =~ ^https://[^/]+$ ]] || {
+          [[ "$PRODUCTION_BASE_URL" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]] || {
             echo "::error::Exact production deployment URL is missing or invalid."
             exit 1
           }
@@ -639,11 +749,12 @@ jobs:
           echo "Resolved Lighthouse Chrome: $chrome_path"
       - name: Build exact-deployment Lighthouse config
         env:
-          PRODUCTION_BASE_URL: ${{ needs.production-release.outputs.production_deployment_url }}
+          PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
         run: |
           set -euo pipefail
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
           base_url="${PRODUCTION_BASE_URL%/}"
-          [[ "$base_url" =~ ^https://[^/]+$ ]] || {
+          [[ "$base_url" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]] || {
             echo "::error::Exact production deployment URL is missing or invalid."
             exit 1
           }
@@ -717,6 +828,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
+          PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
           PRODUCTION_ALIAS_MAX_ATTEMPTS: '3'
           PRODUCTION_ALIAS_REQUIRED_ROUNDS: '1'
           PRODUCTION_ALIAS_RETRY_SECONDS: '5'
@@ -741,10 +853,14 @@ jobs:
             echo "::error::Production release omitted the exact deployment ID."
             exit 1
           }
-          test -n "${{ needs.production-release.outputs.production_deployment_url }}" || {
-            echo "::error::Production release omitted the exact deployment URL."
+          production_deployment_url="$(printf '%s' "$PRODUCTION_DEPLOYMENT_URL_B64" | base64 --decode)" || {
+            echo "::error::Production release emitted malformed deployment URL evidence."
             exit 1
           }
+          if [[ ! "$production_deployment_url" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]]; then
+            echo "::error::Production release omitted the exact immutable deployment URL."
+            exit 1
+          fi
           for probe in \
             "Post-Deploy Smoke:${{ needs.ci-public-profile-smoke.result }}" \
             "Homepage Smoke:${{ needs.ci-homepage-smoke.result }}" \

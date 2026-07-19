@@ -1,0 +1,23 @@
+{
+  "source": "GitHub Actions run 29679076966 observed 2026-07-19",
+  "run": {
+    "id": 29679076966,
+    "run_attempt": 1,
+    "name": "Production Controller 4182a46470b5344234969ad375b00207a8fe5dd5 from CI 29678599155 attempt 1",
+    "display_title": "Production Controller 4182a46470b5344234969ad375b00207a8fe5dd5 from CI 29678599155 attempt 1",
+    "path": ".github/workflows/production-controller.yml",
+    "workflow_id": 316053388,
+    "event": "workflow_run",
+    "status": "completed",
+    "conclusion": "failure",
+    "head_branch": "main",
+    "head_sha": "4182a46470b5344234969ad375b00207a8fe5dd5",
+    "head_repository": "JovieInc/Jovie"
+  },
+  "workflow": {
+    "id": 316053388,
+    "name": "Production Controller",
+    "path": ".github/workflows/production-controller.yml",
+    "state": "active"
+  }
+}

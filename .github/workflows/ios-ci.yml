@@ -26,8 +26,11 @@ jobs:
       - name: iOS best-practices lint
         run: bash scripts/ios-best-practices-lint.sh apps/ios/Jovie
 
-      - name: Test write-configuration script
-        run: node --test apps/ios/scripts/write-configuration.test.mjs
+      - name: Test iOS release configuration scripts
+        run: |
+          node --test apps/ios/scripts/write-configuration.test.mjs \
+          apps/ios/scripts/validate-testflight-env.test.mjs \
+          apps/ios/scripts/validate-testflight-artifact.test.mjs
 
       - name: Ensure iOS local configuration exists
         run: bash apps/ios/scripts/ensure-configuration.sh

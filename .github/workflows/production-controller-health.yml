@@ -38,10 +38,47 @@ jobs:
           echo "current_sha=$current_sha" >> "$GITHUB_OUTPUT"
           echo "short_sha=${current_sha:0:7}" >> "$GITHUB_OUTPUT"
 
+          ci_workflow_json="$(gh api "repos/$REPOSITORY/actions/workflows/ci.yml")"
+          jq -e '
+            type == "object" and
+            (.id | type == "number" and . > 0) and
+            .name == "CI" and
+            .path == ".github/workflows/ci.yml" and
+            .state == "active"
+          ' >/dev/null <<<"$ci_workflow_json" || {
+            echo "::error::Authoritative CI workflow identity is malformed."
+            exit 1
+          }
+          ci_workflow_id="$(jq -r '.id' <<<"$ci_workflow_json")"
+
+          controller_workflow_json="$(gh api \
+            "repos/$REPOSITORY/actions/workflows/production-controller.yml")"
+          jq -e '
+            type == "object" and
+            (.id | type == "number" and . > 0) and
+            .name == "Production Controller" and
+            .path == ".github/workflows/production-controller.yml" and
+            .state == "active"
+          ' >/dev/null <<<"$controller_workflow_json" || {
+            echo "::error::Authoritative Production Controller workflow identity is malformed."
+            exit 1
+          }
+          controller_workflow_id="$(jq -r '.id' <<<"$controller_workflow_json")"
+
           marker_name="production-generation-verified-$current_sha"
           artifacts_json="$(gh api \
             "repos/$REPOSITORY/actions/artifacts?name=$marker_name&per_page=100")"
-          jq -e 'type == "object" and (.artifacts | type == "array")' \
+          jq -e --arg marker_name "$marker_name" '
+            type == "object" and (.artifacts | type == "array") and
+            all(.artifacts[];
+              type == "object" and
+              (.id | type == "number" and . > 0) and
+              .name == $marker_name and
+              (.expired | type == "boolean") and
+              (.created_at | type == "string" and length > 0) and
+              (.workflow_run.id | type == "number" and . > 0)
+            )
+          ' \
             >/dev/null <<<"$artifacts_json"
           marker_candidates="$(jq -r --arg name "$marker_name" '
             [.artifacts[] | select(
@@ -49,6 +86,10 @@ jobs:
             )] | sort_by(.created_at, .id) | reverse |
             .[] | "\(.id)\t\(.workflow_run.id)"
           ' <<<"$artifacts_json")"
+          # Any exact-name history is durable evidence that this generation may
+          # already have mutated production. Expired-only evidence must require
+          # manual recovery; only a truly empty validated listing can replay.
+          marker_presence_count="$(jq '.artifacts | length' <<<"$artifacts_json")"
           while IFS=$'\t' read -r marker_artifact_id marker_run_id; do
             [ -n "$marker_run_id" ] || continue
             [[ "$marker_artifact_id" =~ ^[1-9][0-9]*$ ]] &&
@@ -57,10 +98,35 @@ jobs:
               exit 1
             }
             marker_run="$(gh api "repos/$REPOSITORY/actions/runs/$marker_run_id")"
-            if ! jq -e --arg sha "$current_sha" '
-              .name == "Production Controller" and
+            jq -e '
+              type == "object" and
+              (.id | type == "number" and . > 0) and
+              (.workflow_id | type == "number" and . > 0) and
+              (.run_attempt | type == "number" and . >= 1) and
+              (.display_title | type == "string") and
+              (.path | type == "string") and
+              (.head_sha | type == "string") and
+              (.head_branch | type == "string") and
+              (.head_repository.full_name | type == "string") and
+              (.event | type == "string") and
+              (.status | type == "string") and
+              (.conclusion | type == "string")
+            ' >/dev/null <<<"$marker_run" || {
+              echo "::error::GitHub returned malformed Production Controller run evidence."
+              exit 1
+            }
+            if ! jq -e \
+              --argjson run_id "$marker_run_id" \
+              --arg sha "$current_sha" \
+              --arg repo "$REPOSITORY" \
+              --argjson workflow_id "$controller_workflow_id" '
+              .id == $run_id and
+              .workflow_id == $workflow_id and
               (.display_title | startswith("Production Controller " + $sha + " from CI ")) and
               .path == ".github/workflows/production-controller.yml" and
+              .head_sha == $sha and .head_branch == "main" and
+              .head_repository.full_name == $repo and
+              .event == "workflow_run" and
               .status == "completed" and .conclusion == "success" and
               (.run_attempt | type == "number" and . >= 1)
             ' >/dev/null <<<"$marker_run"; then
@@ -69,11 +135,36 @@ jobs:
             marker_attempt="$(jq -r '.run_attempt' <<<"$marker_run")"
             marker_jobs="$(gh api --paginate --slurp \
               "repos/$REPOSITORY/actions/runs/$marker_run_id/attempts/$marker_attempt/jobs?per_page=100")"
-            jq -e 'type == "array" and length > 0 and all(.[]; (.jobs | type == "array"))' \
-              >/dev/null <<<"$marker_jobs"
-            verified_count="$(jq '
+            jq -e '
+              type == "array" and length > 0 and
+              all(.[];
+                type == "object" and (.jobs | type == "array") and
+                all(.jobs[];
+                  type == "object" and
+                  (.id | type == "number" and . > 0) and
+                  (.run_id | type == "number" and . > 0) and
+                  (.run_attempt | type == "number" and . >= 1) and
+                  (.name | type == "string") and
+                  (.head_sha | type == "string") and
+                  (.head_branch | type == "string") and
+                  (.status | type == "string") and
+                  (.conclusion | type == "string")
+                )
+              )
+            ' >/dev/null <<<"$marker_jobs" || {
+              echo "::error::GitHub returned malformed verified-generation job evidence."
+              exit 1
+            }
+            verified_count="$(jq \
+              --arg sha "$current_sha" \
+              --argjson run_id "$marker_run_id" \
+              --argjson run_attempt "$marker_attempt" '
               [.[] | .jobs[]? | select(
-                .name == "Production Verified" and .status == "completed" and
+                .name == "Production Verified" and
+                .run_id == $run_id and
+                .run_attempt == $run_attempt and
+                .head_sha == $sha and .head_branch == "main" and
+                .status == "completed" and
                 .conclusion == "success"
               )] | length
             ' <<<"$marker_jobs")"
@@ -93,17 +184,42 @@ jobs:
               fi
             fi
           done <<<"$marker_candidates"
+          if [ "$marker_presence_count" -gt 0 ]; then
+            echo "::error::Production markers exist for current main, but none has exact provable controller evidence; refusing automated replay."
+            exit 1
+          fi
 
           ci_runs_json="$(gh api --paginate --slurp \
             "repos/$REPOSITORY/actions/workflows/ci.yml/runs?event=push&branch=main&head_sha=$current_sha&per_page=100")"
           jq -e '
             type == "array" and length > 0 and
-            all(.[]; type == "object" and (.workflow_runs | type == "array"))
+            all(.[];
+              type == "object" and (.workflow_runs | type == "array") and
+              all(.workflow_runs[];
+                type == "object" and
+                (.id | type == "number" and . > 0) and
+                (.workflow_id | type == "number" and . > 0) and
+                (.run_attempt | type == "number" and . >= 1) and
+                (.path | type == "string") and
+                (.head_sha | type == "string") and
+                (.head_branch | type == "string") and
+                (.head_repository.full_name | type == "string") and
+                (.event | type == "string") and
+                (.status | type == "string") and
+                (.conclusion | type == "string") and
+                (.updated_at | type == "string") and
+                (.html_url | type == "string")
+              )
+            )
           ' >/dev/null <<<"$ci_runs_json"
-          source_ci="$(jq -c --arg sha "$current_sha" --arg repo "$REPOSITORY" '
+          source_ci="$(jq -c \
+            --arg sha "$current_sha" \
+            --arg repo "$REPOSITORY" \
+            --argjson workflow_id "$ci_workflow_id" '
             [.[] | .workflow_runs[] | select(
               .head_sha == $sha and .head_branch == "main" and
-              .name == "CI" and .path == ".github/workflows/ci.yml" and
+              .workflow_id == $workflow_id and
+              .path == ".github/workflows/ci.yml" and
               .event == "push" and .head_repository.full_name == $repo and
               .status == "completed" and .conclusion == "success"
             )] | unique_by(.id) | sort_by(.updated_at, .id) | last // empty
@@ -129,12 +245,28 @@ jobs:
             "repos/$REPOSITORY/actions/workflows/production-controller.yml/runs?branch=main&per_page=100")"
           jq -e '
             type == "array" and length > 0 and
-            all(.[]; type == "object" and (.workflow_runs | type == "array"))
+            all(.[];
+              type == "object" and (.workflow_runs | type == "array") and
+              all(.workflow_runs[];
+                type == "object" and
+                (.id | type == "number" and . > 0) and
+                (.workflow_id | type == "number" and . > 0) and
+                (.display_title | type == "string") and
+                (.path | type == "string") and
+                (.head_sha | type == "string") and
+                (.head_repository.full_name | type == "string")
+              )
+            )
           ' >/dev/null <<<"$runs_json"
-          run_record="$(jq -c --arg title "$expected_title" --arg repo "$REPOSITORY" '
+          run_record="$(jq -c \
+            --arg title "$expected_title" \
+            --arg sha "$current_sha" \
+            --arg repo "$REPOSITORY" \
+            --argjson workflow_id "$controller_workflow_id" '
             [.[] | .workflow_runs[] | select(
               .head_branch == "main" and
-              .name == "Production Controller" and
+              .head_sha == $sha and
+              .workflow_id == $workflow_id and
               .display_title == $title and
               .path == ".github/workflows/production-controller.yml" and
               .event == "workflow_run" and
@@ -168,10 +300,12 @@ jobs:
             # idempotency boundary for a missing workflow_run delivery.
             source_boundary="$(gh api "repos/$REPOSITORY/actions/runs/$source_ci_id")"
             jq -e --arg sha "$current_sha" --arg repo "$REPOSITORY" \
-              --argjson id "$source_ci_id" '
+              --argjson id "$source_ci_id" \
+              --argjson workflow_id "$ci_workflow_id" '
               .id == $id and .run_attempt == 1 and
+              .workflow_id == $workflow_id and
               .head_sha == $sha and .head_branch == "main" and
-              .name == "CI" and .path == ".github/workflows/ci.yml" and
+              .path == ".github/workflows/ci.yml" and
               .event == "push" and .head_repository.full_name == $repo and
               .status == "completed" and .conclusion == "success"
             ' >/dev/null <<<"$source_boundary" || {
