@@ -120,3 +120,11 @@ Use this lightweight structure in the issue or PR:
 4. **Mitigation applied**
 5. **Permanent fix**
 6. **Preventive actions**
+
+For GitHub control-plane incidents, list the branch Git ref, REST PR head/base,
+GraphQL head/base, timeline or webhook payload, Actions event identity, and
+synthetic merge parents/tree separately with timestamps. Include every mutation
+receipt and the semantic ancestry/tree proof; do not flatten divergent planes
+into one “GitHub state.” Prevent recurrence with one absolute controller
+timeout, bounded child cleanup, no blind mutation retries, and the canonical
+single signed refresh-child rule in [`PR_FLOW.md`](PR_FLOW.md).

@@ -269,11 +269,21 @@ def test_gated_secret_scan_fetches_only_the_exact_event_range() -> None:
     assert "fetch-depth: 0" not in block
     assert "prepare-ci-secret-scan-range.sh" in block
     assert "github.event.pull_request.base.sha" in block
+    assert "github.event.pull_request.base.ref" in block
     assert "github.event.pull_request.head.sha" in block
     assert 'CURRENT_REF="refs/pull/${{ github.event.pull_request.number }}/head"' in block
+    assert (
+        "PULL_REQUEST_BASE_REF: ${{ github.event.pull_request.base.ref }}" in block
+    )
+    assert 'CURRENT_BASE_REF="refs/heads/$PULL_REQUEST_BASE_REF"' in block
+    assert 'CURRENT_BASE_REF="refs/heads/${{ github.event.pull_request.base.ref }}"' not in block
     assert "github.event.merge_group.base_sha" in block
     assert "github.event.before" in block
-    assert '"$BASE_SHA" "$GITHUB_SHA" "$CURRENT_REF" "$CURRENT_SHA"' in block
+    assert (
+        '"$BASE_SHA" "$GITHUB_SHA" "$CURRENT_REF" "$CURRENT_SHA" \\\n'
+        '            "$CURRENT_BASE_REF"'
+    ) in block
+    assert 'BASE_SHA="$(git rev-parse refs/secret-scan/exact-base)"' in block
     assert 'SECRET_SCAN_REMOTE_CURRENT_REF="$CURRENT_REF"' in block
     assert 'SECRET_SCAN_REMOTE_CURRENT_SHA="$CURRENT_SHA"' in block
     assert 'SECRET_SCAN_REMOTE_BASE_SHA="$BASE_SHA"' in block

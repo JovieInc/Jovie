@@ -93,6 +93,28 @@ It fails closed if an open PR is missing from that authoritative snapshot.
 - Queue enrollment is serialized by `merge-queue-drain-mutex`; it does not
   race another controller instance.
 
+### Update Branch convergence
+
+Update Branch can advance the branch Git ref before the PR database, timeline,
+webhook payload, and Actions event base converge. Record and inspect those
+planes separately. Accept the API rebase only with exact live-base/head
+ancestry and semantic-tree proof.
+
+Use one absolute controller timeout; every `gh`/`git` child gets only the
+remaining time and must be killed and reaped before releasing the mutex. If a
+proven rebase remains stuck in stale PR metadata long enough to block checks,
+make exactly one signed empty child with the same tree and ordinary
+fast-forward push it. Never force-push or retry Update Branch. Continue only
+after Git ref, REST, GraphQL, and Actions source identities all equal that child.
+
+Secret Scan anchors the range to immutable merge parent1, never the stale event
+base or a later live tip. It requires ordered parent1/exact-source identity,
+event-base ancestry into parent1, parent1 ancestry into the current base ref,
+an exact `merge-tree` reconstruction equal to the event tree, and source/base
+TOCTOU rechecks. Behind/diverged sources remain valid; missing proof fails
+closed. Checked-in built-in merge attributes are supported; server-only merge
+drivers or renormalization differences remain fail-closed.
+
 ## Guarded UI fast lane
 
 Small visual-only PRs may use `ui`, `fast-track-ui`, and `fast` only when the
