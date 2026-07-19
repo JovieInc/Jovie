@@ -54,9 +54,13 @@ export function ArtistProfileModeSwitcher({
       return;
     }
 
-    const listenIndex = adaptive.modes.findIndex(mode => mode.id === 'listen');
-    const tourIndex = adaptive.modes.findIndex(mode => mode.id === 'tour');
-    const firstIndex = Math.max(listenIndex, 0);
+    const upcomingReleaseIndex = adaptive.modes.findIndex(
+      mode => mode.id === 'upcoming-release'
+    );
+    const touringIndex = adaptive.modes.findIndex(
+      mode => mode.id === 'touring'
+    );
+    const firstIndex = Math.max(upcomingReleaseIndex, 0);
 
     sequenceStartedRef.current = true;
     setTabsVisible(true);
@@ -79,8 +83,8 @@ export function ArtistProfileModeSwitcher({
     };
 
     queueSelection(firstIndex, 220);
-    if (tourIndex >= 0 && tourIndex !== firstIndex) {
-      queueSelection(tourIndex, 1320);
+    if (touringIndex >= 0 && touringIndex !== firstIndex) {
+      queueSelection(touringIndex, 1320);
     }
   }, [adaptive.modes, reducedMotion]);
 
@@ -186,7 +190,9 @@ export function ArtistProfileModeSwitcher({
                   fill
                   sizes='(max-width: 640px) 100vw, 330px'
                   className='object-cover object-top'
-                  priority={activeMode?.id === 'listen' || activeMode === null}
+                  priority={
+                    activeMode?.id === 'upcoming-release' || activeMode === null
+                  }
                 />
               </motion.div>
             </AnimatePresence>

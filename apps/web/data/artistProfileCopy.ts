@@ -1,15 +1,7 @@
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 export interface ArtistProfileMode {
-  readonly id:
-    | 'listen'
-    | 'pay'
-    | 'tour'
-    | 'contact'
-    | 'upcoming-release'
-    | 'release-day'
-    | 'touring'
-    | 'live-support';
+  readonly id: 'upcoming-release' | 'release-day' | 'touring' | 'live-support';
   readonly label: string;
   readonly headline: string;
   readonly description: string;
