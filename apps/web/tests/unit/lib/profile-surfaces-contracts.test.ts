@@ -19,6 +19,14 @@ describe('canonicalizeSurfaceUrl', () => {
     });
   });
 
+  it('normalizes www aliases before generating the unique URL key', () => {
+    expect(canonicalizeSurfaceUrl('https://www.twitter.com/TimWhite')).toEqual({
+      url: 'https://x.com/TimWhite',
+      hostname: 'x.com',
+      isSharedHost: true,
+    });
+  });
+
   it('preserves meaningful query parameters and Unicode paths', () => {
     expect(
       canonicalizeSurfaceUrl('https://example.com/Tim%20White/?lang=en')

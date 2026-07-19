@@ -104,8 +104,8 @@ export function canonicalizeSurfaceUrl(
 
 function canonicalizeHostname(hostname: string): string {
   const lower = hostname.toLowerCase().replace(/\.$/, '');
-  if (CANONICAL_HOSTS[lower]) return CANONICAL_HOSTS[lower];
-  return lower.startsWith('www.') ? lower.slice(4) : lower;
+  const withoutWww = lower.startsWith('www.') ? lower.slice(4) : lower;
+  return CANONICAL_HOSTS[withoutWww] ?? withoutWww;
 }
 
 export function isSharedProfileHost(hostname: string): boolean {

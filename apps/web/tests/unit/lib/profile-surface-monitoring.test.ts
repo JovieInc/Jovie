@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const executeMock = vi.hoisted(() => vi.fn());
+const runLegacyDbTransactionMock = vi.hoisted(() => vi.fn());
+const withSerializableRetryMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/db', () => ({
-  db: { execute: executeMock },
+vi.mock('@/lib/db/legacy-transaction', () => ({
+  runLegacyDbTransaction: runLegacyDbTransactionMock,
+}));
+
+vi.mock('@/lib/db/serializable-retry', () => ({
+  withSerializableRetry: withSerializableRetryMock,
 }));
 
 import { swapProfileSurfaceMonitoring } from '@/lib/db/profile-surface-monitoring';
@@ -19,14 +25,30 @@ const INPUT = {
 describe('swapProfileSurfaceMonitoring', () => {
   beforeEach(() => {
     executeMock.mockReset();
+    runLegacyDbTransactionMock.mockReset();
+    withSerializableRetryMock.mockReset();
+    withSerializableRetryMock.mockImplementation(
+      async (operation: () => Promise<unknown>) => operation()
+    );
+    runLegacyDbTransactionMock.mockImplementation(
+      async (
+        operation: (tx: { execute: typeof executeMock }) => Promise<unknown>
+      ) => operation({ execute: executeMock })
+    );
   });
 
   it('returns true only when the atomic statement activates a row', async () => {
-    executeMock.mockResolvedValueOnce({ rows: [{ surface_id: 'surface' }] });
+    executeMock
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [{ surface_id: 'surface' }] });
     await expect(swapProfileSurfaceMonitoring(INPUT)).resolves.toBe(true);
 
-    executeMock.mockResolvedValueOnce({ rows: [] });
+    executeMock
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [] });
     await expect(swapProfileSurfaceMonitoring(INPUT)).resolves.toBe(false);
+    expect(withSerializableRetryMock).toHaveBeenCalledTimes(2);
+    expect(runLegacyDbTransactionMock).toHaveBeenCalledTimes(2);
   });
 
   it('rejects a zero limit without touching the database', async () => {
@@ -37,10 +59,22 @@ describe('swapProfileSurfaceMonitoring', () => {
   });
 
   it('supports unlimited plans through the same serialized statement', async () => {
-    executeMock.mockResolvedValueOnce({ rows: [{ surface_id: 'surface' }] });
+    executeMock
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [{ surface_id: 'surface' }] });
     await expect(
       swapProfileSurfaceMonitoring({ ...INPUT, limit: null })
     ).resolves.toBe(true);
-    expect(executeMock).toHaveBeenCalledOnce();
+    expect(executeMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects a self-swap without touching the database', async () => {
+    await expect(
+      swapProfileSurfaceMonitoring({
+        ...INPUT,
+        pauseSurfaceId: INPUT.activateSurfaceId,
+      })
+    ).resolves.toBe(false);
+    expect(executeMock).not.toHaveBeenCalled();
   });
 });

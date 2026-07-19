@@ -1,5 +1,6 @@
 import { sql as drizzleSql } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
+import { withSerializableRetry } from '@/lib/db/serializable-retry';
 
 export interface SwapProfileSurfaceMonitoringInput {
   readonly userId: string;
@@ -12,17 +13,24 @@ export interface SwapProfileSurfaceMonitoringInput {
 /**
  * Atomically activates one account-scoped surface preference.
  *
- * The advisory lock is scoped to this single SQL statement's transaction and
- * serializes concurrent activations for the same account/profile pair. The
- * caller must derive user/profile IDs from the authenticated session.
+ * A serializable transaction plus an account-scoped advisory lock prevents
+ * concurrent swaps from observing the same remaining quota slot. The caller
+ * must derive user/profile IDs from the authenticated session.
  */
 export async function swapProfileSurfaceMonitoring(
   input: SwapProfileSurfaceMonitoringInput
 ): Promise<boolean> {
   const effectiveLimit = input.limit ?? 2_147_483_647;
   if (effectiveLimit <= 0) return false;
+  if (input.pauseSurfaceId === input.activateSurfaceId) return false;
 
-  const result = await db.execute(drizzleSql`
+  const result = await withSerializableRetry(() =>
+    runLegacyDbTransaction(async tx => {
+      await tx.execute(
+        drizzleSql`SET TRANSACTION ISOLATION LEVEL SERIALIZABLE`
+      );
+
+      return tx.execute(drizzleSql`
     WITH target AS MATERIALIZED (
       SELECT id
       FROM profile_surfaces
@@ -85,7 +93,9 @@ export async function swapProfileSurfaceMonitoring(
       RETURNING surface_id
     )
     SELECT surface_id FROM activated
-  `);
+      `);
+    })
+  );
 
   return result.rows.length === 1;
 }
