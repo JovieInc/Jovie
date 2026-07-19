@@ -590,6 +590,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(beta).toContain('GH_TOKEN: ${{ github.token }}');
 
     expect(uploadMarker).toContain("needs.beta.result == 'success'");
+    expect(uploadMarker.match(/^    steps:$/gm)).toHaveLength(1);
     expect(uploadMarker).toContain('for attempt in $(seq 1 "$RUN_ATTEMPT")');
     expect(uploadMarker).toContain('upload_attempt="$attempt"');
     expect(uploadMarker).toContain(
@@ -2210,7 +2211,7 @@ describe('production promotion exact-artifact contract', () => {
       "if: ${{ steps.final-current.outputs.is_current == 'true' }}"
     );
     expect(promoteJob).toContain(
-      'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha }}'
+      'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha || steps.mutation-head.outputs.superseded_sha }}'
     );
     expect(verifyStep).toContain(
       'steps.promote.outputs.promotion_sha == inputs.expected_sha'
@@ -2231,6 +2232,10 @@ describe('production promotion exact-artifact contract', () => {
       'utf8'
     );
     const promoteJob = getJobBlock(reusable, 'promote-production');
+    const mutationHead = getStepBlock(
+      promoteJob,
+      'Recheck main immediately before production mutation'
+    );
     const result = getJobBlock(reusable, 'release-result');
     const verified = getJobBlock(controller, 'production-verified');
 
@@ -2238,7 +2243,10 @@ describe('production promotion exact-artifact contract', () => {
       'production_deployment_url_b64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}'
     );
     expect(promoteJob).toContain(
-      'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha }}'
+      'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha || steps.mutation-head.outputs.superseded_sha }}'
+    );
+    expect(mutationHead).toContain(
+      'echo "superseded_sha=$current_sha" >> "$GITHUB_OUTPUT"'
     );
     expect(promoteJob).toContain(
       'echo "superseded_sha=$current_main_sha" >> "$GITHUB_OUTPUT"'

@@ -457,7 +457,7 @@ jobs:
       # observation owns supersession semantics for downstream/result jobs.
       # The final-current fallback is populated only for a proven supersession.
       # A current generation still requires the inner pre-mutation script proof.
-      promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha }}
+      promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha || steps.mutation-head.outputs.superseded_sha }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -521,6 +521,7 @@ jobs:
             echo "is_current=true" >> "$GITHUB_OUTPUT"
           else
             echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha at production mutation."
+            echo "superseded_sha=$current_sha" >> "$GITHUB_OUTPUT"
             echo "is_current=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Build and stage production deployment

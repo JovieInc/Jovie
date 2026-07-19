@@ -137,6 +137,7 @@ test('desktop authorizer cross-proves exact Production Verified evidence', () =>
     /production-generation-verified-\$expected_sha/,
     /repos\/\$REPOSITORY\/commits\/main/,
   ]);
+  assert.equal(proof.match(/' <<<"\$jobs_json"\)"$/gm)?.length, 1);
   assert.doesNotMatch(header, /contents: write/);
   assert.doesNotMatch(authorize, /secrets\./);
   assert.ok(
