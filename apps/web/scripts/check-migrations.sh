@@ -61,7 +61,7 @@ fi
 log_info "Checking migrations against base: $BASE_BRANCH"
 
 # Get list of changed files in migrations directory
-CHANGED_FILES=$(git diff --name-status "$BASE_BRANCH"...HEAD -- "$MIGRATIONS_DIR" 2>/dev/null || echo "")
+CHANGED_FILES=$(git diff --name-status --relative "$BASE_BRANCH"...HEAD -- "$MIGRATIONS_DIR" 2>/dev/null || echo "")
 
 if [ -z "$CHANGED_FILES" ]; then
     log_success "No migration changes detected"
