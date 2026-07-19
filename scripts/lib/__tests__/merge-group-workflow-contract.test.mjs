@@ -118,12 +118,13 @@ describe('merge_group workflow contract', () => {
     expect(route).not.toContain('secrets.');
     expect(route).toContain('.github/scripts/query-runner-heartbeat.sh');
     expect(route).toContain('[ "$HEARTBEAT_HEALTH" = \'up\' ]');
-    expect(route).toContain("runner='ubuntu-latest'");
-    expect(route).toContain('jovie-runner|ubuntu-latest');
+    expect(route).toContain("runner_class='hosted'");
+    expect(route).toContain('fixed|hosted');
+    expect(route).not.toContain('runner: ${{ steps.route.outputs.runner }}');
     expect(units).toContain('ci-unit-runner-route');
     expect(units).toContain('ci-merge-group-admission');
     expect(units).toContain(
-      "runs-on: ${{ needs.ci-unit-runner-route.outputs.runner || 'ubuntu-latest' }}"
+      "runs-on: ${{ needs.ci-unit-runner-route.outputs.runner_class == 'fixed' && 'jovie-runner' || 'ubuntu-latest' }}"
     );
     expect(units).not.toContain('vars.CI_UNIT_RUNNER');
     expect(units).toContain('max-parallel: 2');

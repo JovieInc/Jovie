@@ -274,13 +274,13 @@ def _run_route_select(
         capture_output=True,
         check=False,
     )
-    route = ""
+    runner_class = ""
     if output.exists():
-        route = output.read_text(encoding="utf-8").strip().split("=", 1)[1]
-    return result, route
+        runner_class = output.read_text(encoding="utf-8").strip().split("=", 1)[1]
+    return result, runner_class
 
 
-def test_route_selects_only_allowlisted_fixed_or_hosted_labels(tmp_path: Path) -> None:
+def test_route_emits_only_non_sensitive_fixed_or_hosted_class(tmp_path: Path) -> None:
     fixed_result, fixed = _run_route_select(tmp_path / "fixed", "up")
     hosted_dir = tmp_path / "hosted"
     hosted_dir.mkdir()
@@ -292,9 +292,9 @@ def test_route_selects_only_allowlisted_fixed_or_hosted_labels(tmp_path: Path) -
     assert fixed_result.returncode == 0, fixed_result.stderr
     assert hosted_result.returncode == 0, hosted_result.stderr
     assert missing_result.returncode == 0, missing_result.stderr
-    assert fixed == "jovie-runner"
-    assert hosted == "ubuntu-latest"
-    assert missing == "ubuntu-latest"
+    assert fixed == "fixed"
+    assert hosted == "hosted"
+    assert missing == "hosted"
 
 
 def test_prelanding_missing_trusted_helper_routes_hosted(tmp_path: Path) -> None:
@@ -329,7 +329,7 @@ def test_prelanding_missing_trusted_helper_routes_hosted(tmp_path: Path) -> None
     assert "trusted heartbeat helper unavailable" in outputs["evidence"]
     route_result, route = _run_route_select(tmp_path / "route", outputs["health"])
     assert route_result.returncode == 0, route_result.stderr
-    assert route == "ubuntu-latest"
+    assert route == "hosted"
 
 
 def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
@@ -355,17 +355,20 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     assert "secrets." not in route
     assert "GH_TOKEN: ${{ github.token }}" in route
     assert "HEARTBEAT_API_TIMEOUT_SECONDS: '20'" in route
-    assert "jovie-runner|ubuntu-latest" in route
-    assert "runner='ubuntu-latest'" in route
+    assert "fixed|hosted" in route
+    assert "runner_class='hosted'" in route
+    assert "runner: ${{ steps.route.outputs.runner }}" not in route
     assert query.count('timeout "${HEARTBEAT_API_TIMEOUT_SECONDS}s" gh api') == 2
     assert 'head_repository.full_name == $repo' in query
     assert '.[0].run_id == $run_id' in query
     assert '.[0].head_sha == $head_sha' in query
     assert 'index("jovie-runner") != null' in query
-    assert "needs: [ci-path-changes, ci-unit-runner-route]" in units
     assert (
-        "runs-on: ${{ needs.ci-unit-runner-route.outputs.runner || "
-        "'ubuntu-latest' }}"
+        "[ci-path-changes, ci-unit-runner-route, ci-merge-group-admission]" in units
+    )
+    assert (
+        "runs-on: ${{ needs.ci-unit-runner-route.outputs.runner_class == "
+        "'fixed' && 'jovie-runner' || 'ubuntu-latest' }}"
     ) in units
     assert "vars.CI_UNIT_RUNNER" not in units
     assert "max-parallel: 2" in units
