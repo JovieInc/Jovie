@@ -37,6 +37,7 @@ export type CiFailureClass =
   | 'broad_test_performance_regression'
   | 'isolated_stuck_test_regression'
   | 'test_fixture_import_timeout'
+  | 'mobile_overflow_navigation_race'
   | 'runner_slice_task_saturation'
   | 'runner_process_exhaustion'
   | 'runner_io_pressure_admission'
@@ -573,6 +574,20 @@ const DIAGNOSES: ReadonlyArray<{
       'The HUD page test counted its cold dynamic module transform and import against the per-test timeout after resetting the module graph.',
     remediation:
       'Hoist the mocked HUD page import outside the timed test bodies and avoid resetting modules when the assertions do not require a fresh module graph.',
+  },
+  {
+    failureClass: 'mobile_overflow_navigation_race',
+    matches: log =>
+      /Mobile Overflow/i.test(log) &&
+      /auth-signin/i.test(log) &&
+      /page\.evaluate: Execution context was destroyed, most likely because of a navigation/i.test(
+        log
+      ) &&
+      /utils\/mobile-overflow\.ts/i.test(log),
+    rootCause:
+      'The no-auth mobile overflow lane only recognized a DOM data-dgst redirect marker, but the raw Next.js response carries the digest in its streamed Flight script, so DOM measurement began before navigation completed and invalidated the evaluation context.',
+    remediation:
+      'Parse the NEXT_REDIRECT digest from the raw response and wait for its exact target to finish loading before hydration and overflow measurement; do not retry page.evaluate.',
   },
   {
     failureClass: 'runner_slice_task_saturation',

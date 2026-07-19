@@ -263,6 +263,19 @@ const GTMQ_SOURCE_GATE_REAPER_PYTHON_TESTS = ['scripts/tests/test_gh_retry.py'];
 const GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = new Set([
+  'apps/web/tests/e2e/mobile-overflow.spec.ts',
+  'apps/web/tests/e2e/utils/mobile-overflow.ts',
+  'apps/web/tests/unit/e2e/mobile-overflow-navigation.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+]);
+const MOBILE_OVERFLOW_NAVIGATION_RACE_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+];
 const RUNNER_IO_PRESSURE_MANIFEST = new Set([
   '.github/runner-host/README.md',
   '.github/runner-host/autoscaler/controller-io-pressure.patch',
@@ -488,6 +501,13 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount === GTMQ_SOURCE_GATE_REAPER_MANIFEST.size &&
     files.length === GTMQ_SOURCE_GATE_REAPER_MANIFEST.size;
+  const mobileOverflowNavigationRaceInputCount = files.filter(file =>
+    MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.has(file)
+  ).length;
+  const isExactMobileOverflowNavigationRace =
+    mobileOverflowNavigationRaceInputCount ===
+      MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.size &&
+    files.length === MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.size;
   const runnerIoPressureInputCount = files.filter(file =>
     RUNNER_IO_PRESSURE_MANIFEST.has(file)
   ).length;
@@ -537,7 +557,9 @@ export function buildAffectedTestPlan(changedFiles) {
       !(
         isExactGoldenPathSmokeContractRepair &&
         file === 'apps/web/tests/e2e/golden-path.spec.ts'
-      )
+      ) &&
+      // Per docs/PR_FLOW.md, Playwright remains in hosted manual/deep lanes.
+      !(isExactMobileOverflowNavigationRace && file.endsWith('.spec.ts'))
   );
   const mandatoryTests = [];
   const hasSeedConfirmationChange = files.some(
@@ -675,6 +697,9 @@ export function buildAffectedTestPlan(changedFiles) {
     ...(isExactGtmqSourceGateReaper
       ? GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS
       : []),
+    ...(isExactMobileOverflowNavigationRace
+      ? MOBILE_OVERFLOW_NAVIGATION_RACE_SCRIPT_TESTS
+      : []),
     ...(isExactRunnerIoPressure ? RUNNER_IO_PRESSURE_SCRIPT_TESTS : []),
     ...(isExactRunnerPrerequisiteRepair
       ? RUNNER_PREREQUISITE_CONTROL_TESTS
@@ -709,6 +734,11 @@ export function buildAffectedTestPlan(changedFiles) {
     if (
       isExactPersistedAuthFixtureRepair &&
       PERSISTED_AUTH_FIXTURE_REPAIR_CORE.has(file)
+    )
+      return true;
+    if (
+      isExactMobileOverflowNavigationRace &&
+      MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.has(file)
     )
       return true;
     if (isExactRunnerIoPressure && RUNNER_IO_PRESSURE_MANIFEST.has(file))
@@ -771,6 +801,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactPersistedAuthFixtureRepair &&
     !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper &&
+    !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract &&
@@ -785,6 +816,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactGoldenPathSmokeContractRepair &&
     !isExactNeonAttemptArtifactRepair &&
     !isExactPersistedAuthFixtureRepair &&
+    !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract;
@@ -801,6 +833,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactPersistedAuthFixtureRepair &&
     !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper &&
+    !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract &&
@@ -816,6 +849,22 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactScannerLoadRepairPrimary &&
     !isExactVisualQaSelectorRepair &&
     !isExactPerformanceProfilerRepairWithSelector &&
+    !isExactMobileOverflowNavigationRace &&
+    !isExactRunnerIoPressure &&
+    !isExactRunnerPrerequisiteRepair &&
+    !isExactLayoutGuardContract &&
+    !isExactPrSizeGuardWithSelector;
+  const hasIncompleteMobileOverflowNavigationRace =
+    mobileOverflowNavigationRaceInputCount > 0 &&
+    !isExactMobileOverflowNavigationRace &&
+    !isExactAuthenticatedA11yRepair &&
+    !isExactAffectedTestSelector &&
+    !isExactGoldenPathSmokeContractRepair &&
+    !isExactNeonAttemptArtifactRepair &&
+    !isExactPerformanceProfilerRepair &&
+    !isExactPersistedAuthFixtureRepair &&
+    !isExactVisualQaSelectorRepair &&
+    !isExactGtmqSourceGateReaper &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract &&
@@ -831,6 +880,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper &&
     !isExactPerformanceProfilerRepair &&
+    !isExactMobileOverflowNavigationRace &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract &&
     !isExactPrSizeGuardWithSelector;
@@ -847,6 +897,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactPersistedAuthFixtureRepair &&
     !isExactLayoutGuardContract &&
     !isExactPerformanceProfilerRepair &&
+    !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactPrSizeGuardWithSelector;
   const hasIncompleteLayoutGuardContract =
@@ -862,6 +913,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactVisualQaSelectorRepair &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactPerformanceProfilerRepair &&
+    !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactPrSizeGuardWithSelector;
   const hasIncompleteNeonAttemptArtifactRepair =
@@ -876,6 +928,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactPersistedAuthFixtureRepair &&
     !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper &&
+    !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract &&
@@ -893,6 +946,7 @@ export function buildAffectedTestPlan(changedFiles) {
     hasIncompletePerformanceProfilerRepair ||
     hasIncompleteScannerLoadRepair ||
     hasIncompleteGtmqSourceGateReaper ||
+    hasIncompleteMobileOverflowNavigationRace ||
     hasIncompleteRunnerIoPressure ||
     hasIncompleteRunnerPrerequisiteContract ||
     hasIncompleteLayoutGuardContract ||
@@ -920,6 +974,7 @@ export function buildAffectedTestPlan(changedFiles) {
             isExactPersistedAuthFixtureRepair ||
             isExactVisualQaSelectorRepair ||
             isExactGtmqSourceGateReaper ||
+            isExactMobileOverflowNavigationRace ||
             isExactRunnerIoPressure ||
             isExactRunnerPrerequisiteRepair ||
             isExactLayoutGuardContract)
