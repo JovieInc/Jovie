@@ -365,18 +365,26 @@ jobs:
           baseline_sha=""
           publish_markers="$(gh api \
             "repos/$REPOSITORY/actions/artifacts?name=desktop-production-published&per_page=100")"
-          jq -e 'type == "object" and (.artifacts | type == "array")' \
+          jq -e '
+            type == "object" and (.artifacts | type == "array") and
+            all(.artifacts[];
+              type == "object" and
+              .name == "desktop-production-published" and
+              (.id | type == "number" and . > 0) and
+              (.expired | type == "boolean") and
+              (.created_at | type == "string" and length > 0) and
+              (.workflow_run.id | type == "number" and . > 0)
+            )
+          ' \
             >/dev/null <<<"$publish_markers" || {
             echo "::error::GitHub returned malformed desktop publish markers."
             exit 1
           }
-          publish_marker_count="$(jq '[
-            .artifacts[]?
-            | select(
-                .expired == false and
-                .name == "desktop-production-published"
-              )
-          ] | length' <<<"$publish_markers")"
+          # Any exact-name history is durable evidence that a desktop release
+          # may already have been published. Expired-only evidence may use the
+          # bounded publisher recovery below, but must never become bootstrap.
+          publish_marker_presence_count="$(jq '.artifacts | length' \
+            <<<"$publish_markers")"
           marker_candidates="$(jq -r '
             [
               .artifacts[]?
@@ -495,11 +503,6 @@ jobs:
             break
           done <<<"$marker_candidates"
 
-          if [ "$publish_marker_count" -gt 0 ] && [ -z "$baseline_sha" ]; then
-            echo "::error::$publish_marker_count desktop publish marker(s) existed, but none fully proved a release."
-            exit 1
-          fi
-
           # Recover publish truth when the release mutation succeeded but its
           # dependent marker job failed. This also makes rerun-all idempotent.
           if [ -z "$baseline_sha" ]; then
@@ -594,6 +597,11 @@ jobs:
                 break
               fi
             done <<<"$recovery_candidates"
+          fi
+
+          if [ "$publish_marker_presence_count" -gt 0 ] && [ -z "$baseline_sha" ]; then
+            echo "::error::$publish_marker_presence_count desktop publish marker(s) existed, but none fully proved a release."
+            exit 1
           fi
 
           # Migration-only fallback for the legacy raw-push workflow.

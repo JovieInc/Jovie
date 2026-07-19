@@ -167,7 +167,9 @@ test('desktop dedup cross-proves an actual-publish-only marker', () => {
     /\.publisherJobId/,
     /actions\/workflows\/\$workflow_id/,
     /\.name == "desktop-release"/,
-    /publish_marker_count.*-gt 0/s,
+    /all\(\.artifacts\[\];[\s\S]*\.name == "desktop-production-published"/,
+    /publish_marker_presence_count="\$\(jq '\.artifacts \| length'/,
+    /publish_marker_presence_count.*-gt 0/s,
     /status=completed&per_page=25/,
     /Recovered exact desktop publish/,
     /desktop-release\.yml\/runs\?branch=main&event=push&status=success&per_page=100/,
@@ -183,6 +185,62 @@ test('desktop dedup cross-proves an actual-publish-only marker', () => {
   assert.doesNotMatch(select, /apps\/desktop/);
   assert.doesNotMatch(select, /desktop-release\.yml/);
   assert.doesNotMatch(proof, /gh api[\s\S]{0,160}\|\| continue/);
+  const failClosedIndex = proof.indexOf(
+    'if [ "$publish_marker_presence_count" -gt 0 ]'
+  );
+  assert.ok(
+    failClosedIndex > proof.indexOf('recovery_candidates='),
+    'marker history must allow exact publisher recovery first'
+  );
+  assert.ok(
+    failClosedIndex < proof.indexOf('legacy_runs_json='),
+    'unproved marker history must fail before legacy or bootstrap fallback'
+  );
+});
+
+test('desktop stable marker listing distinguishes empty from unprovable history', () => {
+  const proof = step(
+    job(desktopWorkflow, 'authorize-release'),
+    'Cross-prove exact production evidence'
+  );
+  const validationStart = proof.indexOf(
+    "          jq -e '\n",
+    proof.indexOf('publish_markers=')
+  );
+  const validationEnd = proof.indexOf("\n          ' \\\n", validationStart);
+  assert.ok(validationStart >= 0 && validationEnd > validationStart);
+  const validationProgram = proof.slice(
+    validationStart + "          jq -e '\n".length,
+    validationEnd
+  );
+  const marker = {
+    id: 1,
+    name: 'desktop-production-published',
+    expired: true,
+    created_at: '2026-07-19T00:00:00Z',
+    workflow_run: { id: 2 },
+  };
+
+  assert.doesNotThrow(() =>
+    execFileSync('jq', ['-e', validationProgram], {
+      input: JSON.stringify({ artifacts: [marker] }),
+    })
+  );
+  assert.throws(() =>
+    execFileSync('jq', ['-e', validationProgram], {
+      input: JSON.stringify({
+        artifacts: [{ ...marker, name: 'unexpected-marker' }],
+      }),
+      stdio: ['pipe', 'ignore', 'ignore'],
+    })
+  );
+  assert.equal(
+    execFileSync('jq', ['-r', '.artifacts | length'], {
+      encoding: 'utf8',
+      input: JSON.stringify({ artifacts: [marker] }),
+    }).trim(),
+    '1'
+  );
 });
 
 test('desktop recovery ignores legacy push titles and selects new run-name evidence', () => {
