@@ -18,6 +18,7 @@ export const REQUIRED_INCIDENT_IDS = [
   'ci-release/superseded-run-capacity',
   'ci-release/runner-heartbeat-routing',
   'ci-release/runner-image-prerequisites',
+  'ci-release/runner-image-source-sha-provenance',
   'ci-release/cache-artifact-fanout',
   'ci-release/runner-emergency-headroom',
   'ci-release/sentry-read-gate-scopes',
@@ -30,8 +31,12 @@ export const REQUIRED_INCIDENT_IDS = [
   'ci-release/production-evidence-freshness',
   'ci-release/controller-loop-bounds',
   'ci-release/gbrain-readiness-diagnosis',
+  'ci-release/gbrain-pool-recovery',
   'ci-release/coordination-query-bounds',
+  'ci-release/agent-task-identity-context-drift',
   'ci-release/admin-secret-log-redaction',
+  'ci-release/gbrain-admin-secret-log-redaction',
+  'ci-release/secret-scan-synthetic-merge-base',
 ];
 
 const REQUIRED_STAGES = new Set([
@@ -43,12 +48,35 @@ const REQUIRED_STAGES = new Set([
   'operator-bootstrap',
 ]);
 
+const CANONICAL_TEMPLATE = {
+  repository: 'JovieInc/ci',
+  template: 'templates/jovie-ci-release-prevention',
+  bootstrap: 'templates/jovie-ci-release-prevention/bootstrap.mjs',
+  workflow: '.github/workflows/verify-ci-release-prevention.yml@v1',
+  manifest: 'ci-release-prevention.yml',
+  requiredFields: [
+    'template',
+    'template_version',
+    'ledger',
+    'verifier',
+    'scaffold_proof',
+  ],
+};
+
+const CANONICAL_SCAFFOLD_PROOF = {
+  repository: 'JovieInc/ci',
+  path: 'scripts/test-jovie-ci-template-scaffold.mjs',
+  command: 'node scripts/test-jovie-ci-template-scaffold.mjs',
+};
+
 function nonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
 function localPath(value) {
-  return nonEmptyString(value) && !value.startsWith('/') && !value.includes('..');
+  return (
+    nonEmptyString(value) && !value.startsWith('/') && !value.includes('..')
+  );
 }
 
 function requireExistingPath(value, label, errors) {
@@ -59,10 +87,24 @@ function requireExistingPath(value, label, errors) {
   }
 }
 
+function requireFileText(path, expected, label, errors) {
+  if (!localPath(path) || !existsSync(resolve(path))) return;
+  if (!readFileSync(resolve(path), 'utf8').includes(expected)) {
+    errors.push(`${label} must index ${expected}`);
+  }
+}
+
 export function validateIncidentLedger(ledger) {
   const errors = [];
-  if (!ledger || ledger.schemaVersion !== 1 || !Array.isArray(ledger.incidents)) {
-    return { ok: false, errors: ['ledger must contain schemaVersion 1 and an incidents array'] };
+  if (
+    !ledger ||
+    ledger.schemaVersion !== 1 ||
+    !Array.isArray(ledger.incidents)
+  ) {
+    return {
+      ok: false,
+      errors: ['ledger must contain schemaVersion 1 and an incidents array'],
+    };
   }
 
   const seen = new Set();
@@ -74,13 +116,15 @@ export function validateIncidentLedger(ledger) {
     }
     if (seen.has(id)) errors.push(`duplicate incident id: ${id}`);
     seen.add(id);
-    if (!nonEmptyString(incident.failureMode)) errors.push(`${id}: failureMode is required`);
+    if (!nonEmptyString(incident.failureMode))
+      errors.push(`${id}: failureMode is required`);
 
     const regression = incident.regression;
     if (!regression || !['test', 'verifier'].includes(regression.kind)) {
       errors.push(`${id}: regression.kind must be test or verifier`);
     }
-    if (!nonEmptyString(regression?.command)) errors.push(`${id}: regression.command is required`);
+    if (!nonEmptyString(regression?.command))
+      errors.push(`${id}: regression.command is required`);
     requireExistingPath(regression?.path, `${id}: regression.path`, errors);
 
     if (!REQUIRED_STAGES.has(incident.ciStageOwner?.stage)) {
@@ -90,15 +134,46 @@ export function validateIncidentLedger(ledger) {
       errors.push(`${id}: ciStageOwner.owner is required`);
     }
 
-    requireExistingPath(incident.documentation?.operator, `${id}: documentation.operator`, errors);
-    requireExistingPath(incident.documentation?.postmortem, `${id}: documentation.postmortem`, errors);
-    requireExistingPath(incident.templatePropagation?.path, `${id}: templatePropagation.path`, errors);
-    if (!nonEmptyString(incident.templatePropagation?.source)) {
-      errors.push(`${id}: templatePropagation.source is required`);
+    requireExistingPath(
+      incident.documentation?.operator,
+      `${id}: documentation.operator`,
+      errors
+    );
+    requireExistingPath(
+      incident.documentation?.postmortem,
+      `${id}: documentation.postmortem`,
+      errors
+    );
+    requireFileText(
+      incident.documentation?.operator,
+      id,
+      `${id}: documentation.operator`,
+      errors
+    );
+    requireFileText(
+      incident.documentation?.postmortem,
+      'CI_RELEASE_INCIDENTS.md',
+      `${id}: documentation.postmortem`,
+      errors
+    );
+    for (const [field, expected] of Object.entries(CANONICAL_TEMPLATE)) {
+      const actual = incident.templatePropagation?.[field];
+      if (Array.isArray(expected)) {
+        if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+          errors.push(
+            `${id}: templatePropagation.${field} must match the canonical JovieInc/ci manifest fields`
+          );
+        }
+      } else if (actual !== expected) {
+        errors.push(
+          `${id}: templatePropagation.${field} must equal ${expected}`
+        );
+      }
     }
-    requireExistingPath(incident.scaffoldProof?.path, `${id}: scaffoldProof.path`, errors);
-    if (!nonEmptyString(incident.scaffoldProof?.command)) {
-      errors.push(`${id}: scaffoldProof.command is required`);
+    for (const [field, expected] of Object.entries(CANONICAL_SCAFFOLD_PROOF)) {
+      if (incident.scaffoldProof?.[field] !== expected) {
+        errors.push(`${id}: scaffoldProof.${field} must equal ${expected}`);
+      }
     }
   }
 
@@ -106,18 +181,22 @@ export function validateIncidentLedger(ledger) {
     if (!seen.has(id)) errors.push(`required incident missing: ${id}`);
   }
   for (const id of seen) {
-    if (!REQUIRED_INCIDENT_IDS.includes(id)) errors.push(`unregistered incident id: ${id}`);
+    if (!REQUIRED_INCIDENT_IDS.includes(id))
+      errors.push(`unregistered incident id: ${id}`);
   }
   return { ok: errors.length === 0, errors };
 }
 
 function main() {
-  const ledgerPath = process.argv[2] ?? '.github/ci-harness/ci-release-incidents.json';
+  const ledgerPath =
+    process.argv[2] ?? '.github/ci-harness/ci-release-incidents.json';
   let ledger;
   try {
     ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'));
   } catch (error) {
-    console.error(`Unable to read incident ledger ${ledgerPath}: ${error.message}`);
+    console.error(
+      `Unable to read incident ledger ${ledgerPath}: ${error.message}`
+    );
     process.exitCode = 1;
     return;
   }
@@ -128,7 +207,9 @@ function main() {
     process.exitCode = 1;
     return;
   }
-  console.log(`CI release incident contract valid (${ledger.incidents.length} incidents).`);
+  console.log(
+    `CI release incident contract valid (${ledger.incidents.length} incidents).`
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main();

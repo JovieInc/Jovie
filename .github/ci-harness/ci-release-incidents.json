@@ -18,12 +18,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -43,12 +54,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -68,12 +90,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -93,12 +126,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -118,12 +162,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -143,12 +198,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -168,12 +234,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -193,12 +270,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -218,12 +306,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -243,12 +342,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -268,12 +378,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -293,12 +414,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -318,12 +450,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -343,12 +486,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -368,12 +522,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -393,12 +558,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -418,12 +594,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -443,12 +630,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -468,12 +666,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -493,12 +702,23 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     },
     {
@@ -518,12 +738,203 @@
         "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
       },
       "templatePropagation": {
-        "source": "JovieInc/ci",
-        "path": "templates/jovie-ci-release-prevention/ci-release-prevention.yml"
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
       },
       "scaffoldProof": {
-        "command": "node scripts/test-jovie-ci-template-scaffold.mjs",
-        "path": "scripts/test-jovie-ci-template-scaffold.mjs"
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/runner-image-source-sha-provenance",
+      "failureMode": "Runner image source-SHA provenance is absent or does not bind the installed payload to its source revision.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm --filter @jovie/web exec vitest run tests/unit/ci/supply-chain-provenance.test.ts",
+        "path": "apps/web/tests/unit/ci/supply-chain-provenance.test.ts"
+      },
+      "ciStageOwner": {
+        "stage": "operator-bootstrap",
+        "owner": "Runner image"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/gbrain-pool-recovery",
+      "failureMode": "GBrain pool recovery permits wedged sessions to remain allocated or retries recovery without bounded diagnostics.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm ci:control:test",
+        "path": "scripts/lib/__tests__/gbrain-pool-env.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "scheduled-control-plane",
+        "owner": "GBrain operations"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/agent-task-identity-context-drift",
+      "failureMode": "Agent tasks lose bounded identity or context and act against the wrong ownership or checkout state.",
+      "regression": {
+        "kind": "test",
+        "command": "node --test scripts/agent/preflight.test.mjs",
+        "path": "scripts/agent/preflight.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "scheduled-control-plane",
+        "owner": "Agent coordination"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/gbrain-admin-secret-log-redaction",
+      "failureMode": "GBrain administrative credentials enter persistent service logs instead of redacted diagnostics.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm ci:control:test",
+        "path": "scripts/lib/__tests__/gbrain-health-summary.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "operator-bootstrap",
+        "owner": "GBrain operations"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/secret-scan-synthetic-merge-base",
+      "failureMode": "Secret scanning uses a mutable live base rather than immutable synthetic parent1 and exact source parent2 merge-tree evidence.",
+      "regression": {
+        "kind": "verifier",
+        "command": "./scripts/security/scan-secrets.sh ci-pr origin/main",
+        "path": "scripts/security/scan-secrets.sh"
+      },
+      "ciStageOwner": {
+        "stage": "merge-group",
+        "owner": "Security"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@v1",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ]
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
       }
     }
   ]
