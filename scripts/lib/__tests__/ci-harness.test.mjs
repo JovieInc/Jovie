@@ -1,6 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildCiHarnessArtifact,
@@ -34,6 +41,52 @@ const EXPECTED_MERGE_GATE_NAMES = [
 ];
 
 describe('ci-harness manifest', () => {
+  it('counts migration files relative to the apps/web working directory', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-migration-guard-'));
+    const webRoot = resolve(root, 'apps/web');
+    const migrations = resolve(webRoot, 'drizzle/migrations');
+    const runGit = (...args) =>
+      spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+
+    try {
+      mkdirSync(migrations, { recursive: true });
+      writeFileSync(resolve(migrations, '0080_existing.sql'), 'SELECT 1;\n');
+      expect(runGit('init', '-q').status).toBe(0);
+      expect(runGit('config', 'user.name', 'Migration Guard Test').status).toBe(
+        0
+      );
+      expect(
+        runGit('config', 'user.email', 'migration-guard@example.com').status
+      ).toBe(0);
+      expect(runGit('add', '.').status).toBe(0);
+      expect(runGit('commit', '-q', '--no-gpg-sign', '-m', 'base').status).toBe(
+        0
+      );
+      const base = runGit('rev-parse', 'HEAD').stdout.trim();
+
+      writeFileSync(resolve(migrations, '0081_new.sql'), 'SELECT 2;\n');
+      expect(runGit('add', '.').status).toBe(0);
+      expect(
+        runGit('commit', '-q', '--no-gpg-sign', '-m', 'migration').status
+      ).toBe(0);
+
+      const result = spawnSync(
+        'bash',
+        [resolve(REPO_ROOT, 'apps/web/scripts/check-migrations.sh'), base],
+        {
+          cwd: webRoot,
+          encoding: 'utf8',
+          env: { ...process.env, SKIP_MIGRATION_GUARD: '' },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('A\tdrizzle/migrations/0081_new.sql');
+      expect(result.stdout).toContain('Added: 1 files');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('validates the checked-in manifest', () => {
     const validation = validateCiHarnessManifest(manifest);
     expect(validation.errors).toEqual([]);
