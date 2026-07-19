@@ -276,6 +276,37 @@ describe('ci-harness manifest', () => {
     );
   });
 
+  it('binds the production Sentry gate to its environment before reading secrets', () => {
+    const workflow = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/production-release.yml'),
+      'utf8'
+    );
+    const sentryGate = extractWorkflowJobBlock(workflow, 'sentry-error-gate');
+
+    expect(sentryGate).not.toContain(
+      'uses: ./.github/workflows/sentry-error-gate.yml'
+    );
+    expect(sentryGate).toContain('runs-on: ubuntu-latest');
+    expect(sentryGate).toContain('name: Production – jovie');
+    expect(sentryGate).toContain('uses: ./.github/actions/sentry-error-gate');
+    expect(sentryGate).toContain(
+      'sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}'
+    );
+    expect(sentryGate.indexOf('name: Production – jovie')).toBeLessThan(
+      sentryGate.indexOf('sentry-auth-token:')
+    );
+    expect(sentryGate).not.toContain('secrets: inherit');
+
+    const action = readFileSync(
+      resolve(REPO_ROOT, '.github/actions/sentry-error-gate/action.yml'),
+      'utf8'
+    );
+    expect(action).toContain(
+      "SENTRY_AUTH_TOKEN: ${{ inputs['sentry-auth-token'] }}"
+    );
+    expect(action).not.toContain('secrets.');
+  });
+
   it('keeps build and layout in one hosted merge-group workspace', () => {
     const workflow = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/ci.yml'),

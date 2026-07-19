@@ -1,28 +1,8 @@
-# Sentry Error Rate Gate
+# Reusable wrapper for the production Sentry error-rate gate.
 #
-# PURPOSE: Post-deploy safety net that compares Sentry error rates before and
-# after a production deployment. If error rate spikes beyond threshold,
-# reports an observational gate result to the production controller.
-#
-# This catches regressions that the canary health gate misses — the canary
-# checks "does the app respond?", while this checks "is the app throwing
-# more errors than before?"
-#
-# TRIGGER: Called by the serialized production release after promotion
-#
-# HOW IT WORKS:
-# 1. Query Sentry API for baseline error count (30 min window before deploy)
-# 2. Wait for errors to accumulate post-deploy (configurable soak period)
-# 3. Query Sentry API for post-deploy error count (same window duration)
-# 4. Compare: if post-deploy errors > baseline * threshold_multiplier → FAIL
-# 5. On failure: emit `gate_status=failed`; the production controller owns the
-#    only rollback and notification path.
-#
-# SAFETY:
-# - Uses statistical comparison, not absolute counts (handles normal error noise)
-# - Configurable threshold multiplier (default 3x = 300% increase)
-# - Minimum baseline threshold prevents false positives on low-traffic periods
-# - This workflow has no production mutation credentials or rollback command
+# Production release invokes the local action from an ordinary environment-bound
+# job. That binding is required because environment secrets cannot be forwarded
+# through a nested reusable-workflow chain.
 
 name: Sentry Error Gate
 
@@ -30,39 +10,44 @@ on:
   workflow_call:
     inputs:
       deployment_url:
-        description: 'The deployment URL that was just deployed'
+        description: The deployment URL that was just deployed.
         required: true
         type: string
       soak_minutes:
-        description: 'Minutes to wait after deploy before checking error rates'
+        description: Minutes to wait after deploy before checking error rates.
         required: false
         default: 5
         type: number
       baseline_window_minutes:
-        description: 'Minutes of pre-deploy history to use as baseline'
+        description: Minutes of pre-deploy history to use as baseline.
         required: false
         default: 30
         type: number
       threshold_multiplier:
-        description: 'Error rate multiplier that fails the gate (e.g., 3 = 300% increase)'
+        description: Error-rate multiplier that fails the gate.
         required: false
         default: 3
         type: number
       min_baseline_errors:
-        description: 'Minimum baseline errors required to trigger comparison (prevents false positives in low-traffic)'
+        description: Minimum baseline errors required to use rate comparison.
         required: false
         default: 5
         type: number
+    secrets:
+      SENTRY_AUTH_TOKEN:
+        description: Optional explicit Sentry token for non-environment callers.
+        required: false
     outputs:
       gate_status:
-        description: 'Observational gate result: passed, confirmed failed, or error'
+        description: Observational gate result.
         value: ${{ jobs.sentry-gate.outputs.gate_status }}
       baseline_errors:
-        description: 'Number of errors in baseline window'
+        description: Number of errors in the baseline window.
         value: ${{ jobs.sentry-gate.outputs.baseline_errors }}
       post_deploy_errors:
-        description: 'Number of errors in post-deploy window'
+        description: Number of errors in the post-deploy window.
         value: ${{ jobs.sentry-gate.outputs.post_deploy_errors }}
+
 permissions:
   contents: read
 
@@ -74,218 +59,20 @@ jobs:
     environment:
       name: Production – jovie
     outputs:
-      gate_status: ${{ steps.gate-result.outputs.gate_status }}
-      baseline_errors: ${{ steps.baseline.outputs.error_count }}
-      post_deploy_errors: ${{ steps.post-deploy.outputs.error_count }}
+      gate_status: ${{ steps.sentry-gate.outputs.gate_status }}
+      baseline_errors: ${{ steps.sentry-gate.outputs.baseline_errors }}
+      post_deploy_errors: ${{ steps.sentry-gate.outputs.post_deploy_errors }}
     steps:
-      - name: Require canonical production Sentry configuration
-        id: sentry-config
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: jovie
-          SENTRY_PROJECT: jovie-web
-        run: |
-          set -euo pipefail
-          test -n "$SENTRY_AUTH_TOKEN" || {
-            echo "::error::Production environment SENTRY_AUTH_TOKEN is unavailable."
-            exit 1
-          }
-          [ "$SENTRY_ORG" = "jovie" ] && [ "$SENTRY_PROJECT" = "jovie-web" ] || {
-            echo "::error::Canonical production Sentry identity is invalid."
-            exit 1
-          }
-          soak_minutes="${{ inputs.soak_minutes }}"
-          baseline_minutes="${{ inputs.baseline_window_minutes }}"
-          threshold_multiplier="${{ inputs.threshold_multiplier }}"
-          min_baseline_errors="${{ inputs.min_baseline_errors }}"
-          [[ "$soak_minutes" =~ ^[1-9][0-9]*$ ]] && [ "$soak_minutes" -le 60 ] &&
-            [[ "$baseline_minutes" =~ ^[1-9][0-9]*$ ]] && [ "$baseline_minutes" -le 1440 ] &&
-            [[ "$threshold_multiplier" =~ ^[1-9][0-9]*$ ]] && [ "$threshold_multiplier" -le 100 ] &&
-            [[ "$min_baseline_errors" =~ ^[0-9]+$ ]] && [ "$min_baseline_errors" -le 100000 ] || {
-            echo "::error::Sentry gate numeric inputs are outside safe positive bounds."
-            exit 1
-          }
-          project_response="$(curl --fail --silent --show-error \
-            -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
-            "https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/")"
-          project_id="$(jq -r '.id // empty | tostring' <<<"$project_response")"
-          [[ "$project_id" =~ ^[1-9][0-9]*$ ]] || {
-            echo "::error::Sentry project resolution returned no numeric project ID."
-            exit 1
-          }
-          echo "project_id=$project_id" >> "$GITHUB_OUTPUT"
-          echo "gate_start_epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
-
-      - name: Query baseline error rate (pre-deploy)
-        id: baseline
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: jovie
-          SENTRY_PROJECT_ID: ${{ steps.sentry-config.outputs.project_id }}
-        run: |
-          set -euo pipefail
-          WINDOW_MINUTES="${{ inputs.baseline_window_minutes }}"
-          GATE_START_EPOCH="${{ steps.sentry-config.outputs.gate_start_epoch }}"
-
-          # Baseline ends exactly when the gate starts. The post window begins
-          # at that same boundary, so the observations never overlap.
-          END_EPOCH=$GATE_START_EPOCH
-          START_EPOCH=$((END_EPOCH - WINDOW_MINUTES * 60))
-
-          START_ISO=$(date -u -d "@$START_EPOCH" '+%Y-%m-%dT%H:%M:%S')
-          END_ISO=$(date -u -d "@$END_EPOCH" '+%Y-%m-%dT%H:%M:%S')
-
-          echo "Baseline window: $START_ISO to $END_ISO ($WINDOW_MINUTES min)"
-
-          # Count total events across all issues in the window
-          # Use the stats endpoint for more accurate event counts
-          STATS_RESPONSE=$(curl --fail --silent --show-error \
-            -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
-            "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/?project=$SENTRY_PROJECT_ID&field=count()&start=$START_ISO&end=$END_ISO&interval=1m")
-
-          jq -e '
-            type == "object" and
-            (.data | type == "array") and
-            all(.data[];
-              type == "array" and length >= 2 and
-              (.[1] | type == "array") and
-              all(.[1][]; (.count | type == "number"))
-            )
-          ' >/dev/null <<<"$STATS_RESPONSE"
-          ERROR_COUNT=$(jq -r '[.data[]?[1][]?.count] | add // 0' <<<"$STATS_RESPONSE")
-          [[ "$ERROR_COUNT" =~ ^[0-9]+$ ]] || {
-            echo "::error::Sentry baseline count is not a non-negative integer."
-            exit 1
-          }
-
-          echo "Baseline error count: $ERROR_COUNT"
-          echo "error_count=$ERROR_COUNT" >> "$GITHUB_OUTPUT"
-
-      - name: Wait for post-deploy soak period
-        run: |
-          SOAK="${{ inputs.soak_minutes }}"
-          echo "Waiting ${SOAK} minutes for errors to accumulate post-deploy..."
-          sleep $((SOAK * 60))
-
-      - name: Query post-deploy error rate
-        id: post-deploy
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: jovie
-          SENTRY_PROJECT_ID: ${{ steps.sentry-config.outputs.project_id }}
-        run: |
-          set -euo pipefail
-          SOAK_MINUTES="${{ inputs.soak_minutes }}"
-          GATE_START_EPOCH="${{ steps.sentry-config.outputs.gate_start_epoch }}"
-
-          START_EPOCH=$GATE_START_EPOCH
-          END_EPOCH=$((GATE_START_EPOCH + SOAK_MINUTES * 60))
-
-          START_ISO=$(date -u -d "@$START_EPOCH" '+%Y-%m-%dT%H:%M:%S')
-          END_ISO=$(date -u -d "@$END_EPOCH" '+%Y-%m-%dT%H:%M:%S')
-
-          echo "Post-deploy window: $START_ISO to $END_ISO ($SOAK_MINUTES min)"
-
-          STATS_RESPONSE=$(curl --fail --silent --show-error \
-            -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
-            "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/?project=$SENTRY_PROJECT_ID&field=count()&start=$START_ISO&end=$END_ISO&interval=1m")
-
-          jq -e '
-            type == "object" and
-            (.data | type == "array") and
-            all(.data[];
-              type == "array" and length >= 2 and
-              (.[1] | type == "array") and
-              all(.[1][]; (.count | type == "number"))
-            )
-          ' >/dev/null <<<"$STATS_RESPONSE"
-          ERROR_COUNT=$(jq -r '[.data[]?[1][]?.count] | add // 0' <<<"$STATS_RESPONSE")
-          [[ "$ERROR_COUNT" =~ ^[0-9]+$ ]] || {
-            echo "::error::Sentry post-deploy count is not a non-negative integer."
-            exit 1
-          }
-
-          echo "Post-deploy error count: $ERROR_COUNT"
-          echo "error_count=$ERROR_COUNT" >> "$GITHUB_OUTPUT"
-
-      - name: Evaluate error rate comparison
-        id: evaluate
-        run: |
-          BASELINE="${{ steps.baseline.outputs.error_count }}"
-          POST_DEPLOY="${{ steps.post-deploy.outputs.error_count }}"
-          THRESHOLD="${{ inputs.threshold_multiplier }}"
-          MIN_BASELINE="${{ inputs.min_baseline_errors }}"
-          BASELINE_MINUTES="${{ inputs.baseline_window_minutes }}"
-          POST_MINUTES="${{ inputs.soak_minutes }}"
-
-          echo "=== Sentry Error Rate Comparison ==="
-          echo "Baseline errors: $BASELINE"
-          echo "Post-deploy errors: $POST_DEPLOY"
-          echo "Threshold multiplier: ${THRESHOLD}x"
-          echo "Minimum baseline: $MIN_BASELINE"
-
-          # Skip comparison if baseline is too low (not enough signal)
-          if [[ "$BASELINE" -lt "$MIN_BASELINE" ]]; then
-            echo "Baseline too low ($BASELINE < $MIN_BASELINE). Checking absolute count instead."
-
-            # Compare against an absolute rate of 50 errors per baseline window.
-            if [[ $((POST_DEPLOY * BASELINE_MINUTES)) -gt $((50 * POST_MINUTES)) ]]; then
-              echo "High absolute post-deploy error rate"
-              echo "gate_status=failed" >> "$GITHUB_OUTPUT"
-              echo "reason=High absolute error rate: $POST_DEPLOY errors in ${POST_MINUTES}m" >> "$GITHUB_OUTPUT"
-            else
-              echo "Post-deploy errors within acceptable range"
-              echo "gate_status=passed" >> "$GITHUB_OUTPUT"
-              echo "reason=Low baseline ($BASELINE), post-deploy errors ($POST_DEPLOY) within acceptable range" >> "$GITHUB_OUTPUT"
-            fi
-            exit 0
-          fi
-
-          # Dimensionally correct rate comparison without floating point:
-          # post/postMinutes > threshold * baseline/baselineMinutes.
-          POST_RATE_SCALED=$((POST_DEPLOY * BASELINE_MINUTES))
-          BASELINE_RATE_LIMIT_SCALED=$((BASELINE * THRESHOLD * POST_MINUTES))
-
-          if [[ "$POST_RATE_SCALED" -gt "$BASELINE_RATE_LIMIT_SCALED" ]]; then
-            RATIO=$((POST_DEPLOY * BASELINE_MINUTES * 100 / (BASELINE * POST_MINUTES)))
-            echo "ERROR RATE SPIKE DETECTED: ${RATIO}% of baseline rate (threshold: ${THRESHOLD}00%)"
-            echo "gate_status=failed" >> "$GITHUB_OUTPUT"
-            echo "reason=Error rate spike: ${RATIO}% of baseline rate (${POST_DEPLOY}/${POST_MINUTES}m vs ${BASELINE}/${BASELINE_MINUTES}m)" >> "$GITHUB_OUTPUT"
-          else
-            echo "Error rate within acceptable range"
-            echo "gate_status=passed" >> "$GITHUB_OUTPUT"
-            echo "reason=Post-deploy errors ($POST_DEPLOY) within ${THRESHOLD}x of baseline ($BASELINE)" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Resolve observational Sentry gate
-        id: gate-result
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          observed="${{ steps.evaluate.outputs.gate_status }}"
-          if [ "${{ steps.evaluate.outcome }}" = "success" ] &&
-            { [ "$observed" = "passed" ] || [ "$observed" = "failed" ]; }; then
-            echo "gate_status=$observed" >> "$GITHUB_OUTPUT"
-          else
-            echo "gate_status=error" >> "$GITHUB_OUTPUT"
-            echo "::error::Sentry gate could not establish a trustworthy result; refusing automatic rollback."
-          fi
-
-      - name: Summary
-        if: always()
-        run: |
-          STATUS="${{ steps.gate-result.outputs.gate_status }}"
-          REASON="${{ steps.evaluate.outputs.reason }}"
-          BASELINE="${{ steps.baseline.outputs.error_count }}"
-          POST_DEPLOY="${{ steps.post-deploy.outputs.error_count }}"
-
-          echo "### Sentry Error Gate Result" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Status | $STATUS |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Baseline errors | $BASELINE |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Post-deploy errors | $POST_DEPLOY |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Threshold | ${{ inputs.threshold_multiplier }}x |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Reason | $REASON |" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+      - name: Observe production Sentry error rate
+        id: sentry-gate
+        uses: ./.github/actions/sentry-error-gate
+        with:
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          deployment_url: ${{ inputs.deployment_url }}
+          soak_minutes: ${{ inputs.soak_minutes }}
+          baseline_window_minutes: ${{ inputs.baseline_window_minutes }}
+          threshold_multiplier: ${{ inputs.threshold_multiplier }}
+          min_baseline_errors: ${{ inputs.min_baseline_errors }}

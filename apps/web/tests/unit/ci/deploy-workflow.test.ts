@@ -62,6 +62,10 @@ const sentryGateWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/sentry-error-gate.yml'
 );
+const sentryGateActionPath = resolve(
+  repoRoot,
+  '.github/actions/sentry-error-gate/action.yml'
+);
 const costAnomalyWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/cost-anomaly-gate.yml'
@@ -2619,10 +2623,10 @@ describe('production promotion exact-artifact contract', () => {
         'ref: ${{ needs.authorize-production.outputs.expected_sha }}'
       );
     }
-    expect(reusable.match(/actions\/checkout/g)).toHaveLength(5);
+    expect(reusable.match(/actions\/checkout/g)).toHaveLength(6);
     expect(
       reusable.match(/ref: \$\{\{ inputs\.expected_sha \}\}/g)
-    ).toHaveLength(5);
+    ).toHaveLength(6);
   });
 
   it('keeps rollback centralized behind confirmed structured gate failures', () => {
@@ -2668,27 +2672,42 @@ describe('production promotion exact-artifact contract', () => {
   });
 
   it('uses non-overlapping normalized Sentry windows from Production secrets', () => {
-    const sentry = readFileSync(sentryGateWorkflowPath, 'utf8');
+    const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const sentryJob = getJobBlock(reusable, 'sentry-error-gate');
+    const sentryAction = readFileSync(sentryGateActionPath, 'utf8');
 
-    expect(sentry).toContain('name: Production – jovie');
-    expect(sentry).toContain(
-      'SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}'
+    expect(sentryJob).toContain('runs-on: ubuntu-latest');
+    expect(sentryJob).toContain('name: Production – jovie');
+    expect(sentryJob).toContain('ref: ${{ inputs.expected_sha }}');
+    expect(sentryJob).toContain('uses: ./.github/actions/sentry-error-gate');
+    expect(sentryJob).toContain(
+      'sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}'
     );
-    expect(sentry).toContain(
+    expect(sentryJob).not.toContain(
+      'uses: ./.github/workflows/sentry-error-gate.yml'
+    );
+    expect(sentryJob.indexOf('name: Production – jovie')).toBeLessThan(
+      sentryJob.indexOf('sentry-auth-token:')
+    );
+    expect(sentryAction).toContain(
+      "SENTRY_AUTH_TOKEN: ${{ inputs['sentry-auth-token'] }}"
+    );
+    expect(sentryAction).not.toContain('secrets.');
+    expect(sentryAction).toContain(
       'https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/'
     );
-    expect(sentry).toContain('project_id="$(jq -r');
-    expect(sentry).toContain('START_EPOCH=$GATE_START_EPOCH');
-    expect(sentry).toContain(
+    expect(sentryAction).toContain('project_id="$(jq -r');
+    expect(sentryAction).toContain('START_EPOCH=$GATE_START_EPOCH');
+    expect(sentryAction).toContain(
       'START_EPOCH=$((END_EPOCH - WINDOW_MINUTES * 60))'
     );
-    expect(sentry).toContain(
+    expect(sentryAction).toContain(
       'POST_RATE_SCALED=$((POST_DEPLOY * BASELINE_MINUTES))'
     );
-    expect(sentry).toContain(
+    expect(sentryAction).toContain(
       'BASELINE_RATE_LIMIT_SCALED=$((BASELINE * THRESHOLD * POST_MINUTES))'
     );
-    expect(sentry).not.toContain('SENTRY_ORG:\n        required: true');
+    expect(sentryAction).not.toContain('SENTRY_ORG:\n        required: true');
   });
 
   it('keeps cost and main-health observers strict, deduplicated, and bounded', () => {

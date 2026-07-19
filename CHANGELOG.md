@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **[internal] Production Sentry gate secret binding:** the post-deploy error-rate gate now runs inside the protected production environment, so its API token is available without crossing a nested reusable-workflow boundary.
 - **[internal] Fixed-pool unit routing:** healthy runner heartbeats now select the fixed CI pool through a non-sensitive route token, preserving hosted fail-closed fallback without GitHub suppressing the runner decision.
 - **[internal] Governed Vercel agent skills:** Jovie now pins the reviewed AI SDK, React performance, and React composition skills; a Jovie-owned discovery workflow and CI/pre-commit guard reject OpenReview, broad or global installs, missing policy overlays, and malformed source pins.
 - **[internal] Repository artifact hygiene guardrails (JOV-4264):** CI and pre-commit checks reject recursive/generated paths, temporary files, root screenshots, unapproved binaries, oversized payloads, and repository-wide file/byte/binary budget overruns.

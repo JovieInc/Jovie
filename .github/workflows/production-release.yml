@@ -750,13 +750,29 @@ jobs:
     name: Sentry Error Gate (production)
     needs: [promote-production, canary-health-gate]
     if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha && needs.canary-health-gate.result == 'success' }}
-    uses: ./.github/workflows/sentry-error-gate.yml
-    with:
-      deployment_url: https://jov.ie
-      soak_minutes: 5
-      baseline_window_minutes: 30
-      threshold_multiplier: 3
-      min_baseline_errors: 5
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: Production – jovie
+    outputs:
+      gate_status: ${{ steps.sentry-gate.outputs.gate_status }}
+      baseline_errors: ${{ steps.sentry-gate.outputs.baseline_errors }}
+      post_deploy_errors: ${{ steps.sentry-gate.outputs.post_deploy_errors }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+          fetch-depth: 1
+      - name: Observe production Sentry error rate
+        id: sentry-gate
+        uses: ./.github/actions/sentry-error-gate
+        with:
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          deployment_url: https://jov.ie
+          soak_minutes: 5
+          baseline_window_minutes: 30
+          threshold_multiplier: 3
+          min_baseline_errors: 5
 
   production-oauth-gate:
     name: Production OAuth Gate (observational)
