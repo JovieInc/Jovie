@@ -2574,6 +2574,18 @@ describe('production promotion exact-artifact contract', () => {
     expect(controller).toContain(
       'run-name: Production Controller ${{ github.event.workflow_run.head_sha }} from CI'
     );
+    expect(controller).toContain('actions/workflows/production-controller.yml');
+    expect(health).toContain('actions/workflows/production-controller.yml');
+    expect(controller).toContain('actions/workflows/ci.yml');
+    expect(health).toContain('actions/workflows/ci.yml');
+    expect(controller.match(/\.name == "Production Controller"/g)).toHaveLength(
+      1
+    );
+    expect(health.match(/\.name == "Production Controller"/g)).toHaveLength(1);
+    expect(controller.match(/\.name == "CI"/g)).toHaveLength(1);
+    expect(health.match(/\.name == "CI"/g)).toHaveLength(1);
+    expect(controller).toContain('.workflow_id == $workflow_id');
+    expect(health).toContain('.workflow_id == $workflow_id');
     expect(health).toContain('.display_title == $title');
     expect(health.match(/GH_REPO: \${{ github\.repository }}/g)).toHaveLength(
       2
@@ -2611,6 +2623,20 @@ describe('production promotion exact-artifact contract', () => {
     expect(controller).toContain(
       'Ignoring marker with invalid exact-generation content'
     );
+    expect(controller).toContain('marker_candidate_count');
+    expect(health).toContain('marker_candidate_count');
+    expect(controller).toContain('refusing duplicate deployment');
+    expect(health).toContain('refusing automated replay');
+    expect(controller.indexOf('done <<<"$marker_candidates"')).toBeLessThan(
+      controller.indexOf('if [ "$marker_candidate_count" -gt 0 ]')
+    );
+    expect(health.indexOf('done <<<"$marker_candidates"')).toBeLessThan(
+      health.indexOf('if [ "$marker_candidate_count" -gt 0 ]')
+    );
+    expect(controller).toContain('.head_sha == $sha');
+    expect(health).toContain('.head_sha == $sha');
+    expect(controller).toContain('.head_repository.full_name == $repo');
+    expect(health).toContain('.head_repository.full_name == $repo');
     expect(controller).toContain('actions/artifacts/$marker_artifact_id/zip');
     expect(controller).toContain(
       'Authenticated smoke was skipped because no complete credential pair is configured'
