@@ -157,10 +157,16 @@ elif [[ "$CURRENT_SHA" != "$HEAD_SHA" ]]; then
 fi
 
 assert_current_ref_is_current() {
-  local remote_head
-  remote_head="$($GIT_BIN ls-remote --exit-code "$REMOTE" "$CURRENT_REF" \
-    | awk -v expected_ref="$CURRENT_REF" '$2 == expected_ref { print $1; exit }')" \
+  local remote_output remote_head
+  remote_output="$(
+    run_bounded_network_command \
+      "$GIT_BIN" ls-remote --exit-code "$REMOTE" "$CURRENT_REF"
+  )" \
     || fail "current ref is no longer available; this run was superseded"
+  remote_head="$(
+    awk -v expected_ref="$CURRENT_REF" '$2 == expected_ref { print $1; exit }' \
+      <<<"$remote_output"
+  )"
   if [[ "$remote_head" != "$CURRENT_SHA" ]]; then
     fail "current ref moved from $CURRENT_SHA to ${remote_head:-missing}; refusing to scan a stale range"
   fi

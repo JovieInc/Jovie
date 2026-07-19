@@ -530,7 +530,7 @@ FAKE_GIT="$TEST_ROOT/cancellable-git"
 cat >"$FAKE_GIT" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-if [[ "${1:-}" == "fetch" ]]; then
+if [[ "${1:-}" == "${WEDGE_GIT_SUBCOMMAND:-fetch}" ]]; then
   echo "$$" >"$FETCH_PID_FILE"
   trap 'exit 143' INT TERM
   while true; do sleep 1; done
@@ -590,6 +590,33 @@ grep -q 'absolute network budget was exhausted' "$TEST_ROOT/deadline.output" \
 deadline_fetch_pid="$(cat "$DEADLINE_FETCH_PID_FILE")"
 if kill -0 "$deadline_fetch_pid" 2>/dev/null; then
   fail 'absolute range deadline left its fetch child running'
+fi
+
+# Current-ref lookups share the same absolute network budget as fetches. A
+# wedged ls-remote must be killed and reaped instead of waiting for the job's
+# ten-minute timeout backstop.
+DEADLINE_LOOKUP_PID_FILE="$TEST_ROOT/deadline-lookup.pid"
+started_at="$(date +%s)"
+status=0
+(
+  cd "$CANCEL_DIR"
+  FETCH_PID_FILE="$DEADLINE_LOOKUP_PID_FILE" REAL_GIT_BIN="$REAL_GIT_BIN" \
+    WEDGE_GIT_SUBCOMMAND=ls-remote \
+    SECRET_SCAN_GIT_BIN="$FAKE_GIT" \
+    SECRET_SCAN_RANGE_DEADLINE_SECONDS=2 \
+    "$RANGE_SCRIPT" "$BASE_SHA" "$QUEUE_HEAD" "$QUEUE_REF"
+) >"$TEST_ROOT/deadline-lookup.output" 2>&1 || status=$?
+elapsed=$(( $(date +%s) - started_at ))
+[[ $status -ne 0 ]] || fail 'absolute current-ref lookup deadline returned success'
+[[ $elapsed -le 5 ]] || fail "absolute current-ref lookup deadline took ${elapsed}s"
+[[ -f "$DEADLINE_LOOKUP_PID_FILE" ]] \
+  || fail 'absolute current-ref lookup deadline did not reach the wedged ls-remote child'
+grep -q 'absolute network budget was exhausted' \
+  "$TEST_ROOT/deadline-lookup.output" \
+  || fail 'absolute current-ref lookup deadline lacks explicit classification'
+deadline_lookup_pid="$(cat "$DEADLINE_LOOKUP_PID_FILE")"
+if kill -0 "$deadline_lookup_pid" 2>/dev/null; then
+  fail 'absolute current-ref lookup deadline left its ls-remote child running'
 fi
 
 echo 'PASS: exact CI secret-scan range regression tests'
