@@ -706,6 +706,34 @@ jobs:
             echo "run_test_performance=false" >> "$GITHUB_OUTPUT"
           fi
 
+  # Do not allocate unit/build/Xcode/eval capacity after a required external
+  # queue gate has already failed or GitHub has deleted the synthetic ref.
+  ci-merge-group-admission:
+    name: Merge Group Admission
+    needs: [ci-path-changes]
+    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      checks: read
+      contents: read
+    steps:
+      - name: Check out trusted admission policy
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # ALLGREEN prefix groups may use a prior synthetic commit as
+          # merge_group.base_sha. The live default branch is the trusted policy
+          # source; the helper separately proves the event's exact queue ref.
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: scripts/lib/merge-group-admission.mjs
+          sparse-checkout-cone-mode: false
+      - name: Require live queue ref and external admission checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/lib/merge-group-admission.mjs
+
   ci-risk-classifier:
     # Dependency-free so fork PRs classify without waiting on a trusted job or
     # secret. On main, only an unproven exact SHA executes the fallback lane.
@@ -915,12 +943,18 @@ jobs:
     # structural (path-gated). Per-lane PASS/FAIL via scripts/ci-fast-lanes.mjs
     # (--continue semantics; never set -e out on first failure). Heavy lanes
     # (build / Lighthouse / e2e / preview) stay separate.
-    needs: [ci-path-changes]
+    needs: [ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
     # Setup/DB work (~2m) + accepted source deploy (up to 10m) + readiness
     # verification (up to 9m) must fit without the job canceling a healthy build.
     timeout-minutes: 25
-    if: ${{ needs.ci-path-changes.result == 'success' }}
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      )
     env:
       # Match prior Structural Contract job so actionlint/shellcheck is hermetic.
       SHELLCHECK_OPTS: >-
@@ -994,13 +1028,18 @@ jobs:
 
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
-    needs: [ci-path-changes]
+    needs: [ci-path-changes, ci-merge-group-admission]
     # Model-free semantic gate: path-selected only on the exact combined head
     # and direct-main fallback. Manual dispatch may run it exhaustively.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: >-
+      always() &&
       needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      ) &&
       (
         github.event_name == 'workflow_dispatch' ||
         (
@@ -1030,12 +1069,17 @@ jobs:
 
   ci-golden-eval-set:
     name: Golden Eval Set (deterministic)
-    needs: [ci-path-changes]
+    needs: [ci-path-changes, ci-merge-group-admission]
     # Model-free semantic gate with the same combined-head/fallback contract.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: >-
+      always() &&
       needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      ) &&
       (
         github.event_name == 'workflow_dispatch' ||
         (
@@ -1335,9 +1379,14 @@ jobs:
   # workspace. No Actions artifact upload/download sits on the critical path.
   ci-build-layout:
     name: Build + Layout (combined)
-    needs: [ci-path-changes]
+    needs: [ci-path-changes, ci-merge-group-admission]
     if: >-
+      always() &&
       needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      ) &&
       (
         github.event_name == 'merge_group' ||
         (github.event_name == 'push' && github.ref == 'refs/heads/main')
@@ -1431,9 +1480,14 @@ jobs:
   # main commits that touch iOS.
   ci-ios:
     name: iOS Build + Test (combined)
-    needs: [ci-path-changes]
+    needs: [ci-path-changes, ci-merge-group-admission]
     if: >-
+      always() &&
       needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      ) &&
       needs.ci-path-changes.outputs.run_ios == 'true' &&
       (
         github.event_name == 'merge_group' ||
@@ -2772,13 +2826,20 @@ jobs:
 
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
-    needs: [ci-path-changes, ci-unit-runner-route]
+    needs:
+      [ci-path-changes, ci-unit-runner-route, ci-merge-group-admission]
     # Runs five shards on every merge-group combined head and direct-main
     # fallback. The merge-group command remains --affected, but the matrix may
     # never turn into a skipped placeholder. Source PRs defer unit evidence to
     # the combined queue head.
     if: >-
+      always() &&
       needs.ci-path-changes.result == 'success' &&
+      needs.ci-unit-runner-route.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      ) &&
       (
         github.event_name == 'merge_group' ||
         (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
@@ -4287,6 +4348,7 @@ jobs:
     needs:
       [
         ci-path-changes,
+        ci-merge-group-admission,
         ci-risk-classifier,
         ci-fast,
         ci-unit-tests,
@@ -4306,6 +4368,7 @@ jobs:
         run: |
           set -euo pipefail
           PATH_RESULT="${{ needs.ci-path-changes.result }}"
+          ADMISSION_RESULT="${{ needs.ci-merge-group-admission.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
@@ -4327,6 +4390,7 @@ jobs:
             echo "| Gate | Result |"
             echo "| --- | --- |"
             echo "| Path Changes | $PATH_RESULT |"
+            echo "| Merge Group Admission | $ADMISSION_RESULT |"
             echo "| CI Risk Classifier | $RISK_RESULT |"
             echo "| ci-fast | $FAST_RESULT |"
             echo "| Unit Tests | $UNIT_RESULT |"
@@ -4342,6 +4406,7 @@ jobs:
 
           for gate in \
             "Path Changes:$PATH_RESULT" \
+            "Merge Group Admission:$ADMISSION_RESULT" \
             "CI Risk Classifier:$RISK_RESULT" \
             "ci-fast:$FAST_RESULT" \
             "Secret Scan:$SECRET_RESULT" \
