@@ -337,7 +337,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
-      runner: ${{ steps.route.outputs.runner }}
+      # Actions suppresses job outputs that resemble configured masked values.
+      # Keep runner labels local to the trusted workflow and export only this enum.
+      runner_class: ${{ steps.route.outputs.runner_class }}
     steps:
       - name: Checkout trusted runner routing policy
         continue-on-error: true
@@ -383,20 +385,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          runner='ubuntu-latest'
+          runner_class='hosted'
+          runner_label='ubuntu-latest'
           if [ "$HEARTBEAT_HEALTH" = 'up' ]; then
-            runner='jovie-runner'
+            runner_class='fixed'
+            runner_label='jovie-runner'
           fi
 
-          case "$runner" in
-            jovie-runner|ubuntu-latest) ;;
+          case "$runner_class" in
+            fixed|hosted) ;;
             *)
-              echo "::warning::Invalid runner route '$runner'; using ubuntu-latest."
-              runner='ubuntu-latest'
+              echo "::warning::Invalid runner class '$runner_class'; using ubuntu-latest."
+              runner_class='hosted'
+              runner_label='ubuntu-latest'
               ;;
           esac
-          echo "runner=$runner" >> "$GITHUB_OUTPUT"
-          echo "::notice::Unit runner route: $runner — $HEARTBEAT_EVIDENCE"
+          echo "runner_class=$runner_class" >> "$GITHUB_OUTPUT"
+          echo "::notice::Unit runner route: $runner_label — $HEARTBEAT_EVIDENCE"
 
   # ── Centralized deterministic path-change detection ────────────────────
   # Source and combined heads compute their own exact diff. The former
@@ -2849,7 +2854,7 @@ jobs:
     # observation routes this run to hosted capacity before the matrix is
     # created. Two shards per candidate cap fixed-pool use at four, preserving
     # anti-slam headroom for Runner Heartbeat and emergency work.
-    runs-on: ${{ needs.ci-unit-runner-route.outputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ needs.ci-unit-runner-route.outputs.runner_class == 'fixed' && 'jovie-runner' || 'ubuntu-latest' }}
     timeout-minutes: 40
     strategy:
       fail-fast: false

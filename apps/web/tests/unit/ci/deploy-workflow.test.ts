@@ -1262,13 +1262,14 @@ describe('unit-test runner capacity', () => {
     expect(routeJob).toContain('runs-on: ubuntu-latest');
     expect(routeJob).toContain('ref: main');
     expect(routeJob).toContain('continue-on-error: true');
-    expect(routeJob).toContain("runner='ubuntu-latest'");
+    expect(routeJob).toContain("runner_class='hosted'");
     expect(routeJob).toContain('.github/scripts/query-runner-heartbeat.sh');
     expect(routeJob).toContain('[ "$HEARTBEAT_HEALTH" = \'up\' ]');
-    expect(routeJob).toContain('jovie-runner|ubuntu-latest');
+    expect(routeJob).toContain('fixed|hosted');
+    expect(routeJob).not.toContain('runner: ${{ steps.route.outputs.runner }}');
     expect(routeJob).not.toContain('secrets.');
     expect(unitJob).toContain(
-      "runs-on: ${{ needs.ci-unit-runner-route.outputs.runner || 'ubuntu-latest' }}"
+      "runs-on: ${{ needs.ci-unit-runner-route.outputs.runner_class == 'fixed' && 'jovie-runner' || 'ubuntu-latest' }}"
     );
     expect(unitJob).not.toContain('vars.CI_UNIT_RUNNER');
     expect(unitJob).toContain('max-parallel: 2');
