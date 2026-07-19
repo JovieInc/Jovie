@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assertCurrentPullRequest,
   evaluateForkMemberPolicy,
   evaluateSizeMemberPolicy,
   resolveMergeGroupMembers,
@@ -9,7 +10,6 @@ const BASE = '1'.repeat(40);
 const FIRST = '2'.repeat(40);
 const HEAD = '3'.repeat(40);
 const SOURCE_101 = 'a'.repeat(40);
-const SOURCE_102 = 'b'.repeat(40);
 
 function event(overrides = {}) {
   return {
@@ -30,20 +30,16 @@ function commit(sha, parent, number) {
   return {
     sha,
     parents: [{ sha: parent }],
-    commit: { message: `fix(ci): queue member ${number} (#${number})` },
-  };
-}
-
-function entry(number, position, syntheticHead, sourceHead, base = BASE) {
-  return {
-    position,
-    state: 'AWAITING_CHECKS',
-    baseCommit: { oid: base },
-    headCommit: { oid: syntheticHead },
-    pullRequest: {
-      number,
-      baseRefName: 'main',
-      headRefOid: sourceHead,
+    commit: {
+      message: `fix(ci): queue member ${number} (#${number})`,
+      committer: {
+        name: 'GitHub',
+        email: 'noreply@github.com',
+      },
+      verification: {
+        verified: true,
+        reason: 'valid',
+      },
     },
   };
 }
@@ -57,21 +53,6 @@ function comparison(commits) {
     base_commit: { sha: BASE },
     merge_base_commit: { sha: BASE },
     commits,
-  };
-}
-
-function queue(nodes) {
-  return {
-    configuration: {
-      maximumEntriesToMerge: 10,
-      mergeMethod: 'SQUASH',
-      mergingStrategy: 'ALLGREEN',
-    },
-    entries: {
-      totalCount: nodes.length,
-      pageInfo: { hasNextPage: false },
-      nodes,
-    },
   };
 }
 
@@ -106,71 +87,57 @@ function sizedPr(labels) {
 }
 
 describe('merge-group member discovery', () => {
-  it('cross-proves every member of a multi-entry group in queue order', () => {
+  it('resolves every member from the exact synthetic first-parent chain', () => {
     const members = resolveMergeGroupMembers({
       event: event(),
       comparison: comparison([
         commit(FIRST, BASE, 101),
         commit(HEAD, FIRST, 102),
       ]),
-      queue: queue([
-        entry(101, 4, FIRST, SOURCE_101),
-        entry(102, 5, HEAD, SOURCE_102, FIRST),
-        entry(103, 6, '4'.repeat(40), 'c'.repeat(40), HEAD),
-      ]),
     });
 
     expect(members).toEqual([
       {
         number: 101,
-        position: 4,
-        queueState: 'AWAITING_CHECKS',
         syntheticHeadSha: FIRST,
-        sourceHeadSha: SOURCE_101,
       },
       {
         number: 102,
-        position: 5,
-        queueState: 'AWAITING_CHECKS',
         syntheticHeadSha: HEAD,
-        sourceHeadSha: SOURCE_102,
       },
     ]);
   });
 
   it('fails closed on unknown, truncated, or malformed member evidence', () => {
     const commits = [commit(HEAD, BASE, 102)];
-    const validQueue = queue([entry(102, 1, HEAD, SOURCE_102)]);
-
     expect(() =>
       resolveMergeGroupMembers({
         event: event({ head_ref: 'refs/heads/main' }),
         comparison: comparison(commits),
-        queue: validQueue,
       })
     ).toThrow(/head_ref is not a main merge-queue ref/);
 
     expect(() =>
       resolveMergeGroupMembers({
         event: event(),
-        comparison: comparison(commits),
-        queue: queue([]),
+        comparison: {
+          ...comparison(commits),
+          total_commits: 2,
+        },
       })
-    ).toThrow(/absent from the live merge queue/);
+    ).toThrow(/exact base\.\.head range/);
 
     expect(() =>
       resolveMergeGroupMembers({
         event: event(),
-        comparison: comparison(commits),
-        queue: {
-          ...validQueue,
-          entries: {
-            ...validQueue.entries,
-            pageInfo: { hasNextPage: true },
+        comparison: comparison([
+          {
+            ...commits[0],
+            parents: [{ sha: '9'.repeat(40) }],
           },
-        },
+        ]),
       })
-    ).toThrow(/incomplete or malformed/);
+    ).toThrow(/not the expected first-parent link/);
 
     expect(() =>
       resolveMergeGroupMembers({
@@ -179,11 +146,11 @@ describe('merge-group member discovery', () => {
           {
             ...commits[0],
             commit: {
+              ...commits[0].commit,
               message: 'synthetic commit without an attributable trailer',
             },
           },
         ]),
-        queue: validQueue,
       })
     ).toThrow(/no final \(#PR\) trailer/);
 
@@ -192,30 +159,94 @@ describe('merge-group member discovery', () => {
         event: event(),
         comparison: comparison([
           commit(FIRST, BASE, 101),
-          commit(HEAD, FIRST, 102),
-        ]),
-        queue: queue([
-          entry(101, 4, FIRST, SOURCE_101),
-          entry(102, 6, HEAD, SOURCE_102),
+          commit(HEAD, FIRST, 101),
         ]),
       })
-    ).toThrow(/out of merge queue order/);
+    ).toThrow(/repeats PR #101/);
+  });
 
+  it('rejects commits without canonical GitHub generation evidence', () => {
+    const valid = commit(HEAD, BASE, 102);
+
+    for (const synthetic of [
+      {
+        ...valid,
+        commit: {
+          ...valid.commit,
+          verification: { verified: false, reason: 'valid' },
+        },
+      },
+      {
+        ...valid,
+        commit: {
+          ...valid.commit,
+          verification: { verified: true, reason: 'unknown_key' },
+        },
+      },
+      {
+        ...valid,
+        commit: {
+          ...valid.commit,
+          committer: {
+            name: 'Contributor',
+            email: 'noreply@github.com',
+          },
+        },
+      },
+      {
+        ...valid,
+        commit: {
+          ...valid.commit,
+          committer: {
+            name: 'GitHub',
+            email: 'contributor@example.com',
+          },
+        },
+      },
+    ]) {
+      expect(() =>
+        resolveMergeGroupMembers({
+          event: event(),
+          comparison: comparison([synthetic]),
+        })
+      ).toThrow(/not verified GitHub-generated evidence/);
+    }
+  });
+
+  it('caps unprivileged member discovery at the trusted ruleset bound', () => {
     expect(() =>
       resolveMergeGroupMembers({
         event: event(),
-        comparison: comparison([
-          commit(FIRST, BASE, 101),
-          commit(HEAD, FIRST, 102),
-        ]),
-        queue: queue([
-          entry(101, 4, FIRST, SOURCE_101),
-          // A later queue entry is based on the previous synthetic head, not
-          // the original merge-group base.
-          entry(102, 5, HEAD, SOURCE_102),
-        ]),
+        comparison: comparison(
+          Array.from({ length: 11 }, () => commit(HEAD, BASE, 102))
+        ),
       })
-    ).toThrow(/does not match the synthetic chain/);
+    ).toThrow(/exceeds trusted 10-member bound/);
+  });
+
+  it('requires current open main-bound PR metadata after discovery', () => {
+    const member = {
+      number: 101,
+      syntheticHeadSha: HEAD,
+    };
+    const current = {
+      number: 101,
+      state: 'open',
+      base: { ref: 'main' },
+      head: { sha: SOURCE_101, repo: { fork: false } },
+      labels: [],
+    };
+
+    expect(() => assertCurrentPullRequest(member, current)).not.toThrow();
+    expect(() =>
+      assertCurrentPullRequest(member, {
+        ...current,
+        head: { ...current.head, sha: 'not-a-sha' },
+      })
+    ).toThrow(/changed or is malformed after group discovery/);
+    expect(() =>
+      assertCurrentPullRequest(member, { ...current, state: 'closed' })
+    ).toThrow(/changed or is malformed after group discovery/);
   });
 });
 
