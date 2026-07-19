@@ -633,25 +633,22 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     assert 'degrade pending "current exact heartbeat' in query
     assert "for ((attempt = 1; attempt <= POLL_ATTEMPTS; attempt++))" in awaiter
     assert 'if [[ "$probe_state" != "pending" ]]' in awaiter
-    assert (
-        "[ci-path-changes, ci-unit-runner-route, ci-merge-group-admission]" in units
-    )
-    assert (
-        "runs-on: ${{ needs.ci-unit-runner-route.outputs.runner_class == "
-        "'fixed' && 'jovie-runner' || 'ubuntu-latest' }}"
-    ) in units
+    assert "needs: [ci-path-changes, ci-merge-group-admission]" in units
+    assert "ci-unit-runner-route" not in units
+    assert "runs-on: ubuntu-latest" in units
+    assert "runs-on: jovie-runner" not in units
     assert "vars.CI_UNIT_RUNNER" not in units
-    assert "max-parallel: 2" in units
+    assert "max-parallel: 5" in units
+    assert "all five named" in units
 
 
-def test_event_driven_heartbeat_has_no_recursive_trigger_or_fixed_pool_fanout() -> None:
+def test_merge_group_allocates_no_fixed_runner_probe() -> None:
     heartbeat = (_WORKFLOWS / "runner-heartbeat.yml").read_text(encoding="utf-8")
     route = _job_block("ci.yml", "ci-unit-runner-route")
 
     assert "push:" in heartbeat
     assert "branches: [main]" in heartbeat
-    assert "merge_group:" in heartbeat
-    assert "types: [checks_requested]" in heartbeat
+    assert "merge_group:" not in heartbeat
     assert "schedule:" in heartbeat
     assert "workflow_dispatch:" in heartbeat
     assert "pull_request:" not in heartbeat
@@ -661,6 +658,8 @@ def test_event_driven_heartbeat_has_no_recursive_trigger_or_fixed_pool_fanout() 
     assert "group: runner-heartbeat" in heartbeat
     assert "cancel-in-progress: true" in heartbeat
     assert "matrix:" not in heartbeat
+    assert "if: github.event_name == 'workflow_dispatch'" in route
+    assert "github.event_name == 'merge_group'" not in route
     assert "actions: write" not in route
     assert "/dispatches" not in route
     assert "gh workflow run" not in route

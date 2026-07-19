@@ -1258,7 +1258,7 @@ describe('deploy workflow Vercel env resolution', () => {
 });
 
 describe('unit-test runner capacity', () => {
-  it('fills the pool without exceeding each ephemeral runner CPU quota', () => {
+  it('uses five-way hosted capacity while fixed runners are quarantined', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const routeJob = getJobBlock(workflow, 'ci-unit-runner-route');
     const unitJob = getJobBlock(workflow, 'ci-unit-tests');
@@ -1272,16 +1272,16 @@ describe('unit-test runner capacity', () => {
     expect(routeJob).toContain('fixed|hosted');
     expect(routeJob).not.toContain('runner: ${{ steps.route.outputs.runner }}');
     expect(routeJob).not.toContain('secrets.');
-    expect(unitJob).toContain(
-      "runs-on: ${{ needs.ci-unit-runner-route.outputs.runner_class == 'fixed' && 'jovie-runner' || 'ubuntu-latest' }}"
-    );
+    expect(unitJob).toContain('runs-on: ubuntu-latest');
+    expect(unitJob).not.toContain('runs-on: jovie-runner');
+    expect(unitJob).not.toContain('ci-unit-runner-route');
     expect(unitJob).not.toContain('vars.CI_UNIT_RUNNER');
-    expect(unitJob).toContain('max-parallel: 2');
+    expect(unitJob).toContain('max-parallel: 5');
     expect(unitJob).toContain(
-      'Five logical shards, at most two concurrent per queue candidate'
+      'Hosted capacity runs all five logical shards without consuming Gem'
     );
-    expect(unitJob).toContain('anti-slam headroom');
-    expect(unitJob).toContain('Runner Heartbeat');
+    expect(unitJob).toContain('all five named');
+    expect(unitJob).toContain('warm-canary receipts');
     expect(unitJob).toContain('run: echo "run_full_ci=true"');
     expect(unitJob).not.toContain(
       "github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_test == 'true'"
