@@ -97,4 +97,6 @@ status="$(run_scenario repair-failure)"
 grep -q 'Secret scan checkout repair failed' "$TEST_ROOT/repair-failure.output" \
   || fail 'repair failure must emit an explicit CI classification'
 
+bash "$REPO_ROOT/scripts/security/prepare-ci-secret-scan-range.test.sh"
+
 echo 'PASS: scan-secrets corruption recovery regression tests'
