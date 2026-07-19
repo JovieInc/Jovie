@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { evaluateDesktopReleaseGuard } from './desktop-release-guard.mjs';
@@ -128,9 +129,11 @@ test('desktop authorizer cross-proves exact Production Verified evidence', () =>
     /contents: read/,
   ]);
   assertPatterns(proof, [
-    /TRIGGER_RUN_NAME" = "Production Controller"/,
+    /TRIGGER_WORKFLOW_ID/,
     /TRIGGER_RUN_PATH" = "\.github\/workflows\/production-controller\.yml"/,
     /\.name == "Production Controller"/,
+    /actions\/workflows\/\$TRIGGER_WORKFLOW_ID/,
+    /\^Production Controller .* from CI .* attempt/,
     /runs\/\$TRIGGER_RUN_ID\/attempts\/\$TRIGGER_RUN_ATTEMPT\/jobs\?per_page=100/,
     /\.name == "Production Verified"/,
     /\[ "\$verified_count" = "1" \]/,
@@ -138,6 +141,7 @@ test('desktop authorizer cross-proves exact Production Verified evidence', () =>
     /repos\/\$REPOSITORY\/commits\/main/,
   ]);
   assert.equal(proof.match(/' <<<"\$jobs_json"\)"$/gm)?.length, 1);
+  assert.doesNotMatch(proof, /TRIGGER_RUN_NAME/);
   assert.doesNotMatch(header, /contents: write/);
   assert.doesNotMatch(authorize, /secrets\./);
   assert.ok(
@@ -158,38 +162,96 @@ test('desktop dedup cross-proves an actual-publish-only marker', () => {
     /actions\/artifacts\?name=desktop-production-published&per_page=100/,
     /runs\/\$run_id\/attempts\/\$run_attempt\/jobs\?per_page=100/,
     /\.name == "Publish production desktop release"/,
-    /\.name == "Upload production desktop publish marker"/,
     /\.environment == "production"/,
-    /\.runAttempt == \$attempt/,
+    /\.publisherAttempt/,
+    /\.publisherJobId/,
+    /actions\/workflows\/\$workflow_id/,
+    /\.name == "desktop-release"/,
+    /publish_marker_count.*-gt 0/s,
+    /status=completed&per_page=25/,
+    /Recovered exact desktop publish/,
     /desktop-release\.yml\/runs\?branch=main&event=push&status=success&per_page=100/,
     /No proven desktop baseline exists/,
     /already_released=true/,
   ]);
   assertPatterns(select, [
-    /First verified desktop release selected/,
+    /No proven publish baseline; comparing the exact prior main generation/,
     /git merge-base --is-ancestor/,
-    /\.github\/workflows\/desktop-release\.yml/,
     /git diff --name-status --find-renames/,
   ]);
   assert.doesNotMatch(proof, /desktop-staging-/);
   assert.doesNotMatch(select, /apps\/desktop/);
+  assert.doesNotMatch(select, /desktop-release\.yml/);
+  assert.doesNotMatch(proof, /gh api[\s\S]{0,160}\|\| continue/);
+});
+
+test('desktop recovery ignores legacy push titles and selects new run-name evidence', () => {
+  const proof = step(
+    job(desktopWorkflow, 'authorize-release'),
+    'Cross-prove exact production evidence'
+  );
+  const recovery = proof.slice(proof.indexOf('recovery_candidates='));
+  const jqProgram = recovery.match(
+    /jq -r '\n([\s\S]*?)\n\s+' <<<"\$\(jq -c '\.workflow_runs'/
+  )?.[1];
+  assert.ok(jqProgram, 'missing embedded recovery selector');
+  const oldSha = 'a'.repeat(40);
+  const newSha = 'b'.repeat(40);
+  const output = execFileSync('jq', ['-r', jqProgram], {
+    encoding: 'utf8',
+    input: JSON.stringify([
+      {
+        id: 1,
+        run_attempt: 1,
+        head_sha: oldSha,
+        event: 'push',
+        display_title: 'fix: old desktop release',
+        created_at: '2026-07-18T00:00:00Z',
+      },
+      {
+        id: 2,
+        run_attempt: 1,
+        head_sha: newSha,
+        event: 'workflow_run',
+        display_title: `Desktop release ${newSha}`,
+        created_at: '2026-07-19T00:00:00Z',
+      },
+    ]),
+  });
+  assert.equal(output.trim(), `2\t1\t${newSha}`);
+});
+
+test('automatic desktop publishing selects VERSION changes only', () => {
+  const select = step(
+    job(desktopWorkflow, 'authorize-release'),
+    'Select desktop-relevant production generation'
+  );
+  const paths = select
+    .match(/release_paths=\(\n([\s\S]*?)\n\s+\)/)?.[1]
+    ?.trim()
+    .split(/\s+/);
+  assert.deepEqual(paths, ['VERSION']);
+  assert.equal(paths?.includes('.github/workflows/desktop-release.yml'), false);
+  assert.equal(paths?.includes('VERSION'), true);
 });
 
 test('desktop staging is a bounded artifact and production is separately proven', () => {
   const build = job(desktopWorkflow, 'build');
+  const publish = step(build, 'Publish production desktop release');
   const stagingUpload = step(build, 'Upload staging desktop package');
+  const marker = job(desktopWorkflow, 'record-production-publish');
 
   assertPatterns(build, [
     /needs: \[authorize-release\]/,
     /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
     /package:staging/,
     /package:production/,
-    /repos\/\$\{\{ github\.repository \}\}\/commits\/main/,
     /electron-builder publish/,
     /dist\/latest-mac\.yml/,
-    /desktop-production-published\.json/,
-    /name: desktop-production-published/,
-    /retention-days: 90/,
+  ]);
+  assertPatterns(publish, [
+    /repos\/\$\{\{ github\.repository \}\}\/commits\/main/,
+    /electron-builder publish/,
   ]);
   assertPatterns(stagingUpload, [
     /if: env\.ENVIRONMENT == 'staging'/,
@@ -199,13 +261,21 @@ test('desktop staging is a bounded artifact and production is separately proven'
   ]);
   assert.doesNotMatch(stagingUpload, /desktop-production-published|GH_TOKEN/);
   assert.ok(
-    build.indexOf(
-      '- name: Revalidate exact current main before production publish'
-    ) < build.lastIndexOf('- name: Publish production desktop release')
+    publish.indexOf('commits/main') <
+      publish.indexOf('electron-builder publish')
   );
-  assert.ok(
-    build.lastIndexOf('- name: Publish production desktop release') <
-      build.lastIndexOf('- name: Upload production desktop publish marker')
-  );
+  assert.doesNotMatch(build, /Upload production desktop publish marker/);
+  assertPatterns(marker, [
+    /needs: \[authorize-release, build\]/,
+    /runs-on: ubuntu-latest/,
+    /actions: read/,
+    /contents: read/,
+    /Cross-prove exact production publisher/,
+    /publisherJobId/,
+    /Upload production desktop publish marker/,
+    /overwrite: true/,
+    /retention-days: 90/,
+  ]);
+  assert.doesNotMatch(marker, /contents: write|electron-builder publish/);
   assert.doesNotMatch(desktopWorkflow, /--publish always/);
 });
