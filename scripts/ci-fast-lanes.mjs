@@ -206,6 +206,7 @@ function runIosFast() {
     'Gemfile.lock',
     'scripts/ios-best-practices-lint.sh',
     '.github/workflows/ios-ci.yml',
+    '.github/workflows/ios-testflight.yml',
   ]);
   if (files && files.length === 0) {
     return {

@@ -124,7 +124,7 @@ bundle exec fastlane ios bootstrap_signing
 bundle exec fastlane ios beta
 ```
 
-Release CI uses these GitHub secrets: `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_TEAM_ID`, `MATCH_GIT_URL`, `MATCH_PASSWORD`, one of `MATCH_GIT_PRIVATE_KEY` or `MATCH_GIT_BASIC_AUTHORIZATION`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, and `CLERK_ASSOCIATED_DOMAIN`.
+Release CI uses these GitHub secrets: `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_TEAM_ID`, `MATCH_GIT_URL`, `MATCH_PASSWORD`, one of `MATCH_GIT_PRIVATE_KEY` or `MATCH_GIT_BASIC_AUTHORIZATION`, and `CLERK_ASSOCIATED_DOMAIN`.
 
 The TestFlight workflow validates release config before running Fastlane. The
 bundled Clerk publishable key must be the production `pk_live_...` key; a

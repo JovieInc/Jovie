@@ -32,6 +32,19 @@ const visualA11yWorkflowPath = resolve(
   '.github/workflows/visual-a11y.yml'
 );
 const iosWorkflowPath = resolve(repoRoot, '.github/workflows/ios-ci.yml');
+const iosTestFlightWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/ios-testflight.yml'
+);
+const iosTestFlightEnvValidatorPath = resolve(
+  repoRoot,
+  'apps/ios/scripts/validate-testflight-env.sh'
+);
+const iosTestFlightArtifactValidatorPath = resolve(
+  repoRoot,
+  'apps/ios/scripts/validate-testflight-artifact.sh'
+);
+const fastlanePath = resolve(repoRoot, 'fastlane/Fastfile');
 const ciFastLanesPath = resolve(repoRoot, 'scripts/ci-fast-lanes.mjs');
 const canaryWorkflowPath = resolve(
   repoRoot,
@@ -469,6 +482,104 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(controllerTrigger).not.toContain('paths-ignore:');
     expect(workflow).not.toContain('  production-release:');
     expect(workflow).not.toContain('  production-verified:');
+  });
+
+  it('authorizes TestFlight only after exact production proof without duplicating Xcode tests', () => {
+    const testflight = readFileSync(iosTestFlightWorkflowPath, 'utf8');
+    const envValidator = readFileSync(iosTestFlightEnvValidatorPath, 'utf8');
+    const artifactValidator = readFileSync(
+      iosTestFlightArtifactValidatorPath,
+      'utf8'
+    );
+    const fastlane = readFileSync(fastlanePath, 'utf8');
+    const trigger = testflight.slice(0, testflight.indexOf('\npermissions:'));
+    const workflowHeader = testflight.slice(0, testflight.indexOf('\njobs:'));
+    const authorization = getJobBlock(testflight, 'authorize-release');
+    const beta = getJobBlock(testflight, 'beta');
+
+    expect(trigger).toContain('workflow_dispatch:');
+    expect(trigger).toContain('workflow_run:');
+    expect(trigger).toContain('workflows: [Production Controller]');
+    expect(trigger).toContain('types: [completed]');
+    expect(trigger).toContain('branches: [main]');
+    expect(trigger).not.toMatch(/^  push:/m);
+    expect(workflowHeader).toContain('group: ios-testflight');
+    expect(workflowHeader).toContain('cancel-in-progress: false');
+    expect(workflowHeader).not.toContain('github.ref');
+
+    expect(authorization).toContain(
+      "github.event.workflow_run.conclusion == 'success'"
+    );
+    expect(authorization).toContain(
+      '.path == ".github/workflows/production-controller.yml"'
+    );
+    expect(authorization).toContain('.name == "Production Verified"');
+    expect(authorization).toContain('.head_sha == $sha');
+    expect(authorization).toContain('.conclusion == "success"');
+    expect(authorization).toContain('commits/main');
+    expect(authorization).toContain('status=success');
+    expect(authorization).toContain(
+      'production-generation-verified-$expected_sha'
+    );
+    expect(authorization).toContain('.controllerRun == $run');
+    expect(
+      authorization.indexOf('prove_existing_production_marker "$release_sha"')
+    ).toBeLessThan(
+      authorization.indexOf(
+        'if [ "$EVENT_NAME" = "workflow_dispatch" ]; then\n            exit 0'
+      )
+    );
+    expect(authorization).toContain(
+      'actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100'
+    );
+    expect(authorization).toContain('.name == "Upload Internal TestFlight"');
+    expect(authorization).toContain('if [ "$beta_count" = "1" ]');
+    expect(authorization).toContain('baseline_sha="$run_sha"');
+    expect(authorization).toContain('break');
+    expect(authorization).toContain('already_released=true');
+    expect(authorization).toContain(
+      'git merge-base --is-ancestor "$BASELINE_SHA" "$RELEASE_SHA"'
+    );
+    expect(authorization).toContain('.github/workflows/ios-ci.yml');
+    expect(authorization).toContain('.github/workflows/ios-testflight.yml');
+    expect(authorization).toContain(
+      'git diff --name-only "$BASELINE_SHA" "$RELEASE_SHA" -- "${release_paths[@]}"'
+    );
+    expect(authorization).not.toContain('--diff-filter=d');
+    expect(readFileSync(workflowPath, 'utf8')).toContain(
+      '.github/workflows/ios-(ci|testflight)\\.yml'
+    );
+    expect(readFileSync(ciFastLanesPath, 'utf8')).toContain(
+      "'.github/workflows/ios-testflight.yml'"
+    );
+
+    expect(beta).toContain('needs: [authorize-release]');
+    expect(beta).toContain(
+      "needs.authorize-release.outputs.should_release == 'true'"
+    );
+    expect(beta).toContain(
+      'ref: ${{ needs.authorize-release.outputs.release_sha }}'
+    );
+    expect(beta).toContain('bundle exec fastlane ios beta');
+    expect(beta).not.toContain('bundle exec fastlane ios ios_tests');
+    expect(beta).not.toContain('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
+    expect(beta).toContain('GH_TOKEN: ${{ github.token }}');
+
+    expect(envValidator).toContain('CLERK_ASSOCIATED_DOMAIN');
+    expect(envValidator).not.toContain('CLERK_PUBLISHABLE_KEY');
+    expect(fastlane).not.toContain('require_env!("CLERK_PUBLISHABLE_KEY")');
+    expect(fastlane).toContain('def verify_release_sha_is_current_main!');
+    expect(fastlane).toContain('repos/#{repository}/commits/main');
+    const finalMainCheck = fastlane.lastIndexOf(
+      'verify_release_sha_is_current_main!'
+    );
+    expect(fastlane.indexOf('gym(')).toBeLessThan(finalMainCheck);
+    expect(finalMainCheck).toBeLessThan(
+      fastlane.indexOf('upload_to_testflight(')
+    );
+    expect(artifactValidator).toContain(
+      'still embeds retired ClerkPublishableKey'
+    );
   });
 
   it('keeps the dependency-free risk classifier off dependency caches', () => {

@@ -536,7 +536,7 @@ jobs:
             CHANGED_FILES=$(git diff --name-only "$PUSH_BASE_SHA" HEAD)
           fi
 
-          IOS_PATTERN='^(apps/ios/|fastlane/|Gemfile$|Gemfile\.lock$|scripts/ios-best-practices-lint\.sh$|\.github/workflows/ios-ci\.yml$)'
+          IOS_PATTERN='^(apps/ios/|fastlane/|Gemfile$|Gemfile\.lock$|scripts/ios-best-practices-lint\.sh$|\.github/workflows/ios-(ci|testflight)\.yml$)'
           if echo "$CHANGED_FILES" | grep -q -E "$IOS_PATTERN"; then
             echo "run_ios=true" >> "$GITHUB_OUTPUT"
           else
