@@ -642,6 +642,38 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
     ).toBe('test_fixture_import_timeout');
   });
 
+  it('classifies the mobile overflow sign-in navigation race', () => {
+    const diagnosis = diagnoseCiFailure(`
+        Mobile Overflow Release Guard > 320px > public auth-signin has no horizontal overflow @ 320px
+        page.evaluate: Execution context was destroyed, most likely because of a navigation
+        at getOverflowingElements (tests/e2e/utils/mobile-overflow.ts:61:15)
+      `);
+
+    expect(diagnosis.failureClass).toBe('mobile_overflow_navigation_race');
+    expect(diagnosis.rootCause).toContain('streamed Flight script');
+    expect(diagnosis.remediation).toContain('raw response');
+  });
+
+  it('does not classify a generic destroyed execution context as mobile overflow', () => {
+    expect(
+      diagnoseCiFailure(`
+        Checkout flow
+        page.evaluate: Execution context was destroyed, most likely because of a navigation
+        at tests/e2e/checkout.spec.ts:42:9
+      `).failureClass
+    ).toBe('unknown');
+  });
+
+  it('does not apply the sign-in diagnosis to another mobile overflow surface', () => {
+    expect(
+      diagnoseCiFailure(`
+        Mobile Overflow Release Guard > 320px > public marketing-pricing has no horizontal overflow @ 320px
+        page.evaluate: Execution context was destroyed, most likely because of a navigation
+        at getOverflowingElements (tests/e2e/utils/mobile-overflow.ts:61:15)
+      `).failureClass
+    ).toBe('unknown');
+  });
+
   it('keeps process exhaustion and host pressure as distinct failure classes', () => {
     expect(
       diagnoseCiFailure('ERR_WORKER_INIT_FAILED: spawnSync node EAGAIN')

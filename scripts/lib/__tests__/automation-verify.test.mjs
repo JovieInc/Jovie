@@ -198,6 +198,15 @@ const GTMQ_SOURCE_GATE_REAPER_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = [
+  'apps/web/tests/e2e/mobile-overflow.spec.ts',
+  'apps/web/tests/e2e/utils/mobile-overflow.ts',
+  'apps/web/tests/unit/e2e/mobile-overflow-navigation.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
 const RUNNER_IO_PRESSURE_MANIFEST = [
   '.github/runner-host/README.md',
   '.github/runner-host/autoscaler/controller-io-pressure.patch',
@@ -907,6 +916,53 @@ describe('automation-verify affected scope', () => {
     ]);
   });
 
+  it('keeps Playwright deep and selects deterministic mobile overflow regressions', () => {
+    const plan = buildAffectedTestPlan(
+      MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST
+    );
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/e2e/mobile-overflow-navigation.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+    ]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          'exec',
+          'vitest',
+          '--root',
+          'scripts',
+          '--config',
+          'vitest.config.mts',
+          'run',
+          'lib/__tests__/automation-verify.test.mjs',
+          'hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+      [
+        'pnpm',
+        [
+          '--filter',
+          '@jovie/web',
+          'exec',
+          'vitest',
+          'run',
+          'tests/unit/e2e/mobile-overflow-navigation.test.ts',
+          '--passWithNoTests',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
+  });
+
   it.each([
     { manifest: PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST },
     { manifest: PERFORMANCE_PROFILER_REPAIR_MANIFEST },
@@ -1044,6 +1100,27 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan(
         GTMQ_SOURCE_GATE_REAPER_MANIFEST.filter(file => file !== missingInput)
       ).mode
+    ).toBe('full');
+  });
+
+  it.each(
+    MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST
+  )('fails closed when the mobile overflow navigation repair is missing %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.filter(
+          file => file !== missingInput
+        )
+      ).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when the mobile overflow navigation repair includes an unknown peer', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST,
+        'scripts/hermes/lib/unknown-mobile-overflow-helper.ts',
+      ]).mode
     ).toBe('full');
   });
 
