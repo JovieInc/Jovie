@@ -127,12 +127,10 @@ bundle exec fastlane ios beta
 Release CI uses these GitHub secrets: `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_TEAM_ID`, `MATCH_GIT_URL`, `MATCH_PASSWORD`, one of `MATCH_GIT_PRIVATE_KEY` or `MATCH_GIT_BASIC_AUTHORIZATION`, and `CLERK_ASSOCIATED_DOMAIN`.
 
 The TestFlight workflow validates release config before running Fastlane. The
-bundled Clerk publishable key must be the production `pk_live_...` key; a
-placeholder or `pk_test...` key fails the upload workflow before another
-internal build can ship with sign-in disabled. The `beta` lane also
-re-validates the Clerk key embedded in the WRITTEN `Configuration.local.plist`
-right after it's generated, so a stale cached plist can't slip a non-live key
-past the earlier env-only check.
+generated artifact must use the canonical `https://jov.ie` API and web
+endpoints. The `beta` lane validates the WRITTEN
+`Configuration.local.plist` immediately before archiving and rejects any stale
+artifact that still embeds the retired Clerk publishable-key field.
 
 `bootstrap_signing` is intentionally manual. It creates or verifies the Apple bundle identifier, enables Associated Domains, creates or verifies the App Store Connect app record, and writes App Store distribution assets into match storage. Normal TestFlight uploads use readonly match in CI.
 

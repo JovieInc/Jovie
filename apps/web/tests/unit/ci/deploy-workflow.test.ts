@@ -496,6 +496,7 @@ describe('deploy workflow Vercel env resolution', () => {
     const workflowHeader = testflight.slice(0, testflight.indexOf('\njobs:'));
     const authorization = getJobBlock(testflight, 'authorize-release');
     const beta = getJobBlock(testflight, 'beta');
+    const uploadMarker = getJobBlock(testflight, 'record-upload');
 
     expect(trigger).toContain('workflow_dispatch:');
     expect(trigger).toContain('workflow_run:');
@@ -513,6 +514,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(authorization).toContain(
       '.path == ".github/workflows/production-controller.yml"'
     );
+    expect(authorization).toContain('.name == "Production Controller"');
     expect(authorization).toContain('.name == "Production Verified"');
     expect(authorization).toContain('.head_sha == $sha');
     expect(authorization).toContain('.conclusion == "success"');
@@ -533,6 +535,28 @@ describe('deploy workflow Vercel env resolution', () => {
       'actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100'
     );
     expect(authorization).toContain('.name == "Upload Internal TestFlight"');
+    expect(authorization).toContain(
+      'actions/artifacts?name=$marker_name&per_page=100'
+    );
+    expect(
+      authorization.indexOf('marker_name="testflight-upload-verified"')
+    ).toBeLessThan(
+      authorization.indexOf(
+        'actions/workflows/ios-testflight.yml/runs?branch=main&status=success&per_page=100'
+      )
+    );
+    expect(authorization).toContain(
+      'actions/runs/$run_id/attempts/$upload_attempt'
+    );
+    expect(authorization).toContain('(.id | tostring) == $job');
+    expect(authorization).toContain('.uploadRunAttempt');
+    expect(authorization).toContain('.uploadJob');
+    expect(authorization).toContain(
+      'No proven TestFlight upload baseline exists; treating this as the first verified release.'
+    );
+    expect(authorization).not.toContain(
+      'No exact successful TestFlight upload was found in the bounded run history.'
+    );
     expect(authorization).toContain('if [ "$beta_count" = "1" ]');
     expect(authorization).toContain('baseline_sha="$run_sha"');
     expect(authorization).toContain('break');
@@ -564,6 +588,23 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(beta).not.toContain('bundle exec fastlane ios ios_tests');
     expect(beta).not.toContain('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY');
     expect(beta).toContain('GH_TOKEN: ${{ github.token }}');
+
+    expect(uploadMarker).toContain("needs.beta.result == 'success'");
+    expect(uploadMarker).toContain('for attempt in $(seq 1 "$RUN_ATTEMPT")');
+    expect(uploadMarker).toContain('upload_attempt="$attempt"');
+    expect(uploadMarker).toContain(
+      'No successful exact TestFlight upload job exists in this run.'
+    );
+    expect(uploadMarker).toContain('.name == "iOS TestFlight"');
+    expect(uploadMarker).toContain(
+      '.path == ".github/workflows/ios-testflight.yml"'
+    );
+    expect(uploadMarker).toContain('.name == "Upload Internal TestFlight"');
+    expect(uploadMarker).toContain('workflowRun: $workflow_run');
+    expect(uploadMarker).toContain('uploadRunAttempt: $upload_attempt');
+    expect(uploadMarker).toContain('uploadJob: $upload_job');
+    expect(uploadMarker).toContain('name: testflight-upload-verified');
+    expect(uploadMarker).toContain('retention-days: 90');
 
     expect(envValidator).toContain('CLERK_ASSOCIATED_DOMAIN');
     expect(envValidator).not.toContain('CLERK_PUBLISHABLE_KEY');

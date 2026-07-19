@@ -143,6 +143,7 @@ jobs:
                   .head_branch == "main" and
                   .head_repository.full_name == $repo and
                   .event == "workflow_run" and
+                  .name == "Production Controller" and
                   .path == ".github/workflows/production-controller.yml" and
                   .status == "completed" and
                   .conclusion == "success" and
@@ -210,6 +211,7 @@ jobs:
                 .head_branch == "main" and
                 .head_repository.full_name == $repo and
                 .event == "workflow_run" and
+                .name == "Production Controller" and
                 .path == ".github/workflows/production-controller.yml" and
                 .status == "completed" and
                 .conclusion == "success" and
@@ -262,64 +264,205 @@ jobs:
             exit 0
           fi
 
-          # Bounded legacy lookup. Stop at the newest exact successful upload;
-          # authorization must never grow with all workflow history.
-          runs_json="$(gh api \
-            "repos/$REPOSITORY/actions/workflows/ios-testflight.yml/runs?branch=main&status=success&per_page=100")"
-          jq -e 'type == "object" and (.workflow_runs | type == "array")' \
-            >/dev/null <<<"$runs_json" || {
-            echo "::error::GitHub returned malformed TestFlight run history."
+          # Upload markers are written only after the exact beta job succeeds.
+          # Unlike workflow success, this fixed-name history cannot be polluted
+          # by the common authorize-success/beta-skipped path.
+          marker_name="testflight-upload-verified"
+          marker_listing="$(gh api \
+            "repos/$REPOSITORY/actions/artifacts?name=$marker_name&per_page=100")"
+          jq -e 'type == "object" and (.artifacts | type == "array")' \
+            >/dev/null <<<"$marker_listing" || {
+            echo "::error::GitHub returned malformed TestFlight marker history."
             exit 1
           }
-          successful_runs="$(jq -c '[.workflow_runs[]? | select(
-            .status == "completed" and .conclusion == "success" and
-            .head_branch == "main" and (.head_sha | test("^[0-9a-f]{40}$")) and
-            (.id | type == "number") and (.run_attempt | type == "number")
-          )]' <<<"$runs_json")"
+          marker_candidates="$(jq -r --arg name "$marker_name" '
+            [
+              .artifacts[]?
+              | select(
+                  .expired == false and
+                  .name == $name and
+                  (.id | type == "number") and
+                  (.workflow_run.id | type == "number")
+                )
+            ]
+            | sort_by(.created_at, .id) | reverse
+            | .[] | [.id, .workflow_run.id] | @tsv
+          ' <<<"$marker_listing")"
 
-          # A successful workflow can contain only the Ubuntu authorization job
-          # while beta is skipped. Cross-prove the exact run attempt's upload job
-          # before using any run as release truth or as the comparison baseline.
           baseline_sha=""
-          while IFS=$'\t' read -r run_id run_attempt run_sha; do
-            [[ "$run_id" =~ ^[1-9][0-9]*$ ]] &&
-              [[ "$run_attempt" =~ ^[1-9][0-9]*$ ]] &&
-              [[ "$run_sha" =~ ^[0-9a-f]{40}$ ]] || {
-              echo "::error::Successful TestFlight run history contained malformed identity."
-              exit 1
-            }
-            run_jobs="$(gh api --paginate --slurp \
-              "repos/$REPOSITORY/actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100")"
+          while IFS=$'\t' read -r artifact_id run_id; do
+            [ -n "$artifact_id" ] || continue
+            [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] &&
+              [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || continue
+
+            marker_archive="$RUNNER_TEMP/testflight-marker-${artifact_id}.zip"
+            marker_json="$RUNNER_TEMP/testflight-marker-${artifact_id}.json"
+            gh api "repos/$REPOSITORY/actions/artifacts/$artifact_id/zip" \
+              > "$marker_archive"
+            if ! unzip -p "$marker_archive" testflight-upload-verified.json \
+              > "$marker_json" 2>/dev/null ||
+              ! jq -e '
+                type == "object" and
+                (.sha | type == "string" and test("^[0-9a-f]{40}$")) and
+                (.workflowRun | type == "string" and test("^[1-9][0-9]*$")) and
+                (.uploadRunAttempt | type == "string" and test("^[1-9][0-9]*$")) and
+                (.uploadJob | type == "string" and test("^[1-9][0-9]*$"))
+              ' >/dev/null "$marker_json"; then
+              echo "::warning::Ignoring malformed TestFlight upload marker artifact $artifact_id."
+              continue
+            fi
+
+            marker_sha="$(jq -r '.sha' "$marker_json")"
+            marker_run_id="$(jq -r '.workflowRun' "$marker_json")"
+            upload_attempt="$(jq -r '.uploadRunAttempt' "$marker_json")"
+            upload_job_id="$(jq -r '.uploadJob' "$marker_json")"
+            if [ "$marker_run_id" != "$run_id" ]; then
+              echo "::warning::Ignoring TestFlight marker $artifact_id with mismatched run identity."
+              continue
+            fi
+
+            marker_run="$(gh api "repos/$REPOSITORY/actions/runs/$run_id")"
+            if ! jq -e \
+              --arg repo "$REPOSITORY" \
+              --arg run "$run_id" \
+              --arg sha "$marker_sha" '
+                type == "object" and
+                (.id | tostring) == $run and
+                .name == "iOS TestFlight" and
+                .path == ".github/workflows/ios-testflight.yml" and
+                (.event == "workflow_run" or .event == "workflow_dispatch") and
+                .head_branch == "main" and
+                .head_sha == $sha and
+                .head_repository.full_name == $repo and
+                .status == "completed" and
+                .conclusion == "success"
+              ' >/dev/null <<<"$marker_run"; then
+              echo "::warning::Ignoring TestFlight marker $artifact_id without exact workflow identity."
+              continue
+            fi
+
+            upload_run="$(gh api \
+              "repos/$REPOSITORY/actions/runs/$run_id/attempts/$upload_attempt")"
+            if ! jq -e \
+              --arg repo "$REPOSITORY" \
+              --arg run "$run_id" \
+              --arg attempt "$upload_attempt" \
+              --arg sha "$marker_sha" '
+                type == "object" and
+                (.id | tostring) == $run and
+                (.run_attempt | tostring) == $attempt and
+                .name == "iOS TestFlight" and
+                .path == ".github/workflows/ios-testflight.yml" and
+                (.event == "workflow_run" or .event == "workflow_dispatch") and
+                .head_branch == "main" and
+                .head_sha == $sha and
+                .head_repository.full_name == $repo and
+                .status == "completed" and
+                .conclusion == "success"
+              ' >/dev/null <<<"$upload_run"; then
+              echo "::warning::Ignoring TestFlight marker $artifact_id with mismatched upload attempt."
+              continue
+            fi
+
+            upload_jobs="$(gh api --paginate --slurp \
+              "repos/$REPOSITORY/actions/runs/$run_id/attempts/$upload_attempt/jobs?per_page=100")"
             jq -e '
               type == "array" and length > 0 and
               all(.[]; type == "object" and (.jobs | type == "array"))
-            ' >/dev/null <<<"$run_jobs" || {
-              echo "::error::GitHub returned malformed TestFlight upload job evidence."
+            ' >/dev/null <<<"$upload_jobs" || {
+              echo "::error::GitHub returned malformed marked TestFlight job evidence."
               exit 1
             }
-            beta_count="$(jq --arg sha "$run_sha" '
-              [
-                .[].jobs[]?
-                | select(
-                    .name == "Upload Internal TestFlight" and
-                    .head_sha == $sha and
-                    .status == "completed" and
-                    .conclusion == "success"
-                  )
-              ] | length
-            ' <<<"$run_jobs")"
-            if [ "$beta_count" = "1" ]; then
-              baseline_sha="$run_sha"
-              break
-            fi
-          done < <(jq -r '
-            sort_by(.created_at, .id) | reverse | .[] |
-            [.id, .run_attempt, .head_sha] | @tsv
-          ' <<<"$successful_runs")
+            marked_upload_count="$(jq \
+              --arg sha "$marker_sha" \
+              --arg job "$upload_job_id" '
+                [
+                  .[].jobs[]?
+                  | select(
+                      (.id | tostring) == $job and
+                      .name == "Upload Internal TestFlight" and
+                      .head_sha == $sha and
+                      .status == "completed" and
+                      .conclusion == "success"
+                    )
+                ] | length
+              ' <<<"$upload_jobs")"
+            [ "$marked_upload_count" = "1" ] || {
+              echo "::warning::Ignoring TestFlight marker $artifact_id without its exact successful upload job."
+              continue
+            }
+
+            baseline_sha="$marker_sha"
+            echo "Accepted exact TestFlight upload marker $artifact_id from run $run_id attempt $upload_attempt."
+            break
+          done <<<"$marker_candidates"
+
+          # Bootstrap only: older uploads predate the stable marker. Scan one
+          # bounded page and accept a baseline only when its exact run-attempt
+          # Upload Internal TestFlight job succeeded. Authorization-only workflow
+          # success is never release truth. Once one new upload lands, markers
+          # become the permanent, upload-only baseline index.
+          if [ -z "$baseline_sha" ]; then
+            runs_json="$(gh api \
+              "repos/$REPOSITORY/actions/workflows/ios-testflight.yml/runs?branch=main&status=success&per_page=100")"
+            jq -e 'type == "object" and (.workflow_runs | type == "array")' \
+              >/dev/null <<<"$runs_json" || {
+              echo "::error::GitHub returned malformed TestFlight run history."
+              exit 1
+            }
+            successful_runs="$(jq -c --arg repo "$REPOSITORY" '[.workflow_runs[]? | select(
+              .name == "iOS TestFlight" and
+              .path == ".github/workflows/ios-testflight.yml" and
+              (.event == "workflow_run" or .event == "workflow_dispatch" or .event == "push") and
+              .status == "completed" and .conclusion == "success" and
+              .head_branch == "main" and .head_repository.full_name == $repo and
+              (.head_sha | test("^[0-9a-f]{40}$")) and
+              (.id | type == "number") and (.run_attempt | type == "number")
+            )]' <<<"$runs_json")"
+
+            # A successful workflow can contain only the Ubuntu authorization
+            # job while beta is skipped. Cross-prove the upload job before using
+            # a legacy run as a comparison baseline.
+            while IFS=$'\t' read -r run_id run_attempt run_sha; do
+              [[ "$run_id" =~ ^[1-9][0-9]*$ ]] &&
+                [[ "$run_attempt" =~ ^[1-9][0-9]*$ ]] &&
+                [[ "$run_sha" =~ ^[0-9a-f]{40}$ ]] || {
+                echo "::error::Successful TestFlight run history contained malformed identity."
+                exit 1
+              }
+              run_jobs="$(gh api --paginate --slurp \
+                "repos/$REPOSITORY/actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100")"
+              jq -e '
+                type == "array" and length > 0 and
+                all(.[]; type == "object" and (.jobs | type == "array"))
+              ' >/dev/null <<<"$run_jobs" || {
+                echo "::error::GitHub returned malformed TestFlight upload job evidence."
+                exit 1
+              }
+              beta_count="$(jq --arg sha "$run_sha" '
+                [
+                  .[].jobs[]?
+                  | select(
+                      .name == "Upload Internal TestFlight" and
+                      .head_sha == $sha and
+                      .status == "completed" and
+                      .conclusion == "success"
+                    )
+                ] | length
+              ' <<<"$run_jobs")"
+              if [ "$beta_count" = "1" ]; then
+                baseline_sha="$run_sha"
+                break
+              fi
+            done < <(jq -r '
+              sort_by(.created_at, .id) | reverse | .[] |
+              [.id, .run_attempt, .head_sha] | @tsv
+            ' <<<"$successful_runs")
+          fi
 
           if [ -z "$baseline_sha" ]; then
-            echo "::error::No exact successful TestFlight upload was found in the bounded run history."
-            exit 1
+            echo "::notice::No proven TestFlight upload baseline exists; treating this as the first verified release."
+            exit 0
           fi
           if [ "$baseline_sha" = "$release_sha" ]; then
             echo "already_released=true" >> "$GITHUB_OUTPUT"
@@ -467,3 +610,113 @@ jobs:
             unset MATCH_GIT_PRIVATE_KEY
           fi
           bundle exec fastlane ios beta
+
+  record-upload:
+    name: Record exact TestFlight upload
+    needs: [authorize-release, beta]
+    if: ${{ always() && needs.authorize-release.result == 'success' && needs.beta.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cross-prove and record the exact upload job
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ needs.authorize-release.outputs.release_sha }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] &&
+            [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::TestFlight upload marker identity is malformed."
+            exit 1
+          }
+
+          run_record="$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID")"
+          jq -e \
+            --arg repo "$REPOSITORY" \
+            --arg run "$RUN_ID" \
+            --arg attempt "$RUN_ATTEMPT" \
+            --arg sha "$RELEASE_SHA" '
+              type == "object" and
+              (.id | tostring) == $run and
+              (.run_attempt | tostring) == $attempt and
+              .name == "iOS TestFlight" and
+              .path == ".github/workflows/ios-testflight.yml" and
+              (.event == "workflow_run" or .event == "workflow_dispatch") and
+              .head_branch == "main" and
+              .head_sha == $sha and
+              .head_repository.full_name == $repo
+            ' >/dev/null <<<"$run_record" || {
+            echo "::error::Current TestFlight run does not match the authorized upload identity."
+            exit 1
+          }
+
+          # A rerun-all can legitimately create more than one successful upload
+          # attempt. Select the newest attempt with one exact successful beta and
+          # bind the marker to that attempt and job ID.
+          upload_attempt=""
+          upload_job=""
+          for attempt in $(seq 1 "$RUN_ATTEMPT"); do
+            jobs_json="$(gh api --paginate --slurp \
+              "repos/$REPOSITORY/actions/runs/$RUN_ID/attempts/$attempt/jobs?per_page=100")"
+            jq -e '
+              type == "array" and length > 0 and
+              all(.[]; type == "object" and (.jobs | type == "array"))
+            ' >/dev/null <<<"$jobs_json" || {
+              echo "::error::GitHub returned malformed TestFlight upload evidence."
+              exit 1
+            }
+            attempt_matches="$(jq -c \
+              --arg sha "$RELEASE_SHA" \
+              '
+                [
+                  .[].jobs[]?
+                  | select(
+                      .name == "Upload Internal TestFlight" and
+                      .head_sha == $sha and
+                      .status == "completed" and
+                      .conclusion == "success" and
+                      (.id | type == "number")
+                    )
+                  | (.id | tostring)
+                ]
+              ' <<<"$jobs_json")"
+            attempt_match_count="$(jq 'unique | length' <<<"$attempt_matches")"
+            if [ "$attempt_match_count" -gt 1 ]; then
+              echo "::error::TestFlight attempt $attempt has ambiguous successful upload jobs."
+              exit 1
+            fi
+            if [ "$attempt_match_count" = "1" ]; then
+              upload_attempt="$attempt"
+              upload_job="$(jq -r 'unique | .[0]' <<<"$attempt_matches")"
+            fi
+          done
+
+          [[ "$upload_attempt" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$upload_job" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::No successful exact TestFlight upload job exists in this run."
+            exit 1
+          }
+          jq -n \
+            --arg sha "$RELEASE_SHA" \
+            --arg workflow_run "$RUN_ID" \
+            --arg upload_attempt "$upload_attempt" \
+            --arg upload_job "$upload_job" \
+            '{
+              sha: $sha,
+              workflowRun: $workflow_run,
+              uploadRunAttempt: $upload_attempt,
+              uploadJob: $upload_job
+            }' > "$RUNNER_TEMP/testflight-upload-verified.json"
+
+      - name: Preserve upload-only TestFlight baseline marker
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: testflight-upload-verified
+          path: ${{ runner.temp }}/testflight-upload-verified.json
+          if-no-files-found: error
+          retention-days: 90
