@@ -32,6 +32,7 @@ import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { generateAppleClientSecret } from './apple-client-secret';
+import { oauthProviderErrorReturn } from './oauth-provider-error-return';
 import { provisionAppUser } from './provision';
 import {
   AUTH_RATE_LIMIT_RULES,
@@ -201,6 +202,7 @@ function buildPlugins() {
       storeTokens: 'hashed',
       cachedTrustedClients: new Set(['logyourbody-ios', 'logyourbody-web']),
     }) as BetterAuthPlugin,
+    oauthProviderErrorReturn(),
     oneTimeToken({
       expiresIn: 5,
       disableClientRequest: true,
