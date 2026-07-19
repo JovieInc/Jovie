@@ -12,7 +12,11 @@ name: Runner Health Monitor
 # its own fallback repair.
 
 on:
-  workflow_dispatch:         # manual trigger (cron moved to agent-tick.yml)
+  schedule:
+    # Observe the 10-minute heartbeat on a two-minute offset. The monitor is
+    # hosted, so an offline self-hosted pool cannot prevent its own failover.
+    - cron: '2,12,22,32,42,52 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -7,11 +7,14 @@ name: Main Autofix
 # Guardrails (enforced in eval-main-health composite action):
 #  - Canary/Sentry gate failures do NOT trigger autofix (rollback path owns those).
 #  - Newer commit already in progress → skip.
-#  - ≥2 distinct SHAs needed autofix within 60 min → escalate to needs-human.
+#  - The failed CI run must already be on run_attempt >= 2.
+#  - An exact-SHA repair workflow, PR, or durable ownership marker must not exist.
+#  - Ownership is recorded before fixed-runner work so cancellation cannot loop.
+#  - ≥2 distinct SHAs recorded durable autofix ownership within 60 min → escalate to needs-human.
 #
-# Per-SHA limits (enforced here):
+# Per-SHA limits (enforced by durable status history plus PR history):
 #  - Dedup: no new PR if an open autofix PR for the SHA already exists.
-#  - Attempt cap: 3 autofix PRs per SHA (open+closed), then needs-human.
+#  - Attempt cap: 3 owned attempts per SHA, including no-PR/aborted runs.
 #  - SHA drift guard: if main HEAD moved past the failing SHA, exit without opening a PR.
 
 on:
@@ -21,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       failing_run_id:
-        description: 'CI run ID to autofix (overrides evaluation).'
+        description: 'Eligible CI run ID to autofix (must match current evaluation).'
         required: false
 
 permissions: {}
@@ -35,16 +38,19 @@ jobs:
   evaluate:
     name: Evaluate eligibility
     # Monitor exits 1 (conclusion=failure) only when main CI is unhealthy.
-    # Skip evaluate on healthy monitor runs to avoid 96 no-op workflow runs/day.
+    # Skip evaluate on healthy monitor runs to avoid 72 no-op jobs/day.
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
       pull-requests: read
+      statuses: write
     outputs:
       needs_autofix: ${{ steps.decide.outputs.needs_autofix }}
       failing_run_id: ${{ steps.decide.outputs.failing_run_id }}
+      failing_run_attempt: ${{ steps.decide.outputs.failing_run_attempt }}
+      repair_attempt: ${{ steps.decide.outputs.repair_attempt }}
       failing_sha: ${{ steps.decide.outputs.failing_sha }}
       failing_short_sha: ${{ steps.decide.outputs.failing_short_sha }}
       last_green_sha: ${{ steps.decide.outputs.last_green_sha }}
@@ -66,6 +72,8 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           EVAL_NEEDS_AUTOFIX: ${{ steps.evaluate.outputs.needs_autofix }}
           EVAL_FAILING_RUN_ID: ${{ steps.evaluate.outputs.failing_run_id }}
+          EVAL_FAILING_RUN_ATTEMPT: ${{ steps.evaluate.outputs.failing_run_attempt }}
+          EVAL_REPAIR_ATTEMPT: ${{ steps.evaluate.outputs.repair_attempt }}
           EVAL_FAILING_SHA: ${{ steps.evaluate.outputs.failing_sha }}
           EVAL_FAILING_SHORT_SHA: ${{ steps.evaluate.outputs.failing_short_sha }}
           EVAL_LAST_GREEN_SHA: ${{ steps.evaluate.outputs.last_green_sha }}
@@ -73,19 +81,21 @@ jobs:
           EVAL_SYSTEMIC: ${{ steps.evaluate.outputs.systemic }}
           EVAL_SKIP_REASON: ${{ steps.evaluate.outputs.autofix_skip_reason }}
         run: |
-          # workflow_dispatch with explicit run ID overrides evaluation (for smoke testing).
-          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$DISPATCH_RUN_ID" ]; then
-            echo "Manual dispatch override: forcing autofix for run $DISPATCH_RUN_ID"
+          # Manual dispatch may select the currently eligible run, but it never
+          # bypasses run-attempt or in-flight-repair safety.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$DISPATCH_RUN_ID" ] && [ "$DISPATCH_RUN_ID" != "$EVAL_FAILING_RUN_ID" ]; then
+            echo "Manual dispatch target $DISPATCH_RUN_ID is not the current eligible failure $EVAL_FAILING_RUN_ID; refusing override."
             {
-              echo "needs_autofix=true"
+              echo "needs_autofix=false"
               echo "failing_run_id=$DISPATCH_RUN_ID"
-              # Rest of fields still come from evaluation (most recent failure context).
+              echo "failing_run_attempt=$EVAL_FAILING_RUN_ATTEMPT"
+              echo "repair_attempt=$EVAL_REPAIR_ATTEMPT"
               echo "failing_sha=$EVAL_FAILING_SHA"
               echo "failing_short_sha=$EVAL_FAILING_SHORT_SHA"
               echo "last_green_sha=$EVAL_LAST_GREEN_SHA"
               echo "failed_job_names=$EVAL_FAILED_JOB_NAMES"
               echo "systemic=false"
-              echo "autofix_skip_reason="
+              echo "autofix_skip_reason=dispatch_target_not_current_failure"
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -93,6 +103,8 @@ jobs:
           {
             echo "needs_autofix=$EVAL_NEEDS_AUTOFIX"
             echo "failing_run_id=$EVAL_FAILING_RUN_ID"
+            echo "failing_run_attempt=$EVAL_FAILING_RUN_ATTEMPT"
+            echo "repair_attempt=$EVAL_REPAIR_ATTEMPT"
             echo "failing_sha=$EVAL_FAILING_SHA"
             echo "failing_short_sha=$EVAL_FAILING_SHORT_SHA"
             echo "last_green_sha=$EVAL_LAST_GREEN_SHA"
@@ -107,6 +119,40 @@ jobs:
             echo "Skipping autofix: $EVAL_SKIP_REASON"
           fi
 
+      - name: Record exact-SHA repair ownership
+        if: >-
+          steps.decide.outputs.needs_autofix == 'true' ||
+          steps.decide.outputs.autofix_skip_reason == 'canary_or_sentry_gate_failed' ||
+          steps.decide.outputs.autofix_skip_reason == 'systemic_multiple_shas_failing'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          NEEDS_AUTOFIX: ${{ steps.decide.outputs.needs_autofix }}
+          SKIP_REASON: ${{ steps.decide.outputs.autofix_skip_reason }}
+          FAILING_SHA: ${{ steps.decide.outputs.failing_sha }}
+          REPAIR_ATTEMPT: ${{ steps.decide.outputs.repair_attempt }}
+        with:
+          script: |
+            const sha = process.env.FAILING_SHA ?? '';
+            if (!/^[0-9a-f]{40}$/.test(sha)) {
+              core.setFailed(`Refusing to record autofix ownership for invalid SHA: ${sha}`);
+              return;
+            }
+
+            const attempt = process.env.REPAIR_ATTEMPT || '1';
+            const description = process.env.NEEDS_AUTOFIX === 'true'
+              ? `owned:run-${context.runId}:attempt-${attempt}`
+              : `terminal:${process.env.SKIP_REASON ?? 'unclassified_skip'}:attempt-${attempt}`;
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha,
+              state: 'success',
+              context: 'main-autofix/ownership',
+              description: description.slice(0, 140),
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+
       - name: Escalate systemic failure to Slack
         if: ${{ steps.decide.outputs.systemic == 'true' && env.SLACK_WEBHOOK_URL != '' }}
         env:
@@ -120,7 +166,7 @@ jobs:
               color: "danger",
               fields: [
                 { title: "Failing SHA", value: $sha, short: true },
-                { title: "Reason", value: "≥2 distinct SHAs triggered autofix within 60 min — likely not a code bug (rotated secret, upstream outage, infra). Human triage required.", short: false },
+                { title: "Reason", value: "≥2 distinct SHAs recorded durable autofix ownership within 60 min — likely not a code bug (rotated secret, upstream outage, infra). Human triage required.", short: false },
                 { title: "Run", value: ("<" + $url + "|View failing run>"), short: false }
               ]
             }]
@@ -136,6 +182,7 @@ jobs:
     permissions:
       actions: read
       id-token: write
+      statuses: write
     steps:
       - name: Generate Jovie Bot token
         id: app-token
@@ -168,6 +215,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
           SHORT_SHA: ${{ needs.evaluate.outputs.failing_short_sha }}
+          MARKER_ATTEMPT: ${{ needs.evaluate.outputs.repair_attempt }}
         run: |
           # Count existing autofix PRs for this SHA using label filter + client-side title match.
           # We avoid --search (GitHub Search has a 10-60s indexing delay that would cause
@@ -178,6 +226,9 @@ jobs:
           echo "total=$PR_COUNT" >> "$GITHUB_OUTPUT"
           echo "open=$OPEN_COUNT" >> "$GITHUB_OUTPUT"
           ATTEMPT=$((PR_COUNT + 1))
+          if [ "$MARKER_ATTEMPT" -gt "$ATTEMPT" ]; then
+            ATTEMPT="$MARKER_ATTEMPT"
+          fi
           echo "attempt=$ATTEMPT" >> "$GITHUB_OUTPUT"
           if [ "$OPEN_COUNT" -gt 0 ]; then
             echo "skip_reason=open_pr_exists" >> "$GITHUB_OUTPUT"
@@ -653,3 +704,68 @@ jobs:
           The automated fix did not pass verify. A human developer needs to review and complete the fix.
 
           The \`needs-human\` label has been added and auto-merge is disabled (PR converted to draft)." 2>/dev/null || true
+
+      - name: Finalize exact-SHA repair ownership
+        if: ${{ always() }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          FAILING_SHA: ${{ needs.evaluate.outputs.failing_sha }}
+          JOB_STATUS: ${{ job.status }}
+          DRIFTED: ${{ steps.drift.outputs.drifted }}
+          DEDUP_SKIP_REASON: ${{ steps.dedup.outputs.skip_reason }}
+          ABORTED: ${{ steps.abort-check.outputs.aborted }}
+          CREATE_PR_OUTCOME: ${{ steps.create-pr.outcome }}
+          HAS_CHANGES: ${{ steps.create-pr.outputs.has_changes }}
+          PR_NUMBER: ${{ steps.create-pr.outputs.pr_number }}
+          REPAIR_ATTEMPT: ${{ needs.evaluate.outputs.repair_attempt }}
+        with:
+          script: |
+            const sha = process.env.FAILING_SHA ?? '';
+            if (!/^[0-9a-f]{40}$/.test(sha)) {
+              core.setFailed(`Refusing to finalize autofix ownership for invalid SHA: ${sha}`);
+              return;
+            }
+
+            const drifted = process.env.DRIFTED === 'true';
+            const skipReason = process.env.DEDUP_SKIP_REASON ?? '';
+            const aborted = process.env.ABORTED === 'true';
+            const hasChanges = process.env.HAS_CHANGES === 'true';
+            const prNumber = process.env.PR_NUMBER ?? '';
+            const createPrOutcome = process.env.CREATE_PR_OUTCOME ?? '';
+            const jobStatus = process.env.JOB_STATUS ?? 'unknown';
+            const attempt = process.env.REPAIR_ATTEMPT || '1';
+            let description;
+
+            if (drifted) {
+              description = `released:sha_drift:attempt-${attempt}`;
+            } else if (skipReason === 'attempt_cap_reached') {
+              description = `terminal:attempt_cap_reached:attempt-${attempt}`;
+            } else if (skipReason === 'open_pr_exists') {
+              description = `released:open_pr_exists:attempt-${attempt}`;
+            } else if (aborted) {
+              description = `terminal:autofix_aborted:attempt-${attempt}`;
+            } else if (hasChanges && prNumber) {
+              description = `released:pr-${prNumber}:attempt-${attempt}`;
+            } else if (createPrOutcome === 'success' && !hasChanges) {
+              description = `terminal:no_changes:attempt-${attempt}`;
+            } else if (jobStatus === 'failure' || jobStatus === 'cancelled') {
+              // Leave the bounded owned lease in place. The next evaluator
+              // observes this terminal/missing run, counts the attempt, and
+              // admits another repair only while the per-SHA budget remains.
+              core.warning(`Autofix workflow ${jobStatus}; retaining bounded ownership lease for retry accounting.`);
+              return;
+            } else {
+              // A successful run that produced neither a PR nor an explicit
+              // disposition is terminal. Never release ownership into a loop.
+              description = `terminal:unclassified_no_pr:attempt-${attempt}`;
+            }
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha,
+              state: 'success',
+              context: 'main-autofix/ownership',
+              description: description.slice(0, 140),
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });

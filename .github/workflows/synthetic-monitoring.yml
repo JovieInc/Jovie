@@ -4,7 +4,15 @@ permissions:
   contents: read
 
 on:
-  workflow_dispatch: # Manual trigger (cron moved to agent-tick.yml)
+  schedule:
+    # Deep production coverage runs independently of the disabled Agent Tick
+    # monolith and is intentionally outside the deploy-blocking path.
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: production-synthetic-monitoring
+  cancel-in-progress: false
 
 jobs:
   synthetic-test:
@@ -157,6 +165,7 @@ jobs:
 
       - name: Parse test results
         id: test-results
+        if: ${{ always() }}
         env:
           LEGACY_CANARY_ENABLED: ${{ vars.E2E_PROD_LEGACY_CANARY != '0' && '1' || '0' }}
         run: |
@@ -195,14 +204,8 @@ jobs:
             !apps/web/test-results/public-profile-smoke-*.png
           retention-days: 30
 
-      - name: Fail job if tests failed
-        if: steps.test-results.outputs.test_status != 'passed'
-        run: |
-          echo "Marking job as failed because synthetic status is '${{ steps.test-results.outputs.test_status }}'"
-          exit 1
-
       - name: Send Slack Alert on Failure
-        if: steps.test-results.outputs.test_status != 'passed'
+        if: ${{ always() && (failure() || steps.test-results.outputs.test_status != 'passed') }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -243,7 +246,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Send Slack Success Notification (Scheduled Summary)
-        if: steps.test-results.outputs.test_status == 'passed' && github.event_name == 'schedule'
+        if: ${{ always() && !failure() && steps.test-results.outputs.test_status == 'passed' && github.event_name == 'schedule' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -277,3 +280,12 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # Preserve the red signal only after the failure alert has had a chance to
+      # run. `always()` also covers setup/checkout/parser failures that produced
+      # no structured test result.
+      - name: Fail job if tests failed
+        if: ${{ always() && (failure() || steps.test-results.outputs.test_status != 'passed') }}
+        run: |
+          echo "Marking job as failed because synthetic status is '${{ steps.test-results.outputs.test_status }}'"
+          exit 1

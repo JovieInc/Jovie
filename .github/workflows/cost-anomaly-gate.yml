@@ -18,7 +18,9 @@
 # This workflow is the secondary defense: it triggers a rollback BEFORE
 # spending hits the cap.
 #
-# TRIGGER: Scheduled every 15 minutes + manual workflow_dispatch.
+# TRIGGER: Manual workflow_dispatch while the required Sentry query secrets are
+# unavailable. Restore the staggered hosted schedule only after
+# SENTRY_AUTH_TOKEN, SENTRY_ORG, and SENTRY_PROJECT are configured.
 #
 # HOW IT WORKS:
 # 1. Query Sentry for current event count (last 60 min, all event types).
@@ -77,7 +79,7 @@ permissions:
 jobs:
   evaluate:
     name: Evaluate Production Event Volume
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     # Defaults to DRY RUN on schedule until thresholds are calibrated against
     # real production baselines. After observing 1-2 weeks of healthy runs in

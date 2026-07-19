@@ -36,6 +36,10 @@ export const ADVISORY_CHECK_NAMES = Object.freeze([
   'Open PR',
   'Preview Deploy',
   'Slop Gate (advisory)',
+  // Historical check runs remain attached to existing PR heads after the
+  // duplicate Agent PR Verify workflow is retired. They must not strand drafts
+  // or queue enrollment forever.
+  'Verify Draft Agent PR',
 ]);
 
 const branchProtectionYaml = readFileSync(
@@ -189,10 +193,7 @@ export function collapseNewestCheckAttempts(checks) {
 }
 
 /** Positive readiness proof shared by auto-ready and queue enrollment. */
-export function classifyQueueCheckBlockers(
-  checks,
-  { requireVerifyDraft = false } = {}
-) {
+export function classifyQueueCheckBlockers(checks) {
   const latest = collapseNewestCheckAttempts(checks);
   const allChecks = latest.checks;
   const blockers = new Set(extractTerminalFailures(allChecks));
@@ -230,18 +231,6 @@ export function classifyQueueCheckBlockers(
       !matches.some(check => isSuccessfulCheck(check) || isSkippedCheck(check))
     ) {
       blockers.add(`${name} (not complete)`);
-    }
-  }
-
-  if (requireVerifyDraft) {
-    const matches = allChecks.filter(
-      check => normalizeCheckName(check) === 'Verify Draft Agent PR'
-    );
-    if (matches.some(isPendingCheck)) {
-      blockers.add('Verify Draft Agent PR (pending)');
-    }
-    if (!matches.some(isSuccessfulCheck)) {
-      blockers.add('Verify Draft Agent PR (missing exact-head success)');
     }
   }
 
@@ -407,9 +396,10 @@ if (
     const chunks = [];
     for await (const chunk of process.stdin) chunks.push(chunk);
     const checks = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    const blockers = classifyQueueCheckBlockers(checks, {
-      requireVerifyDraft: process.argv[2] === '--classify-auto-ready',
-    });
+    // `--classify-auto-ready` is a compatibility alias for the canonical queue
+    // policy. The retired Agent PR Verify workflow must not remain a hidden
+    // prerequisite for draft promotion.
+    const blockers = classifyQueueCheckBlockers(checks);
     process.stdout.write(`${JSON.stringify(blockers)}\n`);
   }
 }

@@ -1,22 +1,19 @@
 # Real-Model Eval Lane (JOV-3659)
 #
-# PURPOSE: Nightly + prompt-PR regression checks against the live chat model via
+# PURPOSE: Scheduled + manual regression checks against the live chat model via
 # Helicone observability. Runs golden-case sampling (N=5) and the adversarial
 # input battery sequentially (batch size 1) with a hard BUDGET_CAP_USD.
 #
 # TRIGGER:
 # - Nightly schedule
-# - PRs touching prompts/**
 # - Manual workflow_dispatch
 
 name: Real-Model Eval Lane
 
 on:
-  pull_request:
-    paths:
-      - 'prompts/**'
   schedule:
-    - cron: '30 3 * * *'
+    # Runs after the deterministic nightly lanes; never fans out from PRs.
+    - cron: '30 6 * * *'
       timezone: 'America/Los_Angeles'
   workflow_dispatch:
     inputs:
@@ -48,7 +45,7 @@ env:
 jobs:
   real-model-eval:
     name: Golden + Adversarial (Helicone)
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -64,7 +61,7 @@ jobs:
           HELICONE_API_KEY: ${{ secrets.HELICONE_API_KEY }}
           GITHUB_HEAD_REF: ${{ github.head_ref || github.ref_name }}
         run: |
-          vitest run \
+          pnpm exec vitest run \
             --config lib/eval/adversarial/vitest.config.real-eval.mts \
             --maxWorkers 1 \
             --maxConcurrency 1

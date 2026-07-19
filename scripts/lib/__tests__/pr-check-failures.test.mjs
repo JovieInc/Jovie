@@ -70,7 +70,7 @@ describe('pr-check-failures', () => {
     );
     expect(ADVISORY_CHECK_NAMES).not.toContain('Gitleaks Secret Scanning');
     expect(ADVISORY_CHECK_NAMES).not.toContain('TruffleHog Secret Scanning');
-    expect(ADVISORY_CHECK_NAMES).not.toContain('Verify Draft Agent PR');
+    expect(ADVISORY_CHECK_NAMES).toContain('Verify Draft Agent PR');
     expect(ADVISORY_CHECK_NAMES).not.toContain('E2E Smoke (PR Fast Feedback)');
     expect(ADVISORY_CHECK_NAMES).not.toContain('Extended Smoke (Preview)');
     expect(
@@ -90,7 +90,6 @@ describe('pr-check-failures', () => {
       'Gitleaks Secret Scanning',
       'Preview Deploy (PR)',
       'Security Advisory Enforcement',
-      'Verify Draft Agent PR',
     ]);
   });
 
@@ -100,7 +99,6 @@ describe('pr-check-failures', () => {
       { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
       { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
       { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Verify Draft Agent PR' },
       {
         bucket: 'pending',
         state: 'IN_PROGRESS',
@@ -112,13 +110,6 @@ describe('pr-check-failures', () => {
       'E2E Smoke (PR Fast Feedback) (not complete)',
       'E2E Smoke (PR Fast Feedback) (pending)',
     ]);
-    expect(
-      classifyQueueCheckBlockers(checks, { requireVerifyDraft: true })
-    ).toEqual([
-      'E2E Smoke (PR Fast Feedback) (not complete)',
-      'E2E Smoke (PR Fast Feedback) (pending)',
-    ]);
-
     expect(
       classifyQueueCheckBlockers(
         checks.filter(check => check.name !== 'PR Ready')
@@ -320,6 +311,7 @@ describe('pr-check-failures', () => {
     }
 
     expect(autoReady).toContain('--classify-auto-ready');
+    expect(autoReady).not.toContain('Verify Draft Agent PR');
     expect(autoReady).not.toContain('dependabot/');
     expect(drain).toContain(`fail='["required check status unavailable"]'`);
     expect(drain).not.toContain("fail='[]'");

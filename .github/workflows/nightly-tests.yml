@@ -5,15 +5,14 @@
 #
 # REPLACES: nightly-unit-tests.yml, nightly-e2e-tests.yml
 #
-# SCHEDULE: Daily at 2:00 AM America/Los_Angeles during daylight saving time
-# (both suites run in parallel). Keep UTC here until actionlint accepts
-# GitHub's timezone-aware schedule key.
+# SCHEDULE: Daily at 11:30 PM America/Los_Angeles. This leaves at least a
+# 90-minute buffer before the fixed 09:00 UTC screenshot and Tuesday harness.
 
 name: Nightly Tests
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '30 23 * * *'
       timezone: 'America/Los_Angeles'
   workflow_dispatch:
     inputs:
@@ -51,7 +50,7 @@ jobs:
       github.event_name == 'schedule' ||
       github.event.inputs.suite == 'all' ||
       github.event.inputs.suite == 'unit'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -72,7 +71,7 @@ jobs:
       github.event_name == 'schedule' ||
       github.event.inputs.suite == 'all' ||
       github.event.inputs.suite == 'unit'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -346,7 +345,7 @@ jobs:
     name: Notify Results
     needs: [knip, unit-tests, e2e-tests]
     if: always()
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     steps:
       - name: Slack notification on Knip failure
         if: ${{ needs.knip.result == 'failure' }}
