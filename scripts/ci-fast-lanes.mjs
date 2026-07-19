@@ -241,6 +241,7 @@ function runStructural() {
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
     'pnpm doc:freshness:check',
     'node .github/scripts/quarantine-ledger.mjs validate',
+    'python3 .github/scripts/test-security-suppression-audit.py',
     // CI workflow changes live at the repo root, so Turbo --affected can select
     // only the root package and return success after running zero web tests.
     // Target Vitest directly so the deploy contract always executes and fails

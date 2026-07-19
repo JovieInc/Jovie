@@ -267,6 +267,13 @@ jobs:
             file:line, the issue, why it matters (cite gbrain if relevant), and a
             concrete fix only when its classification permits one.
 
+            SECURITY SUPPRESSION AUDIT: never silently suppress a security finding.
+            If you intentionally suppress one, include this exact machine-readable
+            marker in the review body and keep the human-readable reason next to it:
+            <!-- jovie-security-suppression {"type":"<finding type>","reason":"<why it is accepted>"} -->
+            Suppressed findings must remain auditable by type and author; do not use
+            a generic summary that hides unrelated active security findings.
+
             Do not post or mutate GitHub. Return the complete review only in the
             structured `review_markdown` field. A trusted bounded step publishes it.
 
