@@ -107,6 +107,20 @@ jobs:
             exit 0
           fi
 
+          production_controller_workflow="$(gh api \
+            "repos/$REPOSITORY/actions/workflows/production-controller.yml")"
+          jq -e '
+            type == "object" and
+            (.id | type == "number" and . >= 1 and floor == .) and
+            .name == "Production Controller" and
+            .path == ".github/workflows/production-controller.yml"
+          ' >/dev/null <<<"$production_controller_workflow" || {
+            echo "::error::GitHub returned malformed Production Controller workflow identity."
+            exit 1
+          }
+          production_controller_workflow_id="$(jq -r '.id | tostring' \
+            <<<"$production_controller_workflow")"
+
           prove_existing_production_marker() {
             local expected_sha="$1"
             local marker_name="production-generation-verified-$expected_sha"
@@ -137,18 +151,21 @@ jobs:
                 "repos/$REPOSITORY/actions/runs/$controller_run_id")" || continue
               if ! jq -e \
                 --arg repo "$REPOSITORY" \
-                --arg sha "$expected_sha" '
+                --arg sha "$expected_sha" \
+                --arg workflow_id "$production_controller_workflow_id" '
                   type == "object" and
                   .head_sha == $sha and
                   .head_branch == "main" and
                   .head_repository.full_name == $repo and
                   .event == "workflow_run" and
-                  .name == "Production Controller" and
+                  (.workflow_id | tostring) == $workflow_id and
                   .path == ".github/workflows/production-controller.yml" and
                   .status == "completed" and
                   .conclusion == "success" and
                   (.run_attempt | type == "number" and . >= 1) and
-                  (.display_title | startswith("Production Controller " + $sha + " from CI "))
+                  (.display_title | type == "string" and
+                    test("^Production Controller " + $sha +
+                      " from CI [1-9][0-9]* attempt [1-9][0-9]*$"))
                 ' >/dev/null <<<"$controller_json"; then
                 continue
               fi
@@ -203,7 +220,8 @@ jobs:
               --arg repo "$REPOSITORY" \
               --arg run_id "$TRIGGER_RUN_ID" \
               --arg run_attempt "$TRIGGER_RUN_ATTEMPT" \
-              --arg sha "$release_sha" '
+              --arg sha "$release_sha" \
+              --arg workflow_id "$production_controller_workflow_id" '
                 type == "object" and
                 (.id | tostring) == $run_id and
                 (.run_attempt | tostring) == $run_attempt and
@@ -211,11 +229,13 @@ jobs:
                 .head_branch == "main" and
                 .head_repository.full_name == $repo and
                 .event == "workflow_run" and
-                .name == "Production Controller" and
+                (.workflow_id | tostring) == $workflow_id and
                 .path == ".github/workflows/production-controller.yml" and
                 .status == "completed" and
                 .conclusion == "success" and
-                (.display_title | startswith("Production Controller " + $sha + " from CI "))
+                (.display_title | type == "string" and
+                  test("^Production Controller " + $sha +
+                    " from CI [1-9][0-9]* attempt [1-9][0-9]*$"))
               ' >/dev/null <<<"$run_record" || {
               echo "::error::Exact Production Controller attempt evidence did not match the workflow_run signal."
               exit 1
@@ -264,25 +284,69 @@ jobs:
             exit 0
           fi
 
+          testflight_workflow="$(gh api \
+            "repos/$REPOSITORY/actions/workflows/ios-testflight.yml")"
+          jq -e '
+            type == "object" and
+            (.id | type == "number" and . >= 1 and floor == .) and
+            .name == "iOS TestFlight" and
+            .path == ".github/workflows/ios-testflight.yml"
+          ' >/dev/null <<<"$testflight_workflow" || {
+            echo "::error::GitHub returned malformed TestFlight workflow identity."
+            exit 1
+          }
+          testflight_workflow_id="$(jq -r '.id | tostring' \
+            <<<"$testflight_workflow")"
+
           # Upload markers are written only after the exact beta job succeeds.
           # Unlike workflow success, this fixed-name history cannot be polluted
           # by the common authorize-success/beta-skipped path.
+          testflight_marker_history_allows_legacy_bootstrap() {
+            local candidate_count="$1"
+            local accepted_baseline="$2"
+
+            [[ "$candidate_count" =~ ^[0-9]+$ ]] || return 2
+            if [ -n "$accepted_baseline" ]; then
+              [[ "$accepted_baseline" =~ ^[0-9a-f]{40}$ ]] || return 2
+              return 0
+            fi
+            [ "$candidate_count" -eq 0 ]
+          }
+
           marker_name="testflight-upload-verified"
           marker_listing="$(gh api \
             "repos/$REPOSITORY/actions/artifacts?name=$marker_name&per_page=100")"
-          jq -e 'type == "object" and (.artifacts | type == "array")' \
+          jq -e --arg name "$marker_name" '
+            type == "object" and
+            (.artifacts | type == "array") and
+            all(.artifacts[]?;
+              type == "object" and
+              .name == $name and
+              (.expired | type == "boolean")
+            ) and
+            all(
+              .artifacts[]?
+              | select(.name == $name and .expired == false);
+              (.id | type == "number" and . >= 1 and floor == .) and
+              (.workflow_run | type == "object") and
+              (.workflow_run.id | type == "number" and . >= 1 and floor == .) and
+              (.created_at | type == "string")
+            )
+          ' \
             >/dev/null <<<"$marker_listing" || {
             echo "::error::GitHub returned malformed TestFlight marker history."
             exit 1
           }
+          marker_candidate_count="$(jq --arg name "$marker_name" '[
+            .artifacts[]?
+            | select(.name == $name and .expired == false)
+          ] | length' <<<"$marker_listing")"
           marker_candidates="$(jq -r --arg name "$marker_name" '
             [
               .artifacts[]?
               | select(
                   .expired == false and
-                  .name == $name and
-                  (.id | type == "number") and
-                  (.workflow_run.id | type == "number")
+                  .name == $name
                 )
             ]
             | sort_by(.created_at, .id) | reverse
@@ -293,7 +357,10 @@ jobs:
           while IFS=$'\t' read -r artifact_id run_id; do
             [ -n "$artifact_id" ] || continue
             [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] &&
-              [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || continue
+              [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || {
+              echo "::error::GitHub returned malformed TestFlight marker identity."
+              exit 1
+            }
 
             marker_archive="$RUNNER_TEMP/testflight-marker-${artifact_id}.zip"
             marker_json="$RUNNER_TEMP/testflight-marker-${artifact_id}.json"
@@ -322,14 +389,20 @@ jobs:
             fi
 
             marker_run="$(gh api "repos/$REPOSITORY/actions/runs/$run_id")"
+            jq -e 'type == "object"' >/dev/null <<<"$marker_run" || {
+              echo "::error::GitHub returned malformed marked TestFlight workflow evidence."
+              exit 1
+            }
             if ! jq -e \
               --arg repo "$REPOSITORY" \
               --arg run "$run_id" \
-              --arg sha "$marker_sha" '
+              --arg sha "$marker_sha" \
+              --arg workflow_id "$testflight_workflow_id" '
                 type == "object" and
                 (.id | tostring) == $run and
-                .name == "iOS TestFlight" and
+                (.workflow_id | tostring) == $workflow_id and
                 .path == ".github/workflows/ios-testflight.yml" and
+                .display_title == ("iOS TestFlight " + $sha) and
                 (.event == "workflow_run" or .event == "workflow_dispatch") and
                 .head_branch == "main" and
                 .head_sha == $sha and
@@ -343,16 +416,22 @@ jobs:
 
             upload_run="$(gh api \
               "repos/$REPOSITORY/actions/runs/$run_id/attempts/$upload_attempt")"
+            jq -e 'type == "object"' >/dev/null <<<"$upload_run" || {
+              echo "::error::GitHub returned malformed marked TestFlight attempt evidence."
+              exit 1
+            }
             if ! jq -e \
               --arg repo "$REPOSITORY" \
               --arg run "$run_id" \
               --arg attempt "$upload_attempt" \
-              --arg sha "$marker_sha" '
+              --arg sha "$marker_sha" \
+              --arg workflow_id "$testflight_workflow_id" '
                 type == "object" and
                 (.id | tostring) == $run and
                 (.run_attempt | tostring) == $attempt and
-                .name == "iOS TestFlight" and
+                (.workflow_id | tostring) == $workflow_id and
                 .path == ".github/workflows/ios-testflight.yml" and
+                .display_title == ("iOS TestFlight " + $sha) and
                 (.event == "workflow_run" or .event == "workflow_dispatch") and
                 .head_branch == "main" and
                 .head_sha == $sha and
@@ -397,67 +476,103 @@ jobs:
             break
           done <<<"$marker_candidates"
 
-          # Bootstrap only: older uploads predate the stable marker. Scan one
-          # bounded page and accept a baseline only when its exact run-attempt
-          # Upload Internal TestFlight job succeeded. Authorization-only workflow
-          # success is never release truth. Once one new upload lands, markers
-          # become the permanent, upload-only baseline index.
+          if ! testflight_marker_history_allows_legacy_bootstrap \
+            "$marker_candidate_count" "$baseline_sha"; then
+            echo "::error::Stable TestFlight markers exist, but none fully proves a successful upload."
+            exit 1
+          fi
+
+          # Bootstrap/recovery only: older uploads predate the stable marker, and
+          # marker upload can fail after beta succeeds. Scan one bounded page and
+          # accept a baseline only when an exact run-attempt beta job succeeded.
+          # Authorization-only completion is never release truth. Once one marker
+          # lands, stable upload-only history becomes the permanent index.
           if [ -z "$baseline_sha" ]; then
             runs_json="$(gh api \
-              "repos/$REPOSITORY/actions/workflows/ios-testflight.yml/runs?branch=main&status=success&per_page=100")"
-            jq -e 'type == "object" and (.workflow_runs | type == "array")' \
+              "repos/$REPOSITORY/actions/workflows/ios-testflight.yml/runs?branch=main&status=completed&per_page=100")"
+            jq -e '
+              type == "object" and
+              (.workflow_runs | type == "array") and
+              all(.workflow_runs[]?;
+                type == "object" and
+                (.id | type == "number" and . >= 1 and floor == .) and
+                (.run_attempt | type == "number" and . >= 1 and floor == .) and
+                (.workflow_id | type == "number" and . >= 1 and floor == .) and
+                (.path | type == "string") and
+                (.event | type == "string") and
+                (.status | type == "string") and
+                (.head_branch | type == "string") and
+                (.head_sha | type == "string") and
+                (.head_repository | type == "object") and
+                (.head_repository.full_name | type == "string") and
+                (.created_at | type == "string")
+              )
+            ' \
               >/dev/null <<<"$runs_json" || {
               echo "::error::GitHub returned malformed TestFlight run history."
               exit 1
             }
-            successful_runs="$(jq -c --arg repo "$REPOSITORY" '[.workflow_runs[]? | select(
-              .name == "iOS TestFlight" and
+            completed_runs="$(jq -c \
+              --arg repo "$REPOSITORY" \
+              --arg workflow_id "$testflight_workflow_id" \
+              '[.workflow_runs[]? | select(
+              (.workflow_id | tostring) == $workflow_id and
               .path == ".github/workflows/ios-testflight.yml" and
               (.event == "workflow_run" or .event == "workflow_dispatch" or .event == "push") and
-              .status == "completed" and .conclusion == "success" and
+              .status == "completed" and
               .head_branch == "main" and .head_repository.full_name == $repo and
               (.head_sha | test("^[0-9a-f]{40}$")) and
               (.id | type == "number") and (.run_attempt | type == "number")
             )]' <<<"$runs_json")"
 
-            # A successful workflow can contain only the Ubuntu authorization
-            # job while beta is skipped. Cross-prove the upload job before using
-            # a legacy run as a comparison baseline.
+            # The marker job can fail after App Store Connect has accepted beta,
+            # so workflow conclusion is not external upload truth. Cross-prove
+            # every exact run attempt and accept only a successful beta job.
             while IFS=$'\t' read -r run_id run_attempt run_sha; do
               [[ "$run_id" =~ ^[1-9][0-9]*$ ]] &&
                 [[ "$run_attempt" =~ ^[1-9][0-9]*$ ]] &&
                 [[ "$run_sha" =~ ^[0-9a-f]{40}$ ]] || {
-                echo "::error::Successful TestFlight run history contained malformed identity."
+                echo "::error::Completed TestFlight run history contained malformed identity."
                 exit 1
               }
-              run_jobs="$(gh api --paginate --slurp \
-                "repos/$REPOSITORY/actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100")"
-              jq -e '
-                type == "array" and length > 0 and
-                all(.[]; type == "object" and (.jobs | type == "array"))
-              ' >/dev/null <<<"$run_jobs" || {
-                echo "::error::GitHub returned malformed TestFlight upload job evidence."
-                exit 1
-              }
-              beta_count="$(jq --arg sha "$run_sha" '
-                [
-                  .[].jobs[]?
-                  | select(
-                      .name == "Upload Internal TestFlight" and
-                      .head_sha == $sha and
-                      .status == "completed" and
-                      .conclusion == "success"
-                    )
-                ] | length
-              ' <<<"$run_jobs")"
-              if [ "$beta_count" = "1" ]; then
+              run_has_upload=false
+              for attempt in $(seq 1 "$run_attempt"); do
+                run_jobs="$(gh api --paginate --slurp \
+                  "repos/$REPOSITORY/actions/runs/$run_id/attempts/$attempt/jobs?per_page=100")"
+                jq -e '
+                  type == "array" and length > 0 and
+                  all(.[]; type == "object" and (.jobs | type == "array"))
+                ' >/dev/null <<<"$run_jobs" || {
+                  echo "::error::GitHub returned malformed TestFlight upload job evidence."
+                  exit 1
+                }
+                beta_count="$(jq --arg sha "$run_sha" '
+                  [
+                    .[].jobs[]?
+                    | select(
+                        .name == "Upload Internal TestFlight" and
+                        .head_sha == $sha and
+                        .status == "completed" and
+                        .conclusion == "success"
+                      )
+                  ] | length
+                ' <<<"$run_jobs")"
+                if [ "$beta_count" -gt 1 ]; then
+                  echo "::error::TestFlight run $run_id attempt $attempt has ambiguous upload jobs."
+                  exit 1
+                fi
+                if [ "$beta_count" = "1" ]; then
+                  run_has_upload=true
+                fi
+              done
+              if [ "$run_has_upload" = "true" ]; then
                 baseline_sha="$run_sha"
                 break
               fi
             done < <(jq -r '
               sort_by(.created_at, .id) | reverse | .[] |
               [.id, .run_attempt, .head_sha] | @tsv
-            ' <<<"$successful_runs")
+            ' <<<"$completed_runs")
           fi
 
           if [ -z "$baseline_sha" ]; then
@@ -636,16 +751,31 @@ jobs:
           }
 
           run_record="$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID")"
+          testflight_workflow="$(gh api \
+            "repos/$REPOSITORY/actions/workflows/ios-testflight.yml")"
+          jq -e '
+            type == "object" and
+            (.id | type == "number" and . >= 1 and floor == .) and
+            .name == "iOS TestFlight" and
+            .path == ".github/workflows/ios-testflight.yml"
+          ' >/dev/null <<<"$testflight_workflow" || {
+            echo "::error::GitHub returned malformed TestFlight workflow identity."
+            exit 1
+          }
+          testflight_workflow_id="$(jq -r '.id | tostring' \
+            <<<"$testflight_workflow")"
           jq -e \
             --arg repo "$REPOSITORY" \
             --arg run "$RUN_ID" \
             --arg attempt "$RUN_ATTEMPT" \
-            --arg sha "$RELEASE_SHA" '
+            --arg sha "$RELEASE_SHA" \
+            --arg workflow_id "$testflight_workflow_id" '
               type == "object" and
               (.id | tostring) == $run and
               (.run_attempt | tostring) == $attempt and
-              .name == "iOS TestFlight" and
+              (.workflow_id | tostring) == $workflow_id and
               .path == ".github/workflows/ios-testflight.yml" and
+              .display_title == ("iOS TestFlight " + $sha) and
               (.event == "workflow_run" or .event == "workflow_dispatch") and
               .head_branch == "main" and
               .head_sha == $sha and

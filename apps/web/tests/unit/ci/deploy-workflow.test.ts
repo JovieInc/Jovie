@@ -11,6 +11,10 @@ const productionControllerWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/production-controller.yml'
 );
+const productionControllerRunLiveFixturePath = resolve(
+  repoRoot,
+  'apps/web/tests/unit/ci/fixtures/production-controller-run-live-shape.json'
+);
 const productionReleaseWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/production-release.yml'
@@ -462,6 +466,36 @@ function previewRobotsPolicyValid(
   );
 }
 
+function runTestFlightMarkerBootstrapGate(
+  authorizationJob: string,
+  candidateCount: number,
+  acceptedBaseline: string
+) {
+  const functionName = 'testflight_marker_history_allows_legacy_bootstrap';
+  const start = authorizationJob.indexOf(`          ${functionName}() {`);
+  const end = authorizationJob.indexOf('\n          }', start);
+  expect(start).toBeGreaterThan(0);
+  expect(end).toBeGreaterThan(start);
+
+  const source = authorizationJob
+    .slice(start, end + '\n          }'.length)
+    .split('\n')
+    .map(line => line.replace(/^ {10}/, ''))
+    .join('\n');
+
+  return spawnSync(
+    'bash',
+    [
+      '-c',
+      `${source}\n${functionName} "$1" "$2"`,
+      'marker-gate',
+      String(candidateCount),
+      acceptedBaseline,
+    ],
+    { encoding: 'utf8' }
+  );
+}
+
 describe('deploy workflow Vercel env resolution', () => {
   it('gives every main SHA CI evidence and a production-controller opportunity', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -514,12 +548,22 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(authorization).toContain(
       '.path == ".github/workflows/production-controller.yml"'
     );
+    expect(authorization).toContain(
+      'actions/workflows/production-controller.yml'
+    );
     expect(authorization).toContain('.name == "Production Controller"');
+    expect(authorization).toContain(
+      '(.workflow_id | tostring) == $workflow_id'
+    );
+    expect(authorization).toContain('test("^Production Controller " + $sha +');
+    expect(authorization).not.toMatch(
+      /\.event == "workflow_run" and\n\s+\.name == "Production Controller"/
+    );
     expect(authorization).toContain('.name == "Production Verified"');
     expect(authorization).toContain('.head_sha == $sha');
     expect(authorization).toContain('.conclusion == "success"');
     expect(authorization).toContain('commits/main');
-    expect(authorization).toContain('status=success');
+    expect(authorization).toContain('status=completed');
     expect(authorization).toContain(
       'production-generation-verified-$expected_sha'
     );
@@ -532,7 +576,7 @@ describe('deploy workflow Vercel env resolution', () => {
       )
     );
     expect(authorization).toContain(
-      'actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100'
+      'actions/runs/$run_id/attempts/$attempt/jobs?per_page=100'
     );
     expect(authorization).toContain('.name == "Upload Internal TestFlight"');
     expect(authorization).toContain(
@@ -542,9 +586,30 @@ describe('deploy workflow Vercel env resolution', () => {
       authorization.indexOf('marker_name="testflight-upload-verified"')
     ).toBeLessThan(
       authorization.indexOf(
-        'actions/workflows/ios-testflight.yml/runs?branch=main&status=success&per_page=100'
+        'actions/workflows/ios-testflight.yml/runs?branch=main&status=completed&per_page=100'
       )
     );
+    const legacyHistory = authorization.slice(
+      authorization.indexOf(
+        'actions/workflows/ios-testflight.yml/runs?branch=main&status=completed&per_page=100'
+      )
+    );
+    expect(legacyHistory).toContain(
+      '(.workflow_id | tostring) == $workflow_id'
+    );
+    expect(legacyHistory).not.toContain(
+      '.display_title == ("iOS TestFlight " + .head_sha)'
+    );
+    const completedRunSelection = legacyHistory.slice(
+      0,
+      legacyHistory.indexOf(
+        '# The marker job can fail after App Store Connect has accepted beta'
+      )
+    );
+    expect(completedRunSelection).toContain('.status == "completed"');
+    expect(completedRunSelection).not.toContain('.conclusion == "success"');
+    expect(legacyHistory).toContain('for attempt in $(seq 1 "$run_attempt")');
+    expect(legacyHistory).toContain('run_has_upload=true');
     expect(authorization).toContain(
       'actions/runs/$run_id/attempts/$upload_attempt'
     );
@@ -596,7 +661,15 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(uploadMarker).toContain(
       'No successful exact TestFlight upload job exists in this run.'
     );
+    expect(uploadMarker).toContain('actions/workflows/ios-testflight.yml');
     expect(uploadMarker).toContain('.name == "iOS TestFlight"');
+    expect(uploadMarker).toContain('(.workflow_id | tostring) == $workflow_id');
+    expect(uploadMarker).toContain(
+      '.display_title == ("iOS TestFlight " + $sha)'
+    );
+    expect(uploadMarker).not.toMatch(
+      /\.run_attempt \| tostring\) == \$attempt and\n\s+\.name == "iOS TestFlight"/
+    );
     expect(uploadMarker).toContain(
       '.path == ".github/workflows/ios-testflight.yml"'
     );
@@ -621,6 +694,81 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(artifactValidator).toContain(
       'still embeds retired ClerkPublishableKey'
+    );
+  });
+
+  it('fails closed on unprovable stable TestFlight marker history', () => {
+    const testflight = readFileSync(iosTestFlightWorkflowPath, 'utf8');
+    const authorization = getJobBlock(testflight, 'authorize-release');
+    const legacyLookup =
+      'actions/workflows/ios-testflight.yml/runs?branch=main&status=completed&per_page=100';
+    const gateCall = 'if ! testflight_marker_history_allows_legacy_bootstrap';
+
+    expect(authorization).toContain(
+      'marker_candidate_count="$(jq --arg name "$marker_name"'
+    );
+    expect(authorization).toContain(gateCall);
+    expect(authorization.indexOf(gateCall)).toBeLessThan(
+      authorization.indexOf(legacyLookup)
+    );
+    expect(authorization).toContain(
+      'Stable TestFlight markers exist, but none fully proves a successful upload.'
+    );
+    expect(authorization).toContain(
+      'Ignoring malformed TestFlight upload marker artifact $artifact_id.'
+    );
+
+    const olderValid = runTestFlightMarkerBootstrapGate(
+      authorization,
+      2,
+      'a'.repeat(40)
+    );
+    expect(olderValid.status).toBe(0);
+
+    const allUnprovable = runTestFlightMarkerBootstrapGate(
+      authorization,
+      2,
+      ''
+    );
+    expect(allUnprovable.status).not.toBe(0);
+
+    const trueZero = runTestFlightMarkerBootstrapGate(authorization, 0, '');
+    expect(trueZero.status).toBe(0);
+  });
+
+  it('cross-proves workflow identity instead of comparing run-name to workflow name', () => {
+    const fixture = JSON.parse(
+      readFileSync(productionControllerRunLiveFixturePath, 'utf8')
+    ) as {
+      run: {
+        name: string;
+        display_title: string;
+        path: string;
+        workflow_id: number;
+        head_sha: string;
+      };
+      workflow: { id: number; name: string; path: string };
+    };
+    const authorization = getJobBlock(
+      readFileSync(iosTestFlightWorkflowPath, 'utf8'),
+      'authorize-release'
+    );
+
+    expect(fixture.run.name).toBe(fixture.run.display_title);
+    expect(fixture.run.name).not.toBe(fixture.workflow.name);
+    expect(fixture.run.workflow_id).toBe(fixture.workflow.id);
+    expect(fixture.run.path).toBe(fixture.workflow.path);
+    expect(fixture.run.display_title).toMatch(
+      new RegExp(
+        `^Production Controller ${fixture.run.head_sha} from CI [1-9][0-9]* attempt [1-9][0-9]*$`
+      )
+    );
+    expect(authorization).toContain(
+      'production_controller_workflow_id="$(jq -r'
+    );
+    expect(authorization).toContain("'.id | tostring'");
+    expect(authorization).toContain(
+      '(.workflow_id | tostring) == $workflow_id'
     );
   });
 
