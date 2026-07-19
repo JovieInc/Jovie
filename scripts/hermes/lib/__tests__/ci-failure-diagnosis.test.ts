@@ -469,11 +469,40 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
     expect(diagnosis.remediation).toContain('fail closed');
   });
 
+  it('diagnoses a Vercel prebuilt whose cross-job artifact omitted traced runtime files', () => {
+    const failures = [
+      `failure_subtype=staged_production_canary_failed
+       Cannot find module 'require-in-the-middle-a99415fa67232f7f'
+       at /var/task/apps/web/.next/server/middleware.js`,
+      `Cannot find package '@opentelemetry/sdk-node' imported from
+       /var/task/apps/web/.next/server/chunks/observability.js`,
+    ];
+
+    const diagnoses = failures.map(diagnoseCiFailure);
+    expect(diagnoses.map(({ failureClass }) => failureClass)).toEqual([
+      'vercel_prebuilt_function_closure_missing',
+      'vercel_prebuilt_function_closure_missing',
+    ]);
+    expect(diagnoses[0]).toMatchObject({
+      rootCause: expect.stringMatching(/filePathMap.*\.vercel\/output/),
+      remediation: expect.stringMatching(
+        /Do not rerun.*same job and workspace.*\/api\/health/
+      ),
+    });
+  });
+
   it('does not infer a launcher mismatch from an unrelated missing module', () => {
     expect(
       diagnoseCiFailure(
         'Error: Failed to load external module require-in-the-middle-deadbeef'
       ).failureClass
+    ).toBe('unknown');
+    expect(
+      diagnoseCiFailure(`
+        Cannot find module 'require-in-the-middle-deadbeef'
+        Require stack:
+        - /home/runner/work/Jovie/Jovie/apps/web/.next/server/middleware.js
+      `).failureClass
     ).toBe('unknown');
   });
 
