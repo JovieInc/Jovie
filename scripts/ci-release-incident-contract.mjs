@@ -50,9 +50,11 @@ const REQUIRED_STAGES = new Set([
 
 const CANONICAL_TEMPLATE = {
   repository: 'JovieInc/ci',
+  templateVersion: 'bc0b0676c058ffa1c8515e8c29fefd2317b160cc',
   template: 'templates/jovie-ci-release-prevention',
   bootstrap: 'templates/jovie-ci-release-prevention/bootstrap.mjs',
-  workflow: '.github/workflows/verify-ci-release-prevention.yml@v1',
+  workflow:
+    '.github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc',
   manifest: 'ci-release-prevention.yml',
   requiredFields: [
     'template',
@@ -61,6 +63,11 @@ const CANONICAL_TEMPLATE = {
     'verifier',
     'scaffold_proof',
   ],
+};
+
+const MERGE_QUEUE_LABEL_POLICY = {
+  nativeForbidsLegacyLabel: true,
+  graphiteExplicitlyAllowsLegacyLabel: true,
 };
 
 const CANONICAL_SCAFFOLD_PROOF = {
@@ -106,6 +113,14 @@ export function validateIncidentLedger(ledger) {
       errors: ['ledger must contain schemaVersion 1 and an incidents array'],
     };
   }
+  if (
+    JSON.stringify(ledger.mergeQueueLabelPolicy) !==
+    JSON.stringify(MERGE_QUEUE_LABEL_POLICY)
+  ) {
+    errors.push(
+      'ledger must declare the native/Graphite merge-queue label policy'
+    );
+  }
 
   const seen = new Set();
   for (const incident of ledger.incidents) {
@@ -123,7 +138,10 @@ export function validateIncidentLedger(ledger) {
     if (!regression || !['test', 'verifier'].includes(regression.kind)) {
       errors.push(`${id}: regression.kind must be test or verifier`);
     }
-    if (!nonEmptyString(regression?.command))
+    if (
+      !nonEmptyString(regression?.command) ||
+      !/^(node|pnpm|pytest|test|\.\/)/.test(regression.command)
+    )
       errors.push(`${id}: regression.command is required`);
     requireExistingPath(regression?.path, `${id}: regression.path`, errors);
 
@@ -185,6 +203,17 @@ export function validateIncidentLedger(ledger) {
       errors.push(`unregistered incident id: ${id}`);
   }
   return { ok: errors.length === 0, errors };
+}
+
+export function validateMergeQueueBackendLabels(backend, labels) {
+  const hasLegacyLabel = labels.includes('merge-queue');
+  if (backend === 'native' && hasLegacyLabel) {
+    return ['native merge queue must reject legacy merge-queue labels'];
+  }
+  if (backend !== 'native' && backend !== 'graphite') {
+    return ['merge queue backend must be native or graphite'];
+  }
+  return [];
 }
 
 function main() {

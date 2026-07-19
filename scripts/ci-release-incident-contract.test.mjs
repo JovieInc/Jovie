@@ -6,6 +6,7 @@ import test from 'node:test';
 import {
   REQUIRED_INCIDENT_IDS,
   validateIncidentLedger,
+  validateMergeQueueBackendLabels,
 } from './ci-release-incident-contract.mjs';
 
 function fixture() {
@@ -27,7 +28,9 @@ function fixture() {
       repository: 'JovieInc/ci',
       template: 'templates/jovie-ci-release-prevention',
       bootstrap: 'templates/jovie-ci-release-prevention/bootstrap.mjs',
-      workflow: '.github/workflows/verify-ci-release-prevention.yml@v1',
+      templateVersion: 'bc0b0676c058ffa1c8515e8c29fefd2317b160cc',
+      workflow:
+        '.github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc',
       manifest: 'ci-release-prevention.yml',
       requiredFields: [
         'template',
@@ -45,7 +48,17 @@ function fixture() {
   }));
   writeFileSync(join(root, 'operator.md'), REQUIRED_INCIDENT_IDS.join('\n'));
   writeFileSync(join(root, 'postmortem.md'), 'CI_RELEASE_INCIDENTS.md\n');
-  return { root, ledger: { schemaVersion: 1, incidents } };
+  return {
+    root,
+    ledger: {
+      schemaVersion: 1,
+      mergeQueueLabelPolicy: {
+        nativeForbidsLegacyLabel: true,
+        graphiteExplicitlyAllowsLegacyLabel: true,
+      },
+      incidents,
+    },
+  };
 }
 
 test('accepts every registered incident with existing prevention evidence', () => {
@@ -58,6 +71,17 @@ test('accepts every registered incident with existing prevention evidence', () =
     process.chdir(cwd);
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('rejects legacy labels for native queue while permitting explicit Graphite backend', () => {
+  assert.deepEqual(validateMergeQueueBackendLabels('native', ['merge-queue']), [
+    'native merge queue must reject legacy merge-queue labels',
+  ]);
+  assert.deepEqual(validateMergeQueueBackendLabels('native', []), []);
+  assert.deepEqual(
+    validateMergeQueueBackendLabels('graphite', ['merge-queue']),
+    []
+  );
 });
 
 test('fails closed when an incident lacks propagation or a regression path', () => {
