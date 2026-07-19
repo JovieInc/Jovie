@@ -2,10 +2,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  DEFAULT_MERGE_QUEUE_BACKEND,
   dequeuePullRequest,
   enrollPullRequest,
   listPullRequestQueueStates,
   preflightMergeQueue,
+  resolveMergeQueueBackend,
   runCli,
   validateNativePreflightEvidence,
 } from '../../merge-queue-backend.mjs';
@@ -150,6 +152,12 @@ function workflowStep(workflow, name) {
 }
 
 describe('merge queue backend resolution', () => {
+  it('defaults bare callers to the live native backend', () => {
+    expect(DEFAULT_MERGE_QUEUE_BACKEND).toBe('native');
+    expect(resolveMergeQueueBackend()).toBe('native');
+    expect(resolveMergeQueueBackend('graphite')).toBe('graphite');
+  });
+
   it('fails unknown backends before any command can run', async () => {
     const runner = vi.fn();
     await expect(
@@ -233,6 +241,10 @@ describe('queue workflow mutation safety', () => {
       'MERGE_QUEUE_BACKEND: ${{ vars.MERGE_QUEUE_BACKEND }}'
     );
     expect(workflow).not.toContain("MERGE_QUEUE_BACKEND || 'graphite'");
+    expect(drain).toContain(
+      'MERGE_QUEUE_BACKEND="${MERGE_QUEUE_BACKEND:-native}"'
+    );
+    expect(drain).not.toContain('MERGE_QUEUE_BACKEND:-graphite');
     expect(workflow).toContain('  rebase:\n    needs: enroll\n');
     for (const job of [enrollJob, rebaseJob]) {
       expect(job).toContain(tokenAction);

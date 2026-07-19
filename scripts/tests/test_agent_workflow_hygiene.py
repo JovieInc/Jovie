@@ -18,9 +18,7 @@ HOT_PATH_WORKFLOWS = (
 )
 
 FULL_CHECKOUT_JOBS = (
-    ("ci.yml", "ci-build-public"),
-    ("ci.yml", "ci-layout-guard"),
-    ("ci.yml", "ci-summary"),
+    ("ci.yml", "ci-unit-tests"),
 )
 
 FLEET_CONTROLLER_JOBS = (
@@ -29,6 +27,84 @@ FLEET_CONTROLLER_JOBS = (
     ("merge-queue-autoenroll.yml", "enroll"),
     ("merge-queue-autoenroll.yml", "rebase"),
     ("agent-tick.yml", "auto-ready"),
+)
+
+MODEL_OR_ADVISORY_JOBS = (
+    ("claude.yml", "claude"),
+    ("claude-review.yml", "review"),
+    ("eval.yml", "eval"),
+    ("eval-real-model.yml", "real-model-eval"),
+    ("github-ai-orchestrator.yml", "implement_and_open_pr"),
+    ("main-autofix.yml", "autofix"),
+    ("sentry-autofix.yml", "autofix"),
+    ("taste-classifier.yml", "classify"),
+    ("taste-label-guard.yml", "guard"),
+)
+
+HOSTED_DEEP_EVIDENCE_JOBS = (
+    ("e2e-full-matrix.yml", "e2e-full-matrix"),
+    ("e2e-full-matrix.yml", "notify"),
+    ("nightly-testing-agent.yml", "context"),
+    ("nightly-testing-agent.yml", "deterministic"),
+    ("nightly-testing-agent.yml", "mutation-hotspots"),
+    ("nightly-testing-agent.yml", "candidate-validation"),
+    ("nightly-testing-agent.yml", "report"),
+    ("nightly-tests.yml", "knip"),
+    ("nightly-tests.yml", "unit-tests"),
+    ("nightly-tests.yml", "e2e-tests"),
+    ("nightly-tests.yml", "notify"),
+    ("synthetic-monitoring.yml", "synthetic-test"),
+    ("test-coverage-audit.yml", "audit"),
+    ("sonarcloud.yml", "sonarcloud"),
+    ("security.yml", "gitleaks"),
+    ("security.yml", "trufflehog"),
+    ("security.yml", "trivy"),
+    ("security.yml", "scorecard"),
+    ("security.yml", "commit-signature-check"),
+    ("screenshots.yml", "generate"),
+    ("test-flakiness-report.yml", "analyze-flakiness"),
+    ("ci-duration-ratchet.yml", "measure"),
+    ("sentry-error-gate.yml", "sentry-gate"),
+    ("cost-anomaly-gate.yml", "evaluate"),
+    ("main-ci-health-monitor.yml", "monitor"),
+    ("main-ci-health-monitor.yml", "auto-rerun"),
+    ("visual-a11y.yml", "ci-visual-path-changes"),
+    ("visual-a11y.yml", "storybook-a11y"),
+    ("visual-regression.yml", "visual-regression"),
+)
+
+HOSTED_POST_MERGE_JOBS = (
+    ("linear-sync-on-merge.yml", "sync_done"),
+    ("neon-ephemeral-branch-cleanup.yml", "delete-neon-branch"),
+)
+
+HOSTED_API_ONLY_PR_CONTROLLERS = (
+    ("dependabot-auto-merge.yml", "auto-merge"),
+    ("pr-size-guard-label-override.yml", "override"),
+)
+
+HOSTED_BACKGROUND_CONTROLLER_JOBS = (
+    ("agent-harness-health-report.yml", "report"),
+    ("agent-landing-sweep.yml", "sweep"),
+    ("agent-tick.yml", "landing-sweep"),
+    ("agent-tick.yml", "cost-anomaly"),
+    ("agent-tick.yml", "dispatch"),
+    ("agent-tick.yml", "neon-cleanup"),
+    ("agent-tick.yml", "synthetic-monitoring"),
+    ("auto-fix-lint-agent-drafts.yml", "auto-fix-lint"),
+    ("doc-gardening-agent.yml", "garden"),
+    ("github-ai-dispatcher.yml", "dispatch"),
+    ("github-ai-orchestrator.yml", "guard"),
+    ("github-ai-orchestrator.yml", "claim_issue"),
+    ("github-ai-orchestrator.yml", "sync_in_review"),
+    ("neon-scheduled-cleanup.yml", "scheduled-cleanup"),
+    ("observability-issue.yml", "sync-issue"),
+    ("reusable-ci-lint.yml", "lint"),
+    ("reusable-ci-lint.yml", "typecheck"),
+    ("reusable-ci-lint.yml", "knip"),
+    ("reusable-ci-lint.yml", "env-example-guard"),
+    ("reusable-ci-lint.yml", "promptfoo-evals"),
+    ("reusable-ci-lint.yml", "golden-eval-set"),
 )
 
 
@@ -108,6 +184,25 @@ def test_agent_hot_paths_do_not_run_repo_tests() -> None:
     for workflow_name in HOT_PATH_WORKFLOWS:
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "test_gh_retry.py" not in content, workflow_name
+
+
+def test_stuck_draft_autoclose_is_manual_and_hosted_only() -> None:
+    """The all-PR drain must never schedule an automatic draft closer."""
+    workflow = (WORKFLOWS / "stuck-draft-autoclose.yml").read_text(
+        encoding="utf-8"
+    )
+    trigger_block = workflow.split("\non:\n", 1)[1].split(
+        "\nconcurrency:", 1
+    )[0]
+
+    assert "workflow_dispatch:" in trigger_block
+    assert "schedule:" not in trigger_block
+    assert "runs-on: ubuntu-latest" in _job_block(
+        "stuck-draft-autoclose.yml", "autoclose"
+    )
+    assert "CI_FAST_RUNNER" not in _job_block(
+        "stuck-draft-autoclose.yml", "autoclose"
+    )
 
 
 def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
@@ -309,9 +404,16 @@ def test_main_autofix_waits_for_rerun_and_exact_sha_repair_ownership() -> None:
     for workflow, job_name in (
         ("main-ci-health-monitor.yml", "monitor"),
         ("main-autofix.yml", "evaluate"),
-        ("agent-tick.yml", "main-ci-health"),
     ):
         assert "statuses: write" in _job_block(workflow, job_name)
+
+    agent_tick = (WORKFLOWS / "agent-tick.yml").read_text(encoding="utf-8")
+    assert "\n  main-ci-health:\n" not in agent_tick
+    agent_tick_trigger = agent_tick.split("\non:\n", 1)[1].split(
+        "\npermissions:", 1
+    )[0]
+    assert "workflow_dispatch:" in agent_tick_trigger
+    assert "schedule:" not in agent_tick_trigger
 
     landing_sweep = _job_block("agent-tick.yml", "landing-sweep")
     assert "statuses: read" in landing_sweep
@@ -445,8 +547,8 @@ def test_deep_lanes_are_staggered_and_bounded() -> None:
     assert "'0 9 * * 2'" in harness
 
 
-def test_cost_monitoring_docs_match_dispatch_only_workflow() -> None:
-    """Docs must not advertise an inactive 15-minute rollback monitor."""
+def test_cost_monitoring_docs_match_activation_gated_observer() -> None:
+    """Declared scheduling must not be confused with activation or rollback."""
     workflow = (WORKFLOWS / "cost-anomaly-gate.yml").read_text(encoding="utf-8")
     cost_docs = (REPO_ROOT / "docs/COST_MONITORING.md").read_text(
         encoding="utf-8"
@@ -457,11 +559,13 @@ def test_cost_monitoring_docs_match_dispatch_only_workflow() -> None:
 
     trigger_block = workflow.split("on:", 1)[1].split("# Prevent", 1)[0]
     assert "workflow_dispatch:" in trigger_block
-    assert "schedule:" not in trigger_block
-    assert "runs every 15 minutes" not in cost_docs
-    assert "`workflow_dispatch`-only" in cost_docs
+    assert "schedule:" in trigger_block
+    assert "'*/15 * * * *'" in trigger_block
+    assert "workflow enablement is an explicit operational step" in cost_docs
+    assert "never mutates production" in cost_docs
+    assert "vercel rollback" not in workflow
     assert "Cost Anomaly Gate" in audit
-    assert "Manual-only" in audit
+    assert "Keep activation-gated" in audit
 
 
 def test_auto_pr_compares_trigger_branch_without_executing_its_checkout() -> None:
@@ -478,3 +582,95 @@ def test_claude_review_uses_hosted_bun_prerequisites() -> None:
     assert "runs-on: ubuntu-latest" in block
     assert "runs-on: ${{ vars.CI_FAST_RUNNER }}" not in block
     assert "uses: oven-sh/setup-bun@" in block
+
+
+def test_taste_policy_runs_trusted_base_code_with_write_authority() -> None:
+    """PR data may steer policy, but PR-controlled code must never execute."""
+    for workflow, job_name in (
+        ("taste-classifier.yml", "classify"),
+        ("taste-label-guard.yml", "guard"),
+    ):
+        source = (WORKFLOWS / workflow).read_text(encoding="utf-8")
+        block = _job_block(workflow, job_name)
+        assert "\n  pull_request_target:\n" in source
+        assert "\n  pull_request:\n" not in source
+        assert "ref: ${{ github.event.pull_request.base.sha }}" in block
+        assert "persist-credentials: false" in block
+        assert "ref: ${{ github.event.pull_request.head.sha }}" not in block
+        assert "pnpm install" not in block
+        assert "corepack enable" not in block
+        assert "runs-on: ubuntu-latest" in block
+
+
+def test_model_and_advisory_jobs_never_consume_fixed_ci_runners() -> None:
+    """Long or advisory work cannot starve deterministic merge capacity."""
+    for workflow, job_name in MODEL_OR_ADVISORY_JOBS:
+        block = _job_block(workflow, job_name)
+        assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
+        assert "CI_FAST_RUNNER" not in block, (workflow, job_name)
+        assert "CI_UNIT_RUNNER" not in block, (workflow, job_name)
+
+
+def test_deep_evidence_jobs_use_hosted_capacity() -> None:
+    """Deep evidence must not consume the five fixed merge-throughput runners."""
+    for workflow, job_name in HOSTED_DEEP_EVIDENCE_JOBS:
+        block = _job_block(workflow, job_name)
+        assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
+        assert "CI_FAST_RUNNER" not in block, (workflow, job_name)
+        assert "CI_UNIT_RUNNER" not in block, (workflow, job_name)
+
+
+def test_post_merge_fanout_never_consumes_fixed_ci_capacity() -> None:
+    """Every merged PR fans these jobs out, so they must stay off fixed runners."""
+    for workflow, job_name in HOSTED_POST_MERGE_JOBS:
+        block = _job_block(workflow, job_name)
+        assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
+        assert "CI_FAST_RUNNER" not in block, (workflow, job_name)
+        assert "CI_UNIT_RUNNER" not in block, (workflow, job_name)
+
+
+def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
+    """Queue and check API work must leave fixed runners to deterministic tests."""
+    for workflow, job_name in HOSTED_API_ONLY_PR_CONTROLLERS:
+        block = _job_block(workflow, job_name)
+        assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
+        assert "CI_FAST_RUNNER" not in block, (workflow, job_name)
+        assert "CI_UNIT_RUNNER" not in block, (workflow, job_name)
+
+    dependabot = (WORKFLOWS / "dependabot-auto-merge.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "Graphite" not in dependabot
+    assert "native merge-queue enrollment" in dependabot
+
+
+def test_background_controllers_never_consume_fixed_ci_capacity() -> None:
+    """Schedules, API controllers, and dormant lanes cannot steal unit slots."""
+    for workflow, job_name in HOSTED_BACKGROUND_CONTROLLER_JOBS:
+        block = _job_block(workflow, job_name)
+        assert "runs-on: ubuntu-latest" in block, (workflow, job_name)
+        assert "CI_FAST_RUNNER" not in block, (workflow, job_name)
+        assert "CI_UNIT_RUNNER" not in block, (workflow, job_name)
+
+
+def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None:
+    """Schedules cannot silently compete with the bounded merge unit pool."""
+    scheduled_fixed: list[str] = []
+    for workflow_path in sorted(WORKFLOWS.glob("*.yml")):
+        content = workflow_path.read_text(encoding="utf-8")
+        if "\non:\n" not in content:
+            continue
+        trigger = content.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+        if "schedule:" not in trigger:
+            continue
+        if any(
+            marker in content
+            for marker in (
+                "runs-on: jovie-runner",
+                "runs-on: ${{ vars.CI_FAST_RUNNER",
+                "runs-on: ${{ vars.CI_UNIT_RUNNER",
+            )
+        ):
+            scheduled_fixed.append(workflow_path.name)
+
+    assert scheduled_fixed == ["runner-heartbeat.yml"]

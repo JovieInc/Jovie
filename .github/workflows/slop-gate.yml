@@ -9,26 +9,21 @@
 name: Slop Gate
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - '**.md'
-      - '**.mdx'
-      - 'apps/web/app/(marketing)/**'
-      - 'apps/web/components/features/home/**'
-      - 'docs/**'
+  schedule:
+    - cron: '37 9 * * 2'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: slop-gate-advisory
   cancel-in-progress: true
 
 jobs:
   slopcheck:
     name: Slop Gate (advisory)
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     # ponytail: advisory until tuning week ends — flip to blocking by removing continue-on-error
     continue-on-error: true
     steps:
@@ -51,7 +46,7 @@ jobs:
           # whole-file slop score only ever grows and always fails regardless of the
           # new entry's quality. Changelog copy quality is governed by the changelog
           # format rules in .claude/rules/release.md, not this marketing-copy gate.
-          git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD \
+          git diff --name-only --diff-filter=d HEAD~1 HEAD \
             | grep -E '\.(md|mdx)$' \
             | grep -v -E '^(node_modules|\.cache|drizzle/migrations|DESIGN\.md)' \
             | grep -v -E '(^|/)CHANGELOG\.md$' \
@@ -70,7 +65,7 @@ jobs:
         if: steps.changed.outputs.has_files == 'true'
         run: |
           mapfile -t files < /tmp/changed_copy_files.txt
-          python3 scripts/slopcheck.py --max 3.0 --diff-base "origin/${{ github.base_ref }}" "${files[@]}"
+          python3 scripts/slopcheck.py --max 3.0 --diff-base HEAD~1 "${files[@]}"
 
       - name: No copy files changed — skip
         if: steps.changed.outputs.has_files == 'false'
@@ -78,7 +73,7 @@ jobs:
 
   slopcheck-unit-tests:
     name: slopcheck.py unit tests
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

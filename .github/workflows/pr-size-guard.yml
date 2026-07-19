@@ -22,8 +22,9 @@ name: PR Size Guard
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  # Inert while Graphite owns landing. Every source PR has already passed the
-  # size policy, so only the required context is reproduced on the combined SHA.
+  # Active native-queue required-context producer. Labels and policy inputs can
+  # change after a source status turns green, so revalidate every member of the
+  # exact synthetic group before reproducing the required context on the head.
   merge_group:
     types: [checks_requested]
 
@@ -39,15 +40,32 @@ jobs:
   merge-group-size:
     name: ${{ github.event_name == 'merge_group' && 'PR Size Guard' || 'PR Size Guard (merge-group inactive)' }}
     if: github.event_name == 'merge_group'
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
-      - name: Confirm source PR size checks
-        run: echo "Merge-group members were size-checked as source PRs."
+      - name: Check out trusted queue policy
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # Never execute policy code from the synthetic PR-controlled head.
+          ref: ${{ github.event.merge_group.base_sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lib/merge-group-member-policy.mjs
+            scripts/lib/pr-size-guard-policy.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Revalidate every merge-group member's size policy
+        env:
+          # The synthetic head controls this workflow definition. Never expose
+          # an App private key here; the read-only ephemeral token is enough.
+          GH_TOKEN: ${{ github.token }}
+          MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
+          MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
+        run: node scripts/lib/merge-group-member-policy.mjs --policy=size
 
   size:
     name: ${{ github.event_name == 'pull_request' && 'PR Size Guard' || 'PR Size Guard (source inactive)' }}
-    runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.event_name == 'pull_request'
     steps:

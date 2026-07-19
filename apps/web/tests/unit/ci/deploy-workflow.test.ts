@@ -7,6 +7,14 @@ import { describe, expect, it } from 'vitest';
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
 const workflowPath = resolve(repoRoot, '.github/workflows/ci.yml');
+const productionControllerWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/production-controller.yml'
+);
+const productionReleaseWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/production-release.yml'
+);
 const productionAliasVerifierPath = resolve(
   repoRoot,
   '.github/scripts/verify-production-alias.sh'
@@ -23,6 +31,7 @@ const visualA11yWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/visual-a11y.yml'
 );
+const iosWorkflowPath = resolve(repoRoot, '.github/workflows/ios-ci.yml');
 const ciFastLanesPath = resolve(repoRoot, 'scripts/ci-fast-lanes.mjs');
 const canaryWorkflowPath = resolve(
   repoRoot,
@@ -31,6 +40,26 @@ const canaryWorkflowPath = resolve(
 const agentTickWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/agent-tick.yml'
+);
+const sentryGateWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/sentry-error-gate.yml'
+);
+const costAnomalyWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/cost-anomaly-gate.yml'
+);
+const mainHealthWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/main-ci-health-monitor.yml'
+);
+const mainHealthActionPath = resolve(
+  repoRoot,
+  '.github/actions/eval-main-health/action.yml'
+);
+const productionControllerHealthPath = resolve(
+  repoRoot,
+  '.github/workflows/production-controller-health.yml'
 );
 
 function getStepBlock(workflow: string, stepName: string): string {
@@ -72,6 +101,161 @@ function getJobBlock(workflow: string, jobKey: string): string {
   return block.join('\n');
 }
 
+describe('source PR path-output reachability contract', () => {
+  it('runs fast required gates for workflow-only changes without source unit or build work', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const pathJob = getJobBlock(workflow, 'ci-path-changes');
+    const provenance = getJobBlock(workflow, 'main-queue-provenance');
+    const provenanceHeader = provenance.slice(
+      0,
+      provenance.indexOf('    steps:')
+    );
+    const neutralProvenance = getStepBlock(
+      provenance,
+      'Emit neutral provenance for non-main events'
+    );
+    const mainCheckout = getStepBlock(provenance, 'Checkout exact main push');
+    const mainProvenance = getStepBlock(
+      provenance,
+      'Resolve exact queue provenance once'
+    );
+    const detectStep = getStepBlock(
+      pathJob,
+      'Detect path changes for all job types'
+    );
+    const ciFast = getJobBlock(workflow, 'ci-fast');
+    const migrationGuard = getJobBlock(workflow, 'drizzle-migration-guard');
+    const prReady = getJobBlock(workflow, 'ci-pr-ready');
+    const unitTests = getJobBlock(workflow, 'ci-unit-tests');
+    const buildLayout = getJobBlock(workflow, 'ci-build-layout');
+
+    expect(provenanceHeader).not.toMatch(/^    if:/m);
+    expect(provenanceHeader).toContain('runs-on: ubuntu-latest');
+    expect(neutralProvenance).toContain(
+      "github.event_name != 'push' || github.ref != 'refs/heads/main'"
+    );
+    expect(neutralProvenance).toContain('echo "is_current=false"');
+    expect(neutralProvenance).toContain('echo "queue_proven=false"');
+    expect(neutralProvenance).toContain('echo "proof_run_id="');
+    for (const mainOnlyStep of [mainCheckout, mainProvenance]) {
+      expect(mainOnlyStep).toContain(
+        "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+      );
+    }
+    for (const event of [
+      {
+        name: 'pull_request',
+        ref: 'refs/pull/14484/merge',
+        neutral: true,
+        verifiesMain: false,
+      },
+      {
+        name: 'merge_group',
+        ref: 'refs/heads/gh-readonly-queue/main/pr-14484',
+        neutral: true,
+        verifiesMain: false,
+      },
+      {
+        name: 'workflow_dispatch',
+        ref: 'refs/heads/codex/manual',
+        neutral: true,
+        verifiesMain: false,
+      },
+      {
+        name: 'push',
+        ref: 'refs/heads/main',
+        neutral: false,
+        verifiesMain: true,
+      },
+    ]) {
+      expect(
+        event.name !== 'push' || event.ref !== 'refs/heads/main',
+        `${event.name} neutral provenance`
+      ).toBe(event.neutral);
+      expect(
+        event.name === 'push' && event.ref === 'refs/heads/main',
+        `${event.name} exact main proof`
+      ).toBe(event.verifiesMain);
+      expect(event.neutral).not.toBe(event.verifiesMain);
+    }
+    expect(provenanceHeader).toContain(
+      'steps.verified.outputs.is_current || steps.neutral.outputs.is_current'
+    );
+    expect(provenanceHeader).toContain(
+      'steps.verified.outputs.queue_proven || steps.neutral.outputs.queue_proven'
+    );
+    expect(pathJob).toContain('needs: [main-queue-provenance]');
+
+    expect(pathJob).not.toContain('skip: ${{');
+    expect(detectStep).not.toContain('echo "skip=');
+    expect(workflow).not.toContain('needs.ci-path-changes.outputs.skip');
+
+    // `.github/**` is explicitly not docs-only. ci-fast additionally keys only
+    // off the authoritative Path Changes conclusion, including docs-only PRs.
+    expect(detectStep).toContain(
+      'if ! echo "$CHANGED_FILES" | grep -q -E \'^\\.github/\''
+    );
+    expect(
+      detectStep.lastIndexOf('echo "has_code_changes=true"')
+    ).toBeGreaterThan(detectStep.indexOf('Only documentation files changed'));
+    expect(ciFast).toContain("needs.ci-path-changes.result == 'success'");
+    expect(ciFast).not.toContain('needs.ci-path-changes.outputs.');
+    expect(migrationGuard).toContain(
+      "needs.ci-path-changes.result == 'success'"
+    );
+    expect(migrationGuard).toContain("github.event_name == 'pull_request'");
+    expect(prReady).toContain(
+      "always() && github.event_name == 'pull_request'"
+    );
+    expect(prReady).toContain('ci-path-changes, ci-risk-classifier, ci-fast');
+    expect(prReady).not.toContain('HAS_CODE_CHANGES');
+
+    expect(unitTests).not.toContain("github.event_name == 'pull_request'");
+    expect(buildLayout).not.toContain("github.event_name == 'pull_request'");
+
+    // Cross-job control flow keys off GitHub's authoritative job conclusion.
+    // Boolean-looking job outputs caused live source and merge-queue cascades
+    // to skip even after the runner logged that every output had been set.
+    for (const jobKey of [
+      'ci-env-example-guard',
+      'ci-fast',
+      'ci-promptfoo-evals',
+      'ci-golden-eval-set',
+      'ci-knip',
+      'neon-db',
+      'drizzle-migration-guard',
+      'ci-drizzle-check',
+      'ci-integration-ready',
+      'ci-build-layout',
+      'ci-ios',
+      'ci-build-public',
+      'ci-layout-guard',
+      'ci-mobile-overflow',
+      'ci-lighthouse-pr',
+      'ci-lighthouse-dashboard-pr',
+      'ci-lighthouse-onboarding-pr',
+      'ci-lighthouse-admin-pr',
+      'ci-lighthouse-chat-pr',
+      'ci-pr-neon-migrate',
+      'ci-unit-tests',
+      'ci-a11y',
+      'ci-a11y-authed',
+      'ci-e2e-smoke',
+      'ci-golden-path',
+      'ci-admin-smoke',
+      'ci-e2e-migrate',
+      'ci-e2e-tests',
+      'ci-pr-vercel-preview',
+      'ci-storybook-a11y',
+      'ci-smoke-required',
+    ]) {
+      expect(getJobBlock(workflow, jobKey), jobKey).toContain(
+        "needs.ci-path-changes.result == 'success'"
+      );
+    }
+  });
+});
+
 describe('CI Neon connection artifact contract', () => {
   it('binds every producer and consumer to the current run attempt', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -99,20 +283,18 @@ describe('CI Neon connection artifact contract', () => {
 });
 
 describe('CI test-performance path gate', () => {
-  it('runs the budget job only for its exact internal-PR inputs or main', () => {
+  it('routes exact performance inputs to a hosted manual lane', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const pathJob = getJobBlock(workflow, 'ci-path-changes');
     const detectStep = getStepBlock(
       pathJob,
       'Detect path changes for all job types'
     );
-    const graphiteSkip = getStepBlock(pathJob, 'Resolve exact-head CI policy');
     const performanceJob = getJobBlock(workflow, 'ci-test-performance');
 
     expect(pathJob).toContain(
-      "run_test_performance: ${{ steps.detect.outputs.run_test_performance || steps.graphite_skip.outputs.run_test_performance || 'false' }}"
+      "run_test_performance: ${{ steps.detect.outputs.run_test_performance || 'false' }}"
     );
-    expect(graphiteSkip).toContain('run_test_performance');
     expect(detectStep).toContain(
       'for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse'
     );
@@ -140,15 +322,7 @@ describe('CI test-performance path gate', () => {
       }).status
     ).toBe(1);
 
-    const testingStart = detectStep.indexOf(
-      'if [[ "$FULL_CI_LABEL" == "true" ]]'
-    );
-    const testingEnd = detectStep.indexOf('\n          fi', testingStart);
-    expect(testingStart).toBeGreaterThan(0);
-    expect(testingEnd).toBeGreaterThan(testingStart);
-    expect(detectStep.slice(testingStart, testingEnd)).not.toContain(
-      'run_test_performance'
-    );
+    expect(detectStep).not.toContain('DEEP_CI_LABEL');
     const generalTestElse = detectStep.match(
       /TEST_PATTERN=[\s\S]*?else\n\s+RUN_TEST=false([\s\S]*?)\n\s+fi/
     )?.[1];
@@ -161,11 +335,9 @@ describe('CI test-performance path gate', () => {
     );
 
     expect(performanceJob).toContain(
-      "if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (needs.ci-path-changes.outputs.skip == 'false' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_test_performance == 'true') }}"
+      "github.event_name == 'workflow_dispatch'"
     );
-    expect(performanceJob).not.toContain(
-      "if: ${{ needs.ci-path-changes.outputs.skip == 'false' && ((github.event_name == 'push'"
-    );
+    expect(performanceJob).not.toContain("github.event_name == 'pull_request'");
     expect(performanceJob).toContain(
       "run_full_ci=${{ needs.ci-path-changes.outputs.run_test == 'true' || needs.ci-path-changes.outputs.run_test_performance == 'true' }}"
     );
@@ -173,29 +345,21 @@ describe('CI test-performance path gate', () => {
 });
 
 describe('CI Storybook accessibility path gate', () => {
-  it('runs for relevant paths and every full-CI request', () => {
+  it('classifies relevant paths but runs only by manual dispatch', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const pathJob = getJobBlock(workflow, 'ci-path-changes');
     const detectStep = getStepBlock(
       pathJob,
       'Detect path changes for all job types'
     );
-    const graphiteSkip = getStepBlock(pathJob, 'Resolve exact-head CI policy');
+    const storybookJob = getJobBlock(workflow, 'ci-storybook-a11y');
 
     expect(pathJob).toContain(
-      "run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || steps.graphite_skip.outputs.run_storybook_a11y || 'false' }}"
+      "run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || 'false' }}"
     );
-    expect(graphiteSkip).toContain('run_storybook_a11y');
-
-    const testingStart = detectStep.indexOf(
-      'if [[ "$FULL_CI_LABEL" == "true" ]]'
-    );
-    const testingEnd = detectStep.indexOf('\n          fi', testingStart);
-    expect(testingStart).toBeGreaterThan(0);
-    expect(testingEnd).toBeGreaterThan(testingStart);
-    expect(detectStep.slice(testingStart, testingEnd)).toContain(
-      'run_storybook_a11y'
-    );
+    expect(storybookJob).toContain("github.event_name == 'workflow_dispatch'");
+    expect(storybookJob).not.toContain("github.event_name == 'pull_request'");
+    expect(detectStep).not.toContain('DEEP_CI_LABEL');
 
     const pattern = detectStep.match(/STORYBOOK_A11Y_PATTERN='([^']+)'/)?.[1];
     expect(pattern).toBeTruthy();
@@ -224,13 +388,17 @@ describe('CI Storybook accessibility path gate', () => {
     ).toBe(1);
 
     const visualWorkflow = readFileSync(visualA11yWorkflowPath, 'utf8');
+    expect(visualWorkflow).toMatch(/^  schedule:/m);
+    expect(visualWorkflow).not.toMatch(/^  push:/m);
+    expect(visualWorkflow).not.toMatch(/^  pull_request:/m);
+    expect(visualWorkflow).not.toContain('vars.CI_FAST_RUNNER');
     const visualPathJob = getJobBlock(visualWorkflow, 'ci-visual-path-changes');
     const visualDetectStep = getStepBlock(
       visualPathJob,
       'Detect visual-relevant changes'
     );
     expect(visualDetectStep).toContain(
-      'if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then'
+      '[ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "schedule" ]'
     );
     expect(visualDetectStep).toContain(
       'echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"'
@@ -282,6 +450,27 @@ function previewRobotsPolicyValid(
 }
 
 describe('deploy workflow Vercel env resolution', () => {
+  it('gives every main SHA CI evidence and a production-controller opportunity', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const ciTrigger = workflow.slice(0, workflow.indexOf('\npermissions:'));
+    const controllerTrigger = controller.slice(
+      0,
+      controller.indexOf('\npermissions:')
+    );
+
+    expect(ciTrigger).toContain('push:');
+    expect(ciTrigger).toContain('branches: [main]');
+    expect(ciTrigger).not.toContain('paths-ignore:');
+    expect(controllerTrigger).toContain('workflow_run:');
+    expect(controllerTrigger).toContain('workflows: [CI]');
+    expect(controllerTrigger).toContain('types: [completed]');
+    expect(controllerTrigger).toContain('branches: [main]');
+    expect(controllerTrigger).not.toContain('paths-ignore:');
+    expect(workflow).not.toContain('  production-release:');
+    expect(workflow).not.toContain('  production-verified:');
+  });
+
   it('keeps the dependency-free risk classifier off dependency caches', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const classifierJob = getJobBlock(workflow, 'ci-risk-classifier');
@@ -291,8 +480,8 @@ describe('deploy workflow Vercel env resolution', () => {
       'uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e'
     );
     expect(classifierJob).toContain("node-version: '22'");
-    // biome-ignore format: merge-group checkout contract stays compact for the integration-train cap
-    expect([classifierJob.includes('fetch-depth: 2'), classifierJob.includes('git fetch --no-tags --depth=1 origin "$DIFF_BASE"'), classifierJob.includes('git diff --name-only "$DIFF_BASE" "${{ github.event.merge_group.head_sha }}"'), classifierJob.includes('$DIFF_BASE...${{ github.event.merge_group.head_sha }}')]).toEqual([true, true, true, false]);
+    // biome-ignore format: exact-diff/fail-closed contract stays compact for the integration-train cap
+    expect([classifierJob.includes('fetch-depth: 0'), classifierJob.includes('filter: blob:none'), classifierJob.includes('git cat-file -e "${DIFF_BASE}^{commit}"'), classifierJob.includes('git diff --name-only "$DIFF_BASE" "${{ github.event.merge_group.head_sha }}"'), classifierJob.includes('DIFF_BASE="${{ github.event.before }}"'), classifierJob.includes('|| git show')]).toEqual([true, true, true, true, true, false]);
     expect(classifierJob).toContain(
       'node scripts/ci-harness.mjs classify-risk'
     );
@@ -304,38 +493,88 @@ describe('deploy workflow Vercel env resolution', () => {
     );
   });
 
-  it('routes main deploy artifact builds to hosted capacity', () => {
+  it('routes the direct-main fallback build and layout to one hosted workspace', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
-    const buildJob = getJobBlock(workflow, 'ci-build-public');
+    const buildJob = getJobBlock(workflow, 'ci-build-layout');
 
     expect(buildJob).toContain("github.ref == 'refs/heads/main'");
-    expect(buildJob).toContain("&& 'ubuntu-latest'");
-    expect(buildJob).toContain('|| vars.CI_FAST_RUNNER');
+    expect(buildJob).toContain('runs-on: ubuntu-latest');
+    expect(buildJob).toContain('Build exact combined head');
+    expect(buildJob).toContain('Run deterministic layout behavior guard');
+    expect(buildJob).not.toContain('actions/upload-artifact');
+    expect(buildJob).not.toContain('actions/download-artifact');
   });
 
-  it('runs main deploy control jobs on hosted capacity', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+  it('runs every release control job on hosted capacity', () => {
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
 
-    expect(getJobBlock(workflow, 'deploy-gate')).toContain(
-      'runs-on: ubuntu-latest'
-    );
-    expect(getJobBlock(workflow, 'deploy-staging')).toContain(
-      'runs-on: ubuntu-latest'
-    );
-    expect(getJobBlock(workflow, 'alias-staging')).toContain(
-      'runs-on: ubuntu-latest'
-    );
-    expect(getJobBlock(workflow, 'promote-production')).toContain(
-      'runs-on: ubuntu-latest'
-    );
+    for (const job of [
+      'release-head',
+      'deploy-staging',
+      'staging-head',
+      'alias-staging',
+      'production-head',
+      'promote-production',
+      'release-result',
+    ]) {
+      expect(getJobBlock(workflow, job)).toContain('runs-on: ubuntu-latest');
+    }
     expect(readFileSync(canaryWorkflowPath, 'utf8')).toContain(
       'runs-on: ubuntu-latest'
     );
   });
 
-  it('passes the exact GitHub SHA into every external Vercel build and source deploy', () => {
+  it('cross-proves one-shot CI evidence under one dedicated FIFO production lease', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
-    const buildShaEnv = 'VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}';
+    const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const controllerHeader = controller.slice(0, controller.indexOf('\njobs:'));
+    const provenanceJob = getJobBlock(workflow, 'main-queue-provenance');
+    const readinessJob = getJobBlock(workflow, 'main-release-ready');
+    const authorization = getJobBlock(controller, 'authorize-production');
+    const releaseCaller = getJobBlock(controller, 'production-release');
+    const verified = getJobBlock(controller, 'production-verified');
+    const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
+
+    expect(provenanceJob).toContain(
+      'node .github/scripts/verify-main-release-readiness.mjs'
+    );
+    expect(readinessJob).toContain('QUEUE_PROVEN');
+    expect(readinessJob).toContain('Unit Tests (five shards)');
+    expect(readinessJob).toContain('Build + Layout');
+    expect(readinessJob).toContain('Promptfoo Evals');
+    expect(readinessJob).toContain('Golden Eval Set');
+    expect(readinessJob).toContain('RUN_PROMPTFOO');
+    expect(readinessJob).toContain('RUN_GOLDEN_EVAL');
+    expect(readinessJob).toContain(
+      'Main fallback $name did not pass (result $result)'
+    );
+    expect(readinessJob).toContain(
+      'Main fallback ran $name without path selection (result $result)'
+    );
+    expect(readinessJob).toContain('did not pass (result $result)');
+    expect(releaseCaller).toContain(
+      'uses: ./.github/workflows/production-release.yml'
+    );
+    expect(controllerHeader).toContain('group: production-mutation');
+    expect(controllerHeader).toContain('queue: max');
+    expect(controllerHeader).toContain('cancel-in-progress: false');
+    expect(authorization).toContain(
+      'actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT'
+    );
+    expect(authorization).toContain(
+      '(.run_attempt | tostring) == $run_attempt'
+    );
+    expect(authorization).toContain('.name == "Main Release Ready"');
+    expect(authorization).toContain('.head_sha == $sha');
+    expect(authorization).toContain('gh api --paginate --slurp');
+    expect(releaseCaller).not.toContain('concurrency:');
+    expect(verified).not.toContain('concurrency:');
+    expect(reusable).not.toContain('concurrency:');
+  });
+
+  it('passes the exact GitHub SHA into every external Vercel build and source deploy', () => {
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const buildShaEnv = 'VERCEL_GIT_COMMIT_SHA: ${{ inputs.expected_sha }}';
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
     const deployStep = getStepBlock(
       stagingJob,
@@ -363,6 +602,10 @@ describe('deploy workflow Vercel env resolution', () => {
 
   it('pins Vercel pull and build commands to the configured project', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
+    const productionWorkflow = readFileSync(
+      productionReleaseWorkflowPath,
+      'utf8'
+    );
     const steps = [
       {
         command: 'vercel pull',
@@ -390,7 +633,7 @@ describe('deploy workflow Vercel env resolution', () => {
       expect(step).not.toContain('--scope ${{ secrets.VERCEL_ORG_ID }}');
     }
 
-    const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const stagingJob = getJobBlock(productionWorkflow, 'deploy-staging');
     const configureStep = getStepBlock(
       stagingJob,
       'Configure staging deployment credentials'
@@ -451,7 +694,7 @@ describe('deploy workflow Vercel env resolution', () => {
   });
 
   it('builds the staging prebuilt in-job and refuses source-cache substitution', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
     const buildStep = getStepBlock(
       stagingJob,
@@ -471,7 +714,7 @@ describe('deploy workflow Vercel env resolution', () => {
   });
 
   it('packages generated public trace files and budgets remote fallback readiness', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
     const buildStep = getStepBlock(
       stagingJob,
@@ -492,7 +735,7 @@ describe('deploy workflow Vercel env resolution', () => {
   });
 
   it('passes signup readiness keys into the staging preview runtime', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const deployStep = getStepBlock(
       workflow,
       'Deploy (staging preview, prebuilt)'
@@ -519,7 +762,7 @@ describe('deploy workflow Vercel env resolution', () => {
   });
 
   it('checks staging signup readiness against the deploy env before building the promotion artifact', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const readinessStep = getStepBlock(
       workflow,
       'Check signup readiness (staging deploy env)'
@@ -544,7 +787,7 @@ describe('deploy workflow Vercel env resolution', () => {
   });
 
   it('loads production runtime config from Doppler without yielding Vercel deployment identity', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const promoteJob = getJobBlock(workflow, 'promote-production');
     const configureStep = getStepBlock(
       promoteJob,
@@ -599,7 +842,7 @@ describe('deploy workflow Vercel env resolution', () => {
   });
 
   it('verifies production promotion through the canonical public alias', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const promoteJob = getJobBlock(workflow, 'promote-production');
     const domainGuardStep = getStepBlock(
       promoteJob,
@@ -660,41 +903,80 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(verifyStep).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
   });
 
-  it('alerts specifically when production domains drift off the canonical Vercel project', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
-    const classifyStep = getStepBlock(workflow, 'Classify failure type');
-    const generalSlackStep = getStepBlock(
-      workflow,
-      'Slack notify (general deploy failure)'
-    );
+  it('settles hosted post-deploy probes before announcing Production Verified', () => {
+    const workflow = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const verified = getJobBlock(workflow, 'production-verified');
+    const lighthouse = getJobBlock(workflow, 'lighthouse-ci');
 
-    expect(classifyStep).toContain('domain_project_mismatch');
-    expect(classifyStep).toContain(
-      'Production domains are on the wrong Vercel project'
+    for (const job of [
+      'ci-public-profile-smoke',
+      'ci-post-deploy-auth-smoke',
+      'ci-homepage-smoke',
+      'lighthouse-ci',
+    ]) {
+      const block = getJobBlock(workflow, job);
+      expect(block).toContain('runs-on: ubuntu-latest');
+      expect(block).not.toContain('continue-on-error: true');
+      expect(block).toContain(
+        'needs.production-release.outputs.production_deployment_url'
+      );
+      expect(block).not.toContain('verify-production-alias.sh');
+    }
+    expect(lighthouse).toContain('uses: ./.github/actions/setup-playwright');
+    expect(lighthouse).toContain(
+      "require('playwright').chromium.executablePath()"
     );
-    expect(classifyStep).toContain(
-      'Production promotion was blocked before deploy.'
+    expect(lighthouse).toContain('echo "CHROME_PATH=$chrome_path"');
+    expect(lighthouse).toContain('lighthouse-production-exact.json');
+    expect(verified).toContain('ci-public-profile-smoke');
+    expect(verified).toContain('ci-post-deploy-auth-smoke');
+    expect(verified).toContain('ci-homepage-smoke');
+    expect(verified).toContain('lighthouse-ci');
+    expect(verified).toContain('did not complete successfully');
+    expect(verified).not.toContain('concurrency:');
+    expect(verified).toContain('repos/${{ github.repository }}/commits/main');
+    expect(verified).toContain('verify-production-alias.sh');
+    expect(verified).toContain('superseded by $current_sha');
+    expect(verified).toContain("steps.current.outputs.is_current == 'true'");
+    expect(verified).toContain(
+      "always() && steps.current.outputs.is_current == 'true'"
     );
-    expect(generalSlackStep).toContain('promote_domain_project_mismatch');
+    expect(verified).toContain('Finalize exact current release generation');
+    expect(verified).toContain('Notify exact verified production generation');
+    expect(verified).toContain('steps.finalize.outputs.verified');
+    expect(workflow).not.toContain('  deploy-notify:');
   });
 });
 
 describe('unit-test runner capacity', () => {
   it('fills the pool without exceeding each ephemeral runner CPU quota', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
+    const routeJob = getJobBlock(workflow, 'ci-unit-runner-route');
     const unitJob = getJobBlock(workflow, 'ci-unit-tests');
 
+    expect(routeJob).toContain('runs-on: ubuntu-latest');
+    expect(routeJob).toContain('ref: main');
+    expect(routeJob).toContain('continue-on-error: true');
+    expect(routeJob).toContain("runner='ubuntu-latest'");
+    expect(routeJob).toContain('.github/scripts/query-runner-heartbeat.sh');
+    expect(routeJob).toContain('[ "$HEARTBEAT_HEALTH" = \'up\' ]');
+    expect(routeJob).toContain('jovie-runner|ubuntu-latest');
+    expect(routeJob).not.toContain('secrets.');
     expect(unitJob).toContain(
-      "runs-on: ${{ vars.CI_UNIT_RUNNER || 'ubuntu-latest' }}"
+      "runs-on: ${{ needs.ci-unit-runner-route.outputs.runner || 'ubuntu-latest' }}"
     );
+    expect(unitJob).not.toContain('vars.CI_UNIT_RUNNER');
+    expect(unitJob).toContain('max-parallel: 2');
     expect(unitJob).toContain(
-      "max-parallel: ${{ vars.CI_UNIT_RUNNER == 'jovie-ephemeral' && 5 || 3 }}"
+      'Five logical shards, at most two concurrent per queue candidate'
     );
-    expect(unitJob).toContain('10-slot autoscaled ephemeral pool');
-    expect(unitJob).toContain('two PRs use all 10');
-    expect(unitJob).toContain(
-      'hosted fallback retains the original 3-shard cap'
+    expect(unitJob).toContain('anti-slam headroom');
+    expect(unitJob).toContain('Runner Heartbeat');
+    expect(unitJob).toContain('run: echo "run_full_ci=true"');
+    expect(unitJob).not.toContain(
+      "github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_test == 'true'"
     );
+    expect(unitJob).not.toContain('&& 5 || 3');
     expect(unitJob).toContain('Each ephemeral runner has 2 CPUs');
     expect(unitJob).toContain('VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"');
     expect(unitJob).not.toContain(
@@ -703,15 +985,53 @@ describe('unit-test runner capacity', () => {
   });
 });
 
+describe('iOS stage contract', () => {
+  it('keeps portable checks on source and Xcode on combined/fallback heads', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const iosWorkflow = readFileSync(iosWorkflowPath, 'utf8');
+    const fastLanes = readFileSync(ciFastLanesPath, 'utf8');
+    const pathChanges = getJobBlock(workflow, 'ci-path-changes');
+    const ios = getJobBlock(workflow, 'ci-ios');
+    const sourceReady = getJobBlock(workflow, 'ci-pr-ready');
+    const mergeReady = getJobBlock(workflow, 'ci-merge-group-ready');
+    const mainReady = getJobBlock(workflow, 'main-release-ready');
+
+    expect(iosWorkflow).toMatch(
+      /^on:\n(?:  #.*\n)*  workflow_call:\n  workflow_dispatch:/m
+    );
+    expect(iosWorkflow).not.toMatch(/^  pull_request:/m);
+    expect(iosWorkflow).not.toMatch(/^  push:/m);
+    expect(iosWorkflow).toContain('runs-on: macos-26');
+    expect(pathChanges).toContain(
+      "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"
+    );
+    expect(pathChanges).toContain("IOS_PATTERN='^(apps/ios/");
+    expect(ios).toContain("needs.ci-path-changes.outputs.run_ios == 'true'");
+    expect(ios).toContain("github.event_name == 'merge_group'");
+    expect(ios).toContain(
+      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    );
+    expect(ios).toContain('uses: ./.github/workflows/ios-ci.yml');
+    expect(sourceReady).not.toContain('ci-ios');
+    expect(mergeReady).toContain('ci-ios');
+    expect(mainReady).toContain('ci-ios');
+    expect(fastLanes).toContain("id: 'ios-fast'");
+    expect(fastLanes).toContain('pnpm run ios:lint');
+    expect(fastLanes).not.toContain('write-configuration.test.mjs');
+    expect(iosWorkflow).toContain(
+      'node --test apps/ios/scripts/write-configuration.test.mjs'
+    );
+  });
+});
+
 describe('informational CI tail capacity', () => {
-  it('keeps PR Summary off the ephemeral unit-test pool', () => {
+  it('keeps the manual evidence summary off the ephemeral unit-test pool', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const summaryJob = getJobBlock(workflow, 'ci-summary');
 
-    expect(summaryJob).toContain('Informational only (posts a PR comment)');
-    expect(summaryJob).toContain(
-      "runs-on: ${{ vars.CI_GATE_RUNNER || 'ubuntu-latest' }}"
-    );
+    expect(summaryJob).toContain('name: Manual Evidence Summary');
+    expect(summaryJob).toContain("github.event_name == 'workflow_dispatch'");
+    expect(summaryJob).toContain('runs-on: ubuntu-latest');
     expect(summaryJob).not.toContain('runs-on: ${{ vars.CI_FAST_RUNNER }}');
   });
 });
@@ -1328,33 +1648,32 @@ describe('CI mobile overflow workflow', () => {
 });
 
 describe('CI required smoke materialization', () => {
-  it('evaluates the smoke condition when the shared Neon prerequisite is path-skipped', () => {
+  it('requires the shared manual Neon producer without a racing fallback', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const smokeJob = getJobBlock(workflow, 'ci-e2e-smoke');
 
-    expect(smokeJob).toContain('if: ${{ always() &&');
-    expect(smokeJob).toContain(
+    expect(smokeJob).toContain("github.event_name == 'workflow_dispatch'");
+    expect(smokeJob).not.toContain("github.event_name == 'pull_request'");
+    expect(smokeJob).not.toContain(
       "needs.ci-risk-classifier.outputs.requires_smoke == 'true'"
     );
     expect(smokeJob).toContain(
-      "needs.neon-db.result == 'success' || needs.neon-db.result == 'skipped'"
+      'run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}"'
     );
-    expect(smokeJob).toContain(
-      "if: steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'"
-    );
-    expect(smokeJob).toContain(
-      "if: always() && steps.check_changes.outputs.run_full_ci == 'true' && needs.neon-db.result != 'success'"
-    );
+    expect(smokeJob).toContain("needs.neon-db.result == 'success'");
+    expect(smokeJob).not.toContain('fallback Neon ephemeral');
+    expect(smokeJob).not.toContain('steps.neon-branch');
   });
 });
 
 describe('CI bounded evidence parallelism', () => {
-  it('uses both Lighthouse shards without unbounded future fan-out', () => {
+  it('isolates public Lighthouse below the observed server exhaustion horizon', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const lighthouse = getJobBlock(workflow, 'ci-lighthouse-pr');
 
-    expect(lighthouse).toContain('max-parallel: 2');
-    expect(lighthouse).toContain('shard: [0, 1]');
+    expect(lighthouse).toContain('max-parallel: 4');
+    expect(lighthouse).toContain('shard: [0, 1, 2, 3]');
+    expect(lighthouse).toContain("PUBLIC_LIGHTHOUSE_TOTAL_SHARDS: '4'");
   });
 
   it('runs two mobile widths while retaining the three-width evidence set', () => {
@@ -1492,11 +1811,13 @@ describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
     expect(cleanupWorkflow).toContain('startswith($base + "-")');
   });
 
-  it('runs Neon branch cleanup from the consolidated ten-minute agent tick', () => {
+  it('keeps consolidated agent tick manual-only while retaining cleanup controls', () => {
     const agentTickWorkflow = readFileSync(agentTickWorkflowPath, 'utf8');
     const cleanupJob = getJobBlock(agentTickWorkflow, 'neon-cleanup');
 
-    expect(agentTickWorkflow).toContain("cron: '*/10 * * * *'");
+    expect(agentTickWorkflow).toContain('workflow_dispatch:');
+    expect(agentTickWorkflow).not.toContain('schedule:');
+    expect(agentTickWorkflow).not.toContain('vercel rollback');
     expect(cleanupJob).toContain('uses: ./.github/actions/neon-branch-cleanup');
     expect(cleanupJob).toContain("minimum_branch_age_minutes: '45'");
     expect(cleanupJob).toContain(
@@ -1643,7 +1964,7 @@ describe('CI PR neon migrate workflow', () => {
 
 describe('production promotion exact-artifact contract', () => {
   it('deploys the in-job staging prebuilt without a source fallback', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const deployStep = getStepBlock(
       workflow,
       'Deploy (staging preview, prebuilt)'
@@ -1659,7 +1980,7 @@ describe('production promotion exact-artifact contract', () => {
   });
 
   it('builds and canaries a Production-target prebuilt before promotion', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const promoteJob = getJobBlock(workflow, 'promote-production');
     const stageStep = getStepBlock(
       promoteJob,
@@ -1668,6 +1989,10 @@ describe('production promotion exact-artifact contract', () => {
     const promoteStep = getStepBlock(
       promoteJob,
       'Promote staged production deployment'
+    );
+    const finalCurrentStep = getStepBlock(
+      promoteJob,
+      'Recheck main immediately before production promotion'
     );
     const verifyStep = getStepBlock(
       promoteJob,
@@ -1693,9 +2018,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(canaryIndex).toBeGreaterThan(inspectIndex);
     expect(stageStep).toContain('--target=prd --source=env');
     expect(stageStep).not.toContain('--target=prd --source=vercel-file');
-    expect(stageStep).toContain('VERCEL_GIT_COMMIT_SHA="$GITHUB_SHA"');
+    expect(stageStep).toContain('VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"');
     expect(stageStep).toContain('NEXT_PUBLIC_BUILD_SHA="$expected"');
-    expect(stageStep).toContain('--meta "githubCommitSha=${GITHUB_SHA}"');
+    expect(stageStep).toContain('--meta "githubCommitSha=${EXPECTED_SHA}"');
     expect(stageStep).toContain('[ "$production_deploy_state" != "READY" ]');
     expect(stageStep).toContain(
       '[ "$production_deploy_target" != "production" ]'
@@ -1705,6 +2030,29 @@ describe('production promotion exact-artifact contract', () => {
     expect(promoteStep).toContain(
       'bash .github/scripts/promote-production-deployment.sh'
     );
+    const resolveMainIndex = finalCurrentStep.indexOf(
+      'current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main"'
+    );
+    const compareMainIndex = finalCurrentStep.indexOf(
+      'if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]]'
+    );
+    expect(finalCurrentStep).toContain(
+      'EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}'
+    );
+    expect(resolveMainIndex).toBeGreaterThanOrEqual(0);
+    expect(compareMainIndex).toBeGreaterThan(resolveMainIndex);
+    expect(finalCurrentStep).toContain('echo "is_current=false"');
+    expect(finalCurrentStep).toContain('exit 0');
+    expect(finalCurrentStep).not.toContain(
+      'Refusing stale production promotion'
+    );
+    expect(promoteStep).toContain(
+      "if: ${{ steps.final-current.outputs.is_current == 'true' }}"
+    );
+    expect(promoteJob).toContain(
+      'is_current: ${{ steps.promote.outputs.is_current }}'
+    );
+    expect(verifyStep).toContain("steps.promote.outputs.is_current == 'true'");
     expect(verifyStep).toContain(
       'bash .github/scripts/verify-production-alias.sh'
     );
@@ -1713,19 +2061,57 @@ describe('production promotion exact-artifact contract', () => {
     expect(promoteJob).not.toContain('vercel promote "$deploy_url"');
   });
 
-  it('requires canonical deployment ID and SHA convergence before smoke', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+  it('neutralizes rapid main advance after staging while API uncertainty fails closed', () => {
+    const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const promoteJob = getJobBlock(reusable, 'promote-production');
+    const finalCurrent = getStepBlock(
+      promoteJob,
+      'Recheck main immediately before production promotion'
+    );
+    const result = getJobBlock(reusable, 'release-result');
+
+    expect(finalCurrent).toContain(
+      'if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]'
+    );
+    expect(finalCurrent).toContain('exit 1');
+    expect(finalCurrent).toContain('echo "is_current=false"');
+    expect(finalCurrent).toContain('exit 0');
+    expect(result).toContain(
+      'needs.promote-production.outputs.is_current }}" != "true"'
+    );
+    expect(result).toContain('Superseded at production mutation; neutral.');
+  });
+
+  it('serializes initial runs and reruns in the same bounded FIFO lease', () => {
+    const workflow = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const workflowHeader = workflow.slice(0, workflow.indexOf('\njobs:'));
+    const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const releaseCaller = getJobBlock(workflow, 'production-release');
+    const verified = getJobBlock(workflow, 'production-verified');
+
+    expect(workflowHeader).toContain('group: production-mutation');
+    expect(workflowHeader).toContain('queue: max');
+    expect(workflowHeader).toContain('cancel-in-progress: false');
+    expect(workflowHeader).not.toContain('github.run_attempt');
+    expect(workflowHeader).not.toContain('github.sha');
+    expect(releaseCaller).not.toContain('concurrency:');
+    expect(verified).not.toContain('concurrency:');
+    expect(reusable).not.toContain('concurrency:');
+    expect(verified).toContain('canonical_verified=true');
+    expect(verified).toContain('neutral with no notification');
+    expect(verified).toContain('Finalize exact current release generation');
+    expect(verified).toContain('Notify exact verified production generation');
+    expect(verified.match(/commits\/main/g)).toHaveLength(3);
+  });
+
+  it('requires canonical deployment ID and SHA convergence only in the leased final tail', () => {
+    const workflow = readFileSync(productionControllerWorkflowPath, 'utf8');
     const verifier = readFileSync(productionAliasVerifierPath, 'utf8');
     const smokeJob = getJobBlock(workflow, 'ci-public-profile-smoke');
+    const verifiedJob = getJobBlock(workflow, 'production-verified');
     const exactGate = getStepBlock(
-      smokeJob,
-      'Verify exact production deployment before smoke'
-    );
-    const genericSmokeIndex = smokeJob.indexOf(
-      '- name: Verify production endpoints are healthy'
-    );
-    const exactGateIndex = smokeJob.indexOf(
-      '- name: Verify exact production deployment before smoke'
+      verifiedJob,
+      'Require exact deployment and every post-deploy probe'
     );
 
     expect(verifier).toContain('vercel inspect "$canonical_domain"');
@@ -1736,16 +2122,20 @@ describe('production promotion exact-artifact contract', () => {
     expect(verifier).toContain('[ "$environment" != "production" ]');
     expect(verifier).not.toContain('x-vercel-protection-bypass');
     expect(exactGate).toContain(
-      'EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.production_deployment_id }}'
+      'EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}'
     );
     expect(exactGate).toContain("PRODUCTION_ALIAS_REQUIRED_ROUNDS: '1'");
-    expect(exactGateIndex).toBeGreaterThanOrEqual(0);
-    expect(genericSmokeIndex).toBeGreaterThan(exactGateIndex);
+    expect(exactGate).toContain('verify-production-alias.sh');
+    expect(verifiedJob).not.toContain('concurrency:');
+    expect(smokeJob).not.toContain('verify-production-alias.sh');
+    expect(smokeJob).toContain(
+      'needs.production-release.outputs.production_deployment_url'
+    );
     expect(smokeJob).not.toContain('Wait for CDN propagation');
   });
 
   it('keeps promotion ownership and live rollout horizon hard-bounded', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const controller = readFileSync(productionPromotionControllerPath, 'utf8');
     const promotionJob = getJobBlock(workflow, 'promote-production');
     const promotionStep = getStepBlock(
@@ -1784,7 +2174,13 @@ describe('production promotion exact-artifact contract', () => {
     expect(controller).toContain('PRODUCTION_PROMOTION_CLEANUP_ATTEMPTS:-12');
     expect(controller).toContain('rolling-release fetch');
     expect(controller).toContain('rollout_target_id');
-    expect(controller).toContain('rolling-release complete --dpl "$deploy_id"');
+    expect(controller).toContain('observing owned automatic rollout');
+    expect(
+      controller
+        .split('\n')
+        .filter(line => !line.trimStart().startsWith('#'))
+        .join('\n')
+    ).not.toContain('rolling-release complete');
     expect(controller).toContain('rolling-release abort --dpl "$deploy_id"');
     expect(controller).toContain('without resubmitting');
     expect(controller).not.toContain('while true');
@@ -1792,19 +2188,189 @@ describe('production promotion exact-artifact contract', () => {
     expect(controller.match(/vercel promote/g)).toHaveLength(1);
   });
 
-  it('routes new production failure subtypes to actionable notifications', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
-    const classifyStep = getStepBlock(workflow, 'Classify failure type');
-    const generalSlackStep = getStepBlock(
-      workflow,
-      'Slack notify (general deploy failure)'
+  it('preserves production failure subtypes through the reusable result', () => {
+    const workflow = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const verifier = readFileSync(productionAliasVerifierPath, 'utf8');
+    const result = getJobBlock(reusable, 'release-result');
+    const verified = getJobBlock(workflow, 'production-verified');
+
+    expect(reusable).toContain('staged_production_canary_failed');
+    expect(verifier).toContain('production_alias_not_updated');
+    expect(reusable).toContain('failure_subtype:');
+    expect(result).toContain(
+      'needs.promote-production.outputs.failure_subtype'
+    );
+    expect(verified).toContain(
+      'Release generation lacks exact passing gate, canonical deployment, or SHA evidence'
+    );
+    expect(reusable).toContain('production_deployment_url:');
+    expect(result).toContain(
+      'needs.promote-production.outputs.production_deployment_url'
+    );
+  });
+
+  it('checks out the exact authorized SHA with direct needs wiring', () => {
+    const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
+
+    for (const jobName of [
+      'ci-public-profile-smoke',
+      'ci-post-deploy-auth-smoke',
+      'lighthouse-ci',
+      'production-verified',
+    ]) {
+      const job = getJobBlock(controller, jobName);
+      expect(job).toContain('authorize-production');
+      expect(job).toContain(
+        'ref: ${{ needs.authorize-production.outputs.expected_sha }}'
+      );
+    }
+    expect(reusable.match(/actions\/checkout/g)).toHaveLength(5);
+    expect(
+      reusable.match(/ref: \$\{\{ inputs\.expected_sha \}\}/g)
+    ).toHaveLength(5);
+  });
+
+  it('keeps rollback centralized behind confirmed structured gate failures', () => {
+    const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const sentry = readFileSync(sentryGateWorkflowPath, 'utf8');
+    const cost = readFileSync(costAnomalyWorkflowPath, 'utf8');
+    const tick = readFileSync(agentTickWorkflowPath, 'utf8');
+
+    expect(reusable.match(/vercel rollback/g)).toHaveLength(1);
+    expect(`${sentry}\n${cost}\n${tick}`).not.toContain('vercel rollback');
+    expect(reusable).toContain("gate_status == 'failed'");
+    expect(reusable).toContain('gate_status=error');
+    expect(reusable).toContain('PLAYWRIGHT_JSON_OUTPUT_NAME');
+    expect(reusable).toContain(
+      'Google rejected redirect_uri|Apple rejected return URL'
+    );
+    expect(reusable).toContain('application/json {ok:true}');
+    expect(reusable).toContain('no confirmed regression flag emitted');
+    expect(reusable).toContain(
+      'An uncertain production gate result must never trigger rollback'
+    );
+  });
+
+  it('keeps leased canonical rollback valid when source main advances during soak', () => {
+    const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const rollbackJob = getJobBlock(reusable, 'rollback-production');
+    const rollbackStep = getStepBlock(
+      rollbackJob,
+      'Roll back explicitly to recorded previous deployment'
     );
 
-    expect(classifyStep).toContain('staged_production_canary_failed');
-    expect(classifyStep).toContain('production_alias_not_updated');
-    expect(classifyStep).toContain('^production_promotion_');
-    expect(generalSlackStep).toContain('promote_staged_production_failed');
-    expect(generalSlackStep).toContain('promote_production_alias_not_updated');
-    expect(generalSlackStep).toContain('promote_production_state_blocked');
+    expect(rollbackStep).not.toContain('/commits/main');
+    expect(rollbackStep).not.toContain('EXPECTED_COMMIT_SHA');
+    expect(rollbackStep).toContain(
+      '[ "$PREVIOUS_PRODUCTION_DEPLOYMENT_ID" = "$CURRENT_PRODUCTION_DEPLOYMENT_ID" ]'
+    );
+    expect(rollbackStep).toContain(
+      '[ "$canonical_id" != "$CURRENT_PRODUCTION_DEPLOYMENT_ID" ]'
+    );
+    expect(rollbackStep).toContain(
+      'vercel rollback "$PREVIOUS_PRODUCTION_DEPLOYMENT_ID"'
+    );
+  });
+
+  it('uses non-overlapping normalized Sentry windows from Production secrets', () => {
+    const sentry = readFileSync(sentryGateWorkflowPath, 'utf8');
+
+    expect(sentry).toContain('name: Production – jovie');
+    expect(sentry).toContain(
+      'SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}'
+    );
+    expect(sentry).toContain(
+      'https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/'
+    );
+    expect(sentry).toContain('project_id="$(jq -r');
+    expect(sentry).toContain('START_EPOCH=$GATE_START_EPOCH');
+    expect(sentry).toContain(
+      'START_EPOCH=$((END_EPOCH - WINDOW_MINUTES * 60))'
+    );
+    expect(sentry).toContain(
+      'POST_RATE_SCALED=$((POST_DEPLOY * BASELINE_MINUTES))'
+    );
+    expect(sentry).toContain(
+      'BASELINE_RATE_LIMIT_SCALED=$((BASELINE * THRESHOLD * POST_MINUTES))'
+    );
+    expect(sentry).not.toContain('SENTRY_ORG:\n        required: true');
+  });
+
+  it('keeps cost and main-health observers strict, deduplicated, and bounded', () => {
+    const cost = readFileSync(costAnomalyWorkflowPath, 'utf8');
+    const monitor = readFileSync(mainHealthWorkflowPath, 'utf8');
+    const evaluator = readFileSync(mainHealthActionPath, 'utf8');
+
+    expect(cost).toContain("cron: '*/15 * * * *'");
+    expect(cost).toContain('name: Production – jovie');
+    expect(cost).toContain('curl --fail --silent --show-error');
+    expect(cost).toContain('gh label create cost-monitoring --force');
+    expect(cost).toContain('GH_REPO: ${{ github.repository }}');
+    expect(cost).toContain('INCIDENT_TITLE="[Cost Anomaly]');
+    expect(cost).toContain('should_notify=false');
+    expect(cost).not.toContain('DRY_RUN');
+    expect(monitor).toContain('group: main-ci-health-monitor');
+    expect(monitor).toContain('main-ci-health-alert-$ALERT_KEY');
+    expect(monitor).toContain('main-ci-rerun-request-${FAILED_RUN_ID}');
+    expect(monitor).toContain('gh run rerun "$FAILED_RUN_ID" --failed');
+    expect(evaluator).toContain("default: '5'");
+    expect(evaluator).toContain('failingRunAttempt === 1');
+    expect(evaluator).toContain('failingRunAttempt < 2');
+    expect(evaluator).toContain('repair_state_unavailable');
+  });
+
+  it('recovers a failed controller only once and skips obsolete fanout', () => {
+    const health = readFileSync(productionControllerHealthPath, 'utf8');
+    const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
+
+    expect(health).toContain("cron: '*/15 * * * *'");
+    expect(controller).toContain(
+      'run-name: Production Controller ${{ github.event.workflow_run.head_sha }} from CI'
+    );
+    expect(health).toContain('.display_title == $title');
+    expect(health.match(/GH_REPO: \${{ github\.repository }}/g)).toHaveLength(
+      2
+    );
+    expect(health).toContain('event-delivery grace');
+    expect(health).toContain('[ "$source_ci_attempt" -ge 2 ]');
+    expect(health).toContain('.id == $id and .run_attempt == 1');
+    expect(health).toContain('gh run rerun "$source_ci_id"');
+    expect(health).toContain(
+      'Could not resolve exact main at the CI event-replay boundary'
+    );
+    expect(health).toContain('[ "$run_attempt" -ge 2 ]');
+    expect(health).toContain('gh run rerun "$run_id" --failed');
+    expect(health).toContain('gh run rerun "$run_id"');
+    expect(health).toContain('needs_manual=true');
+    expect(health).toContain(
+      'runs/$run_id/attempts/$run_attempt/jobs?per_page=100'
+    );
+    expect(health).toContain('endswith("Centralized production rollback")');
+    expect(health).toContain('(.status == "completed")');
+    expect(health).toContain('(.conclusion == "skipped")');
+    expect(health).toContain('recovery_reason=terminal_rollback');
+    expect(health).toContain('this controller attempt is terminal');
+    expect(health).toContain('It must not be rerun');
+    expect(health.indexOf('rollback_jobs="$(jq -c')).toBeLessThan(
+      health.indexOf('gh run rerun "$run_id" --failed')
+    );
+    expect(reusable).toContain(
+      'Could not resolve exact main at the release-result boundary'
+    );
+    expect(reusable).toContain('before post-deploy fanout; neutral');
+    expect(controller).toContain(
+      'Ignoring marker from incomplete or unsuccessful controller run'
+    );
+    expect(controller).toContain(
+      'Ignoring marker with invalid exact-generation content'
+    );
+    expect(controller).toContain('actions/artifacts/$marker_artifact_id/zip');
+    expect(controller).toContain(
+      'Authenticated smoke was skipped because no complete credential pair is configured'
+    );
+    expect(controller).toContain('credentials_configured=false');
   });
 });

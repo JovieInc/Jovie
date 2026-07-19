@@ -34,7 +34,7 @@ concurrency:
 jobs:
   audit:
     name: Regenerate coverage heatmap
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: write

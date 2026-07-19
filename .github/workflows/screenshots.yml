@@ -39,7 +39,7 @@ concurrency:
 jobs:
   generate:
     name: Generate Screenshots
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
       contents: read

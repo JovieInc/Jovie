@@ -430,7 +430,7 @@ describe('Neon endpoint admission', () => {
       'utf8'
     );
 
-    expect(creatorCount).toBe(8);
+    expect(creatorCount).toBe(7);
     expect(visualWorkflow).toContain(
       'uses: ./.github/actions/neon-create-branch-with-retry'
     );

@@ -1,12 +1,8 @@
 # Visual regression for public marketing/auth surfaces + admin chrome (JOV-4060/4062).
 #
-# Two modes, one job:
-#   - compare (pull_request): runs tests/e2e/visual-regression.spec.ts against the
-#     committed baselines in apps/web/tests/e2e/__snapshots__/visual-regression.spec.ts/.
-#     Informational for now (continue-on-error) — flip to blocking once the baseline
-#     set is complete and fresh (see the follow-up issue linked in the PR that added
-#     this workflow). Diff artifacts upload on failure.
-#   - refresh (push:main / schedule / dispatch): re-runs the suite with
+# Scheduled/manual baseline refresh. Source PR visual work is covered by the
+# deterministic queue Build + Layout gate; screenshot comparison stays off the
+# source and merge-queue runner paths. This workflow re-runs the suite with
 #     --update-snapshots and opens/updates a single auto-PR when baselines change
 #     (same JOVIE_BOT + merge-queue pattern as screenshots.yml). This is what heals
 #     the currently stale/missing baseline set without a human in the loop.
@@ -16,39 +12,6 @@
 name: Visual Regression
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'apps/web/app/(marketing)/**'
-      - 'apps/web/app/(home)/**'
-      - 'apps/web/app/(auth)/**'
-      - 'apps/web/app/layout.tsx'
-      - 'apps/web/app/globals.css'
-      - 'apps/web/components/**'
-      - 'apps/web/features/**'
-      - 'apps/web/styles/**'
-      - 'apps/web/tailwind.config.*'
-      - 'packages/ui/**'
-      - 'apps/web/tests/e2e/visual-regression.spec.ts'
-      - 'apps/web/tests/e2e/admin-visual-regression.spec.ts'
-      - 'apps/web/tests/e2e/__snapshots__/visual-regression.spec.ts/**'
-      - '.github/workflows/visual-regression.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'apps/web/app/(marketing)/**'
-      - 'apps/web/app/(home)/**'
-      - 'apps/web/app/(auth)/**'
-      - 'apps/web/app/layout.tsx'
-      - 'apps/web/app/globals.css'
-      - 'apps/web/components/**'
-      - 'apps/web/features/**'
-      - 'apps/web/styles/**'
-      - 'apps/web/tailwind.config.*'
-      - 'packages/ui/**'
-      - 'apps/web/tests/e2e/visual-regression.spec.ts'
-      - 'apps/web/tests/e2e/admin-visual-regression.spec.ts'
-      - '.github/workflows/visual-regression.yml'
   schedule:
     # Daily catch-up so baselines never drift more than a day behind main.
     - cron: '0 10 * * *'
@@ -57,14 +20,12 @@ on:
 permissions: {}
 
 concurrency:
-  group: visual-regression-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'baseline-refresh' }}
+  group: visual-regression-baseline-refresh
   cancel-in-progress: true
 
 jobs:
   visual-regression:
-    name: Visual Regression (${{ github.event_name == 'pull_request' && 'compare' || 'baseline refresh' }})
-    # Fork PRs are excluded (no secrets). Dependabot PRs are excluded (no Neon access).
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login != 'dependabot[bot]') }}
+    name: Visual Regression (baseline refresh)
     environment: Preview – jovie
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -72,7 +33,7 @@ jobs:
       actions: read
       contents: read
     env:
-      REFRESH_MODE: ${{ github.event_name != 'pull_request' && 'true' || 'false' }}
+      REFRESH_MODE: 'true'
       SNAPSHOT_DIR: apps/web/tests/e2e/__snapshots__
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
@@ -144,8 +105,8 @@ jobs:
 
       - name: Run visual regression suite
         id: visual
-        # Informational on PRs until the baseline set is complete — see workflow header.
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        # Scheduled/manual deep evidence only; source PRs and merge groups never
+        # provision this secret-bound Neon + Playwright lane.
         run: |
           cd apps/web
 
@@ -191,8 +152,8 @@ jobs:
           node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/visual-regression.spec.ts \
             --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
 
-          # Admin surfaces (JOV-4062) — same server, refresh heals stale admin baselines.
-          # Compare stays informational with the public suite (continue-on-error on PRs).
+          # Admin surfaces (JOV-4062) — the same refresh server heals stale
+          # admin baselines only after functional assertions pass.
           E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=admin \
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/admin-visual-regression.spec.ts \
             --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
@@ -300,7 +261,7 @@ jobs:
           else
             PR_URL=$(gh pr create \
               --title "chore: refresh visual regression baselines" \
-              --body "Auto-generated baseline refresh triggered by ${GITHUB_SHA::8}. Generated on ubuntu-latest + Chromium (pinned via pnpm), same environment the compare lane runs in.")
+              --body "Auto-generated scheduled/manual baseline refresh triggered by ${GITHUB_SHA::8}. Generated on ubuntu-latest + Chromium (pinned via pnpm).")
             gh pr edit --add-label "merge-queue" "$PR_URL" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
           fi
 
@@ -320,8 +281,3 @@ jobs:
           pnpm dlx neonctl branches delete "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" || {
             echo "Branch '$BRANCH_NAME' not found or already deleted; ignoring." >&2
           }
-
-      - name: Surface compare outcome (PR only)
-        if: github.event_name == 'pull_request' && steps.visual.outcome == 'failure'
-        run: |
-          echo "::warning::Visual regression compare failed — informational for now. Download the visual-regression-report artifact to inspect diffs. This lane flips to blocking once the baseline set is complete."

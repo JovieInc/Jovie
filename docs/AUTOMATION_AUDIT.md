@@ -75,30 +75,50 @@ These routes exist in the codebase but have **no entry in `vercel.json`**. They 
 
 ## 2. Agent Workflow Registry
 
+Declared YAML triggers describe workflow capability, not the repository's live
+GitHub enablement state. During the PR-drain rollout, enable only **Merge Queue
+Auto-Enroll** and **Auto-Ready Agent Drafts** first. Enable **Main CI Health
+Monitor** and **Main Autofix** only after the staged queue and production path
+have produced bounded proof. Keep **GitHub AI Orchestrator**, **Agent Pipeline**,
+**PR Conflict Handler**, **Agent Tick**, **Stuck Draft Auto-Close**, **Auto-Fix
+Lint on Agent Drafts**, **Taste Classifier**, **Taste Label Guard**, **Auto-PR on
+Agent Push**, and the legacy **Release Loop** disabled throughout the drain. The new **Production
+Controller**, **Production Controller Health**, and **Production Release**
+workflows are intended to register active on land; verify that state explicitly
+before treating production delivery as continuous. Merging workflow files does
+not re-enable an existing disabled workflow. At rollout preparation, GitHub AI
+Orchestrator workflow ID `306926687` was verified `disabled_manually`. Runner
+Health Monitor workflow ID `307794302` was verified `disabled_manually` after
+the legacy repository-variable mutation failed with HTTP 403; keep it disabled
+until the observer-only definition lands and is proven.
+
 ### GitHub Actions — Agent/Automation Workflows
 
 | Workflow | File | Trigger | What It Does | Usage Pattern | Recommendation |
 |----------|------|---------|--------------|--------------|----------------|
-| **GitHub AI Orchestrator** | `github-ai-orchestrator.yml` | GitHub issue receives `agent-ready` + `workflow_dispatch` replay | Implements one eligible GitHub issue, pushes a branch, and opens a PR; capacity-gated at 5 open agent PRs | Event-driven | **Keep** — current issue-to-PR implementation loop |
+| **GitHub AI Orchestrator** | `github-ai-orchestrator.yml` | GitHub issue receives `agent-ready` + `workflow_dispatch` replay | Implements one eligible GitHub issue, pushes a branch, and opens a PR; capacity-gated at 5 open agent PRs | Verified `disabled_manually` (workflow ID `306926687`) at rollout preparation | **Keep disabled during drain** — do not admit new agent work while draining existing PRs |
 | **GitHub AI Dispatcher** | `github-ai-dispatcher.yml` | `workflow_dispatch` only | Scans `agent-ready` GitHub issues and dispatches bounded orchestrator replays | Manual recovery | **Manual-only** — no active polling schedule |
 | **Linear AI Dispatcher** | retired (workflow removed) | none | Legacy scheduled Linear polling loop | none | **Retired** — no active `linear-ai-dispatcher.yml` exists |
 | **Hermes CLI Worker** | `hermes-cli-worker.yml` | `repository_dispatch` (`hermes_cli_worker`) + `workflow_dispatch` | Runs a self-hosted CLI worker (codex-cli, claude-code, or ruflo) on Hermes tasks; supports kinds: investigation, bug_patch, code_review, qa, triage, support_draft | Recently shipped (PR #8092); triggered on-demand | **Keep — enable if self-hosted runner is ready** — requires `[self-hosted, hermes]` runner. Verify runner is operational before routing work here. |
-| **Agent Pipeline** | `agent-pipeline.yml` | `workflow_run` (CI completes) | Unified: (1) fixes agent PRs after CI failures (up to 5 attempts/SHA), (2) auto-approves + enables auto-merge when all gates pass | Triggered on every agent PR CI completion | **Keep** — essential quality gate and throughput accelerator; systemic failure detection prevents runaway fix loops |
-| **Main Autofix** | `main-autofix.yml` | `workflow_run` after an unhealthy Main CI monitor + guarded `workflow_dispatch` | Runs only after CI `run_attempt >= 2` and positive proof that no exact-SHA repair owner exists; records workflow-bound ownership before fixed-runner work, counts only recent durable ownership (never healthy/skipped workflow invocation) toward cross-SHA escalation, gives orphaned markers a 30-minute consistency grace, counts cancelled/expired leases toward a 3-attempt cap, and terminally acknowledges no-PR outcomes | Event-driven after the one-shot rerun | **Keep** — bounded exact-SHA ownership prevents repair fanout, timeout loops, and permanent deadlock |
-| **Main CI Health Monitor** | `main-ci-health-monitor.yml` | `8,28,48 * * * *` UTC + manual | Detects stalled/failing main CI, issues one failed-job rerun, suppresses duplicate schedule alerts/dispatch for active or terminal exact-SHA repair, and durably deduplicates repair-state uncertainty notification | Every 20 min, hosted | **Keep** |
+| **Merge Queue Auto-Enroll** | `merge-queue-autoenroll.yml` | PR/CI/main events + manual; no schedule | Revalidates the exact current head and enrolls eligible PRs into GitHub's native merge queue | First controller enabled during drain | **Keep enabled first** — canonical queue enrollment owner |
+| **Auto-Ready Agent Drafts** | `auto-ready-agent-drafts.yml` | PR/CI events + manual; no schedule | Promotes only the exact current draft head after canonical source gates pass | First controller enabled during drain | **Keep enabled first** — canonical draft promotion owner |
+| **Agent Pipeline** | `agent-pipeline.yml` | `workflow_run` (CI completes) | Unified: (1) fixes agent PRs after CI failures (up to 5 attempts/SHA), (2) auto-approves + enables auto-merge when all gates pass | Disabled throughout drain; trigger is declarative only | **Keep disabled during drain** — avoid a second repair/enrollment owner |
+| **Main Autofix** | `main-autofix.yml` | `workflow_run` after an unhealthy Main CI monitor + guarded `workflow_dispatch` | Runs only after CI `run_attempt >= 2` and positive proof that no exact-SHA repair owner exists; records workflow-bound ownership before fixed-runner work, counts only recent durable ownership (never healthy/skipped workflow invocation) toward cross-SHA escalation, gives orphaned markers a 30-minute consistency grace, counts cancelled/expired leases toward a 3-attempt cap, and terminally acknowledges no-PR outcomes | Disabled initially; enable only after queue/production proof | **Activation-gated** — bounded exact-SHA ownership prevents repair fanout, timeout loops, and permanent deadlock |
+| **Main CI Health Monitor** | `main-ci-health-monitor.yml` | Declared `8,28,48 * * * *` UTC + manual | Detects stalled/failing main CI, issues one failed-job rerun, suppresses duplicate schedule alerts/dispatch for active or terminal exact-SHA repair, and durably deduplicates repair-state uncertainty notification | Disabled initially; enable with Main Autofix after proof | **Activation-gated** |
+| **Runner Health Monitor** | `runner-health-monitor.yml` | Declared every 10 minutes + manual | Hosted read-only Runner Heartbeat observer; CI selects fixed or hosted unit capacity per run and never waits for repository-variable mutation | Verified `disabled_manually` (workflow ID `307794302`) after legacy HTTP 403 | **Re-enable only after observer-only proof** |
 | **Sentry Autofix** | `sentry-autofix.yml` | `repository_dispatch` (`sentry-issue`) | Receives Sentry error payload, calls Claude Code to fix root cause, opens auto-merge PR with dedup | Event-driven; fires when Sentry webhook delivers | **Keep** — directly compounds product stability KPI |
 | **Nightly Tests** | `nightly-tests.yml` | `30 23 * * *` America/Los_Angeles + manual | Runs Knip dead-code audit, full unit test suite, E2E suite (including Design V1 canary and full-surface chaos), Slack alerts on failure | Daily; at least a 90-minute buffer before the 09:00 UTC screenshot/Tuesday harness lanes | **Keep** — only place full E2E and dead-code audits run; flags regressions before they compound |
 | **Nightly Testing Agent** | `nightly-testing-agent.yml` | Scheduled `30 4 * * *` PT | Risk-ranked target selection, unit telemetry normalization, Stryker mutation hotspots, commits `docs/NIGHTLY_TESTING_AGENT_REPORT.md`, publishes Redis ops snapshot for `/app/admin/ops` | Daily | **Keep** — deterministic, LLM-free regression intelligence loop (JOV-1870) |
 | **Synthetic Monitoring** | `synthetic-monitoring.yml` | Every 6 hours + manual dispatch | Front-door, Better Auth production account, onboarding, and public-profile canaries against `jov.ie`; the account canary creates one exact throwaway identity and transactionally proves zero residue | Independent production health lane | **Keep** — isolated from the retired Agent Tick monolith and outside deploy-blocking CI |
-| **Cost Anomaly Gate** | `cost-anomaly-gate.yml` | `workflow_dispatch` only | Dry-run/anomaly evaluation and optional rollback path | Dormant as continuous monitoring while Sentry query credentials are unavailable | **Manual-only** — it is not an active schedule or continuous defense |
+| **Cost Anomaly Gate** | `cost-anomaly-gate.yml` | Declared `*/15 * * * *` UTC + manual | Alert-only Sentry event-volume observer; opens one deduplicated incident and never mutates production | Every 15 minutes only when the workflow is explicitly enabled and Production secrets resolve | **Keep activation-gated** — verify workflow state and secrets before relying on continuous coverage |
 | **Linear Sync on Merge** | `linear-sync-on-merge.yml` | `pull_request` (closed) | Extracts Linear issue marker from merged PR, transitions issue to Done, posts merge SHA comment | Per-merge | **Keep** — closes the Linear state loop for all merged PRs, not just agent ones |
-| **Auto-PR on Agent Push** | `auto-pr-on-push.yml` | `push` to `codex/**`, `codegen-bot/**`, `linear/**`, `claude/**`, `*/jov-**` | Creates draft PR when agent pushes branch without an existing PR; extracts Linear ticket ID | Per-push | **Keep** — closes the gap where agents push but leave no PR |
+| **Auto-PR on Agent Push** | `auto-pr-on-push.yml` | `push` to `codex/**`, `codegen-bot/**`, `linear/**`, `claude/**`, `*/jov-**` | Creates draft PR when agent pushes branch without an existing PR; extracts Linear ticket ID | Disabled throughout drain; trigger is declarative only | **Keep disabled during drain** — avoids admitting new work while draining the queue |
 | **Agent PR Verify Ready** | retired (workflow disabled and removed) | none | Duplicated source-PR verification and promoted drafts from stale event runs | none | **Retired** — canonical `CI / PR Ready` plus the current-head Auto-Ready controller own this transition without a second CI fanout |
 | **Auto-Resolve Conflicts** | retired (workflow disabled and removed) | none | Merged `main` into PR branches from label events | none | **Retired** — conflict remediation uses the exact-head GitHub Update Branch `REBASE` path; no automatic merge commit or force-push controller remains |
 | **Neon Scheduled Cleanup** | `neon-scheduled-cleanup.yml` | `workflow_dispatch` only | Cleans up orphaned Neon ephemeral branches from E2E / nightly runs | Manual | **Manual-only** — no active schedule |
 | **Neon Ephemeral Branch Cleanup** | `neon-ephemeral-branch-cleanup.yml` | Event-driven (PR close) | Deletes Neon branch created for a PR when PR closes | Per-PR close | **Keep** |
 | **Periodic Evals** | `evals-periodic.yml` | `workflow_dispatch` with typed `RUN_LIVE_EVALS` confirmation | Runs legacy live LLM eval tests; builds Docker image | Manual-only, concurrency 1 | **Keep manual-only** — no scheduled live-eval spend; verify coverage before any scheduled trigger returns |
-| **CI** | `ci.yml` | `push`/`pull_request` + merge queue | Main CI pipeline: build, typecheck, lint, tests, deploy staging, canary health gate, promote production | Per-PR and per-push | **Keep** |
+| **CI** | `ci.yml` | source PR, native `merge_group`, `main`, and explicit manual dispatch | Source fast gate; exact combined-head integration; queue-proof reuse or direct-main fallback; release-readiness handoff to the production controller | Stage-specific | **Keep** — production mutation is owned outside CI by the fixed controller lease |
 | **Sentry Error Gate** | `sentry-error-gate.yml` | Reusable `workflow_call` | 5-minute soak watching Sentry for error spikes post-deploy; triggers rollback if spike detected | Called by deploy flow | **Keep** |
 | **Canary Health Gate** | `canary-health-gate.yml` | Reusable `workflow_call` | Verifies staging health before production promotion | Called by CI deploy flow | **Keep** |
 | **CodeQL** | `codeql.yml` | `push: main`, `36 5 * * *` UTC, manual | GitHub-native static analysis security scan | Post-merge + nightly | **Keep** |
@@ -182,9 +202,13 @@ There is no workflow that reports the weekly health of the agent pipeline itself
 
 **Lead discovery in `frequent` is the highest-risk recurring cost.** If `leadPipelineSettings.enabled` is `true` in production, SerpAPI is called on every 15-minute tick (96 calls/day). SerpAPI charges per search. Verify the gate is `false` while GTM is paused. When GTM resumes, document the expected SerpAPI call volume and cost per 1,000 users in the PR that re-enables it.
 
-### No new recurring costs introduced
+### Activation and recurring-cost boundary
 
-This audit is read-only. No automations were added, modified, or enabled.
+This document does not enable workflows. The topology changes modify declared
+workflow behavior, but repository enablement remains an explicit operator step.
+No new model-spend loop is introduced; hosted schedules and production
+controllers must be verified against their documented activation gates before
+their recurring usage is treated as live.
 
 ### Cost Impact for any new automation ideas
 

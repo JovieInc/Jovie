@@ -5,7 +5,10 @@ import { describe, expect, it } from 'vitest';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
-const ciWorkflowPath = resolve(repoRoot, '.github/workflows/ci.yml');
+const productionReleaseWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/production-release.yml'
+);
 const securityWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/security.yml'
@@ -56,7 +59,7 @@ function getJobBlock(workflow: string, jobKey: string): string {
 
 describe('supply chain provenance guardrails', () => {
   it('attests deploy-staging build output with SLSA provenance after vercel build', () => {
-    const workflow = readFileSync(ciWorkflowPath, 'utf8');
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const deployJob = getJobBlock(workflow, 'deploy-staging');
     const buildStep = getStepBlock(
       workflow,
@@ -126,10 +129,13 @@ describe('supply chain provenance guardrails', () => {
     expect(verifyStep).toContain('::warning title=Unsigned commit::');
   });
 
-  it('requires signed commits on main in the branch protection ruleset source', () => {
+  it('keeps commit signing audit-only until an explicit live cutover', () => {
     const ruleset = readFileSync(branchProtectionPath, 'utf8');
 
-    expect(ruleset).toContain("type: 'required_signatures'");
+    expect(ruleset).not.toMatch(
+      /^\s*-\s*type:\s*['"]required_signatures['"]\s*$/m
+    );
+    expect(ruleset).toContain('Dormant rules are intentionally absent');
     expect(ruleset).toContain("include:\n      - 'refs/heads/main'");
   });
 });

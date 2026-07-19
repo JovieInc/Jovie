@@ -1,0 +1,1171 @@
+name: Production Release
+
+on:
+  workflow_call:
+    inputs:
+      expected_sha:
+        description: Exact current main SHA authorized for release.
+        required: true
+        type: string
+    outputs:
+      released:
+        description: Whether this SHA reached and passed production rollback gates.
+        value: ${{ jobs.release-result.outputs.released }}
+      production_deployment_id:
+        description: Exact Vercel production deployment ID.
+        value: ${{ jobs.release-result.outputs.production_deployment_id }}
+      production_deployment_url:
+        description: Exact immutable Vercel production deployment URL.
+        value: ${{ jobs.release-result.outputs.production_deployment_url }}
+      previous_production_deployment_id:
+        description: Exact deployment ID that was canonical before promotion.
+        value: ${{ jobs.release-result.outputs.previous_production_deployment_id }}
+      previous_production_deployment_url:
+        description: Immutable URL that was canonical before promotion.
+        value: ${{ jobs.release-result.outputs.previous_production_deployment_url }}
+      schema_drift:
+        description: Whether post-migration schema verification drifted.
+        value: ${{ jobs.release-result.outputs.schema_drift }}
+      failure_subtype:
+        description: Production promotion failure classification.
+        value: ${{ jobs.release-result.outputs.failure_subtype }}
+      sentry_gate_status:
+        description: Final observational Sentry gate status.
+        value: ${{ jobs.release-result.outputs.sentry_gate_status }}
+      oauth_gate_status:
+        description: Final observational OAuth gate status.
+        value: ${{ jobs.release-result.outputs.oauth_gate_status }}
+
+permissions:
+  contents: read
+  actions: read
+  attestations: write
+  id-token: write
+
+jobs:
+  release-head:
+    name: Check current main before release
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      is_current: ${{ steps.head.outputs.is_current }}
+    steps:
+      - name: Resolve current main HEAD
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::expected_sha must be a full commit SHA."
+            exit 1
+          }
+          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::GitHub returned an invalid main HEAD."
+            exit 1
+          }
+          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha before lease work began."
+            echo "is_current=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy-staging:
+    needs: [release-head]
+    # The caller owns the single release lease. A superseded SHA is neutral.
+    if: ${{ always() && needs.release-head.result == 'success' && needs.release-head.outputs.is_current == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      actions: read
+      # Required for SLSA build-provenance attestation
+      attestations: write
+      id-token: write
+    outputs:
+      migration_status: ${{ steps.migrate.outcome }}
+      preflight_status: ${{ steps.preflight.outcome }}
+      # Note: if deploy is cancelled before verify completes, outcome is '' (not 'failure'),
+      # so no drift warning fires. This is acceptable — the cancelled deploy didn't ship.
+      schema_drift: ${{ steps.verify.outcome == 'failure' }}
+      deploy_url: ${{ steps.deploy.outputs.deploy_url }}
+      deploy_url_b64: ${{ steps.encode_deploy_url.outputs.deploy_url_b64 }}
+    environment:
+      name: Staging – jovie
+      url: https://staging.jov.ie
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+      - uses: ./.github/actions/setup-node-pnpm
+      # Main deploys to staging with the isolated Doppler `stg` service token.
+      # Doppler owns runtime config; GitHub owns the existing Vercel control-plane
+      # credentials used only to pull, deploy, and alias the staging build.
+      - uses: ./.github/actions/setup-doppler
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN_STG }}
+      - name: Configure staging deployment credentials
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          # Write after setup-doppler so a runtime config cannot override the
+          # repository-scoped deployment identity for later Vercel CLI steps.
+          {
+            printf 'VERCEL_TOKEN=%s\n' "$VERCEL_TOKEN"
+            printf 'VERCEL_ORG_ID=%s\n' "$VERCEL_ORG_ID"
+            printf 'VERCEL_PROJECT_ID=%s\n' "$VERCEL_PROJECT_ID"
+          } >> "$GITHUB_ENV"
+      - name: Verify staging deploy control-plane credentials
+        shell: bash
+        run: |
+          missing=()
+          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("$key")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing required staging deployment credentials: ${missing[*]}"
+            exit 1
+          fi
+      - name: Cancel stale Vercel preview deployments
+        run: node .github/scripts/cancel-stale-vercel-previews.mjs
+      - name: DB safety check (staging preflight)
+        id: preflight
+        run: pnpm --filter=@jovie/web exec tsx scripts/drizzle-migrate-preflight.ts
+        env:
+          GIT_BRANCH: main
+          ALLOW_PROD_MIGRATIONS: 'true'
+      - name: DB migrate (staging - Drizzle)
+        id: migrate
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          GIT_BRANCH: main
+          ALLOW_PROD_MIGRATIONS: 'true'
+        continue-on-error: false
+      - name: DB verify (post-migration schema check)
+        id: verify
+        run: pnpm --filter=@jovie/web run drizzle:verify:ci
+        # Blocks deploy by default — missing columns = broken staging.
+        # To bypass in emergencies, include [skip-schema-verify] in the
+        # merge commit message. The Slack drift notification in deploy-notify
+        # fires when verify fails but deploy proceeds (bypass alert).
+        continue-on-error: ${{ contains(github.event.head_commit.message, '[skip-schema-verify]') }}
+      - name: Pull env (staging preview)
+        # Always pull project metadata/env; the deploy CLI reads
+        # .vercel/project.json even for prebuilt deploys.
+        timeout-minutes: 10
+        run: |
+          scope_args=()
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then
+            scope_args=(--scope "$VERCEL_ORG_ID")
+          fi
+          for i in {1..3}; do
+            if ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+              break
+            fi
+            echo "Vercel pull attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ $i -eq 3 ]; then exit 1; fi
+          done
+      - name: Strip deprecated Turbo env overrides (staging preview)
+        run: |
+          for env_file in .vercel/.env.preview.local .vercel/.env.local; do
+            if [ -f "$env_file" ]; then
+              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
+              mv "${env_file}.tmp" "$env_file"
+            fi
+          done
+      - name: Check signup readiness (staging deploy env)
+        run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=stg --source=env
+      - name: Build (preview target for staging verification)
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          scope_args=()
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then
+            scope_args=(--scope "$VERCEL_ORG_ID")
+          fi
+          for i in {1..3}; do
+            if env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+              break
+            fi
+            echo "Vercel build attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ $i -eq 3 ]; then exit 1; fi
+          done
+          # Vercel's function trace references the generated robots response at
+          # its public-file path even though the source route is app/robots.ts.
+          test -f apps/web/.next/server/app/robots.txt.body
+          cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt
+          printf '%s\n' 'apps/web/public/robots.txt' \
+            > .vercel/jovie-generated-public-files
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+          COREPACK_ENABLE_STRICT: 0
+          VERCEL_GIT_COMMIT_SHA: ${{ inputs.expected_sha }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
+      - name: Package build output for provenance attestation
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/vercel-build-output.tar.gz -C . .vercel/output
+      - name: Attest build provenance (SLSA Level 2)
+        id: attest
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: /tmp/vercel-build-output.tar.gz
+          # ponytail: attests the vercel build output; attestation is SLSA L2 (hosted
+          # runner + signed provenance). L3 requires hermetic build — upgrade when
+          # Vercel builds become reproducible/isolated.
+      - name: Deploy (staging preview, prebuilt)
+        timeout-minutes: 10
+        id: deploy
+        run: |
+          required_runtime_env=(
+            VERCEL_AUTOMATION_BYPASS_SECRET
+            NEXT_PUBLIC_BETTER_AUTH_URL
+            BETTER_AUTH_SECRET
+            BETTER_AUTH_URL
+            DATABASE_URL
+            SESSION_SECRET
+            AI_GATEWAY_API_KEY
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY
+            TURNSTILE_SECRET_KEY
+          )
+
+          missing_runtime_env=()
+          for key in "${required_runtime_env[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              missing_runtime_env+=("$key")
+            fi
+          done
+
+          if [ "${#missing_runtime_env[@]}" -gt 0 ]; then
+            echo "Missing staging preview runtime env: ${missing_runtime_env[*]}"
+            exit 1
+          fi
+
+          for i in {1..3}; do
+            if bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
+              --env VERCEL_AUTOMATION_BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET}" \
+              --env NEXT_PUBLIC_BETTER_AUTH_URL="${NEXT_PUBLIC_BETTER_AUTH_URL}" \
+              --env BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET}" \
+              --env BETTER_AUTH_URL="${BETTER_AUTH_URL}" \
+              --env DATABASE_URL="${DATABASE_URL}" \
+              --env SESSION_SECRET="${SESSION_SECRET}" \
+              --env AI_GATEWAY_API_KEY="${AI_GATEWAY_API_KEY}" \
+              --env NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY}" \
+              --env TURNSTILE_SECRET_KEY="${TURNSTILE_SECRET_KEY}"; then
+              break
+            fi
+            echo "Vercel deploy attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ $i -eq 3 ]; then exit 1; fi
+          done
+        env:
+          VERCEL_GIT_COMMIT_SHA: ${{ inputs.expected_sha }}
+          # The closed staging artifact contains more than Vercel's 15k plain
+          # upload limit. Give the archive path the full prebuilt budget.
+          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'false'
+          # The in-job prebuilt artifact is the thing canary verifies. A source
+          # fallback would silently discard it and repeat the slow server build.
+          VERCEL_ENABLE_SOURCE_FALLBACK: 'false'
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
+
+      - name: Wait for staging deployment readiness
+        timeout-minutes: 21
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
+        run: |
+          inspect_wait_status=0
+          ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
+            --wait \
+            --timeout 20m \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID" || inspect_wait_status=$?
+          deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
+            --format=json \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID")"
+          deployment_state="$(jq -r '(.readyState // .state // .status // "unknown") | ascii_upcase' \
+            <<<"$deployment_json")"
+          echo "Current deployment state: $deployment_state"
+          case "$deployment_state" in
+            READY)
+              ;;
+            BUILDING|QUEUED|INITIALIZING)
+              echo "::warning::Vercel is still $deployment_state after readiness wait (status $inspect_wait_status); handing off to retrying canary."
+              ;;
+            *)
+              echo "::error::Vercel deployment entered terminal state $deployment_state."
+              exit 1
+              ;;
+          esac
+
+      - name: Encode deployment URL for downstream jobs
+        id: encode_deploy_url
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
+        run: |
+          printf 'deploy_url_b64=%s\n' "$(printf '%s' "$DEPLOYMENT_URL" | base64 | tr -d '\n')" \
+            >> "$GITHUB_OUTPUT"
+
+  canary-health-gate:
+    name: Canary Health Gate (staging)
+    needs: [deploy-staging]
+    if: ${{ always() && needs.deploy-staging.result == 'success' }}
+    uses: ./.github/workflows/canary-health-gate.yml
+    with:
+      # Verify the exact deployment produced by deploy-staging instead of the
+      # shared staging alias. Merge-queue traffic can retarget staging.jov.ie
+      # while this gate is still retrying, which produces false negatives even
+      # when the freshly deployed preview is healthy.
+      deployment_url_b64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
+      commit_sha: ${{ inputs.expected_sha }}
+      fallback_health_url: /api/health
+    secrets:
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  staging-head:
+    name: Recheck main before staging alias
+    needs: [deploy-staging, canary-health-gate]
+    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      is_current: ${{ steps.head.outputs.is_current }}
+    steps:
+      - name: Resolve current main HEAD
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::GitHub returned an invalid main HEAD before staging alias."
+            exit 1
+          }
+          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha before staging alias."
+            echo "is_current=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  alias-staging:
+    name: Alias verified preview to staging.jov.ie
+    needs: [deploy-staging, canary-health-gate, staging-head]
+    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.staging-head.result == 'success' && needs.staging-head.outputs.is_current == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      is_current: ${{ steps.head.outputs.is_current }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Recheck main immediately before staging alias
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::GitHub returned an invalid main HEAD at staging alias."
+            exit 1
+          }
+          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha at staging alias."
+            echo "is_current=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Alias verified deployment
+        if: ${{ steps.head.outputs.is_current == 'true' }}
+        env:
+          DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
+          test -n "$deployment_url"
+          ./node_modules/.bin/vercel alias set "$deployment_url" staging.jov.ie \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID"
+
+  production-head:
+    name: Recheck main before production mutation
+    needs: [alias-staging]
+    if: ${{ always() && needs.alias-staging.result == 'success' && needs.alias-staging.outputs.is_current == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      is_current: ${{ steps.head.outputs.is_current }}
+    steps:
+      - name: Resolve current main HEAD
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::GitHub returned an invalid main HEAD before production mutation."
+            exit 1
+          }
+          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha before production mutation."
+            echo "is_current=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  promote-production:
+    name: Promote to Production
+    needs: [deploy-staging, canary-health-gate, alias-staging, production-head]
+    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: Production – jovie
+      url: https://jov.ie
+    outputs:
+      # Emitted when promote-production exits non-zero so deploy-notify can
+      # distinguish silent-no-op regressions from generic promote failures.
+      # Values distinguish production artifact, promotion state, and canonical
+      # alias convergence failures for deploy-notify and Gem diagnosis.
+      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.stage-production.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype }}
+      production_deployment_id: ${{ steps.stage-production.outputs.production_deployment_id }}
+      production_deployment_url: ${{ steps.stage-production.outputs.production_deployment_url }}
+      previous_production_deployment_id: ${{ steps.promote.outputs.previous_production_deployment_id }}
+      previous_production_deployment_url: ${{ steps.promote.outputs.previous_production_deployment_url }}
+      # The build may run for up to 30 minutes. Only the final pre-promote
+      # observation owns supersession semantics for downstream/result jobs.
+      is_current: ${{ steps.promote.outputs.is_current }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+      - uses: ./.github/actions/setup-node-pnpm
+      # Production runtime config comes from the isolated Doppler `prd`
+      # service token. Vercel remains the deployment control plane only.
+      - uses: ./.github/actions/setup-doppler
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN_PRD }}
+      - name: Configure production deployment credentials
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("$key")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing required production deployment credentials: ${missing[*]}"
+            exit 1
+          fi
+
+          # Write after setup-doppler so runtime config cannot override the
+          # repository-scoped deployment identity used by Vercel CLI steps.
+          {
+            printf 'VERCEL_TOKEN=%s\n' "$VERCEL_TOKEN"
+            printf 'VERCEL_ORG_ID=%s\n' "$VERCEL_ORG_ID"
+            printf 'VERCEL_PROJECT_ID=%s\n' "$VERCEL_PROJECT_ID"
+          } >> "$GITHUB_ENV"
+      - name: Verify production domains are on canonical Vercel project
+        id: domain-guard
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if ! node .github/scripts/verify-vercel-production-domains.mjs; then
+            echo "failure_subtype=domain_project_mismatch" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+      - name: Recheck main immediately before production mutation
+        id: mutation-head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::GitHub returned an invalid main HEAD at production mutation."
+            exit 1
+          }
+          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha at production mutation."
+            echo "is_current=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build and stage production deployment
+        id: stage-production
+        if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
+        timeout-minutes: 30
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          set -euo pipefail
+
+          fail_stage() {
+            echo "::error::$1"
+            echo "failure_subtype=$2" >> "$GITHUB_OUTPUT"
+            exit 1
+          }
+
+          missing=()
+          for key in EXPECTED_SHA VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!key:-}" ]; then
+              missing+=("$key")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            fail_stage "Missing production deployment inputs: ${missing[*]}" missing_creds
+          fi
+
+          required_runtime_env=(
+            NEXT_PUBLIC_BETTER_AUTH_URL
+            BETTER_AUTH_SECRET
+            DATABASE_URL
+            SESSION_SECRET
+            AI_GATEWAY_API_KEY
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY
+            TURNSTILE_SECRET_KEY
+          )
+          missing_runtime_env=()
+          runtime_env_args=()
+          for key in "${required_runtime_env[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              missing_runtime_env+=("$key")
+            else
+              runtime_env_args+=(--env "${key}=${!key}")
+            fi
+          done
+          if [ "${#missing_runtime_env[@]}" -gt 0 ]; then
+            fail_stage "Missing production runtime env: ${missing_runtime_env[*]}" production_artifact_failed
+          fi
+
+          expected="${EXPECTED_SHA:0:7}"
+          scope_args=(--scope "$VERCEL_ORG_ID")
+          rm -rf .vercel/output .vercel/.env.preview.local .vercel/.env.production.local .vercel/.env.local
+
+          if ! ./node_modules/.bin/vercel pull --yes --environment=production \
+            --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+            fail_stage "Unable to pull the Production environment." production_artifact_failed
+          fi
+
+          for env_file in .vercel/.env.production.local .vercel/.env.local; do
+            if [ -f "$env_file" ]; then
+              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
+              mv "${env_file}.tmp" "$env_file"
+            fi
+          done
+
+          if ! pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts \
+            --target=prd --source=env; then
+            fail_stage "Production signup configuration is incomplete." production_artifact_failed
+          fi
+
+          if ! env -u TURBO_REMOTE_ONLY \
+            VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA" \
+            NEXT_PUBLIC_BUILD_SHA="$expected" \
+            ./node_modules/.bin/vercel build --prod \
+              --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+            fail_stage "Production Vercel build failed." production_artifact_failed
+          fi
+          if [ ! -f .vercel/output/config.json ]; then
+            fail_stage "Production build did not create .vercel/output/config.json." production_artifact_failed
+          fi
+
+          deploy_json=""
+          if ! deploy_json="$(./node_modules/.bin/vercel deploy \
+            --prebuilt --archive=tgz --prod --skip-domain --format=json \
+            --env "VERCEL_GIT_COMMIT_SHA=${EXPECTED_SHA}" \
+            --env "NEXT_PUBLIC_BUILD_SHA=${expected}" \
+            "${runtime_env_args[@]}" \
+            --meta "githubCommitSha=${EXPECTED_SHA}" \
+            --token "$VERCEL_TOKEN" "${scope_args[@]}")"; then
+            fail_stage "Production prebuilt deployment failed." production_artifact_failed
+          fi
+          if ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$deploy_json"; then
+            fail_stage "Production deploy returned malformed JSON." production_artifact_failed
+          fi
+
+          production_deploy_id="$(jq -r '.id // .deployment.id // ""' <<<"$deploy_json")"
+          production_deploy_url="$(jq -r '.url // .deployment.url // ""' <<<"$deploy_json")"
+          if [[ "$production_deploy_url" != *://* && "$production_deploy_url" == *.vercel.app ]]; then
+            production_deploy_url="https://${production_deploy_url}"
+          fi
+          production_deploy_url="${production_deploy_url%/}"
+          if [[ "$production_deploy_id" != dpl_* ]] ||
+            [[ "$production_deploy_url" != https://*.vercel.app ]]; then
+            fail_stage "Production deploy returned an invalid deployment ID or URL." production_artifact_failed
+          fi
+          echo "Staged production deployment: ${production_deploy_id} (${production_deploy_url})"
+
+          inspect_wait_status=0
+          ./node_modules/.bin/vercel inspect "$production_deploy_id" \
+            --wait --timeout 15m --token "$VERCEL_TOKEN" "${scope_args[@]}" ||
+            inspect_wait_status=$?
+          if ! production_deploy_json="$(./node_modules/.bin/vercel inspect \
+            "$production_deploy_id" --format=json --token "$VERCEL_TOKEN" \
+            "${scope_args[@]}")" ||
+            ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$production_deploy_json"; then
+            fail_stage "Unable to inspect the staged production deployment." staged_production_not_ready
+          fi
+
+          inspected_id="$(jq -r '.id // ""' <<<"$production_deploy_json")"
+          production_deploy_state="$(jq -r \
+            '(.readyState // .state // .status // "unknown") | ascii_upcase' \
+            <<<"$production_deploy_json")"
+          production_deploy_target="$(jq -r '(.target // "") | ascii_downcase' \
+            <<<"$production_deploy_json")"
+          if [ "$inspected_id" != "$production_deploy_id" ] ||
+            [ "$production_deploy_state" != "READY" ] ||
+            [ "$production_deploy_target" != "production" ]; then
+            fail_stage "Staged production deployment is not the exact READY Production target (wait status ${inspect_wait_status})." staged_production_not_ready
+          fi
+
+          bypass_args=()
+          if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
+            bypass_args+=(-H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}")
+          fi
+          fetch_staged() {
+            local url="$1"
+            local separator="?"
+            [[ "$url" == *"?"* ]] && separator="&"
+            STAGED_RESPONSE="$(curl -sS -L --connect-timeout 5 --max-time 15 \
+              -A "Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)" \
+              -H "Cache-Control: no-cache, no-store, must-revalidate" \
+              "${bypass_args[@]}" -w "\n%{http_code}" \
+              "${url}${separator}_cb=$(date +%s%N)" \
+              2>/dev/null || printf '\n000')"
+            STAGED_STATUS="${STAGED_RESPONSE##*$'\n'}"
+            STAGED_BODY="${STAGED_RESPONSE%$'\n'*}"
+          }
+
+          fetch_staged "${production_deploy_url}/api/health/build-info"
+          staged_sha="$(printf '%s' "$STAGED_BODY" | jq -r '.commitSha // ""' 2>/dev/null || echo "")"
+          staged_environment="$(printf '%s' "$STAGED_BODY" | jq -r '.environment // ""' 2>/dev/null || echo "")"
+          if [ "$STAGED_STATUS" != "200" ] ||
+            [ "$staged_sha" != "$expected" ] ||
+            [ "$staged_environment" != "production" ]; then
+            fail_stage "Staged production build-info canary failed (HTTP ${STAGED_STATUS}, SHA ${staged_sha:-<empty>}, environment ${staged_environment:-<empty>})." staged_production_canary_failed
+          fi
+
+          fetch_staged "${production_deploy_url}/api/health"
+          staged_health="$(printf '%s' "$STAGED_BODY" | jq -r '.status // ""' 2>/dev/null || echo "")"
+          if [ "$STAGED_STATUS" != "200" ] || [ "$staged_health" != "ok" ]; then
+            fail_stage "Staged production health canary failed (HTTP ${STAGED_STATUS})." staged_production_canary_failed
+          fi
+
+          fetch_staged "${production_deploy_url}/"
+          if [ "$STAGED_STATUS" != "200" ] ||
+            [ "${#STAGED_BODY}" -lt 1000 ] ||
+            printf '%s' "$STAGED_BODY" | grep -qiE 'application error|internal server error|something went wrong'; then
+            fail_stage "Staged production homepage canary failed (HTTP ${STAGED_STATUS}, ${#STAGED_BODY} bytes)." staged_production_canary_failed
+          fi
+
+          echo "production_deployment_id=$production_deploy_id" >> "$GITHUB_OUTPUT"
+          echo "production_deployment_url=$production_deploy_url" >> "$GITHUB_OUTPUT"
+
+      - name: Recheck main immediately before production promotion
+        id: final-current
+        if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Could not resolve an exact main HEAD immediately before production promotion."
+            exit 1
+          fi
+          if [[ "$current_main_sha" != "$EXPECTED_MAIN_SHA" ]]; then
+            echo "::notice::Release $EXPECTED_MAIN_SHA was superseded by $current_main_sha after its staged production build; skipping production mutation."
+            echo "is_current=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "is_current=true" >> "$GITHUB_OUTPUT"
+
+      - name: Promote staged production deployment
+        id: promote
+        if: ${{ steps.final-current.outputs.is_current == 'true' }}
+        timeout-minutes: 15
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PRODUCTION_DEPLOYMENT_ID: ${{ steps.stage-production.outputs.production_deployment_id }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: bash .github/scripts/promote-production-deployment.sh
+
+      - name: Verify canonical production deployment
+        id: verify-production
+        if: ${{ steps.final-current.outputs.is_current == 'true' && steps.promote.outputs.is_current == 'true' }}
+        timeout-minutes: 8
+        env:
+          EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
+          EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ steps.stage-production.outputs.production_deployment_id }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: bash .github/scripts/verify-production-alias.sh
+
+  sentry-error-gate:
+    name: Sentry Error Gate (production)
+    needs: [promote-production, canary-health-gate]
+    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.is_current == 'true' && needs.canary-health-gate.result == 'success' }}
+    uses: ./.github/workflows/sentry-error-gate.yml
+    with:
+      deployment_url: https://jov.ie
+      soak_minutes: 5
+      baseline_window_minutes: 30
+      threshold_multiplier: 3
+      min_baseline_errors: 5
+
+  production-oauth-gate:
+    name: Production OAuth Gate (observational)
+    needs: [promote-production]
+    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.is_current == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      gate_status: ${{ steps.gate-result.outputs.gate_status }}
+      ba_health: ${{ steps.gate-result.outputs.ba_health }}
+      oauth_status: ${{ steps.gate-result.outputs.oauth_status }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+          fetch-depth: 1
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+
+      - name: Hard probe — Better Auth handler reachable (GET /api/auth/ok)
+        id: ba-health
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          # Plan Phase 11 (Clerk → Better Auth migration): a deterministic 200
+          # from `/api/auth/ok` proves the BA handler mounted on prod before
+          # the OAuth provider redirect_uri probe runs. A 404 means the
+          # catch-all `/api/auth/[...all]` shadowed the static route, or the
+          # deploy broke auth stitching. Separate axis from the OAuth provider
+          # probe: catches handler-wired-wrong without depending on
+          # Google/Apple console state.
+          ok_url="https://jov.ie/api/auth/ok"
+          attempt=1
+          max_attempts=3
+          confirmed_status=""
+          uncertain=false
+          while [ "$attempt" -le "$max_attempts" ]; do
+            response_file="$RUNNER_TEMP/ba-health-${attempt}.body"
+            headers_file="$RUNNER_TEMP/ba-health-${attempt}.headers"
+            curl_status=0
+            http_status="$(curl --silent --show-error --connect-timeout 10 --max-time 30 \
+              -D "$headers_file" -o "$response_file" -w '%{http_code}' "$ok_url")" || curl_status=$?
+            if [ "$curl_status" -eq 0 ] && [[ "$http_status" =~ ^[1-5][0-9][0-9]$ ]]; then
+              if [ "$http_status" = "200" ]; then
+                content_type="$(awk 'tolower($0) ~ /^content-type:/ { value=$0 } END { sub(/^[^:]+:[[:space:]]*/, "", value); sub(/\r$/, "", value); print tolower(value) }' "$headers_file")"
+                if [[ "$content_type" == application/json* ]] &&
+                  jq -e 'type == "object" and .ok == true' >/dev/null "$response_file"; then
+                  echo "ba_health=passed" >> "$GITHUB_OUTPUT"
+                  echo "✅ $ok_url returned canonical JSON health truth"
+                  exit 0
+                fi
+                uncertain=true
+                echo "HTTP 200 from $ok_url lacked canonical application/json {ok:true} truth."
+                attempt=$((attempt + 1))
+                if [ "$attempt" -le "$max_attempts" ]; then sleep 15; fi
+                continue
+              fi
+              if [ -z "$confirmed_status" ]; then
+                confirmed_status="$http_status"
+              elif [ "$confirmed_status" != "$http_status" ]; then
+                uncertain=true
+              fi
+              echo "Confirmed HTTP $http_status from $ok_url on attempt ${attempt}/${max_attempts}."
+            else
+              uncertain=true
+              echo "Transport/API uncertainty probing $ok_url on attempt ${attempt}/${max_attempts} (curl=$curl_status, HTTP=${http_status:-<empty>})."
+            fi
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              sleep_seconds=$((attempt * 15))
+              sleep "$sleep_seconds"
+            fi
+            attempt=$((attempt + 1))
+          done
+          if [ "$uncertain" = "false" ] && [ -n "$confirmed_status" ]; then
+            echo "ba_health=failed" >> "$GITHUB_OUTPUT"
+            echo "❌ Confirmed deterministic HTTP $confirmed_status from $ok_url across all attempts."
+          else
+            echo "::error::Better Auth probe was inconclusive; no confirmed regression flag emitted."
+          fi
+          exit 1
+
+      - name: Probe production Google + Apple OAuth redirect URIs
+        id: oauth-probe
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          # Hits the Google + Apple authorize endpoints with the EXACT redirect_uri
+          # Better Auth hands them (https://jov.ie/api/auth/callback/<provider>)
+          # and fails ONLY on a real provider rejection
+          # (redirect_uri_mismatch / invalid_request). This is the gap the
+          # staging canary cannot cover: production runs a different app host
+          # + different OAuth clients than staging.
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          attempt=1
+          max_attempts=3
+          confirmed_attempts=0
+          uncertain=false
+          while [ "$attempt" -le "$max_attempts" ]; do
+            report="$RUNNER_TEMP/oauth-provider-report-${attempt}.json"
+            probe_status=0
+            CI=true SMOKE_ONLY=1 BASE_URL="https://jov.ie" \
+              PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" \
+              --run -- pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
+              --project=chromium --reporter=json || probe_status=$?
+            if [ "$probe_status" -eq 0 ]; then
+              echo "oauth_status=passed" >> "$GITHUB_OUTPUT"
+              echo "✅ Production Google + Apple accept Better Auth's redirect_uri"
+              exit 0
+            fi
+
+            # Only exact assertion messages in a valid Playwright JSON report
+            # confirm provider rejection. Browser/tool/network/report failures
+            # remain uncertainty and can never request rollback.
+            if [ -s "$report" ] && jq -e '
+              def results:
+                [ .suites[]? | .. | objects | select(has("results")) | .results[]? ];
+              type == "object" and (.suites | type == "array") and
+              (results | map(select(.status == "failed")) | length) > 0 and
+              all(results[] | select(.status != "passed" and .status != "skipped");
+                .status == "failed" and
+                ([.errors[]?.message // ""] | any(
+                  test("Google rejected redirect_uri|Apple rejected return URL")
+                ))
+              )
+            ' >/dev/null "$report"; then
+              confirmed_attempts=$((confirmed_attempts + 1))
+              echo "Confirmed provider redirect rejection in structured report ${attempt}/${max_attempts}."
+            else
+              uncertain=true
+              echo "OAuth attempt ${attempt}/${max_attempts} lacked exact structured provider-rejection evidence."
+            fi
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              sleep_seconds=$((attempt * 15))
+              sleep "$sleep_seconds"
+            fi
+            attempt=$((attempt + 1))
+          done
+          if [ "$uncertain" = "false" ] && [ "$confirmed_attempts" -eq "$max_attempts" ]; then
+            echo "oauth_status=failed" >> "$GITHUB_OUTPUT"
+            echo "❌ Structured evidence confirmed provider redirect rejection across all attempts."
+          else
+            echo "::error::OAuth probe was inconclusive; no confirmed regression flag emitted."
+          fi
+          exit 1
+      - name: Resolve observational OAuth gate
+        id: gate-result
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ba_health="${{ steps.ba-health.outputs.ba_health }}"
+          oauth_status="${{ steps.oauth-probe.outputs.oauth_status }}"
+          echo "ba_health=${ba_health:-error}" >> "$GITHUB_OUTPUT"
+          echo "oauth_status=${oauth_status:-error}" >> "$GITHUB_OUTPUT"
+          if [ "${{ steps.ba-health.outcome }}" = "success" ] &&
+            [ "$ba_health" = "passed" ] &&
+            [ "${{ steps.oauth-probe.outcome }}" = "success" ] &&
+            [ "$oauth_status" = "passed" ]; then
+            echo "gate_status=passed" >> "$GITHUB_OUTPUT"
+          elif { [ "${{ steps.ba-health.outcome }}" = "failure" ] &&
+              [ "$ba_health" = "failed" ]; } ||
+            { [ "${{ steps.oauth-probe.outcome }}" = "failure" ] &&
+              [ "$oauth_status" = "failed" ]; }; then
+            echo "gate_status=failed" >> "$GITHUB_OUTPUT"
+            echo "::error::Confirmed production OAuth regression; centralized rollback will evaluate ownership."
+          else
+            echo "gate_status=error" >> "$GITHUB_OUTPUT"
+            echo "::error::Production OAuth gate could not establish a trustworthy result; refusing automatic rollback."
+          fi
+
+  rollback-production:
+    name: Centralized production rollback
+    needs: [promote-production, sentry-error-gate, production-oauth-gate]
+    if: >-
+      ${{
+        always() &&
+        needs.promote-production.result == 'success' &&
+        needs.promote-production.outputs.is_current == 'true' &&
+        (
+          needs.sentry-error-gate.outputs.gate_status == 'failed' ||
+          needs.production-oauth-gate.outputs.gate_status == 'failed'
+        )
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: Production – jovie
+      url: https://jov.ie
+    outputs:
+      rolled_back: ${{ steps.rollback.outputs.rolled_back }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+          fetch-depth: 1
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Roll back explicitly to recorded previous deployment
+        id: rollback
+        env:
+          PREVIOUS_PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.previous_production_deployment_id }}
+          CURRENT_PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.production_deployment_id }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          set -euo pipefail
+          [[ "$PREVIOUS_PRODUCTION_DEPLOYMENT_ID" == dpl_* ]] || {
+            echo "::error::Previous production deployment ID is missing or invalid."
+            exit 1
+          }
+          [[ "$CURRENT_PRODUCTION_DEPLOYMENT_ID" == dpl_* ]] || {
+            echo "::error::Current production deployment ID is missing or invalid."
+            exit 1
+          }
+          if [ "$PREVIOUS_PRODUCTION_DEPLOYMENT_ID" = "$CURRENT_PRODUCTION_DEPLOYMENT_ID" ]; then
+            echo "::error::Rollback target must differ from the failed deployment."
+            exit 1
+          fi
+
+          # Keep ownership proof and mutation in one step. The caller's fixed
+          # production-mutation lease blocks every newer production generation
+          # through this soak. Main may advance meanwhile, so exact canonical
+          # deployment ownership—not source-main equality—authorizes rollback.
+          canonical_json="$(./node_modules/.bin/vercel inspect jov.ie --format=json \
+            --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID")"
+          jq -e '
+            type == "object" and
+            (.id | type == "string") and
+            (.readyState | type == "string") and
+            (.target | type == "string")
+          ' >/dev/null <<<"$canonical_json" || {
+            echo "::error::Canonical Vercel ownership response is malformed."
+            exit 1
+          }
+          canonical_id="$(jq -r '.id' <<<"$canonical_json")"
+          canonical_state="$(jq -r '.readyState | ascii_upcase' <<<"$canonical_json")"
+          canonical_target="$(jq -r '.target | ascii_downcase' <<<"$canonical_json")"
+          if [ "$canonical_id" != "$CURRENT_PRODUCTION_DEPLOYMENT_ID" ] ||
+            [ "$canonical_state" != "READY" ] ||
+            [ "$canonical_target" != "production" ]; then
+            echo "::error::Refusing rollback: canonical production is not the exact failed deployment."
+            exit 1
+          fi
+
+          ./node_modules/.bin/vercel rollback "$PREVIOUS_PRODUCTION_DEPLOYMENT_ID" \
+            --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"
+
+          for attempt in $(seq 1 12); do
+            canonical_json="$(./node_modules/.bin/vercel inspect jov.ie --format=json \
+              --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID")"
+            canonical_id="$(jq -r '.id // ""' <<<"$canonical_json")"
+            canonical_state="$(jq -r '(.readyState // "") | ascii_upcase' <<<"$canonical_json")"
+            canonical_target="$(jq -r '(.target // "") | ascii_downcase' <<<"$canonical_json")"
+            if [ "$canonical_id" = "$PREVIOUS_PRODUCTION_DEPLOYMENT_ID" ] &&
+              [ "$canonical_state" = "READY" ] &&
+              [ "$canonical_target" = "production" ]; then
+              echo "rolled_back=true" >> "$GITHUB_OUTPUT"
+              echo "Rollback verified on $canonical_id."
+              exit 0
+            fi
+            if [ "$attempt" -lt 12 ]; then
+              sleep 5
+            fi
+          done
+          echo "::error::Rollback command completed but canonical production did not converge to the recorded previous deployment."
+          exit 1
+
+
+  release-result:
+    name: Production release result
+    needs:
+      [
+        release-head,
+        deploy-staging,
+        canary-health-gate,
+        staging-head,
+        alias-staging,
+        production-head,
+        promote-production,
+        sentry-error-gate,
+        production-oauth-gate,
+        rollback-production,
+      ]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      released: ${{ steps.result.outputs.released }}
+      production_deployment_id: ${{ steps.result.outputs.production_deployment_id }}
+      production_deployment_url: ${{ steps.result.outputs.production_deployment_url }}
+      previous_production_deployment_id: ${{ steps.result.outputs.previous_production_deployment_id }}
+      previous_production_deployment_url: ${{ steps.result.outputs.previous_production_deployment_url }}
+      schema_drift: ${{ steps.result.outputs.schema_drift }}
+      failure_subtype: ${{ steps.result.outputs.failure_subtype }}
+      sentry_gate_status: ${{ steps.result.outputs.sentry_gate_status }}
+      oauth_gate_status: ${{ steps.result.outputs.oauth_gate_status }}
+    steps:
+      - name: Resolve release result
+        id: result
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          echo "released=false" >> "$GITHUB_OUTPUT"
+          echo "production_deployment_id=${{ needs.promote-production.outputs.production_deployment_id }}" >> "$GITHUB_OUTPUT"
+          echo "production_deployment_url=${{ needs.promote-production.outputs.production_deployment_url }}" >> "$GITHUB_OUTPUT"
+          echo "previous_production_deployment_id=${{ needs.promote-production.outputs.previous_production_deployment_id }}" >> "$GITHUB_OUTPUT"
+          echo "previous_production_deployment_url=${{ needs.promote-production.outputs.previous_production_deployment_url }}" >> "$GITHUB_OUTPUT"
+          echo "schema_drift=${{ needs.deploy-staging.outputs.schema_drift }}" >> "$GITHUB_OUTPUT"
+          echo "failure_subtype=${{ needs.promote-production.outputs.failure_subtype }}" >> "$GITHUB_OUTPUT"
+          echo "sentry_gate_status=${{ needs.sentry-error-gate.outputs.gate_status }}" >> "$GITHUB_OUTPUT"
+          echo "oauth_gate_status=${{ needs.production-oauth-gate.outputs.gate_status }}" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ needs.release-head.result }}" != "success" ]; then
+            echo "::error::Initial main HEAD API check failed closed."
+            exit 1
+          fi
+          if [ "${{ needs.release-head.outputs.is_current }}" != "true" ]; then
+            echo "Superseded before release work; neutral."
+            exit 0
+          fi
+          if [ "${{ needs.staging-head.result }}" = "success" ] &&
+            [ "${{ needs.staging-head.outputs.is_current }}" != "true" ]; then
+            echo "Superseded before staging alias; neutral."
+            exit 0
+          fi
+          if [ "${{ needs.alias-staging.result }}" = "success" ] &&
+            [ "${{ needs.alias-staging.outputs.is_current }}" != "true" ]; then
+            echo "Superseded at staging alias; neutral."
+            exit 0
+          fi
+          if [ "${{ needs.production-head.result }}" = "success" ] &&
+            [ "${{ needs.production-head.outputs.is_current }}" != "true" ]; then
+            echo "Superseded before production mutation; neutral."
+            exit 0
+          fi
+          if [ "${{ needs.promote-production.result }}" = "success" ] &&
+            [ "${{ needs.promote-production.outputs.is_current }}" != "true" ]; then
+            echo "Superseded at production mutation; neutral."
+            exit 0
+          fi
+
+          sentry_status="${{ needs.sentry-error-gate.outputs.gate_status }}"
+          oauth_status="${{ needs.production-oauth-gate.outputs.gate_status }}"
+          if [ "$sentry_status" = "failed" ] || [ "$oauth_status" = "failed" ]; then
+            if [ "${{ needs.rollback-production.result }}" != "success" ] ||
+              [ "${{ needs.rollback-production.outputs.rolled_back }}" != "true" ]; then
+              echo "::error::A production gate failed and centralized rollback did not complete exactly."
+              exit 1
+            fi
+            echo "::error::A production gate failed; the exact previous deployment was restored."
+            exit 1
+          fi
+          if [ "${{ needs.sentry-error-gate.result }}" != "success" ] ||
+            [ "$sentry_status" != "passed" ] ||
+            [ "${{ needs.production-oauth-gate.result }}" != "success" ] ||
+            [ "$oauth_status" != "passed" ]; then
+            if [ "${{ needs.rollback-production.result }}" != "skipped" ]; then
+              echo "::error::An uncertain production gate result must never trigger rollback."
+              exit 1
+            fi
+            echo "::error::Production gate evidence was incomplete or errored; release is not verified."
+            exit 1
+          fi
+          if [ "${{ needs.rollback-production.result }}" != "skipped" ]; then
+            echo "::error::Centralized rollback ran even though every production gate passed."
+            exit 1
+          fi
+
+          for gate in \
+            "deploy-staging:${{ needs.deploy-staging.result }}" \
+            "canary-health-gate:${{ needs.canary-health-gate.result }}" \
+            "staging-head:${{ needs.staging-head.result }}" \
+            "alias-staging:${{ needs.alias-staging.result }}" \
+            "production-head:${{ needs.production-head.result }}" \
+            "promote-production:${{ needs.promote-production.result }}" \
+            "sentry-error-gate:${{ needs.sentry-error-gate.result }}" \
+            "production-oauth-gate:${{ needs.production-oauth-gate.result }}"; do
+            name="${gate%%:*}"
+            result="${gate#*:}"
+            if [ "$result" != "success" ]; then
+              echo "::error::$name did not complete successfully ($result)."
+              exit 1
+            fi
+          done
+
+          test -n "${{ needs.promote-production.outputs.production_deployment_id }}" || {
+            echo "::error::Release completed without an exact production deployment ID."
+            exit 1
+          }
+          test -n "${{ needs.promote-production.outputs.production_deployment_url }}" || {
+            echo "::error::Release completed without an exact production deployment URL."
+            exit 1
+          }
+
+          # Do not spend the sole production lease on deep probes for a SHA
+          # that main already superseded while release gates soaked.
+          boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          [[ "$boundary_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact main at the release-result boundary."
+            exit 1
+          }
+          if [ "$boundary_sha" != "$EXPECTED_SHA" ]; then
+            echo "Release $EXPECTED_SHA was superseded by $boundary_sha before post-deploy fanout; neutral."
+            exit 0
+          fi
+          echo "released=true" >> "$GITHUB_OUTPUT"

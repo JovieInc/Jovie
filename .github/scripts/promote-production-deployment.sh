@@ -3,6 +3,9 @@ set -euo pipefail
 
 deploy_id="${PRODUCTION_DEPLOYMENT_ID:-}"
 vercel_cli="${VERCEL_CLI:-./node_modules/.bin/vercel}"
+gh_cli="${GH_CLI:-gh}"
+expected_main_sha="${EXPECTED_MAIN_SHA:-}"
+repository="${GITHUB_REPOSITORY:-}"
 poll_seconds="${PRODUCTION_PROMOTION_POLL_SECONDS:-5}"
 # Production holds at 10% for five minutes. The eight-minute default leaves
 # three minutes for Vercel's asynchronous rollout state to converge.
@@ -16,7 +19,7 @@ write_failure() {
   fi
 }
 
-for required in deploy_id VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+for required in deploy_id expected_main_sha repository GH_TOKEN VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
   if [ -z "${!required:-}" ]; then
     echo "${required} is required" >&2
     write_failure production_promotion_state_invalid
@@ -25,6 +28,8 @@ for required in deploy_id VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
 done
 
 if [[ "$deploy_id" != dpl_* ]] ||
+  ! [[ "$expected_main_sha" =~ ^[0-9a-f]{40}$ ]] ||
+  ! [[ "$repository" =~ ^[^/]+/[^/]+$ ]] ||
   ! [[ "$poll_seconds" =~ ^[0-9]+$ ]] ||
   ! [[ "$settle_attempts" =~ ^[1-9][0-9]*$ ]] ||
   ! [[ "$cleanup_attempts" =~ ^[1-9][0-9]*$ ]]; then
@@ -149,6 +154,11 @@ inspect_current() {
     inspect jov.ie --format=json
 }
 
+inspect_deployment() {
+  read_vercel_json "inspect deployment" current \
+    inspect "$1" --format=json
+}
+
 fetch_rollout() {
   read_vercel_json "rolling-release fetch" rollout \
     rolling-release fetch
@@ -192,11 +202,65 @@ if [[ "$previous_id" != dpl_* ]]; then
   exit 1
 fi
 
-echo "Current production deployment before promotion: $previous_id"
+previous_url="$(jq -r '.url // ""' <<<"$current_json")"
+if [[ "$previous_url" != *://* && "$previous_url" == *.vercel.app ]]; then
+  previous_url="https://${previous_url}"
+fi
+previous_url="${previous_url%/}"
+if [[ "$previous_url" != https://*.vercel.app ]]; then
+  echo "Current jov.ie deployment has an invalid immutable URL." >&2
+  write_failure production_promotion_state_invalid
+  exit 1
+fi
+
+previous_deployment_json=""
+if ! previous_deployment_json="$(inspect_deployment "$previous_id")"; then
+  echo "Unable to prove the previous canonical deployment's immutable URL." >&2
+  write_failure production_promotion_state_invalid
+  exit 1
+fi
+inspected_previous_id="$(jq -r '.id // ""' <<<"$previous_deployment_json")"
+inspected_previous_url="$(jq -r '.url // ""' <<<"$previous_deployment_json")"
+if [[ "$inspected_previous_url" != *://* && "$inspected_previous_url" == *.vercel.app ]]; then
+  inspected_previous_url="https://${inspected_previous_url}"
+fi
+inspected_previous_url="${inspected_previous_url%/}"
+if [ "$inspected_previous_id" != "$previous_id" ] ||
+  [ "$inspected_previous_url" != "$previous_url" ]; then
+  echo "Canonical previous deployment ID/URL did not match direct immutable inspection." >&2
+  write_failure production_promotion_state_invalid
+  exit 1
+fi
+
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  printf 'previous_production_deployment_id=%s\n' "$previous_id" >> "$GITHUB_OUTPUT"
+  printf 'previous_production_deployment_url=%s\n' "$previous_url" >> "$GITHUB_OUTPUT"
+fi
+
+echo "Current production deployment before promotion: $previous_id ($previous_url)"
+
+# Main may advance while the staged production artifact is inspected. Bind the
+# mutation inside this controller, immediately after authoritative Vercel state
+# discovery and before any promote/rollout command.
+current_main_sha="$($gh_cli api "repos/$repository/commits/main" --jq '.sha // empty')"
+if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Unable to resolve exact main immediately before production mutation." >&2
+  write_failure production_promotion_state_invalid
+  exit 1
+fi
+if [ "$current_main_sha" != "$expected_main_sha" ]; then
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    printf 'is_current=false\n' >> "$GITHUB_OUTPUT"
+  fi
+  echo "Release $expected_main_sha was superseded by $current_main_sha before production mutation."
+  exit 0
+fi
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  printf 'is_current=true\n' >> "$GITHUB_OUTPUT"
+fi
 
 promotion_requested=false
 promote_status=0
-complete_requested=false
 current_ready="$(jq -r '.readyState | ascii_upcase' <<<"$current_json")"
 current_target="$(jq -r '.target | ascii_downcase' <<<"$current_json")"
 if [ "$previous_id" = "$deploy_id" ] &&
@@ -308,12 +372,10 @@ for attempt in $(seq 1 "$settle_attempts"); do
         exit 1
       fi
 
-      if [ "$complete_requested" != "true" ]; then
-        complete_requested=true
-        if ! vercel rolling-release complete --dpl "$deploy_id"; then
-          echo "Rolling-release completion request failed; observing terminal state without resubmitting." >&2
-        fi
-      fi
+      # Automatic Vercel stages advance on their configured durations. Never
+      # call `rolling-release complete` here: that command forces 100% traffic
+      # and would truncate the 10% canary when `promote --timeout` returns.
+      echo "  observing owned automatic rollout; waiting for Vercel to advance"
     fi
   else
     last_state_valid=false
