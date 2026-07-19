@@ -269,9 +269,14 @@ def test_gated_secret_scan_fetches_only_the_exact_event_range() -> None:
     assert "fetch-depth: 0" not in block
     assert "prepare-ci-secret-scan-range.sh" in block
     assert "github.event.pull_request.base.sha" in block
+    assert "github.event.pull_request.head.sha" in block
+    assert 'CURRENT_REF="refs/pull/${{ github.event.pull_request.number }}/head"' in block
     assert "github.event.merge_group.base_sha" in block
     assert "github.event.before" in block
-    assert '"$BASE_SHA" "$GITHUB_SHA" "$GITHUB_REF"' in block
+    assert '"$BASE_SHA" "$GITHUB_SHA" "$CURRENT_REF" "$CURRENT_SHA"' in block
+    assert 'SECRET_SCAN_REMOTE_CURRENT_REF="$CURRENT_REF"' in block
+    assert 'SECRET_SCAN_REMOTE_CURRENT_SHA="$CURRENT_SHA"' in block
+    assert 'SECRET_SCAN_REMOTE_BASE_SHA="$BASE_SHA"' in block
     assert 'scan-secrets.sh ci-pr "$BASE_SHA"' in block
     assert 'git fetch origin "${{ github.base_ref }}"' not in block
 

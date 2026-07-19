@@ -38,11 +38,24 @@ REMOVED_SHA="$(git -C "$SEED" rev-parse HEAD)"
 printf 'feature complete\n' >"$SEED/feature.txt"
 git -C "$SEED" add feature.txt
 git -C "$SEED" commit -q -m 'finish feature'
+SOURCE_HEAD="$(git -C "$SEED" rev-parse HEAD)"
 
 git -C "$SEED" switch -q -c pr-merge "$BASE_SHA"
-git -C "$SEED" merge -q --no-ff feature -m 'synthetic pull request merge'
+git -C "$SEED" merge -q --no-ff feature \
+  -m $'synthetic pull request merge\n\nparent message-lines-are-not-headers'
 PR_HEAD="$(git -C "$SEED" rev-parse HEAD)"
-git -C "$SEED" push -q origin "$PR_HEAD:refs/pull/1/merge"
+PR_TREE="$(git -C "$SEED" rev-parse "${PR_HEAD}^{tree}")"
+REGENERATED_PR_HEAD="$(
+  printf 'regenerated synthetic pull request merge\n' \
+    | git -C "$SEED" commit-tree "$PR_TREE" -p "$BASE_SHA" -p "$SOURCE_HEAD"
+)"
+if [[ "$REGENERATED_PR_HEAD" == "$PR_HEAD" ]]; then
+  echo 'FAIL: regenerated pull request merge fixture did not change commit id' >&2
+  exit 1
+fi
+git -C "$SEED" push -q origin \
+  "$PR_HEAD:refs/pull/1/merge" \
+  "$SOURCE_HEAD:refs/pull/1/head"
 
 # A merge-group head can contain more than one branch side. Both sides must be
 # complete relative to the exact queue base.
@@ -108,29 +121,50 @@ assert_complete_range() {
 
 checkout_range() {
   local name="$1"
-  local fetch_ref="$2"
+  local checkout_ref="$2"
   local base_sha="$3"
   local head_sha="$4"
+  local current_ref="$5"
+  local current_sha="$6"
+  local regenerated_head="${7:-}"
   SCENARIO_DIR="$TEST_ROOT/$name"
   git init -q "$SCENARIO_DIR"
   git -C "$SCENARIO_DIR" remote add origin "file://$ORIGIN"
-  git -C "$SCENARIO_DIR" fetch -q --depth=1 origin "$fetch_ref"
+  git -C "$SCENARIO_DIR" fetch -q --depth=1 origin "$checkout_ref"
   git -C "$SCENARIO_DIR" checkout -q --detach FETCH_HEAD
   [[ "$(git -C "$SCENARIO_DIR" rev-list --count HEAD)" -eq 1 ]] \
     || fail "$name did not begin as a depth-1 checkout"
+  if [[ -n "$regenerated_head" ]]; then
+    git -C "$SEED" push -q --force origin "$regenerated_head:$checkout_ref"
+  fi
   (
     cd "$SCENARIO_DIR"
-    "$RANGE_SCRIPT" "$base_sha" "$head_sha" "$fetch_ref"
+    "$RANGE_SCRIPT" "$base_sha" "$head_sha" "$current_ref" "$current_sha"
   ) >"$TEST_ROOT/$name.output"
-  assert_complete_range "$SCENARIO_DIR" "$base_sha" "$head_sha"
+  assert_complete_range \
+    "$SCENARIO_DIR" "$base_sha" "$(git -C "$SCENARIO_DIR" rev-parse HEAD)"
   if git -C "$SCENARIO_DIR" show-ref --verify --quiet refs/remotes/origin/unrelated \
     || git -C "$SCENARIO_DIR" show-ref --verify --quiet refs/tags/unrelated-history; then
     fail "$name fetched unrelated refs"
   fi
 }
 
-checkout_range pr refs/pull/1/merge "$BASE_SHA" "$PR_HEAD"
+checkout_range \
+  pr \
+  refs/pull/1/merge \
+  "$BASE_SHA" \
+  "$PR_HEAD" \
+  refs/pull/1/head \
+  "$SOURCE_HEAD" \
+  "$REGENERATED_PR_HEAD"
 PR_DIR="$SCENARIO_DIR"
+PR_SCAN_HEAD="$(git -C "$PR_DIR" rev-parse HEAD)"
+[[ "$PR_SCAN_HEAD" != "$PR_HEAD" ]] \
+  || fail 'pull request scan head remained the obsolete shallow merge object'
+[[ "$(git -C "$PR_DIR" rev-parse "${PR_SCAN_HEAD}^{tree}")" == "$PR_TREE" ]] \
+  || fail 'pull request scan head did not preserve the checked-out event tree'
+[[ "$(git -C "$PR_DIR" show -s --format='%P' "$PR_SCAN_HEAD")" == "$BASE_SHA $SOURCE_HEAD" ]] \
+  || fail 'pull request scan head did not preserve exact ordered parents'
 git -C "$PR_DIR" cat-file -e "${INTRODUCED_SHA}^{commit}" \
   || fail 'introduced-secret commit is absent from PR range'
 git -C "$PR_DIR" cat-file -e "${REMOVED_SHA}^{commit}" \
@@ -153,31 +187,71 @@ else
   echo 'SKIP: gitleaks binary unavailable for historical-range fixture assertion'
 fi
 
-checkout_range merge-group "$QUEUE_REF" "$BASE_SHA" "$QUEUE_HEAD"
+if TRUFFLEHOG_BIN="${TRUFFLEHOG_BIN:-$(command -v trufflehog || true)}" \
+  && [[ -n "$TRUFFLEHOG_BIN" ]]; then
+  "$TRUFFLEHOG_BIN" git "file://$PR_DIR" \
+    --since-commit "$BASE_SHA" \
+    --branch HEAD \
+    --no-verification \
+    --fail >"$TEST_ROOT/trufflehog.output" 2>&1 \
+    || fail 'trufflehog could not clone and scan the local-only pull request scan head'
+  echo 'PASS: trufflehog cloned and scanned the local-only pull request scan head'
+else
+  echo 'SKIP: trufflehog binary unavailable for local-only scan-head assertion'
+fi
+
+checkout_range \
+  merge-group "$QUEUE_REF" "$BASE_SHA" "$QUEUE_HEAD" "$QUEUE_REF" "$QUEUE_HEAD"
 git -C "$SCENARIO_DIR" cat-file -e "${QUEUE_ONE_SHA}^{commit}" \
   || fail 'first merge-group side is absent'
 git -C "$SCENARIO_DIR" cat-file -e "${QUEUE_TWO_SHA}^{commit}" \
   || fail 'second merge-group side is absent'
 
-checkout_range direct-main refs/heads/main "$BASE_SHA" "$DIRECT_HEAD"
+checkout_range \
+  direct-main refs/heads/main "$BASE_SHA" "$DIRECT_HEAD" refs/heads/main "$DIRECT_HEAD"
 git -C "$SCENARIO_DIR" cat-file -e "${DIRECT_ONE_SHA}^{commit}" \
   || fail 'direct-main intermediate commit is absent'
 
-# A moved event ref fails before fetching or scanning stale history.
+# A moved PR source-head ref fails before fetching or scanning stale history,
+# even though GitHub's mutable synthetic merge ref is not used as freshness.
 STALE_DIR="$TEST_ROOT/stale"
 git init -q "$STALE_DIR"
 git -C "$STALE_DIR" remote add origin "file://$ORIGIN"
 git -C "$STALE_DIR" fetch -q --depth=1 origin refs/pull/1/merge
 git -C "$STALE_DIR" checkout -q --detach FETCH_HEAD
-git -C "$SEED" push -q --force origin "feature:refs/pull/1/merge"
+STALE_HEAD="$(git -C "$STALE_DIR" rev-parse HEAD)"
+git -C "$SEED" switch -q feature
+printf 'superseded source head\n' >>"$SEED/feature.txt"
+git -C "$SEED" commit -qam 'supersede source head'
+SUPERSEDING_SOURCE_HEAD="$(git -C "$SEED" rev-parse HEAD)"
+git -C "$SEED" push -q --force origin \
+  "$SUPERSEDING_SOURCE_HEAD:refs/pull/1/head"
 status=0
 (
   cd "$STALE_DIR"
-  "$RANGE_SCRIPT" "$BASE_SHA" "$PR_HEAD" refs/pull/1/merge
+  "$RANGE_SCRIPT" "$BASE_SHA" "$STALE_HEAD" refs/pull/1/head "$SOURCE_HEAD"
 ) >"$TEST_ROOT/stale.output" 2>&1 || status=$?
-[[ $status -ne 0 ]] || fail 'a superseded event ref must fail closed'
-grep -q 'event ref moved' "$TEST_ROOT/stale.output" \
-  || fail 'superseded event ref lacks explicit classification'
+[[ $status -ne 0 ]] || fail 'a superseded pull request source ref must fail closed'
+grep -q 'current ref moved' "$TEST_ROOT/stale.output" \
+  || fail 'superseded pull request source ref lacks explicit classification'
+
+# A matching fork-safe pull head ref cannot bless a synthetic merge with the
+# wrong ordered base/source parents.
+TOPOLOGY_DIR="$TEST_ROOT/topology"
+git init -q "$TOPOLOGY_DIR"
+git -C "$TOPOLOGY_DIR" remote add origin "file://$ORIGIN"
+git -C "$TOPOLOGY_DIR" fetch -q --depth=1 origin refs/pull/1/merge
+git -C "$TOPOLOGY_DIR" checkout -q --detach FETCH_HEAD
+TOPOLOGY_HEAD="$(git -C "$TOPOLOGY_DIR" rev-parse HEAD)"
+git -C "$SEED" push -q --force origin "$QUEUE_ONE_SHA:refs/pull/2/head"
+status=0
+(
+  cd "$TOPOLOGY_DIR"
+  "$RANGE_SCRIPT" "$BASE_SHA" "$TOPOLOGY_HEAD" refs/pull/2/head "$QUEUE_ONE_SHA"
+) >"$TEST_ROOT/topology.output" 2>&1 || status=$?
+[[ $status -ne 0 ]] || fail 'wrong pull request parent topology must fail closed'
+grep -q 'exact base/source parent topology' "$TEST_ROOT/topology.output" \
+  || fail 'wrong pull request parent topology lacks explicit classification'
 
 # Cancellation reaches the in-flight exact-range fetch instead of leaving an
 # unbounded child process behind.
