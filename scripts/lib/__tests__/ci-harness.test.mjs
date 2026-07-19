@@ -307,6 +307,125 @@ describe('ci-harness manifest', () => {
     expect(action).not.toContain('secrets.');
   });
 
+  it('neutralizes only well-formed superseded production observer signals', () => {
+    const fixture = JSON.parse(
+      readFileSync(
+        resolve(
+          REPO_ROOT,
+          'scripts/lib/__tests__/fixtures/production-controller-observer-signals.json'
+        ),
+        'utf8'
+      )
+    );
+    const workflows = [
+      {
+        job: 'authorize-release',
+        path: '.github/workflows/ios-testflight.yml',
+        workflowIdentityMarker: 'production_controller_workflow="$(gh api',
+      },
+      {
+        job: 'authorize-release',
+        path: '.github/workflows/desktop-release.yml',
+        workflowIdentityMarker: 'workflow_record="$(gh api',
+      },
+    ];
+
+    for (const observer of workflows) {
+      const workflow = readFileSync(resolve(REPO_ROOT, observer.path), 'utf8');
+      const authorize = extractWorkflowJobBlock(workflow, observer.job);
+      const selectorStartMarker = "controller_generation_selector='\n";
+      const selectorStart = authorize.indexOf(selectorStartMarker);
+      const selectorEnd = authorize.indexOf("\n          '\n", selectorStart);
+
+      expect(selectorStart, observer.path).toBeGreaterThanOrEqual(0);
+      expect(selectorEnd, observer.path).toBeGreaterThan(selectorStart);
+      const selector = authorize.slice(
+        selectorStart + selectorStartMarker.length,
+        selectorEnd
+      );
+      const resolveGeneration = runRecord =>
+        spawnSync(
+          'jq',
+          [
+            '-er',
+            '--arg',
+            'repo',
+            fixture.repository,
+            '--arg',
+            'run_id',
+            fixture.signal.runId,
+            '--arg',
+            'run_attempt',
+            fixture.signal.runAttempt,
+            '--arg',
+            'workflow_id',
+            fixture.signal.workflowId,
+            '--arg',
+            'transport_sha',
+            fixture.signal.transportHeadSha,
+            selector,
+          ],
+          { encoding: 'utf8', input: JSON.stringify(runRecord) }
+        );
+
+      const matching = resolveGeneration(fixture.records.matching);
+      expect(matching.status, matching.stderr).toBe(0);
+      expect(matching.stdout.trim()).toBe(fixture.signal.transportHeadSha);
+
+      const superseded = resolveGeneration(fixture.records.superseded);
+      expect(superseded.status, superseded.stderr).toBe(0);
+      expect(superseded.stdout.trim()).toBe(
+        '23eb0f7c03af2efb4687787cf05fea0fb1506970'
+      );
+      expect(superseded.stdout.trim()).not.toBe(
+        fixture.signal.transportHeadSha
+      );
+
+      const malformed = resolveGeneration(fixture.records.malformedTitle);
+      expect(malformed.status, observer.path).not.toBe(0);
+      const wrongRunIdentity = resolveGeneration({
+        ...fixture.records.matching,
+        id: fixture.records.matching.id + 1,
+      });
+      expect(wrongRunIdentity.status, observer.path).not.toBe(0);
+
+      const workflowIdentity = authorize.indexOf(
+        observer.workflowIdentityMarker
+      );
+      const selectorIndex = authorize.indexOf(
+        'controller_generation_selector='
+      );
+      const neutralIndex = authorize.indexOf(
+        'if [ "$controller_generation" != "$release_sha" ]'
+      );
+      const jobsIndex = authorize.indexOf('jobs_json=', neutralIndex);
+      const currentMainIndex = authorize.indexOf('current_main_sha=');
+      const markerIndex = authorize.indexOf(
+        'if prove_existing_production_marker "$release_sha"',
+        neutralIndex
+      );
+      const authorizedIndex = authorize.indexOf(
+        'echo "authorized=true"',
+        neutralIndex
+      );
+
+      expect(workflowIdentity, observer.path).toBeGreaterThanOrEqual(0);
+      expect(workflowIdentity, observer.path).toBeLessThan(selectorIndex);
+      expect(selectorIndex, observer.path).toBeLessThan(neutralIndex);
+      expect(neutralIndex, observer.path).toBeLessThan(currentMainIndex);
+      expect(neutralIndex, observer.path).toBeLessThan(jobsIndex);
+      expect(neutralIndex, observer.path).toBeLessThan(markerIndex);
+      expect(neutralIndex, observer.path).toBeLessThan(authorizedIndex);
+      expect(authorize.slice(neutralIndex, jobsIndex)).toContain('exit 0');
+      expect(authorize.slice(neutralIndex)).toContain(
+        '.name == "Production Verified"'
+      );
+      expect(authorize.slice(neutralIndex)).toContain(
+        '[ "$verified_count" = "1" ]'
+      );
+    }
+  });
+
   it('keeps build and layout in one hosted merge-group workspace', () => {
     const workflow = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/ci.yml'),

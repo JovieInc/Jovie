@@ -1,0 +1,62 @@
+{
+  "source": "GitHub Actions Production Controller run 29683753890 observed 2026-07-19",
+  "repository": "JovieInc/Jovie",
+  "signal": {
+    "runId": "29683753890",
+    "runAttempt": "1",
+    "workflowId": "316053388",
+    "transportHeadSha": "d208da0cb385065c8dd8ca794067230e14d366d3"
+  },
+  "workflow": {
+    "id": 316053388,
+    "name": "Production Controller",
+    "path": ".github/workflows/production-controller.yml"
+  },
+  "records": {
+    "matching": {
+      "id": 29683753890,
+      "run_attempt": 1,
+      "workflow_id": 316053388,
+      "head_sha": "d208da0cb385065c8dd8ca794067230e14d366d3",
+      "head_branch": "main",
+      "head_repository": {
+        "full_name": "JovieInc/Jovie"
+      },
+      "event": "workflow_run",
+      "path": ".github/workflows/production-controller.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "display_title": "Production Controller d208da0cb385065c8dd8ca794067230e14d366d3 from CI 29682922411 attempt 1"
+    },
+    "superseded": {
+      "id": 29683753890,
+      "run_attempt": 1,
+      "workflow_id": 316053388,
+      "head_sha": "d208da0cb385065c8dd8ca794067230e14d366d3",
+      "head_branch": "main",
+      "head_repository": {
+        "full_name": "JovieInc/Jovie"
+      },
+      "event": "workflow_run",
+      "path": ".github/workflows/production-controller.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "display_title": "Production Controller 23eb0f7c03af2efb4687787cf05fea0fb1506970 from CI 29682922411 attempt 1"
+    },
+    "malformedTitle": {
+      "id": 29683753890,
+      "run_attempt": 1,
+      "workflow_id": 316053388,
+      "head_sha": "d208da0cb385065c8dd8ca794067230e14d366d3",
+      "head_branch": "main",
+      "head_repository": {
+        "full_name": "JovieInc/Jovie"
+      },
+      "event": "workflow_run",
+      "path": ".github/workflows/production-controller.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "display_title": "Production Controller 23eb0f7c03af2efb4687787cf05fea0fb1506970 from CI 29682922411 attempt 1 trailing"
+    }
+  }
+}

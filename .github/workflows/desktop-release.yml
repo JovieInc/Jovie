@@ -129,6 +129,64 @@ jobs:
             exit 1
           fi
 
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            run_record="$(gh api \
+              "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT")"
+            workflow_record="$(gh api \
+              "repos/$REPOSITORY/actions/workflows/$TRIGGER_WORKFLOW_ID")"
+            jq -e \
+              --arg workflow_id "$TRIGGER_WORKFLOW_ID" '
+                type == "object" and
+                (.id | type == "number" and . >= 1 and floor == .) and
+                (.id | tostring) == $workflow_id and
+                .name == "Production Controller" and
+                .path == ".github/workflows/production-controller.yml"
+              ' >/dev/null <<<"$workflow_record" || {
+              echo "::error::Production Controller workflow identity was not proven."
+              exit 1
+            }
+            controller_generation_selector='
+              if (
+                type == "object" and
+                (.id | type == "number" and . >= 1 and floor == .) and
+                (.id | tostring) == $run_id and
+                (.run_attempt | type == "number" and . >= 1 and floor == .) and
+                (.run_attempt | tostring) == $run_attempt and
+                (.workflow_id | type == "number" and . >= 1 and floor == .) and
+                (.workflow_id | tostring) == $workflow_id and
+                .head_sha == $transport_sha and
+                .head_branch == "main" and
+                .head_repository.full_name == $repo and
+                .event == "workflow_run" and
+                .path == ".github/workflows/production-controller.yml" and
+                .status == "completed" and
+                .conclusion == "success" and
+                (.display_title | type == "string" and
+                  test("^Production Controller [0-9a-f]{40} from CI [1-9][0-9]* attempt [1-9][0-9]*$"))
+              ) then
+                .display_title
+                | capture("^Production Controller (?<generation>[0-9a-f]{40}) from CI [1-9][0-9]* attempt [1-9][0-9]*$")
+                | .generation
+              else
+                empty
+              end
+          '
+            if ! controller_generation="$(jq -er \
+              --arg repo "$REPOSITORY" \
+              --arg run_id "$TRIGGER_RUN_ID" \
+              --arg run_attempt "$TRIGGER_RUN_ATTEMPT" \
+              --arg workflow_id "$TRIGGER_WORKFLOW_ID" \
+              --arg transport_sha "$release_sha" \
+              "$controller_generation_selector" <<<"$run_record")"; then
+              echo "::error::Exact Production Controller attempt evidence did not match the workflow_run signal."
+              exit 1
+            fi
+            if [ "$controller_generation" != "$release_sha" ]; then
+              echo "::notice::Production Controller generation $controller_generation was superseded before desktop observer dispatch; transport head is $release_sha."
+              exit 0
+            fi
+          fi
+
           echo "environment=$environment" >> "$GITHUB_OUTPUT"
           current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
@@ -282,42 +340,6 @@ jobs:
 
           production_proven=false
           if [ "$EVENT_NAME" = "workflow_run" ]; then
-            run_record="$(gh api \
-              "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT")"
-            jq -e \
-              --arg repo "$REPOSITORY" \
-              --arg run_id "$TRIGGER_RUN_ID" \
-              --arg run_attempt "$TRIGGER_RUN_ATTEMPT" \
-              --arg workflow_id "$TRIGGER_WORKFLOW_ID" \
-              --arg sha "$release_sha" '
-                type == "object" and
-                (.id | tostring) == $run_id and
-                (.run_attempt | tostring) == $run_attempt and
-                (.workflow_id | tostring) == $workflow_id and
-                .head_sha == $sha and
-                .head_branch == "main" and
-                .head_repository.full_name == $repo and
-                .event == "workflow_run" and
-                .path == ".github/workflows/production-controller.yml" and
-                .status == "completed" and
-                .conclusion == "success" and
-                (.display_title | test("^Production Controller " + $sha + " from CI [1-9][0-9]* attempt [1-9][0-9]*$"))
-              ' >/dev/null <<<"$run_record" || {
-              echo "::error::Exact Production Controller attempt evidence did not match the workflow_run signal."
-              exit 1
-            }
-            workflow_record="$(gh api \
-              "repos/$REPOSITORY/actions/workflows/$TRIGGER_WORKFLOW_ID")"
-            jq -e \
-              --arg workflow_id "$TRIGGER_WORKFLOW_ID" '
-                type == "object" and
-                (.id | tostring) == $workflow_id and
-                .name == "Production Controller" and
-                .path == ".github/workflows/production-controller.yml"
-              ' >/dev/null <<<"$workflow_record" || {
-              echo "::error::Production Controller workflow identity was not proven."
-              exit 1
-            }
             jobs_json="$(gh api --paginate --slurp \
               "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT/jobs?per_page=100")"
             jq -e '
