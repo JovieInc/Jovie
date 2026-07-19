@@ -250,7 +250,7 @@ def test_exact_fresh_run_and_job_prove_fixed_runner_health(tmp_path: Path) -> No
     result, outputs = _run_query(tmp_path)
 
     assert result.returncode == 0, result.stderr
-    assert outputs["health"] == "up"
+    assert outputs["health"] == "up", outputs
     assert outputs["probe_state"] == "healthy"
     assert "run 29672288797 attempt 1" in outputs["evidence"]
 
@@ -277,7 +277,7 @@ def test_current_exact_queued_or_in_progress_probe_is_the_only_retryable_state(
 
         assert result.returncode == 0, result.stderr
         assert outputs["health"] == "down"
-        assert outputs["probe_state"] == "pending"
+        assert outputs["probe_state"] == "pending", outputs
         assert f"status={status}" in outputs["evidence"]
 
 
@@ -307,7 +307,7 @@ def test_current_merge_group_probe_requires_exact_queue_ref_and_sha(
     )
 
     assert accepted.returncode == 0, accepted.stderr
-    assert accepted_outputs["health"] == "up"
+    assert accepted_outputs["health"] == "up", accepted_outputs
     assert accepted_outputs["probe_state"] == "healthy"
     assert wrong_sha.returncode == 0, wrong_sha.stderr
     assert wrong_sha_outputs["health"] == "down"
@@ -347,7 +347,7 @@ def test_stale_success_failed_probe_and_api_uncertainty_never_poll(
         )
         assert result.returncode == 0, result.stderr
         assert outputs["health"] == "down"
-        assert outputs["probe_state"] == expected_state
+        assert outputs["probe_state"] == expected_state, outputs
 
 
 def test_bounded_observer_polls_pending_then_accepts_exact_success(
