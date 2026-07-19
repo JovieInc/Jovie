@@ -5,71 +5,130 @@ set -uo pipefail
 HEARTBEAT_WORKFLOW="${HEARTBEAT_WORKFLOW:-runner-heartbeat.yml}"
 HEARTBEAT_MAX_AGE_SECONDS="${HEARTBEAT_MAX_AGE_SECONDS:-1500}"
 HEARTBEAT_API_TIMEOUT_SECONDS="${HEARTBEAT_API_TIMEOUT_SECONDS:-20}"
+HEARTBEAT_EXPECTED_SHA="${HEARTBEAT_EXPECTED_SHA:-}"
+HEARTBEAT_EXPECTED_EVENT="${HEARTBEAT_EXPECTED_EVENT:-}"
+HEARTBEAT_GH_TEST_HELPER="${HEARTBEAT_GH_TEST_HELPER:-}"
 
 emit_health() {
   local health="$1"
-  local evidence="$2"
+  local probe_state="$2"
+  local evidence="$3"
   echo "Runner health: $health — $evidence"
   if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-    echo "health=$health" >> "$GITHUB_OUTPUT"
-    echo "evidence=$evidence" >> "$GITHUB_OUTPUT"
+    {
+      echo "health=$health"
+      echo "probe_state=$probe_state"
+      echo "evidence=$evidence"
+    } >> "$GITHUB_OUTPUT"
   fi
 }
 
 degrade() {
-  emit_health down "$1"
+  emit_health down "$1" "$2"
   exit 0
 }
 
+# Production always executes the installed GitHub CLI directly. Tests may
+# inject one exact, user-owned fixture script, but never from an Actions job:
+# this keeps the seam deterministic without making production command input
+# configurable or evaluating shell text from the environment.
+GH_API_COMMAND=(gh api)
+if [[ -n "$HEARTBEAT_GH_TEST_HELPER" ]]; then
+  if [[ "${GITHUB_ACTIONS:-}" == "true" || "${HEARTBEAT_GH_TEST_MODE:-}" != "1" ]]; then
+    degrade uncertain "heartbeat gh test helper is not authorized"
+  fi
+  if [[ "$HEARTBEAT_GH_TEST_HELPER" != /* || "${HEARTBEAT_GH_TEST_HELPER##*/}" != "gh" || ! -f "$HEARTBEAT_GH_TEST_HELPER" || -L "$HEARTBEAT_GH_TEST_HELPER" || ! -r "$HEARTBEAT_GH_TEST_HELPER" || ! -O "$HEARTBEAT_GH_TEST_HELPER" ]]; then
+    degrade uncertain "heartbeat gh test helper path is malformed"
+  fi
+  GH_API_COMMAND=(bash "$HEARTBEAT_GH_TEST_HELPER" api)
+fi
+
+heartbeat_gh_api() {
+  timeout "${HEARTBEAT_API_TIMEOUT_SECONDS}s" "${GH_API_COMMAND[@]}" "$@"
+}
+
 if ! [[ "$GH_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
-  degrade "repository identity is malformed"
+  degrade uncertain "repository identity is malformed"
 fi
 if [[ "$HEARTBEAT_WORKFLOW" != "runner-heartbeat.yml" ]]; then
-  degrade "heartbeat workflow identity is not authorized"
+  degrade uncertain "heartbeat workflow identity is not authorized"
 fi
 if ! [[ "$HEARTBEAT_MAX_AGE_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
-  degrade "heartbeat freshness boundary is malformed"
+  degrade uncertain "heartbeat freshness boundary is malformed"
 fi
 if ! [[ "$HEARTBEAT_API_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
-  degrade "heartbeat API timeout is malformed"
+  degrade uncertain "heartbeat API timeout is malformed"
+fi
+
+STRICT_EXPECTATION=false
+if [[ -n "$HEARTBEAT_EXPECTED_SHA" || -n "$HEARTBEAT_EXPECTED_EVENT" ]]; then
+  if ! [[ "$HEARTBEAT_EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    degrade uncertain "expected heartbeat commit identity is malformed"
+  fi
+  case "$HEARTBEAT_EXPECTED_EVENT" in
+    push|merge_group) ;;
+    *) degrade uncertain "expected heartbeat event identity is not authorized" ;;
+  esac
+  STRICT_EXPECTATION=true
+  RUNS_ENDPOINT="repos/$GH_REPO/actions/workflows/$HEARTBEAT_WORKFLOW/runs?event=$HEARTBEAT_EXPECTED_EVENT&head_sha=$HEARTBEAT_EXPECTED_SHA&per_page=2"
+  MAX_RUNS=2
+else
+  RUNS_ENDPOINT="repos/$GH_REPO/actions/workflows/$HEARTBEAT_WORKFLOW/runs?branch=main&per_page=1"
+  MAX_RUNS=1
 fi
 
 # Fail closed to hosted capacity on every API, schema, identity, or freshness
 # uncertainty. Never echo raw API responses or credentials into evidence.
-if ! runs_json="$(timeout "${HEARTBEAT_API_TIMEOUT_SECONDS}s" gh api \
-  "repos/$GH_REPO/actions/workflows/$HEARTBEAT_WORKFLOW/runs?branch=main&per_page=1" \
-  2>/dev/null)"; then
-  degrade "heartbeat Actions API is unavailable"
+if ! runs_json="$(heartbeat_gh_api "$RUNS_ENDPOINT" 2>/dev/null)"; then
+  degrade uncertain "heartbeat Actions API is unavailable"
 fi
-if ! jq -e '
+if ! jq -e --argjson max_runs "$MAX_RUNS" '
   type == "object" and
   (.workflow_runs | type == "array") and
-  (.workflow_runs | length <= 1)
+  (.workflow_runs | length <= $max_runs)
 ' >/dev/null <<<"$runs_json"; then
-  degrade "heartbeat run evidence is malformed or ambiguous"
+  degrade uncertain "heartbeat run evidence is malformed or ambiguous"
 fi
 run_count="$(jq '.workflow_runs | length' <<<"$runs_json")"
 if [[ "$run_count" != "1" ]]; then
-  degrade "no exact heartbeat run exists"
+  if [[ "$STRICT_EXPECTATION" == "true" && "$run_count" == "0" ]]; then
+    degrade pending "current exact heartbeat has not materialized yet"
+  fi
+  degrade uncertain "heartbeat run evidence is missing or ambiguous"
 fi
 
 run_record="$(jq -c '.workflow_runs[0]' <<<"$runs_json")"
-if ! jq -e --arg repo "$GH_REPO" '
+if ! jq -e \
+  --arg repo "$GH_REPO" \
+  --arg expected_event "$HEARTBEAT_EXPECTED_EVENT" \
+  --arg expected_sha "$HEARTBEAT_EXPECTED_SHA" \
+  --argjson strict "$STRICT_EXPECTATION" '
   type == "object" and
   (.id | type == "number" and . > 0) and
   (.run_attempt | type == "number" and . > 0) and
   .name == "Runner Heartbeat" and
   .path == ".github/workflows/runner-heartbeat.yml" and
-  .head_branch == "main" and
   .head_repository.full_name == $repo and
   (.head_sha | type == "string" and test("^[0-9a-f]{40}$")) and
-  (.event == "schedule" or .event == "workflow_dispatch") and
+  (
+    if $strict then
+      .head_sha == $expected_sha and
+      .event == $expected_event and
+      (
+        ($expected_event == "push" and .head_branch == "main") or
+        ($expected_event == "merge_group" and (.head_branch | startswith("gh-readonly-queue/main/")))
+      )
+    else
+      .head_branch == "main" and
+      (.event == "schedule" or .event == "workflow_dispatch" or .event == "push")
+    end
+  ) and
   (.status | type == "string") and
   ((.conclusion // "") | type == "string") and
   (.updated_at | type == "string") and
   (.html_url | type == "string")
 ' >/dev/null <<<"$run_record"; then
-  degrade "latest heartbeat run identity is malformed or unauthorized"
+  degrade uncertain "latest heartbeat run identity is malformed or unauthorized"
 fi
 
 run_id="$(jq -r '.id' <<<"$run_record")"
@@ -80,23 +139,58 @@ conclusion="$(jq -r '.conclusion // ""' <<<"$run_record")"
 observed_at="$(jq -r '.updated_at' <<<"$run_record")"
 run_url="$(jq -r '.html_url' <<<"$run_record")"
 if [[ "$run_url" != "https://github.com/$GH_REPO/actions/runs/$run_id" ]]; then
-  degrade "latest heartbeat run URL is malformed"
-fi
-if [[ "$status" != "completed" || "$conclusion" != "success" ]]; then
-  degrade "latest exact heartbeat is not a completed success"
+  degrade uncertain "latest heartbeat run URL is malformed"
 fi
 
-if ! jobs_json="$(timeout "${HEARTBEAT_API_TIMEOUT_SECONDS}s" gh api \
+if ! age_seconds="$(python3 - "$observed_at" <<'PY'
+import datetime
+import sys
+
+observed = datetime.datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00"))
+now = datetime.datetime.now(datetime.timezone.utc)
+age = int((now - observed).total_seconds())
+if age < 0:
+    raise ValueError("heartbeat timestamp is in the future")
+print(age)
+PY
+)"; then
+  degrade uncertain "heartbeat timestamp could not be parsed"
+fi
+if ! [[ "$age_seconds" =~ ^[0-9]+$ ]]; then
+  degrade uncertain "heartbeat age is malformed"
+fi
+if (( age_seconds > HEARTBEAT_MAX_AGE_SECONDS )); then
+  degrade unhealthy "latest exact heartbeat is stale (${age_seconds}s > ${HEARTBEAT_MAX_AGE_SECONDS}s)"
+fi
+
+case "$status" in
+  queued|in_progress|waiting|requested|pending)
+    if [[ "$STRICT_EXPECTATION" == "true" ]]; then
+      degrade pending "current exact heartbeat is status=$status"
+    fi
+    degrade unhealthy "latest exact heartbeat is status=$status"
+    ;;
+  completed)
+    if [[ "$conclusion" != "success" ]]; then
+      degrade unhealthy "latest exact heartbeat completed with conclusion=${conclusion:-none}"
+    fi
+    ;;
+  *)
+    degrade uncertain "latest exact heartbeat status is not recognized"
+    ;;
+esac
+
+if ! jobs_json="$(heartbeat_gh_api \
   --paginate --slurp \
   "repos/$GH_REPO/actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100" \
   2>/dev/null)"; then
-  degrade "exact heartbeat job API is unavailable"
+  degrade uncertain "exact heartbeat job API is unavailable"
 fi
 if ! jq -e '
   type == "array" and length > 0 and
   all(.[]; type == "object" and (.jobs | type == "array"))
 ' >/dev/null <<<"$jobs_json"; then
-  degrade "exact heartbeat job evidence is malformed"
+  degrade uncertain "exact heartbeat job evidence is malformed"
 fi
 heartbeat_jobs="$(jq -c '
   [
@@ -115,28 +209,7 @@ if ! jq -e --argjson run_id "$run_id" --arg head_sha "$head_sha" '
   (.[0].runner_name | type == "string" and length > 0) and
   (.[0].labels | type == "array" and index("jovie-runner") != null)
 ' >/dev/null <<<"$heartbeat_jobs"; then
-  degrade "exact heartbeat job did not complete successfully"
+  degrade uncertain "exact heartbeat job did not complete successfully"
 fi
 
-if ! age_seconds="$(python3 - "$observed_at" <<'PY'
-import datetime
-import sys
-
-observed = datetime.datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00"))
-now = datetime.datetime.now(datetime.timezone.utc)
-age = int((now - observed).total_seconds())
-if age < 0:
-    raise ValueError("heartbeat timestamp is in the future")
-print(age)
-PY
-)"; then
-  degrade "heartbeat timestamp could not be parsed"
-fi
-if ! [[ "$age_seconds" =~ ^[0-9]+$ ]]; then
-  degrade "heartbeat age is malformed"
-fi
-if (( age_seconds > HEARTBEAT_MAX_AGE_SECONDS )); then
-  degrade "latest exact heartbeat is stale (${age_seconds}s > ${HEARTBEAT_MAX_AGE_SECONDS}s)"
-fi
-
-emit_health up "exact heartbeat run $run_id attempt $run_attempt succeeded ${age_seconds}s ago ($run_url)"
+emit_health up healthy "exact heartbeat run $run_id attempt $run_attempt succeeded ${age_seconds}s ago ($run_url)"

@@ -347,7 +347,9 @@ jobs:
         with:
           ref: main
           fetch-depth: 1
-          sparse-checkout: .github/scripts/query-runner-heartbeat.sh
+          sparse-checkout: |
+            .github/scripts/await-runner-heartbeat.sh
+            .github/scripts/query-runner-heartbeat.sh
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
@@ -358,22 +360,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           HEARTBEAT_MAX_AGE_SECONDS: '900'
-          HEARTBEAT_API_TIMEOUT_SECONDS: '20'
+          HEARTBEAT_API_TIMEOUT_SECONDS: '5'
+          HEARTBEAT_EXPECTED_EVENT: ${{ (github.event_name == 'push' || github.event_name == 'merge_group') && github.event_name || '' }}
+          HEARTBEAT_EXPECTED_SHA: ${{ (github.event_name == 'push' || github.event_name == 'merge_group') && github.sha || '' }}
+          HEARTBEAT_POLL_ATTEMPTS: '10'
+          HEARTBEAT_POLL_INTERVAL_SECONDS: '5'
         run: |
           set -uo pipefail
-          echo "health=down" >> "$GITHUB_OUTPUT"
-          echo "evidence=trusted heartbeat helper unavailable; using hosted capacity" >> "$GITHUB_OUTPUT"
-          helper='.github/scripts/query-runner-heartbeat.sh'
+          {
+            echo "health=down"
+            echo "probe_state=unhealthy"
+            echo "evidence=trusted heartbeat helper unavailable; using hosted capacity"
+          } >> "$GITHUB_OUTPUT"
+          helper='.github/scripts/await-runner-heartbeat.sh'
           if [ ! -x "$helper" ]; then
             echo "::warning::Trusted heartbeat helper is absent before landing; using ubuntu-latest."
             exit 0
           fi
           query_output="$RUNNER_TEMP/unit-runner-heartbeat-output"
           : > "$query_output"
-          if GITHUB_OUTPUT="$query_output" "$helper"; then
+          if GITHUB_OUTPUT="$query_output" timeout 60s "$helper"; then
             cat "$query_output" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::Trusted heartbeat helper failed unexpectedly; using ubuntu-latest."
+            echo "::warning::Trusted heartbeat observer timed out or failed unexpectedly; using ubuntu-latest."
           fi
           exit 0
 

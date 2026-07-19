@@ -1,6 +1,14 @@
 name: Runner Heartbeat
 
 on:
+  # GitHub cron delivery is best-effort and can be delayed well past its nominal
+  # interval. Probe every combined candidate and direct main generation so the
+  # hosted CI router can await current, exact evidence instead of inheriting a
+  # stale scheduled result.
+  push:
+    branches: [main]
+  merge_group:
+    types: [checks_requested]
   schedule:
     - cron: '*/10 * * * *'
   workflow_dispatch:

@@ -14,6 +14,7 @@ from typing import Any, Optional
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _WORKFLOWS = _REPO_ROOT / ".github" / "workflows"
 _QUERY_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "query-runner-heartbeat.sh"
+_AWAIT_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "await-runner-heartbeat.sh"
 
 
 def _job_block(workflow: str, job_name: str) -> str:
@@ -65,6 +66,9 @@ def _fake_gh(tmp_path: Path) -> Path:
             done
             if [[ -n "${FAKE_GH_SLEEP_SECONDS:-}" ]]; then
               sleep "$FAKE_GH_SLEEP_SECONDS"
+            fi
+            if [[ -n "${FAKE_GH_INVOCATION_MARKER:-}" ]]; then
+              printf 'invoked\n' >> "$FAKE_GH_INVOCATION_MARKER"
             fi
             if [[ -n "${FAKE_GH_ERROR:-}" ]]; then
               echo "$FAKE_GH_ERROR" >&2
@@ -133,27 +137,44 @@ def _run_query(
     api_error: str = "",
     sleep_seconds: str = "",
     timeout_seconds: str = "20",
+    expected_event: str = "",
+    expected_sha: str = "",
+    github_actions_context: bool = False,
+    invocation_marker: Optional[Path] = None,
 ) -> tuple[subprocess.CompletedProcess[str], dict[str, str]]:
-    _fake_gh(tmp_path)
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    fake_gh = _fake_gh(tmp_path)
     if runs_json is None or jobs_json is None:
         exact_runs, exact_jobs = _exact_evidence()
         runs_json = exact_runs if runs_json is None else runs_json
         jobs_json = exact_jobs if jobs_json is None else jobs_json
     output = tmp_path / "github-output"
     env = os.environ.copy()
+    # Fixture injection is deliberately unavailable to production Actions
+    # invocations. The test subprocess opts out of that parent context and
+    # passes the exact helper path instead of relying on PATH resolution.
+    env.pop("GITHUB_ACTIONS", None)
     env.update(
         {
-            "PATH": f"{tmp_path}:{env['PATH']}",
             "GH_REPO": "JovieInc/Jovie",
             "GITHUB_OUTPUT": str(output),
+            "HEARTBEAT_GH_TEST_HELPER": str(fake_gh),
+            "HEARTBEAT_GH_TEST_MODE": "1",
             "HEARTBEAT_MAX_AGE_SECONDS": "900",
             "HEARTBEAT_API_TIMEOUT_SECONDS": timeout_seconds,
+            "HEARTBEAT_EXPECTED_EVENT": expected_event,
+            "HEARTBEAT_EXPECTED_SHA": expected_sha,
             "FAKE_RUNS_JSON": runs_json,
             "FAKE_JOBS_JSON": jobs_json,
             "FAKE_GH_ERROR": api_error,
             "FAKE_GH_SLEEP_SECONDS": sleep_seconds,
+            "FAKE_GH_INVOCATION_MARKER": (
+                str(invocation_marker) if invocation_marker is not None else ""
+            ),
         }
     )
+    if github_actions_context:
+        env["GITHUB_ACTIONS"] = "true"
     result = subprocess.run(
         ["bash", str(_QUERY_SCRIPT)],
         cwd=_REPO_ROOT,
@@ -170,12 +191,247 @@ def _run_query(
     return result, outputs
 
 
+def _run_await(
+    tmp_path: Path,
+    states: list[tuple[str, str, str]],
+    *,
+    attempts: int,
+) -> tuple[subprocess.CompletedProcess[str], dict[str, str], int]:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    state_file = tmp_path / "states"
+    state_file.write_text(
+        "\n".join("|".join(state) for state in states) + "\n", encoding="utf-8"
+    )
+    count_file = tmp_path / "count"
+    query = tmp_path / "query"
+    query.write_text(
+        textwrap.dedent(
+            """\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            count=0
+            [[ ! -f "$FAKE_QUERY_COUNT" ]] || count="$(cat "$FAKE_QUERY_COUNT")"
+            count=$((count + 1))
+            echo "$count" > "$FAKE_QUERY_COUNT"
+            record="$(sed -n "${count}p" "$FAKE_QUERY_STATES")"
+            if [[ -z "$record" ]]; then
+              record="$(tail -n 1 "$FAKE_QUERY_STATES")"
+            fi
+            IFS='|' read -r health probe_state evidence <<< "$record"
+            {
+              echo "health=$health"
+              echo "probe_state=$probe_state"
+              echo "evidence=$evidence"
+            } >> "$GITHUB_OUTPUT"
+            """
+        ),
+        encoding="utf-8",
+    )
+    query.chmod(query.stat().st_mode | stat.S_IXUSR)
+    fake_sleep = tmp_path / "sleep"
+    fake_sleep.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    fake_sleep.chmod(fake_sleep.stat().st_mode | stat.S_IXUSR)
+    output = tmp_path / "github-output"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{tmp_path}:{env['PATH']}",
+            "GITHUB_OUTPUT": str(output),
+            "RUNNER_HEARTBEAT_QUERY_HELPER": str(query),
+            "HEARTBEAT_POLL_ATTEMPTS": str(attempts),
+            "HEARTBEAT_POLL_INTERVAL_SECONDS": "1",
+            "FAKE_QUERY_COUNT": str(count_file),
+            "FAKE_QUERY_STATES": str(state_file),
+        }
+    )
+    result = subprocess.run(
+        ["bash", str(_AWAIT_SCRIPT)],
+        cwd=_REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    outputs: dict[str, str] = {}
+    if output.exists():
+        for line in output.read_text(encoding="utf-8").splitlines():
+            key, value = line.split("=", 1)
+            outputs[key] = value
+    count = int(count_file.read_text(encoding="utf-8")) if count_file.exists() else 0
+    return result, outputs, count
+
+
 def test_exact_fresh_run_and_job_prove_fixed_runner_health(tmp_path: Path) -> None:
     result, outputs = _run_query(tmp_path)
 
     assert result.returncode == 0, result.stderr
-    assert outputs["health"] == "up"
+    assert outputs["health"] == "up", outputs
+    assert outputs["probe_state"] == "healthy"
     assert "run 29672288797 attempt 1" in outputs["evidence"]
+
+
+def test_production_actions_context_cannot_authorize_test_gh_helper(
+    tmp_path: Path,
+) -> None:
+    marker = tmp_path / "fake-gh-invoked"
+    result, outputs = _run_query(
+        tmp_path,
+        github_actions_context=True,
+        invocation_marker=marker,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert outputs == {
+        "health": "down",
+        "probe_state": "uncertain",
+        "evidence": "heartbeat gh test helper is not authorized",
+    }
+    assert not marker.exists()
+
+
+def test_current_exact_queued_or_in_progress_probe_is_the_only_retryable_state(
+    tmp_path: Path,
+) -> None:
+    head_sha = "a" * 40
+    for status in ("queued", "in_progress"):
+        runs_json, jobs_json = _exact_evidence(
+            run_updates={
+                "event": "push",
+                "status": status,
+                "conclusion": None,
+            }
+        )
+        result, outputs = _run_query(
+            tmp_path / status,
+            runs_json=runs_json,
+            jobs_json=jobs_json,
+            expected_event="push",
+            expected_sha=head_sha,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert outputs["health"] == "down"
+        assert outputs["probe_state"] == "pending", outputs
+        assert f"status={status}" in outputs["evidence"]
+
+
+def test_current_merge_group_probe_requires_exact_queue_ref_and_sha(
+    tmp_path: Path,
+) -> None:
+    head_sha = "a" * 40
+    exact_runs, exact_jobs = _exact_evidence(
+        run_updates={
+            "event": "merge_group",
+            "head_branch": "gh-readonly-queue/main/pr-14469-c3d181de6800",
+        }
+    )
+    accepted, accepted_outputs = _run_query(
+        tmp_path / "accepted",
+        runs_json=exact_runs,
+        jobs_json=exact_jobs,
+        expected_event="merge_group",
+        expected_sha=head_sha,
+    )
+    wrong_sha, wrong_sha_outputs = _run_query(
+        tmp_path / "wrong-sha",
+        runs_json=exact_runs,
+        jobs_json=exact_jobs,
+        expected_event="merge_group",
+        expected_sha="b" * 40,
+    )
+
+    assert accepted.returncode == 0, accepted.stderr
+    assert accepted_outputs["health"] == "up", accepted_outputs
+    assert accepted_outputs["probe_state"] == "healthy"
+    assert wrong_sha.returncode == 0, wrong_sha.stderr
+    assert wrong_sha_outputs["health"] == "down"
+    assert wrong_sha_outputs["probe_state"] == "uncertain"
+
+
+def test_stale_success_failed_probe_and_api_uncertainty_never_poll(
+    tmp_path: Path,
+) -> None:
+    head_sha = "a" * 40
+    stale_at = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat().replace(
+        "+00:00", "Z"
+    )
+    stale_runs, stale_jobs = _exact_evidence(
+        observed_at=stale_at,
+        run_updates={"event": "push"},
+    )
+    failed_runs, failed_jobs = _exact_evidence(
+        run_updates={"event": "push", "conclusion": "failure"}
+    )
+    cases = (
+        (stale_runs, stale_jobs, "", "unhealthy"),
+        (failed_runs, failed_jobs, "", "unhealthy"),
+        (None, None, "HTTP 503: unavailable", "uncertain"),
+    )
+
+    for index, (runs_json, jobs_json, api_error, expected_state) in enumerate(cases):
+        case_dir = tmp_path / str(index)
+        case_dir.mkdir()
+        result, outputs = _run_query(
+            case_dir,
+            runs_json=runs_json,
+            jobs_json=jobs_json,
+            api_error=api_error,
+            expected_event="push",
+            expected_sha=head_sha,
+        )
+        assert result.returncode == 0, result.stderr
+        assert outputs["health"] == "down"
+        assert outputs["probe_state"] == expected_state, outputs
+
+
+def test_bounded_observer_polls_pending_then_accepts_exact_success(
+    tmp_path: Path,
+) -> None:
+    result, outputs, count = _run_await(
+        tmp_path,
+        [
+            ("down", "pending", "current exact heartbeat is status=in_progress"),
+            ("up", "healthy", "current exact heartbeat succeeded"),
+        ],
+        attempts=3,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert count == 2
+    assert outputs["health"] == "up"
+    assert outputs["probe_state"] == "healthy"
+
+
+def test_offline_pending_probe_falls_back_after_exact_observation_bound(
+    tmp_path: Path,
+) -> None:
+    result, outputs, count = _run_await(
+        tmp_path,
+        [("down", "pending", "current exact heartbeat is status=queued")],
+        attempts=3,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert count == 3
+    assert outputs["health"] == "down"
+    assert outputs["probe_state"] == "unhealthy"
+    assert "remained pending after 3 observations" in outputs["evidence"]
+
+
+def test_uncertain_or_failed_probe_selects_hosted_without_retry(
+    tmp_path: Path,
+) -> None:
+    for index, state in enumerate(("uncertain", "unhealthy")):
+        result, outputs, count = _run_await(
+            tmp_path / str(index),
+            [("down", state, f"{state} evidence")],
+            attempts=10,
+        )
+        assert result.returncode == 0, result.stderr
+        assert count == 1
+        assert outputs["health"] == "down"
+        assert outputs["probe_state"] == state
+        assert "using hosted capacity" in outputs["evidence"]
 
 
 def test_missing_stale_or_incomplete_evidence_degrades_to_hosted(
@@ -336,11 +592,13 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     route = _job_block("ci.yml", "ci-unit-runner-route")
     units = _job_block("ci.yml", "ci-unit-tests")
     query = _QUERY_SCRIPT.read_text(encoding="utf-8")
+    awaiter = _AWAIT_SCRIPT.read_text(encoding="utf-8")
 
     assert "runs-on: ubuntu-latest" in route
     assert "ref: main" in route
     assert "persist-credentials: false" in route
-    assert "sparse-checkout: .github/scripts/query-runner-heartbeat.sh" in route
+    assert ".github/scripts/await-runner-heartbeat.sh" in route
+    assert ".github/scripts/query-runner-heartbeat.sh" in route
     assert route.count("continue-on-error: true") == 2
     assert (
         "name: Checkout trusted runner routing policy\n"
@@ -354,15 +612,27 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     assert 'if [ ! -x "$helper" ]' in route
     assert "secrets." not in route
     assert "GH_TOKEN: ${{ github.token }}" in route
-    assert "HEARTBEAT_API_TIMEOUT_SECONDS: '20'" in route
+    assert "HEARTBEAT_API_TIMEOUT_SECONDS: '5'" in route
+    assert "HEARTBEAT_POLL_ATTEMPTS: '10'" in route
+    assert "HEARTBEAT_POLL_INTERVAL_SECONDS: '5'" in route
+    assert "HEARTBEAT_EXPECTED_EVENT:" in route
+    assert "HEARTBEAT_EXPECTED_SHA:" in route
+    assert 'timeout 60s "$helper"' in route
     assert "fixed|hosted" in route
     assert "runner_class='hosted'" in route
     assert "runner: ${{ steps.route.outputs.runner }}" not in route
-    assert query.count('timeout "${HEARTBEAT_API_TIMEOUT_SECONDS}s" gh api') == 2
+    assert 'GH_API_COMMAND=(gh api)' in query
+    assert 'GH_API_COMMAND=(bash "$HEARTBEAT_GH_TEST_HELPER" api)' in query
+    assert query.count("heartbeat_gh_api") == 3
+    assert "eval " not in query
+    assert '"${GITHUB_ACTIONS:-}" == "true"' in query
     assert 'head_repository.full_name == $repo' in query
     assert '.[0].run_id == $run_id' in query
     assert '.[0].head_sha == $head_sha' in query
     assert 'index("jovie-runner") != null' in query
+    assert 'degrade pending "current exact heartbeat' in query
+    assert "for ((attempt = 1; attempt <= POLL_ATTEMPTS; attempt++))" in awaiter
+    assert 'if [[ "$probe_state" != "pending" ]]' in awaiter
     assert (
         "[ci-path-changes, ci-unit-runner-route, ci-merge-group-admission]" in units
     )
@@ -372,6 +642,28 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     ) in units
     assert "vars.CI_UNIT_RUNNER" not in units
     assert "max-parallel: 2" in units
+
+
+def test_event_driven_heartbeat_has_no_recursive_trigger_or_fixed_pool_fanout() -> None:
+    heartbeat = (_WORKFLOWS / "runner-heartbeat.yml").read_text(encoding="utf-8")
+    route = _job_block("ci.yml", "ci-unit-runner-route")
+
+    assert "push:" in heartbeat
+    assert "branches: [main]" in heartbeat
+    assert "merge_group:" in heartbeat
+    assert "types: [checks_requested]" in heartbeat
+    assert "schedule:" in heartbeat
+    assert "workflow_dispatch:" in heartbeat
+    assert "pull_request:" not in heartbeat
+    assert "workflow_run:" not in heartbeat
+    assert "repository_dispatch:" not in heartbeat
+    assert heartbeat.count("runs-on: jovie-runner") == 1
+    assert "group: runner-heartbeat" in heartbeat
+    assert "cancel-in-progress: true" in heartbeat
+    assert "matrix:" not in heartbeat
+    assert "actions: write" not in route
+    assert "/dispatches" not in route
+    assert "gh workflow run" not in route
 
 
 def test_observers_are_hosted_and_never_mutate_routing_or_fail_on_api_state() -> None:
