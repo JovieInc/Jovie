@@ -81,6 +81,11 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const PR_SIZE_GUARD_MANIFEST = [
+  '.github/workflows/pr-size-guard.yml',
+  'scripts/lib/pr-size-guard-policy.mjs',
+  'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
+];
 const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = [
   '.github/workflows/ci.yml',
   'apps/web/scripts/test-performance-guard.ts',
@@ -791,6 +796,71 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...AFFECTED_TEST_SELECTOR_MANIFEST,
         'scripts/lib/unknown-selector-helper.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the policy regression for the exact PR size guard signature', () => {
+    const plan = buildAffectedTestPlan(PR_SIZE_GUARD_MANIFEST);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
+    ]);
+  });
+
+  it('self-selects selector and policy regressions for this five-file control diff', () => {
+    const plan = buildAffectedTestPlan([
+      ...PR_SIZE_GUARD_MANIFEST,
+      ...AFFECTED_TEST_SELECTOR_MANIFEST,
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
+    ]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          'exec',
+          'vitest',
+          '--root',
+          'scripts',
+          '--config',
+          'vitest.config.mts',
+          'run',
+          'lib/__tests__/automation-verify.test.mjs',
+          'lib/__tests__/pr-size-guard-policy.test.mjs',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
+  });
+
+  it.each(
+    PR_SIZE_GUARD_MANIFEST
+  )('fails closed when the PR size guard input %s is standalone', input => {
+    expect(buildAffectedTestPlan([input]).mode).toBe('full');
+  });
+
+  it.each(
+    PR_SIZE_GUARD_MANIFEST
+  )('fails closed when the PR size guard signature is missing %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        PR_SIZE_GUARD_MANIFEST.filter(file => file !== missingInput)
+      ).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when the PR size guard signature includes an unknown peer', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...PR_SIZE_GUARD_MANIFEST,
+        'scripts/lib/unknown-pr-size-helper.mjs',
       ]).mode
     ).toBe('full');
   });

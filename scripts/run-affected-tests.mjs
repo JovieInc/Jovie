@@ -127,6 +127,14 @@ const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
   'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
 ]);
+const PR_SIZE_GUARD_MANIFEST = new Set([
+  '.github/workflows/pr-size-guard.yml',
+  'scripts/lib/pr-size-guard-policy.mjs',
+  'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
+]);
+const PR_SIZE_GUARD_TESTS = [
+  'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
+];
 const GOLDEN_PATH_SMOKE_CONTRACT_CORE = new Set([
   'apps/web/tests/e2e/golden-path.spec.ts',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
@@ -396,6 +404,17 @@ export function buildAffectedTestPlan(changedFiles) {
     ) &&
     (affectedTestSelectorInputCount === 0 ||
       affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  const prSizeGuardInputCount = files.filter(file =>
+    PR_SIZE_GUARD_MANIFEST.has(file)
+  ).length;
+  const isExactPrSizeGuard =
+    prSizeGuardInputCount === PR_SIZE_GUARD_MANIFEST.size &&
+    files.length === PR_SIZE_GUARD_MANIFEST.size;
+  const isExactPrSizeGuardWithSelector =
+    prSizeGuardInputCount === PR_SIZE_GUARD_MANIFEST.size &&
+    affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
+    files.length ===
+      PR_SIZE_GUARD_MANIFEST.size + AFFECTED_TEST_SELECTOR_MANIFEST.size;
   const goldenPathSmokeContractInputCount = files.filter(file =>
     GOLDEN_PATH_SMOKE_CONTRACT_CORE.has(file)
   ).length;
@@ -632,6 +651,7 @@ export function buildAffectedTestPlan(changedFiles) {
       : []),
     ...(isExactAffectedTestSelector ||
     (isExactAuthenticatedA11yRepair && affectedTestSelectorInputCount > 0) ||
+    isExactPrSizeGuardWithSelector ||
     isExactGoldenPathSmokeContractRepair ||
     isExactNeonAttemptArtifactRepair ||
     isExactPerformanceProfilerRepairWithSelector ||
@@ -639,6 +659,9 @@ export function buildAffectedTestPlan(changedFiles) {
     isExactRunnerPrerequisiteVisualQaRepair ||
     (isExactPersistedAuthFixtureRepair && affectedTestSelectorInputCount > 0)
       ? AFFECTED_TEST_SELECTOR_TESTS
+      : []),
+    ...(isExactPrSizeGuard || isExactPrSizeGuardWithSelector
+      ? PR_SIZE_GUARD_TESTS
       : []),
     ...(isExactGoldenPathSmokeContractRepair
       ? GOLDEN_PATH_SMOKE_CONTRACT_SCRIPT_TESTS
@@ -750,7 +773,12 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactGtmqSourceGateReaper &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
-    !isExactLayoutGuardContract;
+    !isExactLayoutGuardContract &&
+    !isExactPrSizeGuardWithSelector;
+  const hasIncompletePrSizeGuard =
+    prSizeGuardInputCount > 0 &&
+    !isExactPrSizeGuard &&
+    !isExactPrSizeGuardWithSelector;
   const hasIncompletePerformanceProfilerRepair =
     performanceProfilerRepairInputCount > 0 &&
     !isExactPerformanceProfilerRepair &&
@@ -775,7 +803,8 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactGtmqSourceGateReaper &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
-    !isExactLayoutGuardContract;
+    !isExactLayoutGuardContract &&
+    !isExactPrSizeGuardWithSelector;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
@@ -789,7 +818,8 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactPerformanceProfilerRepairWithSelector &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
-    !isExactLayoutGuardContract;
+    !isExactLayoutGuardContract &&
+    !isExactPrSizeGuardWithSelector;
   const hasIncompleteRunnerIoPressure =
     runnerIoPressureInputCount > 0 &&
     !isExactRunnerIoPressure &&
@@ -802,7 +832,8 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactGtmqSourceGateReaper &&
     !isExactPerformanceProfilerRepair &&
     !isExactRunnerPrerequisiteRepair &&
-    !isExactLayoutGuardContract;
+    !isExactLayoutGuardContract &&
+    !isExactPrSizeGuardWithSelector;
   const hasIncompleteRunnerPrerequisiteContract =
     runnerPrerequisiteContractInputCount > 0 &&
     !isExactRunnerPrerequisiteRepair &&
@@ -816,7 +847,8 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactPersistedAuthFixtureRepair &&
     !isExactLayoutGuardContract &&
     !isExactPerformanceProfilerRepair &&
-    !isExactRunnerIoPressure;
+    !isExactRunnerIoPressure &&
+    !isExactPrSizeGuardWithSelector;
   const hasIncompleteLayoutGuardContract =
     layoutGuardContractInputCount > 0 &&
     !isExactLayoutGuardContract &&
@@ -830,7 +862,8 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactVisualQaSelectorRepair &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactPerformanceProfilerRepair &&
-    !isExactRunnerIoPressure;
+    !isExactRunnerIoPressure &&
+    !isExactPrSizeGuardWithSelector;
   const hasIncompleteNeonAttemptArtifactRepair =
     neonAttemptArtifactInputCount > 0 &&
     !isExactNeonAttemptArtifactRepair &&
@@ -845,7 +878,8 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactGtmqSourceGateReaper &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
-    !isExactLayoutGuardContract;
+    !isExactLayoutGuardContract &&
+    !isExactPrSizeGuardWithSelector;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
     hasUnknownCiCancellationHealerPeer ||
@@ -855,6 +889,7 @@ export function buildAffectedTestPlan(changedFiles) {
     hasUnknownPrerequisiteTrainPeer ||
     hasIncompleteVercelCongestionControl ||
     hasIncompleteAffectedTestSelector ||
+    hasIncompletePrSizeGuard ||
     hasIncompletePerformanceProfilerRepair ||
     hasIncompleteScannerLoadRepair ||
     hasIncompleteGtmqSourceGateReaper ||
@@ -877,6 +912,8 @@ export function buildAffectedTestPlan(changedFiles) {
             isExactVercelCongestionControl ||
             isExactAffectedTestSelector ||
             isExactAuthenticatedA11yRepair ||
+            isExactPrSizeGuard ||
+            isExactPrSizeGuardWithSelector ||
             isExactGoldenPathSmokeContractRepair ||
             isExactNeonAttemptArtifactRepair ||
             isExactPerformanceProfilerRepair ||
