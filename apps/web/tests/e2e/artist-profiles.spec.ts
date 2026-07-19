@@ -269,8 +269,16 @@ test.describe('Artist Profiles Landing', () => {
     await expect(
       outcomesSection.getByRole('heading', { name: /sell out/i })
     ).toBeVisible();
-    await expect(outcomesSection.getByText('Tim White')).toBeVisible();
-    await expect(outcomesSection.getByText('w/ Cosmic Gate')).toBeVisible();
+    await expect(
+      outcomesSection
+        .getByTestId('artist-profile-drive-streams-live-card')
+        .getByText('Tim White')
+    ).toBeVisible();
+    await expect(
+      outcomesSection
+        .getByTestId('artist-profile-drive-streams-live-card')
+        .getByText('w/ Cosmic Gate')
+    ).toBeVisible();
     await expect(
       outcomesSection.getByTestId('artist-profile-drive-streams-live-card')
     ).toBeVisible();

@@ -1,7 +1,7 @@
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import { MarketingContainer } from '@/components/marketing';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
+import { MarketingContainer } from '../MarketingContainer';
 import { ArtistProfileHero } from './ArtistProfileHero';
 import { ArtistProfileModeSwitcher } from './ArtistProfileModeSwitcher';
 
@@ -21,14 +21,14 @@ export function ArtistProfileHeroAdaptiveIntro({
   showForgeUiMarketingUpdates = false,
 }: Readonly<ArtistProfileHeroAdaptiveIntroProps>) {
   return (
-    <div className='relative overflow-x-clip bg-black dark:bg-black'>
+    <div className='artist-profile-hero-adaptive-intro relative overflow-x-clip bg-black dark:bg-black'>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.hero}>
         <ArtistProfileHero hero={hero} />
       </div>
 
       <div
         data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.adaptive}
-        className='relative bg-black dark:bg-black pb-16 pt-2 sm:pb-10 sm:pt-4 lg:pb-12 lg:pt-6'
+        className='relative bg-black dark:bg-black pb-[4.5rem] pt-2 sm:pb-10 sm:pt-4 lg:pb-12 lg:pt-6'
       >
         <MarketingContainer
           width='page'
@@ -51,7 +51,7 @@ export function ArtistProfileHeroAdaptiveIntro({
 
       <div
         data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.trust}
-        className='relative z-30 lg:-mt-28 xl:-mt-32'
+        className='artist-profile-intro-trust relative z-30 lg:-mt-28 xl:-mt-32'
       >
         <HomeTrustSection label='Trusted By Artists' />
       </div>
@@ -91,6 +91,32 @@ export function ArtistProfileHeroAdaptiveIntro({
               14svh,
               calc(var(--linear-header-height) + 6rem)
             );
+          }
+        }
+
+        @media (min-width: 1024px) and (max-height: 820px) {
+          .artist-profile-hero-adaptive-intro {
+            --artist-profile-intro-scroll-reserve: 44rem;
+          }
+
+          .artist-profile-intro-stage::after {
+            /* A real flow child, rather than padding, extends sticky's
+             * containing block through the trust handoff. */
+            content: '';
+            display: block;
+            height: var(--artist-profile-intro-scroll-reserve);
+          }
+
+          .artist-profile-intro-rail {
+            position: sticky;
+            top: 1rem;
+          }
+
+          .artist-profile-intro-trust {
+            /* The rail's reserve keeps its pinned phone behind the trust
+             * handoff; the matching negative margin keeps downstream
+             * sections in their stable document positions. */
+            margin-top: calc(-3rem - var(--artist-profile-intro-scroll-reserve));
           }
         }
       `}</style>

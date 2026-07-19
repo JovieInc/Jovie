@@ -1,6 +1,6 @@
 import type { ReactNode, Ref } from 'react';
-import { MarketingContainer } from '@/components/marketing';
 import { cn } from '@/lib/utils';
+import { MarketingContainer } from '../MarketingContainer';
 
 const PAGE_CHROME_ALIGNED_CONTAINER_CLASS =
   '!max-w-linear-content !px-5 sm:!px-6 lg:!px-0';
