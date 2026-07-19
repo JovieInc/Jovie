@@ -18,7 +18,7 @@ export const Default: Story = {
     <div className='flex justify-center'>
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant='outline'>More info</Button>
+          <Button variant='secondary'>More info</Button>
         </PopoverTrigger>
         <PopoverContent sideOffset={8} align='center'>
           <p className='text-sm text-gray-700 dark:text-gray-200'>

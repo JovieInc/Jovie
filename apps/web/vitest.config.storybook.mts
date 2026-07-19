@@ -33,6 +33,12 @@ export default defineConfig({
     target: 'esnext',
   },
   resolve: {
+    alias: {
+      // next-themes injects a server bootstrap <script>. Browser-mode story
+      // tests mount previews entirely on the client, where React warns for
+      // every script and never executes it.
+      'next-themes': path.join(dirname, '.storybook/next-themes-mock.tsx'),
+    },
     dedupe: [
       'react',
       'react-dom',
@@ -55,7 +61,6 @@ export default defineConfig({
       'react-dom/client',
       // Storybook / Next.js framework
       '@storybook/nextjs-vite',
-      'next-themes',
       'sonner',
       // UI libraries
       'clsx',
