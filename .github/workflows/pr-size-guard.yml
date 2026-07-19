@@ -6,8 +6,12 @@ name: PR Size Guard
 # approved mechanical codemods (token sweeps, renames, generated output) with
 # the `big-pr` label. Thresholds tunable via repo vars PR_MAX_LINES / PR_MAX_FILES.
 # Circular shared-CI repair trains may use `integration-train`, but only with a
-# machine-readable source block naming 2+ component PRs and the fixed, bounded
-# 2500-line / 60-file cap enforced by pr-size-guard-policy.mjs.
+# machine-readable source block naming 2+ component PRs, each pinned as
+# `- https://github.com/JovieInc/Jovie/pull/123 @ <40-character-head-sha>`.
+# Every source path must be present in the train unless a reviewed path appears
+# in the JSON `integration-train-omissions` body block. Source identity, path
+# coverage, and the fixed 2500-line / 60-file cap are fail-closed in
+# pr-size-guard-policy.mjs.
 
 # PR size can only change on a push (opened/synchronize/reopened), never on a
 # label event. This guard is a REQUIRED check, so re-running it on
