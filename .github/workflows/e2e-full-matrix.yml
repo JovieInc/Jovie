@@ -26,8 +26,8 @@ jobs:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     strategy:
       fail-fast: false
-      # Preserve both browsers without occupying two self-hosted runners at once.
-      max-parallel: 1
+      # Both GitHub-hosted browser jobs run concurrently (ubuntu-latest).
+      max-parallel: 2
       matrix:
         browser: [chromium, firefox]
     steps:

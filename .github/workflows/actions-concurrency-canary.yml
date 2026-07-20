@@ -1,0 +1,105 @@
+# Cheap GitHub-hosted concurrency canary for JOV-4330 / #14545.
+# Proves plan Actions concurrency can schedule >60 simultaneous jobs.
+# Temporary push trigger is branch-scoped so it becomes manual-only after merge.
+name: Actions Concurrency Canary
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ci/jov-4330-concurrency-120
+
+permissions:
+  contents: read
+
+concurrency:
+  group: actions-concurrency-canary-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  concurrency-slot:
+    name: Slot ${{ matrix.slot }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      max-parallel: 65
+      matrix:
+        slot:
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63,
+            64,
+          ]
+    steps:
+      - name: Emit overlap timestamps
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "slot=${{ matrix.slot }}"
+          echo "start=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # Bounded sleep keeps ~65 jobs overlapping without burning billable minutes.
+          sleep 75
+          echo "end=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
