@@ -19,7 +19,13 @@ name: PR Size Guard
 # merge loop does this constantly) cancels the in-flight run via
 # cancel-in-progress, leaving a CANCELLED/QUEUED run as the latest for a
 # required context → GitHub pins the PR BLOCKED even though it's green
-# (JOV-3580). The big-pr/codemod opt-out is honored on push via the webhook
+# (JOV-3580). The same pinning hits two pull_request runs firing on the SAME
+# head SHA in the same second (e.g. opened + synchronize, or a duplicate
+# webhook delivery — PR #14453): they share the per-PR concurrency group, so
+# cancel-in-progress kills one and the rollup can pin the CANCELLED run.
+# pull_request runs therefore never cancel (cancel-in-progress is
+# merge_group-only below); at ~12s per run, serializing same-PR duplicates is
+# negligible. The big-pr/codemod opt-out is honored on push via the webhook
 # payload (no GraphQL — avoids rate-limit flakes on bypass). When the label
 # lands after a failing run,
 # pr-size-guard-label-override.yml posts a passing check-run override.
@@ -38,7 +44,10 @@ permissions:
 
 concurrency:
   group: pr-size-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}
-  cancel-in-progress: true
+  # pull_request: never cancel — duplicate same-head-SHA runs must each reach
+  # a terminal success/failure so the rollup cannot pin a CANCELLED run for
+  # this required context (JOV-3580). merge_group stays keyed by exact head.
+  cancel-in-progress: ${{ github.event_name == 'merge_group' }}
 
 jobs:
   merge-group-size:
