@@ -12,6 +12,14 @@ describe('NavLink', () => {
     expect(link).toHaveClass('text-muted-foreground');
   });
 
+  it('renders through the canonical Link primitive', () => {
+    render(<NavLink href='/test'>Canonical</NavLink>);
+
+    const link = screen.getByRole('link', { name: 'Canonical' });
+    expect(link).toHaveAttribute('data-variant', 'link');
+    expect(link).toHaveAttribute('data-state', 'idle');
+  });
+
   it('renders with primary variant', () => {
     render(
       <NavLink href='/test' variant='primary'>

@@ -14,6 +14,13 @@ describe('FooterLink', () => {
     expect(link).toBeInTheDocument();
   });
 
+  it('renders through the canonical Link primitive', () => {
+    render(<FooterLink href='/about'>Canonical</FooterLink>);
+    const link = screen.getByRole('link', { name: 'Canonical' });
+    expect(link).toHaveAttribute('data-variant', 'link');
+    expect(link).toHaveAttribute('data-state', 'idle');
+  });
+
   it('renders with correct href', () => {
     render(<FooterLink href='/contact'>Contact</FooterLink>);
     const link = screen.getByRole('link', { name: 'Contact' });
