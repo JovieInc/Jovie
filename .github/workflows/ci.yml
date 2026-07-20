@@ -996,6 +996,11 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Validate CI/release incident prevention contract
+        # This is intentionally outside the path-gated Structural Contract.
+        # The required prevention receipt must exist for every source PR and
+        # exact merge-group head, even when no contract file changed.
+        run: pnpm ci:incident-contract:validate
       - name: Verify Node and tsx seed-loader compatibility
         shell: bash
         run: |
