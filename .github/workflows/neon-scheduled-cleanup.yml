@@ -1,6 +1,9 @@
 name: Neon Scheduled Branch Cleanup
 
 on:
+  schedule:
+    # Daily hygiene sweep, offset from the nightly CI lanes.
+    - cron: '43 3 * * *'
   workflow_dispatch:
     inputs:
       cleanup_threshold:
@@ -15,6 +18,10 @@ on:
 permissions:
   actions: read
   contents: read
+
+concurrency:
+  group: neon-scheduled-cleanup
+  cancel-in-progress: false
 
 jobs:
   scheduled-cleanup:
