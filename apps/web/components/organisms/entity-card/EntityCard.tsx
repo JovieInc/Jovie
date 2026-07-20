@@ -34,6 +34,13 @@ interface EntityCardProps {
   readonly priority?: boolean;
   readonly dataTestId?: string;
   readonly onClick?: () => void;
+  /**
+   * 'square' (default): the art zone is a fixed square — for content-driven
+   * card heights. 'fill': the art zone flexes to fill whatever height the
+   * content zone leaves — for height-locked cards (profile home carousel),
+   * where a fixed square would push the CTA out of the card.
+   */
+  readonly artFit?: 'square' | 'fill';
 }
 
 type SizeConfig = {
@@ -188,6 +195,7 @@ export function EntityCard({
   priority = false,
   dataTestId,
   onClick,
+  artFit = 'square',
 }: EntityCardProps) {
   const size = SIZE[treatment];
   // Composition shape (#11899): fixed card aspect + semantic media geometry.
@@ -196,12 +204,15 @@ export function EntityCard({
   const shapeClassName = shape
     ? cn(getProfileCardShapeClassName(shape), 'overflow-hidden')
     : null;
-  const artClassName = shape
-    ? cn(
-        model.kind === 'video' ? 'aspect-video' : 'aspect-square',
-        treatment === 'big' ? 'rounded-2xl' : 'rounded-xl'
-      )
-    : size.artClass;
+  const artClassName =
+    artFit === 'fill'
+      ? 'min-h-0 w-full flex-1 rounded-xl'
+      : shape
+        ? cn(
+            model.kind === 'video' ? 'aspect-video' : 'aspect-square',
+            treatment === 'big' ? 'rounded-2xl' : 'rounded-xl'
+          )
+        : size.artClass;
   const titleClampClassName =
     shape && treatment !== 'big' ? 'line-clamp-1' : 'line-clamp-2';
   const preset = KIND_PRESETS[model.kind];
@@ -239,7 +250,8 @@ export function EntityCard({
     >
       <div
         className={cn(
-          'relative flex w-full shrink-0 items-center justify-center overflow-hidden border border-subtle',
+          'relative flex w-full items-center justify-center overflow-hidden border border-subtle',
+          artFit === 'fill' ? null : 'shrink-0',
           artClassName,
           treatment === 'big' && 'rounded-none border-0'
         )}
@@ -251,7 +263,9 @@ export function EntityCard({
             alt={model.imageAlt}
             fill
             priority={priority}
-            sizes={treatment === 'big' ? '320px' : '180px'}
+            sizes={
+              treatment === 'big' ? '320px' : '(max-width: 767px) 70vw, 300px'
+            }
             className={
               model.kind === 'music' ? 'object-contain' : 'object-cover'
             }
@@ -274,19 +288,14 @@ export function EntityCard({
 
       <div
         className={cn(
-          'flex min-w-0 flex-1 flex-col gap-1.5',
-          shape && 'min-h-0',
+          'flex min-h-0 min-w-0 flex-1 flex-col gap-1.5',
           treatment === 'big' && 'p-3'
         )}
       >
-        {/* Text zone — when shaped it clips so the CTA footer below never
-            moves (#11899: content fits the shape, button never shifts). */}
-        <div
-          className={cn(
-            'flex min-w-0 flex-col gap-1.5',
-            shape && 'min-h-0 flex-1 overflow-hidden'
-          )}
-        >
+        {/* Text zone — when the card is height-locked it clips so the CTA
+            footer below never moves (#11899: content fits the shape, button
+            never shifts). */}
+        <div className='flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden'>
           <div className='flex min-w-0 items-center justify-between gap-2'>
             <span className='inline-flex min-w-0 items-center gap-1.5 text-3xs font-semibold uppercase leading-none tracking-[0.08em] text-tertiary-token'>
               <Icon className='h-3 w-3 shrink-0' aria-hidden='true' />

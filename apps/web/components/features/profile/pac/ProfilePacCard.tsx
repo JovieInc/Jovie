@@ -39,20 +39,18 @@ import {
 } from './pac-machine';
 
 /**
- * Primary Action Card — the one card below the profile hero that resolves
- * per visitor state (spec #13060/#13061).
+ * Primary Action Card — the featured first card of the profile home carousel
+ * that resolves per visitor state (spec #13060/#13061).
  *
- * Anatomy (4 zones): context strip / subject / action / status.
+ * Card anatomy: art zone (release/state artwork, square) on top, content zone
+ * below (context label / subject / action / status). The prompt state swaps
+ * the content zone to the capture form INSIDE the same fixed card box.
  *
- * Zero-CLS contract: the server renders the S0 default inside a container
- * with a reserved fixed height. State transitions animate the container's
- * own height (420ms cinematic easing, 0ms under reduced motion via the
- * `--duration-cinematic` token) — content below the card never shifts
- * during hydration, and moves only through the deliberate height animation
- * on user-driven transitions.
+ * Zero-CLS contract: the card lives inside the carousel's reserved 3:4
+ * geometry (`.profile-entity-card`), so state transitions never move any
+ * element outside the card — no height animation, no ResizeObserver, content
+ * below the carousel never shifts.
  */
-
-const PAC_RESERVED_HEIGHT_PX = 112;
 
 export interface ProfilePacRelease {
   readonly title: string;
@@ -96,10 +94,6 @@ function getCaptureCopy(
     cta: 'Get Updates',
   };
 }
-
-const CARD_RADIUS_STYLE = {
-  borderRadius: 'var(--profile-action-radius)',
-} as const;
 
 function PrimaryPill({
   children,
@@ -164,44 +158,19 @@ function PrimaryPill({
   );
 }
 
-function SubjectZone({
-  imageUrl,
-  imageAlt,
+function SubjectText({
   title,
   meta,
 }: Readonly<{
-  imageUrl: string | null;
-  imageAlt: string;
   title: string;
   meta: string;
 }>) {
   return (
-    <div className='flex min-w-0 flex-1 items-center gap-3'>
-      <div
-        className='relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-white/10'
-        aria-hidden={imageUrl ? undefined : true}
-      >
-        {imageUrl ? (
-          <ImageWithFallback
-            src={imageUrl}
-            alt={imageAlt}
-            fill
-            sizes='48px'
-            className='object-cover'
-            fallbackVariant='release'
-          />
-        ) : (
-          <div className='flex h-full w-full items-center justify-center text-white/50'>
-            <Play className='h-4 w-4 fill-current' />
-          </div>
-        )}
-      </div>
-      <div className='min-w-0 flex-1'>
-        <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
-          {title}
-        </p>
-        <p className='mt-0.5 truncate text-xs text-white/60'>{meta}</p>
-      </div>
+    <div className='min-w-0'>
+      <p className='truncate text-sm font-semibold leading-tight text-primary-token'>
+        {title}
+      </p>
+      <p className='mt-0.5 truncate text-xs text-tertiary-token'>{meta}</p>
     </div>
   );
 }
@@ -505,22 +474,6 @@ export function ProfilePacCard({
     [emit, state.kind]
   );
 
-  // --- Zero-CLS height reservation + 420ms self-height animation.
-  const innerRef = useRef<HTMLDivElement>(null);
-  const [heightPx, setHeightPx] = useState<number>(PAC_RESERVED_HEIGHT_PX);
-  useEffect(() => {
-    const node = innerRef.current;
-    if (!node || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(entries => {
-      const measured = entries[0]?.contentRect.height;
-      if (typeof measured === 'number' && measured > 0) {
-        setHeightPx(Math.max(Math.round(measured), PAC_RESERVED_HEIGHT_PX));
-      }
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
   // --- Zone content per state.
   const copy = getCaptureCopy(assignment.copyArm, artist.name);
   const listenHref = release?.slug
@@ -534,12 +487,7 @@ export function ProfilePacCard({
   let contextAside: ReactNode = null;
 
   const releaseSubject = (
-    <SubjectZone
-      imageUrl={release?.artworkUrl ?? artist.image_url ?? null}
-      imageAlt={release ? `${release.title} artwork` : artist.name}
-      title={release?.title ?? artist.name}
-      meta={artist.name}
-    />
+    <SubjectText title={release?.title ?? artist.name} meta={artist.name} />
   );
 
   switch (state.kind) {
@@ -581,7 +529,7 @@ export function ProfilePacCard({
               onSeek={seek}
               className='h-1.5 flex-1'
             />
-            <span className='shrink-0 text-xs tabular-nums text-white/50'>
+            <span className='shrink-0 text-xs tabular-nums text-tertiary-token'>
               {formatDuration(playbackState.currentTime * 1000)}
             </span>
           </div>
@@ -619,14 +567,7 @@ export function ProfilePacCard({
           )}
         </button>
       );
-      subject = (
-        <div className='min-w-0 flex-1'>
-          <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
-            {copy.title}
-          </p>
-          <p className='mt-0.5 truncate text-xs text-white/60'>{copy.body}</p>
-        </div>
-      );
+      subject = <SubjectText title={copy.title} meta={copy.body} />;
       action = (
         <form
           onSubmit={handleCaptureSubmit}
@@ -671,14 +612,10 @@ export function ProfilePacCard({
     case 'success': {
       contextLabel = 'Stay In The Loop';
       subject = (
-        <div className='min-w-0 flex-1'>
-          <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
-            {"You're in"}
-          </p>
-          <p className='mt-0.5 truncate text-xs text-white/60'>
-            Watch your inbox for {artist.name} updates.
-          </p>
-        </div>
+        <SubjectText
+          title={"You're in"}
+          meta={`Watch your inbox for ${artist.name} updates.`}
+        />
       );
       status = null;
       break;
@@ -687,9 +624,7 @@ export function ProfilePacCard({
     case 'merch': {
       contextLabel = 'Merch';
       subject = (
-        <SubjectZone
-          imageUrl={merchCard?.primaryImageUrl ?? null}
-          imageAlt={merchCard?.title ?? 'Merch'}
+        <SubjectText
           title={merchCard?.title ?? `${artist.name} merch`}
           meta={
             merchCard ? formatAmount(merchCard.retailPriceCents) : artist.name
@@ -710,14 +645,10 @@ export function ProfilePacCard({
     case 'tip': {
       contextLabel = 'Support';
       subject = (
-        <div className='min-w-0 flex-1'>
-          <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
-            Support {artist.name}
-          </p>
-          <p className='mt-0.5 truncate text-xs text-white/60'>
-            Tips go straight to the artist.
-          </p>
-        </div>
+        <SubjectText
+          title={`Support ${artist.name}`}
+          meta='Tips go straight to the artist.'
+        />
       );
       action = (
         <PrimaryPill
@@ -737,14 +668,10 @@ export function ProfilePacCard({
         .filter(Boolean)
         .join(' · ');
       subject = (
-        <div className='min-w-0 flex-1'>
-          <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
-            {nextShow?.title ?? `${artist.name} live`}
-          </p>
-          <p className='mt-0.5 truncate text-xs text-white/60'>
-            {showMeta || 'Upcoming show'}
-          </p>
-        </div>
+        <SubjectText
+          title={nextShow?.title ?? `${artist.name} live`}
+          meta={showMeta || 'Upcoming show'}
+        />
       );
       action =
         state.kind === 'tickets' && nextShow?.ticketUrl ? (
@@ -769,14 +696,10 @@ export function ProfilePacCard({
     case 'following': {
       contextLabel = 'Following';
       subject = (
-        <div className='min-w-0 flex-1'>
-          <p className='truncate text-sm font-semibold leading-tight text-white dark:text-white'>
-            You follow {artist.name}
-          </p>
-          <p className='mt-0.5 truncate text-xs text-white/60'>
-            {"You'll hear about new drops first."}
-          </p>
-        </div>
+        <SubjectText
+          title={`You follow ${artist.name}`}
+          meta="You'll hear about new drops first."
+        />
       );
       action = (
         <PrimaryPill
@@ -790,11 +713,31 @@ export function ProfilePacCard({
     }
   }
 
-  // Merge exposure + height refs on the outer section (callback refs).
+  const isCaptureState =
+    state.kind === 'prompt' ||
+    state.kind === 'submitting' ||
+    state.kind === 'error';
+
+  // Art zone: state-relevant artwork. The merch state shows the merch image;
+  // every other state shows the release artwork (artist image as fallback).
+  const artImageUrl =
+    state.kind === 'merch'
+      ? (merchCard?.primaryImageUrl ??
+        release?.artworkUrl ??
+        artist.image_url ??
+        null)
+      : (release?.artworkUrl ?? artist.image_url ?? null);
+  const artImageAlt =
+    state.kind === 'merch'
+      ? (merchCard?.title ?? 'Merch')
+      : release
+        ? `${release.title} artwork`
+        : artist.name;
+
+  // Exposure ref on the outer card (callback ref).
   const sectionRef = useCallback(
     (node: HTMLElement | null) => {
       exposureRef(node);
-      // height measurement lives on the inner content node, not the section.
     },
     [exposureRef]
   );
@@ -809,39 +752,45 @@ export function ProfilePacCard({
       data-degraded={state.degraded ? 'true' : undefined}
       data-dismiss-affordance={assignment.dismissAffordance}
       className={cn(
-        'w-full overflow-hidden border border-white/10 bg-white/5 backdrop-blur-2xl',
+        'flex h-full w-full min-w-0 flex-col overflow-hidden rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl',
         className
       )}
-      style={{
-        ...CARD_RADIUS_STYLE,
-        height: heightPx,
-        transition: 'height var(--duration-cinematic) var(--ease-cinematic)',
-      }}
     >
-      <div
-        ref={innerRef}
-        className='flex flex-col justify-center gap-3 p-4'
-        style={{ minHeight: PAC_RESERVED_HEIGHT_PX }}
-      >
-        <div className='flex items-center justify-between gap-3'>
-          <p className='truncate text-xs font-medium text-white/50'>
+      <div className='relative min-h-0 w-full flex-1 overflow-hidden border-b border-subtle bg-surface-2'>
+        {artImageUrl ? (
+          <ImageWithFallback
+            src={artImageUrl}
+            alt={artImageAlt}
+            fill
+            sizes='(max-width: 767px) 70vw, 300px'
+            className='object-contain'
+            fallbackVariant='release'
+            fallbackClassName='bg-transparent'
+          />
+        ) : (
+          <div className='flex h-full w-full items-center justify-center text-tertiary-token'>
+            <Play className='h-7 w-7 fill-current' aria-hidden='true' />
+          </div>
+        )}
+      </div>
+
+      <div className='flex min-h-0 min-w-0 flex-none flex-col gap-2 p-3'>
+        <div className='flex items-center justify-between gap-2'>
+          <p className='truncate text-3xs font-semibold uppercase leading-none tracking-wide text-tertiary-token'>
             {contextLabel}
           </p>
           {contextAside}
         </div>
-        <div className='flex min-w-0 items-center justify-between gap-3'>
-          {subject}
-          {state.kind === 'prompt' ||
-          state.kind === 'submitting' ||
-          state.kind === 'error'
-            ? null
-            : action}
-        </div>
-        {(state.kind === 'prompt' ||
-          state.kind === 'submitting' ||
-          state.kind === 'error') && <div>{action}</div>}
-        <div aria-live='polite' className='min-w-0 empty:hidden'>
-          {status}
+
+        {subject}
+
+        {isCaptureState ? <div className='min-w-0'>{action}</div> : null}
+
+        <div className='mt-auto flex min-w-0 flex-col gap-2 pt-1'>
+          {isCaptureState ? null : action}
+          <div aria-live='polite' className='min-w-0 empty:hidden'>
+            {status}
+          </div>
         </div>
       </div>
     </section>

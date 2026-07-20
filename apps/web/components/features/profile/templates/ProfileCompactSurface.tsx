@@ -431,16 +431,13 @@ export function ProfileCompactSurface({
     'h-11! w-11! border-white/14 bg-black/24 text-white dark:text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md hover:bg-black/36';
   const socialIconClassName =
     'inline-flex h-7 w-7 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
-  // Composition rule (#11899, lib/profile/composition.ts): hero media has
-  // priority — it grows with the viewport (flex-1, #11083) but never shrinks
-  // below the 240px floor (min-h-60). On short viewports it locks to exactly
-  // the floor and the rail below scrolls; the image crops (object-cover),
-  // never squashes.
-  // Compact viewports (height ≤820, iPhone SE / short chrome): compress the
-  // hero to ≤190px so the bento release card stays above the fold
-  // (profile-mobile-viewport-stability). Taller phones keep flex growth.
+  // Composition rule: the home hero has one definite token-driven height
+  // (h-(--cover-height) = clamp(220px, 34svh, 400px)) on every viewport. It
+  // never shrink-wraps — the old short-viewport min-h-0/flex-none band
+  // collapse is gone. Media crops via object-cover, never squashes; the
+  // carousel below owns the remaining viewport height.
   const heroHeightClassName = isHomeMode
-    ? 'min-h-(--cover-height) flex-1 [@media(max-height:820px)]:flex-none [@media(max-height:820px)]:min-h-0 [@media(max-height:820px)]:max-h-[190px]'
+    ? 'h-(--cover-height) shrink-0'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))]';
   const homeContentColumnClassName = 'min-h-0 flex-1';
   const homeContentScrollClassName = 'min-h-0 flex-1';
@@ -592,8 +589,10 @@ export function ProfileCompactSurface({
                 )}
               </div>
 
-              <div className='profile-cover-home-gradient pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.1)_0%,rgba(2,3,4,0.18)_30%,rgba(3,4,6,0.48)_64%,rgba(5,6,8,0.94)_88%,var(--profile-stage-bg)_100%)]' />
-              <div className='profile-cover-home-fade pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,var(--profile-stage-bg)_90%)]' />
+              <div
+                className='profile-cover-home-gradient pointer-events-none'
+                aria-hidden='true'
+              />
             </>
           ) : null}
 
@@ -778,7 +777,16 @@ export function ProfileCompactSurface({
             className={cn(
               'profile-content-scroll-region overflow-y-auto overscroll-contain',
               homeContentScrollClassName,
-              showBottomNav ? CONTENT_SAFE_AREA_BOTTOM_PADDING : 'pb-0',
+              // Home mode: the scroll region becomes a flex column so the
+              // carousel rail can flex into the full remaining height
+              // (percentage heights fail against flexed parents).
+              isHomeMode && 'flex flex-col',
+              // Exactly ONE tab-bar reservation: when the bar is visible it
+              // is in-flow below the scroll region and IS the reservation
+              // (no extra padding — that double-counted ~74px of dead space).
+              // When the bar is hidden (cold visitor) the padding reserves
+              // the same footprint so the bar appearing causes no shift.
+              showBottomNav ? 'pb-0' : CONTENT_SAFE_AREA_BOTTOM_PADDING,
               !isHomeMode &&
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
             )}

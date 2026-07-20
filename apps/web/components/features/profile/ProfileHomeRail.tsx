@@ -1,7 +1,7 @@
 'use client';
 
 import { Bell } from 'lucide-react';
-import { type MouseEvent, useMemo } from 'react';
+import { type MouseEvent, memo, useMemo } from 'react';
 import {
   type EntityCardModel,
   merchToEntityCard,
@@ -93,13 +93,11 @@ function HomeAlertsCard({
   artist,
   onAlertsClick,
   renderMode,
-  prominent,
   sourceContext,
 }: Readonly<{
   artist: Artist;
   onAlertsClick?: (context: NotificationSourceContext) => void;
   renderMode: ProfileRenderMode;
-  prominent: boolean;
   sourceContext: NotificationSourceContext;
 }>) {
   const title = 'Alerts';
@@ -123,7 +121,10 @@ function HomeAlertsCard({
       icon={Bell}
       title={title}
       body={description}
-      layout={prominent ? 'prominent' : 'inline'}
+      // Carousel card geometry: the prominent column layout fills the fixed
+      // 3:4 card box; the inline strip layout is gone with the stacked rail.
+      layout='prominent'
+      className='h-full'
       trailing={<HomeAlertsSwitch />}
       href={isInteractive ? subscribeHref : undefined}
       onClick={handleClick}
@@ -163,7 +164,7 @@ export const __profileHomeRailTestUtils = {
   getS2OrderedItems,
 };
 
-export function ProfileHomeRail({
+export const ProfileHomeRail = memo(function ProfileHomeRail({
   artist,
   latestRelease,
   profileSettings,
@@ -211,41 +212,28 @@ export function ProfileHomeRail({
   );
   const nearbyTourDateId = nearbyDates[0]?.date?.id ?? null;
 
-  // One ordered card list — featured item first, then the rest. No stacked
-  // sections: a single carousel is the profile home surface.
+  // One ordered card list — back catalog, merch, and shows. The featured
+  // latest release is NOT an entity card here: it lives in the carousel's
+  // leading slot as the PAC card below, so it never renders twice.
   const carouselItems = useMemo<EntityCardModel[]>(() => {
     const featuredItems: EntityCardModel[] = [];
     const releaseItems: EntityCardModel[] = [];
     const merchItems: EntityCardModel[] = [];
     const showItems: EntityCardModel[] = [];
 
-    // Featured: the latest release when it's visible per profile settings.
+    // The PAC card hosts the visible latest release; only the slug is needed
+    // here to keep it out of the plain catalog list.
     const hasFeaturedRelease = Boolean(
       releaseVisibility?.show && latestRelease
     );
     const featuredReleaseSlug =
       hasFeaturedRelease && latestRelease ? latestRelease.slug : null;
-    const featuredReleaseId =
-      featuredReleaseSlug === null
-        ? null
-        : (releases.find(release => release.slug === featuredReleaseSlug)?.id ??
-          null);
 
-    if (hasFeaturedRelease && latestRelease) {
-      featuredItems.push(
-        releaseToEntityCard(
-          {
-            id: featuredReleaseId ?? undefined,
-            title: latestRelease.title,
-            slug: latestRelease.slug,
-            artworkUrl: latestRelease.artworkUrl,
-            releaseDate: latestRelease.releaseDate,
-            releaseType: latestRelease.releaseType,
-          },
-          { handle: artist.handle, now }
-        )
-      );
-    } else if (upcomingTourDates.length === 0 && featuredPlaylistFallback) {
+    if (
+      !hasFeaturedRelease &&
+      upcomingTourDates.length === 0 &&
+      featuredPlaylistFallback
+    ) {
       // Fallback feature when there's no release or upcoming show: the
       // artist's confirmed "This Is" playlist, as a music card.
       featuredItems.push({
@@ -319,8 +307,6 @@ export function ProfileHomeRail({
     upcomingTourDates,
   ]);
 
-  const isLowContentHome = carouselItems.length === 0;
-
   // Primary Action Card subject: the visible latest release (preferred) or
   // the newest catalog release. Preview URL comes from the lite releases
   // payload; when absent the PAC degrades to a link-out (no inline play).
@@ -356,7 +342,6 @@ export function ProfileHomeRail({
       artist={artist}
       onAlertsClick={onAlertsClick}
       renderMode={renderMode}
-      prominent={isLowContentHome}
       sourceContext={{
         artistId: artist.id,
         profileId: artist.id,
@@ -368,29 +353,34 @@ export function ProfileHomeRail({
     />
   );
 
+  // One screen, one primary focus: the carousel IS the home surface. The PAC
+  // card is the featured first card; the alerts card is the last card. Both
+  // render inside the same fixed card geometry — no stacked sections.
   return (
     <div
       ref={exposureRef}
-      className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-80'
+      className='flex min-h-0 min-w-0 flex-1 flex-col md:mx-auto md:w-full md:max-w-80'
       data-testid='profile-home-rail'
     >
-      <ProfilePacCard
-        artist={artist}
-        release={pacRelease}
-        merchCard={merchCards[0] ?? null}
-        nextShow={pacNextShow}
-        hasTip={hasTip}
-        assignment={profilePacAssignment}
-        isSubscribed={isSubscribed}
-        renderMode={renderMode}
-      />
-      {alertsCard}
       <ReleaseCatalogCarousel
         items={carouselItems}
         artistHandle={artist.handle}
         artistId={artist.id}
         analyticsEnabled={renderMode !== 'preview'}
+        leading={
+          <ProfilePacCard
+            artist={artist}
+            release={pacRelease}
+            merchCard={merchCards[0] ?? null}
+            nextShow={pacNextShow}
+            hasTip={hasTip}
+            assignment={profilePacAssignment}
+            isSubscribed={isSubscribed}
+            renderMode={renderMode}
+          />
+        }
+        trailing={alertsCard}
       />
     </div>
   );
-}
+});
