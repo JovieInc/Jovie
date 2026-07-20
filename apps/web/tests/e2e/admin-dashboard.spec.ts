@@ -1,15 +1,12 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  ensureSignedInUser,
-  getAdminCredentials,
-  hasAdminCredentials,
-} from '../helpers/clerk-auth';
+import { hasAdminCredentials } from '../helpers/clerk-auth';
 import {
   ADMIN_FAST_HEALTH_SURFACES,
   ADMIN_RENDER_SURFACES,
   getAdminSurfaceById,
 } from './utils/admin-surface-manifest';
+import { signInAsAdmin } from './utils/admin-test-utils';
 import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 
 /**
@@ -40,7 +37,7 @@ test.describe('Admin Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!hasAdminCredentials(), 'Admin credentials not configured');
 
-    await ensureSignedInUser(page, getAdminCredentials());
+    await signInAsAdmin(page);
   });
 
   // ── Main admin dashboard page ────────────────────────────────────────────

@@ -368,8 +368,7 @@ jobs:
           done
 
   # --------------------------------------------------------------------------
-  # JOB: main-ci-health
-  # Formerly: main-ci-health-monitor.yml (every ~15 min)
+  # JOB: neon-cleanup
   # --------------------------------------------------------------------------
   neon-cleanup:
     name: Neon Branch Cleanup
