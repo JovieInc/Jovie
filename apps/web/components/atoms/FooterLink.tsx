@@ -1,3 +1,4 @@
+import { Link as UILink } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -45,27 +46,33 @@ export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
         ? 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
         : 'text-white/70 hover:text-white hover:bg-white/5';
 
+    // Renders through the canonical Link primitive (asChild + variant={null}).
+    // The primitive base supplies inline-flex, transition-colors, and the
+    // focus-visible ring; these classes preserve the existing footer-link
+    // appearance (padding hit area, text-app sizing, tone palette, and the
+    // subtle duration/easing, which win over the base timing in the cascade).
     const linkClassName = cn(
-      'inline-flex items-center rounded-md px-2 py-1 -mx-2 -my-1',
+      'rounded-md px-2 py-1 -mx-2 -my-1',
       'text-app leading-5 font-medium tracking-tight',
-      'transition-colors duration-subtle ease-out',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+      'duration-subtle ease-out',
+      'focus-visible:ring-interactive focus-visible:ring-offset-transparent',
       palette,
       className
     );
 
     return (
-      <Link
-        ref={ref}
-        href={href}
-        prefetch={prefetch}
-        className={linkClassName}
-        target={resolvedTarget}
-        rel={resolvedRel}
-        {...props}
-      >
-        <span className='inline-flex items-center gap-2'>{children}</span>
-      </Link>
+      <UILink asChild variant={null} className={linkClassName}>
+        <Link
+          ref={ref}
+          href={href}
+          prefetch={prefetch}
+          target={resolvedTarget}
+          rel={resolvedRel}
+          {...props}
+        >
+          <span className='inline-flex items-center gap-2'>{children}</span>
+        </Link>
+      </UILink>
     );
   }
 );

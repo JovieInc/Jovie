@@ -1,14 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { ensureSignedInUser } from '../helpers/clerk-auth';
 import {
   ADMIN_PRIMARY_NAV_SURFACES,
   getAdminSurfaceById,
 } from './utils/admin-surface-manifest';
 import {
   checkForClientError,
-  getAdminCredentials,
   hasAdminCredentials,
+  signInAsAdmin,
 } from './utils/admin-test-utils';
 import {
   SMOKE_TIMEOUTS,
@@ -63,7 +62,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     'Admin nav persistence runs in the slower authenticated coverage lane'
   );
 
-  // signInUser needs 180s+ for Clerk + Turbopack compilation, plus test body navigation
+  // Admin bypass sign-in + dashboard landing needs 180s+ under dev-server compilation, plus test body navigation
   test.setTimeout(300_000);
 
   test.beforeEach(async ({ page }) => {
@@ -80,10 +79,8 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       console.log(`[Page Error] ${error.message}`);
     });
 
-    const { username, password } = getAdminCredentials();
-
     try {
-      await ensureSignedInUser(page, { username, password });
+      await signInAsAdmin(page);
     } catch (error) {
       console.error('Failed to sign in admin user:', error);
       test.skip();
@@ -103,8 +100,8 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
 
-    // signInUser in beforeEach already navigated to /app/dashboard
-    // and waited for transient React 19 errors to resolve
+    // signInAsAdmin in beforeEach already landed on /app/dashboard
+    // and waited for the app shell to be ready
     // We're already on the dashboard - no need to navigate again
 
     // Wait for page to fully stabilize with retry for admin nav visibility
@@ -335,8 +332,8 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
 
-    // signInUser in beforeEach already navigated to /app/dashboard
-    // and waited for transient React 19 errors to resolve
+    // signInAsAdmin in beforeEach already landed on /app/dashboard
+    // and waited for the app shell to be ready
     await page
       .waitForLoadState('networkidle', { timeout: 5000 })
       .catch(() => {})
@@ -455,8 +452,8 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
 
-    // signInUser in beforeEach already navigated to /app/dashboard
-    // and waited for transient React 19 errors to resolve
+    // signInAsAdmin in beforeEach already landed on /app/dashboard
+    // and waited for the app shell to be ready
     await page
       .waitForLoadState('networkidle', { timeout: 5000 })
       .catch(() => {})

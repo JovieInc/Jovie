@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { captureWarning } from '@/lib/error-tracking';
 
 const { mockDbSelect, mockDbInsert, mockDbUpdate } = vi.hoisted(() => ({
   mockDbSelect: vi.fn(),
@@ -78,6 +79,33 @@ function setupDbSelectMock(row: ReturnType<typeof createMockSettings> | null) {
       }),
     }),
   });
+}
+
+function setupDbSelectError(error: unknown) {
+  mockDbSelect.mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockRejectedValue(error),
+      }),
+    }),
+  });
+}
+
+/**
+ * Mirrors the prod migration-drift failure (JOV-3353): Drizzle wraps the PG
+ * 42P01 (undefined_table) error, so the outer message is "Failed query: ..."
+ * and the real error lives on `.cause`.
+ */
+function createMissingWaitlistSettingsError() {
+  return new Error(
+    'Failed query: select "id", "gate_enabled", "auto_accept_enabled", "auto_accept_after_days", "auto_accept_daily_limit", "auto_accepted_today", "auto_accept_resets_at", "created_at", "updated_at" from "waitlist_settings" where "waitlist_settings"."id" = $1 limit $2',
+    {
+      cause: {
+        code: '42P01',
+        message: 'relation "waitlist_settings" does not exist',
+      },
+    }
+  );
 }
 
 describe('isWaitlistGateEnabled', () => {
@@ -340,5 +368,75 @@ describe('updateWaitlistSettings invalidates cache', () => {
 
     // updateWaitlistSettings still works (admin tooling preserved)
     expect(mockDbUpdate).toHaveBeenCalled();
+  });
+});
+
+describe('migration-drift fail-soft (JOV-3353)', () => {
+  let isWaitlistGateEnabled: typeof import('@/lib/waitlist/settings').isWaitlistGateEnabled;
+  let getWaitlistSettings: typeof import('@/lib/waitlist/settings').getWaitlistSettings;
+  let isMissingWaitlistSettingsTableError: typeof import('@/lib/waitlist/settings').isMissingWaitlistSettingsTableError;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    mockDbSelect.mockClear();
+    mockDbInsert.mockClear();
+    mockDbUpdate.mockClear();
+    vi.mocked(captureWarning).mockClear();
+
+    const mod = await import('@/lib/waitlist/settings');
+    isWaitlistGateEnabled = mod.isWaitlistGateEnabled;
+    getWaitlistSettings = mod.getWaitlistSettings;
+    isMissingWaitlistSettingsTableError =
+      mod.isMissingWaitlistSettingsTableError;
+  });
+
+  it('matches only the missing waitlist_settings relation', () => {
+    expect(
+      isMissingWaitlistSettingsTableError(createMissingWaitlistSettingsError())
+    ).toBe(true);
+    expect(
+      isMissingWaitlistSettingsTableError(
+        new Error('relation "library_asset_approval_statuses" does not exist', {
+          cause: { code: '42P01' },
+        })
+      )
+    ).toBe(false);
+    expect(isMissingWaitlistSettingsTableError(new Error('boom'))).toBe(false);
+  });
+
+  it('isWaitlistGateEnabled degrades to the documented default gate state with one warning when the relation is missing', async () => {
+    setupDbSelectError(createMissingWaitlistSettingsError());
+
+    // Documented default gate state (schema default) is gateEnabled=true.
+    await expect(isWaitlistGateEnabled()).resolves.toBe(true);
+    expect(captureWarning).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(captureWarning).mock.calls[0][0]).toContain(
+      'waitlist_settings'
+    );
+  });
+
+  it('getWaitlistSettings returns documented defaults without issuing writes when the relation is missing', async () => {
+    setupDbSelectError(createMissingWaitlistSettingsError());
+
+    const settings = await getWaitlistSettings();
+
+    expect(settings.gateEnabled).toBe(true);
+    expect(settings.autoAcceptEnabled).toBe(false);
+    expect(settings.autoAcceptAfterDays).toBe(7);
+    expect(settings.autoAcceptDailyLimit).toBe(0);
+    expect(settings.autoAcceptResetsAt.getTime()).toBeGreaterThan(Date.now());
+    // No INSERT/UPDATE may be attempted against the drifted relation.
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(captureWarning).toHaveBeenCalledTimes(1);
+  });
+
+  it('still throws non-drift DB errors (no broad swallow)', async () => {
+    setupDbSelectError(new Error('connection terminated unexpectedly'));
+
+    await expect(isWaitlistGateEnabled()).rejects.toThrow(
+      'connection terminated unexpectedly'
+    );
+    expect(captureWarning).not.toHaveBeenCalled();
   });
 });

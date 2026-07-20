@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { captureError } from '@/lib/error-tracking';
 import { applyGeneratedAlbumArt } from '@/lib/services/album-art/apply';
 import { logger } from '@/lib/utils/logger';
@@ -8,7 +9,7 @@ import { parseAlbumArtRequestBody, requireAlbumArtUser } from '../shared';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const applyGeneratedAlbumArtSchema = z.object({
+const applyGeneratedAlbumArtSchema = chatToolSchema({
   profileId: z.string().uuid(),
   releaseId: z.string().uuid(),
   generationId: z.string().uuid(),

@@ -33,7 +33,7 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 transition-[background-color] duration-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+      className='flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 transition-[background-color] duration-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
     >
       <span className='text-app text-secondary-token'>{label}</span>
       <span

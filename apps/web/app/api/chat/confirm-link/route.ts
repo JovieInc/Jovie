@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
-
+import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { chatAuditLog } from '@/lib/db/schema/chat';
@@ -17,7 +17,7 @@ import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import { httpUrlSchema } from '@/lib/validation/schemas/base';
 
-const confirmLinkSchema = z.object({
+const confirmLinkSchema = chatToolSchema({
   profileId: z.string().uuid(),
   platform: z.string().min(1),
   url: httpUrlSchema,

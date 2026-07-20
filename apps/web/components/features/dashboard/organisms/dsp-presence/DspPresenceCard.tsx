@@ -34,7 +34,7 @@ export function DspPresenceCard({
         'cursor-pointer p-3.5 transition-[border-color,background-color,box-shadow] duration-subtle',
         'bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)] hover:border-default hover:bg-(--linear-bg-surface-0)',
         isSelected &&
-          'border-(--linear-border-focus) bg-(--linear-bg-surface-0) ring-1 ring-(--linear-border-focus)'
+          'border-(--linear-border-focus) bg-(--linear-bg-surface-0) ring-1 ring-ring'
       )}
       data-testid={`presence-card-${item.providerId}`}
     >

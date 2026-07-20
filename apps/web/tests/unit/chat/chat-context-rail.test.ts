@@ -70,4 +70,50 @@ describe('deriveChatRailContextTargets', () => {
       }),
     ]);
   });
+
+  it('ignores entity tokens whose id is a system-prompt placeholder (JOV-3308)', () => {
+    const targets = deriveChatRailContextTargets({
+      messages: [
+        {
+          id: 'msg-3',
+          parts: [
+            {
+              type: 'text',
+              // The model echoing the documented token syntax literally.
+              text: 'Here is @release:<id>[Midnight Drive] as requested',
+            },
+          ],
+        },
+      ],
+      profile: { id: 'profile-1', label: 'Tim White' },
+    });
+
+    expect(targets).toEqual([]);
+  });
+
+  it('ignores tool-event entity ids that are template placeholders (JOV-3308)', () => {
+    const targets = deriveChatRailContextTargets({
+      messages: [
+        {
+          id: 'msg-4',
+          parts: [
+            {
+              type: 'dynamic-tool',
+              toolName: 'generateAlbumArt',
+              toolCallId: 'tool-2',
+              state: 'output-available',
+              input: {
+                releaseId: '<id>',
+                releaseTitle: 'Midnight Drive',
+              },
+              output: { success: false },
+            },
+          ],
+        },
+      ],
+      profile: { id: 'profile-1', label: 'Tim White' },
+    });
+
+    expect(targets).toEqual([]);
+  });
 });
