@@ -20,7 +20,7 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 | `co.jovie.hermes.cron-ci-monitor.plist.template` | every 10 min | Detect CI failures on main |
 | `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | every 15 min | Claim one open GitHub issue labeled `codex` and dispatch a coder-profile agent |
 | `co.jovie.hermes.cron-pipeline-scoreboard.plist.template` | every 60 min | Write daily pipeline scoreboard to local state + gbrain, and alert on 12h shipper stalls |
-| `co.jovie.hermes.cron-gbrain-health-summary.plist.template` | 07:15 local daily | Probe gbrain, write latest health summary back to gbrain, and notify ops |
+| `co.jovie.hermes.cron-gbrain-health-summary.plist.template` | 07:15 local daily | Probe the Tailscale HTTP endpoint, source freshness, and server count; write the latest health summary back to gbrain and notify ops |
 | `co.jovie.hermes.cron-agent-config-health.plist.template` | every 15 min | Detect invalid Hermes/OpenClaw agent config before gateway churn |
 | `co.jovie.hermes.cron-cost-monitor.plist.template` | every 60 min | Cost kill switch |
 | `co.jovie.hermes.cron-daily-briefing.plist.template` | 07:00 daily | Morning briefing to Telegram |
