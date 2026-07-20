@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Entity mention hover cards now use the same rich entity card as the chat rail:** hovering an inline release, artist, track, or event mention opens the canonical compact EntityCard instead of a one-off popover layout.
 - **Artist profiles now adapt to release, touring, and live-support moments:** one music-native link brings listening, tickets, support, fan capture, setup guidance, and product truth into a clearer responsive journey.
 - **[internal] Production Sentry gate secret binding:** the post-deploy error-rate gate now runs inside the protected production environment, so its API token is available without crossing a nested reusable-workflow boundary.
 - **[internal] Fixed-pool unit routing:** healthy runner heartbeats now select the fixed CI pool through a non-sensitive route token, preserving hosted fail-closed fallback without GitHub suppressing the runner decision.

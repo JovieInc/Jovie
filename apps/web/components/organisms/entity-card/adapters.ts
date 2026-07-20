@@ -26,6 +26,9 @@ const MONTHS = [
   'Dec',
 ] as const;
 
+const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
+const dayFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric' });
+
 function toDate(value: Date | string | null | undefined): Date | null {
   if (!value) {
     return null;
@@ -189,6 +192,154 @@ export function chatReleaseContextToEntityCard(
   };
 }
 
+/**
+ * Inline chat entity mention (chip / hover popover) → compact EntityCard.
+ * Accepts the wire mention shape without importing chat command modules so the
+ * organism stays free of composer/registry coupling.
+ */
+export type ChatEntityMentionKind = 'release' | 'artist' | 'track' | 'event';
+
+export interface ChatEntityMentionInput {
+  readonly kind: ChatEntityMentionKind;
+  readonly id: string;
+  readonly label: string;
+  readonly thumbnail?: string | null;
+  readonly subtitle?: string | null;
+  readonly releaseType?: string | null;
+  readonly totalTracks?: number | null;
+  readonly totalDurationMs?: number | null;
+  readonly followers?: number | null;
+  readonly verified?: boolean;
+  readonly isYou?: boolean;
+  readonly venue?: string | null;
+  readonly city?: string | null;
+  readonly eventType?: string | null;
+  readonly eventDate?: string | null;
+  readonly durationMs?: number | null;
+  readonly releaseTitle?: string | null;
+}
+
+function cardKindForMention(
+  kind: ChatEntityMentionKind
+): EntityCardModel['kind'] {
+  return kind === 'event' ? 'show' : 'music';
+}
+
+function mentionEyebrow(input: ChatEntityMentionInput): string {
+  switch (input.kind) {
+    case 'release': {
+      const typeLabel = formatReleaseType(input.releaseType);
+      return typeLabel ? `Release · ${typeLabel}` : 'Release';
+    }
+    case 'artist': {
+      if (input.isYou) return 'Artist · You';
+      if (input.verified) return 'Artist · Verified';
+      return 'Artist';
+    }
+    case 'event': {
+      if (!input.eventType) return 'Event';
+      const type =
+        input.eventType.charAt(0).toUpperCase() + input.eventType.slice(1);
+      return `Event · ${type}`;
+    }
+    default:
+      return 'Track';
+  }
+}
+
+function mentionMeta(input: ChatEntityMentionInput): string | null {
+  if (input.subtitle?.trim()) {
+    return input.subtitle.trim();
+  }
+
+  const parts: string[] = [];
+  switch (input.kind) {
+    case 'release': {
+      if (typeof input.totalTracks === 'number' && input.totalTracks > 0) {
+        parts.push(
+          `${input.totalTracks} ${input.totalTracks === 1 ? 'track' : 'tracks'}`
+        );
+      }
+      if (
+        typeof input.totalDurationMs === 'number' &&
+        input.totalDurationMs > 0
+      ) {
+        const totalSeconds = Math.round(input.totalDurationMs / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        parts.push(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+      }
+      break;
+    }
+    case 'artist': {
+      if (typeof input.followers === 'number' && input.followers > 0) {
+        parts.push(`${compactFollowers(input.followers)} followers`);
+      }
+      break;
+    }
+    case 'track': {
+      if (input.releaseTitle?.trim()) {
+        parts.push(input.releaseTitle.trim());
+      }
+      if (typeof input.durationMs === 'number' && input.durationMs > 0) {
+        const totalSeconds = Math.round(input.durationMs / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        parts.push(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+      }
+      break;
+    }
+    case 'event': {
+      if (input.venue?.trim()) parts.push(input.venue.trim());
+      if (input.city?.trim()) parts.push(input.city.trim());
+      break;
+    }
+  }
+
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+function compactFollowers(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 10_000) return `${Math.round(value / 1000)}k`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return value.toString();
+}
+
+/** Chat inline entity mention → compact EntityCard model (popover / rail). */
+export function chatEntityMentionToEntityCard(
+  input: ChatEntityMentionInput,
+  options?: Readonly<{
+    cta?: EntityCardModel['cta'];
+    interactive?: boolean;
+  }>
+): EntityCardModel {
+  const kind = cardKindForMention(input.kind);
+  const preset = KIND_PRESETS[kind];
+  const title = input.label.trim() || 'Untitled';
+  const date = input.kind === 'event' ? toDate(input.eventDate ?? null) : null;
+
+  return {
+    id: input.id,
+    kind,
+    imageUrl: input.thumbnail ?? null,
+    imageAlt: title,
+    accent: preset.accent,
+    eyebrow: mentionEyebrow(input),
+    title,
+    meta: mentionMeta(input),
+    datePill:
+      kind === 'show' && date && !input.thumbnail
+        ? {
+            month: monthFormatter.format(date),
+            day: dayFormatter.format(date),
+          }
+        : null,
+    interactive: options?.interactive === true,
+    cta: options?.cta ?? null,
+  };
+}
+
 export interface ChatTourDateContextInput {
   readonly id: string;
   readonly title?: string | null;
@@ -231,9 +382,6 @@ export function chatTourDateContextToEntityCard(
     meta: 'Tour Date Context',
   };
 }
-
-const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
-const dayFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric' });
 
 function getTourEyebrow(
   isNearYou: boolean,
@@ -370,7 +518,7 @@ export function aiCrawlerAnalyticsToEntityCard(
         ? { label: 'Active', tone: 'live' }
         : { label: 'Collecting', tone: 'neutral' },
     cta: analytics.isTeaser
-      ? { label: 'Upgrade to Pro', href: null, disabled: true }
+      ? { label: 'Upgrade To Pro', href: null, disabled: true }
       : {
           label: preset.ctaLabel,
           href: null,
