@@ -39,7 +39,7 @@ concurrency:
 jobs:
   generate:
     name: Generate Screenshots
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
       contents: read
@@ -56,16 +56,9 @@ jobs:
       E2E_CLERK_USER_ID: user_test
 
     steps:
-      - name: Generate Jovie Bot token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -78,10 +71,13 @@ jobs:
       - name: Start production server
         run: |
           if [ -f .next/standalone/apps/web/server.js ]; then
-            node .next/standalone/apps/web/server.js &
+            SERVER_COMMAND=(node .next/standalone/apps/web/server.js)
           else
-            pnpm run start &
+            SERVER_COMMAND=(pnpm run start)
           fi
+          setsid "${SERVER_COMMAND[@]}" > "$RUNNER_TEMP/product-screenshots-server.log" 2>&1 &
+          SCREENSHOT_SERVER_PGID=$!
+          echo "SCREENSHOT_SERVER_PGID=$SCREENSHOT_SERVER_PGID" >> "$GITHUB_ENV"
           for _attempt in $(seq 1 30); do
             if curl -fsS http://localhost:3000 >/dev/null 2>&1; then
               exit 0
@@ -89,6 +85,7 @@ jobs:
             sleep 2
           done
           echo "Timed out waiting for the production server to start."
+          cat "$RUNNER_TEMP/product-screenshots-server.log"
           exit 1
 
       - name: Capture screenshot catalog
@@ -99,6 +96,27 @@ jobs:
             --project=screenshots
         env:
           BASE_URL: http://localhost:3000
+
+      - name: Stop production server
+        if: always()
+        run: |
+          if [ -z "${SCREENSHOT_SERVER_PGID:-}" ]; then
+            echo "::error::Screenshot server process group was not recorded."
+            exit 1
+          fi
+          kill -- "-$SCREENSHOT_SERVER_PGID" 2>/dev/null || true
+          for _attempt in $(seq 1 10); do
+            if ! kill -0 -- "-$SCREENSHOT_SERVER_PGID" 2>/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          kill -KILL -- "-$SCREENSHOT_SERVER_PGID" 2>/dev/null || true
+          sleep 1
+          if kill -0 -- "-$SCREENSHOT_SERVER_PGID" 2>/dev/null; then
+            echo "::error::Screenshot server process group is still running."
+            exit 1
+          fi
 
       - name: Verify screenshot catalog integrity and budgets
         run: pnpm exec tsx scripts/check-screenshot-catalog.ts
@@ -116,6 +134,14 @@ jobs:
             git status --short apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
           fi
 
+      - name: Generate Jovie Bot token
+        id: app-token
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Create or update screenshot PR
         if: steps.diff.outputs.changed == 'true'
         working-directory: .
@@ -126,6 +152,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           BRANCH="screenshots/auto-update"
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
 
           # Check for existing open PR before pushing
           EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number \
@@ -144,7 +171,7 @@ jobs:
           PUSHED=false
           for ATTEMPT in 1 2 3; do
             set +e
-            PUSH_OUTPUT=$(git push --force origin "$BRANCH" 2>&1)
+            PUSH_OUTPUT=$(git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push --force origin "$BRANCH" 2>&1)
             PUSH_EXIT=$?
             set -e
 

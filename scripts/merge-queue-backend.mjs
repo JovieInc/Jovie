@@ -4,12 +4,17 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { NATIVE_QUEUE_POLICY } from './lib/merge-queue-guard.mjs';
 
-export const DEFAULT_MERGE_QUEUE_BACKEND = 'graphite';
+// The live repository variable and active ruleset both use GitHub native.
+// Keep bare read-only/local callers aligned with that canon; mutations still
+// require the dedicated native authorization below.
+export const DEFAULT_MERGE_QUEUE_BACKEND = 'native';
 export const MERGE_QUEUE_BACKENDS = Object.freeze(['graphite', 'native']);
 
 const DEFAULT_REPOSITORY = 'JovieInc/Jovie';
 const DEFAULT_RULESET_ID = '10512119';
 const DEFAULT_BASE_BRANCH = 'main';
+const DEFAULT_ENROLLMENT_POSTCONDITION_ATTEMPTS = 6;
+const DEFAULT_ENROLLMENT_POSTCONDITION_DELAY_MS = 2_000;
 const CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
 const NATIVE_MUTATION_AUTHORIZATIONS = new Set([
   'merge-queue-autoenroll',
@@ -29,6 +34,7 @@ const REQUIRED_NATIVE_STATE_FIELDS =
   );
 const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS}}}}`;
 const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:100,after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
+const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{id}}}}`;
 const DEQUEUE_PULL_REQUEST_MUTATION = `mutation DequeuePullRequest($id:ID!){dequeuePullRequest(input:{id:$id}){mergeQueueEntry{id}}}`;
 const DISABLE_AUTO_MERGE_MUTATION = `mutation DisablePullRequestAutoMerge($pullRequestId:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId}){pullRequest{id}}}`;
 
@@ -153,6 +159,32 @@ async function attemptGh(runner, args, description) {
   }
 }
 
+function errorEvidence(error) {
+  const candidate =
+    typeof error === 'object' && error !== null ? error : undefined;
+  return {
+    code:
+      typeof candidate?.code === 'string' ? candidate.code : 'unknown_error',
+    message: error instanceof Error ? error.message : String(error),
+    details:
+      typeof candidate?.details === 'object' && candidate.details !== null
+        ? candidate.details
+        : {},
+  };
+}
+
+function errorSummary(error) {
+  const evidence = errorEvidence(error);
+  const stderr =
+    typeof evidence.details.stderr === 'string'
+      ? evidence.details.stderr.trim()
+      : '';
+  return stderr ? `${evidence.message}: ${stderr}` : evidence.message;
+}
+
+const sleep = milliseconds =>
+  new Promise(resolve => setTimeout(resolve, milliseconds));
+
 export function createGhRunner({ env = process.env, spawn = spawnSync } = {}) {
   return async args => {
     const result = spawn('gh', args, {
@@ -209,8 +241,10 @@ export function validateNativePreflightEvidence({
   ruleset,
   repository,
   workflowYaml,
+  branchProtectionRef,
   rulesetId = DEFAULT_RULESET_ID,
   baseBranch = DEFAULT_BASE_BRANCH,
+  allowUnavailableBypassActors = false,
 } = {}) {
   const errors = [];
   const mergeQueueRule = ruleset?.rules?.find(
@@ -227,6 +261,34 @@ export function validateNativePreflightEvidence({
   );
   const bypassActors = ruleset?.bypass_actors;
   const hasValidBypassActors = Array.isArray(bypassActors);
+  const bypassActorsVisible = bypassActors !== undefined;
+  const unavailableBypassActorsAllowed =
+    allowUnavailableBypassActors === true && !bypassActorsVisible;
+  const hasBranchProtectionRef =
+    typeof branchProtectionRef === 'object' &&
+    branchProtectionRef !== null &&
+    !Array.isArray(branchProtectionRef);
+  const hasBranchProtectionRuleField =
+    hasBranchProtectionRef &&
+    Object.hasOwn(branchProtectionRef, 'branchProtectionRule');
+  const branchProtectionRule = hasBranchProtectionRuleField
+    ? branchProtectionRef.branchProtectionRule
+    : undefined;
+  const hasBranchProtectionRuleShape =
+    branchProtectionRule === null ||
+    (typeof branchProtectionRule === 'object' &&
+      !Array.isArray(branchProtectionRule) &&
+      typeof branchProtectionRule.id === 'string' &&
+      branchProtectionRule.id.length > 0);
+  const hasExactBranchProtectionEvidence =
+    hasBranchProtectionRef &&
+    branchProtectionRef.name === baseBranch &&
+    hasBranchProtectionRuleField &&
+    hasBranchProtectionRuleShape;
+  const classicRuleId =
+    typeof branchProtectionRule?.id === 'string'
+      ? branchProtectionRule.id
+      : 'unknown';
   const validations = {
     [`ruleset id must be ${rulesetId}`]:
       String(ruleset?.id ?? '') === String(rulesetId),
@@ -248,7 +310,8 @@ export function validateNativePreflightEvidence({
     'source required checks must be loose; merge_group validates latest main':
       ruleset?.rules?.find(rule => rule?.type === 'required_status_checks')
         ?.parameters?.strict_required_status_checks_policy === false,
-    'ruleset bypass_actors must be an array': hasValidBypassActors,
+    'ruleset bypass_actors must be an array':
+      hasValidBypassActors || unavailableBypassActorsAllowed,
     'ruleset bypass_actors must be empty before native enrollment':
       !hasValidBypassActors || bypassActors.length === 0,
     [`repository default branch must be ${baseBranch}`]:
@@ -259,6 +322,10 @@ export function validateNativePreflightEvidence({
       repository?.allow_squash_merge === true,
     'CI workflow must handle merge_group checks_requested':
       workflowHasMergeGroup,
+    [`classic branch protection evidence must include exact refs/heads/${baseBranch} branchProtectionRule`]:
+      hasExactBranchProtectionEvidence,
+    [`classic branch protection for refs/heads/${baseBranch} must be absent; found rule ${classicRuleId}, which creates dual control planes with native ruleset ${rulesetId}`]:
+      !hasBranchProtectionRuleField || branchProtectionRule === null,
   };
   for (const [message, condition] of Object.entries(validations)) {
     if (!condition) errors.push(message);
@@ -272,6 +339,7 @@ export function validateNativePreflightEvidence({
       requiredChecks,
       rulesetId: ruleset?.id ?? null,
       workflowHasMergeGroup,
+      bypassActorsVisible,
     },
   };
 }
@@ -281,11 +349,12 @@ export async function preflightMergeQueue({
   repository = DEFAULT_REPOSITORY,
   rulesetId = DEFAULT_RULESET_ID,
   baseBranch = DEFAULT_BASE_BRANCH,
+  allowUnavailableBypassActors = false,
   runner = createGhRunner(),
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
 
-  parseRepositorySlug(repository);
+  const { owner, name } = parseRepositorySlug(repository);
   const ruleset = await runGhJson(
     runner,
     ['api', `repos/${repository}/rulesets/${rulesetId}`],
@@ -306,12 +375,27 @@ export async function preflightMergeQueue({
     ],
     'reading the live CI workflow'
   );
+  const branchProtectionPayload = assertGraphqlResponse(
+    await runGhJson(
+      runner,
+      graphqlArgs(BRANCH_PROTECTION_QUERY, {
+        owner,
+        name,
+        refName: `refs/heads/${baseBranch}`,
+      }),
+      'checking for redundant classic branch protection'
+    ),
+    'checking for redundant classic branch protection'
+  );
+  const branchProtectionRef = branchProtectionPayload?.data?.repository?.ref;
   const validation = validateNativePreflightEvidence({
     ruleset,
     repository: repositoryEvidence,
     workflowYaml,
+    branchProtectionRef,
     rulesetId,
     baseBranch,
+    allowUnavailableBypassActors,
   });
   if (!validation.ok) {
     throw backendError(
@@ -485,14 +569,37 @@ function assertEnrollCandidate(state, expectedHeadOid) {
   }
 }
 
+async function pollEnrollmentPostcondition({
+  stateOptions,
+  expectedHeadOid,
+  attempts,
+  delayMs,
+  wait,
+}) {
+  let state;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    state = await readPullRequestQueueState(stateOptions);
+    if (enrollmentPostcondition(state, expectedHeadOid)) {
+      return { attempts: attempt, state };
+    }
+    assertEnrollCandidate(state, expectedHeadOid);
+    if (attempt < attempts) await wait(delayMs);
+  }
+  return { attempts, state };
+}
+
 export async function enrollPullRequest({
   backend,
   repository = DEFAULT_REPOSITORY,
   rulesetId = DEFAULT_RULESET_ID,
   baseBranch = DEFAULT_BASE_BRANCH,
+  allowUnavailableBypassActors = false,
   number,
   expectedHeadOid,
   runner = createGhRunner(),
+  postconditionAttempts = DEFAULT_ENROLLMENT_POSTCONDITION_ATTEMPTS,
+  postconditionDelayMs = DEFAULT_ENROLLMENT_POSTCONDITION_DELAY_MS,
+  wait = sleep,
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
   const parsedNumber = parsePullRequestNumber(number);
@@ -509,6 +616,7 @@ export async function enrollPullRequest({
     repository,
     rulesetId,
     baseBranch,
+    allowUnavailableBypassActors,
     runner,
   });
 
@@ -532,19 +640,36 @@ export async function enrollPullRequest({
     args,
     `enrolling PR #${parsedNumber} with ${resolvedBackend}`
   );
-  const after = await readPullRequestQueueState(stateOptions);
-  if (enrollmentPostcondition(after, expectedHead)) {
+  const observation = await pollEnrollmentPostcondition({
+    stateOptions,
+    expectedHeadOid: expectedHead,
+    attempts: postconditionAttempts,
+    delayMs: postconditionDelayMs,
+    wait,
+  });
+  if (enrollmentPostcondition(observation.state, expectedHead)) {
     return {
       backend: resolvedBackend,
       changed: true,
+      postconditionAttempts: observation.attempts,
       reconciledAfterCommandError: Boolean(mutationError),
-      state: after,
+      state: observation.state,
     };
   }
+  const mutationErrorDetails = mutationError
+    ? errorEvidence(mutationError)
+    : null;
+  const mutationFailure = mutationError
+    ? `; mutation error: ${errorSummary(mutationError)}`
+    : '';
   throw backendError(
     'enrollment_postcondition_failed',
-    `Could not prove PR #${parsedNumber} is enrolled at ${expectedHead}`,
-    { mutationError: mutationError?.message ?? null, state: after }
+    `Could not prove PR #${parsedNumber} is enrolled at ${expectedHead} after ${observation.attempts} authoritative reads${mutationFailure}`,
+    {
+      mutationError: mutationErrorDetails,
+      postconditionAttempts: observation.attempts,
+      state: observation.state,
+    }
   );
 }
 
@@ -636,14 +761,17 @@ export async function runCli(
   const repository = env.REPO ?? env.GITHUB_REPOSITORY ?? DEFAULT_REPOSITORY;
   const rulesetId = env.MERGE_QUEUE_RULESET_ID ?? DEFAULT_RULESET_ID;
   const baseBranch = env.MERGE_QUEUE_BASE_BRANCH ?? DEFAULT_BASE_BRANCH;
+  const allowUnavailableBypassActors =
+    env.MERGE_QUEUE_NATIVE_AUTHORIZATION === 'merge-queue-autoenroll';
   const [command, ...args] = argv;
   const options = { backend, repository, rulesetId, baseBranch, runner };
+  const preflightOptions = { ...options, allowUnavailableBypassActors };
   const commands = {
-    preflight: () => preflightMergeQueue(options),
+    preflight: () => preflightMergeQueue(preflightOptions),
     'list-state': () => listPullRequestQueueStates(options),
     enroll: () =>
       enrollPullRequest({
-        ...options,
+        ...preflightOptions,
         number: args[0],
         expectedHeadOid: args[1],
       }),

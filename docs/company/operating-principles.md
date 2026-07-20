@@ -1,6 +1,8 @@
 # Jovie Operating Principles
 
-Canon. The four principles that govern how Jovie operates day to day. These supersede [`core-values.md`](./core-values.md) when they conflict — values describe culture, principles are enforced rules. When a decision is in tension between a value and a principle, the principle wins.
+Subordinate canon. The company constitution is [`/canon/OPERATING_SYSTEM.md`](../../canon/OPERATING_SYSTEM.md); if this file conflicts with the operating system, the operating system wins.
+
+These four principles govern how Jovie operates day to day and implement the throughput/bottleneck model in practice. They supersede [`core-values.md`](./core-values.md) when they conflict — values describe culture, principles are enforced rules. When a decision is in tension between a value and a principle, the principle wins unless `/canon/OPERATING_SYSTEM.md` says otherwise.
 
 If a future agent finds these ambiguous, the resolution lives in [`/LESSONS.md`](../../LESSONS.md), not in re-derivation. Add to the canon. Don't reinvent it.
 

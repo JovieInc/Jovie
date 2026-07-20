@@ -677,4 +677,99 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(result?.headers.get('set-cookie')).toBeNull();
     expect(hoisted.encodeSessionCookieMock).not.toHaveBeenCalled();
   });
+
+  describe('anonymous chat rate-limit E2E guard', () => {
+    function mockRateLimitExceeded() {
+      hoisted.checkAnonymousChatRateLimitMock.mockResolvedValue({
+        success: false,
+        limit: 10,
+        remaining: 0,
+        reset: new Date(Date.now() + 60_000),
+        reason: 'Too many anonymous chat requests from this IP',
+      });
+    }
+
+    function mockChatTurnOk() {
+      hoisted.executeChatTurnMock.mockResolvedValue({
+        streamResult: {
+          toUIMessageStreamResponse: ({
+            headers,
+          }: {
+            headers: Record<string, string>;
+          }) => new Response('ok', { status: 200, headers }),
+        },
+        selectedModel: 'anthropic/claude-haiku-4-5-20251001',
+        systemPrompt: '',
+        toolNames: [],
+        modelMessages: [],
+      });
+    }
+
+    it('still 429s when the limiter trips and the E2E guard is off', async () => {
+      vi.resetModules();
+      stubRuntimeEnv();
+      vi.stubEnv('E2E_TEST_MODE', '');
+      mockRateLimitExceeded();
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const req = makeRequest({
+        mode: 'onboarding',
+        messages: [userMessage('hi')],
+      });
+      const result = await tryHandleAnonymousOnboardingChat(req, 'req-rl-1');
+
+      expect(result?.status).toBe(429);
+      const body = await result?.json();
+      expect(body.errorCode).toBe('RATE_LIMITED');
+      expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalledTimes(1);
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    });
+
+    it('skips the limiter entirely when the E2E guard is on', async () => {
+      vi.resetModules();
+      stubRuntimeEnv();
+      vi.stubEnv('E2E_TEST_MODE', '1');
+      // Would 429 if it were consulted — the guard must not call it at all.
+      mockRateLimitExceeded();
+      mockChatTurnOk();
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const req = makeRequest({
+        mode: 'onboarding',
+        messages: [userMessage('hi')],
+      });
+      const result = await tryHandleAnonymousOnboardingChat(req, 'req-rl-2');
+
+      expect(result?.status).toBe(200);
+      expect(hoisted.checkAnonymousChatRateLimitMock).not.toHaveBeenCalled();
+      expect(hoisted.executeChatTurnMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps limiting on production deploys even with E2E_TEST_MODE=1', async () => {
+      vi.resetModules();
+      stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'production' });
+      vi.stubEnv('E2E_TEST_MODE', '1');
+      hoisted.checkGateForUserMock.mockResolvedValue(true);
+      hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+      hoisted.verifyTurnstileTokenMock.mockResolvedValue({ success: true });
+      mockRateLimitExceeded();
+      const { tryHandleAnonymousOnboardingChat } = await import(
+        '@/app/api/chat/onboarding-handler'
+      );
+      const req = makeRequest({
+        mode: 'onboarding',
+        turnstileToken: 'tok',
+        messages: [userMessage('hi')],
+      });
+      const result = await tryHandleAnonymousOnboardingChat(req, 'req-rl-3');
+
+      expect(result?.status).toBe(429);
+      const body = await result?.json();
+      expect(body.errorCode).toBe('RATE_LIMITED');
+      expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalledTimes(1);
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    });
+  });
 });

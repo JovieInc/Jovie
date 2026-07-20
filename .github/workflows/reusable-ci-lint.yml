@@ -37,7 +37,7 @@ jobs:
     # Sanctioned functional delta (Tim, 2026-07-08):
     # lint runs unconditionally on every PR — no ci-path-changes gate,
     # first tier at workflow zero.
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -100,7 +100,7 @@ jobs:
   typecheck:
     name: Typecheck
     if: ${{ inputs.skip == 'false' && (github.event_name != 'pull_request' || inputs.has_code_changes == 'true') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -125,7 +125,7 @@ jobs:
   knip:
     name: Knip (dead code)
     if: ${{ inputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && inputs.has_code_changes == 'true')) }}
-    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -140,7 +140,7 @@ jobs:
   env-example-guard:
     name: Env Example Guard
     if: ${{ inputs.skip == 'false' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -173,7 +173,7 @@ jobs:
   promptfoo-evals:
     name: Promptfoo Evals (deterministic)
     if: ${{ inputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || inputs.run_promptfoo_evals == 'true') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       JOVIE_RUN_LIVE_EVALS: '0'
@@ -199,7 +199,7 @@ jobs:
   golden-eval-set:
     name: Golden Eval Set (deterministic)
     if: ${{ inputs.skip == 'false' && (github.event_name == 'workflow_dispatch' || inputs.run_golden_eval_set == 'true') }}
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
       JOVIE_RUN_LIVE_EVALS: '0'

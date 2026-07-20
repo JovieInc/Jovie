@@ -11,7 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 /**
  * Design-system drift ratchet.
@@ -91,11 +91,13 @@ function runRipgrepCandidates(scanRoot: string): RipgrepResult {
   const result = spawnSync(
     ripgrepPath,
     [
+      '--no-config',
       '--files-with-matches',
       '--sort',
       'path',
       '--null',
       '--hidden',
+      '--text',
       '--no-messages',
       '--no-ignore',
       '--glob',
@@ -181,7 +183,7 @@ describe('design-system arbitrary-value ratchet', () => {
       `Arbitrary Tailwind values rose to ${current} (baseline ${baseline.count}). ` +
         'Use design-system tokens instead of arbitrary values, or — if this is intentional — justify it in review.'
     ).toBeLessThanOrEqual(baseline.count);
-  });
+  }, 30_000);
 });
 
 describe('arbitrary-value source prefilter', () => {
@@ -198,7 +200,7 @@ describe('arbitrary-value source prefilter', () => {
       });
       writeFileSync(
         join(scanRoot, 'app', 'multiline.tsx'),
-        'const classes = "w-[calc(100%\n-1rem)] text-[#fff]";\n'
+        '\0const classes = "w-[calc(100%\n-1rem)] text-[#fff]";\n'
       );
       writeFileSync(
         join(scanRoot, 'components', 'uppercase.ts'),
@@ -235,7 +237,14 @@ describe('arbitrary-value source prefilter', () => {
       expect(countArbitraryValues(scanRoot, candidates)).toBe(3);
       expect(countArbitraryValues(scanRoot, fallback)).toBe(3);
       expect(countArbitraryValues(scanRoot, spawnError)).toBe(3);
-      expect(countArbitraryValues(scanRoot)).toBe(3);
+      const configPath = join(scanRoot, 'ripgrep.conf');
+      writeFileSync(configPath, '--max-count=0\n');
+      vi.stubEnv('RIPGREP_CONFIG_PATH', configPath);
+      try {
+        expect(countArbitraryValues(scanRoot)).toBe(3);
+      } finally {
+        vi.unstubAllEnvs();
+      }
     } finally {
       rmSync(scanRoot, { recursive: true, force: true });
     }

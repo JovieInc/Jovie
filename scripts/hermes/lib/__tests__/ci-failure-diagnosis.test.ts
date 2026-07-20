@@ -469,11 +469,40 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
     expect(diagnosis.remediation).toContain('fail closed');
   });
 
+  it('diagnoses a Vercel prebuilt whose cross-job artifact omitted traced runtime files', () => {
+    const failures = [
+      `failure_subtype=staged_production_canary_failed
+       Cannot find module 'require-in-the-middle-a99415fa67232f7f'
+       at /var/task/apps/web/.next/server/middleware.js`,
+      `Cannot find package '@opentelemetry/sdk-node' imported from
+       /var/task/apps/web/.next/server/chunks/observability.js`,
+    ];
+
+    const diagnoses = failures.map(diagnoseCiFailure);
+    expect(diagnoses.map(({ failureClass }) => failureClass)).toEqual([
+      'vercel_prebuilt_function_closure_missing',
+      'vercel_prebuilt_function_closure_missing',
+    ]);
+    expect(diagnoses[0]).toMatchObject({
+      rootCause: expect.stringMatching(/filePathMap.*\.vercel\/output/),
+      remediation: expect.stringMatching(
+        /Do not rerun.*same job and workspace.*\/api\/health/
+      ),
+    });
+  });
+
   it('does not infer a launcher mismatch from an unrelated missing module', () => {
     expect(
       diagnoseCiFailure(
         'Error: Failed to load external module require-in-the-middle-deadbeef'
       ).failureClass
+    ).toBe('unknown');
+    expect(
+      diagnoseCiFailure(`
+        Cannot find module 'require-in-the-middle-deadbeef'
+        Require stack:
+        - /home/runner/work/Jovie/Jovie/apps/web/.next/server/middleware.js
+      `).failureClass
     ).toBe('unknown');
   });
 
@@ -517,14 +546,17 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
   });
 
   it('classifies the analytics scanner timeout separately from runner pressure', () => {
-    const log = `
-      FAIL tests/unit/analytics-metrics-layer-guard.test.ts > canonical metrics layer guard
+    const diagnosis = diagnoseCiFailure(`
+      Complete job name: Unit Tests (Shard 1/5)
+      FAIL tests/unit/analytics-metrics-layer-guard.test.ts:48
       Error: Test timed out in 12000ms.
-      PSI telemetry: sustained I/O pressure
-    `;
+      File body completed after 34.690s under shared I/O load.
+    `);
 
-    expect(diagnoseCiFailure(log).failureClass).toBe(
-      'bounded_source_scan_timeout'
+    expect(diagnosis.failureClass).toBe('bounded_source_scan_timeout');
+    expect(diagnosis.rootCause).toContain('cannot distinguish');
+    expect(diagnosis.remediation).toContain(
+      'unchanged blob plus a focused pass identifies shared-host I/O saturation'
     );
   });
 
@@ -559,15 +591,18 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
     expect(diagnosis.remediation).toContain(
       'Intersect native candidate-token and semantic file sets'
     );
-    expect(diagnosis.remediation).toContain('preserve fail-closed fallback');
+    expect(diagnosis.remediation).toContain('preserve');
+    expect(diagnosis.remediation).toContain('complete fail-closed fallback');
     expect(diagnosis.remediation).toContain('blindly rerunning');
   });
 
   it('classifies the destructive dialog audit as bounded scanner work', () => {
     expect(
       diagnoseCiFailure(`
-        FAIL tests/unit/design-system/destructive-confirm-dialog-audit.test.ts
+        Complete job name: Unit Tests (Shard 2/5)
+        FAIL tests/unit/design-system/destructive-confirm-dialog-audit.test.ts:94
         Error: Test timed out in 12000ms.
+        File body completed after 19.388s under shared I/O load.
       `).failureClass
     ).toBe('bounded_source_scan_timeout');
   });
@@ -575,13 +610,18 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
   it.each([
     'feature-flags-registry.test.ts',
     'arbitrary-values-ratchet.test.ts',
+    'app/exp-import-boundary.test.ts',
   ])('classifies recurring %s scanner timeouts', testFile => {
-    expect(
-      diagnoseCiFailure(`
+    const diagnosis = diagnoseCiFailure(`
         FAIL tests/unit/${testFile}
         Error: Test timed out in 12000ms.
-      `).failureClass
-    ).toBe('bounded_source_scan_timeout');
+      `);
+
+    expect(diagnosis.failureClass).toBe('bounded_source_scan_timeout');
+    expect(diagnosis.rootCause).toContain('shared-host I/O saturation');
+    expect(diagnosis.remediation).toContain('runner CPU quota');
+    expect(diagnosis.remediation).toContain('30-second ceiling');
+    expect(diagnosis.remediation).toContain('do not skip');
   });
 
   it('classifies the exp lint subprocess timeout as bounded scanner work', () => {
@@ -600,6 +640,38 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
         Error: Test timed out in 5000ms.
       `).failureClass
     ).toBe('test_fixture_import_timeout');
+  });
+
+  it('classifies the mobile overflow sign-in navigation race', () => {
+    const diagnosis = diagnoseCiFailure(`
+        Mobile Overflow Release Guard > 320px > public auth-signin has no horizontal overflow @ 320px
+        page.evaluate: Execution context was destroyed, most likely because of a navigation
+        at getOverflowingElements (tests/e2e/utils/mobile-overflow.ts:61:15)
+      `);
+
+    expect(diagnosis.failureClass).toBe('mobile_overflow_navigation_race');
+    expect(diagnosis.rootCause).toContain('streamed Flight script');
+    expect(diagnosis.remediation).toContain('raw response');
+  });
+
+  it('does not classify a generic destroyed execution context as mobile overflow', () => {
+    expect(
+      diagnoseCiFailure(`
+        Checkout flow
+        page.evaluate: Execution context was destroyed, most likely because of a navigation
+        at tests/e2e/checkout.spec.ts:42:9
+      `).failureClass
+    ).toBe('unknown');
+  });
+
+  it('does not apply the sign-in diagnosis to another mobile overflow surface', () => {
+    expect(
+      diagnoseCiFailure(`
+        Mobile Overflow Release Guard > 320px > public marketing-pricing has no horizontal overflow @ 320px
+        page.evaluate: Execution context was destroyed, most likely because of a navigation
+        at getOverflowingElements (tests/e2e/utils/mobile-overflow.ts:61:15)
+      `).failureClass
+    ).toBe('unknown');
   });
 
   it('keeps process exhaustion and host pressure as distinct failure classes', () => {

@@ -127,6 +127,14 @@ const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
   'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
 ]);
+const PR_SIZE_GUARD_MANIFEST = new Set([
+  '.github/workflows/pr-size-guard.yml',
+  'scripts/lib/pr-size-guard-policy.mjs',
+  'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
+]);
+const PR_SIZE_GUARD_TESTS = [
+  'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
+];
 const GOLDEN_PATH_SMOKE_CONTRACT_CORE = new Set([
   'apps/web/tests/e2e/golden-path.spec.ts',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
@@ -176,6 +184,33 @@ const PERFORMANCE_PROFILER_REPAIR_MANIFEST = new Set([
   ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
+const SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST = new Set([
+  '.github/workflows/agent-pipeline.yml',
+  '.github/workflows/ci.yml',
+  '.github/workflows/merge-queue-autoenroll.yml',
+  'apps/web/tests/unit/analytics-metrics-layer-guard.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+  'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
+  'apps/web/tests/unit/metrics-layer-guard-logic.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+]);
+const SCANNER_LOAD_REPAIR_MANIFEST = new Set([
+  ...SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SCANNER_LOAD_REPAIR_WEB_TESTS = [
+  'apps/web/tests/unit/analytics-metrics-layer-guard.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+  'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
+];
+const SCANNER_LOAD_REPAIR_SCRIPT_TESTS = [
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+];
 const PERFORMANCE_PROFILER_REPAIR_WEB_TESTS = [
   'apps/web/scripts/test-performance-profiler.test.ts',
 ];
@@ -227,6 +262,19 @@ const GTMQ_SOURCE_GATE_REAPER_MANIFEST = new Set([
 const GTMQ_SOURCE_GATE_REAPER_PYTHON_TESTS = ['scripts/tests/test_gh_retry.py'];
 const GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
+];
+const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = new Set([
+  'apps/web/tests/e2e/mobile-overflow.spec.ts',
+  'apps/web/tests/e2e/utils/mobile-overflow.ts',
+  'apps/web/tests/unit/e2e/mobile-overflow-navigation.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+]);
+const MOBILE_OVERFLOW_NAVIGATION_RACE_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const RUNNER_IO_PRESSURE_MANIFEST = new Set([
   '.github/runner-host/README.md',
@@ -369,6 +417,17 @@ export function buildAffectedTestPlan(changedFiles) {
     ) &&
     (affectedTestSelectorInputCount === 0 ||
       affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  const prSizeGuardInputCount = files.filter(file =>
+    PR_SIZE_GUARD_MANIFEST.has(file)
+  ).length;
+  const isExactPrSizeGuard =
+    prSizeGuardInputCount === PR_SIZE_GUARD_MANIFEST.size &&
+    files.length === PR_SIZE_GUARD_MANIFEST.size;
+  const isExactPrSizeGuardWithSelector =
+    prSizeGuardInputCount === PR_SIZE_GUARD_MANIFEST.size &&
+    affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
+    files.length ===
+      PR_SIZE_GUARD_MANIFEST.size + AFFECTED_TEST_SELECTOR_MANIFEST.size;
   const goldenPathSmokeContractInputCount = files.filter(file =>
     GOLDEN_PATH_SMOKE_CONTRACT_CORE.has(file)
   ).length;
@@ -393,12 +452,26 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactPerformanceProfilerRepairPrimary =
     files.length === PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.size &&
     files.every(file => PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.has(file));
-  const isExactPerformanceProfilerRepairWithSelector =
+  const isExactPerformanceProfilerRepairWithSelectorLegacy =
     files.length === PERFORMANCE_PROFILER_REPAIR_MANIFEST.size &&
     files.every(file => PERFORMANCE_PROFILER_REPAIR_MANIFEST.has(file));
+  const isExactScannerLoadRepairPrimary =
+    files.length === SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST.size &&
+    files.every(file => SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST.has(file));
+  const isExactScannerLoadRepairWithSelector =
+    files.length === SCANNER_LOAD_REPAIR_MANIFEST.size &&
+    files.every(file => SCANNER_LOAD_REPAIR_MANIFEST.has(file));
+  const scannerLoadRepairInputCount = files.filter(file =>
+    SCANNER_LOAD_REPAIR_MANIFEST.has(file)
+  ).length;
+  const isExactPerformanceProfilerRepairWithSelector =
+    isExactPerformanceProfilerRepairWithSelectorLegacy ||
+    isExactScannerLoadRepairWithSelector;
   const isExactPerformanceProfilerRepair =
     isExactPerformanceProfilerRepairPrimary ||
-    isExactPerformanceProfilerRepairWithSelector;
+    isExactPerformanceProfilerRepairWithSelectorLegacy ||
+    isExactScannerLoadRepairPrimary ||
+    isExactScannerLoadRepairWithSelector;
   const persistedAuthFixtureInputCount = files.filter(file =>
     PERSISTED_AUTH_FIXTURE_REPAIR_CORE.has(file)
   ).length;
@@ -428,6 +501,13 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount === GTMQ_SOURCE_GATE_REAPER_MANIFEST.size &&
     files.length === GTMQ_SOURCE_GATE_REAPER_MANIFEST.size;
+  const mobileOverflowNavigationRaceInputCount = files.filter(file =>
+    MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.has(file)
+  ).length;
+  const isExactMobileOverflowNavigationRace =
+    mobileOverflowNavigationRaceInputCount ===
+      MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.size &&
+    files.length === MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.size;
   const runnerIoPressureInputCount = files.filter(file =>
     RUNNER_IO_PRESSURE_MANIFEST.has(file)
   ).length;
@@ -477,7 +557,9 @@ export function buildAffectedTestPlan(changedFiles) {
       !(
         isExactGoldenPathSmokeContractRepair &&
         file === 'apps/web/tests/e2e/golden-path.spec.ts'
-      )
+      ) &&
+      // Per docs/PR_FLOW.md, Playwright remains in hosted manual/deep lanes.
+      !(isExactMobileOverflowNavigationRace && file.endsWith('.spec.ts'))
   );
   const mandatoryTests = [];
   const hasSeedConfirmationChange = files.some(
@@ -553,8 +635,14 @@ export function buildAffectedTestPlan(changedFiles) {
   if (isExactNeonAttemptArtifactRepair) {
     mandatoryTests.push(...NEON_ATTEMPT_ARTIFACT_TESTS);
   }
-  if (isExactPerformanceProfilerRepair) {
+  if (
+    isExactPerformanceProfilerRepairPrimary ||
+    isExactPerformanceProfilerRepairWithSelectorLegacy
+  ) {
     mandatoryTests.push(...PERFORMANCE_PROFILER_REPAIR_WEB_TESTS);
+  }
+  if (isExactScannerLoadRepairPrimary || isExactScannerLoadRepairWithSelector) {
+    mandatoryTests.push(...SCANNER_LOAD_REPAIR_WEB_TESTS);
   }
   if (isExactRunnerPrerequisiteRepair) {
     mandatoryTests.push(...RUNNER_PREREQUISITE_CONTRACT_TESTS);
@@ -576,11 +664,16 @@ export function buildAffectedTestPlan(changedFiles) {
       : []),
   ]);
   const scriptVitestTests = unique([
-    ...(isExactPerformanceProfilerRepair
+    ...(isExactPerformanceProfilerRepairPrimary ||
+    isExactPerformanceProfilerRepairWithSelectorLegacy
       ? PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS
+      : []),
+    ...(isExactScannerLoadRepairPrimary || isExactScannerLoadRepairWithSelector
+      ? SCANNER_LOAD_REPAIR_SCRIPT_TESTS
       : []),
     ...(isExactAffectedTestSelector ||
     (isExactAuthenticatedA11yRepair && affectedTestSelectorInputCount > 0) ||
+    isExactPrSizeGuardWithSelector ||
     isExactGoldenPathSmokeContractRepair ||
     isExactNeonAttemptArtifactRepair ||
     isExactPerformanceProfilerRepairWithSelector ||
@@ -588,6 +681,9 @@ export function buildAffectedTestPlan(changedFiles) {
     isExactRunnerPrerequisiteVisualQaRepair ||
     (isExactPersistedAuthFixtureRepair && affectedTestSelectorInputCount > 0)
       ? AFFECTED_TEST_SELECTOR_TESTS
+      : []),
+    ...(isExactPrSizeGuard || isExactPrSizeGuardWithSelector
+      ? PR_SIZE_GUARD_TESTS
       : []),
     ...(isExactGoldenPathSmokeContractRepair
       ? GOLDEN_PATH_SMOKE_CONTRACT_SCRIPT_TESTS
@@ -600,6 +696,9 @@ export function buildAffectedTestPlan(changedFiles) {
       : []),
     ...(isExactGtmqSourceGateReaper
       ? GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS
+      : []),
+    ...(isExactMobileOverflowNavigationRace
+      ? MOBILE_OVERFLOW_NAVIGATION_RACE_SCRIPT_TESTS
       : []),
     ...(isExactRunnerIoPressure ? RUNNER_IO_PRESSURE_SCRIPT_TESTS : []),
     ...(isExactRunnerPrerequisiteRepair
@@ -637,6 +736,11 @@ export function buildAffectedTestPlan(changedFiles) {
       PERSISTED_AUTH_FIXTURE_REPAIR_CORE.has(file)
     )
       return true;
+    if (
+      isExactMobileOverflowNavigationRace &&
+      MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.has(file)
+    )
+      return true;
     if (isExactRunnerIoPressure && RUNNER_IO_PRESSURE_MANIFEST.has(file))
       return true;
     if (file === VISUAL_QA_DIFF_ARTIFACTS_SOURCE) return true;
@@ -644,7 +748,8 @@ export function buildAffectedTestPlan(changedFiles) {
       return true;
     if (
       isExactPerformanceProfilerRepair &&
-      PERFORMANCE_PROFILER_REPAIR_MANIFEST.has(file)
+      (PERFORMANCE_PROFILER_REPAIR_MANIFEST.has(file) ||
+        SCANNER_LOAD_REPAIR_MANIFEST.has(file))
     )
       return true;
     if (
@@ -696,18 +801,43 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactPersistedAuthFixtureRepair &&
     !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper &&
+    !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
-    !isExactLayoutGuardContract;
+    !isExactLayoutGuardContract &&
+    !isExactPrSizeGuardWithSelector;
+  const hasIncompletePrSizeGuard =
+    prSizeGuardInputCount > 0 &&
+    !isExactPrSizeGuard &&
+    !isExactPrSizeGuardWithSelector;
   const hasIncompletePerformanceProfilerRepair =
     performanceProfilerRepairInputCount > 0 &&
     !isExactPerformanceProfilerRepair &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactNeonAttemptArtifactRepair &&
     !isExactPersistedAuthFixtureRepair &&
+    !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract;
+  const hasIncompleteScannerLoadRepair =
+    scannerLoadRepairInputCount > 0 &&
+    !isExactScannerLoadRepairPrimary &&
+    !isExactScannerLoadRepairWithSelector &&
+    !isExactAffectedTestSelector &&
+    !isExactAuthenticatedA11yRepair &&
+    !isExactPrerequisiteTrain &&
+    !isExactGoldenPathSmokeContractRepair &&
+    !isExactNeonAttemptArtifactRepair &&
+    !isExactPerformanceProfilerRepair &&
+    !isExactPersistedAuthFixtureRepair &&
+    !isExactVisualQaSelectorRepair &&
+    !isExactGtmqSourceGateReaper &&
+    !isExactMobileOverflowNavigationRace &&
+    !isExactRunnerIoPressure &&
+    !isExactRunnerPrerequisiteRepair &&
+    !isExactLayoutGuardContract &&
+    !isExactPrSizeGuardWithSelector;
   const hasIncompleteGtmqSourceGateReaper =
     gtmqSourceGateReaperInputCount > 0 &&
     !isExactGtmqSourceGateReaper &&
@@ -716,11 +846,29 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactNeonAttemptArtifactRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactAffectedTestSelector &&
+    !isExactScannerLoadRepairPrimary &&
     !isExactVisualQaSelectorRepair &&
     !isExactPerformanceProfilerRepairWithSelector &&
+    !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
-    !isExactLayoutGuardContract;
+    !isExactLayoutGuardContract &&
+    !isExactPrSizeGuardWithSelector;
+  const hasIncompleteMobileOverflowNavigationRace =
+    mobileOverflowNavigationRaceInputCount > 0 &&
+    !isExactMobileOverflowNavigationRace &&
+    !isExactAuthenticatedA11yRepair &&
+    !isExactAffectedTestSelector &&
+    !isExactGoldenPathSmokeContractRepair &&
+    !isExactNeonAttemptArtifactRepair &&
+    !isExactPerformanceProfilerRepair &&
+    !isExactPersistedAuthFixtureRepair &&
+    !isExactVisualQaSelectorRepair &&
+    !isExactGtmqSourceGateReaper &&
+    !isExactRunnerIoPressure &&
+    !isExactRunnerPrerequisiteRepair &&
+    !isExactLayoutGuardContract &&
+    !isExactPrSizeGuardWithSelector;
   const hasIncompleteRunnerIoPressure =
     runnerIoPressureInputCount > 0 &&
     !isExactRunnerIoPressure &&
@@ -732,8 +880,10 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper &&
     !isExactPerformanceProfilerRepair &&
+    !isExactMobileOverflowNavigationRace &&
     !isExactRunnerPrerequisiteRepair &&
-    !isExactLayoutGuardContract;
+    !isExactLayoutGuardContract &&
+    !isExactPrSizeGuardWithSelector;
   const hasIncompleteRunnerPrerequisiteContract =
     runnerPrerequisiteContractInputCount > 0 &&
     !isExactRunnerPrerequisiteRepair &&
@@ -747,7 +897,9 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactPersistedAuthFixtureRepair &&
     !isExactLayoutGuardContract &&
     !isExactPerformanceProfilerRepair &&
-    !isExactRunnerIoPressure;
+    !isExactMobileOverflowNavigationRace &&
+    !isExactRunnerIoPressure &&
+    !isExactPrSizeGuardWithSelector;
   const hasIncompleteLayoutGuardContract =
     layoutGuardContractInputCount > 0 &&
     !isExactLayoutGuardContract &&
@@ -761,7 +913,9 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactVisualQaSelectorRepair &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactPerformanceProfilerRepair &&
-    !isExactRunnerIoPressure;
+    !isExactMobileOverflowNavigationRace &&
+    !isExactRunnerIoPressure &&
+    !isExactPrSizeGuardWithSelector;
   const hasIncompleteNeonAttemptArtifactRepair =
     neonAttemptArtifactInputCount > 0 &&
     !isExactNeonAttemptArtifactRepair &&
@@ -774,9 +928,11 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactPersistedAuthFixtureRepair &&
     !isExactVisualQaSelectorRepair &&
     !isExactGtmqSourceGateReaper &&
+    !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
-    !isExactLayoutGuardContract;
+    !isExactLayoutGuardContract &&
+    !isExactPrSizeGuardWithSelector;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
     hasUnknownCiCancellationHealerPeer ||
@@ -786,8 +942,11 @@ export function buildAffectedTestPlan(changedFiles) {
     hasUnknownPrerequisiteTrainPeer ||
     hasIncompleteVercelCongestionControl ||
     hasIncompleteAffectedTestSelector ||
+    hasIncompletePrSizeGuard ||
     hasIncompletePerformanceProfilerRepair ||
+    hasIncompleteScannerLoadRepair ||
     hasIncompleteGtmqSourceGateReaper ||
+    hasIncompleteMobileOverflowNavigationRace ||
     hasIncompleteRunnerIoPressure ||
     hasIncompleteRunnerPrerequisiteContract ||
     hasIncompleteLayoutGuardContract ||
@@ -807,12 +966,15 @@ export function buildAffectedTestPlan(changedFiles) {
             isExactVercelCongestionControl ||
             isExactAffectedTestSelector ||
             isExactAuthenticatedA11yRepair ||
+            isExactPrSizeGuard ||
+            isExactPrSizeGuardWithSelector ||
             isExactGoldenPathSmokeContractRepair ||
             isExactNeonAttemptArtifactRepair ||
             isExactPerformanceProfilerRepair ||
             isExactPersistedAuthFixtureRepair ||
             isExactVisualQaSelectorRepair ||
             isExactGtmqSourceGateReaper ||
+            isExactMobileOverflowNavigationRace ||
             isExactRunnerIoPressure ||
             isExactRunnerPrerequisiteRepair ||
             isExactLayoutGuardContract)

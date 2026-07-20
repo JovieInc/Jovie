@@ -1,15 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 import { RELIABILITY_CANARY_E2E_GLOBS } from './lib/testing/reliability-detectors';
+import { vercelAutomationHeaders } from './tests/e2e/utils/vercel-automation-headers';
 
-// Build extra HTTP headers for Vercel Deployment Protection bypass
-// Both headers are required for browser automation to work correctly
-// See: https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation
-const extraHTTPHeaders: Record<string, string> = {};
-if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
-  extraHTTPHeaders['x-vercel-protection-bypass'] =
-    process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  extraHTTPHeaders['x-vercel-set-bypass-cookie'] = 'samesitenone';
-}
+const vercelAutomation = vercelAutomationHeaders();
 
 const isCI = !!process.env.CI;
 const baseURL = process.env.BASE_URL || 'http://localhost:3100';
@@ -29,6 +22,7 @@ const managedWebServerPort = managedWebServerUrl.port;
  * Run with: pnpm exec playwright test --config=playwright.config.nightly.ts
  */
 export default defineConfig({
+  captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
   testMatch: [
     '**/nightly/**/*.spec.ts',
@@ -44,8 +38,11 @@ export default defineConfig({
   reporter: isCI
     ? [
         ['line'],
-        ['html', { open: 'never' }],
-        ['json', { outputFile: 'test-results/nightly-results.json' }],
+        ...(vercelAutomation.active
+          ? []
+          : ([
+              ['json', { outputFile: 'test-results/nightly-results.json' }],
+            ] as const)),
       ]
     : 'html',
 
@@ -57,12 +54,14 @@ export default defineConfig({
 
   use: {
     baseURL,
-    trace: 'on-first-retry',
-    video: 'retain-on-failure',
-    screenshot: 'only-on-failure',
+    trace: isCI ? 'off' : 'on-first-retry',
+    video: isCI ? 'off' : 'retain-on-failure',
+    screenshot: isCI ? 'off' : 'only-on-failure',
     navigationTimeout: 45_000,
     actionTimeout: 20_000,
-    ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
+    ...(vercelAutomation.active && {
+      extraHTTPHeaders: vercelAutomation.headers,
+    }),
     storageState: 'tests/.auth/user.json',
   },
 
@@ -113,7 +112,6 @@ export default defineConfig({
             ? 'pnpm run dev:local'
             : 'doppler run --project jovie-web --config dev -- pnpm run dev:local',
           env: {
-            ...process.env,
             NODE_ENV: 'test',
             PORT: managedWebServerPort,
             NEXT_DISABLE_TOOLBAR: '1',

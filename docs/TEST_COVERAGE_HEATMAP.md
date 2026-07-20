@@ -75,4 +75,4 @@ Tests can run code without verifying its behavior. Mutation testing kills mutant
 
 ## Update Cadence
 
-Nightly cron at `0 6 * * *` UTC via `.github/workflows/test-coverage-audit.yml`. On-demand via `pnpm tsx scripts/audit-test-coverage.ts`.
+Nightly cron at `30 18 * * *` UTC via `.github/workflows/test-coverage-audit.yml`, after the deterministic nightly lanes. On-demand via `pnpm tsx scripts/audit-test-coverage.ts`.

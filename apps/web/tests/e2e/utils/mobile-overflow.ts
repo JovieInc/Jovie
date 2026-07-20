@@ -1,4 +1,9 @@
-import { expect, type Page, type TestInfo } from '@playwright/test';
+import {
+  expect,
+  type Page,
+  type Response,
+  type TestInfo,
+} from '@playwright/test';
 
 export interface MobileOverflowMetrics {
   readonly documentScrollWidth: number;
@@ -22,12 +27,39 @@ export interface OverflowingElement {
   readonly text: string;
 }
 
+type RedirectPage = Pick<Page, 'waitForURL'>;
+type RedirectResponse = Pick<Response, 'text' | 'url'>;
+
 function normalizeAttachmentName(label: string): string {
   return label
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 80);
+}
+
+export async function waitForPendingNextRedirect(
+  page: RedirectPage,
+  response: RedirectResponse | null,
+  timeout: number
+): Promise<void> {
+  if (!response) return;
+
+  const html = await response.text();
+  const digest = html.match(
+    /NEXT_REDIRECT;(?:replace|push);.*?;(?:303|307|308);(?=["'<>\\]|$)/s
+  )?.[0];
+  const target = digest?.split(';').slice(2, -2).join(';').trim();
+  if (!target) return;
+
+  const expectedUrl = new URL(target, response.url());
+  await page.waitForURL(
+    url =>
+      url.origin === expectedUrl.origin &&
+      url.pathname === expectedUrl.pathname &&
+      url.search === expectedUrl.search,
+    { waitUntil: 'domcontentloaded', timeout }
+  );
 }
 
 export async function getMobileOverflowMetrics(

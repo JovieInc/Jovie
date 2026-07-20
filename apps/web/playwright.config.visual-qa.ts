@@ -9,13 +9,9 @@
  */
 
 import { defineConfig, devices } from '@playwright/test';
+import { vercelAutomationHeaders } from './tests/e2e/utils/vercel-automation-headers';
 
-const extraHTTPHeaders: Record<string, string> = {};
-if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
-  extraHTTPHeaders['x-vercel-protection-bypass'] =
-    process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  extraHTTPHeaders['x-vercel-set-bypass-cookie'] = 'samesitenone';
-}
+const vercelAutomation = vercelAutomationHeaders();
 
 const webServerCommand = process.env.DATABASE_URL
   ? 'pnpm run dev:local'
@@ -28,6 +24,7 @@ if (!managedWebServerUrl.port) {
 const managedWebServerPort = managedWebServerUrl.port;
 
 export default defineConfig({
+  captureGitInfo: { commit: false, diff: false },
   testDir: './tests/visual-qa',
   testMatch: '**/capture.spec.ts',
   fullyParallel: false,
@@ -45,7 +42,9 @@ export default defineConfig({
     video: 'off',
     navigationTimeout: 90_000,
     actionTimeout: 30_000,
-    ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
+    ...(vercelAutomation.active && {
+      extraHTTPHeaders: vercelAutomation.headers,
+    }),
   },
 
   projects: [
@@ -66,7 +65,6 @@ export default defineConfig({
         webServer: {
           command: webServerCommand,
           env: {
-            ...process.env,
             NODE_ENV: 'test',
             PORT: managedWebServerPort,
             NEXT_DISABLE_TOOLBAR: '1',

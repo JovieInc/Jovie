@@ -32,22 +32,22 @@ describe('FrostedButton', () => {
     expect(link).toHaveAttribute('href', '/page');
   });
 
-  it('applies solid tone by default (maps to frosted variant)', () => {
+  it('applies solid tone by default (maps to secondary variant)', () => {
     render(<FrostedButton>Solid</FrostedButton>);
     const button = screen.getByRole('button', { name: 'Solid' });
-    expect(button).toHaveAttribute('data-variant', 'frosted');
+    expect(button).toHaveAttribute('data-variant', 'secondary');
   });
 
-  it('applies ghost tone (maps to frosted-ghost variant)', () => {
+  it('applies ghost tone (maps to ghost variant)', () => {
     render(<FrostedButton tone='ghost'>Ghost</FrostedButton>);
     const button = screen.getByRole('button', { name: 'Ghost' });
-    expect(button).toHaveAttribute('data-variant', 'frosted-ghost');
+    expect(button).toHaveAttribute('data-variant', 'ghost');
   });
 
-  it('applies outline tone (maps to frosted-outline variant)', () => {
+  it('applies outline tone (maps to secondary variant)', () => {
     render(<FrostedButton tone='outline'>Outline</FrostedButton>);
     const button = screen.getByRole('button', { name: 'Outline' });
-    expect(button).toHaveAttribute('data-variant', 'frosted-outline');
+    expect(button).toHaveAttribute('data-variant', 'secondary');
   });
 
   it('adds target="_blank" and rel="noopener noreferrer" when external=true', () => {

@@ -1,17 +1,16 @@
 name: Workflow Lint
 
+# Source, merge-group, and direct-main workflow edits are enforced inside
+# ci-fast's Structural Contract. Keep this standalone surface manual for
+# operator diagnosis without duplicating installs and runner allocation.
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/**', '.github/actions/**', '.github/actionlint.yaml']
-  pull_request:
-    paths: ['.github/workflows/**', '.github/actions/**', '.github/actionlint.yaml']
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

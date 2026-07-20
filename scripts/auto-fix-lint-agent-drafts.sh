@@ -115,10 +115,12 @@ SNAP="$ENRICHED"
 
 # Filter to PRs with a failing lint check
 LINT_PR="$(echo "$SNAP" | jq -c '[.[] |
-  select(.draft)
-  and ((.head | test("^(tim/|codex/|agent/|claude/|linear/|dependabot/)")))
-  and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
-  and ([.fail[]] | any(test("(?i)lint|biome")))
+  select(
+    .draft
+    and ((.head | test("^(tim/|codex/|agent/|claude/|linear/|dependabot/)")))
+    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
+    and ([.fail[]] | any(test("(?i)lint|biome")))
+  )
 ]')"
 
 count="$(jq length <<<"$LINT_PR")"

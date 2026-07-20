@@ -55,6 +55,7 @@ export function listMergeGateJobs(manifest) {
       id: job.id,
       name: job.name,
       tier: job.tier,
+      gateStage: job.gateStage,
       nextLocalCommand: job.nextLocalCommand,
       remediation: job.remediation,
     }));
@@ -122,6 +123,14 @@ export function validateCiHarnessManifest(manifest) {
     }
     if (typeof job.mergeGate !== 'boolean') {
       errors.push(`job ${job.id} must declare boolean mergeGate`);
+    }
+    if (
+      job.mergeGate === true &&
+      !['source-pr', 'merge-group', 'both'].includes(job.gateStage)
+    ) {
+      errors.push(
+        `merge-gate job ${job.id} must declare gateStage source-pr, merge-group, or both`
+      );
     }
     if (!job.nextLocalCommand || !job.remediation) {
       errors.push(
@@ -355,7 +364,8 @@ export function classifyCiRisk(files, manifest, options = {}) {
     blocksUnattendedAutoMerge,
     matchedRules: matches,
     recommendedLabels: [
-      ...(requiresSmoke ? ['testing'] : []),
+      // Deep evidence is manual/scheduled/event-driven. Risk classification
+      // must never fan out source-PR work through a label.
       ...(blocksUnattendedAutoMerge ? ['needs-human'] : []),
     ],
     nextLocalCommands: buildRiskLocalCommands({
@@ -389,7 +399,7 @@ function tierRows(manifest) {
   const gatesByTier = new Map();
   for (const job of listMergeGateJobs(manifest)) {
     const list = gatesByTier.get(job.tier) ?? [];
-    list.push(`\`${job.name}\``);
+    list.push(`\`${job.name}\` (${job.gateStage})`);
     gatesByTier.set(job.tier, list);
   }
   return (manifest.tiers ?? [])
@@ -416,7 +426,8 @@ function riskRows(manifest) {
 function mergeGateRows(manifest) {
   return listMergeGateJobs(manifest)
     .map(
-      job => `| \`${job.name}\` | ${job.tier} | \`${job.nextLocalCommand}\` |`
+      job =>
+        `| \`${job.name}\` | ${job.gateStage} | ${job.tier} | \`${job.nextLocalCommand}\` |`
     )
     .join('\n');
 }
@@ -428,6 +439,18 @@ export function generateCiHarnessDocs(manifest, title = 'CI Agent Harness') {
     '',
     'Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; run `pnpm ci:harness:docs` after changing the manifest.',
     '',
+    '### Stage Contract',
+    '',
+    '| Stage | Exact responsibility |',
+    '| --- | --- |',
+    '| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, and diff secret scan. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |',
+    '| Native merge queue | Re-run deterministic gates on the exact `merge_group` head, then require five affected unit shards, one hosted build + layout workspace, path-selected Xcode, and model-free semantic evals. |',
+    '| Queue-proven main | Reuse the exact successful merge-group `PR Ready` proof and skip duplicate fallback work. |',
+    '| Direct/admin main | Fail closed through path/risk/fast/secret/migration, all five unit shards, and the combined hosted build + layout job; skipped placeholders are invalid. |',
+    '| Production release | One reusable staging/canary/promotion/rollback DAG under one non-cancelling caller lease. |',
+    '| Post-deploy | Hosted public, auth, homepage, and explicitly provisioned Lighthouse probes settle into `Production Verified` before notification. |',
+    '| Scheduled/manual/event | Exhaustive E2E, Neon, a11y, performance, eval, visual, slop, brand, and repair/report loops. |',
+    '',
     '### Tiers',
     '',
     '| Tier | Purpose | Merge-gate jobs |',
@@ -436,15 +459,15 @@ export function generateCiHarnessDocs(manifest, title = 'CI Agent Harness') {
     '',
     '### Merge Gates',
     '',
-    '`PR Ready` may require only jobs declared as merge gates below. Informational jobs must stay out of the aggregate merge gate.',
+    'Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `PR Ready` may require only `merge-group`/`both` jobs. Informational evidence stays out of both required aggregates.',
     '',
-    '| Job | Tier | Local remediation command |',
-    '| --- | --- | --- |',
+    '| Job | Gate stage | Tier | Local remediation command |',
+    '| --- | --- | --- | --- |',
     mergeGateRows(manifest),
     '',
-    '### Risk-Triggered Evidence',
+    '### Risk Signals and Opt-in Evidence',
     '',
-    'Sensitive changes are classified deterministically before auto-merge. High-risk changes require smoke and/or preview evidence and block unattended auto-merge.',
+    'Sensitive changes are classified deterministically on source PRs. Smoke and preview are routing signals for hosted manual, scheduled, or event-driven evidence; no PR label allocates a heavy source-event lane. The generic `testing`, `deep-ci`, `launch-candidate`, and `deploy-preview` labels have no CI fan-out semantics.',
     '',
     '| Surface | Level | Smoke | Preview | Blocks unattended auto-merge |',
     '| --- | --- | --- | --- | --- |',
@@ -532,6 +555,7 @@ export function buildCiHarnessArtifact({
       name: job?.name ?? result.name ?? result.id,
       tier: job?.tier ?? result.tier ?? 'unknown',
       mergeGate: Boolean(job?.mergeGate),
+      gateStage: job?.gateStage ?? null,
       status,
       skipReason: result.skipReason ?? null,
       remediation: job?.remediation ?? null,
@@ -565,7 +589,11 @@ export function buildCiHarnessArtifact({
       pullRequest: prNumber ?? null,
       sha: sha ?? null,
     },
-    requiredGates: normalizedJobs.filter(job => job.mergeGate),
+    requiredGates: normalizedJobs.filter(
+      job =>
+        job.mergeGate &&
+        (job.gateStage === 'source-pr' || job.gateStage === 'both')
+    ),
     evidence: {
       previewUrl: previewUrl || null,
       risk: risk ?? null,

@@ -1,4 +1,4 @@
-# Cost Monitoring & Auto-Rollback
+# Cost Monitoring & Incident Alerting
 
 > **Question this answers:** "If a deploy lands and starts costing $X/day in unexpected spend, will the system catch it before I notice?"
 
@@ -9,10 +9,13 @@ This document covers the cost-anomaly defense layer. It exists because of a real
 | Layer | Mechanism | Coverage | Defense Type |
 |---|---|---|---|
 | **1** | Provider-native spend caps | All providers | **Hard circuit-breaker** — provider stops billing |
-| **2** | `cost-anomaly-gate.yml` | Vercel deployments | **Auto-rollback** — reverts deploy on event-volume spike |
+| **2** | `cost-anomaly-gate.yml` | Production event volume | **Alert-only observer** — opens one deduplicated incident |
 | **3** | Provider usage ledger (future) | Per-provider attribution | Per-provider day-over-day anomaly detection |
 
-**Layers 1 and 2 are independent.** If Layer 2's monitoring breaks, Layer 1 still caps your spend. If Layer 1's cap is set too high, Layer 2 catches the spike sooner.
+Layer 1 is independent of GitHub Actions. Layer 2 declares a 15-minute hosted
+schedule, but workflow enablement is an explicit operational step; do not rely
+on it as continuous protection until its enabled state and Production secrets
+have been verified.
 
 ---
 
@@ -65,7 +68,13 @@ This is the primary defense. Walk this checklist on initial setup and re-verify 
 
 ## Layer 2: Cost Anomaly Gate Workflow
 
-`.github/workflows/cost-anomaly-gate.yml` runs every 15 minutes against production. It queries Sentry for total event volume over the last hour and compares against a 4-week same-hour-of-week baseline. On anomaly: triggers `vercel rollback --yes`, posts to Slack, opens a GitHub issue.
+`.github/workflows/cost-anomaly-gate.yml` is configured for a 15-minute hosted
+schedule plus manual dispatch. It queries Sentry for total event volume over
+the last hour and compares against a 4-week same-hour-of-week baseline. On an
+anomaly it opens one fixed-title incident and sends one Slack alert; later
+observations are suppressed until that incident is closed. It has no Vercel
+credentials and never mutates production. Confirmed release regressions are
+rolled back only by the serialized production controller.
 
 ### Why event volume?
 
@@ -80,32 +89,29 @@ This is a proxy metric, not a direct cost metric. If the runaway is in something
 
 | Input | Default | Purpose |
 |---|---|---|
-| `dry_run` | `true` | When true, detects anomalies + posts to Slack but does NOT roll back. Flip to `false` after calibration. |
 | `threshold_multiplier` | `5` | Anomaly = current > baseline × this. |
 | `absolute_floor` | `1000` | Anomaly requires current > this many events even if multiplier hits. Prevents low-traffic-hour false positives. |
 | `lookback_minutes` | `60` | How much recent traffic to evaluate. |
 
 ### Calibration procedure (run on initial setup)
 
-1. **Deploy the workflow with `dry_run` defaulted to `true`**. The current default is already `true`.
-2. **Watch Slack for 1-2 weeks.** Note any "Cost Anomaly Detected (DRY RUN)" alerts. Each one would have triggered a rollback in production.
-3. **Investigate every alert.** Was it a real anomaly or a false positive?
+1. **Watch Slack for 1-2 weeks.** Resolve and close the open incident after each investigation so a later incident can alert again.
+2. **Investigate every alert.** Was it a real anomaly or a false positive?
    - **Real anomaly with a known cause** (release-day notification fan-out, traffic spike from press): adjust `threshold_multiplier` upward or document as expected.
    - **False positive** (stable traffic, just baseline drift): adjust `threshold_multiplier` upward.
-4. **When you go a full week with zero false positives**, edit `.github/workflows/cost-anomaly-gate.yml` and change the default of `DRY_RUN` from `'true'` to `'false'`.
-5. **Verify rollback path** before flipping: run `gh workflow run cost-anomaly-gate.yml -f dry_run=false -f threshold_multiplier=0 -f absolute_floor=0` in a maintenance window. This forces a synthetic anomaly. Confirm `vercel rollback --yes` actually reverts production. Roll forward immediately afterward.
+3. **Tune thresholds only from observed data.** This observer remains alert-only at every threshold.
 
 ### When the gate fires (on-call runbook)
 
-Slack alert lands. GitHub issue opens. Production has been rolled back to the prior deployment.
+Slack alert lands and one GitHub incident opens. Production is unchanged.
 
-1. **Confirm rollback succeeded:**
+1. **Confirm production health and current deployment:**
    ```bash
    doppler run -- vercel ls --token "$VERCEL_TOKEN" | head -5
    curl -s https://jov.ie/api/health
    ```
 
-2. **Identify the bad deployment.** The rollback reverts to the immediately-prior production deployment. Find the commits in between:
+2. **Identify the deployment or traffic source correlated with the spike:**
    ```bash
    gh pr list --state merged --base main --limit 10
    git log --oneline <prior-prod-sha>..<rolled-back-sha>
@@ -119,20 +125,9 @@ Slack alert lands. GitHub issue opens. Production has been rolled back to the pr
 
 4. **Verify Layer 1 caps held.** Spot-check Vercel Spend Management, Anthropic usage, Resend logs. If any provider went above its cap, the cap is misconfigured.
 
-5. **Fix and redeploy.** The rolled-back code is back in production; you have time. Open a fix PR, get it through normal review, ship.
+5. **Fix and redeploy through the serialized production controller.** Use its centralized rollback only when a release gate has structured confirmed-regression evidence.
 
 6. **If false positive:** tune `threshold_multiplier` upward in `.github/workflows/cost-anomaly-gate.yml` and document why in the commit message.
-
-### Recovery from a wrong rollback
-
-If the gate fires on a real anomaly that was actually intentional (e.g. you launched a marketing campaign that legitimately 10x'd traffic), roll forward:
-```bash
-# List recent deployments
-doppler run -- vercel ls --token "$VERCEL_TOKEN"
-
-# Promote a specific deployment back to production
-doppler run -- vercel promote <deployment-url> --token "$VERCEL_TOKEN"
-```
 
 ---
 
@@ -152,15 +147,15 @@ This is finer-grained than Layer 2 but slower to react (daily vs every-15-min). 
 ### Initial setup (one-time)
 
 - [ ] Layer 1: walk the checklist above. Screenshot every cap. Attach to the setup PR.
-- [ ] Layer 2: confirm `cost-anomaly-gate.yml` is scheduled (`gh workflow list | grep cost-anomaly`).
-- [ ] Layer 2: trigger a dry-run manually and confirm Slack message arrives:
+- [ ] Layer 2: confirm `cost-anomaly-gate.yml` is enabled and its 15-minute schedule is declared before treating it as continuous protection.
+- [ ] Layer 2: trigger a synthetic observer run manually and confirm one issue + Slack message arrives:
   ```bash
-  gh workflow run cost-anomaly-gate.yml -f dry_run=true -f threshold_multiplier=0 -f absolute_floor=0
+  gh workflow run cost-anomaly-gate.yml -f threshold_multiplier=0 -f absolute_floor=0
   ```
-- [ ] Layer 2: confirm the workflow's required secrets exist: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `SLACK_WEBHOOK_URL`. (All exist already, used by `sentry-error-gate.yml`.)
+- [ ] Layer 2: confirm the `Production – jovie` environment exposes `SENTRY_AUTH_TOKEN`. The workflow resolves canonical project `jovie/jovie-web` to a numeric Sentry project ID; it does not depend on repo-level org/project secrets or Vercel credentials.
 
 ### Ongoing (quarterly)
 
 - [ ] Re-walk Layer 1 checklist. Increase caps as baseline traffic grows.
 - [ ] Review last quarter's gate fires. Tune thresholds if false-positive rate > 1/month.
-- [ ] Confirm rollback still works by triggering a synthetic anomaly in maintenance window.
+- [ ] Confirm repeated anomaly observations reuse the open incident without duplicate Slack alerts.
