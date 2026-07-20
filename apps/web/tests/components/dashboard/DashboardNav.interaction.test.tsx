@@ -7,8 +7,6 @@ import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palet
 import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 import {
   mockClearPendingShell,
-  mockOpenPreviewPanel,
-  mockRouterPush,
   mockShowPendingShell,
   mockToastInfo,
   mockUseChatConversationsQuery,
@@ -60,10 +58,11 @@ describe('DashboardNav interactions', () => {
       'href',
       buildLibraryViewRoute('releases')
     );
-    expect(
-      screen.getByRole('button', { name: 'Artist Profile' })
-    ).toBeInTheDocument();
+    // 'Artist Profile' was renamed to 'Profiles' and is gated behind
+    // PROFILES_WORKSPACE, which is disabled in the default flag snapshot.
+    expect(screen.queryByRole('button', { name: 'Artist Profile' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Artist Profile' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Profiles' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Touring' })).toHaveAttribute(
       'href',
       APP_ROUTES.SETTINGS_TOURING
@@ -149,28 +148,6 @@ describe('DashboardNav interactions', () => {
     expect(labelNode).toHaveClass('group-data-[collapsible=icon]:hidden');
   });
 
-  it('opens the in-chat profile rail from the artist name on chat routes', async () => {
-    const user = userEvent.setup();
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.CHAT);
-    renderDashboardNav({
-      renderFn: render,
-      appFlags: { DESIGN_V1: true },
-      overrides: {
-        selectedProfile: {
-          id: 'profile_123',
-          displayName: 'Tim White',
-          username: 'tim',
-          usernameNormalized: 'tim',
-        } as DashboardData['selectedProfile'],
-      },
-    });
-
-    await user.click(screen.getByRole('button', { name: 'Tim White' }));
-
-    expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
-    expect(mockRouterPush).not.toHaveBeenCalled();
-  });
-
   it('opens command search from the Design V1 sidebar search row', async () => {
     const user = userEvent.setup();
     const listener = vi.fn();
@@ -232,9 +209,9 @@ describe('DashboardNav interactions', () => {
       'href',
       buildLibraryViewRoute('releases')
     );
-    expect(
-      screen.getByRole('button', { name: 'Tim White' })
-    ).toBeInTheDocument();
+    // The artist-name profile rail entry was removed from the nav; the
+    // collapsible 'Artist' group label above is the only 'Artist' button.
+    expect(screen.queryByRole('button', { name: 'Tim White' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Tim White' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Touring' })).toHaveAttribute(
       'href',
@@ -315,28 +292,6 @@ describe('DashboardNav interactions', () => {
 
     expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'New Chat' })).toBeNull();
-  });
-
-  it('navigates to chat and opens the profile rail from artist name off chat routes', async () => {
-    const user = userEvent.setup();
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.AUDIENCE);
-    renderDashboardNav({
-      renderFn: render,
-      appFlags: { DESIGN_V1: true },
-      overrides: {
-        selectedProfile: {
-          id: 'profile_123',
-          displayName: 'Tim White',
-          username: 'tim',
-          usernameNormalized: 'tim',
-        } as DashboardData['selectedProfile'],
-      },
-    });
-
-    await user.click(screen.getByRole('button', { name: 'Tim White' }));
-
-    expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.CHAT);
-    expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
   });
 
   it('shows the releases pending shell once for a pointer click', async () => {
