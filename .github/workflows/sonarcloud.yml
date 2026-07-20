@@ -18,7 +18,7 @@ concurrency:
 jobs:
   sonarcloud:
     name: SonarCloud
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       SONAR_SCAN_ENABLED: ${{ secrets.SONAR_TOKEN != '' }}

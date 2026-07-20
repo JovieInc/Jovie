@@ -6,7 +6,7 @@ import { waitForHydration } from './utils/smoke-test-utils';
 
 test.use({
   storageState: { cookies: [], origins: [] },
-  trace: 'on',
+  trace: process.env.CI ? 'off' : 'on',
   video: 'off',
   viewport: { width: 1280, height: 720 },
 });

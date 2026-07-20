@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const isCI = !!process.env.CI;
+
 /**
  * Playwright Configuration for Synthetic Monitoring
  *
@@ -11,6 +13,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 
 export default defineConfig({
+  captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
   testMatch: [
     '**/synthetic-auth-ui.spec.ts',
@@ -40,7 +43,11 @@ export default defineConfig({
           'test-results/results.json',
       },
     ],
-    ['html', { outputFolder: 'playwright-report', open: 'never' }],
+    ...(isCI
+      ? []
+      : ([
+          ['html', { outputFolder: 'playwright-report', open: 'never' }],
+        ] as const)),
     ['line'],
     // Compact, redacted failure packet per failed journey (route, step,
     // screenshot, console errors, failed requests, trace path).
@@ -56,9 +63,9 @@ export default defineConfig({
     navigationTimeout: 60_000, // 1 minute for navigation
 
     // Tracing and debugging
-    trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    trace: isCI ? 'off' : 'retain-on-failure',
+    screenshot: isCI ? 'off' : 'only-on-failure',
+    video: isCI ? 'off' : 'retain-on-failure',
 
     // Browser settings for synthetic monitoring
     ignoreHTTPSErrors: false, // Strict HTTPS validation in prod
