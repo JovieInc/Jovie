@@ -1,8 +1,6 @@
 'use client';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
-import { ArrowUpRight } from 'lucide-react';
-import Image from 'next/image';
 import {
   type CSSProperties,
   type KeyboardEvent,
@@ -16,10 +14,15 @@ import {
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { useOptionalPreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import {
+  type ChatEntityMentionInput,
+  chatEntityMentionToEntityCard,
+  EntityCard,
+} from '@/components/organisms/entity-card';
 import type { EntityKind } from '@/lib/chat/tokens';
-import type { EntityRef, EntityRefMeta } from '@/lib/commands/entities';
+import type { EntityRef } from '@/lib/commands/entities';
 import { useAppFlag } from '@/lib/flags/client';
-import { getInitials } from '@/lib/utils/initials';
+import { cn } from '@/lib/utils';
 import { ENTITY_KIND_ACCENT_VAR } from './entity-accent';
 
 const HOVER_OPEN_DELAY_MS = 200;
@@ -52,8 +55,8 @@ interface EntityChipPopoverProps {
  * - Escape → close (Radix Popover handles by default)
  * - focus visible ring on the trigger
  *
- * Popover content is lazy-mounted (Radix only renders when open) so adding
- * one wrapper per transcript chip doesn't pay Popover state cost upfront.
+ * Popover content renders the canonical compact `EntityCard` (same component
+ * as the chat right rail) so every entity surface shares one anatomy.
  */
 export function EntityChipPopover({
   kind,
@@ -174,7 +177,7 @@ export function EntityChipPopover({
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className='system-b-entity-chip-popover-content'
+        className='system-b-entity-chip-popover-content border-0 bg-transparent p-0 shadow-none'
         side='top'
         sideOffset={6}
         align='start'
@@ -198,6 +201,7 @@ export function EntityChipPopover({
       >
         <EntityChipPopoverBody
           kind={kind}
+          id={id}
           label={label}
           entity={entity}
           canOpen={canOpenEntityPanel}
@@ -212,6 +216,7 @@ export function EntityChipPopover({
 
 interface EntityChipPopoverBodyProps {
   readonly kind: EntityKind;
+  readonly id: string;
   readonly label: string;
   readonly entity: EntityRef | undefined;
   readonly canOpen: boolean;
@@ -220,8 +225,63 @@ interface EntityChipPopoverBodyProps {
   readonly onOpenProfilePreview: () => void;
 }
 
+function toMentionInput(
+  kind: EntityKind,
+  id: string,
+  label: string,
+  entity: EntityRef | undefined
+): ChatEntityMentionInput {
+  const meta = entity?.meta;
+  const base: ChatEntityMentionInput = {
+    kind,
+    id,
+    label: entity?.label ?? label,
+    thumbnail: entity?.thumbnail ?? null,
+  };
+
+  if (!meta) {
+    return base;
+  }
+
+  if (meta.kind === 'release') {
+    return {
+      ...base,
+      subtitle: meta.subtitle,
+      releaseType: meta.releaseType,
+      totalTracks: meta.totalTracks,
+      totalDurationMs: meta.totalDurationMs,
+    };
+  }
+  if (meta.kind === 'artist') {
+    return {
+      ...base,
+      subtitle: meta.subtitle,
+      followers: meta.followers,
+      verified: meta.verified,
+      isYou: meta.isYou,
+    };
+  }
+  if (meta.kind === 'event') {
+    return {
+      ...base,
+      subtitle: meta.subtitle,
+      venue: meta.venue,
+      city: meta.city,
+      eventType: meta.eventType,
+      eventDate: meta.eventDate,
+    };
+  }
+  return {
+    ...base,
+    subtitle: meta.subtitle,
+    durationMs: meta.durationMs,
+    releaseTitle: meta.releaseTitle,
+  };
+}
+
 function EntityChipPopoverBody({
   kind,
+  id,
   label,
   entity,
   canOpen,
@@ -229,114 +289,46 @@ function EntityChipPopoverBody({
   canOpenProfilePreview,
   onOpenProfilePreview,
 }: EntityChipPopoverBodyProps) {
-  const eyebrow = entity ? eyebrowFor(entity) : KIND_PREFIX[kind];
-  const subtitle = entity?.meta?.subtitle;
-  const stats = entity?.meta ? compactStatsFor(entity.meta) : null;
-  const thumbnail = entity?.thumbnail;
+  const model = useMemo(() => {
+    const mention = toMentionInput(kind, id, label, entity);
+    const interactive = canOpen || canOpenProfilePreview;
+    const cta = canOpenProfilePreview
+      ? {
+          label: 'Open Live Profile Preview',
+          onClick: () => {
+            onOpenProfilePreview();
+          },
+        }
+      : canOpen
+        ? {
+            label: `Open ${KIND_PREFIX[kind]}`,
+            onClick: () => {
+              onOpenEntity();
+            },
+          }
+        : null;
+
+    return chatEntityMentionToEntityCard(mention, {
+      interactive,
+      cta,
+    });
+  }, [
+    kind,
+    id,
+    label,
+    entity,
+    canOpen,
+    canOpenProfilePreview,
+    onOpenEntity,
+    onOpenProfilePreview,
+  ]);
 
   return (
-    <div className='system-b-entity-chip-popover-body'>
-      <div className='system-b-entity-chip-popover-media'>
-        {thumbnail ? (
-          <Image
-            src={thumbnail}
-            alt=''
-            width={48}
-            height={48}
-            className='system-b-entity-chip-popover-thumbnail'
-            aria-hidden
-          />
-        ) : (
-          <div aria-hidden className='system-b-entity-chip-popover-placeholder'>
-            {getInitials(label) || '·'}
-          </div>
-        )}
-      </div>
-      <div className='system-b-entity-chip-popover-copy'>
-        <p className='system-b-entity-chip-popover-eyebrow'>{eyebrow}</p>
-        <p className='system-b-entity-chip-popover-title'>{label}</p>
-        {subtitle ? (
-          <p className='system-b-entity-chip-popover-subtitle'>{subtitle}</p>
-        ) : null}
-        {stats ? (
-          <p className='system-b-entity-chip-popover-stats'>{stats}</p>
-        ) : null}
-        {canOpenProfilePreview ? (
-          <button
-            type='button'
-            onClick={onOpenProfilePreview}
-            className='system-b-entity-chip-popover-action focus-ring'
-          >
-            Open live profile preview
-            <ArrowUpRight className='system-b-entity-chip-popover-action-icon' />
-          </button>
-        ) : null}
-        {canOpen ? (
-          <button
-            type='button'
-            onClick={onOpenEntity}
-            className='system-b-entity-chip-popover-action focus-ring'
-          >
-            Open {KIND_PREFIX[kind]}
-            <ArrowUpRight className='system-b-entity-chip-popover-action-icon' />
-          </button>
-        ) : null}
-      </div>
-    </div>
+    <EntityCard
+      model={model}
+      treatment='compact'
+      className={cn('w-full shadow-popover')}
+      dataTestId='entity-chip-popover-card'
+    />
   );
-}
-
-function eyebrowFor(entity: EntityRef): string {
-  const meta = entity.meta;
-  if (!meta) return KIND_PREFIX[entity.kind];
-  if (meta.kind === 'release') {
-    const type = meta.releaseType
-      ? meta.releaseType[0].toUpperCase() +
-        meta.releaseType.slice(1).toLowerCase()
-      : null;
-    return type ? `Release · ${type}` : 'Release';
-  }
-  if (meta.kind === 'artist') {
-    if (meta.isYou) return 'Artist · You';
-    if (meta.verified) return 'Artist · Verified';
-    return 'Artist';
-  }
-  if (meta.kind === 'event') {
-    return meta.eventType
-      ? `Event · ${meta.eventType[0].toUpperCase()}${meta.eventType.slice(1)}`
-      : 'Event';
-  }
-  return 'Track';
-}
-
-function compactStatsFor(meta: EntityRefMeta): string | null {
-  const parts: string[] = [];
-  if (meta.kind === 'release') {
-    if (typeof meta.totalTracks === 'number' && meta.totalTracks > 0) {
-      parts.push(
-        `${meta.totalTracks} ${meta.totalTracks === 1 ? 'track' : 'tracks'}`
-      );
-    }
-    if (typeof meta.totalDurationMs === 'number' && meta.totalDurationMs > 0) {
-      const totalSeconds = Math.round(meta.totalDurationMs / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      parts.push(`${minutes}:${seconds.toString().padStart(2, '0')}`);
-    }
-  } else if (meta.kind === 'artist') {
-    if (typeof meta.followers === 'number' && meta.followers > 0) {
-      parts.push(`${compactNumber(meta.followers)} followers`);
-    }
-  } else if (meta.kind === 'event') {
-    if (meta.venue) parts.push(meta.venue);
-    if (meta.city) parts.push(meta.city);
-  }
-  return parts.length > 0 ? parts.join(' · ') : null;
-}
-
-function compactNumber(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 10_000) return `${Math.round(value / 1000)}k`;
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-  return value.toString();
 }

@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { and, sql as drizzleSql, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { isUniqueViolation as isUniqueViolationUtil } from '@/lib/db/errors';
@@ -21,6 +22,7 @@ import {
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
+import { uuidSchema } from '@/lib/validation/schemas/base';
 import { resolveTrackProviderLinks } from './track-provider-links';
 
 /**
@@ -442,6 +444,18 @@ export async function getReleaseForProfileById(
   releaseId: string,
   options?: { includeDrafts?: boolean }
 ): Promise<ReleaseWithProviders | null> {
+  // Query-boundary guard (JOV-3308): releaseId can arrive from chat entity
+  // tokens / tool calls, where the model may pass the literal system-prompt
+  // placeholder `<id>`. Postgres would throw `invalid input syntax for type
+  // uuid` — treat a non-UUID as "no such release" (graceful empty state).
+  if (!uuidSchema.safeParse(releaseId).success) {
+    Sentry.captureMessage('getReleaseForProfileById: non-UUID releaseId', {
+      level: 'warning',
+      extra: { creatorProfileId, releaseId },
+    });
+    return null;
+  }
+
   const filters = [
     eq(discogReleases.creatorProfileId, creatorProfileId),
     eq(discogReleases.id, releaseId),

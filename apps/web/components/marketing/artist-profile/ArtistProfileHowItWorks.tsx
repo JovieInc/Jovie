@@ -1,13 +1,6 @@
-'use client';
-
-import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { CheckCircle2, QrCode, Search } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
-import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
-import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
@@ -21,294 +14,158 @@ function getProviderLabel(provider: string): string {
 interface ArtistProfileHowItWorksProps {
   readonly howItWorks: ArtistProfileLandingCopy['howItWorks'];
 }
+
 export function ArtistProfileHowItWorks({
   howItWorks,
 }: Readonly<ArtistProfileHowItWorksProps>) {
-  const reducedMotion = useReducedMotion();
-  const [progress, setProgress] = useState(howItWorks.sync.startProgress);
-
-  useEffect(() => {
-    if (reducedMotion) {
-      setProgress(howItWorks.sync.endProgress);
-      return;
-    }
-
-    const timer = globalThis.setTimeout(() => {
-      setProgress(howItWorks.sync.endProgress);
-    }, 220);
-
-    return () => {
-      globalThis.clearTimeout(timer);
-    };
-  }, [
-    howItWorks.sync.endProgress,
-    howItWorks.sync.startProgress,
-    reducedMotion,
-  ]);
-
   return (
-    <ArtistProfileSectionShell className='bg-white/[0.012]'>
+    <ArtistProfileSectionShell className='bg-surface-0'>
       <div className='mx-auto max-w-280'>
         <ArtistProfileSectionHeader
           align='left'
           headline={howItWorks.headline}
           body={howItWorks.body}
-          className='max-w-[40rem]'
-          headlineClassName='max-w-none'
-          bodyClassName='max-w-[30rem]'
+          className='max-w-3xl'
+          bodyClassName='max-w-xl'
         />
 
-        <div className='mt-10 grid gap-5 lg:grid-cols-3 lg:gap-5'>
-          <article className='flex flex-col gap-3'>
-            <StepNumber value={1} />
-            <div className='relative min-h-42 space-y-3 pt-1'>
-              <div
-                aria-hidden='true'
-                className='pointer-events-none absolute inset-x-8 top-4 h-14 rounded-full bg-white/8 blur-3xl'
-              />
-              <div className='flex h-11 items-center gap-3 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-4'>
-                <Search
-                  className='h-4 w-4 text-tertiary-token'
-                  strokeWidth={1.85}
-                />
-                <span className='text-app font-medium text-primary-token'>
-                  {howItWorks.claim.searchValue}
-                </span>
-              </div>
-              <DrawerSurfaceCard
-                variant='card'
-                className='rounded-[0.95rem] p-2.5'
-              >
-                <div className='flex items-center gap-3'>
-                  <span className='flex h-10 w-10 items-center justify-center rounded-full bg-(--color-accent-green)/12'>
-                    <ProviderIcon provider='spotify' className='h-4.5 w-4.5' />
-                  </span>
-                  <div className='min-w-0 flex-1'>
-                    <p className='truncate text-app font-semibold text-primary-token'>
-                      {howItWorks.claim.resultName}
-                    </p>
-                    <p className='text-2xs text-secondary-token'>
-                      {howItWorks.claim.resultSubtitle}
-                    </p>
-                  </div>
-                  <span className='rounded-full bg-white dark:bg-surface-1 px-3 py-1.5 text-2xs font-semibold text-black dark:text-white'>
-                    {howItWorks.claim.ctaLabel}
-                  </span>
-                </div>
-              </DrawerSurfaceCard>
-              <div className='flex items-center justify-between rounded-[0.95rem] border border-(--linear-app-frame-seam) bg-surface-0 px-3.5 py-3'>
-                <p className='font-mono text-xs font-medium tracking-[-0.02em] text-secondary-token'>
-                  {howItWorks.claim.profilePath}
-                </p>
-                <CheckCircle2
-                  className='h-4 w-4 text-success'
-                  strokeWidth={2}
-                />
-              </div>
-            </div>
-            <div>
-              <p className='text-mid font-semibold tracking-[-0.03em] text-primary-token'>
-                {howItWorks.steps[0]?.title}
-              </p>
-              <p className='mt-1.5 text-app leading-[1.6] text-secondary-token'>
-                {howItWorks.steps[0]?.description}
-              </p>
-            </div>
-          </article>
-
-          <article className='flex flex-col gap-3'>
-            <StepNumber value={2} />
-            <DrawerSurfaceCard
-              variant='card'
-              className='rounded-[1.15rem] p-3.5'
+        <ol className='mt-10 grid gap-4 lg:grid-cols-3'>
+          {howItWorks.steps.map((step, index) => (
+            <li
+              key={step.id}
+              className='flex min-h-96 flex-col rounded-2xl border border-subtle bg-surface-1 p-5 sm:p-6'
             >
-              <div className='flex items-center justify-between gap-3'>
-                <div>
-                  <p className='text-app font-semibold text-primary-token'>
-                    Importing {howItWorks.sync.artistName}
-                  </p>
-                  <p className='mt-1 text-2xs text-secondary-token'>
-                    Matching providers and pulling the catalog into place.
-                  </p>
-                </div>
-                <p className='text-xs font-semibold text-primary-token'>
-                  {progress}%
-                </p>
-              </div>
-              <div className='mt-3 h-2 overflow-hidden rounded-full bg-(--color-accent-green)/10'>
-                <div
-                  className='h-full rounded-full bg-(--color-accent-green) transition-[width] duration-cinematic ease-out'
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              <div className='mt-3 space-y-2'>
-                {howItWorks.sync.providers.map(provider => (
-                  <div
-                    key={provider.provider}
-                    className='flex items-center justify-between rounded-[0.95rem] border border-(--linear-app-frame-seam) bg-surface-0 px-3.5 py-3'
-                  >
-                    <div className='flex items-center gap-3'>
-                      <ProviderIcon
-                        provider={provider.provider}
-                        className='h-4.5 w-4.5'
-                      />
-                      <p className='text-app font-medium text-primary-token'>
-                        {getProviderLabel(provider.provider)}
-                      </p>
-                    </div>
-                    <span
-                      className={cn(
-                        'rounded-full px-2.5 py-1 text-3xs font-semibold',
-                        provider.status === 'Ingesting'
-                          ? 'border border-accent/18 bg-(--color-bg-surface-2) text-primary-token'
-                          : 'bg-white/6 text-secondary-token'
-                      )}
-                    >
-                      {provider.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <p className='mt-3 text-xs font-medium tracking-[-0.02em] text-secondary-token'>
-                {howItWorks.sync.otherProvidersLabel}
+              <p className='font-mono text-3xs text-tertiary-token'>
+                0{index + 1}
               </p>
-            </DrawerSurfaceCard>
-            <div>
-              <p className='text-mid font-semibold tracking-[-0.03em] text-primary-token'>
-                {howItWorks.steps[1]?.title}
-              </p>
-              <p className='mt-1.5 text-app leading-[1.6] text-secondary-token'>
-                {howItWorks.steps[1]?.description}
-              </p>
-            </div>
-          </article>
 
-          <article className='flex flex-col gap-3'>
-            <StepNumber value={3} />
-            <div className='relative min-h-42 space-y-3 pt-1'>
-              <div
-                aria-hidden='true'
-                className='pointer-events-none absolute inset-x-8 top-4 h-14 rounded-full bg-white/8 blur-3xl'
-              />
-              <CopyableUrlRow
-                url={howItWorks.share.url}
-                displayValue={howItWorks.share.displayValue}
-                className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'
-                valueClassName='text-secondary-token'
-                surface='boxed'
-              />
-              <div className='mt-3 flex flex-wrap gap-2'>
-                <HoverPopover
-                  label={howItWorks.share.qrLabel}
-                  content={
-                    <div className='rounded-[0.9rem] bg-white dark:bg-surface-1 p-2.5 shadow-[0_14px_32px_rgba(0,0,0,0.16)]'>
-                      <div className='grid grid-cols-7 gap-1'>
-                        {QR_CELLS.map(cell => (
-                          <span
-                            key={cell.id}
-                            className='h-2.5 w-2.5 rounded-xs'
-                            style={{
-                              backgroundColor: cell.filled
-                                ? '#0b0b0b'
-                                : '#f3f2ee',
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  }
-                />
-                <HoverPopover
-                  label={howItWorks.share.deepLinksLabel}
-                  content={
-                    <div className='space-y-1.5'>
-                      {howItWorks.share.deepLinks.map(link => (
-                        <p
-                          key={link}
-                          className='font-mono text-2xs tracking-[-0.01em] text-primary-token'
-                        >
-                          {link}
-                        </p>
-                      ))}
-                    </div>
-                  }
-                />
+              <div className='mt-8 flex-1'>
+                {step.id === 'claim' ? (
+                  <ClaimPreview howItWorks={howItWorks} />
+                ) : null}
+                {step.id === 'connect' ? (
+                  <ConnectPreview howItWorks={howItWorks} />
+                ) : null}
+                {step.id === 'share' ? (
+                  <SharePreview howItWorks={howItWorks} />
+                ) : null}
               </div>
-            </div>
-            <div>
-              <p className='text-mid font-semibold tracking-[-0.03em] text-primary-token'>
-                {howItWorks.steps[2]?.title}
+
+              <h3 className='mt-8 text-lg font-semibold tracking-tight text-primary-token'>
+                {step.title}
+              </h3>
+              <p className='mt-3 text-app leading-relaxed text-secondary-token'>
+                {step.description}
               </p>
-              <p className='mt-1.5 text-app leading-[1.6] text-secondary-token'>
-                {howItWorks.steps[2]?.description}
-              </p>
-            </div>
-          </article>
-        </div>
+            </li>
+          ))}
+        </ol>
       </div>
     </ArtistProfileSectionShell>
   );
 }
 
-function StepNumber({ value }: Readonly<{ value: number }>) {
+function ClaimPreview({
+  howItWorks,
+}: Readonly<{ howItWorks: ArtistProfileLandingCopy['howItWorks'] }>) {
   return (
-    <span className='text-[2.15rem] font-semibold leading-none tracking-[-0.08em] text-primary-token'>
-      {value}
-    </span>
+    <div className='space-y-3'>
+      <div className='flex min-h-11 items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-3.5'>
+        <Search className='h-4 w-4 text-tertiary-token' aria-hidden='true' />
+        <span className='text-app font-medium text-primary-token'>
+          {howItWorks.claim.searchValue}
+        </span>
+      </div>
+      <div className='flex items-center gap-3 rounded-xl border border-subtle bg-surface-0 p-3'>
+        <span className='flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-1'>
+          <ProviderIcon provider='spotify' className='h-4 w-4' />
+        </span>
+        <div className='min-w-0 flex-1'>
+          <p className='truncate text-app font-semibold text-primary-token'>
+            {howItWorks.claim.resultName}
+          </p>
+          <p className='mt-1 text-2xs text-secondary-token'>
+            {howItWorks.claim.resultSubtitle}
+          </p>
+        </div>
+        <span className='rounded-full bg-primary-token px-3 py-1.5 text-3xs font-semibold text-surface-1'>
+          {howItWorks.claim.ctaLabel}
+        </span>
+      </div>
+      <p className='flex items-center justify-between rounded-lg border border-subtle bg-surface-0 px-3.5 py-3 font-mono text-xs text-secondary-token'>
+        {howItWorks.claim.profilePath}
+        <CheckCircle2 className='h-4 w-4 text-success' aria-hidden='true' />
+      </p>
+    </div>
   );
 }
 
-function HoverPopover({
-  label,
-  content,
-}: Readonly<{
-  label: string;
-  content: ReactNode;
-}>) {
-  const [open, setOpen] = useState(false);
-
+function ConnectPreview({
+  howItWorks,
+}: Readonly<{ howItWorks: ArtistProfileLandingCopy['howItWorks'] }>) {
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type='button'
-          onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
-          className='inline-flex items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-1.5 text-2xs font-medium text-secondary-token transition-colors hover:bg-surface-1'
-        >
-          {label === 'QR code' ? (
-            <QrCode className='h-3.5 w-3.5' strokeWidth={1.85} />
-          ) : null}
-          {label}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        side='bottom'
-        align='start'
-        showArrow
-        className='w-auto rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3 shadow-[0_22px_54px_rgba(0,0,0,0.24)]'
-      >
-        {content}
-      </PopoverContent>
-    </Popover>
+    <div className='rounded-xl border border-subtle bg-surface-0 p-3.5'>
+      <p className='text-app font-semibold text-primary-token'>
+        {howItWorks.sync.title}
+      </p>
+      <p className='mt-1 text-2xs text-secondary-token'>
+        {howItWorks.sync.detail}
+      </p>
+      <div className='mt-4 space-y-2'>
+        {howItWorks.sync.providers.map(provider => (
+          <div
+            key={provider.provider}
+            className='flex items-center justify-between rounded-lg border border-subtle bg-surface-1 px-3 py-2.5'
+          >
+            <span className='flex items-center gap-2.5 text-xs font-medium text-primary-token'>
+              <ProviderIcon provider={provider.provider} className='h-4 w-4' />
+              {getProviderLabel(provider.provider)}
+            </span>
+            <span
+              className={cn(
+                'text-3xs font-semibold',
+                provider.status === 'Matched'
+                  ? 'text-success'
+                  : 'text-secondary-token'
+              )}
+            >
+              {provider.status}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className='mt-3 text-2xs text-tertiary-token'>
+        {howItWorks.sync.otherProvidersLabel}
+      </p>
+    </div>
   );
 }
 
-const QR_PATTERN = [
-  '1110111',
-  '1010101',
-  '1110111',
-  '0001000',
-  '1111101',
-  '1010001',
-  '1110111',
-] as const;
-
-const QR_CELLS = QR_PATTERN.flatMap((row, rowIndex) =>
-  row.split('').map((cell, cellIndex) => ({
-    id: `r${rowIndex}c${cellIndex}`,
-    filled: cell === '1',
-  }))
-);
+function SharePreview({
+  howItWorks,
+}: Readonly<{ howItWorks: ArtistProfileLandingCopy['howItWorks'] }>) {
+  return (
+    <div className='rounded-xl border border-subtle bg-surface-0 p-4'>
+      <div className='flex items-center justify-between gap-3'>
+        <p className='font-mono text-xs text-primary-token'>
+          {howItWorks.share.displayValue}
+        </p>
+        <span className='flex h-10 w-10 items-center justify-center rounded-lg border border-subtle bg-surface-1 text-secondary-token'>
+          <QrCode className='h-4 w-4' aria-hidden='true' />
+        </span>
+      </div>
+      <div className='mt-5 border-t border-subtle pt-4'>
+        <p className='text-3xs font-semibold text-tertiary-token'>
+          {howItWorks.share.deepLinksLabel}
+        </p>
+        <div className='mt-3 space-y-2'>
+          {howItWorks.share.deepLinks.slice(0, 3).map(link => (
+            <p key={link} className='font-mono text-2xs text-secondary-token'>
+              {link}
+            </p>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

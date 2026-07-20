@@ -351,4 +351,8 @@ export interface UserEntitlements {
   aiDailyMessageLimit: number;
   aiPitchGenPerRelease: number | null;
   aiRetouchDailyLimit: number | null;
+  /** Max files per chat upload batch. Null = unlimited. */
+  chatFileUploadLimit: number | null;
+  /** Max external public surfaces with row-level monitoring. Null = unlimited. */
+  profileMonitoringLimit: number | null;
 }

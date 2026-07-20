@@ -1,7 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { AnalyticsSidebar, calculateConversionRate } from './AnalyticsSidebar';
+import {
+  AnalyticsSidebar,
+  calculateConversionRate,
+  FunnelStage,
+} from './AnalyticsSidebar';
 
 vi.mock('@/lib/queries', () => ({
   useDashboardAnalyticsQuery: () => ({
@@ -147,5 +151,30 @@ describe('AnalyticsSidebar', () => {
     );
     expect(screen.getByText('Audience funnel')).toBeInTheDocument();
     expect(screen.getByText('Link Clicks')).toBeInTheDocument();
+  });
+});
+
+describe('FunnelStage (regression: #13819 skeleton padding parity)', () => {
+  const stageProps = {
+    label: 'Profile Views',
+    value: 120,
+    rate: null,
+    barPercent: 50,
+    barIndex: 0,
+  };
+
+  it('uses identical outer padding in loading and loaded states', () => {
+    const { container: loadingContainer } = render(
+      <FunnelStage {...stageProps} loading />
+    );
+    const { container: loadedContainer } = render(
+      <FunnelStage {...stageProps} loading={false} />
+    );
+
+    const loadingRow = loadingContainer.firstElementChild;
+    const loadedRow = loadedContainer.firstElementChild;
+
+    expect(loadingRow).toHaveClass('px-3.5', 'py-2.5');
+    expect(loadedRow).toHaveClass('px-3.5', 'py-2.5');
   });
 });

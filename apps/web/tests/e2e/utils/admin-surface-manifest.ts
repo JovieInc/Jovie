@@ -142,63 +142,15 @@ export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
     includeInFastHealth: true,
   },
   {
-    id: 'growth-outreach-all',
-    name: 'Admin Growth Outreach All',
-    path: buildAdminGrowthHref(
-      'outreach',
-      new URLSearchParams({ queue: 'all' })
-    ),
-    rootTestId: 'admin-growth-view-outreach-all',
-    snapshotSlug: 'admin-growth-outreach-all',
-    primaryWorkspace: false,
-    utilityRoot: false,
-    includeInFastHealth: false,
-  },
-  {
-    id: 'growth-outreach-email',
-    name: 'Admin Growth Outreach Email',
-    path: buildAdminGrowthHref(
-      'outreach',
-      new URLSearchParams({ queue: 'email' })
-    ),
-    rootTestId: 'admin-growth-view-outreach-email',
-    snapshotSlug: 'admin-growth-outreach-email',
-    primaryWorkspace: false,
-    utilityRoot: false,
-    includeInFastHealth: true,
-  },
-  {
-    id: 'growth-outreach-dm',
-    name: 'Admin Growth Outreach DM',
-    path: buildAdminGrowthHref(
-      'outreach',
-      new URLSearchParams({ queue: 'dm' })
-    ),
-    rootTestId: 'admin-growth-view-outreach-dm',
-    snapshotSlug: 'admin-growth-outreach-dm',
-    primaryWorkspace: false,
-    utilityRoot: false,
-    includeInFastHealth: false,
-  },
-  {
-    id: 'growth-outreach-review',
-    name: 'Admin Growth Outreach Review',
-    path: buildAdminGrowthHref(
-      'outreach',
-      new URLSearchParams({ queue: 'review' })
-    ),
-    rootTestId: 'admin-growth-view-outreach-review',
-    snapshotSlug: 'admin-growth-outreach-review',
-    primaryWorkspace: false,
-    utilityRoot: false,
-    includeInFastHealth: false,
-  },
-  {
-    id: 'growth-campaigns',
-    name: 'Admin Growth Campaigns',
-    path: buildAdminGrowthHref('campaigns'),
-    rootTestId: 'admin-growth-view-campaigns',
-    snapshotSlug: 'admin-growth-campaigns',
+    // The growth page now consolidates outreach + campaigns into a single
+    // "Outreach & Campaigns" accordion (GtmCollapsibles) that auto-opens via
+    // ?view=outreach; the per-queue views and their dedicated testids no
+    // longer exist (JOV-4326). The page shell is the stable render contract.
+    id: 'growth-outreach',
+    name: 'Admin Growth Outreach',
+    path: buildAdminGrowthHref('outreach'),
+    rootTestId: 'admin-growth-page',
+    snapshotSlug: 'admin-growth-outreach',
     primaryWorkspace: false,
     utilityRoot: false,
     includeInFastHealth: true,

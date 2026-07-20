@@ -92,12 +92,21 @@ export const releasesNavItem: NavItem = {
 export const libraryNavItem: NavItem = releasesNavItem;
 
 export const artistProfileNavItem: NavItem = {
-  name: 'Artist Profile',
-  href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
-  id: 'artist-profile',
-  icon: UserCircle,
-  description: 'Edit your artist profile, links, and branding',
+  name: 'Profiles',
+  href: APP_ROUTES.PROFILES,
+  id: 'profiles',
+  icon: IdCard,
+  description: 'Monitor your artist profiles, sources, and connectors',
 };
+
+export function filterProfilesWorkspaceNavigation(
+  items: readonly NavItem[],
+  profilesWorkspaceEnabled: boolean
+): NavItem[] {
+  return profilesWorkspaceEnabled
+    ? [...items]
+    : items.filter(item => item.id !== artistProfileNavItem.id);
+}
 
 export const touringNavItem: NavItem = {
   name: 'Touring',

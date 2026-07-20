@@ -18,7 +18,7 @@ interface AppShellFrameProps {
   readonly contentClassName?: string;
   readonly containerClassName?: string;
   readonly variant?: AppShellFrameVariant;
-  /** When true (desktop), sidebar dims and right rail slides partially off-screen. */
+  /** When true (desktop), sidebar dims and right rail fully collapses off-canvas. */
   readonly composerFocusActive?: boolean;
   /**
    * Chat routes render the ambient blue wash at the shell level so it spans

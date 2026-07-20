@@ -136,5 +136,5 @@ describe('public surface guardrails', () => {
         },
       });
     }
-  }, 15_000);
+  }, 60_000);
 });

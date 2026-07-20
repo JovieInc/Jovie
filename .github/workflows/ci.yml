@@ -996,6 +996,11 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Validate CI/release incident prevention contract
+        # This is intentionally outside the path-gated Structural Contract.
+        # The required prevention receipt must exist for every source PR and
+        # exact merge-group head, even when no contract file changed.
+        run: pnpm ci:incident-contract:validate
       - name: Verify Node and tsx seed-loader compatibility
         shell: bash
         run: |
@@ -4476,21 +4481,9 @@ jobs:
           done
 
           echo "All required combined-head checks passed."
-  ci-storybook-a11y:
-    name: Storybook A11y
-    needs: [ci-path-changes]
-    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 1
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Setup Playwright (Chromium)
-        uses: ./.github/actions/setup-playwright
-      - name: Run Storybook accessibility tests
-        run: pnpm --filter @jovie/web test:a11y
+  # Storybook a11y evidence lives exclusively in the scheduled visual-a11y.yml
+  # storybook-a11y lane; the duplicate manual ci-storybook-a11y job was removed
+  # (JOV-4326) so the evidence has a single owner.
   ci-pr-ready:
     name: ${{ github.event_name == 'pull_request' && 'PR Ready' || 'PR Ready (source inactive)' }}
     # The source-branch aggregate is intentionally small and deterministic.

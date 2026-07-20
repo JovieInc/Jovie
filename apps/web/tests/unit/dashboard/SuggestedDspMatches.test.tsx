@@ -172,7 +172,12 @@ describe('SuggestedDspMatches', () => {
     ).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders skeleton rows while loading', () => {
+  it('renders nothing while loading (regression: #13821 flash-then-collapse)', () => {
+    // Zero matches is the common resolution, so rendering a skeleton during
+    // `isLoading` that later collapses to `null` shifts sibling sections.
+    // The component must stay collapsed while loading and only occupy space
+    // once resolved with real matches — matching the eventual `null` render
+    // for the empty case exactly, with no intermediate skeleton frame.
     mockUseDspMatchesQuery.mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -182,10 +187,8 @@ describe('SuggestedDspMatches', () => {
 
     const { container } = render(<SuggestedDspMatches profileId='profile-1' />);
 
-    expect(screen.getByText('Suggested')).toBeInTheDocument();
-    // Skeleton rows have the skeleton class (at least 2 per row: icon + text)
-    const skeletons = container.querySelectorAll('.skeleton');
-    expect(skeletons.length).toBeGreaterThanOrEqual(2);
+    expect(container.innerHTML).toBe('');
+    expect(screen.queryByText('Suggested')).not.toBeInTheDocument();
   });
 
   it('returns null when no suggestions exist', () => {

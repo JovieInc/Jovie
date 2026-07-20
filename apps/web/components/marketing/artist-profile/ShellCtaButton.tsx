@@ -1,3 +1,4 @@
+import { Link as UILink } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -24,12 +25,12 @@ const SHAPE: Record<Size, string> = {
 
 const TONE: Record<`${Tone}-${Context}`, string> = {
   'primary-on-dark':
-    'bg-white text-black dark:text-white hover:bg-white/90 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]',
+    'bg-white text-black dark:text-black hover:bg-white/90 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]',
   'primary-auto': 'bg-primary-token text-surface-1 hover:bg-primary-token/90',
   'secondary-on-dark':
     'bg-white/[0.04] text-white dark:text-white border border-white/12 hover:bg-white/[0.08]',
   'secondary-auto':
-    'bg-transparent text-primary-token border border-(--linear-app-shell-border) hover:bg-surface-2/80',
+    'bg-transparent text-primary-token border border-subtle hover:bg-surface-2/80',
 };
 
 const RING_OFFSET: Record<Context, string> = {
@@ -49,7 +50,7 @@ export function shellCtaClassName({
   return cn(
     'inline-flex shrink-0 items-center justify-center rounded-full font-semibold tracking-[-0.011em]',
     'transition-[background-color,border-color,box-shadow,opacity] duration-subtle ease-subtle',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) focus-visible:ring-offset-2',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2',
     RING_OFFSET[context],
     SHAPE[size],
     TONE[`${tone}-${context}`]
@@ -66,14 +67,17 @@ export function ShellCtaButton({
   'data-testid': testId,
   'aria-label': ariaLabel,
 }: Readonly<ShellCtaButtonProps>) {
+  // Renders through the canonical Link primitive (asChild + variant={null});
+  // shellCtaClassName keeps the CTA pill appearance on top of it.
   return (
-    <Link
-      href={href}
-      data-testid={testId}
-      aria-label={ariaLabel}
+    <UILink
+      asChild
+      variant={null}
       className={cn(shellCtaClassName({ tone, size, context }), className)}
     >
-      {children}
-    </Link>
+      <Link href={href} data-testid={testId} aria-label={ariaLabel}>
+        {children}
+      </Link>
+    </UILink>
   );
 }

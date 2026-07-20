@@ -112,7 +112,6 @@ describe('ci-harness manifest', () => {
       'Lighthouse (chat manual)',
       'A11y (axe)',
       'A11y (authenticated, informational)',
-      'Storybook A11y',
       'E2E Smoke (manual)',
       'Golden Path (manual)',
       'Extended Smoke (manual)',
@@ -220,7 +219,6 @@ describe('ci-harness manifest', () => {
       'ci-smoke-required',
       'ci-lighthouse-pr',
       'ci-a11y',
-      'ci-storybook-a11y',
       'ci-layout-guard',
       'ci-build-layout',
       'ci-ios',
@@ -252,7 +250,6 @@ describe('ci-harness manifest', () => {
       'ci-e2e-tests',
       'ci-test-performance',
       'ci-pr-vercel-preview',
-      'ci-storybook-a11y',
       'ci-summary',
       'ci-smoke-required',
     ];

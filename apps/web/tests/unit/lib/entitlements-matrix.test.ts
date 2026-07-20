@@ -47,7 +47,7 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn() },
 }));
 
-// Contract matrix — 4 plans × 28 booleans + 6 limits (exact values for mutation killing)
+// Contract matrix — 4 plans × 28 booleans + 7 limits (exact values for mutation killing)
 const BOOLS_FREE: Record<BooleanEntitlement, boolean> = {
   canExportContacts: false,
   canAccessAdvancedAnalytics: false,
@@ -151,6 +151,7 @@ const LIMITS_FREE = {
   aiPitchGenPerRelease: 1,
   aiRetouchDailyLimit: null,
   chatFileUploadLimit: 5,
+  profileMonitoringLimit: 5,
 } as const;
 
 const LIMITS_PRO = {
@@ -161,6 +162,7 @@ const LIMITS_PRO = {
   aiPitchGenPerRelease: 5,
   aiRetouchDailyLimit: 10,
   chatFileUploadLimit: null,
+  profileMonitoringLimit: 25,
 } as const;
 
 const LIMITS_MAX = {
@@ -171,6 +173,7 @@ const LIMITS_MAX = {
   aiPitchGenPerRelease: null,
   aiRetouchDailyLimit: 50,
   chatFileUploadLimit: null,
+  profileMonitoringLimit: null,
 } as const;
 
 const LIMITS_TRIAL = {
@@ -181,6 +184,7 @@ const LIMITS_TRIAL = {
   aiPitchGenPerRelease: 3,
   aiRetouchDailyLimit: 10,
   chatFileUploadLimit: 15,
+  profileMonitoringLimit: 15,
 } as const;
 
 const MATRIX = {
@@ -190,7 +194,7 @@ const MATRIX = {
   trial: { booleans: BOOLS_TRIAL, limits: LIMITS_TRIAL },
 } as const;
 
-describe('Entitlements registry plan matrix contract (4 plans × 28 booleans + 6 limits + legacy)', () => {
+describe('Entitlements registry plan matrix contract (4 plans × 28 booleans + 7 limits + legacy)', () => {
   it('getAllPlanIds returns exactly the 4 canonical PlanIds', () => {
     expect(getAllPlanIds()).toEqual(['free', 'trial', 'pro', 'max'] as const);
   });
@@ -203,7 +207,7 @@ describe('Entitlements registry plan matrix contract (4 plans × 28 booleans + 6
     });
   });
 
-  it('checkBoolean/getLimit cover every key in the 28×4 + 6×4 matrix', () => {
+  it('checkBoolean/getLimit cover every key in the 28×4 + 7×4 matrix', () => {
     (['free', 'pro', 'max', 'trial'] as const).forEach(plan => {
       const m = MATRIX[plan];
       (Object.keys(m.booleans) as BooleanEntitlement[]).forEach(key => {

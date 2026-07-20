@@ -1,0 +1,971 @@
+{
+  "schemaVersion": 1,
+  "incidents": [
+    {
+      "id": "ci-release/source-pr-queue-evidence",
+      "failureMode": "Source PRs incorrectly require merge-queue-only unit evidence.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm ci:control:test",
+        "path": "scripts/lib/__tests__/merge-queue-guard.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "source-pr",
+        "owner": "CI control plane"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/duplicate-ci-retry-loop",
+      "failureMode": "Duplicate source, merge-group, and main CI work or retry loops consume capacity.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm ci:control:test",
+        "path": "scripts/lib/__tests__/merge-queue-guard.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "merge-group",
+        "owner": "CI control plane"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/legacy-merge-queue-label",
+      "failureMode": "Legacy merge-queue labels wake Graphite and rewrite exact heads after native enrollment.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm ci:merge-queue:check",
+        "path": "scripts/ci-merge-queue-check.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "merge-group",
+        "owner": "Merge queue"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/async-update-branch-bounds",
+      "failureMode": "Async Update Branch accepts arbitrary heads, error prose, or unbounded subprocesses.",
+      "regression": {
+        "kind": "verifier",
+        "command": "node scripts/lib/github-update-branch.mjs --help",
+        "path": "scripts/lib/github-update-branch.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "scheduled-control-plane",
+        "owner": "PR remediation"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/superseded-run-capacity",
+      "failureMode": "Stale or superseded runs consume fixed runner capacity.",
+      "regression": {
+        "kind": "test",
+        "command": "node --test .github/scripts/cancel-stale-vercel-previews.test.mjs",
+        "path": ".github/scripts/cancel-stale-vercel-previews.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "scheduled-control-plane",
+        "owner": "Runner control plane"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/runner-heartbeat-routing",
+      "failureMode": "A generic runner heartbeat falsely routes work to cold runners.",
+      "regression": {
+        "kind": "test",
+        "command": "pytest scripts/tests/test_runner_routing.py",
+        "path": "scripts/tests/test_runner_routing.py"
+      },
+      "ciStageOwner": {
+        "stage": "scheduled-control-plane",
+        "owner": "Runner control plane"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/runner-image-prerequisites",
+      "failureMode": "Runner images miss prerequisite markers, service PATH, Playwright payload, or source-SHA provenance.",
+      "regression": {
+        "kind": "verifier",
+        "command": "node .github/runner-image/verify-prerequisites.mjs",
+        "path": ".github/runner-image/verify-prerequisites.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "operator-bootstrap",
+        "owner": "Runner image"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/cache-artifact-fanout",
+      "failureMode": "Self-hosted Actions cache and artifact fanout cause multi-gigabyte uploads.",
+      "regression": {
+        "kind": "verifier",
+        "command": "node .github/scripts/guard-playwright-artifacts.mjs",
+        "path": ".github/scripts/guard-playwright-artifacts.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "source-pr",
+        "owner": "CI control plane"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/runner-emergency-headroom",
+      "failureMode": "Runner matrices consume all capacity without emergency headroom.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm --filter @jovie/web exec vitest run tests/unit/ci/runner-host-capacity.test.ts",
+        "path": "apps/web/tests/unit/ci/runner-host-capacity.test.ts"
+      },
+      "ciStageOwner": {
+        "stage": "scheduled-control-plane",
+        "owner": "Runner control plane"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/sentry-read-gate-scopes",
+      "failureMode": "Sentry credentials upload but lack read-gate scopes.",
+      "regression": {
+        "kind": "verifier",
+        "command": "test -f .github/actions/sentry-error-gate/action.yml",
+        "path": ".github/actions/sentry-error-gate/action.yml"
+      },
+      "ciStageOwner": {
+        "stage": "post-deploy",
+        "owner": "Observability"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/doppler-sync-freshness",
+      "failureMode": "Doppler-to-GitHub sync has freshness or capability gaps.",
+      "regression": {
+        "kind": "verifier",
+        "command": "test -f .github/actions/setup-doppler/action.yml",
+        "path": ".github/actions/setup-doppler/action.yml"
+      },
+      "ciStageOwner": {
+        "stage": "operator-bootstrap",
+        "owner": "Secrets control plane"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/vercel-immutable-probe",
+      "failureMode": "Protected immutable Vercel URLs redirect probes to SSO.",
+      "regression": {
+        "kind": "test",
+        "command": "node --test .github/scripts/verify-vercel-production-domains.test.mjs",
+        "path": ".github/scripts/verify-vercel-production-domains.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "post-deploy",
+        "owner": "Production probes"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/seo-redirect-auth-html",
+      "failureMode": "SEO probes follow cross-origin redirects and accept login HTML as HTTP 200.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm --filter @jovie/web exec vitest run tests/unit/ci/seo-ratchet.test.ts",
+        "path": "apps/web/tests/unit/ci/seo-ratchet.test.ts"
+      },
+      "ciStageOwner": {
+        "stage": "post-deploy",
+        "owner": "Production probes"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/lighthouse-assertion-matches",
+      "failureMode": "Lighthouse audits login pages and passes with zero assertion matches.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm --filter @jovie/web exec vitest run tests/unit/ci/public-lighthouse-config.test.ts",
+        "path": "apps/web/tests/unit/ci/public-lighthouse-config.test.ts"
+      },
+      "ciStageOwner": {
+        "stage": "post-deploy",
+        "owner": "Production probes"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/bypass-secret-containment",
+      "failureMode": "Bypass secrets leak through redirects, subresources, URLs, logs, or cross-origin headers.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm --filter @jovie/web exec vitest run tests/unit/ci/playwright-artifact-secrets.test.ts",
+        "path": "apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts"
+      },
+      "ciStageOwner": {
+        "stage": "post-deploy",
+        "owner": "Security"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/production-workflow-provenance",
+      "failureMode": "Production reruns use immutable old workflow code.",
+      "regression": {
+        "kind": "verifier",
+        "command": "node .github/scripts/verify-main-release-readiness.mjs",
+        "path": ".github/scripts/verify-main-release-readiness.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "main-release",
+        "owner": "Production controller"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/production-evidence-freshness",
+      "failureMode": "Exact-main, provenance, or deploy markers permit stale production evidence.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm ci:control:test",
+        "path": "scripts/lib/__tests__/main-release-readiness.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "main-release",
+        "owner": "Production controller"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/controller-loop-bounds",
+      "failureMode": "Controllers, watchdogs, labels, or auto-remediation create non-terminating queue loops.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm ci:control:test",
+        "path": "scripts/lib/__tests__/merge-queue-guard.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "scheduled-control-plane",
+        "owner": "CI control plane"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/gbrain-readiness-diagnosis",
+      "failureMode": "GBrain readiness returns a misleading pool-saturation message for wedged or DNS-broken DB sessions.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm ci:control:test",
+        "path": "scripts/lib/__tests__/gbrain-health-summary.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "scheduled-control-plane",
+        "owner": "GBrain operations"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/coordination-query-bounds",
+      "failureMode": "Coordination commands issue unbounded sequential ownership queries.",
+      "regression": {
+        "kind": "test",
+        "command": "node --test scripts/agent/preflight.test.mjs",
+        "path": "scripts/agent/preflight.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "scheduled-control-plane",
+        "owner": "Agent coordination"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/admin-secret-log-redaction",
+      "failureMode": "Admin credentials are printed into persistent service logs.",
+      "regression": {
+        "kind": "verifier",
+        "command": "test -f .github/actions/setup-doppler/action.yml",
+        "path": ".github/actions/setup-doppler/action.yml"
+      },
+      "ciStageOwner": {
+        "stage": "operator-bootstrap",
+        "owner": "Security"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/runner-image-source-sha-provenance",
+      "failureMode": "Runner image source-SHA provenance is absent or does not bind the installed payload to its source revision.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm --filter @jovie/web exec vitest run tests/unit/ci/supply-chain-provenance.test.ts",
+        "path": "apps/web/tests/unit/ci/supply-chain-provenance.test.ts"
+      },
+      "ciStageOwner": {
+        "stage": "operator-bootstrap",
+        "owner": "Runner image"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/gbrain-pool-recovery",
+      "failureMode": "GBrain pool recovery permits wedged sessions to remain allocated or retries recovery without bounded diagnostics.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm ci:control:test",
+        "path": "scripts/lib/__tests__/gbrain-pool-env.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "scheduled-control-plane",
+        "owner": "GBrain operations"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/agent-task-identity-context-drift",
+      "failureMode": "Agent tasks lose bounded identity or context and act against the wrong ownership or checkout state.",
+      "regression": {
+        "kind": "test",
+        "command": "node --test scripts/agent/preflight.test.mjs",
+        "path": "scripts/agent/preflight.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "scheduled-control-plane",
+        "owner": "Agent coordination"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/gbrain-admin-secret-log-redaction",
+      "failureMode": "GBrain administrative credentials enter persistent service logs instead of redacted diagnostics.",
+      "regression": {
+        "kind": "test",
+        "command": "pnpm ci:control:test",
+        "path": "scripts/lib/__tests__/gbrain-health-summary.test.mjs"
+      },
+      "ciStageOwner": {
+        "stage": "operator-bootstrap",
+        "owner": "GBrain operations"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    },
+    {
+      "id": "ci-release/secret-scan-synthetic-merge-base",
+      "failureMode": "Secret scanning uses a mutable live base rather than immutable synthetic parent1 and exact source parent2 merge-tree evidence.",
+      "regression": {
+        "kind": "verifier",
+        "command": "./scripts/security/scan-secrets.sh ci-pr origin/main",
+        "path": "scripts/security/scan-secrets.sh"
+      },
+      "ciStageOwner": {
+        "stage": "merge-group",
+        "owner": "Security"
+      },
+      "documentation": {
+        "operator": "docs/ci/CI_RELEASE_INCIDENTS.md",
+        "postmortem": "docs/postmortems/2026-07-ci-release-drain.md"
+      },
+      "templatePropagation": {
+        "repository": "JovieInc/ci",
+        "template": "templates/jovie-ci-release-prevention",
+        "bootstrap": "templates/jovie-ci-release-prevention/bootstrap.mjs",
+        "workflow": ".github/workflows/verify-ci-release-prevention.yml@bc0b0676c058ffa1c8515e8c29fefd2317b160cc",
+        "manifest": "ci-release-prevention.yml",
+        "requiredFields": [
+          "template",
+          "template_version",
+          "ledger",
+          "verifier",
+          "scaffold_proof"
+        ],
+        "templateVersion": "bc0b0676c058ffa1c8515e8c29fefd2317b160cc"
+      },
+      "scaffoldProof": {
+        "repository": "JovieInc/ci",
+        "path": "scripts/test-jovie-ci-template-scaffold.mjs",
+        "command": "node scripts/test-jovie-ci-template-scaffold.mjs"
+      }
+    }
+  ],
+  "mergeQueueLabelPolicy": {
+    "nativeForbidsLegacyLabel": true,
+    "graphiteExplicitlyAllowsLegacyLabel": true
+  }
+}

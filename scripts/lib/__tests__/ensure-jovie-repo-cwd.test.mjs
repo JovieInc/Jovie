@@ -1,4 +1,4 @@
-import { chdirSync, mkdtempSync } from 'node:fs';
+import { mkdtempSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -15,7 +15,7 @@ describe('ensure-jovie-repo-cwd', () => {
   const originalRepoEnv = process.env.HERMES_JOVIE_REPO;
 
   afterEach(() => {
-    chdirSync(originalCwd);
+    process.chdir(originalCwd);
     if (originalRepoEnv === undefined) {
       delete process.env.HERMES_JOVIE_REPO;
     } else {
@@ -33,7 +33,7 @@ describe('ensure-jovie-repo-cwd', () => {
 
   it('ensureJovieRepoCwd chdirs from a non-repo cwd', () => {
     const outside = mkdtempSync(join(tmpdir(), 'hermes-cwd-'));
-    chdirSync(outside);
+    process.chdir(outside);
 
     const moduleUrl = `file://${join(
       REPO_ROOT,
@@ -56,6 +56,7 @@ describe('ensure-jovie-repo-cwd', () => {
     const repoRoot = ensureJovieRepoCwd(moduleUrl);
 
     expect(repoRoot).toBe(override);
-    expect(process.cwd()).toBe(override);
+    // macOS tmpdir is /var → /private/var; cwd reports the resolved path.
+    expect(process.cwd()).toBe(realpathSync(override));
   });
 });

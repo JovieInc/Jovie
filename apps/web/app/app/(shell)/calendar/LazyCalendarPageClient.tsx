@@ -52,7 +52,7 @@ const CALENDAR_GRID_CELL_KEYS = [
   'calendar-cell-35',
 ] as const;
 
-function CalendarRouteSkeleton() {
+export function CalendarRouteSkeleton() {
   return (
     <PageShell
       aria-busy='true'

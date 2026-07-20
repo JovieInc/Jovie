@@ -92,7 +92,7 @@ describe('entity rich chip System B style guard', () => {
     expect(mentionCss).not.toContain('border-radius: var(--radius-full)');
   });
 
-  it('keeps entity chip popover internals on named System B primitives', () => {
+  it('keeps entity chip popover on the canonical EntityCard + System B trigger', () => {
     const popoverSource = readFileSync(
       path.join(webRoot, 'components/jovie/components/EntityChipPopover.tsx'),
       'utf8'
@@ -101,20 +101,23 @@ describe('entity rich chip System B style guard', () => {
       path.join(webRoot, 'styles/design-system.css'),
       'utf8'
     );
-    const requiredClasses = [
-      'system-b-entity-chip-trigger',
-      'system-b-entity-chip-popover-body',
-      'system-b-entity-chip-popover-thumbnail',
-      'system-b-entity-chip-popover-placeholder',
-      'system-b-entity-chip-popover-title',
-      'system-b-entity-chip-popover-action',
-      'system-b-entity-chip-popover-action-icon',
-    ];
 
-    for (const className of requiredClasses) {
-      expect(popoverSource).toContain(className);
-      expect(designSystemSource).toContain(`.${className}`);
-    }
+    expect(popoverSource).toContain('system-b-entity-chip-trigger');
+    expect(popoverSource).toContain('system-b-entity-chip-popover-content');
+    expect(popoverSource).toContain(
+      "from '@/components/organisms/entity-card'"
+    );
+    expect(popoverSource).toContain('chatEntityMentionToEntityCard');
+    expect(popoverSource).toContain('<EntityCard');
+    expect(popoverSource).toContain("treatment='compact'");
+    expect(popoverSource).not.toContain('system-b-entity-chip-popover-body');
+    expect(popoverSource).not.toContain(
+      'system-b-entity-chip-popover-thumbnail'
+    );
+    expect(designSystemSource).toContain('.system-b-entity-chip-trigger');
+    expect(designSystemSource).toContain(
+      '.system-b-entity-chip-popover-content'
+    );
 
     expect(popoverSource).not.toMatch(
       /h-12 w-12|rounded-xl border border-subtle|mt-2 inline-flex|text-2xs font-caption/

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Mail } from 'lucide-react';
 import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import { useId, useRef } from 'react';
@@ -11,7 +11,7 @@ import {
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
 } from '@/features/home/homepage-profile-preview-fixture';
 import { ProfilePrimaryActionCard } from '@/features/profile/ProfilePrimaryActionCard';
-import { getAccentCssVars } from '@/lib/ui/accent-palette';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
@@ -20,13 +20,19 @@ interface ArtistProfileOutcomesCarouselProps {
   readonly outcomes: ArtistProfileLandingCopy['outcomes'];
 }
 
-type OutcomeId = ArtistProfileLandingCopy['outcomes']['cards'][number]['id'];
+type OutcomeId =
+  ArtistProfileLandingCopy['outcomes']['landingCards'][number]['id'];
 
-const OUTCOME_CARD_ACCENTS: Record<OutcomeId, string> = {
-  'drive-streams': getAccentCssVars('blue').solid,
-  'sell-out': getAccentCssVars('purple').solid,
-  'get-paid': getAccentCssVars('green').solid,
-  'share-anywhere': getAccentCssVars('orange').solid,
+type QrPreviewStyle = CSSProperties & {
+  readonly '--qr-preview-ink': string;
+  readonly '--qr-preview-paper': string;
+};
+
+// QR ink and paper are protocol colors, not theme colors. Keeping them local
+// prevents dark mode from reducing the code's contrast or changing its meaning.
+const QR_PREVIEW_STYLE: QrPreviewStyle = {
+  '--qr-preview-ink': '#000',
+  '--qr-preview-paper': '#fff',
 };
 
 // Per-card widths. Horizontal rail lets each outcome take the room its
@@ -34,14 +40,11 @@ const OUTCOME_CARD_ACCENTS: Record<OutcomeId, string> = {
 // proofs, so they get wider slots; Share anywhere is a single QR card
 // and can stay narrow.
 const OUTCOME_CARD_WIDTHS: Record<OutcomeId, string> = {
-  'drive-streams': 'w-full sm:w-[34rem] lg:w-[38rem]',
-  'sell-out': 'w-full sm:w-[36rem] lg:w-[40rem]',
-  'get-paid': 'w-full sm:w-[30rem] lg:w-[32rem]',
-  'share-anywhere': 'w-full sm:w-[24rem] lg:w-[26rem]',
-};
-
-type OutcomeAccentStyle = CSSProperties & {
-  readonly '--outcome-accent': string;
+  'straight-to-listen': 'w-full sm:w-[34rem] lg:w-[38rem]',
+  'local-dates-first': 'w-full sm:w-[36rem] lg:w-[40rem]',
+  'support-without-friction': 'w-full sm:w-[30rem] lg:w-[32rem]',
+  'capture-the-fan': 'w-full sm:w-[27rem] lg:w-[29rem]',
+  'one-link-everywhere': 'w-full sm:w-[24rem] lg:w-[26rem]',
 };
 
 const SHOWCASE_VIEWER_LOCATION = {
@@ -54,6 +57,7 @@ export function ArtistProfileOutcomesCarousel({
 }: Readonly<ArtistProfileOutcomesCarouselProps>) {
   const railId = useId();
   const scrollerRef = useRef<HTMLElement | null>(null);
+  const reducedMotion = useReducedMotion();
 
   const scrollByDirection = (direction: 'prev' | 'next') => {
     const rail = scrollerRef.current;
@@ -64,7 +68,10 @@ export function ArtistProfileOutcomesCarousel({
     const scrollStep = Math.max(rail.clientWidth * 0.8, 240);
     const nextLeft = direction === 'next' ? scrollStep : -scrollStep;
 
-    rail.scrollBy({ left: nextLeft, behavior: 'smooth' });
+    rail.scrollBy({
+      left: nextLeft,
+      behavior: reducedMotion ? 'auto' : 'smooth',
+    });
   };
 
   return (
@@ -74,7 +81,7 @@ export function ArtistProfileOutcomesCarousel({
       width='page'
     >
       <div>
-        <div className='mx-auto max-w-(--linear-content-max) px-5 sm:px-6 lg:px-0'>
+        <div className='mx-auto max-w-public-content px-5 sm:px-6 lg:px-0'>
           <ArtistProfileSectionHeader
             align='left'
             headline={outcomes.headline}
@@ -91,11 +98,12 @@ export function ArtistProfileOutcomesCarousel({
         />
 
         <p id='artist-profile-outcomes-instructions' className='sr-only'>
-          Use the previous and next controls to browse the outcome cards.
+          Browse the five outcome cards. Previous and next controls are
+          available when the cards form a horizontal rail.
         </p>
 
         <div className='relative mt-10 w-full overflow-x-hidden'>
-          <div className='pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--linear-content-max))/2))] top-4 z-20 hidden items-center gap-2 lg:flex'>
+          <div className='pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--public-content-max-page))/2))] top-4 z-20 hidden items-center gap-2 lg:flex'>
             <button
               type='button'
               aria-controls={railId}
@@ -103,7 +111,7 @@ export function ArtistProfileOutcomesCarousel({
               onClick={() => {
                 scrollByDirection('prev');
               }}
-              className='pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              className='pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-black/62 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             >
               <ChevronLeft className='h-4 w-4' aria-hidden='true' />
             </button>
@@ -114,35 +122,37 @@ export function ArtistProfileOutcomesCarousel({
               onClick={() => {
                 scrollByDirection('next');
               }}
-              className='pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              className='pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-black/62 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             >
               <ChevronRight className='h-4 w-4' aria-hidden='true' />
             </button>
           </div>
 
-          <div className='sr-only focus-within:not-sr-only focus-within:absolute focus-within:left-5 focus-within:top-4 focus-within:z-20 focus-within:flex focus-within:gap-2 sm:focus-within:left-6 lg:hidden'>
-            <button
-              type='button'
-              aria-controls={railId}
-              aria-label='Scroll Outcomes Left'
-              onClick={() => {
-                scrollByDirection('prev');
-              }}
-              className='rounded-full border border-black/12 bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold text-black dark:text-white shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
-            >
-              Prev
-            </button>
-            <button
-              type='button'
-              aria-controls={railId}
-              aria-label='Scroll Outcomes Right'
-              onClick={() => {
-                scrollByDirection('next');
-              }}
-              className='rounded-full border border-black/12 bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold text-black dark:text-white shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
-            >
-              Next
-            </button>
+          <div className='hidden sm:block lg:hidden'>
+            <div className='sr-only focus-within:not-sr-only focus-within:absolute focus-within:left-6 focus-within:top-4 focus-within:z-20 focus-within:flex focus-within:gap-2'>
+              <button
+                type='button'
+                aria-controls={railId}
+                aria-label='Scroll Outcomes Left'
+                onClick={() => {
+                  scrollByDirection('prev');
+                }}
+                className='min-h-11 min-w-11 rounded-full border border-black/12 bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold text-black dark:text-white shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+              >
+                Prev
+              </button>
+              <button
+                type='button'
+                aria-controls={railId}
+                aria-label='Scroll Outcomes Right'
+                onClick={() => {
+                  scrollByDirection('next');
+                }}
+                className='min-h-11 min-w-11 rounded-full border border-black/12 bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold text-black dark:text-white shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+              >
+                Next
+              </button>
+            </div>
           </div>
 
           <section
@@ -151,9 +161,12 @@ export function ArtistProfileOutcomesCarousel({
             data-testid='artist-profile-outcomes-grid'
             aria-label='Outcome Showcase'
             aria-describedby='artist-profile-outcomes-instructions'
-            className='relative grid grid-cols-1 gap-3 overflow-visible pb-3 pl-5 pr-5 sm:flex sm:gap-3.5 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-x-contain sm:scroll-smooth sm:snap-x sm:snap-mandatory sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+            className={cn(
+              'relative grid grid-cols-1 gap-3 overflow-visible pb-3 pl-5 pr-5 sm:flex sm:gap-3.5 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-x-contain sm:snap-x sm:snap-mandatory sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+              !reducedMotion && 'sm:scroll-smooth'
+            )}
           >
-            {outcomes.cards.map(card => (
+            {outcomes.landingCards.map(card => (
               <OutcomeCard key={card.id} card={card} outcomes={outcomes} />
             ))}
           </section>
@@ -167,48 +180,41 @@ function OutcomeCard({
   card,
   outcomes,
 }: Readonly<{
-  card: ArtistProfileLandingCopy['outcomes']['cards'][number];
+  card: ArtistProfileLandingCopy['outcomes']['landingCards'][number];
   outcomes: ArtistProfileLandingCopy['outcomes'];
 }>) {
-  const style: OutcomeAccentStyle = {
-    '--outcome-accent': OUTCOME_CARD_ACCENTS[card.id],
-  };
-
   const proof = outcomes.syntheticProofs;
 
   return (
     <article
       data-testid='artist-profile-outcome-card'
       className={cn(
-        'group relative flex shrink-0 snap-start flex-col overflow-hidden rounded-[1.5rem] border border-white/8 bg-(--color-bg-base) shadow-[0_22px_56px_rgba(0,0,0,0.28)]',
+        'group relative flex shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-subtle bg-surface-0 shadow-lg',
         OUTCOME_CARD_WIDTHS[card.id]
       )}
-      style={style}
     >
-      <div
-        className='absolute inset-0 opacity-90'
-        style={{
-          background:
-            'radial-gradient(circle at 80% 78%, color-mix(in srgb, var(--outcome-accent) 18%, transparent), transparent 36%), linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015) 44%, rgba(0,0,0,0.42))',
-        }}
-        aria-hidden='true'
-      />
       <div className='relative flex h-full flex-col p-4 sm:p-5'>
         <div className='max-w-[18rem]'>
-          <h3 className='max-w-[10ch] text-[clamp(1.85rem,3.4vw,3rem)] font-semibold leading-[0.92] tracking-[-0.065em] text-primary-token'>
+          <h3 className='max-w-[12ch] text-2xl font-semibold leading-tight tracking-tight text-primary-token sm:text-3xl'>
             {card.title}
           </h3>
+          <p className='mt-3 max-w-[38ch] text-app leading-relaxed text-secondary-token'>
+            {card.description}
+          </p>
         </div>
 
-        <div className='mt-4'>
-          {card.id === 'drive-streams' ? <DriveStreamsProof /> : null}
-          {card.id === 'sell-out' ? (
+        <div className='mt-6'>
+          {card.id === 'straight-to-listen' ? <DriveStreamsProof /> : null}
+          {card.id === 'local-dates-first' ? (
             <SellOutProof proof={proof.visualProofs.sellOut} />
           ) : null}
-          {card.id === 'get-paid' ? (
+          {card.id === 'support-without-friction' ? (
             <GetPaidProof proof={proof.visualProofs.getPaid} />
           ) : null}
-          {card.id === 'share-anywhere' ? (
+          {card.id === 'capture-the-fan' ? (
+            <CaptureFanProof proof={proof.captureFan} />
+          ) : null}
+          {card.id === 'one-link-everywhere' ? (
             <ShareProof proof={proof.shareAnywhere} />
           ) : null}
         </div>
@@ -385,6 +391,48 @@ function GetPaidProof({
   );
 }
 
+function CaptureFanProof({
+  proof,
+}: Readonly<{
+  proof: ArtistProfileLandingCopy['outcomes']['syntheticProofs']['captureFan'];
+}>) {
+  return (
+    <div className='rounded-xl border border-subtle bg-surface-1 p-4 sm:p-5'>
+      <div className='flex items-center gap-3'>
+        <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-2 text-primary-token'>
+          <Mail className='h-4 w-4' aria-hidden='true' />
+        </span>
+        <div>
+          <p className='text-xs font-semibold text-primary-token'>
+            {proof.inputLabel}
+          </p>
+          <p className='mt-1 font-mono text-xs text-tertiary-token'>
+            {proof.inputValue}
+          </p>
+        </div>
+      </div>
+
+      <div className='mt-4 flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-0 px-3 py-2.5'>
+        <span className='text-xs font-medium text-secondary-token'>
+          {proof.ctaLabel}
+        </span>
+        <span className='inline-flex items-center gap-1.5 rounded-full bg-primary-token px-3 py-1.5 text-3xs font-semibold text-surface-1'>
+          <Check className='h-3 w-3' aria-hidden='true' />
+          {proof.confirmedLabel}
+        </span>
+      </div>
+
+      <p className='mt-4 flex items-center gap-2 text-xs font-medium text-secondary-token'>
+        <span
+          aria-hidden='true'
+          className='h-1.5 w-1.5 rounded-full bg-success'
+        />
+        {proof.followUpLabel}
+      </p>
+    </div>
+  );
+}
+
 function ShareProof({
   proof,
 }: Readonly<{
@@ -397,15 +445,20 @@ function ShareProof({
           {proof.title}
         </p>
 
-        <div className='mt-3.5 flex h-39 w-39 items-center justify-center rounded-xl bg-white dark:bg-surface-1 shadow-[inset_0_0_0_1px_rgba(17,17,17,0.06)]'>
+        <div
+          className='mt-3.5 flex h-39 w-39 items-center justify-center rounded-xl bg-(--qr-preview-paper) shadow-[inset_0_0_0_1px_rgba(17,17,17,0.06)]'
+          style={QR_PREVIEW_STYLE}
+        >
           <div className='grid grid-cols-7 gap-2'>
             {QR_CELLS.map(cell => (
               <span
                 key={cell.id}
-                className='h-2.5 w-2.5 rounded-xs'
-                style={{
-                  backgroundColor: cell.filled ? '#0b0b0b' : '#f2f0ea',
-                }}
+                className={cn(
+                  'h-2.5 w-2.5 rounded-xs',
+                  cell.filled
+                    ? 'bg-(--qr-preview-ink)'
+                    : 'bg-(--qr-preview-paper)'
+                )}
               />
             ))}
           </div>

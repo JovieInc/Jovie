@@ -157,11 +157,11 @@ export const TOOL_UI_REGISTRY = {
   },
   pauseMerchCard: {
     label: 'Merch pause',
-    uiHint: 'status',
-    renderer: 'status',
-    loadingTitle: 'Pausing merch…',
-    successTitle: 'Merch paused',
-    errorTitle: "Couldn't pause merch",
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Preparing pause…',
+    successTitle: 'Pause merch',
+    errorTitle: "Couldn't prepare pause",
   },
   unpauseMerchCard: {
     label: 'Merch unpause',

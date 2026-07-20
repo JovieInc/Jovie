@@ -41,6 +41,7 @@ import {
 } from './ProfileContactSidebarSections';
 import { type CategoryOption, ProfileLinkList } from './ProfileLinkList';
 import { SidebarLinkInput } from './SidebarLinkInput';
+import { SuggestedDspMatches } from './SuggestedDspMatches';
 
 /** Map a platform's category to a sidebar tab, returning null if no switch is needed. */
 function computeTargetCategory(
@@ -786,6 +787,10 @@ export function ProfileContactSidebar() {
                 />
               </div>
             )}
+
+            {resolvedCategory === 'dsp' && selectedProfile?.id ? (
+              <SuggestedDspMatches profileId={selectedProfile.id} />
+            ) : null}
           </>
         )}
       </DrawerTabbedCard>

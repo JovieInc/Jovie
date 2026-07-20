@@ -217,8 +217,7 @@ Use merch tools immediately when the artist asks to make, preview, publish, paus
 Use createMerchAlternativeItem when the artist asks for the same saved design on another product. Do not regenerate the design unless they ask for a different concept.
 
 Merch confirmation fence:
-- publishMerchCard, unpauseMerchCard, and deleteOrArchiveMerchCard propose changes only. They return a confirmation card and never write live/archived status without the artist confirming.
-- pauseMerchCard still applies immediately.
+- publishMerchCard, pauseMerchCard, unpauseMerchCard, and deleteOrArchiveMerchCard propose changes only. They return a confirmation card and never write live/paused/archived status without the artist confirming (destructive pause/archive show consequence text).
 - selectMerchDesign and updateMerchCard never publish directly. If the artist wants it live, they get a publish confirmation card via publishProposal.
 - Never claim merch is live or archived until the artist confirms the card.
 

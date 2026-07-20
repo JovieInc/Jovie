@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import {
+  chatEntityMentionToEntityCard,
   chatReleaseContextToEntityCard,
   chatTourDateContextToEntityCard,
   merchToEntityCard,
@@ -147,6 +148,74 @@ describe('chatReleaseContextToEntityCard', () => {
 
     expect(model.title).toBe('Lost In The Light');
     expect(model.meta).toBe('Loading Release');
+  });
+});
+
+describe('chatEntityMentionToEntityCard', () => {
+  it('maps a resolved release mention into a compact card model', () => {
+    const model = chatEntityMentionToEntityCard({
+      kind: 'release',
+      id: 'rel_1',
+      label: 'Sober',
+      thumbnail: 'https://cdn.test/sober.jpg',
+      releaseType: 'single',
+      totalTracks: 1,
+      totalDurationMs: 210_000,
+    });
+
+    expect(model.kind).toBe('music');
+    expect(model.title).toBe('Sober');
+    expect(model.imageUrl).toBe('https://cdn.test/sober.jpg');
+    expect(model.eyebrow).toBe('Release · Single');
+    expect(model.meta).toBe('1 track · 3:30');
+    expect(model.href).toBeUndefined();
+    expect(model.cta).toBeNull();
+  });
+
+  it('degrades to label-only for unresolved mentions', () => {
+    const model = chatEntityMentionToEntityCard({
+      kind: 'artist',
+      id: 'art_x',
+      label: 'Unknown Artist',
+    });
+
+    expect(model.kind).toBe('music');
+    expect(model.title).toBe('Unknown Artist');
+    expect(model.imageUrl).toBeNull();
+    expect(model.eyebrow).toBe('Artist');
+    expect(model.meta).toBeNull();
+  });
+
+  it('maps events to show cards with date pills when artwork is missing', () => {
+    const model = chatEntityMentionToEntityCard({
+      kind: 'event',
+      id: 'evt_1',
+      label: 'Brooklyn Steel',
+      eventType: 'tour',
+      eventDate: '2026-06-12T23:30:00.000Z',
+      venue: 'Brooklyn Steel',
+      city: 'Brooklyn, NY',
+    });
+
+    expect(model.kind).toBe('show');
+    expect(model.eyebrow).toBe('Event · Tour');
+    expect(model.datePill).toEqual({ month: 'Jun', day: '12' });
+    expect(model.meta).toBe('Brooklyn Steel · Brooklyn, NY');
+  });
+
+  it('attaches interactive CTAs for panel open actions', () => {
+    const onClick = vi.fn();
+    const model = chatEntityMentionToEntityCard(
+      { kind: 'release', id: 'rel_1', label: 'Sober' },
+      { interactive: true, cta: { label: 'Open Release', onClick } }
+    );
+
+    expect(model.interactive).toBe(true);
+    expect(model.cta?.label).toBe('Open Release');
+    model.cta?.onClick?.(
+      {} as unknown as import('react').MouseEvent<HTMLElement>
+    );
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 });
 
