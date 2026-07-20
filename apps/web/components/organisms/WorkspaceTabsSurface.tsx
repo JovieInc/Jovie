@@ -146,7 +146,7 @@ export function WorkspaceTabsSurface<
             title={title}
             subtitle={description}
             actions={actions}
-            className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+            className='min-h-0 px-app-header py-3'
             actionsClassName='shrink-0'
           />
           {shouldShowTabControls ? (

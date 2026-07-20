@@ -22,7 +22,7 @@ export function TaskDescriptionHelper({
         aria-label={`Open ${helper.title} description helper`}
         data-testid='task-description-helper'
         onClick={onBeginEditing}
-        className='absolute inset-0 rounded-2xl bg-[color-mix(in_oklab,var(--linear-app-content-surface)_82%,var(--linear-app-shell-border)_18%)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+        className='absolute inset-0 rounded-2xl bg-[color-mix(in_oklab,var(--linear-app-content-surface)_82%,var(--linear-app-shell-border)_18%)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
       />
       <div className='pointer-events-none relative z-10 max-w-[40rem] space-y-3 px-5 py-5 text-left'>
         <div className='space-y-1'>

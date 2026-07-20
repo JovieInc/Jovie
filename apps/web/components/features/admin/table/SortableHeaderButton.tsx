@@ -24,7 +24,7 @@ export function SortableHeaderButton({
         'inline-flex w-full items-center gap-2 text-left text-app font-medium tracking-normal',
         'rounded-full px-1.5 py-1 transition-[background-color,color,box-shadow] duration-subtle',
         'text-secondary-token hover:bg-surface-1 hover:text-primary-token',
-        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
         'active:bg-surface-0',
         className
       )}

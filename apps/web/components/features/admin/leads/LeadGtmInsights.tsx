@@ -67,7 +67,7 @@ export async function LeadGtmInsights() {
         <ContentSectionHeader
           title='GTM insights'
           subtitle='Attributed cohort performance and ramp recommendation'
-          className='px-(--linear-app-header-padding-x) py-3'
+          className='px-app-header py-3'
         />
         <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
           <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-5'>

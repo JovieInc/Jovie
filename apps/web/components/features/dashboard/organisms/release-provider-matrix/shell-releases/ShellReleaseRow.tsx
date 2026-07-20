@@ -158,7 +158,7 @@ const ArtworkCell = memo(function ArtworkCell({
             // Always renders white-on-black scrim in both themes — pair the
             // light/dark utilities so the play glyph stays legible on the
             // `bg-black/50` overlay (satisfies no-hardcoded-theme-colors).
-            'absolute inset-0 grid place-items-center rounded-sm bg-black/50 text-white dark:text-white transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+            'absolute inset-0 grid place-items-center rounded-sm bg-black/50 text-white dark:text-white transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/55',
             isTrackPlaying
               ? 'opacity-100'
               : 'opacity-0 group-hover/row:opacity-100'

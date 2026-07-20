@@ -68,7 +68,7 @@ export function FilterSearchInput({
             'w-full rounded-lg border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_48%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_34%,transparent)] py-1.5 pl-8 pr-6 text-xs',
             'text-primary-token placeholder:text-tertiary-token',
             'transition-[background-color,border-color,box-shadow] duration-subtle',
-            'focus-visible:border-(--linear-border-focus) focus-visible:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_44%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/14'
+            'focus-visible:border-(--linear-border-focus) focus-visible:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_44%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/14'
           )}
           aria-label={placeholder}
         />
