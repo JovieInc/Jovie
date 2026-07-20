@@ -4,6 +4,16 @@ set -euo pipefail
 
 SCOPE="${1:-affected}"
 
+# Self-select a repo-conforming Node when run standalone (JOV-4329); a no-op
+# when invoked through pre-push-gate.sh, which already resolved it.
+if ! RESOLVED_NODE_BIN="$(bash scripts/hooks/resolve-repo-node.sh)"; then
+  exit 1
+fi
+if [[ -n "$RESOLVED_NODE_BIN" ]]; then
+  echo "[automation-verify] using repo-pinned Node at $RESOLVED_NODE_BIN (ambient: $(node --version 2>/dev/null || echo none))"
+  export PATH="$RESOLVED_NODE_BIN:$PATH"
+fi
+
 case "$SCOPE" in
   affected)
     echo "[automation-verify] Running affected verify bundle"
