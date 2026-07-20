@@ -10,6 +10,9 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
+  // Canonical Link primitive: passthrough so the Slot chain renders the
+  // Next.js anchor child in these unit tests.
+  Link: ({ children }: any) => <>{children}</>,
 }));
 
 vi.mock('next/link', () => ({

@@ -1,3 +1,4 @@
+import { Link as UILink } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -66,14 +67,17 @@ export function ShellCtaButton({
   'data-testid': testId,
   'aria-label': ariaLabel,
 }: Readonly<ShellCtaButtonProps>) {
+  // Renders through the canonical Link primitive (asChild + variant={null});
+  // shellCtaClassName keeps the CTA pill appearance on top of it.
   return (
-    <Link
-      href={href}
-      data-testid={testId}
-      aria-label={ariaLabel}
+    <UILink
+      asChild
+      variant={null}
       className={cn(shellCtaClassName({ tone, size, context }), className)}
     >
-      {children}
-    </Link>
+      <Link href={href} data-testid={testId} aria-label={ariaLabel}>
+        {children}
+      </Link>
+    </UILink>
   );
 }
