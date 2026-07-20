@@ -64,6 +64,41 @@ function rel(file: string): string {
 }
 
 describe('singular System B — design-system unification ratchet', () => {
+  it('keeps the marketing System B wrapper dark, scrollable, and editorial', () => {
+    const layout = readFileSync(
+      resolve(WEB_ROOT, 'app/(marketing)/layout.tsx'),
+      'utf8'
+    );
+    const globals = readFileSync(resolve(WEB_ROOT, 'app/globals.css'), 'utf8');
+    const linearTokens = readFileSync(
+      resolve(WEB_ROOT, 'styles/linear-tokens.css'),
+      'utf8'
+    );
+    const designSystem = readFileSync(
+      resolve(WEB_ROOT, 'styles/design-system.css'),
+      'utf8'
+    );
+
+    expect(layout).toContain('system-b-marketing dark');
+    expect(layout).not.toContain('linear-marketing');
+    expect(globals).toMatch(
+      /html:has\(\.system-b-marketing\)[\s\S]*?\{[^}]*overflow-y:\s*auto/
+    );
+    expect(globals).toMatch(
+      /body:has\(\.system-b-marketing\)[\s\S]*?\{[^}]*overflow:\s*visible/
+    );
+    expect(linearTokens).toContain('.system-b-marketing.dark');
+    expect(designSystem).toContain('.system-b-marketing {');
+    expect(designSystem).toContain('.system-b-marketing.dark');
+    expect(designSystem).toContain('.system-b-marketing h1');
+    expect(designSystem).toMatch(
+      /\.system-b-marketing button,[\s\S]*?\.system-b-marketing a\[class\*="btn"\]\s*\{[^}]*font-family:\s*var\(--marketing-font-body\)/
+    );
+    expect(designSystem).not.toMatch(
+      /\.system-b-marketing button,[\s\S]*?\.system-b-marketing a\[class\*="btn"\]\s*\{[^}]*font-family:\s*var\(--marketing-font-display\)/
+    );
+  });
+
   it('DM Sans is retired: no live source loads it or reads --font-dm-sans', () => {
     const layout = readFileSync(resolve(WEB_ROOT, 'app/layout.tsx'), 'utf8');
     expect(
@@ -97,7 +132,6 @@ describe('singular System B — design-system unification ratchet', () => {
     // surface (reskinning it onto System B tokens) must also remove it here.
     const APPLIERS_ALLOWLIST = new Set<string>([
       'app/(dynamic)/playlists/layout.tsx',
-      'app/(marketing)/layout.tsx',
       'app/brand/layout.tsx',
       'app/not-found.tsx',
       'app/pitch/layout.tsx',
