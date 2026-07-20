@@ -85,7 +85,7 @@ const producerCounts: Record<string, number> = {
   'production-release.yml': 2,
   'screenshots.yml': 1,
   'synthetic-monitoring.yml': 6,
-  'visual-regression.yml': 2,
+  'visual-regression.yml': 5,
 };
 
 function fixture(prefix = 'jovie-artifact-', parent = tmpdir()) {

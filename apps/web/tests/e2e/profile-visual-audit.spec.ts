@@ -7,7 +7,9 @@ import {
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
 
-type ShellVariant = 'legacy' | 'v2';
+// Only the legacy shell exists today: the v2 shell flag (ff_profile_v2) was
+// removed from the app in #8391. Re-add a variant when a new shell flag ships.
+type ShellVariant = 'legacy';
 type ThemeVariant = 'dark' | 'light';
 type BreakpointVariant = 'mobile' | 'tablet' | 'desktop';
 
@@ -30,6 +32,8 @@ const TEST_PROFILE = 'dualipa';
 const TIP_PROFILE = 'testartist';
 const NOTIFICATIONS_PROFILE = 'testartist';
 const PROFILE_READY_SELECTOR = 'h1, [data-testid="profile-header"]';
+// Dead ready selectors removed: subscribe-cta-container and profile-tour-heading
+// were dropped from the app in #8391; the header fallback above is the live gate.
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 const BREAKPOINTS: readonly BreakpointConfig[] = [
   { name: 'mobile', width: 390, height: 844 },
@@ -42,28 +46,26 @@ const PROFILE_CASES: readonly ProfileAuditCase[] = [
     id: 'profile',
     path: `/${TEST_PROFILE}`,
     readySelector: PROFILE_READY_SELECTOR,
-    shells: ['legacy', 'v2'],
+    shells: ['legacy'],
   },
   {
     id: 'listen',
     path: `/${TEST_PROFILE}?mode=listen`,
     readySelector: PROFILE_READY_SELECTOR,
-    shells: ['legacy', 'v2'],
+    shells: ['legacy'],
   },
   {
     id: 'subscribe',
     path: `/${TEST_PROFILE}?mode=subscribe`,
-    readySelector:
-      '[data-testid="subscribe-cta-container"], h1, [data-testid="profile-header"]',
-    shells: ['legacy', 'v2'],
+    readySelector: PROFILE_READY_SELECTOR,
+    shells: ['legacy'],
     composerVisible: true,
   },
   {
     id: 'subscribe-focus',
     path: `/${TEST_PROFILE}?mode=subscribe`,
-    readySelector:
-      '[data-testid="subscribe-cta-container"], h1, [data-testid="profile-header"]',
-    shells: ['legacy', 'v2'],
+    readySelector: PROFILE_READY_SELECTOR,
+    shells: ['legacy'],
     composerVisible: true,
     focusComposerInput: true,
   },
@@ -71,25 +73,25 @@ const PROFILE_CASES: readonly ProfileAuditCase[] = [
     id: 'about',
     path: `/${TEST_PROFILE}?mode=about`,
     readySelector: PROFILE_READY_SELECTOR,
-    shells: ['legacy', 'v2'],
+    shells: ['legacy'],
   },
   {
     id: 'tour',
     path: `/${TEST_PROFILE}?mode=tour`,
-    readySelector: `#profile-tour-heading, ${PROFILE_READY_SELECTOR}`,
-    shells: ['legacy', 'v2'],
+    readySelector: PROFILE_READY_SELECTOR,
+    shells: ['legacy'],
   },
   {
     id: 'contact',
     path: `/${TEST_PROFILE}?mode=contact`,
     readySelector: `${PROFILE_READY_SELECTOR}, [data-testid="contact-drawer"]`,
-    shells: ['legacy', 'v2'],
+    shells: ['legacy'],
   },
   {
     id: 'tip',
     path: `/${TIP_PROFILE}?mode=pay`,
     readySelector: `${PROFILE_READY_SELECTOR}, [data-testid="tip-drawer"]`,
-    shells: ['legacy', 'v2'],
+    shells: ['legacy'],
   },
   {
     id: 'notifications',
@@ -166,15 +168,6 @@ const cycleDir = resolveOwnedOutputDirectory(
   cycleName,
   'PROFILE_AUDIT_CYCLE'
 );
-
-function withShellVariant(routePath: string, shell: ShellVariant): string {
-  if (shell === 'legacy') {
-    return routePath;
-  }
-
-  const separator = routePath.includes('?') ? '&' : '?';
-  return `${routePath}${separator}ff_profile_v2=1`;
-}
 
 function screenshotName(
   shell: ShellVariant,
@@ -397,7 +390,7 @@ test.describe('Public profile visual audit @smoke', () => {
                     : routeCase.composerVisible
                       ? 'composer'
                       : 'rest',
-                  path: withShellVariant(routeCase.path, shell),
+                  path: routeCase.path,
                 }))
               )
             )
@@ -441,7 +434,7 @@ test.describe('Public profile visual audit @smoke', () => {
               height: breakpoint.height,
             });
 
-            const targetPath = withShellVariant(routeCase.path, shell);
+            const targetPath = routeCase.path;
             await page.goto(targetPath, {
               waitUntil: 'domcontentloaded',
               timeout: 120_000,
