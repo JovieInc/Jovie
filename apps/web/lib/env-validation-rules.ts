@@ -129,10 +129,14 @@ function isAllowedBetterAuthHost(
       hostname.endsWith('.localhost')
     );
   }
-  // Preview deployments: allow the exact Vercel deployment host only.
-  const vercelUrl = process.env.VERCEL_URL?.toLowerCase();
-  if (vercelUrl && hostname === vercelUrl) return true;
-  return hostname.endsWith('.vercel.app');
+  // Preview deployments: allow only exact Vercel-provided deployment or
+  // branch hosts. The global *.vercel.app namespace is attacker-controlled.
+  const vercelHosts = new Set(
+    [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]
+      .filter((host): host is string => Boolean(host))
+      .map(host => host.toLowerCase())
+  );
+  return vercelHosts.has(hostname);
 }
 
 /**

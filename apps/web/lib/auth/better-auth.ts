@@ -94,9 +94,47 @@ function resolveSecret(): string | undefined {
     : NON_PRODUCTION_FALLBACK_SECRET;
 }
 
-function resolveBaseUrl(): string | undefined {
-  if (env.BETTER_AUTH_URL) return env.BETTER_AUTH_URL;
-  return env.VERCEL_URL ? `https://${env.VERCEL_URL}` : undefined;
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+function resolveLocalBetterAuthUrl(): URL | undefined {
+  if (
+    env.VERCEL_ENV === 'preview' ||
+    env.VERCEL_ENV === 'production' ||
+    !env.BETTER_AUTH_URL
+  ) {
+    return undefined;
+  }
+
+  const configuredUrl = new URL(env.BETTER_AUTH_URL);
+  return LOOPBACK_HOSTNAMES.has(configuredUrl.hostname)
+    ? configuredUrl
+    : undefined;
+}
+
+function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
+  const localBetterAuthUrl = resolveLocalBetterAuthUrl();
+
+  return {
+    allowedHosts: [
+      ...new Set(
+        [
+          'jov.ie',
+          'www.jov.ie',
+          'staging.jov.ie',
+          'localhost:3100',
+          localBetterAuthUrl?.host,
+          env.VERCEL_URL,
+          env.VERCEL_BRANCH_URL,
+        ].filter((host): host is string => Boolean(host))
+      ),
+    ],
+    protocol:
+      localBetterAuthUrl?.protocol === 'http:' ||
+      env.VERCEL_ENV === 'development' ||
+      (!env.VERCEL_ENV && env.NODE_ENV !== 'production')
+        ? 'http'
+        : 'https',
+  };
 }
 
 /** Providers are included only when their credentials exist (env-gated). */

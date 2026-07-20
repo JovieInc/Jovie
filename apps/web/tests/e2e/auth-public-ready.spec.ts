@@ -1,6 +1,10 @@
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { primeVercelBypassCookie } from '../helpers/vercel-preview';
+import {
+  assertExactNavigationUrl,
+  primeVercelBypassCookie,
+  requireExactNavigationOrigin,
+} from '../helpers/vercel-preview';
 import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -18,18 +22,29 @@ test.beforeEach(() => {
 
 function expectPublicAuthReady(pathname: string) {
   return async ({ page }: { page: Page }) => {
+    const expectedOrigin = requireExactNavigationOrigin(process.env.BASE_URL);
     await primeVercelBypassCookie(page, process.env.BASE_URL, pathname);
 
     await page.goto(pathname, {
       waitUntil: 'domcontentloaded',
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
+    assertExactNavigationUrl(
+      page.url(),
+      expectedOrigin,
+      `Public auth navigation for ${pathname}`
+    );
     await page
       .waitForLoadState('networkidle', { timeout: 20_000 })
       .catch(() => {
         // Clerk can keep background requests open. The DOM readiness assertion is
         // the user-facing gate.
       });
+    assertExactNavigationUrl(
+      page.url(),
+      expectedOrigin,
+      `Settled public auth navigation for ${pathname}`
+    );
 
     const bodyText = await page.locator('body').innerText();
     expect(bodyText).not.toMatch(AUTH_UNAVAILABLE_PATTERN);
@@ -71,6 +86,11 @@ function expectPublicAuthReady(pathname: string) {
     await expect(liveAuthControls.first()).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
+    assertExactNavigationUrl(
+      page.url(),
+      expectedOrigin,
+      `Verified public auth navigation for ${pathname}`
+    );
   };
 }
 
