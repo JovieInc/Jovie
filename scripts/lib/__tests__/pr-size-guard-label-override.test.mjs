@@ -105,7 +105,14 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
     expect(workflow).toContain(
       "group: pr-size-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}"
     );
-    expect(workflow).toContain('cancel-in-progress: true');
+    expect(workflow).toContain(
+      "cancel-in-progress: ${{ github.event_name == 'merge_group' }}"
+    );
+    // #14501: pull_request runs must never cancel — duplicate same-head-SHA
+    // runs (opened + synchronize, or a duplicate webhook delivery) share the
+    // per-PR group, and GitHub's rollup can pin the CANCELLED run as latest
+    // for this required context (JOV-3580). merge_group still cancels.
+    expect(workflow).not.toContain('cancel-in-progress: true');
     expect(workflow).toContain('JOV-3580');
   });
 
