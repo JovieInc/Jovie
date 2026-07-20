@@ -1,4 +1,5 @@
 import {
+  Bell,
   Bot,
   type LucideIcon,
   Music2,
@@ -53,6 +54,13 @@ export const KIND_PRESETS: Record<EntityKind, KindPreset> = {
     accent: 'blue',
     fallbackVariant: 'generic',
     ctaLabel: 'View Details',
+  },
+  alerts: {
+    eyebrow: 'Alerts',
+    icon: Bell,
+    accent: 'purple',
+    fallbackVariant: 'generic',
+    ctaLabel: 'Get Updates',
   },
 };
 

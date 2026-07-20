@@ -284,13 +284,28 @@ describe('showToEntityCard', () => {
     });
   });
 
-  it('omits the CTA when there is no ticket url', () => {
+  it('renders a target-less No Tickets CTA when there is no ticket url', () => {
     const model = showToEntityCard({
       id: 's2',
       venueName: 'Club',
       startDate: null,
     });
-    expect(model.cta).toBeNull();
+    expect(model.cta).toEqual({
+      label: 'No Tickets',
+      href: null,
+      disabled: true,
+    });
     expect(model.datePill).toBeNull();
+  });
+
+  it('formats the date pill in UTC so it always matches the events list', () => {
+    // 02:30 UTC is still the previous day in US timezones — the card and the
+    // TourModePanel list (also UTC) must agree on "Jul 29".
+    const model = showToEntityCard({
+      id: 's3',
+      venueName: 'The Echo',
+      startDate: '2026-07-29T02:30:00.000Z',
+    });
+    expect(model.datePill).toEqual({ month: 'Jul', day: '29' });
   });
 });

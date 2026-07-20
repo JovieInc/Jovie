@@ -11,21 +11,6 @@ import type {
   EntityStatusTone,
 } from './types';
 
-const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
 function toDate(value: Date | string | null | undefined): Date | null {
   if (!value) {
     return null;
@@ -232,8 +217,17 @@ export function chatTourDateContextToEntityCard(
   };
 }
 
-const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
-const dayFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric' });
+// Show dates render in UTC everywhere on the profile (card date pills AND the
+// events list) so the two never disagree — local-time formatting split them
+// for evening shows (e.g. "JUL 28" on the card vs "Jul 29" in the list).
+const monthFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  timeZone: 'UTC',
+});
+const dayFormatter = new Intl.DateTimeFormat('en-US', {
+  day: 'numeric',
+  timeZone: 'UTC',
+});
 
 function getTourEyebrow(
   isNearYou: boolean,
@@ -370,7 +364,7 @@ export function aiCrawlerAnalyticsToEntityCard(
         ? { label: 'Active', tone: 'live' }
         : { label: 'Collecting', tone: 'neutral' },
     cta: analytics.isTeaser
-      ? { label: 'Upgrade to Pro', href: null, disabled: true }
+      ? { label: 'Upgrade To Pro', href: null, disabled: true }
       : {
           label: preset.ctaLabel,
           href: null,
@@ -401,11 +395,13 @@ export function showToEntityCard(show: ShowEntityInput): EntityCardModel {
     title,
     meta: location || null,
     datePill: date
-      ? { month: MONTHS[date.getMonth()], day: String(date.getDate()) }
+      ? { month: monthFormatter.format(date), day: dayFormatter.format(date) }
       : null,
     status: null,
     cta: show.ticketUrl
       ? { label: preset.ctaLabel, href: show.ticketUrl, external: true }
-      : null,
+      : // No ticket URL: keep the bottom slot honest — a target-less CTA the
+        // card renders as plain muted text, never as button chrome.
+        { label: 'No Tickets', href: null, disabled: true },
   };
 }

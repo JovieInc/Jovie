@@ -160,12 +160,9 @@ function TourDateRow({
           {getTicketStatusLabel(item.date.ticketStatus, canBuyTickets)}
         </a>
       ) : (
-        <span
-          className={cn(
-            'inline-flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-xs font-semibold tracking-tight',
-            getTicketStatusClassName(item.date.ticketStatus, canBuyTickets)
-          )}
-        >
+        // No ticket target: plain muted meta text — a non-interactive span
+        // must never wear button chrome.
+        <span className='shrink-0 text-xs font-medium text-white/38'>
           {getTicketStatusLabel(item.date.ticketStatus, canBuyTickets)}
         </span>
       )}
