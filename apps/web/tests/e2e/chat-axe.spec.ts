@@ -124,6 +124,27 @@ test.describe('Chat /app/chat axe audit', () => {
     ).toEqual([]);
   });
 
+  test('composer placeholder stays visually distinct from entered text', async ({
+    page,
+  }) => {
+    const textarea = page.locator(COMPOSER_TEXTAREA);
+    await expect(textarea).toHaveValue('');
+
+    const styles = await textarea.evaluate(element => {
+      const inputStyle = getComputedStyle(element);
+      const placeholderStyle = getComputedStyle(element, '::placeholder');
+
+      return {
+        inputTextFill: inputStyle.webkitTextFillColor,
+        placeholderColor: placeholderStyle.color,
+        placeholderTextFill: placeholderStyle.webkitTextFillColor,
+      };
+    });
+
+    expect(styles.placeholderTextFill).toBe(styles.placeholderColor);
+    expect(styles.placeholderTextFill).not.toBe(styles.inputTextFill);
+  });
+
   test('composer with slash picker open — no critical/serious violations', async ({
     page,
   }) => {

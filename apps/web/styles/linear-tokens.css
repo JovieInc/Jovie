@@ -380,6 +380,7 @@
    ============================================ */
 
 :root.dark,
+.system-b-marketing.dark,
 .linear-marketing.dark,
 [data-theme="linear"].dark {
   /* Text — extracted directly from linear.app computed styles (2026-03-10):

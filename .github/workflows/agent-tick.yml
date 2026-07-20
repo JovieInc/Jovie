@@ -11,8 +11,10 @@
 # CONSOLIDATED WORKFLOWS (removed their cron schedules; kept workflow_dispatch):
 #   agent-landing-sweep      — sweep eligible agent PRs into the merge queue
 #   auto-ready-agent-drafts  — flip green agent draft PRs to "ready for review"
-#   cost-anomaly-gate        — detect production event volume anomalies
 #   github-ai-dispatcher     — dispatch agent-ready issues to the orchestrator
+#
+# RESTORED STANDALONE CRONS (no longer consolidated here):
+#   cost-anomaly-gate        — detect production event volume anomalies
 #   neon-scheduled-cleanup   — clean up orphaned Neon database branches
 #   runner-health-monitor    — observe heartbeat; CI selects fallback per run
 #   synthetic-monitoring     — production synthetic auth/ui/onboarding checks

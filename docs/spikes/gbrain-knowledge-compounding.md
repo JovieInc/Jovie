@@ -15,7 +15,7 @@ notes, no raw logs/customer polling/contact dumps, and explicit web budget.
 
 | Job | Schedule | Script | Delivery | Cost |
 |---|---:|---|---|---|
-| GBrain health summary | Daily 07:15 local | `scripts/hermes/jobs/gbrain-health-summary.ts` | Telegram/Slack + `ops/gbrain-health/latest` | Two local CLI calls/day |
+| GBrain health summary | Daily 07:15 local | `scripts/hermes/jobs/gbrain-health-summary.ts` | Telegram/Slack + `ops/gbrain-health/latest` | One Tailscale HTTP probe plus bounded local diagnostics |
 | Agent performance digest | Daily 07:30 local | Extend `pipeline-scoreboard.ts` or sibling digest | Telegram + `ops/agent-health/latest` | Local logs unless GitHub enrichment is added |
 | Hourly degradation alert | Hourly | Reuse health summary with transition state | Telegram/Slack on change | Local CLI calls |
 | Weekly trend scrape | Mondays 08:00 local | New Exa/web research job | GBrain + Telegram excerpt | Needs approved provider budget |

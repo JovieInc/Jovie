@@ -22,6 +22,8 @@
         <string>{{HOME}}/.hermes</string>
         <key>HERMES_GBRAIN_BIN</key>
         <string>{{GBRAIN_BIN}}</string>
+        <key>HERMES_GBRAIN_HEALTH_URL</key>
+        <string>http://{{TAILSCALE_IP}}:7801/health</string>
         <key>PATH</key>
         <string>{{HOME}}/.bun/bin:{{HOME}}/.hermes/bin:{{HOME}}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>

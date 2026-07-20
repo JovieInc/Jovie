@@ -1814,14 +1814,16 @@ html[data-profile-initial-mode]
 
    Activate Linear styling on marketing pages by adding
    [data-theme="linear"] to a parent element or using
-   the .linear-marketing class.
+   the legacy .linear-marketing class or the semantic .system-b-marketing
+   wrapper while the remaining legacy surfaces migrate separately.
 
    This maps Linear tokens to the existing design system
    variables for seamless integration.
 */
 
 [data-theme="linear"],
-.linear-marketing {
+.linear-marketing,
+.system-b-marketing {
   /* Unified type (one system, two languages): Inter body + UI; Satoshi reserved
      for display/headings (approved exception). DM Sans retired 2026-06-18. */
   font-family: var(--font-sans);
@@ -1860,6 +1862,7 @@ html[data-profile-initial-mode]
 }
 
 .linear-marketing.dark,
+.system-b-marketing.dark,
 .home-viewport.dark,
 .system-b-root-not-found-page.dark {
   --linear-text-primary: #f7f8f8;
@@ -1947,6 +1950,7 @@ html:not(.dark) [data-testid^="profile-mode-drawer"] :where(a, button, span) {
 }
 
 html:not(.dark) .linear-marketing :where(a, button, span),
+html:not(.dark) .system-b-marketing :where(a, button, span),
 html:not(.dark) [data-testid="header-nav"] a[href="/signin"],
 html:not(.dark) [data-testid="not-found"] :where(a, button, span),
 html:not(.dark) .smart-link-powered-by {
@@ -1957,11 +1961,17 @@ html:not(.dark) .smart-link-powered-by {
   color: rgb(64 64 64) !important;
 }
 
-/* Marketing typography: headings and buttons use Satoshi (display font) */
+/* Marketing typography: headings use Satoshi (display font). Product controls
+   on semantic System B surfaces use Inter; the legacy wrapper keeps its
+   existing display treatment until System A is fully retired. */
 .linear-marketing h1,
 .linear-marketing h2,
 .linear-marketing h3,
-.linear-marketing h4 {
+.linear-marketing h4,
+.system-b-marketing h1,
+.system-b-marketing h2,
+.system-b-marketing h3,
+.system-b-marketing h4 {
   font-family: var(--marketing-font-display);
 }
 
@@ -1969,6 +1979,13 @@ html:not(.dark) .smart-link-powered-by {
 .linear-marketing [role="button"],
 .linear-marketing a[class*="btn"] {
   font-family: var(--marketing-font-display);
+  letter-spacing: -0.01em;
+}
+
+.system-b-marketing button,
+.system-b-marketing [role="button"],
+.system-b-marketing a[class*="btn"] {
+  font-family: var(--marketing-font-body);
   letter-spacing: -0.01em;
 }
 
@@ -8469,7 +8486,7 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 .system-b-chat-composer-input {
   color: var(--color-text-primary-token);
   caret-color: var(--color-text-primary-token);
-  -webkit-text-fill-color: var(--color-text-primary-token);
+  -webkit-text-fill-color: currentColor;
 }
 
 :where(.system-b-chat-composer-surface[data-hero="true"]) {

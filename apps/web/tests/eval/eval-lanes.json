@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "deterministic": {
+    "commands": [
+      ["bash", "scripts/run-deterministic-promptfoo-evals.sh", "validate"],
+      ["bash", "scripts/run-deterministic-promptfoo-evals.sh", "eval"],
+      ["bash", "scripts/run-golden-eval-set-ci.sh"],
+      [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config=vitest.config.mts",
+        "lib/chat/tools/onboarding-access-eval.test.ts",
+        "lib/connectors/eval/precision.test.ts",
+        "lib/eval/calibration.test.ts",
+        "lib/eval/leak-guard.test.ts",
+        "lib/eval/promote-trace.test.ts",
+        "lib/eval/scorers/scorers.test.ts",
+        "tests/unit/chat/onboarding-transcript-quality.eval.test.ts"
+      ]
+    ],
+    "files": [
+      "scripts/run-deterministic-promptfoo-evals.sh",
+      "scripts/run-golden-eval-set-ci.sh",
+      "lib/chat/tools/onboarding-access-eval.test.ts",
+      "lib/connectors/eval/precision.test.ts",
+      "lib/eval/calibration.test.ts",
+      "lib/eval/leak-guard.test.ts",
+      "lib/eval/promote-trace.test.ts",
+      "lib/eval/scorers/scorers.test.ts",
+      "tests/eval/golden/golden-eval-set.ci.test.ts",
+      "tests/unit/chat/onboarding-transcript-quality.eval.test.ts"
+    ]
+  },
+  "live": {
+    "requiredOptInFlags": [
+      "JOVIE_RUN_LIVE_EVALS",
+      "JOVIE_RUN_REAL_MODEL_EVALS",
+      "JOVIE_RUN_LIVE_HTTP_EVALS",
+      "JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS",
+      "JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS"
+    ],
+    "commands": [
+      {
+        "family": "promptfoo-all",
+        "command": ["bash", "scripts/run-live-promptfoo-evals.sh", "all"],
+        "requiredEnvironment": ["AI_GATEWAY_API_KEY"]
+      },
+      {
+        "family": "http-routes",
+        "command": ["bash", "scripts/run-live-promptfoo-http-evals.sh"],
+        "requiredEnvironment": [
+          "JOVIE_PROMPTFOO_BASE_URL",
+          "JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED"
+        ]
+      },
+      {
+        "family": "http-rate-limit",
+        "command": [
+          "bash",
+          "scripts/run-live-promptfoo-http-rate-limit-evals.sh"
+        ],
+        "requiredEnvironment": [
+          "JOVIE_PROMPTFOO_BASE_URL",
+          "JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED",
+          "JOVIE_PROMPTFOO_EXPECT_REDIS_DISABLED"
+        ]
+      },
+      {
+        "family": "http-model-error",
+        "command": [
+          "bash",
+          "scripts/run-live-promptfoo-http-model-error-evals.sh"
+        ],
+        "requiredEnvironment": [
+          "JOVIE_PROMPTFOO_BASE_URL",
+          "JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED"
+        ]
+      },
+      {
+        "family": "real-model-golden",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "--config=lib/eval/adversarial/vitest.config.real-eval.mts"
+        ],
+        "requiredEnvironment": ["AI_GATEWAY_API_KEY", "HELICONE_API_KEY"]
+      },
+      {
+        "family": "knowledge-accuracy",
+        "command": [
+          "pnpm",
+          "exec",
+          "vitest",
+          "run",
+          "--config=tests/eval/vitest.config.knowledge-live.mts"
+        ],
+        "requiredEnvironment": ["AI_GATEWAY_API_KEY"]
+      }
+    ],
+    "files": [
+      "tests/eval/vitest.config.knowledge-live.mts",
+      "scripts/run-live-promptfoo-evals.sh",
+      "scripts/run-live-promptfoo-http-evals.sh",
+      "scripts/run-live-promptfoo-http-rate-limit-evals.sh",
+      "scripts/run-live-promptfoo-http-model-error-evals.sh",
+      "tests/eval/golden/golden-eval-set.real.test.ts",
+      "tests/eval/knowledge-accuracy.eval.ts"
+    ]
+  }
+}

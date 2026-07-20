@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { remediateBlockedPrs } from '../../drain-pr-remediate.mjs';
 import {
   classifyGitHubRebaseFailure,
+  execFileTerminating,
+  gitIntegrationProof,
   tryGitHubRebase,
 } from '../github-update-branch.mjs';
 import {
@@ -760,6 +762,25 @@ describe('merge queue telemetry parser', () => {
 const ORIGINAL_HEAD = 'a'.repeat(40);
 const UPDATED_HEAD = 'b'.repeat(40);
 const RACING_HEAD = 'c'.repeat(40);
+const BASE_HEAD = 'd'.repeat(40);
+const MOVED_BASE_HEAD = 'e'.repeat(40);
+const POTENTIAL_MERGE_HEAD = 'f'.repeat(40);
+const EXPECTED_INTEGRATION_TREE = '1'.repeat(40);
+const RACING_TREE = '2'.repeat(40);
+const PR_BASE_HEAD = '3'.repeat(40);
+
+function fakeClock(startMs = 0) {
+  let currentMs = startMs;
+  return {
+    nowImpl: () => currentMs,
+    advance: elapsedMs => {
+      currentMs += elapsedMs;
+    },
+    sleepImpl: vi.fn(async delayMs => {
+      currentMs += delayMs;
+    }),
+  };
+}
 
 function snapshot(overrides = {}) {
   return {
@@ -767,9 +788,13 @@ function snapshot(overrides = {}) {
     state: 'OPEN',
     isDraft: false,
     baseRefName: 'main',
+    baseRefOid: PR_BASE_HEAD,
     headRefName: 'tim/jov-123-example',
     headRefOid: ORIGINAL_HEAD,
+    headRepositoryOwner: { login: 'JovieInc' },
+    isCrossRepository: false,
     mergeable: 'MERGEABLE',
+    potentialMergeCommit: { oid: POTENTIAL_MERGE_HEAD },
     ...overrides,
   };
 }
@@ -779,6 +804,16 @@ function mutationSnapshot() {
     data: {
       updatePullRequestBranch: {
         pullRequest: snapshot({ headRefOid: UPDATED_HEAD }),
+      },
+    },
+  };
+}
+
+function asynchronousMutationSnapshot() {
+  return {
+    data: {
+      updatePullRequestBranch: {
+        pullRequest: snapshot(),
       },
     },
   };
@@ -795,35 +830,240 @@ function blockedPr(overrides = {}) {
   };
 }
 
+function potentialMergeCommit(overrides = {}) {
+  return {
+    sha: POTENTIAL_MERGE_HEAD,
+    tree: { sha: EXPECTED_INTEGRATION_TREE },
+    parents: [{ sha: BASE_HEAD }, { sha: ORIGINAL_HEAD }],
+    ...overrides,
+  };
+}
+
 function ghSequence({
   before = snapshot(),
   mutation = mutationSnapshot(),
   after = snapshot({ headRefOid: UPDATED_HEAD }),
   afterSequence = null,
   mutationError = null,
+  baseRefSequence = [BASE_HEAD],
+  potentialCommit = potentialMergeCommit(),
+  alreadyIntegrated = false,
+  expectedIntegrationTreeOid = EXPECTED_INTEGRATION_TREE,
+  verificationTrees = {},
+  verificationAncestors = {},
+  prepareError = null,
+  verifyError = null,
 } = {}) {
   const calls = [];
+  const callOptions = [];
   let snapshotCalls = 0;
-  const ghJsonImpl = vi.fn(async args => {
+  let baseRefCalls = 0;
+  const ghJsonImpl = vi.fn(async (args, options = {}) => {
     calls.push(args);
+    callOptions.push(options);
     if (args[0] === 'pr' && args[1] === 'view') {
       snapshotCalls += 1;
       if (snapshotCalls === 1) return before;
-      const snapshots = afterSequence ?? [after];
+      const snapshots = afterSequence ?? [alreadyIntegrated ? before : after];
       return snapshots[Math.min(snapshotCalls - 2, snapshots.length - 1)];
     }
     if (args[0] === 'api' && args[1] === 'graphql') {
       if (mutationError) throw mutationError;
       return mutation;
     }
+    if (args[0] === 'api' && args[1].includes('/git/ref/heads/')) {
+      const sha =
+        baseRefSequence[Math.min(baseRefCalls, baseRefSequence.length - 1)];
+      baseRefCalls += 1;
+      return { object: { sha } };
+    }
+    if (
+      args[0] === 'api' &&
+      args[1].endsWith(`/git/commits/${POTENTIAL_MERGE_HEAD}`)
+    ) {
+      return potentialCommit;
+    }
     throw new Error(`unexpected gh args: ${args.join(' ')}`);
   });
-  return { calls, ghJsonImpl };
+  const integrationProofImpl = vi.fn(async input => {
+    if (input.phase === 'prepare') {
+      if (prepareError) throw prepareError;
+      if (alreadyIntegrated) {
+        return {
+          alreadyIntegrated: true,
+          headTreeOid: EXPECTED_INTEGRATION_TREE,
+        };
+      }
+      return { alreadyIntegrated: false, expectedIntegrationTreeOid };
+    }
+
+    if (verifyError) throw verifyError;
+    const headTreeOid =
+      verificationTrees[input.headRefOid] ??
+      (input.headRefOid === UPDATED_HEAD
+        ? EXPECTED_INTEGRATION_TREE
+        : RACING_TREE);
+    const baseIsAncestor = verificationAncestors[input.headRefOid] ?? true;
+    return {
+      ok: baseIsAncestor && headTreeOid === input.expectedIntegrationTreeOid,
+      baseIsAncestor,
+      headTreeOid,
+    };
+  });
+  return { calls, callOptions, ghJsonImpl, integrationProofImpl };
 }
 
 function ghError(message) {
   return Object.assign(new Error(message), { stderr: message });
 }
+
+describe('absolute update-branch subprocess deadline', () => {
+  it('passes a decreasing remaining timeout to every GitHub command', async () => {
+    const clock = fakeClock();
+    const gh = ghSequence();
+    const elapsedGhJson = vi.fn(async (args, options) => {
+      const result = await gh.ghJsonImpl(args, options);
+      clock.advance(10);
+      return result;
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: elapsedGhJson,
+      integrationProofImpl: gh.integrationProofImpl,
+      nowImpl: clock.nowImpl,
+      operationBudgetMs: 1000,
+    });
+
+    expect(result).toMatchObject({ ok: true, category: 'updated' });
+    const timeouts = gh.callOptions.map(({ timeoutMs }) => timeoutMs);
+    expect(timeouts).toHaveLength(gh.calls.length);
+    expect(timeouts.every(timeoutMs => timeoutMs > 0 && timeoutMs < 1000)).toBe(
+      true
+    );
+    expect(timeouts.at(-1)).toBeLessThan(timeouts[0]);
+    expect(clock.nowImpl()).toBe(80);
+  });
+
+  it('caps every integration-proof git command to the same absolute deadline', async () => {
+    const clock = fakeClock();
+    const calls = [];
+    const gitImpl = vi.fn(async (args, options) => {
+      calls.push({ args, atMs: clock.nowImpl(), timeoutMs: options.timeoutMs });
+      clock.advance(10);
+
+      if (args[0] === 'fetch') return '';
+      if (args[0] === 'merge-base') {
+        throw Object.assign(new Error('not an ancestor'), { code: 1 });
+      }
+      if (args[0] === 'merge-tree') return EXPECTED_INTEGRATION_TREE;
+      if (args[0] === 'rev-parse' && args[1] === `${BASE_HEAD}^{commit}`) {
+        return BASE_HEAD;
+      }
+      if (args[0] === 'rev-parse' && args[1] === `${ORIGINAL_HEAD}^{commit}`) {
+        return ORIGINAL_HEAD;
+      }
+      if (args[0] === 'rev-parse' && args[1] === `${ORIGINAL_HEAD}^{tree}`) {
+        return RACING_TREE;
+      }
+      throw new Error(`unexpected git args: ${args.join(' ')}`);
+    });
+
+    const result = await gitIntegrationProof({
+      phase: 'prepare',
+      prNumber: 123,
+      baseRefName: 'main',
+      baseRefOid: BASE_HEAD,
+      headRefOid: ORIGINAL_HEAD,
+      deadline: { deadlineAtMs: 1000, nowImpl: clock.nowImpl },
+      gitImpl,
+    });
+
+    expect(result).toMatchObject({
+      alreadyIntegrated: false,
+      expectedIntegrationTreeOid: EXPECTED_INTEGRATION_TREE,
+    });
+    expect(calls).toHaveLength(6);
+    for (const call of calls) {
+      expect(call.timeoutMs).toBeGreaterThan(0);
+      expect(call.timeoutMs).toBeLessThanOrEqual(1000 - call.atMs);
+    }
+    expect(calls.at(-1).timeoutMs).toBeLessThan(calls[0].timeoutMs);
+  });
+
+  it('SIGKILLs a timed-out child instead of abandoning it', async () => {
+    let failure;
+    try {
+      await execFileTerminating(
+        process.execPath,
+        [
+          '-e',
+          'process.stdout.write(String(process.pid)); setInterval(() => {}, 1000)',
+        ],
+        { encoding: 'utf8', timeout: 150 }
+      );
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toMatchObject({ killed: true, signal: 'SIGKILL' });
+    const childPid = Number.parseInt(failure.stdout, 10);
+    expect(Number.isInteger(childPid)).toBe(true);
+    expect(() => process.kill(childPid, 0)).toThrow();
+  });
+
+  it('returns verification_failure for a hung post-mutation command and permits the next run', async () => {
+    const gh = ghSequence({ mutation: asynchronousMutationSnapshot() });
+    let mutationReturned = false;
+    let hungTimeoutMs = null;
+    const hungGhJson = vi.fn(async (args, options) => {
+      if (args[0] === 'pr' && args[1] === 'view' && mutationReturned) {
+        hungTimeoutMs = options.timeoutMs;
+        return new Promise(() => {});
+      }
+      const result = await gh.ghJsonImpl(args, options);
+      if (args[0] === 'api' && args[1] === 'graphql') mutationReturned = true;
+      return result;
+    });
+    const startedAt = Date.now();
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: hungGhJson,
+      integrationProofImpl: gh.integrationProofImpl,
+      operationBudgetMs: 80,
+    });
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(result).toMatchObject({
+      ok: false,
+      mutationAttempted: true,
+      category: 'verification_failure',
+    });
+    expect(hungTimeoutMs).toBeGreaterThan(0);
+    expect(hungTimeoutMs).toBeLessThan(80);
+    expect(elapsedMs).toBeGreaterThanOrEqual(50);
+    expect(elapsedMs).toBeLessThan(500);
+
+    const next = ghSequence({ alreadyIntegrated: true });
+    await expect(
+      tryGitHubRebase({
+        repo: 'JovieInc/Jovie',
+        pr: blockedPr(),
+        expectedBaseRefName: null,
+        dryRun: false,
+        ghJsonImpl: next.ghJsonImpl,
+        integrationProofImpl: next.integrationProofImpl,
+      })
+    ).resolves.toMatchObject({ ok: true, category: 'no_change' });
+  });
+});
 
 describe('exact-head GitHub Update Branch rebase', () => {
   it('passes the observed head to updatePullRequestBranch with REBASE and verifies the new head', async () => {
@@ -835,6 +1075,7 @@ describe('exact-head GitHub Update Branch rebase', () => {
       expectedBaseRefName: null,
       dryRun: false,
       ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
     });
 
     expect(result).toMatchObject({
@@ -852,14 +1093,60 @@ describe('exact-head GitHub Update Branch rebase', () => {
     );
     expect(mutationArgs.join('\n')).toContain('updateMethod: REBASE');
     expect(mutationArgs).toContain(`expectedHeadOid=${ORIGINAL_HEAD}`);
+    expect(gh.integrationProofImpl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phase: 'prepare',
+        baseRefOid: BASE_HEAD,
+        headRefOid: ORIGINAL_HEAD,
+        potentialMergeCommit: expect.objectContaining({
+          oid: POTENTIAL_MERGE_HEAD,
+          treeOid: EXPECTED_INTEGRATION_TREE,
+        }),
+      })
+    );
+    expect(gh.integrationProofImpl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phase: 'verify',
+        baseRefOid: BASE_HEAD,
+        headRefOid: UPDATED_HEAD,
+        expectedIntegrationTreeOid: EXPECTED_INTEGRATION_TREE,
+      })
+    );
     expect(gh.calls.flat().join(' ')).not.toMatch(
       /repo clone|force-with-lease|git push/
     );
   });
 
-  it('polls through a stale post-mutation read until the exact updated head is visible', async () => {
+  it('returns authoritative no change before mutation when exact base is already an ancestor', async () => {
+    const gh = ghSequence({ alreadyIntegrated: true });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      updated: false,
+      mutationAttempted: false,
+      mutationApplied: false,
+      category: 'no_change',
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: ORIGINAL_HEAD,
+    });
+    expect(
+      gh.calls.some(args => args.join('\n').includes('updatePullRequestBranch'))
+    ).toBe(false);
+  });
+
+  it('accepts an async head only after exact base ancestry and integration-tree proof', async () => {
     const sleepImpl = vi.fn(async () => {});
     const gh = ghSequence({
+      mutation: asynchronousMutationSnapshot(),
       afterSequence: [snapshot(), snapshot({ headRefOid: UPDATED_HEAD })],
     });
 
@@ -869,12 +1156,16 @@ describe('exact-head GitHub Update Branch rebase', () => {
       expectedBaseRefName: null,
       dryRun: false,
       ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
       sleepImpl,
     });
 
     expect(result).toMatchObject({
       ok: true,
       updated: true,
+      mutationAttempted: true,
+      mutationApplied: true,
+      conflict: false,
       expectedHeadOid: ORIGINAL_HEAD,
       observedHeadOid: UPDATED_HEAD,
     });
@@ -882,9 +1173,12 @@ describe('exact-head GitHub Update Branch rebase', () => {
     expect(sleepImpl).toHaveBeenCalledWith(250);
   });
 
-  it('fails closed when the updated head never becomes visible', async () => {
+  it('rejects a same-viewer concurrent push with a different integration tree', async () => {
     const sleepImpl = vi.fn(async () => {});
-    const gh = ghSequence({ afterSequence: [snapshot()] });
+    const gh = ghSequence({
+      mutation: asynchronousMutationSnapshot(),
+      afterSequence: [snapshot(), snapshot({ headRefOid: RACING_HEAD })],
+    });
 
     const result = await tryGitHubRebase({
       repo: 'JovieInc/Jovie',
@@ -892,24 +1186,248 @@ describe('exact-head GitHub Update Branch rebase', () => {
       expectedBaseRefName: null,
       dryRun: false,
       ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
       sleepImpl,
     });
 
     expect(result).toMatchObject({
       ok: false,
       mutationAttempted: true,
+      mutationApplied: false,
+      conflict: false,
+      category: 'verification_failure',
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: RACING_HEAD,
+    });
+    expect(result.reason).toContain('integration-tree proof');
+    expect(sleepImpl).toHaveBeenCalledOnce();
+    expect(sleepImpl).toHaveBeenCalledWith(250);
+  });
+
+  it('rejects an expected tree when the exact base is not an ancestor', async () => {
+    const gh = ghSequence({
+      mutation: asynchronousMutationSnapshot(),
+      after: snapshot({ headRefOid: UPDATED_HEAD }),
+      verificationAncestors: { [UPDATED_HEAD]: false },
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      category: 'verification_failure',
+      observedHeadOid: UPDATED_HEAD,
+    });
+    expect(result.reason).toContain('base-ancestry');
+  });
+
+  it('accepts a same-viewer equivalent-tree race as semantically harmless', async () => {
+    const sleepImpl = vi.fn(async () => {});
+    const gh = ghSequence({
+      mutation: asynchronousMutationSnapshot(),
+      afterSequence: [snapshot({ headRefOid: RACING_HEAD })],
+      verificationTrees: { [RACING_HEAD]: EXPECTED_INTEGRATION_TREE },
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
+      sleepImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      updated: true,
+      mutationAttempted: true,
       mutationApplied: true,
+      conflict: false,
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: RACING_HEAD,
+    });
+    expect(sleepImpl).not.toHaveBeenCalled();
+  });
+
+  it('accepts a semantically proven completion near the 30-second deadline', async () => {
+    const clock = fakeClock();
+    const gh = ghSequence({
+      mutation: asynchronousMutationSnapshot(),
+      afterSequence: [
+        snapshot(),
+        snapshot(),
+        snapshot(),
+        snapshot(),
+        snapshot(),
+        snapshot(),
+        snapshot(),
+        snapshot({ headRefOid: UPDATED_HEAD }),
+      ],
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
+      sleepImpl: clock.sleepImpl,
+      nowImpl: clock.nowImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      updated: true,
+      mutationAttempted: true,
+      mutationApplied: true,
+      conflict: false,
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: UPDATED_HEAD,
+    });
+    expect(clock.sleepImpl.mock.calls.map(([delayMs]) => delayMs)).toEqual([
+      250, 500, 1000, 2000, 4000, 8000, 14000,
+    ]);
+    expect(clock.nowImpl()).toBe(29_750);
+  });
+
+  it('fails beyond the deadline, then a later retry preflight-proves no change', async () => {
+    const clock = fakeClock();
+    const gh = ghSequence({
+      mutation: asynchronousMutationSnapshot(),
+      afterSequence: [snapshot()],
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
+      sleepImpl: clock.sleepImpl,
+      nowImpl: clock.nowImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      mutationAttempted: true,
+      mutationApplied: false,
       conflict: false,
       category: 'verification_failure',
       expectedHeadOid: ORIGINAL_HEAD,
       observedHeadOid: ORIGINAL_HEAD,
     });
-    expect(sleepImpl.mock.calls.map(([delayMs]) => delayMs)).toEqual([
-      250, 500, 1000, 2000,
+    expect(clock.sleepImpl.mock.calls.map(([delayMs]) => delayMs)).toEqual([
+      250, 500, 1000, 2000, 4000, 8000, 14000, 250,
     ]);
+    expect(clock.nowImpl()).toBe(30_000);
+
+    const retry = ghSequence({ alreadyIntegrated: true });
+    const retried = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: retry.ghJsonImpl,
+      integrationProofImpl: retry.integrationProofImpl,
+    });
+    expect(retried).toMatchObject({
+      ok: true,
+      updated: false,
+      mutationAttempted: false,
+      category: 'no_change',
+    });
   });
 
-  it('treats a concurrent head update as stale, never as a conflict', async () => {
+  it('fails closed when the exact base moves during the mutation', async () => {
+    const gh = ghSequence({
+      after: snapshot({ headRefOid: UPDATED_HEAD }),
+      baseRefSequence: [BASE_HEAD, MOVED_BASE_HEAD],
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      conflict: false,
+      category: 'verification_failure',
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: UPDATED_HEAD,
+    });
+    expect(gh.integrationProofImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-reads the exact head after semantic proof and rejects a lost race', async () => {
+    const gh = ghSequence({
+      afterSequence: [
+        snapshot({ headRefOid: UPDATED_HEAD }),
+        snapshot({ headRefOid: RACING_HEAD }),
+      ],
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      mutationAttempted: true,
+      category: 'verification_failure',
+      observedHeadOid: RACING_HEAD,
+    });
+  });
+
+  it('refuses fork refs before any mutation or integration fetch', async () => {
+    const gh = ghSequence({
+      before: snapshot({
+        isCrossRepository: true,
+        headRepositoryOwner: { login: 'fork-owner' },
+      }),
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      mutationAttempted: false,
+      category: 'stale_pr',
+    });
+    expect(gh.integrationProofImpl).not.toHaveBeenCalled();
+    expect(
+      gh.calls.some(args => args.join('\n').includes('updatePullRequestBranch'))
+    ).toBe(false);
+  });
+
+  it('treats an expected-head mutation error as stale, never as a conflict', async () => {
     const gh = ghSequence({
       mutationError: ghError('GraphQL: head branch was modified'),
       after: snapshot({ headRefOid: UPDATED_HEAD }),
@@ -921,6 +1439,7 @@ describe('exact-head GitHub Update Branch rebase', () => {
       expectedBaseRefName: null,
       dryRun: false,
       ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
     });
 
     expect(result).toMatchObject({
@@ -945,6 +1464,7 @@ describe('exact-head GitHub Update Branch rebase', () => {
       expectedBaseRefName: null,
       dryRun: false,
       ghJsonImpl: gh.ghJsonImpl,
+      integrationProofImpl: gh.integrationProofImpl,
     });
 
     expect(result).toMatchObject({
@@ -987,10 +1507,9 @@ describe('exact-head GitHub Update Branch rebase', () => {
         after: snapshot(),
       })
     ).toMatchObject({
-      ok: true,
-      updated: false,
+      ok: false,
       conflict: false,
-      category: 'no_change',
+      category: 'api_failure',
     });
   });
 });
@@ -1106,11 +1625,11 @@ describe('remediation mutations', () => {
       rebaseImpl: async () => ({
         ok: true,
         updated: false,
-        mutationAttempted: true,
+        mutationAttempted: false,
         mutationApplied: false,
         conflict: false,
         category: 'no_change',
-        reason: 'GitHub reports the pull request branch is already current',
+        reason: `exact base ${BASE_HEAD.slice(0, 12)} is already an ancestor of the PR head`,
       }),
       labelPrImpl,
       removeLabelPrImpl,
