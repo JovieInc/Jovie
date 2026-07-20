@@ -855,6 +855,18 @@ export {
   productUpdateSubscribers,
   selectProductUpdateSubscriberSchema,
 } from './product-update-subscribers';
+// Provider-neutral artist search monitoring and issue evidence
+export {
+  type ProfileSearchQuery,
+  type ProfileSearchResult,
+  type ProfileSearchRun,
+  type ProfileSurfaceIssue,
+  profileSearchProviderHealth,
+  profileSearchQueries,
+  profileSearchResults,
+  profileSearchRuns,
+  profileSurfaceIssues,
+} from './profile-search';
 // Unified public profile surface registry
 export {
   insertProfileSurfaceSchema,
