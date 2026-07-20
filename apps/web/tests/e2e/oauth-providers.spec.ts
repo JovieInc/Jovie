@@ -1,133 +1,172 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import expected from '@/lib/auth/oauth-redirect-uris.expected.json';
+import {
+  assertExactNavigationUrl,
+  primeAuthorizedVercelAliasBypass,
+  requireExactNavigationOrigin,
+} from '../helpers/vercel-preview';
 
 /**
- * OAuth provider redirect-URI probe (@production-smoke).
+ * Candidate-bound Better Auth OAuth runtime proof (@production-smoke).
  *
- * Catches the 2026-06-26 incident class: production Google/Apple sign-in
- * died with `Error 400: redirect_uri_mismatch` because the console
- * registrations drifted from the OAuth redirect_uri the app hands them.
- * No existing test caught it: auth-public-ready.spec.ts only asserts the
- * SSO buttons RENDER — it never follows the redirect to Google/Apple.
- *
- * This probe does NOT click the in-app button (that couples to Better
- * Auth handler readiness and invisible bot-protection). Instead it hits
- * the Google + Apple authorize endpoints directly with the EXACT
- * redirect_uri Better Auth hands them —
- * `https://<appHost>/api/auth/callback/<provider>` — and asserts the
- * provider ACCEPTS it (shows its sign-in / consent screen) rather than
- * the redirect_uri_mismatch error page. Deterministic, needs no
- * credentials, and tests the precise contract the consoles must satisfy.
- *
- * Source of truth for the URIs: apps/web/lib/auth/oauth-redirect-uris.expected.json
- * (kept honest by scripts/auth-redirect-uris.ts +
- * redirect-uri-snapshot.test.ts + /auth-console-sync skill).
- *
- * Plan Phase 11 (Clerk → Better Auth migration): the callback changed from
- * Clerk's `https://<fapi-host>/v1/oauth_callback` to Better Auth's
- * `https://<appHost>/api/auth/callback/<provider>`. Plus a new hard probe
- * `GET /api/auth/ok` (ci.yml production-oauth-gate +
- * canary-health-gate.yml) covers the handler-reachable case.
+ * The test starts from the deployed `/signin` UI, clicks each stable provider
+ * button, observes the real same-origin Better Auth catch-all POST, and aborts
+ * the first provider navigation before credentials or provider UI are loaded.
+ * This proves the running generation constructed the provider URL; static
+ * callback configuration and `/api/auth/ok` cannot substitute for this path.
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-// redirect_uri_mismatch surfaces differently per provider; match all the shapes.
-const GOOGLE_REJECT =
-  /redirect_uri_mismatch|Access blocked|request is invalid|Error 400/i;
-const APPLE_REJECT =
-  /invalid_request|invalid_redirect_uri|invalid web redirect|your request could not be completed/i;
+const CONFIRMED_RUNTIME_CONTRACT = 'CONFIRMED_OAUTH_RUNTIME_CONTRACT';
+const ALLOWED_ORIGINS = new Set(['https://jov.ie', 'https://staging.jov.ie']);
 
-/**
- * Pick the OAuth callback URI that matches the deployment under test.
- * Probing jov.ie must test jov.ie's callback; staging.jov.ie must test
- * staging.jov.ie's callback, because the two run different app hosts
- * registered against the same Google OAuth client + Apple Service ID.
- */
-function callbackForBaseUrl(provider: 'google' | 'apple'): string {
-  const base = process.env.BASE_URL ?? 'https://jov.ie';
-  const instance = /staging\./i.test(base) ? 'staging' : 'prod';
-  const appHost = expected.instances[instance].appHost;
-  return `https://${appHost}/api/auth/callback/${provider}`;
+const PROVIDERS = [
+  {
+    provider: 'google',
+    host: 'accounts.google.com',
+    registeredRedirects: expected.google.requiredRedirectUris,
+  },
+  {
+    provider: 'apple',
+    host: 'appleid.apple.com',
+    registeredRedirects: expected.apple.requiredReturnUrls,
+  },
+] as const;
+
+function runtimeOrigin(): string {
+  const origin = requireExactNavigationOrigin(process.env.BASE_URL);
+  if (!ALLOWED_ORIGINS.has(origin)) {
+    throw new Error(
+      'OAuth runtime proof must target exactly staging.jov.ie or jov.ie.'
+    );
+  }
+  return origin;
 }
 
-test.describe('OAuth provider redirect URIs @production-smoke', () => {
+async function primeCandidateBoundOrigin(page: Page, origin: string) {
+  if (origin !== 'https://staging.jov.ie') return;
+  await primeAuthorizedVercelAliasBypass(page.context(), origin);
+}
+
+test.describe('candidate-bound Better Auth OAuth runtime @production-smoke', () => {
   test.setTimeout(60_000);
 
-  test('Google accepts the Better Auth redirect_uri (no redirect_uri_mismatch)', async ({
-    page,
-  }) => {
-    const redirectUri = callbackForBaseUrl('google');
-    // Only probe Google if this redirect_uri is in the required set for the env.
-    test.skip(
-      !expected.google.requiredRedirectUris.includes(redirectUri),
-      `Google not expected to allow ${redirectUri}`
-    );
+  for (const contract of PROVIDERS) {
+    test(`${contract.provider} UI starts the exact Better Auth provider redirect`, async ({
+      page,
+    }) => {
+      const origin = runtimeOrigin();
+      const expectedRedirectUri = `${origin}/api/auth/callback/${contract.provider}`;
+      expect(
+        contract.registeredRedirects,
+        `${CONFIRMED_RUNTIME_CONTRACT}: ${contract.provider} callback is absent from the provider-console contract`
+      ).toContain(expectedRedirectUri);
 
-    const authorize = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    authorize.searchParams.set('client_id', expected.google.clientId);
-    authorize.searchParams.set('redirect_uri', redirectUri);
-    authorize.searchParams.set('response_type', 'code');
-    authorize.searchParams.set('scope', 'openid email profile');
-    authorize.searchParams.set('state', 'oauth-redirect-probe');
-
-    await page.goto(authorize.toString(), { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle').catch(() => {});
-
-    const body = await page.locator('body').innerText();
-    // HARD GATE (drives the post-promote auto-rollback): fail ONLY on a real
-    // provider rejection of our redirect_uri, never on an inconclusive page.
-    expect(
-      body,
-      `Google rejected redirect_uri ${redirectUri} — it is NOT registered in OAuth client ${expected.google.clientId}. Re-run /auth-console-sync.`
-    ).not.toMatch(GOOGLE_REJECT);
-
-    // Soft signal: Google should show its sign-in surface for "Jovie". A CI
-    // datacenter IP can get a "couldn't sign you in / browser not secure" page;
-    // that is NOT a redirect_uri_mismatch, so we warn instead of failing (a
-    // spurious failure here would auto-roll-back a healthy production deploy).
-    if (!/jovie|sign in|choose an account|email/i.test(body)) {
-      test.info().annotations.push({
-        type: 'warning',
-        description: `Google reached without redirect_uri_mismatch but no recognizable sign-in surface (likely datacenter-IP gating). Body: ${body.slice(0, 200)}`,
+      await primeCandidateBoundOrigin(page, origin);
+      await page.goto(`${origin}/signin`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30_000,
       });
-    }
-  });
+      assertExactNavigationUrl(
+        page.url(),
+        origin,
+        `${contract.provider} OAuth UI entry`
+      );
 
-  test('Apple accepts the Better Auth return URL (no invalid_request)', async ({
-    page,
-  }) => {
-    const redirectUri = callbackForBaseUrl('apple');
-    // Apple Sign In is only enabled on prod (staging Apple is off).
-    test.skip(
-      !expected.apple.requiredReturnUrls.includes(redirectUri),
-      `Apple not expected to allow ${redirectUri}`
-    );
+      const button = page.locator(
+        `button[data-auth-provider-slot="${contract.provider}"]`
+      );
+      await expect(
+        button,
+        `${CONFIRMED_RUNTIME_CONTRACT}: ${contract.provider} provider button is not rendered`
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(
+        button,
+        `${CONFIRMED_RUNTIME_CONTRACT}: ${contract.provider} provider button is disabled`
+      ).toBeEnabled();
 
-    const authorize = new URL('https://appleid.apple.com/auth/authorize');
-    authorize.searchParams.set('client_id', expected.apple.serviceId);
-    authorize.searchParams.set('redirect_uri', redirectUri);
-    authorize.searchParams.set('response_type', 'code');
-    authorize.searchParams.set('scope', 'name email');
-    authorize.searchParams.set('response_mode', 'form_post');
-    authorize.searchParams.set('state', 'oauth-redirect-probe');
-
-    await page.goto(authorize.toString(), { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle').catch(() => {});
-
-    const body = await page.locator('body').innerText();
-    // HARD GATE: fail ONLY on a real Apple rejection of our return URL.
-    expect(
-      body,
-      `Apple rejected return URL ${redirectUri} — it is NOT registered on Service ID ${expected.apple.serviceId}. Re-run /auth-console-sync.`
-    ).not.toMatch(APPLE_REJECT);
-
-    // Soft signal: Apple should show its sign-in surface.
-    if (!/apple|sign in|continue/i.test(body)) {
-      test.info().annotations.push({
-        type: 'warning',
-        description: `Apple reached without an invalid_request error but no recognizable sign-in surface. Body: ${body.slice(0, 200)}`,
+      let navigationTimer: ReturnType<typeof setTimeout> | undefined;
+      let resolveProviderNavigation: (url: URL) => void = () => {};
+      let rejectProviderNavigation: (error: Error) => void = () => {};
+      let capturedProviderNavigation = false;
+      const providerNavigation = new Promise<URL>((resolve, reject) => {
+        resolveProviderNavigation = resolve;
+        rejectProviderNavigation = reject;
+        navigationTimer = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `${CONFIRMED_RUNTIME_CONTRACT}: ${contract.provider} provider navigation was not emitted`
+              )
+            ),
+          20_000
+        );
       });
-    }
-  });
+
+      await page.route(`https://${contract.host}/**`, async route => {
+        const request = route.request();
+        if (!request.isNavigationRequest()) {
+          await route.continue();
+          return;
+        }
+        if (!capturedProviderNavigation) {
+          capturedProviderNavigation = true;
+          try {
+            resolveProviderNavigation(new URL(request.url()));
+          } catch {
+            rejectProviderNavigation(
+              new Error(
+                `${CONFIRMED_RUNTIME_CONTRACT}: ${contract.provider} emitted a malformed provider URL`
+              )
+            );
+          }
+        }
+        await route.abort('aborted');
+      });
+
+      const socialPost = page.waitForRequest(
+        request => {
+          const url = new URL(request.url());
+          return (
+            request.method() === 'POST' &&
+            url.origin === origin &&
+            url.pathname === '/api/auth/sign-in/social'
+          );
+        },
+        { timeout: 20_000 }
+      );
+
+      try {
+        await button.click({ noWaitAfter: true });
+        const [request, providerUrl] = await Promise.all([
+          socialPost,
+          providerNavigation,
+        ]);
+        const requestUrl = new URL(request.url());
+        expect(
+          requestUrl.search,
+          `${CONFIRMED_RUNTIME_CONTRACT}: Better Auth social POST must use the exact catch-all route`
+        ).toBe('');
+        expect(
+          request.postDataJSON(),
+          `${CONFIRMED_RUNTIME_CONTRACT}: Better Auth social POST used the wrong provider`
+        ).toEqual(expect.objectContaining({ provider: contract.provider }));
+        expect(
+          providerUrl.protocol,
+          `${CONFIRMED_RUNTIME_CONTRACT}: ${contract.provider} navigation must use HTTPS`
+        ).toBe('https:');
+        expect(
+          providerUrl.hostname,
+          `${CONFIRMED_RUNTIME_CONTRACT}: ${contract.provider} navigation used the wrong provider host`
+        ).toBe(contract.host);
+        expect(
+          providerUrl.searchParams.get('redirect_uri'),
+          `${CONFIRMED_RUNTIME_CONTRACT}: ${contract.provider} runtime redirect_uri drifted`
+        ).toBe(expectedRedirectUri);
+      } finally {
+        if (navigationTimer) clearTimeout(navigationTimer);
+      }
+    });
+  }
 });

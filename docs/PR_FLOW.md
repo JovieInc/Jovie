@@ -115,6 +115,30 @@ dequeued through the native API and then have their audit label removed.
 Pending, queued, and cancelled check runs are not terminal failures, preventing
 dequeue/re-enroll loops during ordinary CI cancellation or main movement.
 
+### Update Branch control-plane safety
+
+GitHub Update Branch is asynchronous: the branch Git ref can advance before the
+PR database, timeline, webhook payload, or Actions event base catches up. Treat
+each plane as separate evidence, never as a reason to repeat the mutation.
+
+- Accept an API rebase only after proving its exact live-base/head ancestry and
+  semantic tree; a successful response alone is not proof.
+- The controller gets one absolute timeout. Every `gh`/`git` child receives only
+  the remaining budget and is killed and reaped before the mutex is released.
+- If the semantic rebase is proven but stale PR metadata prevents checks from
+  materializing, create exactly one signed empty direct child with the identical
+  tree and ordinary fast-forward push it. Do not force-push or retry Update
+  Branch. Require the Git ref, REST, GraphQL, and Actions source SHA to converge
+  on that exact child before continuing.
+- A diff secret scan uses the immutable event merge's first parent as its base,
+  never the stale payload base or a later live tip. Require exactly ordered
+  merge-base/source parents, payload-base ancestry into parent1, parent1 ancestry
+  into the current base ref, an exact `merge-tree` reconstruction equal to the
+  event tree, and TOCTOU rechecks of source and base refs. A behind/diverged
+  source is valid. Checked-in built-in merge attributes are supported;
+  server-only merge drivers or renormalization differences are a fail-closed
+  compatibility boundary, never an acceptance fallback.
+
 ## 4. Taste: advisory, not a gate
 
 - Taste-touching changes (design / UX / copy) get classified as `taste-required`

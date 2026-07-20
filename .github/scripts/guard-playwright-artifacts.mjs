@@ -36,7 +36,7 @@ const EXACT_PUBLIC_IDENTIFIERS = new Set([
 ]);
 const CONNECTION = /(?:^|_)CONNECTION(?:$|_(?:STRING|URL)(?:_|$))/;
 const E2E_IDENTITY =
-  /^(?:E2E_PROD_(?:USER_EMAIL|SIGNUP_EMAIL_BASE)|E2E_CLERK_(?:USER_USERNAME|ADMIN_USERNAME)|E2E_ADMIN_CLERK_USER_USERNAME)$/;
+  /^(?:E2E_PROD_(?:USER_EMAIL|USER_CODE|SIGNUP_EMAIL_BASE)|E2E_CLERK_(?:USER_USERNAME|ADMIN_USERNAME)|E2E_ADMIN_CLERK_USER_USERNAME)$/;
 const TOKEN = /(?:^|_)TOKEN(?:_|$)/;
 const TOKEN_METRIC =
   /(?:^|_)TOKEN_(?:BUDGET|COUNT|COUNTS|ESTIMATE|LIMIT|TOTAL|USAGE|USED)(?:_|$)/;
@@ -679,10 +679,86 @@ function report(findings) {
   );
 }
 
+function maskValues(values) {
+  for (const value of values) {
+    const escaped = value
+      .replaceAll('%', '%25')
+      .replaceAll('\r', '%0D')
+      .replaceAll('\n', '%0A');
+    writeSync(process.stdout.fd, '::add-mask::' + escaped + '\n');
+  }
+}
+
+export function readDynamicSecretReceipt(
+  path = process.env.PLAYWRIGHT_DYNAMIC_SECRETS_FILE,
+  { required = true } = {}
+) {
+  if (!path) return [];
+  const receipt = resolveDynamicSecretReceipt(path);
+  const stat = lstatSync(receipt, { bigint: true, throwIfNoEntry: false });
+  if (!stat) {
+    if (required) throw new Error('dynamic secret receipt missing');
+    return [];
+  }
+  if (
+    stat.isSymbolicLink() ||
+    !stat.isFile() ||
+    Number(stat.mode & 0o777n) !== 0o600 ||
+    realpathSync(receipt) !== receipt
+  )
+    throw new Error('invalid dynamic secret receipt');
+  const fd = openSync(receipt, constants.O_RDONLY | constants.O_NOFOLLOW);
+  let contents;
+  try {
+    const before = fstatSync(fd, { bigint: true });
+    if (!before.isFile() || statKey(before) !== statKey(stat))
+      throw new Error('dynamic secret receipt changed before reading');
+    contents = readFileSync(fd, 'utf8');
+    const after = fstatSync(fd, { bigint: true });
+    if (statKey(before) !== statKey(after))
+      throw new Error('dynamic secret receipt changed while reading');
+  } finally {
+    closeSync(fd);
+  }
+  const values = [...new Set(contents.split(/\r?\n/))]
+    .map(value => value.trim())
+    .filter(Boolean);
+  if (
+    values.length === 0 ||
+    values.some(value => value.length < 4 || /[\r\n]/.test(value))
+  )
+    throw new Error('invalid dynamic secret value');
+  return values;
+}
+
+function resolveDynamicSecretReceipt(path) {
+  const runnerTemp = canonicalRoot(process.env.RUNNER_TEMP);
+  const receipt = resolve(path);
+  if (!isInside(runnerTemp, receipt) || dirname(receipt) !== runnerTemp)
+    throw new Error('dynamic secret receipt outside runner temp');
+  return receipt;
+}
+
+export function withDynamicSecretValues(environment, values) {
+  return Object.fromEntries([
+    ...Object.entries(environment),
+    ...values.map((value, index) => [
+      `PLAYWRIGHT_DYNAMIC_COOKIE_SECRET_${index}`,
+      value,
+    ]),
+  ]);
+}
+
 function runProducer(command) {
   let root;
   let childStatus = 0;
+  let dynamicReceipt;
   try {
+    if (process.env.PLAYWRIGHT_DYNAMIC_SECRETS_FILE) {
+      dynamicReceipt = resolveDynamicSecretReceipt(
+        process.env.PLAYWRIGHT_DYNAMIC_SECRETS_FILE
+      );
+    }
     root = producerRoot();
     const pending = resolve(root, 'pending');
     if (pathExists(resolve(root, 'blocked')) || pathExists(pending)) {
@@ -693,20 +769,19 @@ function runProducer(command) {
     writeFileSync(pending, binding(), { flag: 'wx', mode: 0o400 });
     if (hasShortCredentialValue(process.env))
       throw new Error('credential value is too short to mask safely');
-    for (const value of secretValues(process.env)) {
-      const escaped = value
-        .replaceAll('%', '%25')
-        .replaceAll('\r', '%0D')
-        .replaceAll('\n', '%0A');
-      writeSync(process.stdout.fd, '::add-mask::' + escaped + '\n');
-    }
+    maskValues(secretValues(process.env));
     const child = spawnSync(command[0], command.slice(1), {
       env: process.env,
       stdio: 'inherit',
     });
     childStatus = child.status ?? 1;
+    const dynamicValues = readDynamicSecretReceipt(undefined, {
+      required: childStatus === 0,
+    });
+    maskValues(dynamicValues);
+    const scanEnvironment = withDynamicSecretValues(process.env, dynamicValues);
     const configured = configuredPaths();
-    const result = inspect(configured, process.env, {
+    const result = inspect(configured, scanEnvironment, {
       ...options(),
       allowEmptyPaths: !(process.env.PLAYWRIGHT_ARTIFACT_PATHS ?? '').trim(),
       omitImages: true,
@@ -731,6 +806,8 @@ function runProducer(command) {
     if (root) poison(root);
     report([{ category: 'inspection-error' }]);
     return childStatus || 1;
+  } finally {
+    if (dynamicReceipt) rmSync(dynamicReceipt, { force: true });
   }
 }
 

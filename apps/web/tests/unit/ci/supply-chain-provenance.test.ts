@@ -58,50 +58,101 @@ function getJobBlock(workflow: string, jobKey: string): string {
 }
 
 describe('supply chain provenance guardrails', () => {
-  it('attests deploy-staging build output with SLSA provenance after vercel build', () => {
+  it('isolates staging provenance attestation and gates release mutation on its digest', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const deployJob = getJobBlock(workflow, 'deploy-staging');
+    const attestationJob = getJobBlock(workflow, 'attest-staging-build');
+    const stagingHeadJob = getJobBlock(workflow, 'staging-head');
+    const aliasJob = getJobBlock(workflow, 'alias-staging');
+    const promoteJob = getJobBlock(workflow, 'promote-production');
     const buildStep = getStepBlock(
-      workflow,
+      deployJob,
       'Build (preview target for staging verification)'
     );
-    const packageStep = getStepBlock(
-      workflow,
-      'Package build output for provenance attestation'
+    const hashStep = getStepBlock(
+      deployJob,
+      'Hash fixed staging build subject for isolated attestation'
     );
-    const attestStep = getStepBlock(
-      workflow,
-      'Attest build provenance (SLSA Level 2)'
+    const validateSubjectStep = getStepBlock(
+      attestationJob,
+      'Validate exact attestation subject'
     );
+    const attestStep = getStepBlock(attestationJob, 'Attest build provenance');
     const deployStep = getStepBlock(
-      workflow,
+      deployJob,
       'Deploy (staging preview, prebuilt)'
     );
 
-    expect(deployJob).toContain('attestations: write');
-    expect(deployJob).toContain('id-token: write');
+    expect(deployJob).toContain(
+      'attestation_subject_name: ${{ steps.build-subject.outputs.subject_name }}'
+    );
+    expect(deployJob).toContain(
+      'attestation_subject_digest: ${{ steps.build-subject.outputs.subject_digest }}'
+    );
+    expect(deployJob).not.toContain('attestations: write');
+    expect(deployJob).not.toContain('id-token: write');
 
-    const buildIndex = workflow.indexOf(
+    const buildIndex = deployJob.indexOf(
       '- name: Build (preview target for staging verification)'
     );
-    const packageIndex = workflow.indexOf(
-      '- name: Package build output for provenance attestation'
+    const hashIndex = deployJob.indexOf(
+      '- name: Hash fixed staging build subject for isolated attestation'
     );
-    const attestIndex = workflow.indexOf(
-      '- name: Attest build provenance (SLSA Level 2)'
-    );
-    const deployIndex = workflow.indexOf(
+    const deployIndex = deployJob.indexOf(
       '- name: Deploy (staging preview, prebuilt)'
+    );
+    const validateSubjectIndex = attestationJob.indexOf(
+      '- name: Validate exact attestation subject'
+    );
+    const attestIndex = attestationJob.indexOf(
+      '- name: Attest build provenance'
     );
 
     expect(buildIndex).toBeGreaterThanOrEqual(0);
-    expect(packageIndex).toBeGreaterThan(buildIndex);
-    expect(attestIndex).toBeGreaterThan(packageIndex);
-    expect(deployIndex).toBeGreaterThan(attestIndex);
+    expect(hashIndex).toBeGreaterThan(buildIndex);
+    expect(deployIndex).toBeGreaterThan(hashIndex);
+    expect(validateSubjectIndex).toBeGreaterThanOrEqual(0);
+    expect(attestIndex).toBeGreaterThan(validateSubjectIndex);
 
     expect(buildStep).toContain('vercel build');
-    expect(packageStep).toContain('tar -czf /tmp/vercel-build-output.tar.gz');
-    expect(packageStep).toContain('.vercel/output');
+    expect(hashStep).toContain(
+      "subject_name='jovie-vercel-staging-build-output.tgz'"
+    );
+    expect(hashStep).toContain('subject_path="$RUNNER_TEMP/$subject_name"');
+    expect(hashStep).toContain('tar -czf "$subject_path" -C . .vercel/output');
+    expect(hashStep).toContain('digest="$(sha256sum "$subject_path"');
+    expect(hashStep).toContain('[[ "$digest" =~ ^[0-9a-f]{64}$ ]]');
+    expect(hashStep).toContain('echo "subject_digest=sha256:$digest"');
+    expect(hashStep).not.toContain('/tmp/vercel-build-output.tar.gz');
+    expect(deployStep).toContain('vercel-prebuilt-deploy.sh');
+
+    expect(attestationJob).toContain('needs: [deploy-staging]');
+    expect(attestationJob).toContain(
+      'permissions:\n      contents: read\n      attestations: write\n      id-token: write'
+    );
+    const writePermissions = [
+      ...attestationJob.matchAll(/^\s+([a-z-]+): write$/gm),
+    ].map(match => match[1]);
+    expect(writePermissions).toEqual(['attestations', 'id-token']);
+    expect(attestationJob).not.toContain('write-all');
+    expect(attestationJob).not.toContain('actions/checkout@');
+    expect(attestationJob).not.toContain('setup-doppler');
+    expect(attestationJob).not.toMatch(/\$\{\{\s*secrets(?:\.|\[)/);
+    expect(attestationJob).not.toMatch(/^\s+secrets:/m);
+    expect(attestationJob).not.toContain('DOPPLER_');
+
+    expect(validateSubjectStep).toContain(
+      'SUBJECT_NAME: ${{ needs.deploy-staging.outputs.attestation_subject_name }}'
+    );
+    expect(validateSubjectStep).toContain(
+      'SUBJECT_DIGEST: ${{ needs.deploy-staging.outputs.attestation_subject_digest }}'
+    );
+    expect(validateSubjectStep).toContain(
+      '[ "$SUBJECT_NAME" = \'jovie-vercel-staging-build-output.tgz\' ]'
+    );
+    expect(validateSubjectStep).toContain(
+      '[[ "$SUBJECT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]'
+    );
     // Assert the action is pinned to a full 40-char commit SHA (the security
     // property this guardrail protects) without hardcoding a specific SHA, so
     // dependabot pin bumps don't deterministically redden the merge gate (#12425).
@@ -109,9 +160,30 @@ describe('supply chain provenance guardrails', () => {
       /^\s*uses: actions\/attest-build-provenance@[0-9a-f]{40}(?:\s+#.*)?\s*$/m
     );
     expect(attestStep).toContain(
-      'subject-path: /tmp/vercel-build-output.tar.gz'
+      'subject-name: ${{ steps.subject.outputs.subject_name }}'
     );
-    expect(deployStep).toContain('vercel-prebuilt-deploy.sh');
+    expect(attestStep).toContain(
+      'subject-digest: ${{ steps.subject.outputs.subject_digest }}'
+    );
+    expect(attestStep).not.toContain('subject-path:');
+
+    // Canary and attestation run in parallel, then staging-head joins both
+    // before any shared alias or production mutation can proceed.
+    expect(stagingHeadJob).toContain(
+      'needs: [deploy-staging, attest-staging-build, canary-health-gate]'
+    );
+    expect(stagingHeadJob).toContain(
+      "needs.attest-staging-build.result == 'success'"
+    );
+    expect(aliasJob).toContain(
+      'needs: [deploy-staging, canary-health-gate, staging-head]'
+    );
+    expect(promoteJob).toContain(
+      'needs: [deploy-staging, attest-staging-build, canary-health-gate, alias-staging, production-head]'
+    );
+    expect(promoteJob).toContain(
+      "needs.attest-staging-build.result == 'success'"
+    );
   });
 
   it('audits main commit signatures on every push via security workflow', () => {

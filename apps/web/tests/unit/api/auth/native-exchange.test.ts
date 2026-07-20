@@ -120,7 +120,10 @@ function setupIosSessionCreation(
     token: sessionToken,
     id: sessionId,
   });
-  mockVerifyOneTimeToken.mockResolvedValue({ userId: 'user_ba_123' });
+  mockVerifyOneTimeToken.mockResolvedValue({
+    user: { id: 'user_ba_123' },
+    session: { userId: 'user_ba_123' },
+  });
 }
 
 describe('native auth exchange route (Better Auth)', () => {
@@ -133,8 +136,9 @@ describe('native auth exchange route (Better Auth)', () => {
     setupSuccessfulExchange();
     setupIosSessionCreation();
 
+    const request = createExchangeRequest('ios');
     const { POST } = await import('@/app/api/auth/native/exchange/route');
-    const response = await POST(createExchangeRequest('ios'));
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -144,6 +148,8 @@ describe('native auth exchange route (Better Auth)', () => {
     expect(data.returnTo).toBe('/app');
     expect(mockVerifyOneTimeToken).toHaveBeenCalledWith({
       body: { token: 'ott_123' },
+      request,
+      asResponse: false,
     });
     expect(mockInternalAdapterCreateSession).toHaveBeenCalledWith(
       'user_ba_123'
