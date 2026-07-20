@@ -3,6 +3,7 @@ import {
   canonicalizeSurfaceUrl,
   isSharedProfileHost,
   type MonitoringCandidate,
+  redactLockedRank,
   selectDefaultMonitoredSurfaceIds,
 } from '@/lib/profile-surfaces/contracts';
 
@@ -55,6 +56,13 @@ describe('isSharedProfileHost', () => {
   });
 });
 
+describe('redactLockedRank', () => {
+  it('omits current and historical rank values for locked surfaces', () => {
+    expect(redactLockedRank(true, 7)).toBeNull();
+    expect(redactLockedRank(true, null)).toBeNull();
+    expect(redactLockedRank(false, 2)).toBe(2);
+  });
+});
 describe('selectDefaultMonitoredSurfaceIds', () => {
   const candidate = (
     input: Partial<MonitoringCandidate> & Pick<MonitoringCandidate, 'id'>

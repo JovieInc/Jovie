@@ -124,6 +124,14 @@ export interface MonitoringCandidate {
   readonly userPaused?: boolean;
 }
 
+/** Rank observations outside the account monitoring allowance are not exposed. */
+export function redactLockedRank(
+  locked: boolean,
+  rank: number | null
+): number | null {
+  return locked ? null : rank;
+}
+
 const SOCIAL_PRIORITY = [
   'instagram',
   'tiktok',
