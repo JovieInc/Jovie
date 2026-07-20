@@ -227,16 +227,34 @@ function isVerboseToolModeEnabled(): boolean {
   }
 }
 
+function getActivityIconState(
+  event: PersistedToolEvent,
+  isLocked: boolean
+): 'running' | 'error' | 'success' | 'locked' | 'default' {
+  if (isLocked) return 'locked';
+  if (event.state === 'running') return 'running';
+  if (event.state === 'failed' || event.state === 'denied') return 'error';
+  if (event.state === 'succeeded') return 'success';
+  return 'default';
+}
+
+function getActivityTimelineEdge(
+  index: number,
+  count: number
+): 'first' | 'last' | 'middle' {
+  if (index === 0) return 'first';
+  if (index === count - 1) return 'last';
+  return 'middle';
+}
+
 function ToolActivityRow({
   event,
-  variant,
   multiple,
   index,
   count,
   feedback,
 }: Readonly<{
   event: PersistedToolEvent;
-  variant: ToolRendererVariant;
   multiple: boolean;
   index: number;
   count: number;
@@ -244,12 +262,12 @@ function ToolActivityRow({
 }>) {
   const body = getToolStatusBody(event);
   const nextStep = getToolStatusNextStep(event);
-  const isInline = variant === 'inline';
   const isError = event.state === 'failed' || event.state === 'denied';
   const isRunning = event.state === 'running';
   const isLocked = isLockedToolEvent(event);
   const Icon = isLocked ? Lock : TOOL_STATUS_ICONS[event.state];
   const showVerboseDetails = isVerboseToolModeEnabled();
+  const iconState = getActivityIconState(event, isLocked);
 
   return (
     <div
@@ -258,74 +276,45 @@ function ToolActivityRow({
       data-tool-state={event.state}
       data-tool-locked={isLocked ? 'true' : undefined}
       role={isError ? 'alert' : 'status'}
-      className={cn(
-        'relative flex w-full items-start gap-2.5 text-primary-token',
-        isInline ? 'py-1' : 'py-1.5'
-      )}
+      className='system-b-chat-activity-row'
     >
       {multiple ? (
         <span
           aria-hidden='true'
           data-testid='tool-activity-timeline-line'
-          className={cn(
-            'absolute left-2 w-px bg-[color-mix(in_oklab,var(--linear-app-shell-border)_70%,transparent)]',
-            index === 0 ? 'top-3.5' : 'top-0',
-            index === count - 1 ? 'bottom-[calc(100%_-_14px)]' : 'bottom-0'
-          )}
+          data-edge={getActivityTimelineEdge(index, count)}
+          className='system-b-chat-activity-timeline'
         />
       ) : null}
       <span
-        className={cn(
-          'relative z-10 mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-(--linear-app-content-surface)',
-          isRunning && 'text-secondary-token',
-          isError && 'text-red-500',
-          isLocked && 'text-secondary-token',
-          !isRunning && !isError && !isLocked && 'text-success'
-        )}
+        className='system-b-chat-activity-icon'
+        data-state={iconState}
+        data-spinning={isRunning ? 'true' : undefined}
       >
         <Icon
-          className={cn(
-            isInline ? 'h-3.5 w-3.5' : 'h-4 w-4',
-            isRunning && 'animate-spin motion-reduce:animate-none'
-          )}
+          className={cn(isRunning && 'animate-spin motion-reduce:animate-none')}
           strokeWidth={2.25}
+          aria-hidden='true'
         />
       </span>
-      <div className='min-w-0 flex-1'>
+      <div className='system-b-chat-activity-copy'>
         <div
           title={getToolStatusTitle(event)}
-          className={cn(
-            'truncate font-semibold tracking-tight',
-            isError && 'text-red-500',
-            isInline ? 'text-xs' : 'text-app'
-          )}
+          data-state={isError ? 'error' : undefined}
+          className='system-b-chat-activity-title'
         >
           {getToolStatusTitle(event)}
         </div>
         {body ? (
-          <div
-            className={cn(
-              'mt-0.5 text-secondary-token',
-              isInline ? 'line-clamp-2 text-2xs' : 'line-clamp-2 text-xs'
-            )}
-          >
-            {body}
-          </div>
+          <div className='system-b-chat-activity-body'>{body}</div>
         ) : null}
         {nextStep ? (
-          <div
-            className={cn(
-              'mt-0.5 text-tertiary-token',
-              isInline ? 'line-clamp-2 text-3xs' : 'line-clamp-2 text-2xs'
-            )}
-          >
-            {nextStep}
-          </div>
+          <div className='system-b-chat-activity-next'>{nextStep}</div>
         ) : null}
         {showVerboseDetails ? (
           <details
             data-testid='chat-tool-verbose'
-            className='mt-1.5 text-3xs leading-4 text-tertiary-token'
+            className='system-b-chat-activity-verbose'
           >
             <summary className='cursor-pointer select-none text-secondary-token'>
               Verbose tool details
@@ -369,17 +358,13 @@ function ToolActivityFeed({
     <div
       data-testid='tool-activity-feed'
       data-tool-count={events.length}
-      className={cn(
-        'w-full text-primary-token',
-        variant === 'inline' ? 'max-w-full' : 'max-w-105',
-        multiple ? 'space-y-0.5' : 'space-y-0'
-      )}
+      data-variant={variant}
+      className='system-b-chat-activity-feed'
     >
       {events.map((event, index) => (
         <ToolActivityRow
           key={event.toolCallId}
           event={event}
-          variant={variant}
           multiple={multiple}
           index={index}
           count={events.length}
@@ -497,6 +482,7 @@ function renderSocialLinkArtifact(
       platform={event.output.platform}
       normalizedUrl={event.output.normalizedUrl}
       originalUrl={event.output.originalUrl}
+      toolCallId={event.toolCallId}
     />
   );
 }
@@ -584,7 +570,11 @@ function renderMerchSelectionArtifact(
 
 interface MerchActionToolResult {
   readonly success: true;
-  readonly action: 'publish_merch' | 'archive_merch' | 'unpause_merch';
+  readonly action:
+    | 'publish_merch'
+    | 'archive_merch'
+    | 'unpause_merch'
+    | 'pause_merch';
   readonly merchCardId: string;
   readonly title: string;
   readonly currentStatus: string;
@@ -603,12 +593,14 @@ function isMerchActionResult(result: unknown): result is MerchActionToolResult {
 
 function merchActionFromToolName(
   toolName: string
-): 'publish' | 'archive' | 'unpause' | null {
+): 'publish' | 'archive' | 'unpause' | 'pause' | null {
   switch (toolName) {
     case 'publishMerchCard':
       return 'publish';
     case 'unpauseMerchCard':
       return 'unpause';
+    case 'pauseMerchCard':
+      return 'pause';
     case 'deleteOrArchiveMerchCard':
       return 'archive';
     default:
@@ -635,6 +627,7 @@ function renderMerchActionArtifact(
       title={event.output.title}
       currentStatus={event.output.currentStatus}
       retailPrice={event.output.retailPrice}
+      toolCallId={event.toolCallId}
     />
   );
 }
@@ -676,6 +669,8 @@ const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   createMerchAlternativeItem: (event, profileId) =>
     renderMerchSelectionArtifact(event, profileId),
   publishMerchCard: (event, profileId) =>
+    renderMerchActionArtifact(event, profileId),
+  pauseMerchCard: (event, profileId) =>
     renderMerchActionArtifact(event, profileId),
   unpauseMerchCard: (event, profileId) =>
     renderMerchActionArtifact(event, profileId),

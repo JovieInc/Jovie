@@ -32,7 +32,7 @@ export const SidebarInput = React.forwardRef<
       ref={ref}
       data-sidebar='input'
       className={cn(
-        'h-8 w-full bg-sidebar-input-background border border-sidebar-input-border shadow-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/24',
+        'h-8 w-full bg-sidebar-input-background border border-sidebar-input-border shadow-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-ring/24',
         className
       )}
       {...props}

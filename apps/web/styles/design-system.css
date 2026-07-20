@@ -121,6 +121,21 @@
   --system-b-chat-message-content-max: 66ch;
   --system-b-chat-body-size: var(--text-app);
   --system-b-chat-body-line-height: 1.5;
+  /* Agent activity (tool-call status rows) — one step subordinate to prose */
+  --system-b-chat-activity-indent: var(--space-4);
+  --system-b-chat-activity-size: var(--text-xs);
+  --system-b-chat-activity-line-height: var(--space-4);
+  --system-b-chat-activity-weight: var(--font-weight-book);
+  --system-b-chat-activity-color: var(--color-text-secondary-token);
+  --system-b-chat-activity-meta-color: var(--color-text-tertiary-token);
+  --system-b-chat-activity-gap: var(--space-0-5);
+  --system-b-chat-activity-row-py: var(--space-1);
+  --system-b-chat-activity-icon-size: 0.875rem;
+  --system-b-chat-activity-timeline-color: color-mix(
+    in oklab,
+    var(--linear-app-shell-border) 70%,
+    transparent
+  );
   --system-b-chat-composer-max-width: 45rem;
   --system-b-chat-composer-thread-scroll-padding: 9rem;
   --system-b-chat-composer-scroll-fade-height: 7rem;
@@ -8522,7 +8537,10 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     color-mix(in oklab, var(--color-border-focus) 42%, transparent);
 }
 
-/* Web composer focus mode — sidebar dims, right rail slides off (desktop only). */
+/* Web composer focus mode — sidebar dims; right rail fully yields (desktop).
+   Partial translate left the rail slot occupying width/stacking so the focus
+   picker painted over the profile card (JOV-4041). Collapse width to 0 so the
+   main column owns the full canvas; blur restores prior rail state. */
 @media (min-width: 1024px) {
   :where(
     [data-app-shell-frame][data-composer-focus="true"]
@@ -8535,7 +8553,14 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     [data-app-shell-frame][data-composer-focus="true"]
       [data-testid="app-shell-right-rail"]
   ) {
-    transform: translateX(40%);
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    border: none;
+    transform: none;
   }
 }
 
@@ -9288,6 +9313,157 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   color: var(--color-text-primary-token);
   font-size: var(--system-b-chat-body-size);
   line-height: var(--system-b-chat-body-line-height);
+}
+
+/*
+ * Agent activity feed (GH #13897)
+ * Quiet tool-call / status rows: indented one rhythm step from prose,
+ * secondary color, book weight, one size step below body. Consecutive
+ * steps form a single run with no card chrome. Interactive CTA cards
+ * stay on `.system-b-chat-action-card` (elevated, not this pattern).
+ */
+:where(.system-b-chat-activity-feed) {
+  width: 100%;
+  max-width: var(--system-b-chat-message-content-max);
+  padding-left: var(--system-b-chat-activity-indent);
+  color: var(--system-b-chat-activity-color);
+  font-size: var(--system-b-chat-activity-size);
+  font-weight: var(--system-b-chat-activity-weight);
+  line-height: var(--system-b-chat-activity-line-height);
+}
+
+:where(.system-b-chat-activity-feed[data-variant="inline"]) {
+  max-width: 100%;
+}
+
+:where(.system-b-chat-activity-feed > * + *) {
+  margin-top: var(--system-b-chat-activity-gap);
+}
+
+:where(.system-b-chat-activity-row) {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: var(--space-2);
+  /* Reserve vertical space so body/next-step text does not shift layout */
+  min-height: calc(
+    var(--system-b-chat-activity-line-height) +
+    (var(--system-b-chat-activity-row-py) * 2)
+  );
+  padding-block: var(--system-b-chat-activity-row-py);
+  color: var(--system-b-chat-activity-color);
+}
+
+:where(.system-b-chat-activity-timeline) {
+  position: absolute;
+  left: calc(var(--system-b-chat-activity-icon-size) / 2);
+  width: var(--space-px);
+  transform: translateX(-50%);
+  background: var(--system-b-chat-activity-timeline-color);
+}
+
+:where(.system-b-chat-activity-timeline[data-edge="first"]) {
+  top: calc(
+    var(--system-b-chat-activity-row-py) +
+    (var(--system-b-chat-activity-icon-size) / 2)
+  );
+  bottom: 0;
+}
+
+:where(.system-b-chat-activity-timeline[data-edge="last"]) {
+  top: 0;
+  bottom: calc(
+    100% -
+    (
+      var(--system-b-chat-activity-row-py) +
+      (var(--system-b-chat-activity-icon-size) / 2)
+    )
+  );
+}
+
+:where(.system-b-chat-activity-timeline[data-edge="middle"]) {
+  top: 0;
+  bottom: 0;
+}
+
+:where(.system-b-chat-activity-icon) {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: var(--system-b-chat-activity-icon-size);
+  height: var(--system-b-chat-activity-icon-size);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-0-5);
+  border-radius: var(--radius-full);
+  background: var(--linear-app-content-surface);
+  color: var(--system-b-chat-activity-color);
+}
+
+:where(.system-b-chat-activity-icon[data-state="success"]) {
+  color: var(--color-success);
+}
+
+:where(.system-b-chat-activity-icon[data-state="error"]) {
+  color: var(--color-error);
+}
+
+:where(.system-b-chat-activity-icon svg) {
+  width: 100%;
+  height: 100%;
+}
+
+:where(.system-b-chat-activity-copy) {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+:where(.system-b-chat-activity-title) {
+  overflow: hidden;
+  color: var(--system-b-chat-activity-color);
+  font-size: var(--system-b-chat-activity-size);
+  font-weight: var(--system-b-chat-activity-weight);
+  line-height: var(--system-b-chat-activity-line-height);
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.system-b-chat-activity-title[data-state="error"]) {
+  color: var(--color-error);
+}
+
+:where(.system-b-chat-activity-body) {
+  display: -webkit-box;
+  margin-top: var(--space-0-5);
+  overflow: hidden;
+  color: var(--system-b-chat-activity-meta-color);
+  font-size: var(--text-2xs);
+  font-weight: var(--system-b-chat-activity-weight);
+  line-height: var(--space-4);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+:where(.system-b-chat-activity-next) {
+  display: -webkit-box;
+  margin-top: var(--space-0-5);
+  overflow: hidden;
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-3xs);
+  font-weight: var(--system-b-chat-activity-weight);
+  line-height: var(--space-4);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+:where(.system-b-chat-activity-verbose) {
+  margin-top: var(--space-1-5);
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-3xs);
+  line-height: var(--space-4);
 }
 
 :where(.system-b-chat-markdown) {

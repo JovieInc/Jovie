@@ -1,5 +1,8 @@
 import { APP_ROUTES } from '@/constants/routes';
-import type { ArtistProfileLandingCopy } from './artistProfileCopy';
+import type {
+  ArtistProfileCaptureVisualCopy,
+  ArtistProfileLandingCopy,
+} from './artistProfileCopy';
 
 const PRO_SIGNUP_HREF = `${APP_ROUTES.SIGNUP}?plan=pro`;
 
@@ -21,7 +24,7 @@ export interface ArtistNotificationsLandingCopy {
       readonly detail?: string;
     }[];
   };
-  readonly capture: ArtistProfileLandingCopy['capture'];
+  readonly capture: ArtistProfileCaptureVisualCopy;
   readonly reactivation: ArtistProfileLandingCopy['reactivation'];
   readonly benefits: {
     readonly headline: string;

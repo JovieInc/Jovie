@@ -35,7 +35,7 @@ export function MerchPricingPresetPicker({
           <label
             key={option.preset}
             className={cn(
-              'inline-flex h-7 cursor-pointer items-center rounded-md border px-2 text-3xs font-medium transition-[background-color,border-color,color] duration-subtle has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-(--linear-border-focus)/55',
+              'inline-flex h-7 cursor-pointer items-center rounded-md border px-2 text-3xs font-medium transition-[background-color,border-color,color] duration-subtle has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/55',
               active
                 ? 'border-default bg-surface-1 text-primary-token'
                 : 'border-subtle bg-surface-0 text-tertiary-token hover:border-default hover:text-secondary-token'

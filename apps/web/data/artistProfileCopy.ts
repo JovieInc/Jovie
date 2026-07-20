@@ -1,7 +1,7 @@
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 export interface ArtistProfileMode {
-  readonly id: 'listen' | 'pay' | 'tour' | 'contact';
+  readonly id: 'upcoming-release' | 'release-day' | 'touring' | 'live-support';
   readonly label: string;
   readonly headline: string;
   readonly description: string;
@@ -29,6 +29,17 @@ export interface ArtistProfileModeDrawerItem {
 
 export interface ArtistProfileOutcomeCard {
   readonly id: 'drive-streams' | 'sell-out' | 'get-paid' | 'share-anywhere';
+  readonly title: string;
+  readonly description: string;
+}
+
+export interface ArtistProfileLandingOutcomeCard {
+  readonly id:
+    | 'straight-to-listen'
+    | 'local-dates-first'
+    | 'support-without-friction'
+    | 'capture-the-fan'
+    | 'one-link-everywhere';
   readonly title: string;
   readonly description: string;
 }
@@ -84,6 +95,13 @@ export interface ArtistProfileOutcomeProof {
     readonly title: string;
     readonly subtitle: string;
   };
+  readonly captureFan: {
+    readonly inputLabel: string;
+    readonly inputValue: string;
+    readonly ctaLabel: string;
+    readonly confirmedLabel: string;
+    readonly followUpLabel: string;
+  };
 }
 
 export interface ArtistProfileHowItWorksStep {
@@ -119,6 +137,7 @@ export interface ArtistProfileLandingCopy {
     readonly keywords: readonly string[];
   };
   readonly hero: {
+    readonly eyebrow: string;
     readonly headline: string;
     readonly subhead: string;
     readonly ctaLabel: string;
@@ -128,10 +147,13 @@ export interface ArtistProfileLandingCopy {
     readonly phoneSubcaption: string;
   };
   readonly adaptive: {
+    readonly eyebrow: string;
     readonly headline: string;
     readonly alternateHeadlines: readonly string[];
     readonly body: string;
     readonly contextCues: readonly [string, string, string, string];
+    readonly productLabel: string;
+    readonly productDetail: string;
     readonly restingScreenshotAlt: string;
     readonly restingScreenshotSrc: string;
     readonly modes: readonly ArtistProfileMode[];
@@ -140,7 +162,21 @@ export interface ArtistProfileLandingCopy {
     readonly headline: string;
     readonly body: string;
     readonly cards: readonly ArtistProfileOutcomeCard[];
+    readonly landingCards: readonly ArtistProfileLandingOutcomeCard[];
     readonly syntheticProofs: ArtistProfileOutcomeProof;
+  };
+  readonly opinionated: {
+    readonly eyebrow: string;
+    readonly headline: string;
+    readonly body: string;
+    readonly principle: string;
+    readonly columns: readonly [string, string, string];
+    readonly decisions: readonly {
+      readonly id: 'release' | 'tour' | 'support';
+      readonly context: string;
+      readonly signal: string;
+      readonly action: string;
+    }[];
   };
   readonly outcomeDuo: {
     readonly marketingHeadline: string;
@@ -256,6 +292,7 @@ export interface ArtistProfileLandingCopy {
     readonly action: {
       readonly title: string;
       readonly detail: string;
+      readonly inputPlaceholder: string;
       readonly ctaLabel: string;
       readonly confirmedLabel: string;
     };
@@ -265,7 +302,19 @@ export interface ArtistProfileLandingCopy {
       readonly title: string;
       readonly detail: string;
     };
+    readonly journey: {
+      readonly inputEyebrow: string;
+      readonly inputPreviewLabel: string;
+      readonly notificationEyebrow: string;
+      readonly notificationHeadline: string;
+      readonly notificationBody: string;
+    };
     readonly audienceRails: readonly (readonly ArtistProfileAudiencePill[])[];
+    readonly benefits: readonly {
+      readonly id: 'opt-in' | 'alerts' | 'ownership';
+      readonly label: string;
+      readonly detail: string;
+    }[];
   };
   readonly reactivation: {
     readonly headline: string;
@@ -309,6 +358,8 @@ export interface ArtistProfileLandingCopy {
       readonly ctaLabel: string;
     };
     readonly sync: {
+      readonly title: string;
+      readonly detail: string;
       readonly artistName: string;
       readonly startProgress: number;
       readonly endProgress: number;
@@ -342,6 +393,21 @@ export interface ArtistProfileLandingCopy {
   };
 }
 
+/**
+ * The animated audience visual is also used by the notifications landing page.
+ * Keep its contract limited to the fields that visual actually renders so the
+ * artist-profile narrative can evolve without forcing unrelated page copy.
+ */
+export type ArtistProfileCaptureVisualCopy = Omit<
+  ArtistProfileLandingCopy['capture'],
+  'action' | 'benefits' | 'journey'
+> & {
+  readonly action: Omit<
+    ArtistProfileLandingCopy['capture']['action'],
+    'inputPlaceholder'
+  >;
+};
+
 export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   seo: {
     title: 'Artist Profiles',
@@ -358,6 +424,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   hero: {
+    eyebrow: 'Built for artists',
     headline: 'The link your music deserves.',
     subhead:
       'Streams, drops, support, bookings, and fan capture in a single page.',
@@ -368,19 +435,22 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     phoneSubcaption: 'Adapts to every fan.',
   },
   adaptive: {
-    headline: 'Built for every mode.',
+    eyebrow: 'Adaptive by default',
+    headline: 'One profile that adapts to every fan.',
     alternateHeadlines: [
       'One profile for every release moment.',
       'One link, tuned to what matters right now.',
       'The same link, different job.',
     ],
-    body: 'One profile can flex from release push to ticket sales to fan capture.',
+    body: 'Before a drop, it becomes a countdown. On release day, it routes fans straight to the right service. On tour, nearby dates come first. At the merch table, one scan can become support and fan capture.',
     contextCues: [
-      'Source-aware',
+      'Release-aware',
       'Location-aware',
-      'Device-aware',
-      'Intent-aware',
+      'Service-aware',
+      'Moment-aware',
     ],
+    productLabel: 'Same profile',
+    productDetail: 'Different job, exactly when it matters.',
     restingScreenshotAlt:
       "Jovie artist profile showing Tim White's live profile view.",
     restingScreenshotSrc: getMarketingExportImage(
@@ -388,10 +458,51 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ).publicUrl,
     modes: [
       {
-        id: 'listen',
-        label: 'Drive Streams',
-        headline: 'Keep the latest music one tap away.',
-        description: 'Keep the latest music one tap away.',
+        id: 'upcoming-release',
+        label: 'Upcoming Release',
+        headline: 'Before a drop, your profile becomes a countdown.',
+        description: 'Before a drop, your profile becomes a countdown.',
+        pathLabel: 'jov.ie/you',
+        drawer: {
+          title: 'The Deep End',
+          subtitle: 'New release arriving soon.',
+          ctaLabel: 'Pre-save release',
+          items: [
+            {
+              id: 'countdown',
+              label: 'Release countdown',
+              detail: '02 days · 14 hours',
+              action: 'Live',
+            },
+            {
+              id: 'presave',
+              label: 'Pre-save',
+              detail: 'Spotify + Apple Music',
+              action: 'Save',
+            },
+            {
+              id: 'notify',
+              label: 'Release alert',
+              detail: 'Get notified when it drops',
+              action: 'Notify me',
+            },
+          ],
+        },
+        screenshotSrc: getMarketingExportImage(
+          'tim-white-profile-presave-mobile'
+        ).publicUrl,
+        screenshotAlt:
+          'Jovie artist profile showing an upcoming release and pre-save state.',
+        screenshotWidth: 660,
+        screenshotHeight: 1368,
+      },
+      {
+        id: 'release-day',
+        label: 'Release Day',
+        headline:
+          'When the song is live, fans go straight to the right service.',
+        description:
+          'When the song is live, fans go straight to the right service.',
         pathLabel: 'jov.ie/you/listen',
         drawer: {
           title: 'Listen',
@@ -401,13 +512,13 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             {
               id: 'spotify',
               label: 'Spotify',
-              detail: 'Best for Jason in LA',
+              detail: 'Best for this listener',
               action: 'Play',
             },
             {
               id: 'apple-music',
               label: 'Apple Music',
-              detail: 'Saved by returning fans',
+              detail: 'Open in the native app',
               action: 'Open',
             },
             {
@@ -421,15 +532,16 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         screenshotSrc: getMarketingExportImage(
           'tim-white-profile-listen-mobile'
         ).publicUrl,
-        screenshotAlt: 'Jovie artist profile showing a listen-first view.',
+        screenshotAlt:
+          'Jovie artist profile showing a release-day listen view.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
       },
       {
-        id: 'tour',
-        label: 'Sell Out',
-        headline: 'Surface the right dates and ticket paths.',
-        description: 'Surface the right dates and ticket paths.',
+        id: 'touring',
+        label: 'Touring',
+        headline: "When you're on the road, nearby dates come first.",
+        description: "When you're on the road, nearby dates come first.",
         pathLabel: 'jov.ie/you/tour',
         drawer: {
           title: 'Tour dates',
@@ -439,31 +551,19 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             {
               id: 'la',
               label: 'Los Angeles',
-              detail: 'May 18 - The Novo',
+              detail: 'May 18 · The Novo',
               action: 'Tickets',
             },
             {
               id: 'chicago',
               label: 'Chicago',
-              detail: 'May 24 - Radius',
+              detail: 'May 24 · Radius',
               action: 'Tickets',
             },
             {
               id: 'new-york',
               label: 'New York',
-              detail: 'Jun 02 - Brooklyn Mirage',
-              action: 'Tickets',
-            },
-            {
-              id: 'london',
-              label: 'London',
-              detail: 'Jun 14 - O2 Academy',
-              action: 'Tickets',
-            },
-            {
-              id: 'berlin',
-              label: 'Berlin',
-              detail: 'Jun 21 - Astra Kulturhaus',
+              detail: 'Jun 02 · Brooklyn Mirage',
               action: 'Tickets',
             },
           ],
@@ -476,10 +576,11 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         screenshotHeight: 1368,
       },
       {
-        id: 'pay',
-        label: 'Get Paid',
-        headline: 'Make support one tap away.',
-        description: 'Make support one tap away.',
+        id: 'live-support',
+        label: 'Live Support',
+        headline: 'At the merch table, one scan becomes support and capture.',
+        description:
+          'At the merch table, one scan becomes support and capture.',
         pathLabel: 'jov.ie/you/pay',
         drawer: {
           title: 'Support',
@@ -512,56 +613,11 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         screenshotWidth: 660,
         screenshotHeight: 1368,
       },
-      {
-        id: 'contact',
-        label: 'Contact',
-        headline: 'Keep booking, management, and press one tap away.',
-        description: 'Keep booking, management, and press one tap away.',
-        pathLabel: 'jov.ie/you/contact',
-        drawer: {
-          title: 'Contact',
-          subtitle: 'Booking, management, and press in one place.',
-          ctaLabel: 'Email team',
-          items: [
-            {
-              id: 'booking',
-              label: 'Booking',
-              detail: 'North America + Europe',
-              action: 'Email',
-            },
-            {
-              id: 'management',
-              label: 'Management',
-              detail: 'Worldwide',
-              action: 'Email',
-            },
-            {
-              id: 'press',
-              label: 'Press',
-              detail: 'US + UK',
-              action: 'Email',
-            },
-            {
-              id: 'brands',
-              label: 'Brands',
-              detail: 'Partnerships',
-              action: 'Email',
-            },
-          ],
-        },
-        screenshotSrc: getMarketingExportImage(
-          'tim-white-profile-contact-mobile'
-        ).publicUrl,
-        screenshotAlt:
-          'Jovie artist profile showing contact access for booking and press.',
-        screenshotWidth: 660,
-        screenshotHeight: 1368,
-      },
     ],
   },
   outcomes: {
-    headline: 'Built for Artists.',
-    body: 'Every detail is tuned to move the next tap forward.',
+    headline: 'Built around fan outcomes.',
+    body: 'Every state of the profile is designed to reduce friction and move the fan to the next right action.',
     cards: [
       {
         id: 'drive-streams',
@@ -585,6 +641,38 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         title: 'Share Anywhere',
         description:
           'Use one clean profile link across bio, QR, posts, stories, and shows.',
+      },
+    ],
+    landingCards: [
+      {
+        id: 'straight-to-listen',
+        title: 'Straight to listen',
+        description:
+          'Fans land on the right release and the right platform without hunting through a stack of links.',
+      },
+      {
+        id: 'local-dates-first',
+        title: 'Local dates first',
+        description:
+          'Touring fans see the show that matters to them instead of scrolling through cities that do not.',
+      },
+      {
+        id: 'support-without-friction',
+        title: 'Support without friction',
+        description:
+          'When someone is ready to support, the profile turns that moment into action fast.',
+      },
+      {
+        id: 'capture-the-fan',
+        title: 'Capture the fan',
+        description:
+          'A listen, a signup, or a support moment can become a real fan relationship instead of an anonymous click.',
+      },
+      {
+        id: 'one-link-everywhere',
+        title: 'Keep one link everywhere',
+        description:
+          'Bio, story, flyer, QR code, and release post all point to the same profile.',
       },
     ],
     syntheticProofs: {
@@ -671,7 +759,41 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         title: 'Share-ready',
         subtitle: 'Bio, QR, stories, and shows.',
       },
+      captureFan: {
+        inputLabel: 'Email address',
+        inputValue: 'fan@example.com',
+        ctaLabel: 'Get updates',
+        confirmedLabel: 'Fan captured',
+        followUpLabel: 'Release alerts enabled',
+      },
     },
+  },
+  opinionated: {
+    eyebrow: 'Opinionated by design',
+    headline: 'Built to convert, not decorate.',
+    body: 'Jovie is intentionally constrained. No theme builder. No layout rabbit hole. No generic creator-site sprawl. Every profile teaches fans what to tap because the product is built around release moments, show moments, and conversion.',
+    principle: 'No template maze.',
+    columns: ['Moment', 'Jovie reads', 'Primary action'],
+    decisions: [
+      {
+        id: 'release',
+        context: 'Release is live',
+        signal: 'Latest music',
+        action: 'Listen',
+      },
+      {
+        id: 'tour',
+        context: 'Fan is nearby',
+        signal: 'Local date',
+        action: 'Tickets',
+      },
+      {
+        id: 'support',
+        context: 'Merch-table scan',
+        signal: 'Live moment',
+        action: 'Support',
+      },
+    ],
   },
   outcomeDuo: {
     // Two headlines by design: the /artist-profile page and the homepage
@@ -812,21 +934,30 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     playLabel: 'Play pay flow',
   },
   capture: {
-    headline: 'Build the list. Keep it working.',
-    subhead:
-      'Every visit is a chance to add a fan. Every fan gets reached automatically for the next drop.',
-    body: 'New fans opt in from every profile visit, QR scan, and link click. Jovie notifies them for every release, show, and update — so your audience grows without starting over each time.',
+    headline: 'Capture every fan, not just the click.',
+    subhead: 'One opt-in can become a lasting fan relationship.',
+    body: 'Fans opt in once. From there, Jovie can keep them close with release alerts and future follow-up. The profile is not just a destination. It is the start of an owned audience.',
     action: {
       title: 'Get updates',
-      detail: 'Release and show alerts.',
-      ctaLabel: 'Subscribe',
-      confirmedLabel: 'Notifications Enabled',
+      detail: 'Release and nearby-show alerts.',
+      inputPlaceholder: 'Email or phone',
+      ctaLabel: 'Get updates',
+      confirmedLabel: 'You’re on the list',
     },
     notification: {
       appName: 'Jovie',
       timeLabel: 'now',
-      title: 'Notifications Enabled',
-      detail: 'Next release goes out automatically.',
+      title: 'The Deep End is out now',
+      detail: 'Listen on your favorite service.',
+    },
+    journey: {
+      inputEyebrow: 'Fan action',
+      inputPreviewLabel:
+        'Example fan opt-in with an email or phone field and a confirmed subscription state.',
+      notificationEyebrow: 'The next right moment',
+      notificationHeadline: 'Timely, not noisy.',
+      notificationBody:
+        'The fan asked to hear from you. Jovie keeps that promise when there is something worth opening.',
     },
     audienceRails: [
       [
@@ -896,6 +1027,23 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         },
       ],
     ],
+    benefits: [
+      {
+        id: 'opt-in',
+        label: 'Opt in once',
+        detail: 'A simple fan action starts the relationship.',
+      },
+      {
+        id: 'alerts',
+        label: 'Reach the moment',
+        detail: 'Release and nearby-show alerts arrive when they matter.',
+      },
+      {
+        id: 'ownership',
+        label: 'Keep the audience',
+        detail: 'The relationship belongs to the artist, not the click.',
+      },
+    ],
   },
   reactivation: {
     headline: 'Notify them automatically.',
@@ -938,28 +1086,30 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   specWall: {
-    headline: 'Details that matter.',
+    headline: 'Built for artists.',
     subhead:
-      'Built from 15 years of music marketing experience, obsessing over the details that make a profile convert.',
+      'The product truth behind one fast, music-native profile—kept compact on purpose.',
   },
   howItWorks: {
-    headline: 'Live in 60 seconds.',
-    body: 'Search once, go live fast, and share the same profile everywhere.',
+    headline: 'One link. Three steps.',
+    body: 'Claim the profile, connect the essentials, and keep the same URL everywhere.',
     steps: [
       {
         id: 'claim',
-        title: 'Claim',
-        description: 'Find your artist.',
+        title: 'Claim your profile.',
+        description: 'Start with your handle and get the core page live.',
       },
       {
         id: 'connect',
-        title: 'Sync',
-        description: 'Pull your catalog in.',
+        title: 'Connect your music and links.',
+        description:
+          'Import the essentials so the profile reflects your real catalog and surfaces.',
       },
       {
         id: 'share',
-        title: 'Share',
-        description: 'Use the same link everywhere.',
+        title: 'Share one link everywhere.',
+        description:
+          'Use the same profile in bio, stories, posts, QR, and release campaigns.',
       },
     ],
     claim: {
@@ -970,10 +1120,12 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       ctaLabel: 'Claim',
     },
     sync: {
+      title: 'Music connected',
+      detail: 'Catalog and destinations matched.',
       artistName: 'Tim White',
       startProgress: 0,
       endProgress: 86,
-      otherProvidersLabel: 'And 24 others.',
+      otherProvidersLabel: 'Your catalog stays connected.',
       providers: [
         {
           provider: 'spotify',
@@ -1003,47 +1155,37 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
   },
   socialProof: {
-    headline: 'Built by an artist. For artists.',
-    intro: 'Real artist profiles built around real release moments.',
+    headline: 'Built for real artist workflows.',
+    intro: 'Real artist profiles. Real release moments.',
   },
   faq: {
-    headline: 'Frequently Asked Questions',
+    headline: 'Questions, answered.',
     items: [
       {
-        question: 'How is Jovie different from Linktree?',
+        question: 'How is this different from Linktree?',
         answer:
-          'Linktree is a general-purpose link list. Jovie is a music profile that understands releases, shows, pay, fan capture, and the actions artists need fans to take.',
+          'Linktree is a general-purpose link page. Jovie is built for music release behavior: smart routing, release pages, show moments, support flows, fan capture, and notifications in one profile.',
       },
       {
-        question: 'How is it different from a smart link or pre-save page?',
+        question: 'Can I use this before release day?',
         answer:
-          'A smart link or pre-save page usually serves one campaign. Jovie gives the artist one profile that can route to music, shows, pay, subscribe, releases, and future fan actions.',
+          'Yes. The profile can become a countdown or pre-release surface before the song is live, then switch behavior when release day arrives.',
       },
       {
-        question: 'Can I deep-link to specific modes like shows or pay?',
+        question: 'Can I use it for shows and support?',
         answer:
-          'Yes. You can send fans straight to modes like music, shows, pay, subscribe, and more without asking them to hunt through the full profile.',
-      },
-      {
-        question: 'Do I need to design or customize anything?',
-        answer:
-          'No. Jovie is polished by default. You claim it, connect once, and the page is built around your identity and content without theme work.',
-      },
-      {
-        question: 'What can fans do from one profile?',
-        answer:
-          'Fans can listen, find shows, buy tickets, pay or support, subscribe, scan QR codes, and opt in so you can reach them again.',
+          'Yes. Touring, tickets, QR sharing, and support flows all fit inside the same profile instead of living on separate links.',
       },
       {
         question: 'How long does setup take?',
         answer:
-          'Jovie imports your whole catalog, matches it across 27+ providers, and builds a live always up-to-date profile in 60 seconds.',
+          'Fast. Claim the profile, connect your music and links, and start sharing one URL.',
       },
     ],
   },
   finalCta: {
-    headline: "Don't lose your next fan.",
-    subhead: 'Turn every visit into a stream, save, signup, or support.',
+    headline: 'Claim your profile.',
+    subhead: 'One link for every release, show, and fan action.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
   },

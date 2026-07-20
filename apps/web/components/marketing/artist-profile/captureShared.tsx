@@ -11,7 +11,7 @@ import {
 import type { CSSProperties } from 'react';
 import type {
   ArtistProfileAudiencePill,
-  ArtistProfileLandingCopy,
+  ArtistProfileCaptureVisualCopy,
 } from '@/data/artistProfileCopy';
 import { ACCENT_ROTATION, getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
@@ -170,7 +170,7 @@ export function CaptureActionPill({
   capture,
   phase,
 }: Readonly<{
-  capture: ArtistProfileLandingCopy['capture'];
+  capture: ArtistProfileCaptureVisualCopy;
   phase: CapturePhase;
 }>) {
   const isTyping = phase === 'typing';

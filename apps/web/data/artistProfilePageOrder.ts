@@ -2,12 +2,10 @@ import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
 
 export type ArtistProfileSectionId =
   | 'hero'
-  | 'trust'
   | 'adaptive'
   | 'outcomes'
-  | 'monetization'
   | 'capture'
-  | 'reactivation'
+  | 'opinionated'
   | 'specWall'
   | 'howItWorks'
   | 'socialProof'
@@ -36,23 +34,19 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       id: 'hero',
       label: 'Hero',
       testId: 'artist-profile-section-hero',
+      screenshotScenarioId: 'artist-profile-hero-section-desktop',
     },
     {
       id: 'adaptive',
-      label: 'One Profile',
+      label: 'Adaptive Profile',
       testId: 'artist-profile-section-adaptive',
       screenshotScenarioId: 'artist-profile-adaptive-section-desktop',
     },
     {
-      id: 'trust',
-      label: 'Trust Logo Bar',
-      testId: 'artist-profile-section-trust',
-    },
-    {
       id: 'outcomes',
-      label: 'Built for Artists',
+      label: 'Fan Outcomes',
       testId: 'artist-profile-section-outcomes',
-      screenshotScenarioId: 'artist-profile-built-for-artists-section-desktop',
+      screenshotScenarioId: 'artist-profile-outcomes-section-desktop',
     },
     {
       id: 'capture',
@@ -61,26 +55,20 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       screenshotScenarioId: 'artist-profile-capture-section-desktop',
     },
     {
-      id: 'reactivation',
-      label: 'Notify Them Automatically',
-      testId: 'artist-profile-section-reactivation',
-      screenshotScenarioId: 'artist-profile-reactivation-section-desktop',
-    },
-    {
-      id: 'monetization',
-      label: 'Monetization',
-      testId: 'artist-profile-section-monetization',
-      screenshotScenarioId: 'artist-profile-monetization-section-desktop',
+      id: 'opinionated',
+      label: 'Opinionated by Design',
+      testId: 'artist-profile-section-opinionated',
+      screenshotScenarioId: 'artist-profile-opinionated-section-desktop',
     },
     {
       id: 'specWall',
-      label: 'Details That Matter',
+      label: 'Product Truth',
       testId: 'artist-profile-section-spec-wall',
-      screenshotScenarioId: 'artist-profile-power-features-section-desktop',
+      screenshotScenarioId: 'artist-profile-spec-wall-section-desktop',
     },
     {
       id: 'howItWorks',
-      label: 'Live In 60 Seconds',
+      label: 'How It Works',
       testId: 'artist-profile-section-how-it-works',
       screenshotScenarioId: 'artist-profile-how-it-works-section-desktop',
     },
@@ -94,12 +82,14 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       id: 'faq',
       label: 'FAQ',
       testId: 'artist-profile-section-faq',
+      screenshotScenarioId: 'artist-profile-faq-section-desktop',
       enabledByFlag: 'FAQ',
     },
     {
       id: 'finalCta',
       label: 'Final CTA',
       testId: 'artist-profile-section-final-cta',
+      screenshotScenarioId: 'artist-profile-final-cta-section-desktop',
     },
   ];
 

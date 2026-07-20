@@ -69,6 +69,35 @@ describe('proposeMerchAction', () => {
     });
   });
 
+  it('proposes pause without writing status (JOV-3549)', async () => {
+    hoisted.limitMock.mockResolvedValue([
+      {
+        id: 'card-2',
+        title: 'Hoodie',
+        status: 'live',
+        retailPriceCents: 4500,
+        primaryImageUrl: null,
+      },
+    ]);
+
+    const { proposeMerchAction } = await import('./merch-propose');
+    const result = await proposeMerchAction({
+      action: 'pause',
+      merchCardId: 'card-2',
+      profileId: 'profile-1',
+    });
+
+    expect(result).toEqual({
+      success: true,
+      action: 'pause_merch',
+      merchCardId: 'card-2',
+      title: 'Hoodie',
+      currentStatus: 'live',
+      retailPrice: '$45.00',
+      primaryImageUrl: null,
+    });
+  });
+
   it('returns not found when card is missing', async () => {
     hoisted.limitMock.mockResolvedValue([]);
 

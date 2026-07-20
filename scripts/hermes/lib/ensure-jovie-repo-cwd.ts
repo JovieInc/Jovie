@@ -1,4 +1,3 @@
-import { chdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,6 +15,7 @@ export function ensureJovieRepoCwd(moduleUrl: string): string {
   const repoRoot =
     process.env.HERMES_JOVIE_REPO?.trim() ||
     resolveJovieRepoFromScript(moduleUrl);
-  chdirSync(repoRoot);
+  // process.chdir: node:fs has no chdirSync export (JOV-4325).
+  process.chdir(repoRoot);
   return repoRoot;
 }

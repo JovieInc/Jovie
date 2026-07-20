@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
-
+import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { db } from '@/lib/db';
 import { chatAuditLog } from '@/lib/db/schema/chat';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -13,7 +13,7 @@ import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
-const confirmRemoveLinkSchema = z.object({
+const confirmRemoveLinkSchema = chatToolSchema({
   profileId: z.string().uuid(),
   linkId: z.string().uuid(),
 });

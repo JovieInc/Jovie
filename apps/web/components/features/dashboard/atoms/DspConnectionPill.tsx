@@ -27,7 +27,7 @@ const BASE_PILL_CLASSNAME =
   'inline-flex min-h-7 items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-caption tracking-tight transition-[background-color,border-color,color] duration-subtle';
 
 const INTERACTIVE_PILL_CLASSNAME =
-  'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 disabled:opacity-50 disabled:cursor-not-allowed';
+  'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-ring/20 disabled:opacity-50 disabled:cursor-not-allowed';
 
 const CONNECTION_PILL_PROVIDERS = [
   'spotify',

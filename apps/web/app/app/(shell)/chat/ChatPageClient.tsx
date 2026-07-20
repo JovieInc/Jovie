@@ -99,7 +99,12 @@ function hasConnectedMusicCatalog(profile: ChatActionProfile): boolean {
   );
 }
 
-function buildChatActionCards({
+/**
+ * First-run / empty-thread scaffolding (JOV-3547). Always returns ≥3
+ * profile-aware starter actions so the empty chat never renders a bare
+ * "Ask jovie..." box. Setup-gap cards lead when the profile is incomplete.
+ */
+export function buildChatActionCards({
   profile,
   profileCompletionPercentage,
   profileCompletionSteps,
@@ -111,36 +116,56 @@ function buildChatActionCards({
   const artistName = profileDisplayName(profile);
   const completion = normalizeCompletionPercentage(profileCompletionPercentage);
   const nextSetupStep = profileCompletionSteps[0]?.label;
+  const cards: ChatActionCard[] = [];
 
   if (!hasConnectedMusicCatalog(profile)) {
-    return [
-      {
-        id: 'connect-music-catalog',
-        title: 'Connect Your Music Catalog',
-        body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
-        actionLabel: 'Plan Setup',
-        prompt: `Help me connect my music catalog for ${artistName}. Use the current profile context and give me the next setup step.`,
-      },
-    ];
-  }
-
-  if (completion < 100) {
+    cards.push({
+      id: 'connect-music-catalog',
+      title: 'Connect Your Music Catalog',
+      body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
+      actionLabel: 'Plan Setup',
+      prompt: `Help me connect my music catalog for ${artistName}. Use the current profile context and give me the next setup step.`,
+    });
+  } else if (completion < 100) {
     const body = nextSetupStep
       ? `Your profile is ${completion}% complete. Next setup step: ${nextSetupStep}.`
       : `Your profile is ${completion}% complete. Tighten the missing setup steps before the next share.`;
 
-    return [
-      {
-        id: 'finish-artist-profile',
-        title: 'Complete Your Artist Profile',
-        body,
-        actionLabel: 'Review Gaps',
-        prompt: `Review my artist profile for ${artistName}. Prioritize the missing setup steps and tell me the single highest-impact update to make next.`,
-      },
-    ];
+    cards.push({
+      id: 'finish-artist-profile',
+      title: 'Complete Your Artist Profile',
+      body,
+      actionLabel: 'Review Gaps',
+      prompt: `Review my artist profile for ${artistName}. Prioritize the missing setup steps and tell me the single highest-impact update to make next.`,
+    });
   }
 
-  return [];
+  cards.push(
+    {
+      id: 'plan-release',
+      title: 'Plan A Release',
+      body: `Map the next release for ${artistName} — timeline, assets, and the first share moment.`,
+      actionLabel: 'Start Planning',
+      prompt: `Help me plan my next release for ${artistName}.`,
+    },
+    {
+      id: 'generate-album-art',
+      title: 'Generate Album Art',
+      body: 'Draft cover concepts grounded in the current release context.',
+      actionLabel: 'Generate Art',
+      prompt: `Generate album art for my latest release as ${artistName}.`,
+    },
+    {
+      id: 'whats-working',
+      title: "What's Working Right Now?",
+      body: 'Surface traction signals from the live profile and catalog.',
+      actionLabel: 'Review Signals',
+      prompt: `What's working for me right now as ${artistName}? Help me see what's gaining traction.`,
+    }
+  );
+
+  // Cap at 3 visible starters so the empty stack stays scannable.
+  return cards.slice(0, 3);
 }
 
 export function shouldRetryWelcomeChatBootstrap(

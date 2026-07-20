@@ -123,7 +123,8 @@ export const TOOL_SCHEMAS = {
   },
 
   pauseMerchCard: {
-    description: 'Pause a live merch card so fans can no longer buy it.',
+    description:
+      'Propose pausing a live merch card so fans can no longer buy it. Returns a confirmation card with consequence text; does not pause until the artist confirms.',
     inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),

@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { type DbOrTransaction, db } from '@/lib/db';
+import { getDeepErrorMessage, unwrapPgError } from '@/lib/db/errors';
 import { waitlistSettings } from '@/lib/db/schema/waitlist';
 import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
@@ -172,67 +173,16 @@ function getStartOfNextDayUTC(now: Date = new Date()): Date {
   return next;
 }
 
-async function ensureSettingsRow(
-  dbOrTx: DbOrTransaction = db
-): Promise<WaitlistGateSettings> {
-  // Hot path: cheap SELECT first (matches previous behavior and keeps
-  // existing test mocks working without requiring full insert chain mocks).
-  const [existing] = await dbOrTx
-    .select()
-    .from(waitlistSettings)
-    .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
-    .limit(1);
-
-  if (existing) {
-    return existing;
-  }
-
-  const now = new Date();
-
-  // Miss path: single atomic upsert (INSERT ... ON CONFLICT DO UPDATE) creates
-  // the row if absent. On concurrent first callers, the loser takes the
-  // conflict path and still receives the row via RETURNING — no reload race,
-  // no throw ever.
-  const [row] = await dbOrTx
-    .insert(waitlistSettings)
-    .values({
-      id: SETTINGS_ROW_ID,
-      gateEnabled: true,
-      autoAcceptEnabled: false,
-      autoAcceptAfterDays: 7,
-      autoAcceptDailyLimit: 0,
-      autoAcceptedToday: 0,
-      autoAcceptResetsAt: getStartOfNextDayUTC(now),
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: waitlistSettings.id,
-      set: {
-        // Self-assignment is a deliberate no-op: ensures RETURNING yields the
-        // existing row on the conflict path without mutating data or timestamps.
-        updatedAt: drizzleSql`${waitlistSettings.updatedAt}`,
-      },
-    })
-    .returning();
-
-  if (row) {
-    return row;
-  }
-
-  // Defensive fallback (extremely rare). Plain select again, else safe defaults.
-  // Guarantees ensureSettingsRow (and therefore gate + auto-accept paths) never
-  // throws on reload.
-  const [reloaded] = await dbOrTx
-    .select()
-    .from(waitlistSettings)
-    .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
-    .limit(1);
-
-  if (reloaded) {
-    return reloaded;
-  }
-
-  const fallback: WaitlistGateSettings = {
+/**
+ * Documented default gate state — matches the column defaults in
+ * `lib/db/schema/waitlist.ts` (gate on, auto-accept off). Used when the
+ * settings row cannot be materialized and when the `waitlist_settings`
+ * relation is missing in prod (migration drift, JOV-3353).
+ */
+function getDefaultWaitlistGateSettings(
+  now: Date = new Date()
+): WaitlistGateSettings {
+  return {
     gateEnabled: true,
     autoAcceptEnabled: false,
     autoAcceptAfterDays: 7,
@@ -240,7 +190,102 @@ async function ensureSettingsRow(
     autoAcceptedToday: 0,
     autoAcceptResetsAt: getStartOfNextDayUTC(now),
   };
-  return fallback;
+}
+
+/**
+ * True when Postgres reports the `waitlist_settings` relation is missing —
+ * the known migration-drift class where code ships ahead of the prod
+ * migration (JOV-3353). Drizzle surfaces these as "Failed query: ..." with
+ * the underlying PG error (42P01 undefined_table) on `.cause`.
+ */
+export function isMissingWaitlistSettingsTableError(error: unknown): boolean {
+  const message = getDeepErrorMessage(error).toLowerCase();
+  if (
+    !message.includes('does not exist') &&
+    unwrapPgError(error).code !== '42P01'
+  ) {
+    return false;
+  }
+
+  return message.includes('waitlist_settings');
+}
+
+async function ensureSettingsRow(
+  dbOrTx: DbOrTransaction = db
+): Promise<WaitlistGateSettings> {
+  try {
+    // Hot path: cheap SELECT first (matches previous behavior and keeps
+    // existing test mocks working without requiring full insert chain mocks).
+    const [existing] = await dbOrTx
+      .select()
+      .from(waitlistSettings)
+      .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
+      .limit(1);
+
+    if (existing) {
+      return existing;
+    }
+
+    const now = new Date();
+
+    // Miss path: single atomic upsert (INSERT ... ON CONFLICT DO UPDATE) creates
+    // the row if absent. On concurrent first callers, the loser takes the
+    // conflict path and still receives the row via RETURNING — no reload race,
+    // no throw ever.
+    const [row] = await dbOrTx
+      .insert(waitlistSettings)
+      .values({
+        id: SETTINGS_ROW_ID,
+        gateEnabled: true,
+        autoAcceptEnabled: false,
+        autoAcceptAfterDays: 7,
+        autoAcceptDailyLimit: 0,
+        autoAcceptedToday: 0,
+        autoAcceptResetsAt: getStartOfNextDayUTC(now),
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: waitlistSettings.id,
+        set: {
+          // Self-assignment is a deliberate no-op: ensures RETURNING yields the
+          // existing row on the conflict path without mutating data or timestamps.
+          updatedAt: drizzleSql`${waitlistSettings.updatedAt}`,
+        },
+      })
+      .returning();
+
+    if (row) {
+      return row;
+    }
+
+    // Defensive fallback (extremely rare). Plain select again, else safe defaults.
+    // Guarantees ensureSettingsRow (and therefore gate + auto-accept paths) never
+    // throws on reload.
+    const [reloaded] = await dbOrTx
+      .select()
+      .from(waitlistSettings)
+      .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
+      .limit(1);
+
+    if (reloaded) {
+      return reloaded;
+    }
+
+    return getDefaultWaitlistGateSettings(now);
+  } catch (error) {
+    // Migration drift (JOV-3353): degrade reads to the documented default
+    // gate state instead of 500-ing /start and /signin. Only the missing-
+    // relation class degrades; every other error still throws. Write paths
+    // (admin updates) surface the error from their own UPDATE statement.
+    if (!isMissingWaitlistSettingsTableError(error)) {
+      throw error;
+    }
+    await captureWarning(
+      '[waitlist] waitlist_settings relation missing (migration drift); using default gate settings',
+      error
+    );
+    return getDefaultWaitlistGateSettings();
+  }
 }
 
 export async function getWaitlistSettings(

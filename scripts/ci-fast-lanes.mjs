@@ -229,6 +229,8 @@ function runStructural() {
 
   const parts = [
     'pnpm ci:harness:check',
+    'pnpm ci:incident-contract:validate',
+    'node --test scripts/ci-release-trigger-contract.test.mjs',
     'pnpm ci:control:test',
     'pnpm ci:branching-guard:validate',
     'pnpm ci:merge-queue:check',

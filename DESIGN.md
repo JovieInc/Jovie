@@ -642,6 +642,23 @@ Destructive actions use `destructive` on any variant. Examples: primary destruct
 | Hover | `oklch(96.2% 0.003 260)` | `rgba(255,255,255,0.022)` |
 | Selected | `oklch(94.8% 0.006 260)` | `rgba(255,255,255,0.048)` |
 
+### Chat Agent Activity (Tool-Call Rows)
+
+Quiet tool-call / streaming activity in the chat transcript is a first-class System B pattern (GH #13897). It must stay visually subordinate to assistant prose — not a second card chrome family.
+
+| Property | Token / class | Notes |
+|----------|---------------|-------|
+| Indent | `--system-b-chat-activity-indent` (`space-4`) | One rhythm step in from prose left edge |
+| Size | `--system-b-chat-activity-size` (`text-xs`) | One step below chat body (`text-app`) |
+| Weight | `--system-b-chat-activity-weight` (`font-weight-book` / 450) | Lighter than prose |
+| Color | `--system-b-chat-activity-color` (secondary text) | Meta uses tertiary |
+| Surface | `.system-b-chat-activity-feed` + `.system-b-chat-activity-row` | No borders, no nested cards |
+| Motion | spin token + `prefers-reduced-motion` | Running icon only; duration tokens |
+
+**Do:** group consecutive tool steps into one indented activity run; reserve row min-height so body/next-step text does not shift layout.
+
+**Don't:** give activity rows `font-semibold`, primary text color, or full-width card chrome. Interactive empty-state CTAs stay on `.system-b-chat-action-card` (elevated). Artifact / confirm result cards use `.system-b-chat-tool-surface*`.
+
 ### Confirmations & Destructive Actions
 
 | Action shape | Replacement | When |

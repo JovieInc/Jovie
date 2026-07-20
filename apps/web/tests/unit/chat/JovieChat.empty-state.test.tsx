@@ -179,50 +179,41 @@ describe('JovieChat empty state', () => {
     mockChatState.chipTray.chips = [];
   });
 
-  it('renders only the logo and simple composer when empty', () => {
-    const { getByTestId, queryByTestId, queryByText } = renderWithQueryClient(
-      <JovieChat profileId='profile-1' />
-    );
+  it('renders logo, composer, and prompt rail scaffolding when empty (JOV-3547)', () => {
+    const { getByTestId, queryByTestId, queryByText, getAllByLabelText } =
+      renderWithQueryClient(<JovieChat profileId='profile-1' />);
 
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
     expect(queryByTestId('chat-empty-thread-ornament')).toBeNull();
-    expect(queryByText('Release plan')).toBeNull();
-    expect(queryByText('Asset brief')).toBeNull();
-    expect(queryByText('Context')).toBeNull();
     expect(queryByText('What are we working on?')).toBeNull();
     expect(queryByText('Welcome back')).toBeNull();
-    expect(queryByText('Welcome back, Tim')).toBeNull();
     expect(queryByText("Hey, I'm Jovie.")).toBeNull();
-    expect(queryByText('Jovie Assistant')).toBeNull();
-    expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
     const emptyViewport = getByTestId('chat-empty-state-viewport');
     expect(emptyViewport.className).toContain('flex-1');
     expect(emptyViewport.className).toContain('justify-center');
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
     expect(getByTestId('chat-empty-state-logo')).toBeTruthy();
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
+    // No actionCards prop → no action-card slot, but prompt rail is wired.
     expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
     expect(queryByTestId('chat-composer-dock')).toBeNull();
-    expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
-    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
+    expect(getByTestId('chat-empty-state-soft-suggestions-slot')).toBeTruthy();
+    expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
       'Ask jovie...'
     );
     expect(getByTestId('chat-input').getAttribute('data-variant')).toBe('hero');
-    expect(
-      getByTestId('chat-input').getAttribute('data-quick-actions')
-    ).toBeNull();
-    expect(queryByText('Plan a release')).toBeNull();
-    expect(queryByText('Generate album art')).toBeNull();
-    expect(queryByText('Generate pitch')).toBeNull();
+    // ≥3 profile-aware starters (rail pills use aria-label = suggestion label).
+    expect(getAllByLabelText(/Plan A Release/i).length).toBeGreaterThan(0);
+    expect(getAllByLabelText(/Generate Album Art/i).length).toBeGreaterThan(0);
     // Old task-list-style actions should NOT appear — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();
     expect(queryByText('Change photo')).toBeNull();
     expect(queryByText('Release link')).toBeNull();
   });
 
-  it('does not render empty-state action cards by default', () => {
+  it('renders typed actionCards above the composer when provided (JOV-3547)', () => {
     renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
@@ -234,24 +225,37 @@ describe('JovieChat empty state', () => {
             actionLabel: 'Plan Setup',
             prompt: 'Help me connect my music catalog.',
           },
+          {
+            id: 'plan-release',
+            title: 'Plan A Release',
+            body: 'Map the next release.',
+            actionLabel: 'Start Planning',
+            prompt: 'Help me plan my next release.',
+          },
+          {
+            id: 'whats-working',
+            title: "What's Working Right Now?",
+            body: 'Surface traction signals.',
+            actionLabel: 'Review Signals',
+            prompt: "What's working for me right now?",
+          },
         ]}
       />
     );
 
-    expect(screen.queryByText('Connect Your Music Catalog')).toBeNull();
-    expect(screen.queryByText(/Add Spotify/)).toBeNull();
-    expect(screen.queryByText('What are we working on?')).toBeNull();
+    expect(screen.getByText('Connect Your Music Catalog')).toBeTruthy();
+    expect(screen.getByText(/Add Spotify/)).toBeTruthy();
     expect(
-      screen.queryByTestId('chat-empty-state-action-card-slot')
-    ).toBeNull();
+      screen.getByTestId('chat-empty-state-action-card-slot')
+    ).toBeTruthy();
     expect(
       screen.getByTestId('chat-empty-state-centered-composer')
     ).toBeTruthy();
-    expect(screen.queryByTestId('chat-composer-dock')).toBeNull();
-    expect(screen.queryByTestId('suggested-prompts-rail')).toBeNull();
+    expect(screen.getByTestId('suggested-prompts-rail')).toBeTruthy();
+    expect(screen.getAllByTestId('chat-action-card')).toHaveLength(3);
   });
 
-  it('keeps typed empty chat on the simple composer', () => {
+  it('hides scaffolding while typing so the composer owns attention', () => {
     mockChatState.input = 'Help me with';
 
     const { getByTestId, queryByTestId, queryByText } = renderWithQueryClient(
@@ -278,7 +282,7 @@ describe('JovieChat empty state', () => {
     expect(queryByTestId('suggested-prompts-rail')).toBeNull();
   });
 
-  it('preserves the chip-enabled composer without empty-state suggestions', () => {
+  it('hides empty-state suggestions when skill chips are present', () => {
     mockChatState.chipTray.chips = [
       {
         type: 'skill',
@@ -406,11 +410,13 @@ describe('JovieChat empty state', () => {
   });
 
   it('does not render opportunity cards when there are none pending', () => {
-    const { queryByTestId } = renderWithQueryClient(
+    const { queryByTestId, getByTestId } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
     );
 
     expect(queryByTestId('chat-empty-state-opportunity-cards')).toBeNull();
-    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
+    // Zero pending opportunities → first-run prompt rail scaffolding (JOV-3547).
+    expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
+    expect(getByTestId('chat-empty-state-soft-suggestions-slot')).toBeTruthy();
   });
 });

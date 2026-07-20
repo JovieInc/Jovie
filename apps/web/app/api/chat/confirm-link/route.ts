@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
-
+import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { chatAuditLog } from '@/lib/db/schema/chat';
@@ -17,7 +17,7 @@ import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import { httpUrlSchema } from '@/lib/validation/schemas/base';
 
-const confirmLinkSchema = z.object({
+const confirmLinkSchema = chatToolSchema({
   profileId: z.string().uuid(),
   platform: z.string().min(1),
   url: httpUrlSchema,
@@ -117,6 +117,8 @@ export async function POST(req: Request) {
       .limit(1);
 
     let linkId: string;
+    /** Distinguishes create vs overwrite for truthful client copy (JOV-3549). */
+    let outcome: 'created' | 'updated';
 
     if (existingLink) {
       // Update existing link URL instead of creating duplicate
@@ -130,6 +132,7 @@ export async function POST(req: Request) {
         })
         .where(eq(socialLinks.id, existingLink.id));
       linkId = existingLink.id;
+      outcome = 'updated';
     } else {
       // Insert new social link
       const rows = await db
@@ -152,6 +155,7 @@ export async function POST(req: Request) {
         throw new Error('Insert returned no rows');
       }
       linkId = rows[0].id;
+      outcome = 'created';
     }
 
     await syncPrimaryMusicUrlsFromSocialLinks(db, profileId);
@@ -163,19 +167,25 @@ export async function POST(req: Request) {
     await db.insert(chatAuditLog).values({
       userId: profile.internalUserId!,
       creatorProfileId: profileId,
-      action: 'add_social_link',
+      action: outcome === 'created' ? 'add_social_link' : 'update_social_link',
       field: 'social_links',
       previousValue: null,
       newValue: JSON.stringify({
         platform: detected.platform.id,
         url: detected.normalizedUrl,
+        outcome,
       }),
       ipAddress: ipAddress ?? null,
       userAgent: userAgent ?? null,
     });
 
     return NextResponse.json(
-      { success: true, platform: detected.platform.id, linkId },
+      {
+        success: true,
+        platform: detected.platform.id,
+        linkId,
+        outcome,
+      },
       { headers: NO_CACHE_HEADERS }
     );
   } catch (error) {

@@ -9,9 +9,12 @@
 
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 import {
+  ensureSignedInUser,
   getAdminCredentials as getSharedAdminCredentials,
   hasAdminCredentials as hasSharedAdminCredentials,
+  setTestAuthBypassSession,
 } from '../../helpers/clerk-auth';
 
 // ============================================================================
@@ -36,6 +39,45 @@ export function hasAdminCredentials(): boolean {
  */
 export function getAdminCredentials(): AdminCredentials {
   return getSharedAdminCredentials();
+}
+
+/**
+ * Sign the page in as an ADMIN identity.
+ *
+ * Under Better Auth the dev bypass is the only auth path and
+ * `ensureSignedInUser` resolves the persona from `E2E_TEST_AUTH_PERSONA`
+ * (creator/creator-ready in the heavy lanes), so admin specs that rely on it
+ * land on the dashboard redirect instead of the admin workspace (JOV-4326).
+ * The bypass has a dedicated `admin` persona (`users.isAdmin = true`); the
+ * session route mints its cookie into the browser context. This mirrors the
+ * pattern already used by admin-visual-regression.spec.ts and
+ * nightly/full-surface-chaos.spec.ts.
+ *
+ * Like the legacy bypass sign-in, this lands on the app shell (`/app`) so
+ * specs can assume an authenticated dashboard is already loaded.
+ */
+export async function signInAsAdmin(page: Page): Promise<Page> {
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+    await setTestAuthBypassSession(page, 'admin');
+    await page.goto(APP_ROUTES.DASHBOARD, { waitUntil: 'domcontentloaded' });
+    // Mirror waitForShellReadyAfterAuth: the shell (or chat composer) must be
+    // visible before specs interact with the dashboard.
+    const main = page.locator('main').first();
+    const chatComposer = page
+      .locator('textarea, [contenteditable="true"], a[href="/app/chat"]')
+      .first();
+    await expect
+      .poll(
+        async () =>
+          (await main.isVisible().catch(() => false)) ||
+          (await chatComposer.isVisible().catch(() => false)),
+        { timeout: 30_000, intervals: [2_000, 5_000, 10_000] }
+      )
+      .toBe(true);
+    return page;
+  }
+
+  return ensureSignedInUser(page, getAdminCredentials());
 }
 
 // ============================================================================

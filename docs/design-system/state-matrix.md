@@ -21,6 +21,8 @@ These states apply across families and were previously undocumented.
 | --- | --- | --- | --- | --- |
 | Visited | `--color-link-visited` | `a:visited`, `[data-state="visited"]` | `shadcn/Link/Visited` | `packages/ui/atoms/link.tsx` |
 | Link styling | `--color-link-default`, `--color-link-hover` | `[data-variant="link"]` | `shadcn/Link/Default` | `packages/ui/atoms/link.tsx` |
+| Link active/pressed | `--color-accent` | `:active`, `[data-state="active"]` | `shadcn/Link/Active` | `packages/ui/atoms/link.tsx` |
+| Link disabled | `--state-disabled-opacity`, `--color-text-disabled-token` | `[data-state="disabled"]`, `[aria-disabled="true"]` | `shadcn/Link/Disabled` | `packages/ui/atoms/link.tsx` |
 | Disabled visual | `--state-disabled-opacity`, `--color-text-disabled-token` | `[data-state="disabled"]`, `:disabled`, `[aria-disabled="true"]` | `shadcn/Button/DisabledVisual` | `packages/ui/atoms/button.tsx` |
 | Loading shimmer | `--color-skeleton-base`, `--color-skeleton-shimmer` | `.skeleton`, `[data-state="shimmer"]` | `shadcn/Skeleton/LoadingShimmer` | `packages/ui/atoms/skeleton.tsx` |
 | Partial data | `--state-partial-opacity` | `[data-content-state="partial"]` | `UI/Atoms/Card/PartialData` | `packages/ui/atoms/card.tsx` |
@@ -43,6 +45,8 @@ These states apply across families and were previously undocumented.
 | Success | `--color-success`, `--color-success-subtle` | `[data-state="success"]` | `Molecules/FormStatus/Success` | `apps/web/components/molecules/FormStatus.tsx` |
 | Visited | `--color-link-visited` | `a:visited`, `[data-state="visited"]` | `shadcn/Link/Visited` | `packages/ui/atoms/link.tsx` |
 | Link styling | `--color-link-default`, `--color-link-hover` | `[data-variant="link"]` | `shadcn/Link/Default` | `packages/ui/atoms/link.tsx` |
+| Link active/pressed | `--color-accent` | `:active`, `[data-state="active"]` | `shadcn/Link/Active` | `packages/ui/atoms/link.tsx` |
+| Link disabled | `--state-disabled-opacity`, `--color-text-disabled-token` | `[data-state="disabled"]`, `[aria-disabled="true"]` | `shadcn/Link/Disabled` | `packages/ui/atoms/link.tsx` |
 
 ---
 

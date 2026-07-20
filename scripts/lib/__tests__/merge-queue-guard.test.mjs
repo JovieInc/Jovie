@@ -430,7 +430,7 @@ describe('aggregate required checks', () => {
     }
   });
 
-  it('keeps Storybook A11y manual and outside source PR Ready', () => {
+  it('keeps Storybook A11y scheduled-only and outside source PR Ready', () => {
     const branchProtectionYaml = readFileSync(
       resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.branchProtection),
       'utf8'
@@ -444,19 +444,18 @@ describe('aggregate required checks', () => {
       'utf8'
     );
     const storybookBlock = extractWorkflowJobBlock(
-      ciWorkflowYaml,
-      'ci-storybook-a11y'
+      visualWorkflowYaml,
+      'storybook-a11y'
     );
     const prReadyBlock = extractWorkflowJobBlock(ciWorkflowYaml, 'ci-pr-ready');
 
     expect(
       parseRequiredStatusChecksFromYaml(branchProtectionYaml)
     ).not.toContain('Storybook A11y');
-    expect(storybookBlock).toContain(
-      "github.event_name == 'workflow_dispatch'"
-    );
-    expect(storybookBlock).toMatch(/pnpm --filter @jovie\/web test:a11y/);
-    expect(storybookBlock).not.toContain("github.event_name == 'pull_request'");
+    // The duplicate manual ci-storybook-a11y job was removed (JOV-4326); the
+    // scheduled visual-a11y.yml storybook-a11y lane is the single owner.
+    expect(ciWorkflowYaml).not.toContain('ci-storybook-a11y:');
+    expect(storybookBlock).toMatch(/pnpm --filter web test:a11y/);
     expect(prReadyBlock).not.toMatch(/ci-storybook-a11y|STORYBOOK_A11Y_RESULT/);
     expect(visualWorkflowYaml).not.toMatch(/^\s+pull_request:/m);
     expect(visualWorkflowYaml).not.toMatch(/^\s+push:/m);

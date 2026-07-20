@@ -49,7 +49,7 @@ const sidebarMenuButtonVariants = cva(
     // Active state — filled background only, no border/inset ring
     'data-[active=true]:bg-[color-mix(in_oklab,var(--color-sidebar-accent-active)_88%,var(--linear-app-content-surface))] data-[active=true]:text-sidebar-item-foreground',
     // Focus state - subtle bg plus tokenized keyboard ring
-    'focus-visible:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
+    'focus-visible:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/35',
     // Disabled state
     'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
     // Menu action spacing
@@ -196,7 +196,7 @@ export const SidebarMenuAction = React.forwardRef<
       className={cn(
         'relative flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-[background-color,color] duration-normal ease-interactive',
         'hover:text-sidebar-foreground hover:bg-sidebar-accent',
-        'focus-visible:bg-sidebar-accent focus-visible:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
+        'focus-visible:bg-sidebar-accent focus-visible:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/35',
         '[&>svg]:size-3 [&>svg]:shrink-0',
         // Increases the hit area of the button on mobile.
         'after:absolute after:-inset-2 after:lg:hidden',
@@ -314,7 +314,7 @@ export const SidebarMenuSubButton = React.forwardRef<
       className={cn(
         'flex min-h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-full px-2.5 text-app leading-[1.15] text-sidebar-item-foreground outline-none transition-[background-color,color,box-shadow] duration-normal ease-interactive [font-weight:var(--font-weight-nav)]',
         'hover:bg-sidebar-accent hover:text-sidebar-item-foreground',
-        'focus-visible:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
+        'focus-visible:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/35',
         'active:bg-sidebar-accent active:text-sidebar-item-foreground',
         'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
         '[&>span:last-child]:truncate [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors',
