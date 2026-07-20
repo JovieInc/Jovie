@@ -626,9 +626,10 @@ describe('LibrarySurface', () => {
     fireEvent.click(drawer.getByRole('button', { name: 'Providers' }));
     const providerLink = drawer.getByRole('link', { name: /Spotify/u });
 
-    expect(overflowButton.className).toContain(
-      'focus-visible:ring-(--linear-border-focus)'
-    );
+    expect(
+      overflowButton.className.includes('focus-visible:ring-ring') ||
+        overflowButton.className.includes('focus-visible:ring-ring')
+    ).toBe(true);
     for (const element of [previewButton, providerLink]) {
       expect(element.className).toContain(
         'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
