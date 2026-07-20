@@ -8,6 +8,7 @@ const mockCleanupSmsIntents = vi.hoisted(() => vi.fn());
 const mockRunWaitlistAutoAccept = vi.hoisted(() => vi.fn());
 const mockSweepUnderEnrichedProfilesForCron = vi.hoisted(() => vi.fn());
 const mockRunOnboardingScriptAggregation = vi.hoisted(() => vi.fn());
+const mockRunProfileSearchMonitoring = vi.hoisted(() => vi.fn());
 const mockSyncAiCrawlerAnalyticsCron = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/analytics/data-retention', () => ({
@@ -51,6 +52,10 @@ vi.mock('@/lib/discography/re-enrich', () => ({
 
 vi.mock('@/lib/onboarding/script-aggregation', () => ({
   runOnboardingScriptAggregation: mockRunOnboardingScriptAggregation,
+}));
+
+vi.mock('@/lib/profile-search/runner', () => ({
+  runProfileSearchMonitoring: mockRunProfileSearchMonitoring,
 }));
 
 vi.mock('@/app/api/cron/sync-ai-crawler-analytics/route', () => ({
@@ -99,6 +104,16 @@ describe('GET /api/cron/daily-maintenance', () => {
       promoted: 0,
       retired: 0,
     });
+    mockRunProfileSearchMonitoring.mockResolvedValue({
+      enabled: false,
+      claimed: 0,
+      attempted: 0,
+      succeeded: 0,
+      failed: 0,
+      retried: 0,
+      skippedBudget: 0,
+      stoppedForDeadline: false,
+    });
     mockSyncAiCrawlerAnalyticsCron.mockResolvedValue({
       success: true,
       zonesProcessed: 1,
@@ -138,6 +153,10 @@ describe('GET /api/cron/daily-maintenance', () => {
     expect(data.results.billingReconciliation.success).toBe(true);
     expect(data.results.cleanupSmsIntents.success).toBe(true);
     expect(data.results.waitlistAutoAccept.success).toBe(true);
+    expect(data.results.profileSearchMonitoring.success).toBe(true);
+    expect(mockRunProfileSearchMonitoring).toHaveBeenCalledWith(
+      new Date('2026-03-29T00:00:00.000Z').getTime() + 90_000
+    );
     expect(data.results.discographyReEnrich.success).toBe(true);
     expect(data.results.discographyReEnrich.data).toEqual({
       profilesProcessed: 1,
