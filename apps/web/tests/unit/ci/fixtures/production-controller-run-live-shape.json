@@ -1,0 +1,203 @@
+{
+  "source": "GitHub Actions run 29702874377 observed 2026-07-19; latest-run REST record captured after the exact-attempt run GET returned 503, while the exact-attempt jobs read succeeded",
+  "run": {
+    "id": 29702874377,
+    "run_attempt": 1,
+    "name": "Production Controller d170b32a3cdc54b4be21c4162891618bd4c1fbc5 from CI 29702863354 attempt 1",
+    "display_title": "Production Controller d170b32a3cdc54b4be21c4162891618bd4c1fbc5 from CI 29702863354 attempt 1",
+    "path": ".github/workflows/production-controller.yml",
+    "workflow_id": 316053388,
+    "event": "workflow_run",
+    "status": "completed",
+    "conclusion": "failure",
+    "created_at": "2026-07-19T20:37:45Z",
+    "html_url": "https://github.com/JovieInc/Jovie/actions/runs/29702874377",
+    "head_branch": "main",
+    "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+    "head_repository": {
+      "full_name": "JovieInc/Jovie"
+    }
+  },
+  "workflow": {
+    "id": 316053388,
+    "name": "Production Controller",
+    "path": ".github/workflows/production-controller.yml",
+    "state": "active"
+  },
+  "exact_attempt_jobs": {
+    "source": "GET /repos/JovieInc/Jovie/actions/runs/29702874377/attempts/1/jobs?per_page=100",
+    "total_count": 17,
+    "jobs": [
+      {
+        "id": 88235274453,
+        "name": "Authorize exact main CI evidence",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88235287856,
+        "name": "Production Release / Check current main before release",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88235296766,
+        "name": "Production Release / deploy-staging",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88235798921,
+        "name": "Production Release / Canary Health Gate (staging) / Canary health gate",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88236004733,
+        "name": "Production Release / Recheck main before staging alias",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88236015461,
+        "name": "Production Release / Alias verified preview to staging.jov.ie",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88236094088,
+        "name": "Production Release / Recheck main before production mutation",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88236108969,
+        "name": "Production Release / Promote to Production",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88236727597,
+        "name": "Production Release / Production OAuth Gate (observational)",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88236727601,
+        "name": "Production Release / Sentry Error Gate (production)",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88237157745,
+        "name": "Production Release / Production release result",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88237157974,
+        "name": "Production Release / Centralized production rollback",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 88237169977,
+        "name": "Lighthouse CI (Production)",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88237170000,
+        "name": "Post-Deploy Auth Smoke (Production)",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88237170010,
+        "name": "Homepage Smoke (Production)",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 88237170017,
+        "name": "Post-Deploy Smoke (Production)",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "failure"
+      },
+      {
+        "id": 88237442493,
+        "name": "Production Verified",
+        "run_id": 29702874377,
+        "run_attempt": 1,
+        "head_branch": "main",
+        "head_sha": "d170b32a3cdc54b4be21c4162891618bd4c1fbc5",
+        "status": "completed",
+        "conclusion": "failure"
+      }
+    ]
+  }
+}

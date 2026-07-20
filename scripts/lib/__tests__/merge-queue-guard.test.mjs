@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { remediateBlockedPrs } from '../../drain-pr-remediate.mjs';
+import {
+  classifyGitHubRebaseFailure,
+  tryGitHubRebase,
+} from '../github-update-branch.mjs';
 import {
   bisectBatchFailure,
   ciWorkflowHasMergeGroupTrigger,
@@ -12,7 +17,9 @@ import {
   isAutonomousBranch,
   MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
+  NATIVE_BRANCH_PROTECTION_POLICY,
   NATIVE_QUEUE_POLICY,
+  normalizeBranchProtectionSource,
   parseMergeQueueTimeline,
   parseRequiredStatusChecksFromYaml,
   preQueueFreshnessDecision,
@@ -25,11 +32,18 @@ import {
 } from '../merge-queue-guard.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+const LIVE_NATIVE_RULESET_FIXTURE = JSON.parse(
+  readFileSync(
+    resolve(import.meta.dirname, 'fixtures/main-ruleset-10512119.json'),
+    'utf8'
+  )
+);
 
 const greenStatuses = [
   { name: 'PR Ready', conclusion: 'SUCCESS' },
   { name: 'Migration Guard', conclusion: 'SUCCESS' },
   { name: 'Fork PR Gate', state: 'SUCCESS' },
+  { name: 'PR Size Guard', state: 'SUCCESS' },
 ];
 
 function buildUiFastTrackBody({
@@ -348,6 +362,7 @@ describe('aggregate required checks', () => {
       'CI / PR Ready',
       'CI / Migration Guard',
       'Fork PR Gate',
+      'PR Size Guard',
     ]);
     expect(ok.ok).toBe(true);
 
@@ -382,11 +397,17 @@ describe('aggregate required checks', () => {
     expect(ciWorkflowHasMergeGroupTrigger(ciWorkflowYaml)).toBe(true);
     expect(result.warnings).toEqual([]);
     expect(parseRequiredStatusChecksFromYaml(branchProtectionYaml)).toEqual([
-      'CI / PR Ready',
-      'CI / Migration Guard',
+      'PR Ready',
+      'Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
     ]);
+    expect(normalizeBranchProtectionSource(branchProtectionYaml)).toEqual(
+      LIVE_NATIVE_RULESET_FIXTURE
+    );
+    expect(NATIVE_BRANCH_PROTECTION_POLICY).toEqual(
+      LIVE_NATIVE_RULESET_FIXTURE
+    );
 
     for (const bypass_actors of [
       '{}',
@@ -407,7 +428,7 @@ describe('aggregate required checks', () => {
     }
   });
 
-  it('keeps Storybook A11y path-gated as a leaf and blocking through PR Ready', () => {
+  it('keeps Storybook A11y manual and outside source PR Ready', () => {
     const branchProtectionYaml = readFileSync(
       resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.branchProtection),
       'utf8'
@@ -429,16 +450,16 @@ describe('aggregate required checks', () => {
     expect(
       parseRequiredStatusChecksFromYaml(branchProtectionYaml)
     ).not.toContain('Storybook A11y');
-    expect(storybookBlock).toMatch(/run_storybook_a11y == 'true'/);
+    expect(storybookBlock).toContain(
+      "github.event_name == 'workflow_dispatch'"
+    );
     expect(storybookBlock).toMatch(/pnpm --filter @jovie\/web test:a11y/);
-    expect(prReadyBlock).toMatch(/ci-storybook-a11y/);
-    expect(prReadyBlock).toMatch(
-      /STORYBOOK_A11Y_RESULT.*needs\.ci-storybook-a11y\.result/
-    );
-    expect(prReadyBlock).toMatch(
-      /STORYBOOK_A11Y_RESULT.*!= "success".*!= "skipped"/
-    );
+    expect(storybookBlock).not.toContain("github.event_name == 'pull_request'");
+    expect(prReadyBlock).not.toMatch(/ci-storybook-a11y|STORYBOOK_A11Y_RESULT/);
     expect(visualWorkflowYaml).not.toMatch(/^\s+pull_request:/m);
+    expect(visualWorkflowYaml).not.toMatch(/^\s+push:/m);
+    expect(visualWorkflowYaml).toMatch(/^\s+schedule:/m);
+    expect(visualWorkflowYaml).not.toContain('vars.CI_FAST_RUNNER');
   });
 
   it('keeps merge-queue enroll hot path free of pytest/Python bootstrap (GH-13630)', () => {
@@ -458,7 +479,7 @@ describe('aggregate required checks', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('validates the live ruleset shape used by Graphite merge queue', () => {
+  it('validates the legacy Graphite ruleset shape only when explicitly selected', () => {
     const liveRuleset = {
       bypass_actors: [
         {
@@ -475,6 +496,7 @@ describe('aggregate required checks', () => {
             { context: 'PR Ready' },
             { context: 'Migration Guard' },
             { context: 'Fork PR Gate', integration_id: 2934433 },
+            { context: 'PR Size Guard' },
           ],
         },
         { type: 'non_fast_forward' },
@@ -482,7 +504,9 @@ describe('aggregate required checks', () => {
       ],
     };
 
-    const result = validateLiveMergeQueueRuleset(liveRuleset);
+    const result = validateLiveMergeQueueRuleset(liveRuleset, {
+      backend: 'graphite',
+    });
     expect(result.ok).toBe(true);
     expect(result.hasGraphiteBypass).toBe(true);
   });
@@ -540,6 +564,19 @@ describe('aggregate required checks', () => {
       hasGraphiteBypass: false,
       hasNativeMergeQueue: true,
     });
+
+    for (const dormantType of ['required_signatures', 'non_fast_forward']) {
+      const unexpectedDormantRule = validateLiveMergeQueueRuleset(
+        {
+          bypass_actors: [],
+          rules: [...nativeRules, { type: dormantType }],
+        },
+        { backend: 'native' }
+      );
+      expect(unexpectedDormantRule.errors).toContain(
+        'live native ruleset unexpectedly enables dormant signature or non-fast-forward rules'
+      );
+    }
 
     for (const bypass_actors of [undefined, {}]) {
       const malformed = validateLiveMergeQueueRuleset(
@@ -717,5 +754,448 @@ describe('merge queue telemetry parser', () => {
     ]);
 
     expect(metrics.readyToMergedSeconds).toBeNull();
+  });
+});
+
+const ORIGINAL_HEAD = 'a'.repeat(40);
+const UPDATED_HEAD = 'b'.repeat(40);
+const RACING_HEAD = 'c'.repeat(40);
+
+function snapshot(overrides = {}) {
+  return {
+    id: 'PR_kwDO_example',
+    state: 'OPEN',
+    isDraft: false,
+    baseRefName: 'main',
+    headRefName: 'tim/jov-123-example',
+    headRefOid: ORIGINAL_HEAD,
+    mergeable: 'MERGEABLE',
+    ...overrides,
+  };
+}
+
+function mutationSnapshot() {
+  return {
+    data: {
+      updatePullRequestBranch: {
+        pullRequest: snapshot({ headRefOid: UPDATED_HEAD }),
+      },
+    },
+  };
+}
+
+function blockedPr(overrides = {}) {
+  return {
+    number: 123,
+    headRefName: 'tim/jov-123-example',
+    updatedAt: '2026-07-01T00:00:00Z',
+    labels: [],
+    failures: ['CI / PR Ready'],
+    ...overrides,
+  };
+}
+
+function ghSequence({
+  before = snapshot(),
+  mutation = mutationSnapshot(),
+  after = snapshot({ headRefOid: UPDATED_HEAD }),
+  afterSequence = null,
+  mutationError = null,
+} = {}) {
+  const calls = [];
+  let snapshotCalls = 0;
+  const ghJsonImpl = vi.fn(async args => {
+    calls.push(args);
+    if (args[0] === 'pr' && args[1] === 'view') {
+      snapshotCalls += 1;
+      if (snapshotCalls === 1) return before;
+      const snapshots = afterSequence ?? [after];
+      return snapshots[Math.min(snapshotCalls - 2, snapshots.length - 1)];
+    }
+    if (args[0] === 'api' && args[1] === 'graphql') {
+      if (mutationError) throw mutationError;
+      return mutation;
+    }
+    throw new Error(`unexpected gh args: ${args.join(' ')}`);
+  });
+  return { calls, ghJsonImpl };
+}
+
+function ghError(message) {
+  return Object.assign(new Error(message), { stderr: message });
+}
+
+describe('exact-head GitHub Update Branch rebase', () => {
+  it('passes the observed head to updatePullRequestBranch with REBASE and verifies the new head', async () => {
+    const gh = ghSequence();
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      updated: true,
+      mutationAttempted: true,
+      mutationApplied: true,
+      conflict: false,
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: UPDATED_HEAD,
+      baseRefName: 'main',
+    });
+    const mutationArgs = gh.calls.find(
+      args => args[0] === 'api' && args[1] === 'graphql'
+    );
+    expect(mutationArgs.join('\n')).toContain('updateMethod: REBASE');
+    expect(mutationArgs).toContain(`expectedHeadOid=${ORIGINAL_HEAD}`);
+    expect(gh.calls.flat().join(' ')).not.toMatch(
+      /repo clone|force-with-lease|git push/
+    );
+  });
+
+  it('polls through a stale post-mutation read until the exact updated head is visible', async () => {
+    const sleepImpl = vi.fn(async () => {});
+    const gh = ghSequence({
+      afterSequence: [snapshot(), snapshot({ headRefOid: UPDATED_HEAD })],
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      sleepImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      updated: true,
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: UPDATED_HEAD,
+    });
+    expect(sleepImpl).toHaveBeenCalledOnce();
+    expect(sleepImpl).toHaveBeenCalledWith(250);
+  });
+
+  it('fails closed when the updated head never becomes visible', async () => {
+    const sleepImpl = vi.fn(async () => {});
+    const gh = ghSequence({ afterSequence: [snapshot()] });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+      sleepImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      mutationAttempted: true,
+      mutationApplied: true,
+      conflict: false,
+      category: 'verification_failure',
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: ORIGINAL_HEAD,
+    });
+    expect(sleepImpl.mock.calls.map(([delayMs]) => delayMs)).toEqual([
+      250, 500, 1000, 2000,
+    ]);
+  });
+
+  it('treats a concurrent head update as stale, never as a conflict', async () => {
+    const gh = ghSequence({
+      mutationError: ghError('GraphQL: head branch was modified'),
+      after: snapshot({ headRefOid: UPDATED_HEAD }),
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      mutationAttempted: true,
+      mutationApplied: false,
+      conflict: false,
+      category: 'stale_head',
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: UPDATED_HEAD,
+    });
+  });
+
+  it('refuses enrollment when the post-update head differs from the mutation result', async () => {
+    const gh = ghSequence({
+      after: snapshot({ headRefOid: RACING_HEAD }),
+    });
+
+    const result = await tryGitHubRebase({
+      repo: 'JovieInc/Jovie',
+      pr: blockedPr(),
+      expectedBaseRefName: null,
+      dryRun: false,
+      ghJsonImpl: gh.ghJsonImpl,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      conflict: false,
+      category: 'verification_failure',
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: RACING_HEAD,
+    });
+  });
+
+  it('only classifies a conflict when GitHub confirms CONFLICTING after failure', () => {
+    const error = ghError('GraphQL: pull request is not mergeable');
+
+    expect(
+      classifyGitHubRebaseFailure({
+        error,
+        before: snapshot(),
+        after: snapshot({ mergeable: 'CONFLICTING' }),
+      })
+    ).toMatchObject({ conflict: true, category: 'conflict' });
+    expect(
+      classifyGitHubRebaseFailure({
+        error: ghError('HTTP 503 service unavailable'),
+        before: snapshot(),
+        after: snapshot({ mergeable: 'MERGEABLE' }),
+      })
+    ).toMatchObject({ conflict: false, category: 'transient' });
+    expect(
+      classifyGitHubRebaseFailure({
+        error: ghError('HTTP 403 Resource not accessible by integration'),
+        before: snapshot(),
+        after: snapshot({ mergeable: 'UNKNOWN' }),
+      })
+    ).toMatchObject({ conflict: false, category: 'auth' });
+    expect(
+      classifyGitHubRebaseFailure({
+        error: ghError('GraphQL: PR branch already up-to-date'),
+        before: snapshot(),
+        after: snapshot(),
+      })
+    ).toMatchObject({
+      ok: true,
+      updated: false,
+      conflict: false,
+      category: 'no_change',
+    });
+  });
+});
+
+describe('remediation mutations', () => {
+  const options = {
+    repo: 'JovieInc/Jovie',
+    baseRef: 'main',
+    dryRun: false,
+    maxPerRun: 3,
+    cooldownHours: 0,
+    limit: 10,
+  };
+
+  it('bypasses the cooldown for a stale conflict label', async () => {
+    const rebaseImpl = vi.fn(async () => ({
+      ok: true,
+      updated: true,
+      dryRun: true,
+      reason: 'would rebase exact head',
+    }));
+
+    const summary = await remediateBlockedPrs(
+      { ...options, dryRun: true, cooldownHours: 4 },
+      {
+        listBlockedAgentPrsImpl: async () => [
+          blockedPr({
+            updatedAt: '2026-07-18T17:59:00Z',
+            labels: [{ name: 'needs-conflict-resolution' }],
+          }),
+        ],
+        rebaseImpl,
+        nowMs: Date.parse('2026-07-18T18:00:00Z'),
+      }
+    );
+
+    expect(rebaseImpl).toHaveBeenCalledOnce();
+    expect(summary.applied).toBe(1);
+  });
+
+  it('does not add conflict or queue labels for transient rebase failures', async () => {
+    const labelPrImpl = vi.fn();
+    const commentPrImpl = vi.fn();
+
+    const summary = await remediateBlockedPrs(options, {
+      listBlockedAgentPrsImpl: async () => [blockedPr()],
+      rebaseImpl: async () => ({
+        ok: false,
+        mutationAttempted: true,
+        mutationApplied: false,
+        conflict: false,
+        category: 'transient',
+        reason: 'GitHub rebase transient: HTTP 503',
+      }),
+      labelPrImpl,
+      commentPrImpl,
+      nowMs: Date.parse('2026-07-18T00:00:00Z'),
+    });
+
+    expect(summary.applied).toBe(0);
+    expect(summary.mutationBudgetUsed).toBe(1);
+    expect(labelPrImpl).not.toHaveBeenCalled();
+    expect(commentPrImpl).not.toHaveBeenCalled();
+  });
+
+  it('stops after one attempted but unverified mutation', async () => {
+    const rebaseImpl = vi.fn(async () => ({
+      ok: false,
+      mutationAttempted: true,
+      mutationApplied: true,
+      conflict: false,
+      category: 'verification_failure',
+      reason: 'updated head did not converge before timeout',
+    }));
+    const labelPrImpl = vi.fn();
+    const commentPrImpl = vi.fn();
+
+    const summary = await remediateBlockedPrs(
+      { ...options, maxPerRun: 1 },
+      {
+        listBlockedAgentPrsImpl: async () => [
+          blockedPr(),
+          blockedPr({ number: 124, headRefName: 'codex/next-candidate' }),
+        ],
+        rebaseImpl,
+        labelPrImpl,
+        commentPrImpl,
+        nowMs: Date.parse('2026-07-18T00:00:00Z'),
+      }
+    );
+
+    expect(rebaseImpl).toHaveBeenCalledOnce();
+    expect(summary).toMatchObject({ applied: 0, mutationBudgetUsed: 1 });
+    expect(summary.results).toHaveLength(1);
+    expect(summary.results[0]).toMatchObject({
+      mutationAttempted: true,
+      mutationApplied: true,
+      consumedBudget: true,
+    });
+    expect(labelPrImpl).not.toHaveBeenCalled();
+    expect(commentPrImpl).not.toHaveBeenCalled();
+  });
+
+  it('clears a stale conflict label on a verified no-op without queue churn', async () => {
+    const labelPrImpl = vi.fn();
+    const removeLabelPrImpl = vi.fn();
+    const commentPrImpl = vi.fn();
+
+    const summary = await remediateBlockedPrs(options, {
+      listBlockedAgentPrsImpl: async () => [
+        blockedPr({ labels: [{ name: 'needs-conflict-resolution' }] }),
+      ],
+      rebaseImpl: async () => ({
+        ok: true,
+        updated: false,
+        mutationAttempted: true,
+        mutationApplied: false,
+        conflict: false,
+        category: 'no_change',
+        reason: 'GitHub reports the pull request branch is already current',
+      }),
+      labelPrImpl,
+      removeLabelPrImpl,
+      commentPrImpl,
+      nowMs: Date.parse('2026-07-18T00:00:00Z'),
+    });
+
+    expect(summary.applied).toBe(0);
+    expect(removeLabelPrImpl).toHaveBeenCalledOnce();
+    expect(removeLabelPrImpl).toHaveBeenCalledWith(
+      'JovieInc/Jovie',
+      123,
+      'needs-conflict-resolution'
+    );
+    expect(labelPrImpl).not.toHaveBeenCalled();
+    expect(commentPrImpl).not.toHaveBeenCalled();
+  });
+
+  it('adds needs-conflict-resolution only for confirmed conflicts', async () => {
+    const labelPrImpl = vi.fn();
+    const commentPrImpl = vi.fn();
+
+    await remediateBlockedPrs(options, {
+      listBlockedAgentPrsImpl: async () => [blockedPr()],
+      rebaseImpl: async () => ({
+        ok: false,
+        conflict: true,
+        category: 'conflict',
+        reason: 'GitHub confirmed conflicts',
+      }),
+      labelPrImpl,
+      commentPrImpl,
+      nowMs: Date.parse('2026-07-18T00:00:00Z'),
+    });
+
+    expect(labelPrImpl).toHaveBeenCalledOnce();
+    expect(labelPrImpl).toHaveBeenCalledWith(
+      'JovieInc/Jovie',
+      123,
+      'needs-conflict-resolution'
+    );
+    expect(commentPrImpl).toHaveBeenCalledOnce();
+  });
+
+  it('clears a stale conflict label before enrolling the rebased head', async () => {
+    const labelPrImpl = vi.fn();
+    const removeLabelPrImpl = vi.fn();
+    const commentPrImpl = vi.fn();
+
+    const summary = await remediateBlockedPrs(options, {
+      listBlockedAgentPrsImpl: async () => [
+        blockedPr({ labels: [{ name: 'needs-conflict-resolution' }] }),
+      ],
+      rebaseImpl: async () => ({
+        ok: true,
+        updated: true,
+        mutationAttempted: true,
+        mutationApplied: true,
+        conflict: false,
+        category: 'updated',
+        baseRefName: 'main',
+        expectedHeadOid: ORIGINAL_HEAD,
+        observedHeadOid: UPDATED_HEAD,
+        reason: 'GitHub rebased the exact head',
+      }),
+      labelPrImpl,
+      removeLabelPrImpl,
+      commentPrImpl,
+      nowMs: Date.parse('2026-07-18T00:00:00Z'),
+    });
+
+    expect(summary.applied).toBe(1);
+    expect(removeLabelPrImpl).toHaveBeenCalledWith(
+      'JovieInc/Jovie',
+      123,
+      'needs-conflict-resolution'
+    );
+    expect(labelPrImpl).toHaveBeenCalledWith(
+      'JovieInc/Jovie',
+      123,
+      'merge-queue'
+    );
+    expect(removeLabelPrImpl.mock.invocationCallOrder[0]).toBeLessThan(
+      labelPrImpl.mock.invocationCallOrder[0]
+    );
+    expect(commentPrImpl).toHaveBeenCalledOnce();
   });
 });

@@ -93,9 +93,14 @@ AI agents MUST follow the "draft PR first, commit often" pattern for all non-tri
 
 Labels are part of the CI control plane, not just project organization. Apply intentionally.
 
-- Add `testing` when a PR needs the heavyweight verification lanes (E2E, smoke tests, full build with secrets) beyond the default merge gate.
-- Add `testing` for changes affecting deploy behavior, migrations, auth, billing, middleware/proxy logic, environment/config loading, or any flow that should get E2E and preview QA before merge.
-- Note: Build (public routes), Lighthouse, a11y, and layout-guard now run on ALL PRs without the `testing` label. The `testing` label is only needed for E2E/smoke/preview-deploy lanes.
+- Heavyweight verification (E2E, smoke, preview, Lighthouse, a11y, Storybook, or full builds with secrets) never starts from a source-PR event or label. Use the hosted manual `CI` dispatch, a bounded repository event, or the scheduled/nightly lane.
+- For changes affecting deploy behavior, migrations, auth, billing, middleware/proxy logic, environment/config loading, or another high-risk flow, record the risk classification and run only the specific manual deep evidence that materially reduces risk.
+- Build, Neon, E2E, Lighthouse, a11y, Storybook, layout, golden-path, and
+  extended-smoke lanes do not auto-start from source-PR paths or risk
+  classification. No PR label allocates the evidence set. These heavyweight
+  lanes stay outside required source `PR Ready`; the native merge queue enforces
+  deterministic combined-head unit/build/layout and path-selected iOS evidence.
+- `testing`, `deep-ci`, `launch-candidate`, and `deploy-preview` are metadata only. They have no CI fan-out semantics.
 
 - Add `needs-human` when the PR should be held for human review or automation must stop. This is for physical actions only a human can perform (sign agreement, rotate key, flip dashboard toggle).
 - If a PR has `needs-human`, do **NOT** enable or preserve auto-merge. Treat the label as a hard stop for unattended automation until a human clears it.
@@ -104,8 +109,8 @@ Labels are part of the CI control plane, not just project organization. Apply in
 - Use `automerge` only for clearly safe PRs that fit the auto-merge guardrails below.
 - Do **NOT** add `automerge` to high-risk paths or to PRs that also need `needs-human`.
 
-- Use `deploy-preview` only when a PR specifically needs the build/preview lane for review or QA and `testing` is not otherwise warranted.
-- Do **NOT** rely on `deploy-preview` as a substitute for `testing` on risky changes.
+- For a bounded preview, dispatch `CI` on the exact ref with `run_preview_deploy=true`. External Vercel preview status remains informational.
+- Do **NOT** add a label expecting it to start preview or deep CI.
 
 - Do **NOT** add `skip-migration-guard` unless a human explicitly instructs you to bypass the migration guard for that PR.
 - If a migration-related PR seems to require `skip-migration-guard`, stop and escalate with `needs-human` instead of applying the bypass yourself.
@@ -145,9 +150,9 @@ When in doubt, skip auto-merge and request review.
 3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually).
 4. `/ship` handles: tests, review, CHANGELOG `[Unreleased]` notes, commit, push, PR creation/update. It must **not** bump the version fan-out (`VERSION`, `version.json`, `package.json` versions, dated CHANGELOG headings) — see "Version Stamping (main-only)" below.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
-6. Apply `merge-queue` after the PR is ready. While
-   `MERGE_QUEUE_BACKEND=graphite`, Graphite remains the live transport; native
-   enrollment stays dormant until the guarded cutover:
+6. Apply `merge-queue` after the PR is ready. The live
+   `MERGE_QUEUE_BACKEND=native` controller treats the label as intent/audit
+   evidence, revalidates the exact head, and enrolls through GitHub's queue:
    ```bash
    gh pr edit --add-label merge-queue
    ```
@@ -234,25 +239,33 @@ BOT REVIEWS
 - Platform: Vercel
 - Production URL: https://jov.ie
 - Staging URL: https://staging.jov.ie (Vercel preview alias)
-- Deploy workflow: `.github/workflows/ci.yml` (`deploy-staging` → `canary-health-gate` → `promote-production`)
+- Deploy controller: `.github/workflows/production-controller.yml` authorizes
+  the exact successful `CI` attempt and holds the repo-wide production lease;
+  `.github/workflows/production-release.yml` owns staging, canary, promotion,
+  observational gates, and the sole rollback job.
 - Merge method: squash (merge queue)
 - Project type: Web app (Next.js monorepo)
 - Post-deploy health check: https://jov.ie/api/health
 
 ### Deploy flow
 
-- Deploy trigger: automatic on push to `main`, with Vercel Git auto-aliasing disabled in `vercel.json`
+- Deploy trigger: a completed successful `CI` workflow run for the exact current
+  `main` SHA, with Vercel Git auto-aliasing disabled in `vercel.json`
 - Staging deploy: `vercel deploy --prebuilt` → preview URL → `vercel alias` to `staging.jov.ie`
 - Canary verification: health check + homepage + profile route against `staging.jov.ie`
 - Production promotion: `vercel promote` after canary passes
-- Post-promotion: Sentry error gate (5 minute soak) with auto-rollback
-- Deploy status: `vercel promote` exit code + `canary-health-gate` + `sentry-error-gate`
+- Post-promotion: Sentry and OAuth gates emit `passed`, confirmed `failed`, or
+  uncertain `error`; only confirmed structured regressions authorize the one
+  centralized rollback owner, while uncertainty fails red without rollback.
+- Deploy status: exact staged/canonical deployment evidence, observational gate
+  outcomes, immutable public/home/Lighthouse probes, final current-main proof,
+  and the `Production Verified` generation marker.
 
 ### Custom deploy hooks
 
 - Pre-merge: typecheck + lint (CI fast path, ~10–15s)
 - DB migrations: run before staging deploy (production DB, additive only)
-- Deploy trigger: automatic on push to `main`
+- Deploy trigger: automatic after successful exact-attempt `main` CI authorization
 - Health check: https://jov.ie/api/health (returns `{"status":"ok"}`)
 
 ## Version Stamping (main-only)
@@ -306,40 +319,51 @@ pnpm version:check        # validate consistency
 
 Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; run `pnpm ci:harness:docs` after changing the manifest.
 
+### Stage Contract
+
+| Stage | Exact responsibility |
+| --- | --- |
+| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, and diff secret scan. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
+| Native merge queue | Re-run deterministic gates on the exact `merge_group` head, then require five affected unit shards, one hosted build + layout workspace, path-selected Xcode, and model-free semantic evals. |
+| Queue-proven main | Reuse the exact successful merge-group `PR Ready` proof and skip duplicate fallback work. |
+| Direct/admin main | Fail closed through path/risk/fast/secret/migration, all five unit shards, and the combined hosted build + layout job; skipped placeholders are invalid. |
+| Production release | One reusable staging/canary/promotion/rollback DAG under one non-cancelling caller lease. |
+| Post-deploy | Hosted public, auth, homepage, and explicitly provisioned Lighthouse probes settle into `Production Verified` before notification. |
+| Scheduled/manual/event | Exhaustive E2E, Neon, a11y, performance, eval, visual, slop, brand, and repair/report loops. |
+
 ### Tiers
 
 | Tier | Purpose | Merge-gate jobs |
 | --- | --- | --- |
-| Fast Gate | Cheap deterministic checks required for every merge candidate. | `ci-fast`, `Unit Tests` |
-| Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `Structural Contract`, `CI Risk Classifier` |
-| Risk-Triggered Smoke | Focused smoke validation for sensitive auth, billing, DB, config, and agent-control-plane changes. | `E2E Smoke (PR Fast Feedback)`, `Golden Path (PR)`, `Extended Smoke (Preview)` |
-| Preview Evidence | Preview deploys and visual/a11y/performance evidence for review. | `Build (public routes)`, `Lighthouse (public routes PR)`, `Lighthouse (dashboard PR)`, `Lighthouse (onboarding PR)`, `Lighthouse (admin PR)`, `Preview Deploy (PR)` |
-| Main Deploy | Post-merge staging, canary, production promotion, and deploy-health gates. | none |
+| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Migration Guard` (both), `Unit Tests` (merge-group) |
+| Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `CI Risk Classifier` (both) |
+| Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
+| Preview Evidence | Hosted manual/event visual, a11y, performance, and preview evidence outside the source-PR event. | none |
+| Combined Integration | Affected unit, one hosted build-plus-layout workspace, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `iOS Build + Test (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group) |
+| Production Release | Each exact successful main CI attempt feeds one fixed production-mutation FIFO from authorization through staging, promotion, centralized rollback, immutable probes, canonical proof, marker, and best-effort notification; one hosted monitor retry is bounded to controller attempt 1. | none |
+| Post-deploy Verification | Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated smoke runs only when a complete credential pair exists, while public Better Auth/OAuth gates remain blocking. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
 
 ### Merge Gates
 
-`PR Ready` may require only jobs declared as merge gates below. Informational jobs must stay out of the aggregate merge gate.
+Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `PR Ready` may require only `merge-group`/`both` jobs. Informational evidence stays out of both required aggregates.
 
-| Job | Tier | Local remediation command |
-| --- | --- | --- |
-| `ci-fast` | fast-gate | `pnpm run typecheck && pnpm run biome:check` |
-| `Structural Contract` | structural-contract | `pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors` |
-| `CI Risk Classifier` | structural-contract | `pnpm ci:harness:check` |
-| `Unit Tests` | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
-| `Build (public routes)` | preview-evidence | `pnpm run build:web` |
-| `Lighthouse (public routes PR)` | preview-evidence | `pnpm --filter=@jovie/web run test:lighthouse:public:launch` |
-| `Lighthouse (dashboard PR)` | preview-evidence | `pnpm --filter=@jovie/web run test:lighthouse:dashboard:pr` |
-| `Lighthouse (onboarding PR)` | preview-evidence | `pnpm --filter=@jovie/web run test:lighthouse:onboarding:pr` |
-| `Lighthouse (admin PR)` | preview-evidence | `pnpm --filter=@jovie/web run test:lighthouse:admin:pr` |
-| `E2E Smoke (PR Fast Feedback)` | risk-triggered-smoke | `pnpm run test:web:smoke` |
-| `Golden Path (PR)` | risk-triggered-smoke | `doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e:golden-path:ci` |
-| `Extended Smoke (Preview)` | risk-triggered-smoke | `pnpm --filter @jovie/web exec playwright test --config=playwright.config.smoke.ts` |
-| `Preview Deploy (PR)` | preview-evidence | `pnpm run build:web` |
+| Job | Gate stage | Tier | Local remediation command |
+| --- | --- | --- | --- |
+| `Path Changes` | both | fast-gate | `git diff --name-only origin/main...HEAD` |
+| `ci-fast` | both | fast-gate | `pnpm run typecheck && pnpm run biome:check` |
+| `CI Risk Classifier` | both | structural-contract | `pnpm ci:harness:check` |
+| `Secret Scan (gitleaks + trufflehog)` | both | fast-gate | `./scripts/security/scan-secrets.sh ci-pr origin/main` |
+| `Migration Guard` | both | fast-gate | `cd apps/web && ./scripts/check-migrations.sh && ./scripts/validate-migrations.sh` |
+| `Unit Tests` | merge-group | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
+| `Build + Layout (combined)` | merge-group | combined-integration | `pnpm run build:web && pnpm --filter @jovie/web exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium` |
+| `iOS Build + Test (combined)` | merge-group | combined-integration | `pnpm run ios:lint && pnpm run ios:test` |
+| `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
+| `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |
 
-### Risk-Triggered Evidence
+### Risk Signals and Opt-in Evidence
 
-Sensitive changes are classified deterministically before auto-merge. High-risk changes require smoke and/or preview evidence and block unattended auto-merge.
+Sensitive changes are classified deterministically on source PRs. Smoke and preview are routing signals for hosted manual, scheduled, or event-driven evidence; no PR label allocates a heavy source-event lane. The generic `testing`, `deep-ci`, `launch-candidate`, and `deploy-preview` labels have no CI fan-out semantics.
 
 | Surface | Level | Smoke | Preview | Blocks unattended auto-merge |
 | --- | --- | --- | --- | --- |

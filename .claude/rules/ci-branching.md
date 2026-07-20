@@ -13,7 +13,7 @@ Canonical branching policy for parallel agent work. Supplements [`.claude/rules/
 ```text
 Parallel agents → integration/loop-{domain} (fast verify, squash immediately)
                 → train PR → main (one full CI per domain batch)
-                → merge queue (ci-fast only) → deploy
+                → merge queue (combined-head fast + unit/build/layout) → deploy
 ```
 
 **Throughput:** ~20 agent PRs via integration trains ≈ **4 full CI builds** instead of **40+** when every agent PR targets `main` directly.
@@ -24,8 +24,8 @@ Parallel agents → integration/loop-{domain} (fast verify, squash immediately)
 |-------------|---------|----------|--------------|
 | **Feature (agent)** | `tim/jov-XXXX`, `agent/jov-XXXX`, `linear/*`, `claude/*`, `codex/*` | Integration fast only | `integration/loop-*` |
 | **Integration** | `integration/loop-{domain}` | `Integration Fast` (optional) | Absorbs feature PRs |
-| **Train** | `integration/loop-{domain}` → `main` PR | Full `PR Ready` + `testing` if risky | `main` |
-| **Hotfix** | `hotfix/jov-XXXX` | Full CI + `testing` | `main` (bypass integration) |
+| **Train** | `integration/loop-{domain}` → `main` PR | deterministic `PR Ready`; manual deep evidence only when explicitly needed | `main` |
+| **Hotfix** | `hotfix/jov-XXXX` | deterministic `PR Ready`; merge-group next-level gate | `main` (bypass integration) |
 | **Dependabot** | `dependabot/*` | Full CI; batch merge Mondays | `main` |
 | **Human ad-hoc** | any | Full CI | `main` (discouraged for agents) |
 
@@ -47,7 +47,7 @@ After a train merges to `main`, reset the integration branch from `main` before 
    `docs/PR_FLOW.md`). Target `integration/loop-{domain}` only inside a
    coordinated multi-agent wave (>3 agents, one domain, same window).
 2. **One PR = one Linear issue** — no drive-by refactors.
-3. **No `testing` label** unless touching: auth, billing, DB/migrations, proxy, env, agent control plane.
+3. **PR labels never allocate heavyweight CI.** Use a hosted manual/scheduled/event lane when deep evidence is explicitly required.
 4. **Local verify before integration merge:** `typecheck`, `biome`, focused `vitest`.
 5. **Train PRs to `main` only from lead/orchestrator** — coders use `scripts/loop-integration-ship.sh`.
 6. **Max 5 open PRs per integration branch** — open a train when the batch is full or the domain is idle.
@@ -79,12 +79,11 @@ After a train merges to `main`, reset the integration branch from `main` before 
 |----------|---------|
 | `.context/loop-state.json` | Active integration bases, waves, train PRs |
 | `scripts/loop-integration-ship.sh` | Fast ship feature branch → integration |
-| `scripts/drain-pr-queue.sh` | Close blocked PRs, strip `testing`, queue safe merges |
+| `scripts/drain-pr-queue.sh` | Reconcile blocked PRs and queue safe exact heads |
 | `scripts/loop-train-drain.sh` | Rebase train PRs, auto-merge when CLEAN |
 
 ## Enforcement
 
-- **CI:** `.github/workflows/ci-branching-guard.yml` — warns (then errors) when agent branches target `main` without exemption.
 - **Local:** `pnpm ci:branching-guard --head <branch> --base main` before opening agent PRs.
 - **Harness:** `pnpm ci:branching-guard:validate` in Structural Contract lane.
 

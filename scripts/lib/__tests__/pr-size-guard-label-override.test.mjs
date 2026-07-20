@@ -83,12 +83,18 @@ describe('pr-size-guard label override helpers', () => {
 describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => {
   it('counts files through paginated REST with bounded transient retry', () => {
     const workflow = readFileSync(SIZE_GUARD_WORKFLOW, 'utf8');
+    const override = readFileSync(OVERRIDE_WORKFLOW, 'utf8');
 
     expect(workflow).toContain('gh api --paginate \\');
     expect(workflow).toContain('"repos/$REPO/pulls/$PR/files?per_page=100"');
     expect(workflow).toContain('for attempt in 1 2 3; do');
+    expect(workflow).toContain('[[ "$attempt" -eq 3 ]]');
     expect(workflow).toContain('HTTP 403|HTTP 429|HTTP 5[0-9][0-9]');
+    expect(workflow).toContain("invalid character '<'");
     expect(workflow).not.toContain('gh pr view "$PR" -R "$REPO" --json files');
+    expect(override).toContain('for attempt in 1 2 3; do');
+    expect(override).toContain('[[ "$attempt" -eq 3 ]]');
+    expect(override).toContain("invalid character '<'");
   });
 
   it('keeps the primary size guard off labeled events', () => {

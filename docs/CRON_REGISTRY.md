@@ -20,9 +20,9 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 
 | Workflow | Schedule | Purpose | Source |
 |----------|----------|---------|--------|
-| `Nightly Tests` | `0 2 * * *` PT | Full unit + E2E suite, Knip dead-code audit. Alerts on failure. | `.github/workflows/nightly-tests.yml` |
-| `Nightly Testing Agent` | `30 2 * * *` PT | Risk-ranked target selection, unit telemetry, Stryker mutation hotspots, daily report commit + Redis ops snapshot. LLM-free. | `.github/workflows/nightly-testing-agent.yml` |
-| `Test Coverage Audit` | `0 6 * * *` UTC | Regenerates [`docs/TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) from [`TEST_RISK_REGISTER.md`](TEST_RISK_REGISTER.md) + v8 coverage. Commits if changed. | `.github/workflows/test-coverage-audit.yml` |
+| `Nightly Tests` | `30 23 * * *` America/Los_Angeles | Full unit + E2E suite, Knip dead-code audit. Starts at least 90 minutes before the fixed 09:00 UTC screenshot/Tuesday harness lanes. Alerts on failure. | `.github/workflows/nightly-tests.yml` |
+| `Nightly Testing Agent` | `30 4 * * *` PT | Risk-ranked target selection, unit telemetry, Stryker mutation hotspots, daily report commit + Redis ops snapshot. LLM-free. | `.github/workflows/nightly-testing-agent.yml` |
+| `Test Coverage Audit` | `30 18 * * *` UTC | Regenerates [`docs/TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) from [`TEST_RISK_REGISTER.md`](TEST_RISK_REGISTER.md) + v8 coverage after the deterministic nightly lanes. Commits if changed. | `.github/workflows/test-coverage-audit.yml` |
 | `Neon Ephemeral Branch Cleanup` | (see workflow) | Reaps Neon branches created by per-PR ephemeral DB tests. | `.github/workflows/neon-ephemeral-branch-cleanup.yml` |
 
 ## Local Hermes Launchd Schedule

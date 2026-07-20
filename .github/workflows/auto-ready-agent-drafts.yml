@@ -4,8 +4,8 @@ name: Auto-Ready Agent Drafts
 # are green and the PR is mergeable. The merge-queue autoenroll workflow then
 # picks them up. Without this, draft PRs sit idle until a human flips them.
 #
-# Fires on CI completion (immediate), PR events, schedule safety net.
-# Opt out per-PR with any of: needs-human, hold, gated, fast.
+# Fires on CI completion (immediate), selected PR events, and manual dispatch.
+# Opt out per-PR with any of: needs-human, hold, gated, queue-deferred, fast.
 
 on:
   # Trigger hygiene (#13349): no `synchronize` — every push starts CI, whose
@@ -30,6 +30,12 @@ permissions:
 
 jobs:
   auto-ready:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion != 'cancelled'
+      )
     # Fleet controller: use the hosted image contract so `gh` is always
     # available. Some self-hosted fast runners intentionally lack it.
     runs-on: ubuntu-latest

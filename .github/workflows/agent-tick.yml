@@ -5,16 +5,16 @@
 # intervals into a single schedule. This reduces GitHub Actions concurrency
 # slot contention with PR CI jobs. Each monitoring function is a parallel job.
 #
-# SCHEDULE: every 10 minutes (middle ground between faster */5 and slower */15)
+# DISABLED: manual-only while the consolidated workflow is audited. Production
+# rollback ownership belongs exclusively to the serialized release controller.
 #
 # CONSOLIDATED WORKFLOWS (removed their cron schedules; kept workflow_dispatch):
 #   agent-landing-sweep      — sweep eligible agent PRs into the merge queue
 #   auto-ready-agent-drafts  — flip green agent draft PRs to "ready for review"
 #   cost-anomaly-gate        — detect production event volume anomalies
 #   github-ai-dispatcher     — dispatch agent-ready issues to the orchestrator
-#   main-ci-health-monitor   — detect stalled/failing CI on main
 #   neon-scheduled-cleanup   — clean up orphaned Neon database branches
-#   runner-health-monitor    — detect self-hosted runner outage, flip fallback
+#   runner-health-monitor    — observe heartbeat; CI selects fallback per run
 #   synthetic-monitoring     — production synthetic auth/ui/onboarding checks
 #
 # See tracking issue: #13629
@@ -22,8 +22,6 @@
 name: Agent Tick
 
 on:
-  schedule:
-    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 permissions: {}
@@ -39,7 +37,7 @@ jobs:
   # --------------------------------------------------------------------------
   landing-sweep:
     name: Landing Sweep
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
       contents: read
@@ -207,19 +205,19 @@ jobs:
         run: bash scripts/auto-ready-agent-drafts.sh
 
   # --------------------------------------------------------------------------
-  # JOB: cost-anomaly
-  # Formerly: cost-anomaly-gate.yml (every 15 min)
+  # RETIRED JOB: dedicated cost-anomaly-gate.yml owns the alert-only observer.
   # --------------------------------------------------------------------------
   cost-anomaly:
-    name: Cost Anomaly Gate
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    name: Cost Anomaly Gate (retired)
+    # Agent Tick has no schedule trigger, so this retired lane cannot execute.
+    if: ${{ github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
       issues: write
 
     env:
-      DRY_RUN: 'true'
       THRESHOLD_MULTIPLIER: '5'
       ABSOLUTE_FLOOR: '1000'
       LOOKBACK_MINUTES: '60'
@@ -284,43 +282,21 @@ jobs:
             echo "status=normal" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout for rollback
-        if: steps.evaluate.outputs.status == 'anomaly' && env.DRY_RUN == 'false'
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Setup Node.js and pnpm for rollback
-        if: steps.evaluate.outputs.status == 'anomaly' && env.DRY_RUN == 'false'
-        uses: ./.github/actions/setup-node-pnpm
-
-      - name: Auto-rollback
-        id: rollback
-        if: steps.evaluate.outputs.status == 'anomaly' && env.DRY_RUN == 'false'
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          if ./node_modules/.bin/vercel rollback --yes --token "$VERCEL_TOKEN" 2>&1; then
-            echo "rollback_status=success" >> "$GITHUB_OUTPUT"
-          else
-            echo "rollback_status=failed" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Slack alert
         if: steps.evaluate.outputs.status == 'anomaly' && env.SLACK_WEBHOOK_URL != ''
         run: |
-          HEADLINE="$([ "$DRY_RUN" = "true" ] && echo "🟡 Cost Anomaly (DRY RUN)" || echo "🚨 Cost Anomaly — Rollback Triggered")"
+          HEADLINE="🚨 Cost Anomaly — alert only"
           curl -sS -X POST "$SLACK_WEBHOOK_URL" -H 'Content-Type: application/json' \
             -d "$(jq -n --arg h "$HEADLINE" --arg c "${{ steps.current.outputs.count }}" --arg b "${{ steps.baseline.outputs.average }}" '{text: $h, attachments: [{color: "danger", fields: [{title: "Current", value: $c, short: true}, {title: "Baseline", value: $b, short: true}]}]}')" || true
 
       - name: Open GitHub issue
-        if: steps.evaluate.outputs.status == 'anomaly' && env.DRY_RUN == 'false'
+        if: steps.evaluate.outputs.status == 'anomaly'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh label create cost-monitoring --description "Cost monitoring" --color "e4e669" 2>/dev/null || true
           gh label create incident --description "Production incident" --color "d93f0b" 2>/dev/null || true
-          gh issue create --title "Cost anomaly auto-rollback: $(date -u +%Y-%m-%dT%H:%MZ)" \
+          gh issue create --title "Cost anomaly detected: $(date -u +%Y-%m-%dT%H:%MZ)" \
             --label "cost-monitoring,incident" \
             --body "Current: ${{ steps.current.outputs.count }}\nBaseline: ${{ steps.baseline.outputs.average }}\nSee workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" || true
 
@@ -330,7 +306,7 @@ jobs:
   # --------------------------------------------------------------------------
   dispatch:
     name: Dispatch Ready Issues
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
@@ -393,74 +369,9 @@ jobs:
   # JOB: main-ci-health
   # Formerly: main-ci-health-monitor.yml (every ~15 min)
   # --------------------------------------------------------------------------
-  main-ci-health:
-    name: Main CI Health
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
-    timeout-minutes: 8
-    permissions:
-      actions: read
-      contents: read
-      pull-requests: read
-    outputs:
-      should_alert: ${{ steps.evaluate.outputs.should_alert }}
-      failed_run_id: ${{ steps.evaluate.outputs.failed_run_id }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Evaluate main CI health
-        id: evaluate
-        uses: ./.github/actions/eval-main-health
-
-      - name: Slack alert (main CI unhealthy)
-        if: ${{ steps.evaluate.outputs.should_alert == 'true' && env.SLACK_WEBHOOK_URL != '' }}
-        env:
-          DETAILS: ${{ steps.evaluate.outputs.details }}
-          SUMMARY: ${{ steps.evaluate.outputs.summary }}
-          RUN_URL: ${{ steps.evaluate.outputs.run_url }}
-          GH_REPOSITORY: ${{ github.repository }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          curl -sS -X POST -H 'Content-type: application/json' \
-            -d "$(jq -n --arg s "$SUMMARY" --arg d "$DETAILS" --arg u "$RUN_URL" '{text: "🚨 Main CI Health Issue", attachments: [{color: "danger", fields: [{title: "Summary", value: $s}, {title: "Details", value: $d}, {title: "Run", value: $u}]}]}')" \
-            "$SLACK_WEBHOOK_URL"
-
-      - name: Fail job when unhealthy
-        if: ${{ steps.evaluate.outputs.should_alert == 'true' }}
-        run: |
-          echo "${{ steps.evaluate.outputs.summary }}"
-          echo "${{ steps.evaluate.outputs.details }}"
-          exit 1
-
-  main-ci-auto-rerun:
-    name: Auto-Rerun Failed Deploy
-    needs: main-ci-health
-    if: ${{ always() && needs.main-ci-health.outputs.should_alert == 'true' && needs.main-ci-health.outputs.failed_run_id != '' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
-    permissions:
-      actions: write
-    steps:
-      - name: Auto-rerun failed deploy (self-healing)
-        env:
-          GH_TOKEN: ${{ github.token }}
-          FAILED_RUN_ID: ${{ needs.main-ci-health.outputs.failed_run_id }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          ATTEMPT=$(gh api "repos/$GH_REPO/actions/runs/$FAILED_RUN_ID" --jq '.run_attempt' 2>/dev/null || echo "1")
-          if [ "$ATTEMPT" -gt 1 ]; then
-            echo "Run $FAILED_RUN_ID already re-attempted (attempt $ATTEMPT), skipping — autofix will handle."; exit 0
-          fi
-          echo "Re-running failed CI run $FAILED_RUN_ID (failed jobs only)..."
-          gh run rerun "$FAILED_RUN_ID" --failed || echo "Auto-rerun failed"
-
-  # --------------------------------------------------------------------------
-  # JOB: neon-cleanup
-  # Formerly: neon-scheduled-cleanup.yml (every 15 min)
-  # --------------------------------------------------------------------------
   neon-cleanup:
     name: Neon Branch Cleanup
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       actions: read
@@ -495,55 +406,41 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
-      actions: write
+      actions: read
     env:
-      GH_TOKEN: ${{ github.token }}
-      TARGET_VARIABLE: CI_FAST_RUNNER
-      OFFLINE_TARGET: ubuntu-latest
-      ONLINE_TARGET: jovie-runner
-      # Two missed 10-minute heartbeats indicate either outage or saturation.
-      # The routing debounce requires that signal on two observer ticks.
       HEARTBEAT_MAX_AGE_SECONDS: '1500'
+      HEARTBEAT_API_TIMEOUT_SECONDS: '20'
 
     steps:
       - name: Checkout main policy code
+        continue-on-error: true
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: main
           persist-credentials: false
 
-      - name: Mint Jovie Bot token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-
       - name: Query runner status
         id: runners
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          .github/scripts/query-runner-heartbeat.sh
+          query_output="$RUNNER_TEMP/runner-heartbeat-output"
+          if GITHUB_OUTPUT="$query_output" .github/scripts/query-runner-heartbeat.sh; then
+            cat "$query_output" >> "$GITHUB_OUTPUT"
+          else
+            echo "health=uncertain" >> "$GITHUB_OUTPUT"
+            echo "evidence=heartbeat API unavailable; no routing mutation attempted" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Flip to GitHub-hosted fallback if runners are down
-        if: steps.runners.outputs.health == 'down'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          GH_REPO: ${{ github.repository }}
-          RUNNER_HEALTH: down
+      - name: Log health state
         run: |
-          .github/scripts/update-runner-routing.sh
-
-      - name: Restore self-hosted runners when they come back
-        if: steps.runners.outputs.health == 'up'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          GH_REPO: ${{ github.repository }}
-          RUNNER_HEALTH: up
-        run: |
-          .github/scripts/update-runner-routing.sh
+          echo "::notice::${{ steps.runners.outputs.evidence }}"
+          if [ "${{ steps.runners.outputs.health }}" = "down" ]; then
+            echo "::warning::Fixed runner heartbeat is unavailable; new CI unit runs route to ubuntu-latest."
+          elif [ "${{ steps.runners.outputs.health }}" = "uncertain" ]; then
+            echo "::warning::Runner heartbeat API is uncertain; new CI unit runs route to ubuntu-latest."
+          fi
 
   # --------------------------------------------------------------------------
   # JOB: synthetic-monitoring
@@ -551,14 +448,17 @@ jobs:
   # --------------------------------------------------------------------------
   synthetic-monitoring:
     name: Production Synthetic Monitoring
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true' }
     permissions:
       contents: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
@@ -602,7 +502,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-auth-ui-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-auth-ui.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-auth-ui
+          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-auth-ui.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-auth-ui
         continue-on-error: true
 
       - name: Run Golden Path Health + Performance
@@ -615,7 +515,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-golden-path-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
+          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
         continue-on-error: true
 
       - name: Run Onboarding Robot Full Synthetic
@@ -628,7 +528,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/onboarding-robot-full-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.full.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/onboarding-robot-full
+          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/onboarding-robot.full.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/onboarding-robot-full
         continue-on-error: true
 
       - name: Run Legacy OTP Signup Canary
@@ -642,7 +542,7 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-legacy-otp-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-legacy-otp.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-legacy-otp
+          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-legacy-otp.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-legacy-otp
         continue-on-error: true
 
       - name: Run Better Auth Production Account Canary
@@ -660,7 +560,7 @@ jobs:
           SYNTHETIC_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-better-auth-account-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-better-auth-account.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-better-auth-account
+          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-better-auth-account.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-better-auth-account
         continue-on-error: true
 
       - name: Run Public Profile Smoke Test
@@ -673,16 +573,16 @@ jobs:
           E2E_ENVIRONMENT: production
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/public-profile-smoke-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
+          doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
         continue-on-error: true
 
       - name: Upload Public Profile Smoke Screenshots
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && hashFiles('apps/web/test-results/public-profile-smoke-*.png') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: public-profile-smoke-screenshots
           path: apps/web/test-results/public-profile-smoke-*.png
-          if-no-files-found: ignore
+          allow-images: 'true'
           retention-days: 14
 
       - name: Parse test results
@@ -701,13 +601,13 @@ jobs:
           NODE
 
       - name: Upload test results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        if: ${{ always() && hashFiles('apps/web/test-results/*-results.json') != '' }}
         with:
           name: synthetic-test-results
           path: |
             apps/web/test-results/
-            apps/web/playwright-report/
+            !apps/web/test-results/public-profile-smoke-*.png
           retention-days: 30
 
       - name: Fail job if tests failed

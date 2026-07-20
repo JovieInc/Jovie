@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAuth = vi.hoisted(() => vi.fn());
+const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockCreateFeedbackItem = vi.hoisted(() => vi.fn());
 const mockNotifySlackFeedbackSubmission = vi.hoisted(() => vi.fn());
 const mockFindFirst = vi.hoisted(() => vi.fn());
@@ -10,8 +10,8 @@ const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockGeneralLimit = vi.hoisted(() => vi.fn());
 const mockGetClientIP = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockGetCachedAuth,
 }));
 
 vi.mock('@/lib/feedback', () => ({
@@ -57,7 +57,7 @@ describe('POST /api/feedback', () => {
     vi.resetModules();
     vi.clearAllMocks();
 
-    mockAuth.mockResolvedValue({ userId: 'clerk_1' });
+    mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_1' });
     mockGetClientIP.mockReturnValue('127.0.0.1');
     mockGeneralLimit.mockResolvedValue({
       success: true,
@@ -194,7 +194,7 @@ describe('POST /api/feedback', () => {
   });
 
   it('rate-limits unauthenticated requests by client IP', async () => {
-    mockAuth.mockResolvedValueOnce({ userId: null });
+    mockGetCachedAuth.mockResolvedValueOnce({ userId: null });
     mockGetClientIP.mockReturnValueOnce('203.0.113.5');
 
     const { POST } = await import('@/app/api/feedback/route');
