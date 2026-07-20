@@ -820,6 +820,7 @@ export function ProfileCompactSurface({
                 merchCards={merchCards}
                 releases={releases}
                 hasTip={hasTip}
+                pacArtPriority={!resolvedHeroImageUrl}
               />
             ) : (
               <ProfilePrimaryTabPanel

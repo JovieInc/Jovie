@@ -55,6 +55,11 @@ interface ProfileHomeRailProps {
   readonly merchCards?: readonly PublicMerchCard[];
   readonly releases?: readonly PublicRelease[];
   readonly hasTip?: boolean;
+  /**
+   * Set when the profile has no hero photo: the PAC card's artwork becomes
+   * the LCP image, so it must load with priority instead of lazy.
+   */
+  readonly pacArtPriority?: boolean;
 }
 
 function getUpcomingTourDates(
@@ -179,6 +184,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   merchCards = [],
   releases = [],
   hasTip = false,
+  pacArtPriority = false,
 }: Readonly<ProfileHomeRailProps>) {
   // PAC instrumentation (spec §8): pac_exposure fires when the rail is ≥50%
   // visible, once per state per session, keyed to the visitor's variant.
@@ -377,6 +383,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
             assignment={profilePacAssignment}
             isSubscribed={isSubscribed}
             renderMode={renderMode}
+            artPriority={pacArtPriority}
           />
         }
         trailing={alertsCard}
