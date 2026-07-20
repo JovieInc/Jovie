@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { normalizeIssueNumber, transitionIssue } from './lib/tracker.mjs';
+import { transitionIssue } from './lib/tracker.mjs';
 
-const number = normalizeIssueNumber(process.argv[2]);
+// Same normalization as github-claim-issue.mjs: accepts `123` or `#123`.
+const number = Number.parseInt(String(process.argv[2]).replace(/^#/, ''), 10);
 const target = (process.argv[3] ?? 'in-review').trim().toLowerCase();
 const comment = process.argv[4];
 const repo = process.env.GITHUB_REPOSITORY;

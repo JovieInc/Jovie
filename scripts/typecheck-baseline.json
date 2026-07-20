@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-07-20T21:19:18.004Z",
-  "totalErrors": 202,
+  "generatedAt": "2026-07-20T23:53:45.686Z",
+  "totalErrors": 198,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -47,15 +47,13 @@
       "TS2362": 1
     },
     "scripts/github-transition-issue.mjs": {
-      "TS2305": 1,
       "TS2353": 1
     },
     "scripts/hermes/jobs/agent-config-health.ts": {
       "TS1470": 1
     },
     "scripts/hermes/jobs/agentcookie-sync.ts": {
-      "TS1470": 1,
-      "TS2305": 1
+      "TS1470": 1
     },
     "scripts/hermes/jobs/ci-failure-monitor.ts": {
       "TS1470": 2
@@ -69,11 +67,7 @@
     },
     "scripts/hermes/jobs/gbrain-health-summary.ts": {
       "TS1470": 1,
-      "TS2305": 1,
       "TS2345": 4
-    },
-    "scripts/hermes/jobs/pipeline-scoreboard.ts": {
-      "TS2305": 1
     },
     "scripts/hermes/jobs/pr-stuck-monitor.ts": {
       "TS1470": 1
