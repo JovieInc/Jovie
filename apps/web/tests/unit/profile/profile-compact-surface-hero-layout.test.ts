@@ -67,9 +67,10 @@ describe('ProfileCompactSurface home hero layout', () => {
     expect(contents).not.toMatch(
       /max-height:\s*820px\)[\s\S]{0,120}--cover-height/
     );
-    // Desktop compact shell keeps its 340px override.
+    // Desktop compact shell keeps a proportional hero override (short
+    // windows share shell height instead of crushing the carousel).
     expect(contents).toMatch(
-      /\.public-profile-compact-shell\s*\{[\s\S]{0,120}--cover-height:\s*340px/
+      /\.public-profile-compact-shell\s*\{[\s\S]{0,400}--cover-height:\s*clamp\(200px,\s*45%,\s*340px\)/
     );
   });
 

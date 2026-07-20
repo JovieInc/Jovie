@@ -498,7 +498,10 @@ html[data-profile-initial-mode]
 
 @media (min-width: 768px) {
   .public-profile-compact-shell {
-    --cover-height: 340px;
+    /* Proportional hero: on short desktop windows the shell shrinks below
+       740px and a fixed 340px hero would crush the carousel to a sliver.
+       Share the shell height instead (45%, floored at 200px). */
+    --cover-height: clamp(200px, 45%, 340px);
     height: min(740px, calc(100dvh - (var(--page-pad) * 2)));
   }
 }
