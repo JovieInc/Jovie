@@ -179,7 +179,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
         <button
           type='button'
           onClick={() => setSelectedIndex(globalIndex)}
-          className='block w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
+          className='block w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
           aria-label={`View ${screenshot.title}`}
         >
           <div className='relative aspect-video overflow-hidden bg-surface-1'>

@@ -34,7 +34,7 @@ export const SidebarGroupLabel = React.forwardRef<
       ref={ref}
       data-sidebar='group-label'
       className={cn(
-        'flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 outline-none transition-[background-color,color,opacity,margin] duration-slow ease-interactive focus-visible:bg-sidebar-accent focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35 [&>svg]:size-3.5 [&>svg]:shrink-0',
+        'flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 outline-none transition-[background-color,color,opacity,margin] duration-slow ease-interactive focus-visible:bg-sidebar-accent focus-visible:ring-1 focus-visible:ring-ring/35 [&>svg]:size-3.5 [&>svg]:shrink-0',
         'group-data-[collapsible=icon]:-mt-7 group-data-[collapsible=icon]:opacity-0',
         className
       )}
@@ -55,7 +55,7 @@ export const SidebarGroupAction = React.forwardRef<
       ref={ref}
       data-sidebar='group-action'
       className={cn(
-        'absolute right-2 top-2 flex aspect-square w-4 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-[background-color,color] duration-normal ease-interactive hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35 [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0',
+        'absolute right-2 top-2 flex aspect-square w-4 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-[background-color,color] duration-normal ease-interactive hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent focus-visible:ring-1 focus-visible:ring-ring/35 [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0',
         // Increases the hit area of the button on mobile.
         'after:absolute after:-inset-2 after:lg:hidden',
         'group-data-[collapsible=icon]:hidden',

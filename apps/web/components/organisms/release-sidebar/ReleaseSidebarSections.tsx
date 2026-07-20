@@ -98,7 +98,7 @@ function renderArtistLine(
       <button
         type='button'
         onClick={() => onArtistClick(fallback)}
-        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
+        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
       >
         {fallback}
       </button>
@@ -122,7 +122,7 @@ function renderArtistLine(
         key={key}
         type='button'
         onClick={() => onArtistClick(part.value)}
-        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
+        className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
       >
         {part.value}
       </button>

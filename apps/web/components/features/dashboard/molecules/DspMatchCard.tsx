@@ -154,7 +154,7 @@ export function DspMatchCard({
           <button
             type='button'
             onClick={() => setIsExpanded(!isExpanded)}
-            className='flex h-7 w-full items-center justify-between rounded-lg border border-transparent px-2 text-xs text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+            className='flex h-7 w-full items-center justify-between rounded-lg border border-transparent px-2 text-xs text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-ring'
           >
             <span>Confidence breakdown</span>
             <Icon

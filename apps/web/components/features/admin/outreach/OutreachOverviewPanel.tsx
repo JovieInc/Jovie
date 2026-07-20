@@ -87,7 +87,7 @@ export function OutreachOverviewPanel({
           titleWidth='w-36'
           descriptionWidth='w-56'
           actionWidths={['w-16']}
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-app-header py-3'
         />
         <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
           {['total', 'email', 'dm', 'review'].map(key => (

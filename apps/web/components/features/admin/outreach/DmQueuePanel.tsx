@@ -101,7 +101,7 @@ export function DmQueuePanel() {
             {total} queued
           </span>
         }
-        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        className='min-h-0 px-app-header py-3'
         actionsClassName='shrink-0'
       />
       <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>

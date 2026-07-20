@@ -71,7 +71,7 @@ export function TableHeaderCell<TData>({
                 tableHeaderClass,
                 'flex w-full items-center gap-2',
                 'rounded-full border border-transparent px-1.5 transition-[background-color,border-color,box-shadow] duration-subtle hover:border-subtle hover:bg-surface-1',
-                'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+                'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-ring/20'
               )}
             >
               {flexRender(header.column.columnDef.header, header.getContext())}

@@ -112,7 +112,7 @@ export function FunnelMetricsStrip({
         <ContentSectionHeader
           title='Core KPIs'
           subtitle='Revenue, runway, and monetization health'
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-app-header py-3'
         />
         <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-3'>
           <MetricCard
@@ -177,7 +177,7 @@ export function FunnelMetricsStrip({
         <ContentSectionHeader
           title='Instagram Activation'
           subtitle='First-week bio-link adoption and activation'
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-app-header py-3'
         />
         <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-5'>
           <MetricCard
@@ -225,7 +225,7 @@ export function FunnelMetricsStrip({
         <ContentSectionHeader
           title='YC metrics'
           subtitle='Benchmark gaps and operating signals'
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-app-header py-3'
         />
         <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
           <PlaceholderMetricCard

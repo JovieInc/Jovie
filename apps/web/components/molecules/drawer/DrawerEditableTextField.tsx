@@ -216,7 +216,7 @@ export const DrawerEditableTextField = React.memo(
               onClick={() => setIsEditing(true)}
               onDoubleClick={() => setIsEditing(true)}
               className={cn(
-                'flex w-full min-w-0 cursor-text items-center text-left transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+                'flex w-full min-w-0 cursor-text items-center text-left transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
                 density === 'inline'
                   ? // Align the text baseline with sibling static rows by
                     // removing horizontal inset. The hover chip sits over the
@@ -302,7 +302,7 @@ export const DrawerEditableTextField = React.memo(
                       target='_blank'
                       rel='noreferrer'
                       aria-label={action.ariaLabel}
-                      className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
+                      className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
                       onClick={event => {
                         event.stopPropagation();
                         action.onClick?.();

@@ -58,7 +58,7 @@ function RowActionLink({ href, label }: RowActionLinkProps) {
       rel='noopener noreferrer'
       aria-label={`${label} (opens in a new tab)`}
       onClick={e => e.stopPropagation()}
-      className='inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-[520] text-tertiary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+      className='inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-[520] text-tertiary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
     >
       {label}
       <ExternalLink className='size-3' aria-hidden='true' />
@@ -137,7 +137,7 @@ export function WorkflowRunRow({
       <button
         type='button'
         onClick={() => onSelect(artifact)}
-        className='grid gap-2 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
+        className='grid gap-2 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
         aria-pressed={isSelected}
       >
         {mainContent}

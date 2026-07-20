@@ -359,7 +359,7 @@ export function PersistentAudioBar({
           type='button'
           onClick={handleToggle}
           disabled={isLoading}
-          className='relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:opacity-50 before:absolute before:-inset-2 before:content-[""]'
+          className='relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 before:absolute before:-inset-2 before:content-[""]'
           aria-label={playButtonLabel}
         >
           {playButtonIcon}
@@ -369,7 +369,7 @@ export function PersistentAudioBar({
         <button
           type='button'
           onClick={stop}
-          className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-subtle hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) before:absolute before:-inset-2.5 before:content-[""]'
+          className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-subtle hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring before:absolute before:-inset-2.5 before:content-[""]'
           aria-label='Dismiss Player'
         >
           <X className='h-3.5 w-3.5' />
