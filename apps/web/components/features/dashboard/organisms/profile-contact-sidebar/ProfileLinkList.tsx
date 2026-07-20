@@ -20,7 +20,6 @@ import type { LinkSection } from '@/features/dashboard/organisms/links/utils/lin
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { cn } from '@/lib/utils';
 import { dedupeLinks, extractHandleFromUrl } from '@/lib/utils/social-platform';
-import { SuggestedDspMatches } from './SuggestedDspMatches';
 
 export type CategoryOption = LinkSection | 'all';
 
@@ -234,8 +233,8 @@ export function ProfileLinkList({
         dspConnections.spotify.connected ||
         dspConnections.appleMusic.connected;
 
-      // When profileId is present, always render the section so
-      // SuggestedDspMatches can show even when nothing is connected yet.
+      // Preserve the connected-profile empty state while the parent owns any
+      // async suggestion UI at the end of its fixed scroll region.
       if (!hasDspContent && !profileId) {
         return (
           <div className={cn(sectionSurfaceClassName, 'px-3 py-3')}>
@@ -255,7 +254,6 @@ export function ProfileLinkList({
           {filteredLinks.map(link => (
             <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
           ))}
-          {profileId && <SuggestedDspMatches profileId={profileId} />}
         </div>
       );
     }
