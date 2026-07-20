@@ -72,7 +72,10 @@ jobs:
       github.event.inputs.suite == 'all' ||
       github.event.inputs.suite == 'unit'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The unsharded suite was still making steady progress when the 30m cap
+    # cancelled it every night (Jul 15-20, JOV-4326). 60m fits the current
+    # suite with headroom; the nightly cadence tolerates the longer lane.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -198,6 +201,11 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
+          # Cap the dev-server V8 heap the same way playwright.config.smoke.ts
+          # does for CI: GitHub-hosted runners expose ~7 GiB RAM and the
+          # dev-fast default of 8 GiB starves the OS + Playwright, wedging the
+          # bypass server mid-sweep (ECONNREFUSED / socket hang up, JOV-4326).
+          NODE_OPTIONS: '--max-old-space-size=4096'
           PORT: '3100'
           BASE_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100

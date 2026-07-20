@@ -299,7 +299,6 @@ describe('source PR path-output reachability contract', () => {
       'ci-e2e-migrate',
       'ci-e2e-tests',
       'ci-pr-vercel-preview',
-      'ci-storybook-a11y',
       'ci-smoke-required',
     ]) {
       expect(getJobBlock(workflow, jobKey), jobKey).toContain(
@@ -398,20 +397,20 @@ describe('CI test-performance path gate', () => {
 });
 
 describe('CI Storybook accessibility path gate', () => {
-  it('classifies relevant paths but runs only by manual dispatch', () => {
+  it('classifies relevant paths; the scheduled visual-a11y lane owns execution', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const pathJob = getJobBlock(workflow, 'ci-path-changes');
     const detectStep = getStepBlock(
       pathJob,
       'Detect path changes for all job types'
     );
-    const storybookJob = getJobBlock(workflow, 'ci-storybook-a11y');
 
     expect(pathJob).toContain(
       "run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || 'false' }}"
     );
-    expect(storybookJob).toContain("github.event_name == 'workflow_dispatch'");
-    expect(storybookJob).not.toContain("github.event_name == 'pull_request'");
+    // The duplicate manual ci-storybook-a11y job was removed (JOV-4326); the
+    // scheduled visual-a11y.yml storybook-a11y lane is the single owner.
+    expect(workflow).not.toContain('ci-storybook-a11y:');
     expect(detectStep).not.toContain('DEEP_CI_LABEL');
 
     const pattern = detectStep.match(/STORYBOOK_A11Y_PATTERN='([^']+)'/)?.[1];

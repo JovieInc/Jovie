@@ -204,14 +204,6 @@
       "remediation": "An explicitly requested authenticated axe run regressed. Fix the violation behind auth; the lane is informational evidence and never feeds PR Ready."
     },
     {
-      "id": "ci-storybook-a11y",
-      "name": "Storybook A11y",
-      "tier": "preview-evidence",
-      "mergeGate": false,
-      "nextLocalCommand": "pnpm --filter @jovie/web test:a11y",
-      "remediation": "An explicitly requested Storybook a11y run regressed. Fix the component-level violation in the story instead of disabling the rule."
-    },
-    {
       "id": "ci-e2e-smoke",
       "name": "E2E Smoke (manual)",
       "tier": "risk-triggered-smoke",

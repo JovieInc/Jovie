@@ -1,6 +1,7 @@
-import { ClerkTestError, signInUser } from '../helpers/clerk-auth';
+import { ClerkTestError } from '../helpers/clerk-auth';
 import { expect, test } from './setup';
 import { getAdminSurfaceById } from './utils/admin-surface-manifest';
+import { hasAdminCredentials, signInAsAdmin } from './utils/admin-test-utils';
 import {
   assertNoCriticalErrors,
   SMOKE_TIMEOUTS,
@@ -25,7 +26,7 @@ async function expectAdminPage(
     page.url().includes('/sign-up')
   ) {
     try {
-      await signInUser(page);
+      await signInAsAdmin(page);
     } catch (error) {
       if (error instanceof ClerkTestError) {
         test.skip(
@@ -55,6 +56,14 @@ async function expectAdminPage(
 }
 
 test.describe('Admin GTM Health @smoke', () => {
+  test.beforeEach(async ({ page }) => {
+    // The shared storage state carries the lane's creator persona; admin
+    // surfaces redirect non-admins to /app, so establish the admin session
+    // before the first navigation (JOV-4326).
+    test.skip(!hasAdminCredentials(), 'Admin auth not available');
+    await signInAsAdmin(page);
+  });
+
   test('admin growth renders speed dial, funnel, and lead table without runtime errors', async ({
     page,
   }, testInfo) => {
@@ -85,10 +94,7 @@ test.describe('Admin GTM Health @smoke', () => {
     const { getContext, cleanup } = setupPageMonitoring(page);
 
     try {
-      await expectAdminPage(
-        page,
-        getAdminSurfaceById('growth-outreach-email').path
-      );
+      await expectAdminPage(page, getAdminSurfaceById('growth-outreach').path);
       // The page loads with the outreach accordion auto-opened via ?view=outreach
       await expect(page.getByTestId('admin-growth-page')).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
