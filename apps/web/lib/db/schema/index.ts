@@ -855,6 +855,23 @@ export {
   productUpdateSubscribers,
   selectProductUpdateSubscriberSchema,
 } from './product-update-subscribers';
+// Unified public profile surface registry
+export {
+  insertProfileSurfaceSchema,
+  insertProfileSurfaceSourceSchema,
+  type NewProfileSurface,
+  type NewProfileSurfaceSource,
+  type ProfileSurface,
+  type ProfileSurfaceMonitoringPreference,
+  type ProfileSurfaceQualificationEvent,
+  type ProfileSurfaceSource,
+  profileSurfaceMonitoringPreferences,
+  profileSurfaceQualificationEvents,
+  profileSurfaceSources,
+  profileSurfaces,
+  selectProfileSurfaceSchema,
+  selectProfileSurfaceSourceSchema,
+} from './profile-surfaces';
 // Creator Profiles
 export {
   type CreatorAvatarCandidate,
