@@ -67,6 +67,11 @@ describe('CDN domain registry', () => {
       expect(domains).toContain('https://*.blob.vercel-storage.com');
       expect(domains).toContain('https://*.public.blob.vercel-storage.com');
     });
+
+    it('includes api.qrserver.com for QR code download actions', () => {
+      const domains = getCspConnectSrcDomains();
+      expect(domains).toContain('https://api.qrserver.com');
+    });
   });
 
   describe('getCspImgSrcDomains', () => {

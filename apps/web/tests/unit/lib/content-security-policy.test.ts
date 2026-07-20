@@ -83,6 +83,16 @@ describe('buildContentSecurityPolicy', () => {
     expect(connectSrc).toContain('https://*.public.blob.vercel-storage.com');
   });
 
+  it('includes api.qrserver.com in connect-src for QR code downloads', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const connectSrc = findDirective(csp, 'connect-src');
+
+    expect(connectSrc).toContain('https://api.qrserver.com');
+  });
+
   it('includes Sentry regional ingest wildcard in connect-src', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',
