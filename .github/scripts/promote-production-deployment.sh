@@ -40,7 +40,6 @@ fi
 
 vercel() {
   "$vercel_cli" "$@" \
-    --token "$VERCEL_TOKEN" \
     --scope "$VERCEL_ORG_ID" \
     --no-color
 }

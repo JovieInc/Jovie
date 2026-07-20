@@ -35,9 +35,6 @@ on:
 
 permissions:
   contents: read
-  actions: read
-  attestations: write
-  id-token: write
 
 jobs:
   release-head:
@@ -78,10 +75,6 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: read
-      actions: read
-      # Required for SLSA build-provenance attestation
-      attestations: write
-      id-token: write
     outputs:
       migration_status: ${{ steps.migrate.outcome }}
       preflight_status: ${{ steps.preflight.outcome }}
@@ -89,7 +82,10 @@ jobs:
       # so no drift warning fires. This is acceptable — the cancelled deploy didn't ship.
       schema_drift: ${{ steps.verify.outcome == 'failure' }}
       deploy_url: ${{ steps.deploy.outputs.deploy_url }}
+      deploy_id: ${{ steps.inspect-deployment.outputs.deploy_id }}
       deploy_url_b64: ${{ steps.encode_deploy_url.outputs.deploy_url_b64 }}
+      attestation_subject_name: ${{ steps.build-subject.outputs.subject_name }}
+      attestation_subject_digest: ${{ steps.build-subject.outputs.subject_digest }}
     environment:
       name: Staging – jovie
       url: https://staging.jov.ie
@@ -97,58 +93,48 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       # Main deploys to staging with the isolated Doppler `stg` service token.
       # Doppler owns runtime config; GitHub owns the existing Vercel control-plane
       # credentials used only to pull, deploy, and alias the staging build.
       - uses: ./.github/actions/setup-doppler
-        with:
-          doppler-token: ${{ secrets.DOPPLER_TOKEN_STG }}
-      - name: Configure staging deployment credentials
-        shell: bash
+      - name: Cancel stale Vercel preview deployments
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          # Write after setup-doppler so a runtime config cannot override the
-          # repository-scoped deployment identity for later Vercel CLI steps.
-          {
-            printf 'VERCEL_TOKEN=%s\n' "$VERCEL_TOKEN"
-            printf 'VERCEL_ORG_ID=%s\n' "$VERCEL_ORG_ID"
-            printf 'VERCEL_PROJECT_ID=%s\n' "$VERCEL_PROJECT_ID"
-          } >> "$GITHUB_ENV"
-      - name: Verify staging deploy control-plane credentials
-        shell: bash
-        run: |
-          missing=()
-          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
-            if [ -z "${!key:-}" ]; then
-              missing+=("$key")
-            fi
-          done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Missing required staging deployment credentials: ${missing[*]}"
-            exit 1
-          fi
-      - name: Cancel stale Vercel preview deployments
         run: node .github/scripts/cancel-stale-vercel-previews.mjs
       - name: DB safety check (staging preflight)
         id: preflight
-        run: pnpm --filter=@jovie/web exec tsx scripts/drizzle-migrate-preflight.ts
         env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
           GIT_BRANCH: main
           ALLOW_PROD_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config stg
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web exec tsx
+          scripts/drizzle-migrate-preflight.ts
       - name: DB migrate (staging - Drizzle)
         id: migrate
-        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
           GIT_BRANCH: main
           ALLOW_PROD_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config stg
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
         continue-on-error: false
       - name: DB verify (post-migration schema check)
         id: verify
-        run: pnpm --filter=@jovie/web run drizzle:verify:ci
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+        run: >-
+          doppler run --project jovie-web --config stg
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:verify:ci
         # Blocks deploy by default — missing columns = broken staging.
         # To bypass in emergencies, include [skip-schema-verify] in the
         # merge commit message. The Slack drift notification in deploy-notify
@@ -158,18 +144,22 @@ jobs:
         # Always pull project metadata/env; the deploy CLI reads
         # .vercel/project.json even for prebuilt deploys.
         timeout-minutes: 10
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           scope_args=()
           if [ -n "${VERCEL_ORG_ID:-}" ]; then
             scope_args=(--scope "$VERCEL_ORG_ID")
           fi
           for i in {1..3}; do
-            if ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+            if ./node_modules/.bin/vercel pull --yes --environment=preview "${scope_args[@]}"; then
               break
             fi
             echo "Vercel pull attempt $i failed, retrying in 10s..."
             sleep 10
-            if [ $i -eq 3 ]; then exit 1; fi
+            if [ "$i" -eq 3 ]; then exit 1; fi
           done
       - name: Strip deprecated Turbo env overrides (staging preview)
         run: |
@@ -180,93 +170,125 @@ jobs:
             fi
           done
       - name: Check signup readiness (staging deploy env)
-        run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=stg --source=env
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+        run: >-
+          doppler run --project jovie-web --config stg
+          --only-secrets=NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY
+          --no-fallback -- env -u DOPPLER_TOKEN pnpm --filter=@jovie/web exec
+          tsx scripts/check-signup-readiness.ts --target=stg --source=env
       - name: Build (preview target for staging verification)
         timeout-minutes: 10
         run: |
-          set -euo pipefail
-          scope_args=()
-          if [ -n "${VERCEL_ORG_ID:-}" ]; then
-            scope_args=(--scope "$VERCEL_ORG_ID")
-          fi
-          for i in {1..3}; do
-            if env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
-              break
+          staging_build() {
+            set -euo pipefail
+            scope_args=()
+            if [ -n "${VERCEL_ORG_ID:-}" ]; then
+              scope_args=(--scope "$VERCEL_ORG_ID")
             fi
-            echo "Vercel build attempt $i failed, retrying in 10s..."
-            sleep 10
-            if [ $i -eq 3 ]; then exit 1; fi
-          done
-          # Vercel's function trace references the generated robots response at
-          # its public-file path even though the source route is app/robots.ts.
-          test -f apps/web/.next/server/app/robots.txt.body
-          cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt
-          printf '%s\n' 'apps/web/public/robots.txt' \
-            > .vercel/jovie-generated-public-files
+            for i in {1..3}; do
+              if env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build "${scope_args[@]}"; then
+                break
+              fi
+              echo "Vercel build attempt $i failed, retrying in 10s..."
+              sleep 10
+              if [ "$i" -eq 3 ]; then exit 1; fi
+            done
+            # Vercel's function trace references the generated robots response at
+            # its public-file path even though the source route is app/robots.ts.
+            test -f apps/web/.next/server/app/robots.txt.body
+            cp apps/web/.next/server/app/robots.txt.body apps/web/public/robots.txt
+            printf '%s\n' 'apps/web/public/robots.txt' \
+              > .vercel/jovie-generated-public-files
+          }
+          export -f staging_build
+          doppler run --project jovie-web --config stg \
+            --only-secrets=VERCEL_AUTOMATION_BYPASS_SECRET,NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,BETTER_AUTH_URL,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY \
+            --no-fallback -- env -u DOPPLER_TOKEN bash -c staging_build
         env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_GIT_COMMIT_SHA: ${{ inputs.expected_sha }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
-      - name: Package build output for provenance attestation
+      - name: Hash fixed staging build subject for isolated attestation
+        id: build-subject
         run: |
           set -euo pipefail
-          tar -czf /tmp/vercel-build-output.tar.gz -C . .vercel/output
-      - name: Attest build provenance (SLSA Level 2)
-        id: attest
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
-        with:
-          subject-path: /tmp/vercel-build-output.tar.gz
-          # ponytail: attests the vercel build output; attestation is SLSA L2 (hosted
-          # runner + signed provenance). L3 requires hermetic build — upgrade when
-          # Vercel builds become reproducible/isolated.
+          subject_name='jovie-vercel-staging-build-output.tgz'
+          subject_path="$RUNNER_TEMP/$subject_name"
+          tar -czf "$subject_path" -C . .vercel/output
+          digest="$(sha256sum "$subject_path" | awk '{print $1}')"
+          [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || {
+            echo "::error::Staging build subject digest is malformed."
+            exit 1
+          }
+          {
+            echo "subject_name=$subject_name"
+            echo "subject_digest=sha256:$digest"
+          } >> "$GITHUB_OUTPUT"
+          rm -f "$subject_path"
       - name: Deploy (staging preview, prebuilt)
         timeout-minutes: 10
         id: deploy
         run: |
-          required_runtime_env=(
-            VERCEL_AUTOMATION_BYPASS_SECRET
-            NEXT_PUBLIC_BETTER_AUTH_URL
-            BETTER_AUTH_SECRET
-            BETTER_AUTH_URL
-            DATABASE_URL
-            SESSION_SECRET
-            AI_GATEWAY_API_KEY
-            NEXT_PUBLIC_TURNSTILE_SITE_KEY
-            TURNSTILE_SECRET_KEY
-          )
+          staging_deploy() {
+            set -euo pipefail
+            required_runtime_env=(
+              VERCEL_AUTOMATION_BYPASS_SECRET
+              NEXT_PUBLIC_BETTER_AUTH_URL
+              BETTER_AUTH_SECRET
+              BETTER_AUTH_URL
+              DATABASE_URL
+              SESSION_SECRET
+              AI_GATEWAY_API_KEY
+              NEXT_PUBLIC_TURNSTILE_SITE_KEY
+              TURNSTILE_SECRET_KEY
+            )
 
-          missing_runtime_env=()
-          for key in "${required_runtime_env[@]}"; do
-            if [ -z "${!key:-}" ]; then
-              missing_runtime_env+=("$key")
+            missing_runtime_env=()
+            for key in "${required_runtime_env[@]}"; do
+              if [ -z "${!key:-}" ]; then
+                missing_runtime_env+=("$key")
+              fi
+            done
+
+            if [ "${#missing_runtime_env[@]}" -gt 0 ]; then
+              echo "Missing staging preview runtime env: ${missing_runtime_env[*]}"
+              exit 1
             fi
-          done
 
-          if [ "${#missing_runtime_env[@]}" -gt 0 ]; then
-            echo "Missing staging preview runtime env: ${missing_runtime_env[*]}"
-            exit 1
-          fi
-
-          for i in {1..3}; do
-            if bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
-              --env VERCEL_AUTOMATION_BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET}" \
-              --env NEXT_PUBLIC_BETTER_AUTH_URL="${NEXT_PUBLIC_BETTER_AUTH_URL}" \
-              --env BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET}" \
-              --env BETTER_AUTH_URL="${BETTER_AUTH_URL}" \
-              --env DATABASE_URL="${DATABASE_URL}" \
-              --env SESSION_SECRET="${SESSION_SECRET}" \
-              --env AI_GATEWAY_API_KEY="${AI_GATEWAY_API_KEY}" \
-              --env NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY}" \
-              --env TURNSTILE_SECRET_KEY="${TURNSTILE_SECRET_KEY}"; then
-              break
-            fi
-            echo "Vercel deploy attempt $i failed, retrying in 10s..."
-            sleep 10
-            if [ $i -eq 3 ]; then exit 1; fi
-          done
+            for i in {1..3}; do
+              if bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
+                --env VERCEL_AUTOMATION_BYPASS_SECRET \
+                --env NEXT_PUBLIC_BETTER_AUTH_URL \
+                --env BETTER_AUTH_SECRET \
+                --env BETTER_AUTH_URL \
+                --env DATABASE_URL \
+                --env SESSION_SECRET \
+                --env AI_GATEWAY_API_KEY \
+                --env NEXT_PUBLIC_TURNSTILE_SITE_KEY \
+                --env TURNSTILE_SECRET_KEY; then
+                break
+              fi
+              echo "Vercel deploy attempt $i failed, retrying in 10s..."
+              sleep 10
+              if [ "$i" -eq 3 ]; then exit 1; fi
+            done
+          }
+          export -f staging_deploy
+          doppler run --project jovie-web --config stg \
+            --only-secrets=VERCEL_AUTOMATION_BYPASS_SECRET,NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,BETTER_AUTH_URL,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY \
+            --no-fallback -- env -u DOPPLER_TOKEN bash -c staging_deploy
         env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_GIT_COMMIT_SHA: ${{ inputs.expected_sha }}
           # The closed staging artifact contains more than Vercel's 15k plain
           # upload limit. Give the archive path the full prebuilt budget.
@@ -278,22 +300,38 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
 
       - name: Wait for staging deployment readiness
+        id: inspect-deployment
         timeout-minutes: 21
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deploy_url }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
+          set -euo pipefail
           inspect_wait_status=0
           ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
             --wait \
             --timeout 20m \
-            --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID" || inspect_wait_status=$?
           deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
             --format=json \
-            --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID")"
           deployment_state="$(jq -r '(.readyState // .state // .status // "unknown") | ascii_upcase' \
             <<<"$deployment_json")"
+          deployment_id="$(jq -r '.id // ""' <<<"$deployment_json")"
+          inspected_url="$(jq -r '.url // ""' <<<"$deployment_json")"
+          if [[ "$inspected_url" != *://* && "$inspected_url" == *.vercel.app ]]; then
+            inspected_url="https://${inspected_url}"
+          fi
+          inspected_url="${inspected_url%/}"
+          if [[ ! "$deployment_id" =~ ^dpl_[A-Za-z0-9]+$ ]] || ! \
+            node apps/web/scripts/vercel-protected-origin.cjs \
+              assert-authorized-origin "$DEPLOYMENT_URL" "$inspected_url"; then
+            echo "::error::Vercel inspection did not preserve the exact staging deployment URL/ID."
+            exit 1
+          fi
+          echo "deploy_id=$deployment_id" >> "$GITHUB_OUTPUT"
           echo "Current deployment state: $deployment_state"
           case "$deployment_state" in
             READY)
@@ -315,6 +353,44 @@ jobs:
           printf 'deploy_url_b64=%s\n' "$(printf '%s' "$DEPLOYMENT_URL" | base64 | tr -d '\n')" \
             >> "$GITHUB_OUTPUT"
 
+  attest-staging-build:
+    name: Attest staging build provenance
+    needs: [deploy-staging]
+    if: ${{ always() && needs.deploy-staging.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    steps:
+      # This is intentionally a no-checkout, no-secret job. The deploy job
+      # hashes a fixed subject and passes only its non-secret name/digest.
+      - name: Validate exact attestation subject
+        id: subject
+        env:
+          SUBJECT_NAME: ${{ needs.deploy-staging.outputs.attestation_subject_name }}
+          SUBJECT_DIGEST: ${{ needs.deploy-staging.outputs.attestation_subject_digest }}
+        run: |
+          set -euo pipefail
+          [ "$SUBJECT_NAME" = 'jovie-vercel-staging-build-output.tgz' ] || {
+            echo "::error::Unexpected staging attestation subject name."
+            exit 1
+          }
+          [[ "$SUBJECT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "::error::Malformed staging attestation subject digest."
+            exit 1
+          }
+          {
+            echo "subject_name=$SUBJECT_NAME"
+            echo "subject_digest=$SUBJECT_DIGEST"
+          } >> "$GITHUB_OUTPUT"
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-name: ${{ steps.subject.outputs.subject_name }}
+          subject-digest: ${{ steps.subject.outputs.subject_digest }}
+
   canary-health-gate:
     name: Canary Health Gate (staging)
     needs: [deploy-staging]
@@ -326,8 +402,8 @@ jobs:
       # while this gate is still retrying, which produces false negatives even
       # when the freshly deployed preview is healthy.
       deployment_url_b64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
+      deployment_id: ${{ needs.deploy-staging.outputs.deploy_id }}
       commit_sha: ${{ inputs.expected_sha }}
-      fallback_health_url: /api/health
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -336,8 +412,8 @@ jobs:
 
   staging-head:
     name: Recheck main before staging alias
-    needs: [deploy-staging, canary-health-gate]
-    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' }}
+    needs: [deploy-staging, attest-staging-build, canary-health-gate]
+    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.attest-staging-build.result == 'success' && needs.canary-health-gate.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
@@ -367,13 +443,18 @@ jobs:
     needs: [deploy-staging, canary-health-gate, staging-head]
     if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.staging-head.result == 'success' && needs.staging-head.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     outputs:
       is_current: ${{ steps.head.outputs.is_current }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Recheck main immediately before staging alias
         id: head
@@ -404,8 +485,87 @@ jobs:
           deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
           test -n "$deployment_url"
           ./node_modules/.bin/vercel alias set "$deployment_url" staging.jov.ie \
-            --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID"
+
+      - name: Prove staging alias owns the exact deployment and full SHA
+        if: ${{ steps.head.outputs.is_current == 'true' }}
+        env:
+          DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
+          EXPECTED_DEPLOYMENT_ID: ${{ needs.deploy-staging.outputs.deploy_id }}
+          EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
+          exact_json="$(
+            VERCEL_CANDIDATE_DEPLOYMENT_URL="$deployment_url" \
+            VERCEL_CANDIDATE_DEPLOYMENT_ID="$EXPECTED_DEPLOYMENT_ID" \
+            VERCEL_DEPLOYMENT_MAX_PAGES=5 \
+            VERCEL_API_TIMEOUT_MS=120000 \
+            VERCEL_DEPLOYMENT_POLL_INTERVAL_MS=3000 \
+              node apps/web/scripts/vercel-protected-origin.cjs resolve-deployment
+          )"
+          [ "$(jq -r '.id // ""' <<<"$exact_json")" = "$EXPECTED_DEPLOYMENT_ID" ] || {
+            echo "::error::Exact staging deployment identity did not converge."
+            exit 1
+          }
+
+          for attempt in $(seq 1 15); do
+            alias_json="$(./node_modules/.bin/vercel inspect staging.jov.ie \
+              --format=json --scope "$VERCEL_ORG_ID" 2>/dev/null || true)"
+            if jq -e 'type == "object" and (.id | type == "string") and (.readyState | type == "string")' \
+              >/dev/null 2>&1 <<<"$alias_json"; then
+              alias_id="$(jq -r '.id' <<<"$alias_json")"
+              alias_state="$(jq -r '.readyState | ascii_upcase' <<<"$alias_json")"
+              if [ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ] && [ "$alias_state" = "READY" ]; then
+                echo "staging.jov.ie owns exact READY deployment $alias_id at $EXPECTED_COMMIT_SHA."
+                break
+              fi
+            fi
+            if [ "$attempt" -eq 15 ]; then
+              echo "::error::staging.jov.ie did not converge to the exact candidate deployment."
+              exit 1
+            fi
+            sleep 4
+          done
+
+      - name: Setup Playwright for aliased staging OAuth
+        if: ${{ steps.head.outputs.is_current == 'true' }}
+        uses: ./.github/actions/setup-playwright
+
+      - name: Verify aliased staging OAuth redirect URIs
+        if: ${{ steps.head.outputs.is_current == 'true' }}
+        env:
+          BASE_URL: https://staging.jov.ie
+          EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
+          EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie
+          EXPECTED_VERCEL_ENVIRONMENT: preview
+          PLAYWRIGHT_DYNAMIC_SECRETS_FILE: ${{ runner.temp }}/playwright-dynamic-cookie-values
+          PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          # Provider-console callback allowlists intentionally name the shared
+          # staging alias. This proof must run only after this exact deployment
+          # owns staging.jov.ie; pre-alias probes can test a stale generation.
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          attempt=1
+          max_attempts=3
+          until CI=true SMOKE_ONLY=1 \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
+                --project=chromium --reporter=line; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "❌ Aliased staging Better Auth OAuth runtime proof failed after ${max_attempts} attempts."
+              exit 1
+            fi
+            sleep_seconds=$((attempt * 15))
+            echo "⚠ Aliased staging OAuth runtime attempt ${attempt}/${max_attempts} failed; retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+            attempt=$((attempt + 1))
+          done
 
   production-head:
     name: Recheck main before production mutation
@@ -437,10 +597,12 @@ jobs:
 
   promote-production:
     name: Promote to Production
-    needs: [deploy-staging, canary-health-gate, alias-staging, production-head]
-    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
+    needs: [deploy-staging, attest-staging-build, canary-health-gate, alias-staging, production-head]
+    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.attest-staging-build.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
     environment:
       name: Production – jovie
       url: https://jov.ie
@@ -462,38 +624,11 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       # Production runtime config comes from the isolated Doppler `prd`
       # service token. Vercel remains the deployment control plane only.
       - uses: ./.github/actions/setup-doppler
-        with:
-          doppler-token: ${{ secrets.DOPPLER_TOKEN_PRD }}
-      - name: Configure production deployment credentials
-        shell: bash
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          set -euo pipefail
-          missing=()
-          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
-            if [ -z "${!key:-}" ]; then
-              missing+=("$key")
-            fi
-          done
-          if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::Missing required production deployment credentials: ${missing[*]}"
-            exit 1
-          fi
-
-          # Write after setup-doppler so runtime config cannot override the
-          # repository-scoped deployment identity used by Vercel CLI steps.
-          {
-            printf 'VERCEL_TOKEN=%s\n' "$VERCEL_TOKEN"
-            printf 'VERCEL_ORG_ID=%s\n' "$VERCEL_ORG_ID"
-            printf 'VERCEL_PROJECT_ID=%s\n' "$VERCEL_PROJECT_ID"
-          } >> "$GITHUB_ENV"
       - name: Verify production domains are on canonical Vercel project
         id: domain-guard
         env:
@@ -529,19 +664,21 @@ jobs:
         if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
         timeout-minutes: 30
         env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           EXPECTED_SHA: ${{ inputs.expected_sha }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
-          set -euo pipefail
+          production_stage() {
+            set -euo pipefail
 
-          fail_stage() {
-            echo "::error::$1"
-            echo "failure_subtype=$2" >> "$GITHUB_OUTPUT"
-            exit 1
-          }
+            fail_stage() {
+              echo "::error::$1"
+              echo "failure_subtype=$2" >> "$GITHUB_OUTPUT"
+              exit 1
+            }
 
           missing=()
           for key in EXPECTED_SHA VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
@@ -568,7 +705,7 @@ jobs:
             if [ -z "${!key:-}" ]; then
               missing_runtime_env+=("$key")
             else
-              runtime_env_args+=(--env "${key}=${!key}")
+              runtime_env_args+=(--env "$key")
             fi
           done
           if [ "${#missing_runtime_env[@]}" -gt 0 ]; then
@@ -580,7 +717,7 @@ jobs:
           rm -rf .vercel/output .vercel/.env.preview.local .vercel/.env.production.local .vercel/.env.local
 
           if ! ./node_modules/.bin/vercel pull --yes --environment=production \
-            --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+            "${scope_args[@]}"; then
             fail_stage "Unable to pull the Production environment." production_artifact_failed
           fi
 
@@ -600,7 +737,7 @@ jobs:
             VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA" \
             NEXT_PUBLIC_BUILD_SHA="$expected" \
             ./node_modules/.bin/vercel build --prod \
-              --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+              "${scope_args[@]}"; then
             fail_stage "Production Vercel build failed." production_artifact_failed
           fi
           if [ ! -f .vercel/output/config.json ]; then
@@ -608,13 +745,15 @@ jobs:
           fi
 
           deploy_json=""
+          export VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"
+          export NEXT_PUBLIC_BUILD_SHA="$expected"
           if ! deploy_json="$(./node_modules/.bin/vercel deploy \
             --prebuilt --archive=tgz --prod --skip-domain --format=json \
-            --env "VERCEL_GIT_COMMIT_SHA=${EXPECTED_SHA}" \
-            --env "NEXT_PUBLIC_BUILD_SHA=${expected}" \
+            --env VERCEL_GIT_COMMIT_SHA \
+            --env NEXT_PUBLIC_BUILD_SHA \
             "${runtime_env_args[@]}" \
             --meta "githubCommitSha=${EXPECTED_SHA}" \
-            --token "$VERCEL_TOKEN" "${scope_args[@]}")"; then
+            "${scope_args[@]}")"; then
             fail_stage "Production prebuilt deployment failed." production_artifact_failed
           fi
           if ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$deploy_json"; then
@@ -635,10 +774,10 @@ jobs:
 
           inspect_wait_status=0
           ./node_modules/.bin/vercel inspect "$production_deploy_id" \
-            --wait --timeout 15m --token "$VERCEL_TOKEN" "${scope_args[@]}" ||
+            --wait --timeout 15m "${scope_args[@]}" ||
             inspect_wait_status=$?
           if ! production_deploy_json="$(./node_modules/.bin/vercel inspect \
-            "$production_deploy_id" --format=json --token "$VERCEL_TOKEN" \
+            "$production_deploy_id" --format=json \
             "${scope_args[@]}")" ||
             ! jq -e 'type == "object"' >/dev/null 2>&1 <<<"$production_deploy_json"; then
             fail_stage "Unable to inspect the staged production deployment." staged_production_not_ready
@@ -650,55 +789,45 @@ jobs:
             <<<"$production_deploy_json")"
           production_deploy_target="$(jq -r '(.target // "") | ascii_downcase' \
             <<<"$production_deploy_json")"
+          inspected_url="$(jq -r '.url // ""' <<<"$production_deploy_json")"
+          if [[ "$inspected_url" != *://* && "$inspected_url" == *.vercel.app ]]; then
+            inspected_url="https://${inspected_url}"
+          fi
+          inspected_url="${inspected_url%/}"
           if [ "$inspected_id" != "$production_deploy_id" ] ||
             [ "$production_deploy_state" != "READY" ] ||
             [ "$production_deploy_target" != "production" ]; then
             fail_stage "Staged production deployment is not the exact READY Production target (wait status ${inspect_wait_status})." staged_production_not_ready
           fi
-
-          bypass_args=()
-          if [ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
-            bypass_args+=(-H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}")
-          fi
-          fetch_staged() {
-            local url="$1"
-            local separator="?"
-            [[ "$url" == *"?"* ]] && separator="&"
-            STAGED_RESPONSE="$(curl -sS -L --connect-timeout 5 --max-time 15 \
-              -A "Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)" \
-              -H "Cache-Control: no-cache, no-store, must-revalidate" \
-              "${bypass_args[@]}" -w "\n%{http_code}" \
-              "${url}${separator}_cb=$(date +%s%N)" \
-              2>/dev/null || printf '\n000')"
-            STAGED_STATUS="${STAGED_RESPONSE##*$'\n'}"
-            STAGED_BODY="${STAGED_RESPONSE%$'\n'*}"
-          }
-
-          fetch_staged "${production_deploy_url}/api/health/build-info"
-          staged_sha="$(printf '%s' "$STAGED_BODY" | jq -r '.commitSha // ""' 2>/dev/null || echo "")"
-          staged_environment="$(printf '%s' "$STAGED_BODY" | jq -r '.environment // ""' 2>/dev/null || echo "")"
-          if [ "$STAGED_STATUS" != "200" ] ||
-            [ "$staged_sha" != "$expected" ] ||
-            [ "$staged_environment" != "production" ]; then
-            fail_stage "Staged production build-info canary failed (HTTP ${STAGED_STATUS}, SHA ${staged_sha:-<empty>}, environment ${staged_environment:-<empty>})." staged_production_canary_failed
+          if ! node apps/web/scripts/vercel-protected-origin.cjs \
+            assert-authorized-origin "$production_deploy_url" "$inspected_url"; then
+            fail_stage "Staged production URL does not match the exact project-scoped Vercel inspection." staged_production_not_ready
           fi
 
-          fetch_staged "${production_deploy_url}/api/health"
-          staged_health="$(printf '%s' "$STAGED_BODY" | jq -r '.status // ""' 2>/dev/null || echo "")"
-          if [ "$STAGED_STATUS" != "200" ] || [ "$staged_health" != "ok" ]; then
-            fail_stage "Staged production health canary failed (HTTP ${STAGED_STATUS})." staged_production_canary_failed
+          if [ -z "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
+            fail_stage "Production bypass credential is required for the staged deployment canary." missing_creds
           fi
-
-          fetch_staged "${production_deploy_url}/"
-          if [ "$STAGED_STATUS" != "200" ] ||
-            [ "${#STAGED_BODY}" -lt 1000 ] ||
-            printf '%s' "$STAGED_BODY" | grep -qiE 'application error|internal server error|something went wrong'; then
-            fail_stage "Staged production homepage canary failed (HTTP ${STAGED_STATUS}, ${#STAGED_BODY} bytes)." staged_production_canary_failed
+          staged_cookie_jar="$(mktemp)"
+          trap 'rm -f "$staged_cookie_jar"' EXIT
+          if ! VERCEL_PROBE_URL="$production_deploy_url" \
+            EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$production_deploy_url" \
+            EXPECTED_COMMIT_SHA="$EXPECTED_SHA" \
+            EXPECTED_VERCEL_ENVIRONMENT=production \
+            VERCEL_PROBE_COOKIE_JAR="$staged_cookie_jar" \
+            VERCEL_VERIFY_PUBLIC_SURFACES=true \
+            VERCEL_PROBE_TIMEOUT_MS=180000 \
+            node apps/web/scripts/vercel-protected-origin.cjs bootstrap-cookie-jar; then
+            fail_stage "Staged protected-origin exact build or semantic public-surface verification failed." staged_production_canary_failed
           fi
 
           echo "production_deployment_id=$production_deploy_id" >> "$GITHUB_OUTPUT"
           printf 'production_deployment_url_b64=%s\n' \
             "$(printf '%s' "$production_deploy_url" | base64 | tr -d '\n')" >> "$GITHUB_OUTPUT"
+          }
+          export -f production_stage
+          doppler run --project jovie-web --config prd \
+            --only-secrets=NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY \
+            --no-fallback -- env -u DOPPLER_TOKEN bash -c production_stage
 
       - name: Recheck main immediately before production promotion
         id: final-current
@@ -752,6 +881,8 @@ jobs:
     if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha && needs.canary-health-gate.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     environment:
       name: Production – jovie
     outputs:
@@ -763,6 +894,7 @@ jobs:
         with:
           ref: ${{ inputs.expected_sha }}
           fetch-depth: 1
+          persist-credentials: false
       - name: Observe production Sentry error rate
         id: sentry-gate
         uses: ./.github/actions/sentry-error-gate
@@ -780,6 +912,10 @@ jobs:
     if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     outputs:
       gate_status: ${{ steps.gate-result.outputs.gate_status }}
       ba_health: ${{ steps.gate-result.outputs.ba_health }}
@@ -789,83 +925,48 @@ jobs:
         with:
           ref: ${{ inputs.expected_sha }}
           fetch-depth: 1
+          persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Bind canonical OAuth probe to exact deployment and full SHA
+        env:
+          EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
+          EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.promote-production.outputs.production_deployment_id }}
+          PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.promote-production.outputs.production_deployment_url_b64 }}
+          PRODUCTION_ALIAS_MAX_ATTEMPTS: 8
+          PRODUCTION_ALIAS_REQUIRED_ROUNDS: 2
+          PRODUCTION_ALIAS_RETRY_SECONDS: 5
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          deployment_url="$(printf '%s' "$PRODUCTION_DEPLOYMENT_URL_B64" | base64 --decode)"
+          exact_json="$(
+            VERCEL_CANDIDATE_DEPLOYMENT_URL="$deployment_url" \
+            VERCEL_CANDIDATE_DEPLOYMENT_ID="$EXPECTED_PRODUCTION_DEPLOYMENT_ID" \
+            VERCEL_DEPLOYMENT_MAX_PAGES=5 \
+            VERCEL_API_TIMEOUT_MS=120000 \
+            VERCEL_DEPLOYMENT_POLL_INTERVAL_MS=3000 \
+              node apps/web/scripts/vercel-protected-origin.cjs resolve-deployment
+          )"
+          [ "$(jq -r '.id // ""' <<<"$exact_json")" = "$EXPECTED_PRODUCTION_DEPLOYMENT_ID" ] || {
+            echo "::error::Exact production deployment identity did not converge."
+            exit 1
+          }
+          bash .github/scripts/verify-production-alias.sh
+
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
 
-      - name: Hard probe — Better Auth handler reachable (GET /api/auth/ok)
-        id: ba-health
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          # Plan Phase 11 (Clerk → Better Auth migration): a deterministic 200
-          # from `/api/auth/ok` proves the BA handler mounted on prod before
-          # the OAuth provider redirect_uri probe runs. A 404 means the
-          # catch-all `/api/auth/[...all]` shadowed the static route, or the
-          # deploy broke auth stitching. Separate axis from the OAuth provider
-          # probe: catches handler-wired-wrong without depending on
-          # Google/Apple console state.
-          ok_url="https://jov.ie/api/auth/ok"
-          attempt=1
-          max_attempts=3
-          confirmed_status=""
-          uncertain=false
-          while [ "$attempt" -le "$max_attempts" ]; do
-            response_file="$RUNNER_TEMP/ba-health-${attempt}.body"
-            headers_file="$RUNNER_TEMP/ba-health-${attempt}.headers"
-            curl_status=0
-            http_status="$(curl --silent --show-error --connect-timeout 10 --max-time 30 \
-              -D "$headers_file" -o "$response_file" -w '%{http_code}' "$ok_url")" || curl_status=$?
-            if [ "$curl_status" -eq 0 ] && [[ "$http_status" =~ ^[1-5][0-9][0-9]$ ]]; then
-              if [ "$http_status" = "200" ]; then
-                content_type="$(awk 'tolower($0) ~ /^content-type:/ { value=$0 } END { sub(/^[^:]+:[[:space:]]*/, "", value); sub(/\r$/, "", value); print tolower(value) }' "$headers_file")"
-                if [[ "$content_type" == application/json* ]] &&
-                  jq -e 'type == "object" and .ok == true' >/dev/null "$response_file"; then
-                  echo "ba_health=passed" >> "$GITHUB_OUTPUT"
-                  echo "✅ $ok_url returned canonical JSON health truth"
-                  exit 0
-                fi
-                uncertain=true
-                echo "HTTP 200 from $ok_url lacked canonical application/json {ok:true} truth."
-                attempt=$((attempt + 1))
-                if [ "$attempt" -le "$max_attempts" ]; then sleep 15; fi
-                continue
-              fi
-              if [ -z "$confirmed_status" ]; then
-                confirmed_status="$http_status"
-              elif [ "$confirmed_status" != "$http_status" ]; then
-                uncertain=true
-              fi
-              echo "Confirmed HTTP $http_status from $ok_url on attempt ${attempt}/${max_attempts}."
-            else
-              uncertain=true
-              echo "Transport/API uncertainty probing $ok_url on attempt ${attempt}/${max_attempts} (curl=$curl_status, HTTP=${http_status:-<empty>})."
-            fi
-            if [ "$attempt" -lt "$max_attempts" ]; then
-              sleep_seconds=$((attempt * 15))
-              sleep "$sleep_seconds"
-            fi
-            attempt=$((attempt + 1))
-          done
-          if [ "$uncertain" = "false" ] && [ -n "$confirmed_status" ]; then
-            echo "ba_health=failed" >> "$GITHUB_OUTPUT"
-            echo "❌ Confirmed deterministic HTTP $confirmed_status from $ok_url across all attempts."
-          else
-            echo "::error::Better Auth probe was inconclusive; no confirmed regression flag emitted."
-          fi
-          exit 1
-
-      - name: Probe production Google + Apple OAuth redirect URIs
+      - name: Probe production Better Auth Google + Apple runtime
         id: oauth-probe
         continue-on-error: true
+        env:
+          BASE_URL: https://jov.ie
         run: |
           set -euo pipefail
-          # Hits the Google + Apple authorize endpoints with the EXACT redirect_uri
-          # Better Auth hands them (https://jov.ie/api/auth/callback/<provider>)
-          # and fails ONLY on a real provider rejection
-          # (redirect_uri_mismatch / invalid_request). This is the gap the
-          # staging canary cannot cover: production runs a different app host
-          # + different OAuth clients than staging.
+          # The browser must issue the same-origin POST
+          # /api/auth/sign-in/social before either provider navigation exists.
           cd apps/web
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
@@ -876,19 +977,28 @@ jobs:
           while [ "$attempt" -le "$max_attempts" ]; do
             report="$RUNNER_TEMP/oauth-provider-report-${attempt}.json"
             probe_status=0
-            CI=true SMOKE_ONLY=1 BASE_URL="https://jov.ie" \
+            CI=true SMOKE_ONLY=1 \
               PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" \
               --run -- pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
               --project=chromium --reporter=json || probe_status=$?
-            if [ "$probe_status" -eq 0 ]; then
-              echo "oauth_status=passed" >> "$GITHUB_OUTPUT"
-              echo "✅ Production Google + Apple accept Better Auth's redirect_uri"
+            if [ "$probe_status" -eq 0 ] && jq -e '
+              def results:
+                [ .suites[]? | .. | objects | select(has("results")) | .results[]? ];
+              type == "object" and (.suites | type == "array") and
+              (results | map(select(.status == "passed")) | length) == 2 and
+              (results | map(select(.status == "skipped")) | length) == 0
+            ' >/dev/null "$report"; then
+              {
+                echo "ba_health=passed"
+                echo "oauth_status=passed"
+              } >> "$GITHUB_OUTPUT"
+              echo "✅ Production UI exercised the Better Auth catch-all and exact Google + Apple redirect URIs"
               exit 0
             fi
 
-            # Only exact assertion messages in a valid Playwright JSON report
-            # confirm provider rejection. Browser/tool/network/report failures
+            # Only explicit runtime-contract assertions in a valid Playwright
+            # report confirm a regression. Browser/tool/network/report failures
             # remain uncertainty and can never request rollback.
             if [ -s "$report" ] && jq -e '
               def results:
@@ -898,15 +1008,15 @@ jobs:
               all(results[] | select(.status != "passed" and .status != "skipped");
                 .status == "failed" and
                 ([.errors[]?.message // ""] | any(
-                  test("Google rejected redirect_uri|Apple rejected return URL")
+                  contains("CONFIRMED_OAUTH_RUNTIME_CONTRACT")
                 ))
               )
             ' >/dev/null "$report"; then
               confirmed_attempts=$((confirmed_attempts + 1))
-              echo "Confirmed provider redirect rejection in structured report ${attempt}/${max_attempts}."
+              echo "Confirmed Better Auth OAuth runtime-contract failure ${attempt}/${max_attempts}."
             else
               uncertain=true
-              echo "OAuth attempt ${attempt}/${max_attempts} lacked exact structured provider-rejection evidence."
+              echo "OAuth attempt ${attempt}/${max_attempts} lacked exact structured runtime-contract evidence."
             fi
             if [ "$attempt" -lt "$max_attempts" ]; then
               sleep_seconds=$((attempt * 15))
@@ -915,8 +1025,11 @@ jobs:
             attempt=$((attempt + 1))
           done
           if [ "$uncertain" = "false" ] && [ "$confirmed_attempts" -eq "$max_attempts" ]; then
-            echo "oauth_status=failed" >> "$GITHUB_OUTPUT"
-            echo "❌ Structured evidence confirmed provider redirect rejection across all attempts."
+            {
+              echo "ba_health=failed"
+              echo "oauth_status=failed"
+            } >> "$GITHUB_OUTPUT"
+            echo "❌ Structured evidence confirmed a Better Auth OAuth runtime regression across all attempts."
           else
             echo "::error::OAuth probe was inconclusive; no confirmed regression flag emitted."
           fi
@@ -927,19 +1040,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ba_health="${{ steps.ba-health.outputs.ba_health }}"
+          ba_health="${{ steps.oauth-probe.outputs.ba_health }}"
           oauth_status="${{ steps.oauth-probe.outputs.oauth_status }}"
           echo "ba_health=${ba_health:-error}" >> "$GITHUB_OUTPUT"
           echo "oauth_status=${oauth_status:-error}" >> "$GITHUB_OUTPUT"
-          if [ "${{ steps.ba-health.outcome }}" = "success" ] &&
+          if [ "${{ steps.oauth-probe.outcome }}" = "success" ] &&
             [ "$ba_health" = "passed" ] &&
-            [ "${{ steps.oauth-probe.outcome }}" = "success" ] &&
             [ "$oauth_status" = "passed" ]; then
             echo "gate_status=passed" >> "$GITHUB_OUTPUT"
-          elif { [ "${{ steps.ba-health.outcome }}" = "failure" ] &&
-              [ "$ba_health" = "failed" ]; } ||
-            { [ "${{ steps.oauth-probe.outcome }}" = "failure" ] &&
-              [ "$oauth_status" = "failed" ]; }; then
+          elif [ "${{ steps.oauth-probe.outcome }}" = "failure" ] &&
+            [ "$ba_health" = "failed" ] && [ "$oauth_status" = "failed" ]; then
             echo "gate_status=failed" >> "$GITHUB_OUTPUT"
             echo "::error::Confirmed production OAuth regression; centralized rollback will evaluate ownership."
           else
@@ -962,6 +1072,8 @@ jobs:
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     environment:
       name: Production – jovie
       url: https://jov.ie
@@ -972,6 +1084,7 @@ jobs:
         with:
           ref: ${{ inputs.expected_sha }}
           fetch-depth: 1
+          persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Roll back explicitly to recorded previous deployment
@@ -1001,7 +1114,7 @@ jobs:
           # through this soak. Main may advance meanwhile, so exact canonical
           # deployment ownership—not source-main equality—authorizes rollback.
           canonical_json="$(./node_modules/.bin/vercel inspect jov.ie --format=json \
-            --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID")"
+            --scope "$VERCEL_ORG_ID")"
           jq -e '
             type == "object" and
             (.id | type == "string") and
@@ -1022,11 +1135,11 @@ jobs:
           fi
 
           ./node_modules/.bin/vercel rollback "$PREVIOUS_PRODUCTION_DEPLOYMENT_ID" \
-            --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"
+            --yes --scope "$VERCEL_ORG_ID"
 
           for attempt in $(seq 1 12); do
             canonical_json="$(./node_modules/.bin/vercel inspect jov.ie --format=json \
-              --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID")"
+              --scope "$VERCEL_ORG_ID")"
             canonical_id="$(jq -r '.id // ""' <<<"$canonical_json")"
             canonical_state="$(jq -r '(.readyState // "") | ascii_upcase' <<<"$canonical_json")"
             canonical_target="$(jq -r '(.target // "") | ascii_downcase' <<<"$canonical_json")"
@@ -1051,6 +1164,7 @@ jobs:
       [
         release-head,
         deploy-staging,
+        attest-staging-build,
         canary-health-gate,
         staging-head,
         alias-staging,
@@ -1159,6 +1273,7 @@ jobs:
 
           for gate in \
             "deploy-staging:${{ needs.deploy-staging.result }}" \
+            "attest-staging-build:${{ needs.attest-staging-build.result }}" \
             "canary-health-gate:${{ needs.canary-health-gate.result }}" \
             "staging-head:${{ needs.staging-head.result }}" \
             "alias-staging:${{ needs.alias-staging.result }}" \
@@ -1182,7 +1297,7 @@ jobs:
             echo "::error::Release completed with malformed production deployment URL evidence."
             exit 1
           }
-          if [[ ! "$production_deployment_url" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]]; then
+          if [[ ! "$production_deployment_url" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]]; then
             echo "::error::Release completed without an exact immutable production deployment URL."
             exit 1
           fi
