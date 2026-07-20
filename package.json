@@ -224,7 +224,7 @@
     "tsx": "^4.22.4",
     "turbo": "^2.9.14",
     "typescript": "^6.0.3",
-    "vercel": "54.14.5",
+    "vercel": "56.3.2",
     "vitest": "4.1.8"
   },
   "lint-staged": {
