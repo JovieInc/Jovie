@@ -982,7 +982,7 @@ final class JovieUITests: XCTestCase {
     }
 
     try openAuthCallbackURL(
-      "ie.jov.jovie://auth/complete?error=access_denied&error_description=Denied&state=state_123",
+      "ie.jov.jovie://auth/complete?error=access_denied&state=state_123&iss=https%3A%2F%2Fjov.ie%2Fapi%2Fauth",
       targetApp: app
     )
 

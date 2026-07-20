@@ -12,9 +12,6 @@ on:
 
 permissions:
   contents: read
-  actions: read
-  attestations: write
-  id-token: write
 
 # Every initial run and rerun joins one repo-wide FIFO. This lease spans exact
 # CI evidence authorization, all production mutation and rollback gates,
@@ -30,6 +27,9 @@ jobs:
     if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
     outputs:
       authorized: ${{ steps.authorize.outputs.authorized }}
       is_current: ${{ steps.authorize.outputs.is_current }}
@@ -37,7 +37,12 @@ jobs:
       source_ci_run_attempt: ${{ steps.authorize.outputs.source_ci_run_attempt }}
       expected_sha: ${{ steps.authorize.outputs.expected_sha }}
       already_verified: ${{ steps.authorize.outputs.already_verified }}
+      marker_recovery: ${{ steps.authorize.outputs.marker_recovery }}
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
       - name: Cross-prove exact successful push CI
         id: authorize
         env:
@@ -56,9 +61,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "authorized=false" >> "$GITHUB_OUTPUT"
-          echo "is_current=false" >> "$GITHUB_OUTPUT"
-          echo "already_verified=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "authorized=false"
+            echo "is_current=false"
+            echo "already_verified=false"
+            echo "marker_recovery=false"
+          } >> "$GITHUB_OUTPUT"
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Controller expected SHA must be a full commit."
             exit 1
@@ -105,170 +113,70 @@ jobs:
           fi
           echo "is_current=true" >> "$GITHUB_OUTPUT"
 
-            # The marker records production truth independently of best-effort
-            # notification delivery. Cross-prove its completed controller run
-            # and exact Production Verified job before treating a rerun as done.
-            controller_workflow_json="$(gh api \
-              "repos/$REPOSITORY/actions/workflows/production-controller.yml")"
-            jq -e '
-              type == "object" and
-              (.id | type == "number" and . > 0) and
-              .name == "Production Controller" and
-              .path == ".github/workflows/production-controller.yml" and
-              .state == "active"
-            ' >/dev/null <<<"$controller_workflow_json" || {
-              echo "::error::Authoritative Production Controller workflow identity is malformed."
-              exit 1
-            }
-            controller_workflow_id="$(jq -r '.id' <<<"$controller_workflow_json")"
-            marker_name="production-generation-verified-$EXPECTED_SHA"
-            artifacts_json="$(gh api \
-              "repos/$REPOSITORY/actions/artifacts?name=$marker_name&per_page=100")"
-            jq -e --arg marker_name "$marker_name" '
-              type == "object" and (.artifacts | type == "array") and
-              all(.artifacts[];
-                type == "object" and
-                (.id | type == "number" and . > 0) and
-                .name == $marker_name and
-                (.expired | type == "boolean") and
-                (.created_at | type == "string" and length > 0) and
-                (.workflow_run.id | type == "number" and . > 0)
-              )
-            ' \
-              >/dev/null <<<"$artifacts_json" || {
-              echo "::error::GitHub returned malformed production marker evidence."
-              exit 1
-            }
-            marker_candidates="$(jq -r --arg sha "$EXPECTED_SHA" '
-              [
-                .artifacts[]
-                | select(
-                    .expired == false and
-                    .name == ("production-generation-verified-" + $sha)
-                  )
-              ]
-              | sort_by(.created_at, .id) | reverse
-              | .[] | "\(.id)\t\(.workflow_run.id)"
-            ' <<<"$artifacts_json")"
-            # Any exact-name history is durable evidence that this generation
-            # may already have mutated production. Expired-only evidence cannot
-            # authorize a duplicate deployment; only a truly empty validated
-            # listing permits the first deployment.
-            marker_presence_count="$(jq '.artifacts | length' <<<"$artifacts_json")"
-            while IFS=$'\t' read -r marker_artifact_id marker_run_id; do
-              [ -n "$marker_run_id" ] || continue
-              [[ "$marker_artifact_id" =~ ^[1-9][0-9]*$ ]] &&
-                [[ "$marker_run_id" =~ ^[1-9][0-9]*$ ]] || {
-                echo "::error::Production marker run identity is malformed."
-                exit 1
-              }
-              marker_run_json="$(gh api "repos/$REPOSITORY/actions/runs/$marker_run_id")"
-              jq -e '
-                type == "object" and
-                (.id | type == "number" and . > 0) and
-                (.workflow_id | type == "number" and . > 0) and
-                (.run_attempt | type == "number" and . >= 1) and
-                (.display_title | type == "string") and
-                (.path | type == "string") and
-                (.head_sha | type == "string") and
-                (.head_branch | type == "string") and
-                (.head_repository.full_name | type == "string") and
-                (.event | type == "string") and
-                (.status | type == "string") and
-                (.conclusion | type == "string")
-              ' >/dev/null <<<"$marker_run_json" || {
-                echo "::error::GitHub returned malformed Production Controller run evidence."
-                exit 1
-              }
-              jq -e \
-                --argjson run_id "$marker_run_id" \
-                --arg sha "$EXPECTED_SHA" \
-                --arg repo "$REPOSITORY" \
-                --argjson workflow_id "$controller_workflow_id" '
-                type == "object" and
-                .id == $run_id and
-                .workflow_id == $workflow_id and
-                (.display_title | startswith("Production Controller " + $sha + " from CI ")) and
-                .path == ".github/workflows/production-controller.yml" and
-                .head_sha == $sha and
-                .head_branch == "main" and
-                .head_repository.full_name == $repo and
-                .event == "workflow_run" and
-                .status == "completed" and
-                .conclusion == "success" and
-                (.run_attempt | type == "number" and . >= 1)
-              ' >/dev/null <<<"$marker_run_json" || {
-                echo "::warning::Ignoring marker from incomplete or unsuccessful controller run $marker_run_id."
-                continue
-              }
-              marker_run_attempt="$(jq -r '.run_attempt' <<<"$marker_run_json")"
-              marker_jobs_json="$(gh api --paginate --slurp \
-                "repos/$REPOSITORY/actions/runs/$marker_run_id/attempts/$marker_run_attempt/jobs?per_page=100")"
-              jq -e '
-                type == "array" and length > 0 and
-                all(.[];
-                  type == "object" and (.jobs | type == "array") and
-                  all(.jobs[];
-                    type == "object" and
-                    (.id | type == "number" and . > 0) and
-                    (.run_id | type == "number" and . > 0) and
-                    (.run_attempt | type == "number" and . >= 1) and
-                    (.name | type == "string") and
-                    (.head_sha | type == "string") and
-                    (.head_branch | type == "string") and
-                    (.status | type == "string") and
-                    (.conclusion | type == "string")
-                  )
-                )
-              ' >/dev/null <<<"$marker_jobs_json" || {
-                echo "::error::GitHub returned malformed verified-generation job evidence."
-                exit 1
-              }
-              marker_job_count="$(jq \
-                --arg sha "$EXPECTED_SHA" \
-                --argjson run_id "$marker_run_id" \
-                --argjson run_attempt "$marker_run_attempt" '
-                [.[] | .jobs[]? | select(
-                  .name == "Production Verified" and
-                  .run_id == $run_id and
-                  .run_attempt == $run_attempt and
-                  .head_sha == $sha and
-                  .head_branch == "main" and
-                  .status == "completed" and
-                  .conclusion == "success"
-                )] | length
-              ' <<<"$marker_jobs_json")"
-              if [ "$marker_job_count" != "1" ]; then
-                echo "::warning::Ignoring marker without one successful exact Production Verified job."
-                continue
-              fi
-              marker_archive="$RUNNER_TEMP/production-marker-${marker_artifact_id}.zip"
-              marker_json="$RUNNER_TEMP/production-marker-${marker_artifact_id}.json"
-              gh api "repos/$REPOSITORY/actions/artifacts/$marker_artifact_id/zip" \
-                > "$marker_archive"
-              if ! unzip -p "$marker_archive" production-generation-verified.json \
-                > "$marker_json" 2>/dev/null ||
-                ! jq -e --arg sha "$EXPECTED_SHA" --arg run "$marker_run_id" '
-                  type == "object" and .sha == $sha and
-                  (.deploymentId | type == "string" and startswith("dpl_")) and
-                  .controllerRun == $run
-                ' >/dev/null "$marker_json"; then
-                echo "::warning::Ignoring marker with invalid exact-generation content."
-                continue
-              fi
+          controller_workflow_json="$(gh api \
+            "repos/$REPOSITORY/actions/workflows/production-controller.yml")"
+          jq -e '
+            type == "object" and
+            (.id | type == "number" and . > 0) and
+            .name == "Production Controller" and
+            .path == ".github/workflows/production-controller.yml" and
+            .state == "active"
+          ' >/dev/null <<<"$controller_workflow_json" || {
+            echo "::error::Authoritative Production Controller workflow identity is malformed."
+            exit 1
+          }
+          controller_workflow_id="$(jq -r '.id' <<<"$controller_workflow_json")"
+          marker_state_json="$(node .github/scripts/production-marker-state.mjs \
+            --sha "$EXPECTED_SHA" \
+            --repo "$REPOSITORY" \
+            --controller-workflow-id "$controller_workflow_id" \
+            --actor-run-id "${{ github.run_id }}" \
+            --actor-attempt "${{ github.run_attempt }}")"
+          jq -e '
+            type == "object" and
+            (.state | IN("none", "pending", "recovery_available", "verified", "manual")) and
+            (.reason | type == "string" and length > 0)
+          ' >/dev/null <<<"$marker_state_json" || {
+            echo "::error::Production marker classifier returned malformed evidence."
+            exit 1
+          }
+          marker_state="$(jq -r '.state' <<<"$marker_state_json")"
+          marker_reason="$(jq -r '.reason' <<<"$marker_state_json")"
+          case "$marker_state" in
+            verified)
               echo "already_verified=true" >> "$GITHUB_OUTPUT"
-              echo "::notice::Exact production generation $EXPECTED_SHA is already verified; neutral."
+              echo "::notice::Exact production generation $EXPECTED_SHA is already verified by its payload-bound historical attempt."
               exit 0
-            done <<<"$marker_candidates"
-            if [ "$marker_presence_count" -gt 0 ]; then
-              echo "::error::Production markers exist for current main, but none has exact provable controller evidence; refusing duplicate deployment."
+              ;;
+            pending)
+              echo "::notice::Exact production marker state is still pending ($marker_reason); no mutation is authorized."
+              exit 0
+              ;;
+            recovery_available)
+              if [ "${{ github.run_attempt }}" != "2" ] ||
+                [ "$(jq -r '.controllerRun // 0' <<<"$marker_state_json")" != "${{ github.run_id }}" ] ||
+                [ "$marker_reason" != "current_recovery_attempt_requires_lease" ]; then
+                echo "::error::Only the exact full controller attempt 2 may consume an interrupted-marker recovery."
+                exit 1
+              fi
+              echo "marker_recovery=true" >> "$GITHUB_OUTPUT"
+              ;;
+            none)
+              if [ "${{ github.run_attempt }}" != "1" ]; then
+                echo "::error::A controller rerun without durable marker evidence cannot authorize production."
+                exit 1
+              fi
+              ;;
+            manual)
+              echo "::error::Production marker evidence requires manual recovery ($marker_reason)."
               exit 1
-            fi
+              ;;
+          esac
 
-            # Reruns retain a run ID but increment run_attempt. Read the exact
-            # attempt endpoint carried by workflow_run so attempt N can never
-            # opportunistically authorize from attempt N+1.
-            run_record="$(gh api \
+          # Reruns retain a run ID but increment run_attempt. Read the exact
+          # attempt endpoint carried by workflow_run so attempt N can never
+          # opportunistically authorize from attempt N+1.
+          run_record="$(gh api \
               "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT")"
             jq -e \
               --arg sha "$EXPECTED_SHA" \
@@ -295,12 +203,23 @@ jobs:
             source_run_id="$TRIGGER_RUN_ID"
             source_run_attempt="$TRIGGER_RUN_ATTEMPT"
 
-            jobs_json="$(gh api --paginate --slurp \
+            jobs_json="$(gh api \
               "repos/$REPOSITORY/actions/runs/$source_run_id/attempts/$source_run_attempt/jobs?per_page=100")"
             jq -e '
-              type == "array" and
-              length > 0 and
-              all(.[]; type == "object" and (.jobs | type == "array"))
+              type == "object" and
+              (.total_count | type == "number") and
+              (.jobs | type == "array") and
+              .total_count == (.jobs | length) and
+              all(.jobs[];
+                (.id | type == "number" and . > 0) and
+                (.run_id | type == "number" and . > 0) and
+                (.run_attempt | type == "number" and . > 0) and
+                (.name | type == "string" and length > 0) and
+                (.head_sha | type == "string" and length > 0) and
+                (.head_branch | type == "string" and length > 0) and
+                (.status | type == "string" and length > 0) and
+                ((.conclusion | type) == "string" or .conclusion == null)
+              )
             ' \
               >/dev/null <<<"$jobs_json" || {
               echo "::error::GitHub returned malformed exact CI job evidence."
@@ -311,7 +230,7 @@ jobs:
               --argjson run_id "$source_run_id" \
               --argjson run_attempt "$source_run_attempt" '
               [
-                .[].jobs[]
+                .jobs[]
                 | select(
                     .name == "Main Release Ready" and
                     .run_id == $run_id and
@@ -340,11 +259,34 @@ jobs:
               exit 0
             fi
 
-            echo "source_ci_run_id=$source_run_id" >> "$GITHUB_OUTPUT"
-            echo "source_ci_run_attempt=$source_run_attempt" >> "$GITHUB_OUTPUT"
-            echo "authorized=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "source_ci_run_id=$source_run_id"
+              echo "source_ci_run_attempt=$source_run_attempt"
+              echo "authorized=true"
+            } >> "$GITHUB_OUTPUT"
             echo "Authorized production from exact CI run $source_run_id attempt $source_run_attempt."
             exit 0
+
+      - name: Write one-shot production marker recovery lease
+        if: ${{ steps.authorize.outputs.marker_recovery == 'true' && steps.authorize.outputs.authorized == 'true' }}
+        env:
+          EXPECTED_SHA: ${{ steps.authorize.outputs.expected_sha }}
+        run: |
+          jq -n \
+            --arg sha "$EXPECTED_SHA" \
+            --arg controller_run "${{ github.run_id }}" \
+            --arg controller_attempt "${{ github.run_attempt }}" \
+            '{sha: $sha, controllerRun: $controller_run, controllerAttempt: $controller_attempt}' \
+            > "$RUNNER_TEMP/production-generation-recovery.json"
+
+      - name: Consume the one-shot production marker recovery lease
+        if: ${{ steps.authorize.outputs.marker_recovery == 'true' && steps.authorize.outputs.authorized == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-generation-recovery-${{ steps.authorize.outputs.expected_sha }}
+          path: ${{ runner.temp }}/production-generation-recovery.json
+          if-no-files-found: error
+          retention-days: 30
 
   production-release:
     name: Production Release
@@ -366,16 +308,20 @@ jobs:
     if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           fetch-depth: 1
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Verify production endpoints are healthy
         env:
+          EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
@@ -383,199 +329,37 @@ jobs:
 
           PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
           PRODUCTION_BASE_URL="${PRODUCTION_BASE_URL%/}"
-          [[ "$PRODUCTION_BASE_URL" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]] || {
+          [[ "$PRODUCTION_BASE_URL" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] || {
             echo "::error::Exact production deployment URL is missing or invalid."
             exit 1
           }
-
-          USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
           COOKIE_JAR="$(mktemp)"
-          MAX_RETRIES=5
-
-          # Vercel Deployment Protection bypass
-          BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET:-}"
-          BYPASS_ARGS=()
-          if [ -n "$BYPASS_SECRET" ]; then
-            BYPASS_ARGS+=(
-              -H "x-vercel-protection-bypass: $BYPASS_SECRET"
-              -H "x-vercel-set-bypass-cookie: true"
-              -c "$COOKIE_JAR"
-              -b "$COOKIE_JAR"
-            )
-          fi
-
-          # Helper: curl with standard options, returns "body\nstatus_code"
-          # Append a cache-busting query parameter to bypass Vercel CDN edge cache,
-          # ensuring post-deploy smoke tests always hit the origin server.
-          fetch() {
-            local sep="?"
-            [[ "$1" == *"?"* ]] && sep="&"
-            curl -sS -L -A "$USER_AGENT" \
-              -H "Cache-Control: no-cache, no-store, must-revalidate" \
-              -H "Pragma: no-cache" \
-              "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${1}${sep}_cb=$(date +%s%N)" || echo -e "\n000"
-          }
-
-          # Helper: retry a check function with exponential backoff (max 5 attempts)
-          retry() {
-            local label="$1"; shift
-            local attempt=1
-            while [ $attempt -le $MAX_RETRIES ]; do
-              if "$@"; then
-                return 0
-              fi
-              if [ $attempt -lt $MAX_RETRIES ]; then
-                local delay=$((attempt * 3))
-                echo "  Retry $attempt/$MAX_RETRIES for $label in ${delay}s..."
-                sleep "$delay"
-              fi
-              attempt=$((attempt + 1))
-            done
-            echo "::error::$label failed after $MAX_RETRIES attempts"
-            return 1
-          }
-
-          FAILURES=0
-
-          # -- 1. Health API: JSON status=ok --
-          check_health() {
-            local response
-            response=$(fetch "${PRODUCTION_BASE_URL}/api/health")
-            local status="${response##*$'\n'}"
-            local body="${response%$'\n'*}"
-
-            if [ "$status" != "200" ]; then
-              echo "  Health API returned HTTP $status"
-              return 1
-            fi
-
-            if ! echo "$body" | grep -q '"status":"ok"'; then
-              echo "  Health API status is not ok: $body"
-              return 1
-            fi
-
-            echo "  Health API: HTTP 200, status=ok"
-            return 0
-          }
-
-          echo "=== 1/5 Health API ==="
-          if ! retry "Health API" check_health; then
-            FAILURES=$((FAILURES + 1))
-          fi
-
-          # -- 2. Homepage: HTTP 200, >1000 chars, no error strings --
-          check_homepage() {
-            local response
-            response=$(fetch "$PRODUCTION_BASE_URL")
-            local status="${response##*$'\n'}"
-            local body="${response%$'\n'*}"
-
-            if [ "$status" != "200" ]; then
-              echo "  Homepage returned HTTP $status"
-              return 1
-            fi
-
-            if [ ${#body} -lt 1000 ]; then
-              echo "  Homepage body too short (${#body} chars)"
-              return 1
-            fi
-
-            if echo "$body" | grep -qi "application error\|internal server error\|something went wrong"; then
-              echo "  Homepage contains error message"
-              return 1
-            fi
-
-            echo "  Homepage: HTTP 200, ${#body} chars, no errors"
-            return 0
-          }
-
-          echo "=== 2/5 Homepage ==="
-          if ! retry "Homepage" check_homepage; then
-            FAILURES=$((FAILURES + 1))
-          fi
-
-          # -- 3. Public profile: HTTP 200, substantial content, no 404 markers --
-          # Warm up the database connection before checking the profile page.
-          # The health check (step 1) may use a lightweight query that doesn't
-          # fully warm Neon, so hit the profile once and discard the result.
-          fetch "${PRODUCTION_BASE_URL}/tim" > /dev/null 2>&1
-          sleep 5
-
-          check_profile() {
-            local response
-            response=$(fetch "${PRODUCTION_BASE_URL}/tim")
-            local status="${response##*$'\n'}"
-            local body="${response%$'\n'*}"
-
-            if [ "$status" -ge 500 ] 2>/dev/null; then
-              echo "  Profile /tim returned HTTP $status (server error)"
-              return 1
-            fi
-
-            if [ ${#body} -lt 500 ]; then
-              echo "  Profile /tim body too short (${#body} chars)"
-              return 1
-            fi
-
-            if echo "$body" | grep -qi "application error\|internal server error\|something went wrong"; then
-              echo "  Profile /tim contains error content"
-              return 1
-            fi
-
-            # "Profile not found" with HTTP 200 is a valid app response (data issue),
-            # not a code regression — warn but don't fail.
-            if echo "$body" | grep -qi "profile not found\|page could not be found"; then
-              echo "  Profile /tim: HTTP $status, profile not seeded (non-blocking warning)"
-            else
-              echo "  Profile /tim: HTTP $status, ${#body} chars, renders correctly"
-            fi
-            return 0
-          }
-
-          echo "=== 3/5 Public Profile ==="
-          if ! retry "Public Profile" check_profile; then
-            FAILURES=$((FAILURES + 1))
-          fi
-
-          # -- 4. Critical pages: /signup, /start, /pricing -- no 5xx --
-          check_critical_pages() {
-            for route in "/signup" "/start" "/pricing"; do
-              local response
-              response=$(fetch "${PRODUCTION_BASE_URL}${route}")
-              local status="${response##*$'\n'}"
-              local body="${response%$'\n'*}"
-
-              if [ "$status" -ge 500 ] 2>/dev/null; then
-                echo "  Route ${route} returned HTTP $status (server error)"
-                return 1
-              fi
-              if echo "$body" | grep -qi "turnstile is not configured\|auth unavailable\|clerk is not configured"; then
-                echo "  Route ${route} contains front-door config error"
-                return 1
-              fi
-              echo "  ${route}: HTTP $status"
-            done
-            return 0
-          }
-
-          echo "=== 4/5 Critical Pages ==="
-          if ! retry "Critical Pages" check_critical_pages; then
-            FAILURES=$((FAILURES + 1))
-          fi
-
-          # -- 5. Production SEO surfaces: robots.txt + sitemap.xml --
-          echo "=== 5/5 Production SEO Surfaces ==="
-          if ! retry "Production SEO Surfaces" env BASE_URL="$PRODUCTION_BASE_URL" pnpm --filter=@jovie/web exec tsx scripts/seo-ratchet-live.ts; then
-            FAILURES=$((FAILURES + 1))
-          fi
-
-          # -- Summary --
-          echo ""
-          if [ $FAILURES -gt 0 ]; then
-            echo "::error::Post-deploy smoke failed: $FAILURES/5 checks failed"
+          trap 'rm -f "$COOKIE_JAR"' EXIT
+          if [ -z "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
+            echo "::error::VERCEL_AUTOMATION_BYPASS_SECRET is required for exact production deployment probes."
             exit 1
           fi
-          echo "Post-deploy smoke passed: 5/5 checks OK"
+
+          # One Node process owns the only secret-bearing request, verifies the
+          # exact build identity, and checks every common public surface under
+          # one absolute deadline before emitting a host-only cookie jar.
+          VERCEL_PROBE_URL="$PRODUCTION_BASE_URL" \
+          EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
+          EXPECTED_VERCEL_ENVIRONMENT=production \
+          VERCEL_PROBE_COOKIE_JAR="$COOKIE_JAR" \
+          VERCEL_VERIFY_PUBLIC_SURFACES=true \
+          VERCEL_PROBE_TIMEOUT_MS=180000 \
+            node apps/web/scripts/vercel-protected-origin.cjs bootstrap-cookie-jar
+
+          echo "=== Exact-Deployment SEO Surfaces ==="
+          VERCEL_PROBE_COOKIE_JAR="$COOKIE_JAR" BASE_URL="$PRODUCTION_BASE_URL" \
+            pnpm --filter=@jovie/web exec tsx scripts/seo-ratchet-live.ts
+
+          echo "=== Canonical Production SEO Surfaces ==="
+          BASE_URL="https://jov.ie" \
+            pnpm --filter=@jovie/web exec tsx scripts/seo-ratchet-live.ts
+
+          echo "Post-deploy smoke passed: exact build, semantic surfaces, and SEO verified."
 
   # Post-deploy authenticated smoke test against the immutable deployment URL.
   # Verifies sign-in + dashboard load with real credentials after deploy.
@@ -585,8 +369,11 @@ jobs:
     if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     outputs:
       credentials_configured: ${{ steps.check-creds.outputs.credentials_configured }}
+      auth_smoke_status: ${{ steps.auth-result.outputs.auth_smoke_status || steps.check-creds.outputs.auth_smoke_status }}
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -597,17 +384,28 @@ jobs:
 
       - name: Check for production auth credentials
         id: check-creds
+        env:
+          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
+          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
         run: |
-          if { [ -n "${{ secrets.E2E_PROD_USER_EMAIL }}" ] &&
-              [ -n "${{ secrets.E2E_PROD_USER_PASSWORD }}" ]; } ||
-            { [ -n "${{ secrets.E2E_CLERK_USER_USERNAME }}" ] &&
-              [ -n "${{ secrets.E2E_CLERK_USER_PASSWORD }}" ]; }; then
-            echo "credentials_configured=true" >> "$GITHUB_OUTPUT"
-            echo "skip=false" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if { [ -n "$E2E_PROD_USER_EMAIL" ] &&
+              [ -n "$E2E_PROD_USER_PASSWORD" ]; } ||
+            { [ -n "$E2E_CLERK_USER_USERNAME" ] &&
+              [ -n "$E2E_CLERK_USER_PASSWORD" ]; }; then
+            {
+              echo "credentials_configured=true"
+              echo "skip=false"
+            } >> "$GITHUB_OUTPUT"
           else
             echo "::notice::Production auth credentials are not configured; authenticated smoke is explicitly skipped and is not release proof."
-            echo "credentials_configured=false" >> "$GITHUB_OUTPUT"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "credentials_configured=false"
+              echo "auth_smoke_status=not-configured"
+              echo "skip=true"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - uses: ./.github/actions/setup-node-pnpm
@@ -622,11 +420,12 @@ jobs:
         run: sleep 30
 
       - name: Run production auth smoke tests
+        id: auth-result
         if: steps.check-creds.outputs.skip != 'true'
         run: |
           set -euo pipefail
           PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
-          [[ "$PRODUCTION_BASE_URL" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]] || {
+          [[ "$PRODUCTION_BASE_URL" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] || {
             echo "::error::Exact production deployment URL is missing or invalid."
             exit 1
           }
@@ -635,15 +434,24 @@ jobs:
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           test -n "$PRODUCTION_BASE_URL"
-          CI=true BASE_URL="$PRODUCTION_BASE_URL" node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
+          CI=true \
+          BASE_URL="$PRODUCTION_BASE_URL" \
+          EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
+          EXPECTED_VERCEL_ENVIRONMENT=production \
+          PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
+          echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
         env:
+          EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
+          PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
           E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
           E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
+          E2E_PROD_USER_CODE: ${{ secrets.E2E_PROD_USER_CODE }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && steps.check-creds.outputs.skip != 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -653,75 +461,6 @@ jobs:
           path: |
             apps/web/test-results/
           retention-days: 3
-  ci-homepage-smoke:
-    name: Homepage Smoke (Production)
-    needs: [authorize-production, production-release]
-    if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Verify homepage renders correctly
-        env:
-          PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: |
-          echo "Running homepage smoke test against production..."
-
-          set -euo pipefail
-          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
-          PRODUCTION_BASE_URL="${PRODUCTION_BASE_URL%/}"
-          [[ "$PRODUCTION_BASE_URL" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]] || {
-            echo "::error::Exact production deployment URL is missing or invalid."
-            exit 1
-          }
-
-          USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
-          COOKIE_JAR="$(mktemp)"
-
-          # Vercel Deployment Protection bypass for automation
-          BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET:-}"
-          BYPASS_ARGS=()
-          if [ -n "$BYPASS_SECRET" ]; then
-            BYPASS_ARGS+=(
-              -H "x-vercel-protection-bypass: $BYPASS_SECRET"
-              -H "x-vercel-set-bypass-cookie: true"
-              -c "$COOKIE_JAR"
-              -b "$COOKIE_JAR"
-            )
-          fi
-
-          # Check homepage
-          response=$(curl -sS -L -A "$USER_AGENT" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "$PRODUCTION_BASE_URL" || echo "\n000")
-          status="${response##*$'\n'}"
-          body="${response%$'\n'*}"
-
-          if [ "$status" != "200" ]; then
-            echo "❌ Homepage returned HTTP $status"
-            exit 1
-          fi
-
-          if [ ${#body} -lt 1000 ]; then
-            echo "❌ Homepage body too short (${#body} chars) - likely broken"
-            exit 1
-          fi
-
-          if echo "$body" | grep -qi "application error\|internal server error\|something went wrong"; then
-            echo "❌ Homepage contains error message"
-            exit 1
-          fi
-
-          # Check critical pages (/sign-up, /pricing)
-          for route in "/sign-up" "/pricing"; do
-            route_response=$(curl -sS -L -A "$USER_AGENT" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${PRODUCTION_BASE_URL}${route}" || echo "\n000")
-            route_status="${route_response##*$'\n'}"
-
-            if [ "$route_status" -ge 500 ]; then
-              echo "❌ Route ${route} returned HTTP $route_status (server error)"
-              exit 1
-            fi
-          done
-
-          echo "✅ Homepage smoke passed"
   lighthouse-ci:
     name: Lighthouse CI (Production)
     needs: [authorize-production, production-release]
@@ -729,10 +468,13 @@ jobs:
     if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
+          persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install production Lighthouse Chromium
         uses: ./.github/actions/setup-playwright
@@ -754,17 +496,50 @@ jobs:
           set -euo pipefail
           PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
           base_url="${PRODUCTION_BASE_URL%/}"
-          [[ "$base_url" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]] || {
+          [[ "$base_url" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] || {
             echo "::error::Exact production deployment URL is missing or invalid."
             exit 1
           }
+          echo "EXPECTED_VERCEL_DEPLOYMENT_ORIGIN=$base_url" >> "$GITHUB_ENV"
+          echo "EXPECTED_VERCEL_ENVIRONMENT=production" >> "$GITHUB_ENV"
           jq --arg base "$base_url" '
+            ($base | gsub("\\."; "\\.")) as $base_pattern |
             .ci.collect.url = [$base + "/", $base + "/tim"] |
-            .ci.assert.assertMatrix[0].matchingUrlPattern = "^https://[^/]+/$" |
-            .ci.assert.assertMatrix[1].matchingUrlPattern = "^https://[^/]+/tim/?$"
+            .ci.collect.puppeteerScript = "scripts/lighthouse-vercel-bypass.cjs" |
+            .ci.collect.puppeteerLaunchOptions.args = [
+              "--no-sandbox",
+              "--disable-setuid-sandbox",
+              "--disable-dev-shm-usage"
+            ] |
+            .ci.collect.settings.disableStorageReset = true |
+            del(.ci.collect.settings.chromeFlags) |
+            .ci.assert.includePassedAssertions = true |
+            .ci.assert.assertMatrix[0].matchingUrlPattern = ("^" + $base_pattern + "/$") |
+            .ci.assert.assertMatrix[1].matchingUrlPattern = ("^" + $base_pattern + "/tim$")
           ' apps/web/.lighthouserc.json > "$RUNNER_TEMP/lighthouse-production-exact.json"
-      - name: Run Lighthouse CI against production
-        run: node scripts/lighthouse-retry.mjs -- pnpm --filter @jovie/web exec lhci autorun --config="$RUNNER_TEMP/lighthouse-production-exact.json"
+          pnpm --filter @jovie/web exec tsx scripts/lighthouse-exact-target-guard.ts \
+            --config="$RUNNER_TEMP/lighthouse-production-exact.json"
+      - name: Collect Lighthouse against exact production deployment
+        env:
+          EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
+          LIGHTHOUSE_SENSITIVE_VALUES_FILE: ${{ runner.temp }}/lighthouse-sensitive-values
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node scripts/lighthouse-retry.mjs -- pnpm --filter @jovie/web exec lhci collect --config="$RUNNER_TEMP/lighthouse-production-exact.json"
+      - name: Assert Lighthouse production budgets
+        run: pnpm --filter @jovie/web exec lhci assert --config="$RUNNER_TEMP/lighthouse-production-exact.json"
+      - name: Validate and upload hash-sealed Lighthouse evidence
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          pnpm --filter @jovie/web exec tsx scripts/lighthouse-exact-target-guard.ts \
+            --config="$RUNNER_TEMP/lighthouse-production-exact.json" \
+            --reports-dir=".lighthouseci" \
+            --assertions=".lighthouseci/assertion-results.json" \
+            --sensitive-values-file="$RUNNER_TEMP/lighthouse-sensitive-values" \
+            --upload
+      - name: Remove Lighthouse sensitive probe state
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/lighthouse-sensitive-values"
   production-verified:
     name: Production Verified
     needs:
@@ -773,7 +548,6 @@ jobs:
         production-release,
         ci-public-profile-smoke,
         ci-post-deploy-auth-smoke,
-        ci-homepage-smoke,
         lighthouse-ci,
       ]
     if: >-
@@ -789,6 +563,8 @@ jobs:
     # canonical production until this final current-main proof completes.
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     outputs:
       verified: ${{ steps.finalize.outputs.verified || 'false' }}
     steps:
@@ -816,6 +592,7 @@ jobs:
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           fetch-depth: 1
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.current.outputs.is_current == 'true'
@@ -836,9 +613,11 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         run: |
           set -euo pipefail
-          echo "canonical_verified=false" >> "$GITHUB_OUTPUT"
-          echo "canonical_deployment_id=" >> "$GITHUB_OUTPUT"
-          echo "canonical_sha=" >> "$GITHUB_OUTPUT"
+          {
+            echo "canonical_verified=false"
+            echo "canonical_deployment_id="
+            echo "canonical_sha="
+          } >> "$GITHUB_OUTPUT"
           if [ "${{ needs.authorize-production.result }}" != "success" ] ||
             [ "${{ needs.authorize-production.outputs.authorized }}" != "true" ]; then
             echo "::error::Exact source CI authorization failed."
@@ -857,13 +636,12 @@ jobs:
             echo "::error::Production release emitted malformed deployment URL evidence."
             exit 1
           }
-          if [[ ! "$production_deployment_url" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app$ ]]; then
+          if [[ ! "$production_deployment_url" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]]; then
             echo "::error::Production release omitted the exact immutable deployment URL."
             exit 1
           fi
           for probe in \
             "Post-Deploy Smoke:${{ needs.ci-public-profile-smoke.result }}" \
-            "Homepage Smoke:${{ needs.ci-homepage-smoke.result }}" \
             "Lighthouse CI:${{ needs.lighthouse-ci.result }}"; do
             name="${probe%%:*}"
             result="${probe#*:}"
@@ -876,7 +654,18 @@ jobs:
             echo "::error::Optional authenticated smoke lane did not resolve cleanly."
             exit 1
           fi
-          if [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" != "true" ]; then
+          auth_smoke_status="${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}"
+          if [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" = "true" ] &&
+            [ "$auth_smoke_status" != "passed" ]; then
+            echo "::error::Configured authenticated smoke did not produce passing test evidence."
+            exit 1
+          fi
+          if [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" != "true" ] &&
+            [ "$auth_smoke_status" != "not-configured" ]; then
+            echo "::error::Authenticated smoke emitted an invalid result state."
+            exit 1
+          fi
+          if [ "$auth_smoke_status" = "not-configured" ]; then
             echo "::notice::Authenticated smoke was skipped because no complete credential pair is configured; OAuth and Better Auth public gates remain blocking."
           fi
 
@@ -894,9 +683,11 @@ jobs:
           fi
 
           bash .github/scripts/verify-production-alias.sh
-          echo "canonical_verified=true" >> "$GITHUB_OUTPUT"
-          echo "canonical_deployment_id=$EXPECTED_PRODUCTION_DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
-          echo "canonical_sha=$EXPECTED_COMMIT_SHA" >> "$GITHUB_OUTPUT"
+          {
+            echo "canonical_verified=true"
+            echo "canonical_deployment_id=$EXPECTED_PRODUCTION_DEPLOYMENT_ID"
+            echo "canonical_sha=$EXPECTED_COMMIT_SHA"
+          } >> "$GITHUB_OUTPUT"
           echo "Exact production deployment and every required post-deploy probe completed."
 
       - name: Finalize exact current release generation
@@ -937,6 +728,7 @@ jobs:
       - name: Write exact verified-generation marker
         if: ${{ steps.finalize.outputs.verified == 'true' }}
         env:
+          AUTH_SMOKE_STATUS: ${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
         run: |
@@ -945,14 +737,16 @@ jobs:
             --arg sha "$EXPECTED_SHA" \
             --arg deployment_id "$DEPLOYMENT_ID" \
             --arg controller_run "${{ github.run_id }}" \
-            '{sha: $sha, deploymentId: $deployment_id, controllerRun: $controller_run}' \
+            --arg controller_attempt "${{ github.run_attempt }}" \
+            --arg auth_smoke "$AUTH_SMOKE_STATUS" \
+            '{sha: $sha, deploymentId: $deployment_id, controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke}' \
             > "$RUNNER_TEMP/production-generation-verified.json"
 
       - name: Preserve exact verified-generation marker
         if: ${{ steps.finalize.outputs.verified == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: production-generation-verified-${{ needs.authorize-production.outputs.expected_sha }}
+          name: ${{ needs.authorize-production.outputs.marker_recovery == 'true' && format('production-generation-verified-recovery-{0}', needs.authorize-production.outputs.expected_sha) || format('production-generation-verified-{0}', needs.authorize-production.outputs.expected_sha) }}
           path: ${{ runner.temp }}/production-generation-verified.json
           if-no-files-found: error
           retention-days: 30
@@ -974,12 +768,14 @@ jobs:
             --arg deployment "${{ needs.production-release.outputs.production_deployment_id }}" \
             --arg sentry_gate "${{ needs.production-release.outputs.sentry_gate_status }}" \
             --arg oauth_gate "${{ needs.production-release.outputs.oauth_gate_status }}" \
+            --arg auth_smoke "${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}" \
             --arg run "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             '{text: $text, attachments: [{color: "good", fields: [
               {title: "SHA", value: $sha, short: true},
               {title: "Deployment", value: $deployment, short: true},
               {title: "Sentry gate", value: $sentry_gate, short: true},
               {title: "OAuth gate", value: $oauth_gate, short: true},
+              {title: "Auth smoke", value: $auth_smoke, short: true},
               {title: "Run", value: $run, short: false}
             ]}]}')"
           if ! curl --fail --silent --show-error \

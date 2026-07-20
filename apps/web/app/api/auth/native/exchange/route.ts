@@ -201,7 +201,8 @@ export async function POST(request: Request) {
     if (client === 'ios') {
       exchangePayload = await createIosNativeExchangePayload(
         result.ott,
-        result.userId
+        result.userId,
+        request
       );
     } else {
       // Electron: return the OTT. The native-complete page POSTs it to
@@ -255,14 +256,18 @@ export async function POST(request: Request) {
  */
 async function createIosNativeExchangePayload(
   ott: string,
-  expectedUserId: string
+  expectedUserId: string,
+  request: Request
 ): Promise<NativeExchangePayload> {
   const verification = await auth.api.verifyOneTimeToken({
     body: { token: ott },
+    request,
+    // A full Request makes Better Auth return a raw Response by default.
+    // Keep the direct API's parsed-result and thrown-error behavior here.
+    asResponse: false,
   });
 
-  const verifiedUserId =
-    (verification as { userId?: string } | null)?.userId ?? null;
+  const verifiedUserId = verification?.user?.id ?? null;
   if (!verifiedUserId || verifiedUserId !== expectedUserId) {
     throw new Error('OTT user mismatch');
   }

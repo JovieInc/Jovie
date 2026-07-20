@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -82,6 +90,10 @@ const productionControllerHealthPath = resolve(
   repoRoot,
   '.github/workflows/production-controller-health.yml'
 );
+const productionMarkerStatePath = resolve(
+  repoRoot,
+  '.github/scripts/production-marker-state.mjs'
+);
 
 function getStepBlock(workflow: string, stepName: string): string {
   const lines = workflow.split('\n');
@@ -120,6 +132,26 @@ function getJobBlock(workflow: string, jobKey: string): string {
   }
 
   return block.join('\n');
+}
+
+function getShellRunBlocks(workflow: string): string[] {
+  const lines = workflow.split('\n');
+  const blocks: string[] = [];
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]!;
+    const match = /^(\s*)run:\s*(.*)$/.exec(line);
+    if (!match) continue;
+    const indentation = match[1]!.length;
+    const block = [match[2]!];
+    while (index + 1 < lines.length) {
+      const next = lines[index + 1]!;
+      if (next.trim() && next.search(/\S/) <= indentation) break;
+      block.push(next);
+      index += 1;
+    }
+    blocks.push(block.join('\n'));
+  }
+  return blocks;
 }
 
 describe('source PR path-output reachability contract', () => {
@@ -453,7 +485,10 @@ function previewRobotsPolicyValid(
 ): boolean {
   const step = getStepBlock(workflow, 'Canary health check');
   const start = step.indexOf('preview_robots_policy_valid() {');
-  const end = step.indexOf('\n\n          if ! printf', start);
+  const end = step.indexOf(
+    '\n\n          if [ "$robots_code" != "200" ]',
+    start
+  );
   expect(start).toBeGreaterThan(0);
   expect(end).toBeGreaterThan(start);
   const source = step
@@ -871,7 +906,8 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(authorization).toContain('.name == "Main Release Ready"');
     expect(authorization).toContain('.head_sha == $sha');
-    expect(authorization).toContain('gh api --paginate --slurp');
+    expect(authorization).toContain('.total_count == (.jobs | length)');
+    expect(authorization).not.toContain('gh api --paginate --slurp');
     expect(releaseCaller).not.toContain('concurrency:');
     expect(verified).not.toContain('concurrency:');
     expect(reusable).not.toContain('concurrency:');
@@ -897,11 +933,143 @@ describe('deploy workflow Vercel env resolution', () => {
       )
     ).toContain(buildShaEnv);
     expect(deployStep).toContain(buildShaEnv);
-    expect(deployScript).toContain(
-      '--build-env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}"'
+    expect(deployScript).toContain('--build-env VERCEL_GIT_COMMIT_SHA');
+    expect(deployScript).toContain('--env VERCEL_GIT_COMMIT_SHA');
+    expect(deployScript).not.toMatch(/--(?:build-)?env\s+[^\s]+=/);
+    expect(deployScript).not.toContain('--token');
+  });
+
+  it('keeps Vercel secrets and runtime values out of every preview and production process argument', () => {
+    const previewWorkflow = readFileSync(workflowPath, 'utf8');
+    const productionWorkflow = readFileSync(
+      productionReleaseWorkflowPath,
+      'utf8'
     );
-    expect(deployScript).toContain(
-      '--env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}"'
+    const helperSources = [
+      readFileSync(vercelPrebuiltDeployPath, 'utf8'),
+      readFileSync(productionAliasVerifierPath, 'utf8'),
+      readFileSync(productionPromotionControllerPath, 'utf8'),
+    ];
+    const vercelSources = [
+      previewWorkflow,
+      productionWorkflow,
+      ...helperSources,
+    ].join('\n');
+
+    expect(vercelSources).not.toMatch(/--token(?:[=\s"']|$)/);
+    expect(vercelSources).not.toMatch(
+      /--(?:build-)?env\s+["']?[A-Z][A-Z0-9_]*=/
+    );
+
+    const previewDeploy = getStepBlock(
+      getJobBlock(previewWorkflow, 'ci-pr-vercel-preview'),
+      'Deploy (PR preview, fast deployment for UI-only changes)'
+    );
+    expect(previewDeploy).toContain('export DATABASE_URL="$POOLED_URL"');
+    expect(previewDeploy).toContain('export GIT_BRANCH');
+    expect(previewDeploy).toContain('--env DATABASE_URL');
+    expect(previewDeploy).toContain('--env GIT_BRANCH');
+
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
+    ) as { devDependencies: Record<string, string> };
+    const vercelEntry = readFileSync(
+      resolve(repoRoot, 'node_modules/vercel/dist/index.js'),
+      'utf8'
+    );
+    const vercelDeploy = readFileSync(
+      resolve(repoRoot, 'node_modules/vercel/dist/commands/deploy/index.js'),
+      'utf8'
+    );
+    expect(packageJson.devDependencies.vercel).toBe('54.14.5');
+    expect(vercelEntry).toContain('else if (process.env.VERCEL_TOKEN)');
+    expect(vercelDeploy).toContain('val = process.env[key]');
+    expect(vercelDeploy).toContain('Reading ${import_chalk.default.bold(');
+
+    const fixtureRoot = mkdtempSync(
+      resolve(tmpdir(), 'jovie-vercel-argv-contract-')
+    );
+    try {
+      const binDirectory = resolve(fixtureRoot, 'bin');
+      const fakeVercel = resolve(binDirectory, 'vercel');
+      const argvCapture = resolve(fixtureRoot, 'argv.bin');
+      const githubOutput = resolve(fixtureRoot, 'github-output');
+      mkdirSync(binDirectory);
+      writeFileSync(
+        fakeVercel,
+        `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\0' "$@" > "$ARGV_CAPTURE"
+printf 'raw-cli-output:%s\\n' "$VERCEL_TOKEN"
+printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
+`
+      );
+      chmodSync(fakeVercel, 0o700);
+
+      const secret = 'argv-contract-token-must-not-appear';
+      const runtimeValue = 'argv-contract-sha-value-must-not-appear';
+      const result = spawnSync(
+        'bash',
+        [vercelPrebuiltDeployPath, 'deployment_url', '--yes'],
+        {
+          cwd: fixtureRoot,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            ARGV_CAPTURE: argvCapture,
+            GITHUB_OUTPUT: githubOutput,
+            PATH: `${binDirectory}:${process.env.PATH ?? ''}`,
+            RUNNER_TEMP: fixtureRoot,
+            VERCEL_ENABLE_SOURCE_FALLBACK: 'true',
+            VERCEL_FORCE_SOURCE_DEPLOY: 'true',
+            VERCEL_GIT_COMMIT_SHA: runtimeValue,
+            VERCEL_ORG_ID: 'jovie-team',
+            VERCEL_TOKEN: secret,
+          },
+        }
+      );
+
+      expect(result.status, result.stderr).toBe(0);
+      const argv = readFileSync(argvCapture, 'utf8').split('\0');
+      expect(argv).toContain('--build-env');
+      expect(argv).toContain('VERCEL_GIT_COMMIT_SHA');
+      expect(argv).toContain('--env');
+      expect(argv).not.toContain(secret);
+      expect(argv).not.toContain(runtimeValue);
+      expect(`${result.stdout}${result.stderr}`).not.toContain(secret);
+      expect(`${result.stdout}${result.stderr}`).not.toContain(
+        'raw-cli-output:'
+      );
+    } finally {
+      rmSync(fixtureRoot, { force: true, recursive: true });
+    }
+  });
+
+  it('maps secrets through step env instead of interpolating them into shell source', () => {
+    for (const workflowPath of [
+      productionControllerWorkflowPath,
+      productionReleaseWorkflowPath,
+      canaryWorkflowPath,
+    ]) {
+      const workflow = readFileSync(workflowPath, 'utf8');
+      const runBlocks = getShellRunBlocks(workflow);
+      expect(runBlocks.length).toBeGreaterThan(0);
+      for (const runBlock of runBlocks) {
+        expect(runBlock).not.toContain('${{ secrets.');
+      }
+    }
+
+    const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const credentialCheck = getStepBlock(
+      controller,
+      'Check for production auth credentials'
+    );
+    expect(credentialCheck).toContain(
+      'E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}'
+    );
+    expect(credentialCheck).toContain('[ -n "$E2E_PROD_USER_EMAIL" ]');
+    expect(credentialCheck).not.toContain(
+      '[ -n "${{ secrets.E2E_PROD_USER_EMAIL }}" ]'
     );
   });
 
@@ -939,10 +1107,6 @@ describe('deploy workflow Vercel env resolution', () => {
     }
 
     const stagingJob = getJobBlock(productionWorkflow, 'deploy-staging');
-    const configureStep = getStepBlock(
-      stagingJob,
-      'Configure staging deployment credentials'
-    );
     const stagingSteps = [
       {
         command: 'vercel pull',
@@ -954,16 +1118,10 @@ describe('deploy workflow Vercel env resolution', () => {
       },
     ];
 
-    expect(configureStep).toContain(
-      'VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}'
+    expect(stagingJob).not.toContain(
+      '- name: Configure staging deployment credentials'
     );
-    expect(configureStep).toContain(
-      'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
-    );
-    expect(configureStep).toContain(
-      'VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}'
-    );
-    expect(configureStep).toContain('>> "$GITHUB_ENV"');
+    expect(stagingJob).not.toContain('>> "$GITHUB_ENV"');
 
     const queueReaperStep = getStepBlock(
       stagingJob,
@@ -975,6 +1133,11 @@ describe('deploy workflow Vercel env resolution', () => {
 
     for (const { command, name } of stagingSteps) {
       const step = getStepBlock(stagingJob, name);
+      expect(step).toContain('VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}');
+      expect(step).toContain(
+        'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
+      );
+      expect(step).toContain('VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}');
       expect(step).toContain(command);
       expect(step).toContain('scope_args=()');
       expect(step).toContain('scope_args=(--scope "$VERCEL_ORG_ID")');
@@ -1062,7 +1225,8 @@ describe('deploy workflow Vercel env resolution', () => {
 
     for (const key of runtimeKeys) {
       expect(deployStep).toContain(key);
-      expect(deployStep).toContain(`--env ${key}="\${${key}}"`);
+      expect(deployStep).toContain(`--env ${key}`);
+      expect(deployStep).not.toContain(`--env ${key}=`);
     }
   });
 
@@ -1094,19 +1258,12 @@ describe('deploy workflow Vercel env resolution', () => {
   it('loads production runtime config from Doppler without yielding Vercel deployment identity', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const promoteJob = getJobBlock(workflow, 'promote-production');
-    const configureStep = getStepBlock(
-      promoteJob,
-      'Configure production deployment credentials'
-    );
     const stageStep = getStepBlock(
       promoteJob,
       'Build and stage production deployment'
     );
     const dopplerIndex = promoteJob.indexOf(
       '- uses: ./.github/actions/setup-doppler'
-    );
-    const configureIndex = promoteJob.indexOf(
-      '- name: Configure production deployment credentials'
     );
     const domainGuardIndex = promoteJob.indexOf(
       '- name: Verify production domains are on canonical Vercel project'
@@ -1122,25 +1279,32 @@ describe('deploy workflow Vercel env resolution', () => {
     ];
 
     expect(dopplerIndex).toBeGreaterThanOrEqual(0);
-    expect(configureIndex).toBeGreaterThan(dopplerIndex);
-    expect(domainGuardIndex).toBeGreaterThan(configureIndex);
-    expect(promoteJob).toContain(
-      'doppler-token: ${{ secrets.DOPPLER_TOKEN_PRD }}'
+    expect(domainGuardIndex).toBeGreaterThan(dopplerIndex);
+    expect(promoteJob).not.toContain('doppler-token:');
+    expect(promoteJob).not.toContain(
+      '- name: Configure production deployment credentials'
     );
-    expect(configureStep).toContain(
-      'Missing required production deployment credentials:'
-    );
+    expect(promoteJob).not.toContain('>> "$GITHUB_ENV"');
     for (const key of ['VERCEL_TOKEN', 'VERCEL_ORG_ID', 'VERCEL_PROJECT_ID']) {
-      expect(configureStep).toContain(`${key}: \${{ secrets.${key} }}`);
-      expect(configureStep).toContain(`printf '${key}=%s\\n'`);
+      expect(stageStep).toContain(`${key}: \${{ secrets.${key} }}`);
     }
 
+    expect(stageStep).toContain(
+      'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}'
+    );
+    expect(stageStep).toContain('doppler run --project jovie-web --config prd');
+    expect(stageStep).toContain(`--only-secrets=${runtimeKeys.join(',')}`);
+    expect(stageStep).toContain(
+      '--no-fallback -- env -u DOPPLER_TOKEN bash -c production_stage'
+    );
     expect(stageStep).toContain('--target=prd --source=env');
     expect(stageStep).not.toContain('--target=prd --source=vercel-file');
     expect(stageStep).toContain('required_runtime_env=(');
     expect(stageStep).toContain('Missing production runtime env:');
-    expect(stageStep).toContain('runtime_env_args+=(--env "${key}=${!key}")');
+    expect(stageStep).toContain('runtime_env_args+=(--env "$key")');
     expect(stageStep).toContain('"${runtime_env_args[@]}"');
+    expect(stageStep).not.toMatch(/--env\s+"?[^\s"]+=/);
+    expect(stageStep).not.toContain('--token');
     for (const key of runtimeKeys) {
       expect(stageStep).toContain(key);
     }
@@ -1197,8 +1361,17 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(stageStep).toContain('--prod --skip-domain --format=json');
     expect(stageStep).toContain(
-      '${production_deploy_url}/api/health/build-info'
+      'assert-authorized-origin "$production_deploy_url" "$inspected_url"'
     );
+    expect(stageStep).toContain('bootstrap-cookie-jar');
+    expect(stageStep).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
+    expect(stageStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(stageStep).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
+    expect(stageStep).not.toContain('fetch_staged');
+    expect(stageStep).not.toContain('STAGED_RESPONSE');
+    expect(stageStep).not.toContain('curl -sS -L');
+    expect(stageStep).not.toContain('bypass_args');
+    expect(stageStep).not.toContain('x-vercel-protection-bypass');
     expect(promoteStep).toContain(
       'bash .github/scripts/promote-production-deployment.sh'
     );
@@ -1212,11 +1385,12 @@ describe('deploy workflow Vercel env resolution', () => {
     const workflow = readFileSync(productionControllerWorkflowPath, 'utf8');
     const verified = getJobBlock(workflow, 'production-verified');
     const lighthouse = getJobBlock(workflow, 'lighthouse-ci');
+    const publicSmoke = getJobBlock(workflow, 'ci-public-profile-smoke');
+    const authSmoke = getJobBlock(workflow, 'ci-post-deploy-auth-smoke');
 
     for (const job of [
       'ci-public-profile-smoke',
       'ci-post-deploy-auth-smoke',
-      'ci-homepage-smoke',
       'lighthouse-ci',
     ]) {
       const block = getJobBlock(workflow, job);
@@ -1232,15 +1406,88 @@ describe('deploy workflow Vercel env resolution', () => {
       expect(block).not.toContain('verify-production-alias.sh');
     }
     expect(lighthouse).toContain('uses: ./.github/actions/setup-playwright');
+    expect(lighthouse).toContain('permissions:\n      contents: read');
+    expect(lighthouse).toContain('persist-credentials: false');
+    expect(lighthouse).not.toContain('id-token: write');
+    expect(lighthouse).not.toContain('attestations: write');
     expect(lighthouse).toContain(
       "require('playwright').chromium.executablePath()"
     );
     expect(lighthouse).toContain('echo "CHROME_PATH=$chrome_path"');
     expect(lighthouse).toContain('lighthouse-production-exact.json');
+    expect(lighthouse).toContain('gsub("\\\\."; "\\\\.")');
+    expect(lighthouse).not.toContain('gsub("\\\\."; "\\\\\\\\.")');
+    expect(lighthouse).toContain(
+      '.ci.collect.puppeteerScript = "scripts/lighthouse-vercel-bypass.cjs"'
+    );
+    expect(lighthouse).toContain(
+      '.ci.collect.settings.disableStorageReset = true'
+    );
+    expect(lighthouse).toContain('.ci.assert.includePassedAssertions = true');
+    expect(lighthouse).toContain(
+      'VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
+    );
+    expect(lighthouse).toContain('lhci collect');
+    expect(lighthouse).toContain('lhci assert');
+    expect(lighthouse).toContain('lighthouse-exact-target-guard.ts');
+    expect(lighthouse).toContain('LIGHTHOUSE_SENSITIVE_VALUES_FILE');
+    expect(lighthouse).toContain('EXPECTED_VERCEL_DEPLOYMENT_ORIGIN=$base_url');
+    expect(lighthouse).toContain('--sensitive-values-file');
+    expect(lighthouse).toContain('--reports-dir=".lighthouseci"');
+    expect(lighthouse).toContain(
+      '--assertions=".lighthouseci/assertion-results.json"'
+    );
+    expect(lighthouse).not.toContain('--reports-dir="apps/web/.lighthouseci"');
+    expect(lighthouse).toContain('Remove Lighthouse sensitive probe state');
+    expect(lighthouse).toContain('--upload');
+    expect(lighthouse).toContain(
+      'Validate and upload hash-sealed Lighthouse evidence'
+    );
+    expect(lighthouse).not.toContain('lhci autorun');
+    expect(lighthouse).not.toContain('extraHeaders');
+    expect(lighthouse.indexOf('lhci collect')).toBeLessThan(
+      lighthouse.indexOf('lhci assert')
+    );
+    expect(lighthouse.indexOf('lhci assert')).toBeLessThan(
+      lighthouse.lastIndexOf('lighthouse-exact-target-guard.ts')
+    );
+    expect(lighthouse).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
+
+    expect(publicSmoke).toContain('bootstrap-cookie-jar');
+    expect(publicSmoke).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(publicSmoke).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
+    expect(publicSmoke).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
+    expect(publicSmoke).not.toContain('x-vercel-protection-bypass');
+    expect(workflow).not.toContain('  ci-homepage-smoke:');
+    expect(workflow).toContain(
+      '^https://jovie-[a-z0-9-]+-jovie\\.vercel\\.app$'
+    );
+    expect(publicSmoke).toContain(
+      'VERCEL_PROBE_COOKIE_JAR="$COOKIE_JAR" BASE_URL="$PRODUCTION_BASE_URL"'
+    );
+    expect(publicSmoke).toContain('BASE_URL="https://jov.ie"');
+    expect(publicSmoke.match(/scripts\/seo-ratchet-live\.ts/g)).toHaveLength(2);
+    expect(authSmoke).toContain(
+      'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
+    );
+    expect(authSmoke).toContain(
+      'EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}'
+    );
+    expect(authSmoke).toContain(
+      'EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL"'
+    );
+    expect(authSmoke).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
+    expect(authSmoke).toContain('PLAYWRIGHT_DYNAMIC_SECRETS_FILE=');
+    expect(authSmoke).toContain('echo "auth_smoke_status=passed"');
+    expect(authSmoke).not.toMatch(/^\s+VERCEL_AUTOMATION_BYPASS_SECRET:/m);
+    expect(verified).toContain(
+      'needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status'
+    );
     expect(verified).toContain('ci-public-profile-smoke');
     expect(verified).toContain('ci-post-deploy-auth-smoke');
-    expect(verified).toContain('ci-homepage-smoke');
+    expect(verified).not.toContain('ci-homepage-smoke');
     expect(verified).toContain('lighthouse-ci');
+    expect(verified).toContain('authSmoke: $auth_smoke');
     expect(verified).toContain('did not complete successfully');
     expect(verified).not.toContain('concurrency:');
     expect(verified).toContain('repos/${{ github.repository }}/commits/main');
@@ -1255,10 +1502,100 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(verified).toContain('steps.finalize.outputs.verified');
     expect(workflow).not.toContain('  deploy-notify:');
   });
+
+  it('isolates OIDC in a no-checkout attestation job and strips Git credentials from sensitive jobs', () => {
+    const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const canary = readFileSync(canaryWorkflowPath, 'utf8');
+    const health = readFileSync(productionControllerHealthPath, 'utf8');
+    const ci = readFileSync(workflowPath, 'utf8');
+    const controllerDefaults = controller.slice(
+      0,
+      controller.indexOf('\njobs:')
+    );
+    const reusableDefaults = reusable.slice(0, reusable.indexOf('\njobs:'));
+    const releaseCaller = getJobBlock(controller, 'production-release');
+    const stagingDeploy = getJobBlock(reusable, 'deploy-staging');
+    const productionDeploy = getJobBlock(reusable, 'promote-production');
+    const attestation = getJobBlock(reusable, 'attest-staging-build');
+
+    expect(controllerDefaults).not.toContain('id-token: write');
+    expect(controllerDefaults).not.toContain('attestations: write');
+    expect(reusableDefaults).not.toContain('id-token: write');
+    expect(reusableDefaults).not.toContain('attestations: write');
+    expect(releaseCaller).toContain('id-token: write');
+    expect(releaseCaller).toContain('attestations: write');
+    expect(attestation).toContain('id-token: write');
+    expect(attestation).toContain('attestations: write');
+    expect(attestation).toContain('contents: read');
+    expect(attestation).toContain('actions/attest-build-provenance@');
+    const forbiddenAttestationCapabilities = [
+      'actions/checkout@',
+      'setup-node-pnpm',
+      'setup-doppler',
+      'secrets.',
+      'drizzle',
+      'vercel build',
+      'vercel deploy',
+      'vercel rollback',
+    ];
+    const attestationViolations = (job: string) =>
+      forbiddenAttestationCapabilities.filter(capability =>
+        job.includes(capability)
+      );
+    expect(attestationViolations(attestation)).toEqual([]);
+    for (const forbidden of forbiddenAttestationCapabilities) {
+      const mutant = `${attestation}\n      - name: Forbidden mutant\n        run: ${forbidden}`;
+      expect(attestationViolations(mutant)).toContain(forbidden);
+    }
+    for (const deploy of [stagingDeploy, productionDeploy]) {
+      expect(deploy).not.toContain('id-token: write');
+      expect(deploy).not.toContain('attestations: write');
+    }
+
+    for (const [workflow, jobNames] of [
+      [
+        controller,
+        [
+          'ci-public-profile-smoke',
+          'ci-post-deploy-auth-smoke',
+          'lighthouse-ci',
+          'production-verified',
+        ],
+      ],
+      [
+        reusable,
+        [
+          'alias-staging',
+          'promote-production',
+          'production-oauth-gate',
+          'rollback-production',
+        ],
+      ],
+    ] as const) {
+      for (const jobName of jobNames) {
+        const job = getJobBlock(workflow, jobName);
+        expect(job, jobName).toContain('permissions:\n      contents: read');
+        expect(job, jobName).not.toContain('id-token: write');
+        expect(job, jobName).not.toContain('attestations: write');
+      }
+    }
+
+    for (const workflow of [controller, reusable, canary, health]) {
+      for (const checkout of workflow.matchAll(
+        /- uses: actions\/checkout@[a-f0-9]+[\s\S]*?(?=\n\s{6}- |\n\s{2}[\w-]+:|$)/g
+      )) {
+        expect(checkout[0]).toContain('persist-credentials: false');
+      }
+    }
+    const preview = getJobBlock(ci, 'ci-pr-vercel-preview');
+    expect(preview).toContain('secrets.VERCEL_TOKEN');
+    expect(preview).toContain('persist-credentials: false');
+  });
 });
 
 describe('unit-test runner capacity', () => {
-  it('fills the pool without exceeding each ephemeral runner CPU quota', () => {
+  it('uses five-way hosted capacity while fixed runners are quarantined', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const routeJob = getJobBlock(workflow, 'ci-unit-runner-route');
     const unitJob = getJobBlock(workflow, 'ci-unit-tests');
@@ -1272,16 +1609,16 @@ describe('unit-test runner capacity', () => {
     expect(routeJob).toContain('fixed|hosted');
     expect(routeJob).not.toContain('runner: ${{ steps.route.outputs.runner }}');
     expect(routeJob).not.toContain('secrets.');
-    expect(unitJob).toContain(
-      "runs-on: ${{ needs.ci-unit-runner-route.outputs.runner_class == 'fixed' && 'jovie-runner' || 'ubuntu-latest' }}"
-    );
+    expect(unitJob).toContain('runs-on: ubuntu-latest');
+    expect(unitJob).not.toContain('runs-on: jovie-runner');
+    expect(unitJob).not.toContain('ci-unit-runner-route');
     expect(unitJob).not.toContain('vars.CI_UNIT_RUNNER');
-    expect(unitJob).toContain('max-parallel: 2');
+    expect(unitJob).toContain('max-parallel: 5');
     expect(unitJob).toContain(
-      'Five logical shards, at most two concurrent per queue candidate'
+      'Hosted capacity runs all five logical shards without consuming Gem'
     );
-    expect(unitJob).toContain('anti-slam headroom');
-    expect(unitJob).toContain('Runner Heartbeat');
+    expect(unitJob).toContain('all five named');
+    expect(unitJob).toContain('warm-canary receipts');
     expect(unitJob).toContain('run: echo "run_full_ci=true"');
     expect(unitJob).not.toContain(
       "github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_test == 'true'"
@@ -1355,8 +1692,9 @@ describe('canary health gate workflow', () => {
       previewRobotsPolicyValid(workflow, 'User-agent: *\nDisallow: /')
     ).toBe(true);
     expect(canaryStep).toContain(
-      `if ! printf '%s\\n' "$robots_body" | preview_robots_policy_valid; then`
+      `! printf '%s\\n' "$robots_body" | preview_robots_policy_valid; then`
     );
+    expect(canaryStep).toContain('[ "$robots_code" != "200" ]');
   });
 
   it('rejects a block that only belongs to an unrelated crawler group', () => {
@@ -1403,77 +1741,88 @@ describe('canary health gate workflow', () => {
     );
   });
 
-  it('waits for the public alias to serve the target build before auth smoke', () => {
+  it('binds the exact project deployment before cookie-only canary and auth smoke', () => {
     const workflow = readFileSync(canaryWorkflowPath, 'utf8');
     const canaryStep = getStepBlock(workflow, 'Canary health check');
     const authSmokeStep = getStepBlock(
       workflow,
       'Verify public auth controls are interactive'
     );
-    const directFallbackStart = canaryStep.indexOf(
-      'Retrying commit deployment URL'
-    );
-    const directFallbackEnd = canaryStep.indexOf(
-      'if [ "$response_code" != "200" ]; then',
-      directFallbackStart
-    );
-    const directFallbackBlock = canaryStep.slice(
-      directFallbackStart,
-      directFallbackEnd
-    );
     const canaryCurlProbes =
-      canaryStep.match(
-        /curl -sS? -L[\s\S]*?(?:\|\| printf '\\n000'|\|\| echo "")/g
-      ) ?? [];
+      canaryStep.match(/curl -sS? --max-redirs 0/g) ?? [];
 
-    expect(directFallbackStart).toBeGreaterThanOrEqual(0);
-    expect(directFallbackEnd).toBeGreaterThan(directFallbackStart);
     expect(workflow).toContain('verified_deployment_url:');
     expect(workflow).toContain(
       'value: ${{ jobs.canary-health-gate.outputs.verified_deployment_url }}'
     );
-    expect(canaryStep).toContain('/api/health/build-info');
-    expect(canaryStep).toContain('local max_attempts=15');
+    expect(canaryStep).toContain('resolve-deployment');
+    expect(canaryStep).toContain('VERCEL_CANDIDATE_DEPLOYMENT_URL=');
+    expect(canaryStep).toContain('VERCEL_CANDIDATE_DEPLOYMENT_ID=');
+    expect(canaryStep).toContain('VERCEL_DEPLOYMENT_MAX_PAGES=5');
+    expect(canaryStep).toContain('VERCEL_API_TIMEOUT_MS=180000');
+    expect(canaryStep).toContain('VERCEL_DEPLOYMENT_POLL_INTERVAL_MS=5000');
+    expect(canaryStep.indexOf('sleep "$WAIT_SECONDS"')).toBeLessThan(
+      canaryStep.indexOf('resolve-deployment')
+    );
+    expect(
+      workflow.indexOf('uses: ./.github/actions/setup-node-pnpm')
+    ).toBeLessThan(
+      workflow.indexOf(
+        'node apps/web/scripts/vercel-protected-origin.cjs resolve-deployment'
+      )
+    );
+    expect(workflow).toContain('deployment_id:');
+    expect(workflow).not.toContain('fallback_health_url');
     expect(canaryStep).toContain(
       'CURL_TIMEOUT_ARGS=(--connect-timeout 5 --max-time 15)'
     );
-    expect(canaryStep).toContain('public_deployment_url="${deployment_url%/}"');
-    expect(directFallbackBlock).toContain(
-      'diagnostic_deployment_url="$resolved_commit_deployment_url"'
-    );
-    expect(directFallbackBlock).not.toMatch(
-      /^\s*deployment_url="\$resolved_commit_deployment_url"/m
-    );
-    expect(canaryStep).toContain(
-      'verify_build_info_serves_commit "$public_deployment_url"'
-    );
-    expect(canaryStep).toContain('canary_status=failed_build_info');
-    expect(canaryStep).toContain(
-      'verified_deployment_url=${public_deployment_url}'
-    );
+    expect(canaryStep).toContain('bootstrap-cookie-jar');
+    expect(canaryStep).toContain('EXPECTED_VERCEL_ENVIRONMENT=preview');
+    expect(canaryStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(canaryStep).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
+    expect(canaryStep).toContain('-b "$COOKIE_JAR"');
+    expect(canaryStep).not.toContain('curl -s -L');
+    expect(canaryStep).not.toContain('curl -sS -L');
+    expect(canaryStep).not.toContain('BYPASS_ARGS');
+    expect(canaryStep).not.toContain('x-vercel-protection-bypass');
+    expect(canaryStep).toContain('verified_deployment_url=${deployment_url}');
     expect(canaryStep).toContain(
       'Checking onboarding chat reaches the bot gate'
     );
     expect(canaryStep).toContain('"errorCode":"ONBOARDING_CHAT_DISABLED"');
     expect(canaryStep).toContain('"errorCode":"TURNSTILE_REQUIRED"');
     expect(canaryStep).toContain('canary_status=failed_onboarding_chat');
+    expect(canaryStep).not.toContain('/api/auth/ok');
+    expect(canaryStep).not.toContain('failed_better_auth_handler');
+    expect(canaryStep).not.toContain('health_url_fallback');
+    expect(canaryStep).not.toContain('max_attempts=8');
+    expect(canaryStep).not.toContain('check_route_renders');
+    expect(canaryStep).not.toContain('profile_response=');
     expect(authSmokeStep).toContain(
       'DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}'
     );
     expect(authSmokeStep).toContain(
       'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
     );
+    expect(authSmokeStep).toContain(
+      'EXPECTED_COMMIT_SHA: ${{ inputs.commit_sha }}'
+    );
+    expect(authSmokeStep).toContain(
+      'EXPECTED_VERCEL_DEPLOYMENT_ORIGIN: ${{ steps.canary-check.outputs.verified_deployment_url }}'
+    );
     expect(authSmokeStep).not.toContain(
       'VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
     );
     expect(authSmokeStep).toContain(
-      "primes Vercel's bypass cookie by URL query instead of headers"
+      'verifies build identity and host-only cookie'
     );
     expect(authSmokeStep).toContain('auth_smoke_attempt=1');
     expect(authSmokeStep).toContain('auth_smoke_max_attempts=3');
-    expect(authSmokeStep).toContain(
-      'until CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do'
-    );
+    expect(authSmokeStep).toContain('until CI=true');
+    expect(authSmokeStep).toContain('BASE_URL="${DEPLOYMENT_URL}"');
+    expect(authSmokeStep).toContain('EXPECTED_VERCEL_ENVIRONMENT=preview');
+    expect(authSmokeStep).toContain('PLAYWRIGHT_DYNAMIC_SECRETS_FILE=');
+    expect(authSmokeStep).toContain('auth-public-ready.spec.ts');
     expect(authSmokeStep).toContain(
       'Public auth controls failed after ${auth_smoke_max_attempts} attempts.'
     );
@@ -1481,12 +1830,32 @@ describe('canary health gate workflow', () => {
       'sleep_seconds=$((auth_smoke_attempt * 30))'
     );
 
-    expect(canaryCurlProbes.length).toBeGreaterThanOrEqual(9);
-    for (const probe of canaryCurlProbes) {
-      expect(probe).toMatch(
-        /("\$\{CURL_TIMEOUT_ARGS\[@\]\}"|--connect-timeout 5[\s\S]*--max-time (10|15))/
-      );
-    }
+    expect(canaryCurlProbes).toHaveLength(3);
+  });
+
+  it('never probes the shared staging alias before this release owns it', () => {
+    const canary = readFileSync(canaryWorkflowPath, 'utf8');
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const aliasJob = getJobBlock(release, 'alias-staging');
+    const aliasStep = getStepBlock(aliasJob, 'Alias verified deployment');
+    const oauthStep = getStepBlock(
+      aliasJob,
+      'Verify aliased staging OAuth redirect URIs'
+    );
+
+    expect(canary).not.toContain('staging.jov.ie');
+    expect(aliasStep).toContain(
+      'vercel alias set "$deployment_url" staging.jov.ie'
+    );
+    expect(oauthStep).toContain('BASE_URL: https://staging.jov.ie');
+    expect(oauthStep).toContain(
+      'EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie'
+    );
+    expect(oauthStep).toContain('PLAYWRIGHT_VERCEL_BYPASS_SECRET:');
+    expect(oauthStep).toContain('oauth-providers.spec.ts');
+    expect(aliasJob.indexOf('- name: Alias verified deployment')).toBeLessThan(
+      aliasJob.indexOf('- name: Verify aliased staging OAuth redirect URIs')
+    );
   });
 });
 
@@ -2318,7 +2687,7 @@ describe('production promotion exact-artifact contract', () => {
       'vercel inspect "$production_deploy_id"'
     );
     const canaryIndex = stageStep.indexOf(
-      '${production_deploy_url}/api/health/build-info'
+      'VERCEL_PROBE_URL="$production_deploy_url"'
     );
 
     expect(pullIndex).toBeGreaterThanOrEqual(0);
@@ -2335,8 +2704,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(stageStep).toContain(
       '[ "$production_deploy_target" != "production" ]'
     );
-    expect(stageStep).toContain('${production_deploy_url}/api/health');
-    expect(stageStep).toContain('${production_deploy_url}/"');
+    expect(stageStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(stageStep).not.toContain('fetch_staged');
     expect(stageStep).toContain('production_deployment_url_b64=');
     expect(stageStep).not.toContain(
       'echo "production_deployment_url=$production_deploy_url"'
@@ -2424,7 +2793,7 @@ describe('production promotion exact-artifact contract', () => {
       'PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.promote-production.outputs.production_deployment_url_b64 }}'
     );
     expect(result).toContain('base64 --decode');
-    expect(result).toContain('^https://[A-Za-z0-9.-]+\\.vercel\\.app$');
+    expect(result).toContain('^https://jovie-[a-z0-9-]+-jovie\\.vercel\\.app$');
     expect(result).toContain(
       'Successful production promotion omitted exact observed main SHA evidence.'
     );
@@ -2434,7 +2803,6 @@ describe('production promotion exact-artifact contract', () => {
     for (const jobName of [
       'ci-public-profile-smoke',
       'ci-post-deploy-auth-smoke',
-      'ci-homepage-smoke',
       'lighthouse-ci',
     ]) {
       const job = getJobBlock(controller, jobName);
@@ -2640,10 +3008,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(reusable).toContain("gate_status == 'failed'");
     expect(reusable).toContain('gate_status=error');
     expect(reusable).toContain('PLAYWRIGHT_JSON_OUTPUT_NAME');
-    expect(reusable).toContain(
-      'Google rejected redirect_uri|Apple rejected return URL'
-    );
-    expect(reusable).toContain('application/json {ok:true}');
+    expect(reusable).toContain('CONFIRMED_OAUTH_RUNTIME_CONTRACT');
+    expect(reusable).toContain('/api/auth/sign-in/social');
+    expect(reusable).not.toContain('/api/auth/ok');
     expect(reusable).toContain('no confirmed regression flag emitted');
     expect(reusable).toContain(
       'An uncertain production gate result must never trigger rollback'
@@ -2733,10 +3100,18 @@ describe('production promotion exact-artifact contract', () => {
     expect(evaluator).toContain('repair_state_unavailable');
   });
 
-  it('recovers a failed controller only once and skips obsolete fanout', () => {
+  it('recovers one payload-bound interrupted marker with a full leased rerun', () => {
     const health = readFileSync(productionControllerHealthPath, 'utf8');
+    const healthEvaluation = getStepBlock(
+      health,
+      'Evaluate exact current production controller'
+    );
     const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const markerState = readFileSync(productionMarkerStatePath, 'utf8');
+    const liveFixture = JSON.parse(
+      readFileSync(productionControllerRunLiveFixturePath, 'utf8')
+    );
 
     expect(health).toContain("cron: '*/15 * * * *'");
     expect(controller).toContain(
@@ -2744,6 +3119,9 @@ describe('production promotion exact-artifact contract', () => {
     );
     expect(controller).toContain('actions/workflows/production-controller.yml');
     expect(health).toContain('actions/workflows/production-controller.yml');
+    expect(health).toContain(
+      'event=workflow_run&head_sha=$current_sha&per_page=100'
+    );
     expect(controller).toContain('actions/workflows/ci.yml');
     expect(health).toContain('actions/workflows/ci.yml');
     expect(controller.match(/\.name == "Production Controller"/g)).toHaveLength(
@@ -2758,84 +3136,164 @@ describe('production promotion exact-artifact contract', () => {
     expect(health.match(/GH_REPO: \${{ github\.repository }}/g)).toHaveLength(
       2
     );
-    expect(health).toContain('event-delivery grace');
-    expect(health).toContain('[ "$source_ci_attempt" -ge 2 ]');
+    expect(health).toContain('15-minute delivery grace');
+    expect(health).toContain('[ "$source_ci_attempt" -ne 1 ]');
     expect(health).toContain('.id == $id and .run_attempt == 1');
     expect(health).toContain('gh run rerun "$source_ci_id"');
-    expect(health).toContain(
-      'Could not resolve exact main at the CI event-replay boundary'
-    );
-    expect(health).toContain('[ "$run_attempt" -ge 2 ]');
-    expect(health).toContain('gh run rerun "$run_id" --failed');
     expect(health).toContain('gh run rerun "$run_id"');
+    expect(health).not.toContain('gh run rerun "$run_id" --failed');
     expect(health).toContain('needs_manual=true');
-    expect(health).toContain(
-      'runs/$run_id/attempts/$run_attempt/jobs?per_page=100'
-    );
+    expect(health).toContain('runs/$run_id/attempts/1/jobs?per_page=100');
     expect(health).toContain('endswith("Centralized production rollback")');
-    expect(health).toContain('(.status == "completed")');
-    expect(health).toContain('(.conclusion == "skipped")');
-    expect(health).toContain('recovery_reason=terminal_rollback');
-    expect(health).toContain('this controller attempt is terminal');
-    expect(health).toContain('It must not be rerun');
-    expect(health.indexOf('rollback_jobs="$(jq -c')).toBeLessThan(
-      health.indexOf('gh run rerun "$run_id" --failed')
+    expect(health).toContain('.status == "completed"');
+    expect(health).toContain('.conclusion == "skipped"');
+    expect(health).toContain('actions/runs/$run_id/attempts/1');
+    expect(health).toContain('actions/runs/$run_id")');
+    expect(health).toContain(
+      '(.conclusion | IN("cancelled", "failure", "startup_failure", "timed_out"))'
     );
+    expect(health).toContain('recovery_lease_already_exists');
+    expect(health).toContain(
+      "always() && steps.evaluate.outputs.needs_manual == 'true'"
+    );
+    expect(health).not.toContain('exit 1');
+    expect(health.indexOf('exact_attempt="$(gh api')).toBeLessThan(
+      health.indexOf('gh run rerun "$run_id"')
+    );
+    expect(health.indexOf('exact_jobs="$(gh api')).toBeLessThan(
+      health.indexOf('gh run rerun "$run_id"')
+    );
+    expect(health.indexOf('latest_run="$(gh api')).toBeLessThan(
+      health.indexOf('gh run rerun "$run_id"')
+    );
+    expect(health.indexOf('lease_listing="$(gh api')).toBeLessThan(
+      health.indexOf('gh run rerun "$run_id"')
+    );
+    expect(health).toContain('incident duplicate_controller_generation');
+    expect(healthEvaluation).toContain(
+      'policy_state="$(policy_generation_state "$checked_out_sha" "$current_sha")"'
+    );
+    expect(healthEvaluation).toContain(
+      'invalid)\n              incident invalid_checked_out_policy'
+    );
+    expect(healthEvaluation).toContain(
+      'recovery_reason=policy_generation_superseded'
+    );
+    expect(
+      healthEvaluation.indexOf('checked_out_sha="$(git rev-parse')
+    ).toBeLessThan(healthEvaluation.indexOf('production-marker-state.mjs'));
+    const policyFunctionMatch =
+      / {10}(policy_generation_state\(\) \{[\s\S]*?\n {10}\})/.exec(
+        healthEvaluation
+      );
+    expect(policyFunctionMatch).not.toBeNull();
+    const policyFunction = (policyFunctionMatch?.[1] ?? '').replace(
+      /^ {10}/gm,
+      ''
+    );
+    const exactPolicySha = 'a'.repeat(40);
+    for (const [checkedOut, current, expectedState] of [
+      [exactPolicySha, exactPolicySha, 'current'],
+      ['b'.repeat(40), exactPolicySha, 'superseded'],
+      [exactPolicySha, 'c'.repeat(40), 'superseded'],
+      ['not-a-sha', exactPolicySha, 'invalid'],
+      ['', exactPolicySha, 'invalid'],
+    ]) {
+      const classification = spawnSync(
+        'bash',
+        [
+          '-c',
+          `${policyFunction}\npolicy_generation_state "$1" "$2"`,
+          'policy-version-test',
+          checkedOut,
+          current,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(classification.status).toBe(0);
+      expect(classification.stdout.trim()).toBe(expectedState);
+    }
+
+    const listingFilterMatch =
+      /controller_runs="\$\(gh api[\s\S]*?jq -e '\n([\s\S]*?)\n\s+' >\/dev\/null <<<"\$controller_runs"/.exec(
+        health
+      );
+    expect(listingFilterMatch).not.toBeNull();
+    const listingFilter = listingFilterMatch?.[1] ?? 'false';
+    const validListing = {
+      total_count: 1,
+      workflow_runs: [liveFixture.run],
+    };
+    expect(
+      spawnSync('jq', ['-e', listingFilter], {
+        encoding: 'utf8',
+        input: JSON.stringify(validListing),
+      }).status
+    ).toBe(0);
+    for (const missingField of [
+      'id',
+      'display_title',
+      'status',
+      'created_at',
+    ]) {
+      const malformedRun = structuredClone(liveFixture.run);
+      delete malformedRun[missingField];
+      expect(
+        spawnSync('jq', ['-e', listingFilter], {
+          encoding: 'utf8',
+          input: JSON.stringify({
+            total_count: 1,
+            workflow_runs: [malformedRun],
+          }),
+        }).status,
+        `controller listing must reject a run missing ${missingField}`
+      ).not.toBe(0);
+    }
     expect(reusable).toContain(
       'Could not resolve exact main at the release-result boundary'
     );
     expect(reusable).toContain('before post-deploy fanout; neutral');
+    expect(controller).toContain('production-marker-state.mjs');
+    expect(health).toContain('production-marker-state.mjs');
+    expect(markerState).toContain('controllerAttempt');
+    expect(markerState).toContain('/attempts/${controllerAttempt}');
+    expect(markerState).toContain('Download every marker payload');
     expect(controller).toContain(
-      'Ignoring marker from incomplete or unsuccessful controller run'
+      'production-generation-recovery-${{ steps.authorize.outputs.expected_sha }}'
     );
+    expect(controller).toContain('controllerAttempt: $controller_attempt');
     expect(controller).toContain(
-      'Ignoring marker with invalid exact-generation content'
+      "format('production-generation-verified-recovery-{0}'"
     );
-    expect(controller).toContain('jq -e --arg marker_name "$marker_name"');
-    expect(health).toContain('jq -e --arg marker_name "$marker_name"');
-    expect(controller).toContain('.name == $marker_name');
-    expect(health).toContain('.name == $marker_name');
-    expect(controller).toContain(
-      "marker_presence_count=\"$(jq '.artifacts | length'"
-    );
-    expect(health).toContain(
-      "marker_presence_count=\"$(jq '.artifacts | length'"
-    );
-    expect(controller).toContain('.expired == false');
-    expect(health).toContain('.expired == false');
-    expect(controller).toContain('refusing duplicate deployment');
-    expect(health).toContain('refusing automated replay');
-    expect(controller.indexOf('done <<<"$marker_candidates"')).toBeLessThan(
-      controller.indexOf('if [ "$marker_presence_count" -gt 0 ]')
-    );
-    expect(health.indexOf('done <<<"$marker_candidates"')).toBeLessThan(
-      health.indexOf('if [ "$marker_presence_count" -gt 0 ]')
-    );
+    expect(controller).not.toContain('overwrite: true');
+    expect(
+      controller.indexOf(
+        'Consume the one-shot production marker recovery lease'
+      )
+    ).toBeLessThan(controller.indexOf('\n  production-release:'));
     expect(controller).toContain('.head_sha == $sha');
     expect(health).toContain('.head_sha == $sha');
     expect(controller).toContain('.head_repository.full_name == $repo');
     expect(health).toContain('.head_repository.full_name == $repo');
-    expect(controller).toContain('actions/artifacts/$marker_artifact_id/zip');
+    expect(markerState).toContain('actions/artifacts/${artifactId}/zip');
     expect(controller).toContain(
       'Authenticated smoke was skipped because no complete credential pair is configured'
     );
     expect(controller).toContain('credentials_configured=false');
   });
 
-  it('fails closed on expired-only or wrong-name production marker listings', () => {
-    const workflows = [
-      readFileSync(productionControllerWorkflowPath, 'utf8'),
-      readFileSync(productionControllerHealthPath, 'utf8'),
-    ];
+  it('fails closed on expired, duplicate, foreign, or unpaired marker evidence', () => {
+    const markerState = readFileSync(productionMarkerStatePath, 'utf8');
 
-    for (const workflow of workflows) {
-      expect(workflow).toContain('jq -e --arg marker_name "$marker_name"');
-      expect(workflow).toContain('.name == $marker_name');
-      expect(workflow).toContain(
-        "marker_presence_count=\"$(jq '.artifacts | length'"
-      );
-      expect(workflow).toContain('.expired == false');
-      expect(workflow).toContain('if [ "$marker_presence_count" -gt 0 ]');
-    }
+    expect(markerState).toContain("manual('expired_marker')");
+    expect(markerState).toContain("manual('duplicate_marker_name')");
+    expect(markerState).toContain("manual('recovery_marker_without_primary')");
+    expect(markerState).toContain("manual('recovery_lease_without_marker')");
+    expect(markerState).toContain('artifact.workflowRunId');
+    expect(markerState).toContain('payload.controllerRun');
+    expect(markerState).toContain('payload.controllerAttempt');
+    expect(markerState).toContain(
+      '`production-generation-verified-recovery-${sha}`'
+    );
   });
 });

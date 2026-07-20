@@ -107,11 +107,13 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
   });
 
-  it('selects unit capacity on hosted evidence and fails uncertainty to hosted', () => {
+  it('quarantines fixed unit capacity until all named warm receipts exist', () => {
     const route = getJobBlock(CI_WORKFLOW, 'ci-unit-runner-route');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
 
     expect(route).toContain('runs-on: ubuntu-latest');
+    expect(route).toContain("if: github.event_name == 'workflow_dispatch'");
+    expect(route).not.toContain("github.event_name == 'merge_group'");
     expect(route).toContain('ref: main');
     expect(route).toContain('continue-on-error: true');
     expect(route).toContain('GH_TOKEN: ${{ github.token }}');
@@ -121,13 +123,13 @@ describe('merge_group workflow contract', () => {
     expect(route).toContain("runner_class='hosted'");
     expect(route).toContain('fixed|hosted');
     expect(route).not.toContain('runner: ${{ steps.route.outputs.runner }}');
-    expect(units).toContain('ci-unit-runner-route');
+    expect(units).not.toContain('ci-unit-runner-route');
     expect(units).toContain('ci-merge-group-admission');
-    expect(units).toContain(
-      "runs-on: ${{ needs.ci-unit-runner-route.outputs.runner_class == 'fixed' && 'jovie-runner' || 'ubuntu-latest' }}"
-    );
+    expect(units).toContain('runs-on: ubuntu-latest');
+    expect(units).not.toContain('runs-on: jovie-runner');
     expect(units).not.toContain('vars.CI_UNIT_RUNNER');
-    expect(units).toContain('max-parallel: 2');
+    expect(units).toContain('max-parallel: 5');
+    expect(units).toContain('all five named');
   });
 
   it('admits expensive queue lanes only while exact external gates are green', () => {
@@ -169,7 +171,7 @@ describe('merge_group workflow contract', () => {
     const ciFast = getJobBlock(CI_WORKFLOW, 'ci-fast');
     expect(ciFast).toContain("github.event_name != 'merge_group'");
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
-    expect(units).toContain("needs.ci-unit-runner-route.result == 'success'");
+    expect(units).not.toContain('ci-unit-runner-route');
     expect(units).toContain(
       "github.event_name == 'push' && github.ref == 'refs/heads/main'"
     );
@@ -263,7 +265,7 @@ describe('merge_group workflow contract', () => {
     expect(buildLayout).not.toContain('actions/upload-artifact');
     expect(buildLayout).not.toContain('actions/download-artifact');
     expect(unitTests).toContain("shard: ['1/5', '2/5', '3/5', '4/5', '5/5']");
-    expect(unitTests).toContain('max-parallel: 2');
+    expect(unitTests).toContain('max-parallel: 5');
     expect(getJobBlock(CI_WORKFLOW, 'ci-a11y')).not.toContain(
       "github.event_name == 'merge_group'"
     );
@@ -460,7 +462,6 @@ describe('merge_group workflow contract', () => {
     }
 
     const activeJobs = [
-      'ci-unit-runner-route',
       'ci-path-changes',
       'ci-merge-group-admission',
       'ci-risk-classifier',

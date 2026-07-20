@@ -8,22 +8,26 @@
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   formatSurfaceViolations,
+  type SeoSurfaceViolation,
   validateRobotsTxtSurface,
   validateSitemapXmlSurface,
 } from '../lib/seo/surface-ratchet';
+import {
+  assertExactProbeResponse,
+  buildOriginBoundCookieRequest,
+  buildOriginBoundProbeRequest,
+  createAbsoluteDeadline,
+  isExactVercelDeploymentUrl,
+  parseProbeUrl,
+  readExactHostCookieJar,
+} from './vercel-protected-origin.cjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(scriptDir, '..');
 const baselinePath = join(projectRoot, 'seo-ratchet.baseline.json');
-
-const baseUrl = (
-  process.env.BASE_URL ??
-  process.argv[2] ??
-  'https://jov.ie'
-).replace(/\/$/, '');
 
 const baseline = JSON.parse(readFileSync(baselinePath, 'utf8')) as {
   robots: { requiredAiCrawlers: string[] };
@@ -33,36 +37,93 @@ const baseline = JSON.parse(readFileSync(baselinePath, 'utf8')) as {
 const USER_AGENT =
   'Mozilla/5.0 (compatible; JovieSeoRatchet/1.0; +https://jov.ie)';
 const TIMEOUT_MS = 15_000;
+const buildCookieOnlyRequest = buildOriginBoundCookieRequest as unknown as (
+  url: URL,
+  options: {
+    readonly cookieHeader: string;
+    readonly headers: Record<string, string>;
+  }
+) => { readonly url: URL; readonly options: RequestInit };
+const buildPublicRequest = buildOriginBoundProbeRequest as unknown as (
+  url: URL,
+  options: { readonly headers: Record<string, string> }
+) => { readonly url: URL; readonly options: RequestInit };
 
-async function fetchText(
-  path: string
+export function normalizeSeoBaseUrl(rawBaseUrl: string): string {
+  const parsed = parseProbeUrl(rawBaseUrl, 'SEO ratchet base URL');
+  if (
+    parsed.pathname !== '/' ||
+    parsed.search ||
+    (parsed.origin !== 'https://jov.ie' && !isExactVercelDeploymentUrl(parsed))
+  ) {
+    throw new Error(
+      'SEO ratchet base URL must be canonical production or one trusted Jovie deployment origin.'
+    );
+  }
+  return parsed.origin;
+}
+
+export async function fetchSeoSurface(
+  rawBaseUrl: string,
+  path: '/robots.txt' | '/sitemap.xml',
+  {
+    fetchImpl = globalThis.fetch,
+    cookieJarPath = process.env.VERCEL_PROBE_COOKIE_JAR,
+    timeoutMs = TIMEOUT_MS,
+  }: {
+    readonly fetchImpl?: typeof globalThis.fetch;
+    readonly cookieJarPath?: string;
+    readonly timeoutMs?: number;
+  } = {}
 ): Promise<{ status: number; body: string }> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const baseUrl = normalizeSeoBaseUrl(rawBaseUrl);
+  const deadline = createAbsoluteDeadline(timeoutMs, 'SEO surface fetch');
   try {
-    const response = await fetch(`${baseUrl}${path}`, {
-      headers: {
-        Accept: '*/*',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
-        'User-Agent': USER_AGENT,
-      },
-      signal: controller.signal,
-    });
+    const targetUrl = parseProbeUrl(`${baseUrl}${path}`);
+    const headers = {
+      Accept: '*/*',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      Pragma: 'no-cache',
+      'User-Agent': USER_AGENT,
+    };
+    const request = isExactVercelDeploymentUrl(targetUrl)
+      ? buildCookieOnlyRequest(targetUrl, {
+          cookieHeader: readExactHostCookieJar(cookieJarPath, targetUrl),
+          headers,
+        })
+      : buildPublicRequest(targetUrl, { headers });
+    const response = await deadline.run(signal =>
+      fetchImpl(request.url, {
+        ...request.options,
+        signal,
+      })
+    );
+    assertExactProbeResponse(response, request.url);
 
-    const body = await response.text();
+    const body = await deadline.run(() => response.text());
+    const contentType = (
+      response.headers.get('content-type') ?? ''
+    ).toLowerCase();
+    if (contentType.includes('text/html') || /<html(?:\s|>)/i.test(body)) {
+      throw new Error(
+        `${path} returned HTML instead of exact SEO surface content.`
+      );
+    }
     return { status: response.status, body };
   } finally {
-    clearTimeout(timeout);
+    deadline.dispose();
   }
 }
 
 async function main(): Promise<void> {
-  const violations = [];
+  const baseUrl = normalizeSeoBaseUrl(
+    process.env.BASE_URL ?? process.argv[2] ?? 'https://jov.ie'
+  );
+  const violations: SeoSurfaceViolation[] = [];
 
   console.log(`[seo-ratchet:live] Checking ${baseUrl}`);
 
-  const robots = await fetchText('/robots.txt');
+  const robots = await fetchSeoSurface(baseUrl, '/robots.txt');
   if (robots.status !== 200) {
     violations.push({
       check: 'robots-http',
@@ -78,7 +139,7 @@ async function main(): Promise<void> {
     console.log('[seo-ratchet:live] ✓ robots.txt fetched');
   }
 
-  const sitemap = await fetchText('/sitemap.xml');
+  const sitemap = await fetchSeoSurface(baseUrl, '/sitemap.xml');
   if (sitemap.status !== 200) {
     violations.push({
       check: 'sitemap-http',
@@ -111,7 +172,13 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch(error => {
-  console.error('[seo-ratchet:live] Unexpected failure:', error);
-  process.exit(1);
-});
+const invokedPath = process.argv[1];
+if (invokedPath && import.meta.url === pathToFileURL(invokedPath).href) {
+  void main().catch(error => {
+    console.error(
+      '[seo-ratchet:live] Unexpected failure:',
+      error instanceof Error ? error.message : 'Unknown error.'
+    );
+    process.exitCode = 1;
+  });
+}

@@ -27,13 +27,32 @@ export async function PATCH(
     'stage',
     'notes',
     'isActive',
-    'expiresAt',
   ] as const;
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   for (const field of allowedFields) {
     if (field in body) {
       updates[field] = body[field];
+    }
+  }
+
+  if ('expiresAt' in body) {
+    if (body.expiresAt === null) {
+      updates.expiresAt = null;
+    } else if (typeof body.expiresAt === 'string') {
+      const expiresAt = new Date(body.expiresAt);
+      if (Number.isNaN(expiresAt.getTime())) {
+        return NextResponse.json(
+          { error: 'expiresAt must be a valid date' },
+          { status: 400 }
+        );
+      }
+      updates.expiresAt = expiresAt;
+    } else {
+      return NextResponse.json(
+        { error: 'expiresAt must be a valid date' },
+        { status: 400 }
+      );
     }
   }
 

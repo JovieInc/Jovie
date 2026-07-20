@@ -70,17 +70,19 @@ const protectedJobs: Record<string, string[]> = {
   'nightly-tests.yml': ['e2e-tests'],
   'nightly-testing-agent.yml': ['deterministic', 'report'],
   'production-controller.yml': ['ci-post-deploy-auth-smoke'],
+  'production-release.yml': ['alias-staging', 'production-oauth-gate'],
   'synthetic-monitoring.yml': ['synthetic-test'],
   'visual-regression.yml': ['visual-regression'],
 };
 const producerCounts: Record<string, number> = {
   'agent-tick.yml': 6,
-  'canary-health-gate.yml': 2,
+  'canary-health-gate.yml': 1,
   'ci.yml': 14,
   'e2e-full-matrix.yml': 2,
   'nightly-testing-agent.yml': 2,
   'nightly-tests.yml': 4,
   'production-controller.yml': 1,
+  'production-release.yml': 2,
   'screenshots.yml': 1,
   'synthetic-monitoring.yml': 6,
   'visual-regression.yml': 2,
@@ -658,13 +660,9 @@ describe('Playwright artifact secret boundary', () => {
         (await configs(true, true))['playwright.config.ts'].reporter
       )
     ).not.toContain('json');
-    const protectedConfig = (await configs(true, false, 'sentinel'))[
-      'playwright.config.ts'
-    ];
-    expect(protectedConfig.use?.extraHTTPHeaders).toMatchObject({
-      'x-vercel-protection-bypass': 'sentinel',
-    });
-    expect(reporterNames(protectedConfig.reporter)).not.toContain('json');
+    await expect(configs(true, false, 'sentinel')).rejects.toThrow(
+      'Global Vercel bypass headers are forbidden'
+    );
   }, 20_000);
 
   it('inherits child env without JSON disclosure and rejects a real credential trace', async () => {
@@ -1136,9 +1134,14 @@ ${fixtureCheckout}
       canary,
       'Verify public auth controls are interactive'
     );
+    const productionRelease = readFileSync(
+      join(workflowsRoot, 'production-release.yml'),
+      'utf8'
+    );
+    const aliasJob = jobBlock(productionRelease, 'alias-staging');
     const oauthProbe = stepBlock(
-      canary,
-      'Verify staging OAuth redirect URIs are accepted by Google/Apple'
+      aliasJob,
+      'Verify aliased staging OAuth redirect URIs'
     );
     expect(canaryJob).not.toBe('');
     expect(publicAuthProbe).not.toBe('');
@@ -1151,11 +1154,9 @@ ${fixtureCheckout}
     );
     const canaryWorkflowEnv = yamlPropertyBlock(canary, 'env', 0);
     const canaryJobEnv = yamlPropertyBlock(canaryJob, 'env', 4);
-    const oauthProbeEnv = yamlPropertyBlock(oauthProbe, 'env', 8);
     expect(canaryWorkflowEnv).toBe('');
     expect(canaryJobEnv).toBe('');
-    expect(oauthProbeEnv).toBe('');
-    const canaryInherited = canaryWorkflowEnv + canaryJobEnv + oauthProbe;
+    const canaryInherited = canaryWorkflowEnv + canaryJobEnv;
     expect(canaryInherited).not.toContain('${{ secrets.');
     expect(
       [...canaryInherited.matchAll(/\b([A-Z][A-Z0-9_]*)\s*(?::|=)/g)]
@@ -1169,8 +1170,13 @@ ${fixtureCheckout}
       'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
     );
     expect(publicAuthProbe).not.toContain('$GITHUB_ENV');
-    expect(canaryJob.indexOf(publicAuthProbe)).toBeLessThan(
-      canaryJob.indexOf(oauthProbe)
+    expect(canaryJob).not.toContain('oauth-providers.spec.ts');
+    expect(aliasJob.indexOf('Prove staging alias owns')).toBeLessThan(
+      aliasJob.indexOf(oauthProbe)
+    );
+    expect(oauthProbe).toContain('oauth-providers.spec.ts');
+    expect(oauthProbe).toContain(
+      'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
     );
     const action = readFileSync(
       join(githubRoot, 'actions/upload-safe-playwright-artifact/action.yml'),
@@ -1389,6 +1395,7 @@ ${fixtureCheckout}
       'CSC_LINK',
       'GITLEAKS_LICENSE',
       'E2E_PROD_USER_EMAIL',
+      'E2E_PROD_USER_CODE',
       'E2E_PROD_SIGNUP_EMAIL_BASE',
       'E2E_CLERK_USER_USERNAME',
       'E2E_CLERK_ADMIN_USERNAME',
@@ -1634,6 +1641,7 @@ ${fixtureCheckout}
       ['CSC_LINK', 'csc%2Flink'],
       ['GITLEAKS_LICENSE', 'license%2Fvalue'],
       ['E2E_PROD_USER_EMAIL', 'standing%2Femail'],
+      ['E2E_PROD_USER_CODE', '867%2F530'],
       ['E2E_PROD_SIGNUP_EMAIL_BASE', 'signup%2Fmailbox'],
       ['E2E_CLERK_USER_USERNAME', 'clerk%2Fusername'],
       ['E2E_CLERK_ADMIN_USERNAME', 'admin%2Fusername'],
@@ -2025,5 +2033,44 @@ ${fixtureCheckout}
     );
     expect(action).toMatch(/\[\[ -f "\$producer_root\/current"/);
     expect(action).toMatch(/\[\[ -d "\$source_root"/);
+  });
+
+  it('scans dynamically returned browser cookies and deletes their receipt', () => {
+    const workspace = fixture();
+    const runner = fixture();
+    const receipt = join(runner, 'dynamic-cookie-values');
+    const dynamicCookie = 'runtime-cookie-value';
+    const leaking = `const f=require('node:fs');f.writeFileSync(process.env.PLAYWRIGHT_DYNAMIC_SECRETS_FILE,'${dynamicCookie}\\n',{mode:0o600});f.mkdirSync('out',{recursive:true});f.writeFileSync('out/report.json',JSON.stringify({diagnostic:'${dynamicCookie}'}))`;
+
+    const result = runChild(workspace, runner, leaking, {
+      PLAYWRIGHT_DYNAMIC_SECRETS_FILE: receipt,
+    });
+
+    expect(result.status).toBe(1);
+    expect(existsSync(receipt)).toBe(false);
+    expect(`${result.stdout}\n${result.stderr}`).toContain('credential-text:1');
+    expect(
+      existsSync(join(runner, 'safe-playwright-producer', 'blocked'))
+    ).toBe(true);
+  });
+
+  it('rejects a dynamic cookie receipt that is not mode 0600', () => {
+    const workspace = fixture();
+    const runner = fixture();
+    const receipt = join(runner, 'dynamic-cookie-values');
+    const child = `const f=require('node:fs');f.writeFileSync(process.env.PLAYWRIGHT_DYNAMIC_SECRETS_FILE,'runtime-cookie-value\\n',{mode:0o644});f.chmodSync(process.env.PLAYWRIGHT_DYNAMIC_SECRETS_FILE,0o644);f.mkdirSync('out',{recursive:true});f.writeFileSync('out/report.json','{}')`;
+
+    const result = runChild(workspace, runner, child, {
+      PLAYWRIGHT_DYNAMIC_SECRETS_FILE: receipt,
+    });
+
+    expect(result.status).toBe(1);
+    expect(existsSync(receipt)).toBe(false);
+    expect(`${result.stdout}\n${result.stderr}`).toContain(
+      'categories=inspection-error:1'
+    );
+    expect(
+      existsSync(join(runner, 'safe-playwright-producer', 'blocked'))
+    ).toBe(true);
   });
 });
