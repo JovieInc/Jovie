@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   artistProfileNavItem,
+  filterProfilesWorkspaceNavigation,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   newThreadNavItem,
@@ -31,5 +32,18 @@ describe('mobile nav derivation', () => {
 
   it('uses the shared chat entry point instead of a redefined "home" item', () => {
     expect(mobilePrimaryNavigation[0]).toBe(newThreadNavItem);
+  });
+
+  it('omits the Profiles destination while its rollout flag is disabled', () => {
+    expect(
+      filterProfilesWorkspaceNavigation(mobileExpandedNavigation, false).some(
+        item => item.id === artistProfileNavItem.id
+      )
+    ).toBe(false);
+    expect(
+      filterProfilesWorkspaceNavigation(mobileExpandedNavigation, true).some(
+        item => item.id === artistProfileNavItem.id
+      )
+    ).toBe(true);
   });
 });

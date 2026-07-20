@@ -4,11 +4,13 @@ import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   adminNavigation,
+  filterProfilesWorkspaceNavigation,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
 } from '@/features/dashboard/dashboard-nav';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
+import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 
 import { LiquidGlassMenu, type LiquidGlassMenuItem } from './LiquidGlassMenu';
@@ -28,10 +30,15 @@ export function DashboardMobileTabs({
   className,
 }: DashboardMobileTabsProps): React.JSX.Element {
   const { isAdmin } = useDashboardData();
+  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
   const { signOut } = useAuthSafe();
   const expandedItems = useMemo(
-    () => mobileExpandedNavigation.map(toMenuItem),
-    []
+    () =>
+      filterProfilesWorkspaceNavigation(
+        mobileExpandedNavigation,
+        profilesWorkspaceEnabled
+      ).map(toMenuItem),
+    [profilesWorkspaceEnabled]
   );
 
   const handleSignOut = useCallback(async () => {

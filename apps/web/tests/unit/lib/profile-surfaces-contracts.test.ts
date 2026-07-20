@@ -4,7 +4,10 @@ import {
   isSharedProfileHost,
   type MonitoringCandidate,
   redactLockedRank,
+  selectAdditionalMonitoredSurfaceIds,
   selectDefaultMonitoredSurfaceIds,
+  selectDurablyMissingSurfaceIds,
+  selectRetirableSurfaceIds,
 } from '@/lib/profile-surfaces/contracts';
 
 describe('canonicalizeSurfaceUrl', () => {
@@ -63,6 +66,70 @@ describe('redactLockedRank', () => {
     expect(redactLockedRank(false, 2)).toBe(2);
   });
 });
+
+describe('selectRetirableSurfaceIds', () => {
+  it('retires only surfaces absent from current evidence and live sources', () => {
+    expect(
+      selectRetirableSurfaceIds(
+        ['current', 'stale', 'still-live'],
+        ['current'],
+        ['current', 'still-live']
+      )
+    ).toEqual(['stale']);
+  });
+});
+
+describe('selectDurablyMissingSurfaceIds', () => {
+  it('requires a prior missing run and a full grace period', () => {
+    const cutoff = new Date('2026-07-16T00:00:00.000Z');
+
+    expect(
+      selectDurablyMissingSurfaceIds(
+        [
+          {
+            surfaceId: 'live-old',
+            isLive: true,
+            lastSeenAt: new Date('2026-07-14T00:00:00.000Z'),
+          },
+          {
+            surfaceId: 'missing-recently',
+            isLive: false,
+            lastSeenAt: new Date('2026-07-16T12:00:00.000Z'),
+          },
+          {
+            surfaceId: 'missing-durably',
+            isLive: false,
+            lastSeenAt: new Date('2026-07-14T00:00:00.000Z'),
+          },
+        ],
+        cutoff
+      )
+    ).toEqual(['missing-durably']);
+  });
+
+  it('keeps a surface when any contributing source is still live', () => {
+    const cutoff = new Date('2026-07-16T00:00:00.000Z');
+
+    expect(
+      selectDurablyMissingSurfaceIds(
+        [
+          {
+            surfaceId: 'mixed',
+            isLive: false,
+            lastSeenAt: new Date('2026-07-14T00:00:00.000Z'),
+          },
+          {
+            surfaceId: 'mixed',
+            isLive: true,
+            lastSeenAt: new Date('2026-07-14T00:00:00.000Z'),
+          },
+        ],
+        cutoff
+      )
+    ).toEqual([]);
+  });
+});
+
 describe('selectDefaultMonitoredSurfaceIds', () => {
   const candidate = (
     input: Partial<MonitoringCandidate> & Pick<MonitoringCandidate, 'id'>
@@ -109,5 +176,25 @@ describe('selectDefaultMonitoredSurfaceIds', () => {
       'b',
     ]);
     expect(selectDefaultMonitoredSurfaceIds(candidates, -1)).toEqual([]);
+  });
+
+  it('seeds only unused capacity and leaves paused rows untouched', () => {
+    const candidates = [
+      candidate({ id: 'active' }),
+      candidate({ id: 'paused', platform: 'tiktok' }),
+      candidate({ id: 'new', platform: 'youtube' }),
+      candidate({ id: 'overflow', platform: 'facebook' }),
+    ];
+
+    expect(
+      selectAdditionalMonitoredSurfaceIds(
+        candidates,
+        [
+          { surfaceId: 'active', state: 'active' },
+          { surfaceId: 'paused', state: 'paused' },
+        ],
+        2
+      )
+    ).toEqual(['new']);
   });
 });

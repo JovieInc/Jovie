@@ -18,6 +18,43 @@ export const PROFILE_QUALIFICATION_STATUSES = [
 export type ProfileQualificationStatus =
   (typeof PROFILE_QUALIFICATION_STATUSES)[number];
 
+export function selectRetirableSurfaceIds(
+  knownSurfaceIds: readonly string[],
+  currentSurfaceIds: readonly string[],
+  liveSourceSurfaceIds: readonly string[]
+): string[] {
+  const current = new Set(currentSurfaceIds);
+  const live = new Set(liveSourceSurfaceIds);
+  return knownSurfaceIds.filter(id => !current.has(id) && !live.has(id));
+}
+
+export interface SurfaceSourceState {
+  readonly surfaceId: string;
+  readonly isLive: boolean;
+  readonly lastSeenAt: Date;
+}
+
+/** Require a prior missing run plus a time grace before destructive retirement. */
+export function selectDurablyMissingSurfaceIds(
+  sources: readonly SurfaceSourceState[],
+  missingBefore: Date
+): string[] {
+  const sourcesBySurface = new Map<string, SurfaceSourceState[]>();
+  for (const source of sources) {
+    const existing = sourcesBySurface.get(source.surfaceId) ?? [];
+    existing.push(source);
+    sourcesBySurface.set(source.surfaceId, existing);
+  }
+
+  return [...sourcesBySurface.entries()]
+    .filter(([, surfaceSources]) =>
+      surfaceSources.every(
+        source => !source.isLive && source.lastSeenAt <= missingBefore
+      )
+    )
+    .map(([surfaceId]) => surfaceId);
+}
+
 const TRACKING_PARAMS = new Set([
   'fbclid',
   'gclid',
@@ -124,6 +161,11 @@ export interface MonitoringCandidate {
   readonly userPaused?: boolean;
 }
 
+export interface MonitoringPreferenceSeed {
+  readonly surfaceId: string;
+  readonly state: string;
+}
+
 /** Rank observations outside the account monitoring allowance are not exposed. */
 export function redactLockedRank(
   locked: boolean,
@@ -167,6 +209,27 @@ export function selectDefaultMonitoredSurfaceIds(
 
   return (limit === null ? ordered : ordered.slice(0, Math.max(0, limit))).map(
     candidate => candidate.id
+  );
+}
+
+/** Fill only unused monitoring capacity without reactivating existing rows. */
+export function selectAdditionalMonitoredSurfaceIds(
+  candidates: readonly MonitoringCandidate[],
+  existingPreferences: readonly MonitoringPreferenceSeed[],
+  limit: number | null
+): string[] {
+  const existingSurfaceIds = new Set(
+    existingPreferences.map(preference => preference.surfaceId)
+  );
+  const activeCount = existingPreferences.filter(
+    preference => preference.state === 'active'
+  ).length;
+  const remainingLimit =
+    limit === null ? null : Math.max(0, limit - activeCount);
+
+  return selectDefaultMonitoredSurfaceIds(
+    candidates.filter(candidate => !existingSurfaceIds.has(candidate.id)),
+    remainingLimit
   );
 }
 

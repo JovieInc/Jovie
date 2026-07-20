@@ -53,6 +53,8 @@ export const APP_ROUTES = {
   YOUTUBE_REVIVAL: '/app/youtube',
   JOVIE_WORK: '/app/jovie-work',
   LYRICS: '/app/lyrics',
+  PROFILES: '/app/profiles',
+  /** Legacy profile-presence route. Use PROFILES for navigation. */
   PRESENCE: '/app/presence',
 
   // Settings
