@@ -1,13 +1,18 @@
 'use client';
 
-import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import type {
+  ArtistProfileCaptureVisualCopy,
+  ArtistProfileLandingCopy,
+} from '@/data/artistProfileCopy';
 import { ArtistProfileCaptureVisual } from '../MarketingStoryPrimitives';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
 interface ArtistProfileCaptureSectionProps {
   readonly id?: string;
-  readonly capture: ArtistProfileLandingCopy['capture'];
+  readonly capture:
+    | ArtistProfileCaptureVisualCopy
+    | ArtistProfileLandingCopy['capture'];
 }
 
 export function ArtistProfileCaptureSection({

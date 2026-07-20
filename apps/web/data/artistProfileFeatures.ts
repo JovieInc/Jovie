@@ -1,6 +1,8 @@
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import type { MarketingFeatureTile } from './marketingFeatureTiles';
 
+export type ArtistProfileFeatureTile = MarketingFeatureTile;
+
 export type ArtistProfileFeaturePlacement = 'section' | 'card' | 'spec tile';
 
 export interface ArtistProfileLaunchFeature {
@@ -10,8 +12,6 @@ export interface ArtistProfileLaunchFeature {
   readonly copyCandidate: string;
   readonly placement: ArtistProfileFeaturePlacement;
 }
-
-export type ArtistProfileFeatureTile = MarketingFeatureTile;
 
 export const ARTIST_PROFILE_LAUNCH_FEATURES: readonly ArtistProfileLaunchFeature[] =
   [
@@ -152,8 +152,8 @@ export const ARTIST_PROFILE_SPEC_TILES_BASE: readonly ArtistProfileFeatureTile[]
       id: 'activate-creators',
       title: 'Activate Creators',
       body: 'Give fans and creators one obvious path to use the sound and post.',
-      accent: 'green',
       size: 'small',
+      accent: 'green',
       layoutClassName:
         'xl:col-start-1 xl:row-start-3 xl:col-span-3 xl:row-span-1',
       visual: 'button-chip',
@@ -203,6 +203,9 @@ export const ARTIST_PROFILE_SPEC_TILES_BASE: readonly ArtistProfileFeatureTile[]
     },
   ];
 
+// Homepage v2 still consumes this richer visual grid. Keep it separate from
+// the compact artist-profiles truth wall so the two surfaces can evolve
+// without silently changing each other's layout contract.
 export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
   {
     id: 'audience-quality-filtering',
@@ -310,3 +313,72 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     badgeLabel: 'Fast by default',
   },
 ];
+
+export interface ArtistProfileTruthTile {
+  readonly id:
+    | 'fast-load'
+    | 'smart-routing'
+    | 'deep-link-modes'
+    | 'release-pages'
+    | 'tour-dates'
+    | 'pay'
+    | 'fan-capture'
+    | 'notifications'
+    | 'qr-sharing'
+    | 'lightweight-analytics';
+  readonly title: string;
+  readonly body: string;
+}
+
+export const ARTIST_PROFILE_TRUTH_TILES: readonly ArtistProfileTruthTile[] = [
+  {
+    id: 'fast-load',
+    title: 'Fast load',
+    body: 'Built to open quickly when attention is thin.',
+  },
+  {
+    id: 'smart-routing',
+    title: 'Smart routing',
+    body: 'Send each fan to the right destination with less friction.',
+  },
+  {
+    id: 'deep-link-modes',
+    title: 'Deep-link modes',
+    body: 'Listen, tour, support, and subscribe all live behind one profile.',
+  },
+  {
+    id: 'release-pages',
+    title: 'Release pages + countdowns',
+    body: 'Give every release a clean destination before and after the drop.',
+  },
+  {
+    id: 'tour-dates',
+    title: 'Tour dates',
+    body: 'Show nearby dates first and keep ticket intent close.',
+  },
+  {
+    id: 'pay',
+    title: 'Pay',
+    body: 'Turn support moments into action without breaking the flow.',
+  },
+  {
+    id: 'fan-capture',
+    title: 'Fan capture',
+    body: 'Move from anonymous traffic to an owned audience.',
+  },
+  {
+    id: 'notifications',
+    title: 'Notifications',
+    body: 'Give fans a simple way to stay in the loop.',
+  },
+  {
+    id: 'qr-sharing',
+    title: 'QR sharing',
+    body: 'Put one scan on a flyer, merch table, or venue wall.',
+  },
+  {
+    id: 'lightweight-analytics',
+    title: 'Views, clicks, referrers',
+    body: 'Keep a lightweight read on what is working.',
+  },
+] as const;

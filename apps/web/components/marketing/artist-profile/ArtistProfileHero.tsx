@@ -1,6 +1,6 @@
 import { HomeHeroCTA } from '@/components/features/home/HomeHeroCTA';
-import { MarketingContainer } from '@/components/marketing';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import { MarketingContainer } from '../MarketingContainer';
 
 interface ArtistProfileHeroProps {
   readonly hero: ArtistProfileLandingCopy['hero'];

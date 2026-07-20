@@ -15,12 +15,12 @@ describe('ArtistProfileSpecWall', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'Details that matter.',
+        name: 'Built for artists.',
       })
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Built from 15 years of music marketing experience, obsessing over the details that make a profile convert.'
+        'The product truth behind one fast, music-native profile—kept compact on purpose.'
       )
     ).toBeInTheDocument();
 
