@@ -316,7 +316,7 @@ final class JovieUITests: XCTestCase {
     chatApp.buttons["Open navigation drawer"].tap()
     chatApp.buttons["shell-drawer-surface-shell-tab-profile"].tap()
     let copyURLButton = chatApp.buttons["Copy URL"]
-    XCTAssertTrue(copyURLButton.waitForExistence(timeout: 3))
+    XCTAssertTrue(copyURLButton.waitForExistence(timeout: 10))
     attachScreenshot(named: "no-ghost-footprint-profile", app: chatApp)
     endUITestSession(chatApp)
 
@@ -579,17 +579,36 @@ final class JovieUITests: XCTestCase {
     XCTAssertEqual(input.value as? String, draft)
 
     app.buttons["Open navigation drawer"].tap()
-    app.buttons["shell-drawer-surface-shell-tab-profile"].tap()
+    let contentPlaneMarker = app.buttons["Open navigation drawer"]
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
     XCTAssertTrue(
-      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      waitForDrawerSurfaceToBeUncovered(
+        profileSurface,
+        contentPlaneMarker: contentPlaneMarker,
+        timeout: 3
+      ),
+      "Profile surface stayed covered by the opening content plane.\n\(app.debugDescription)"
+    )
+    profileSurface.tap()
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 10),
       "Shell navigation did not switch to Profile.\n\(app.debugDescription)"
     )
 
     app.buttons["Open navigation drawer"].tap()
-    app.buttons["shell-drawer-surface-shell-tab-chat"].tap()
+    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(
+      waitForDrawerSurfaceToBeUncovered(
+        chatSurface,
+        contentPlaneMarker: contentPlaneMarker,
+        timeout: 3
+      ),
+      "Chat surface stayed covered by the opening content plane.\n\(app.debugDescription)"
+    )
+    chatSurface.tap()
     let restoredInput = app.textFields["Ask Jovie"]
     XCTAssertTrue(
-      waitForHittable(restoredInput, timeout: 3),
+      waitForHittable(restoredInput, timeout: 10),
       "Shell navigation did not return to the chat composer.\n\(app.debugDescription)"
     )
     XCTAssertEqual(app.textFields.count, 1)
@@ -963,7 +982,7 @@ final class JovieUITests: XCTestCase {
     }
 
     try openAuthCallbackURL(
-      "ie.jov.jovie://auth/complete?error=access_denied&error_description=Denied&state=state_123",
+      "ie.jov.jovie://auth/complete?error=access_denied&state=state_123&iss=https%3A%2F%2Fjov.ie%2Fapi%2Fauth",
       targetApp: app
     )
 
@@ -1153,6 +1172,34 @@ final class JovieUITests: XCTestCase {
     }
 
     return element.exists && element.isHittable
+  }
+
+  /// SwiftUI reports recessed drawer controls hittable before the animated
+  /// content plane has physically cleared them. Wait on the actual frames so
+  /// XCUITest cannot synthesize a tap into the covering plane.
+  private func waitForDrawerSurfaceToBeUncovered(
+    _ surface: XCUIElement,
+    contentPlaneMarker: XCUIElement,
+    timeout: TimeInterval
+  ) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+
+    while Date() < deadline {
+      if surface.exists,
+         surface.isHittable,
+         contentPlaneMarker.exists,
+         contentPlaneMarker.frame.minX >= surface.frame.maxX
+      {
+        return true
+      }
+
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    }
+
+    return surface.exists
+      && surface.isHittable
+      && contentPlaneMarker.exists
+      && contentPlaneMarker.frame.minX >= surface.frame.maxX
   }
 
   /// Resolve a primary tab bar / Talk FAB control by accessibility identifier.

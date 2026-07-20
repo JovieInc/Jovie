@@ -127,8 +127,8 @@ const PROFILE_MOBILE_SCREENS = [
   },
   {
     id: 'notifications',
-    path: '/testartist/notifications',
-    rootSelector: '[data-testid="notifications-page"]',
+    path: '/testartist?mode=subscribe',
+    rootSelector: '[data-testid="profile-compact-surface"]',
     readySelectors: ['[data-testid="profile-mobile-notifications-step-email"]'],
   },
 ] as const satisfies readonly MobileProfileScreen[];
@@ -569,6 +569,7 @@ type ReleaseCardLayout = {
   readonly artwork: {
     readonly width: number;
     readonly height: number;
+    readonly contentWidth: number;
   } | null;
   readonly title: {
     readonly top: number;
@@ -619,7 +620,12 @@ async function collectMockHomeReleaseCardLayout(
 
     return {
       card: rect(card),
-      artwork: artwork ? rect(artwork) : null,
+      artwork: artwork
+        ? {
+            ...rect(artwork),
+            contentWidth: artwork.parentElement?.clientWidth ?? 0,
+          }
+        : null,
       title: title ? rect(title) : null,
       hero: hero ? rect(hero) : null,
       cover: cover
@@ -681,9 +687,12 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
       }
 
       expect(
-        layout.artwork?.width ?? 0,
-        `${viewport.label} bento artwork should fill the card width`
-      ).toBeGreaterThanOrEqual(layout.card.width - 2);
+        Math.abs(
+          (layout.artwork?.width ?? 0) -
+            (layout.artwork?.contentWidth ?? Number.POSITIVE_INFINITY)
+        ),
+        `${viewport.label} bento artwork should fill its padded content box`
+      ).toBeLessThanOrEqual(2);
 
       if (layout.title) {
         expect(
@@ -823,7 +832,7 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
 
         const response = await smokeNavigate(
           flowPage,
-          '/testartist/notifications',
+          '/testartist?mode=subscribe',
           {
             timeout: 120_000,
           }
@@ -836,10 +845,10 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
           SMOKE_TIMEOUTS.NAVIGATION
         );
 
-        const rootSelector = '[data-testid="notifications-page"]';
-        const activeFlow = flowPage.locator(
-          '[role="dialog"][data-testid="profile-mobile-notifications-flow"]'
-        );
+        const rootSelector = '[data-testid="profile-compact-surface"]';
+        const activeFlow = flowPage
+          .locator('[data-testid="profile-mobile-notifications-flow"]:visible')
+          .first();
         const emailInput = activeFlow.getByTestId('mobile-email-input');
         await focusAndAssertNoShift(
           flowPage,
@@ -850,7 +859,7 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
         await emailInput.fill(`mobile-${viewport.id}@example.com`);
         await activeFlow
           .getByTestId('profile-mobile-notifications-step-email')
-          .getByRole('button', { name: /^continue$/i })
+          .getByRole('button', { name: /^submit$/i })
           .click();
 
         const firstOtpDigit = activeFlow.getByLabel('Digit 1 of 6');

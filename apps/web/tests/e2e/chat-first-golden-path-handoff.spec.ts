@@ -4,7 +4,7 @@ import { waitForHydration } from './utils/smoke-test-utils';
 
 const USE_TEST_AUTH_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const CHAT_PANEL = '[data-testid="onboarding-chat"]';
-const COMPOSER_TEXTAREA = '[aria-label="Chat message input"]';
+const COMPOSER_TEXTAREA = '[aria-label="Chat Message Input"]';
 
 const IGNORABLE_CONSOLE_ERRORS = [
   /favicon/i,
@@ -84,7 +84,7 @@ test.describe('Chat-first golden path handoff @golden-path', () => {
     await expect(page.locator('body')).not.toContainText(
       /application error|internal server error|something went wrong/i
     );
-    await expect(page.getByLabel('Chat message input')).toBeVisible({
+    await expect(page.getByLabel('Chat Message Input')).toBeVisible({
       timeout: 90_000,
     });
 
@@ -107,7 +107,7 @@ test.describe('Chat-first golden path handoff @golden-path', () => {
     await expect(page.locator(COMPOSER_TEXTAREA)).toBeVisible();
     await expect(page.locator(COMPOSER_TEXTAREA)).toHaveAttribute(
       'aria-label',
-      'Chat message input'
+      'Chat Message Input'
     );
 
     expect(

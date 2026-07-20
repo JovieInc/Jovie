@@ -8,7 +8,7 @@
 #
 # TRIGGERS:
 # 1. CI failure on agent branches → fix job (Claude Code fixes)
-# 2. CI + Scope Judge both pass → approve job (auto-approve + auto-merge)
+# 2. CI + Scope Judge both pass → approve job (auto-approve + queue handoff)
 #
 # NOTE: CodeRabbit blocking review trigger (pull_request_review) was removed
 # because bot-submitted reviews create action_required runs that clog the
@@ -19,7 +19,7 @@
 # - Runs on all branches except known infrastructure branches (main, dependabot/*, gh-readonly-queue/*, renovate/*)
 # - Max 5 fix attempts per SHA to prevent infinite loops
 # - Escalates to 'needs-human' label after exhaustion
-# - Sensitive path detection prevents auto-merge on high-risk changes
+# - Sensitive path detection prevents unattended approval/queue handoff on high-risk changes
 # - Uses least-privilege credentials
 # - Does NOT execute untrusted PR code
 
@@ -51,8 +51,10 @@ jobs:
   # ==========================================================================
   guard:
     name: Trigger Guard
-    if: github.actor != 'copilot-swe-agent[bot]'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    if: >-
+      github.actor != 'copilot-swe-agent[bot]' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
       actions: read
@@ -76,8 +78,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR_NUMBER_RUN: ${{ github.event.workflow_run.pull_requests[0].number }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
           PR_REVIEW_USER: ${{ github.event.review.user.login }}
@@ -107,13 +109,19 @@ jobs:
               exit 0
             fi
 
-            # Find the PR for this branch
-            # gh api --paginate returns one JSON array per page; jq -s joins the pages.
-            PR_DATA=$(gh api --paginate "repos/$REPOSITORY/pulls?state=open&per_page=100" \
-              | jq -s --arg branch "$HEAD_BRANCH" '([.[][] | select(.head.ref == $branch and .state == "open")] | first) as $pr | if $pr == null then null else {number: $pr.number, head_ref: $pr.head.ref, head_sha: $pr.head.sha, draft: $pr.draft, labels: [($pr.labels // [])[]?.name]} end')
+            if [[ -z "$PR_NUMBER_RUN" ]]; then
+              echo "Completed workflow is not associated with an open pull request. Skipping."
+              write_output "should_continue=false"
+              exit 0
+            fi
 
-            if [[ -z "$PR_DATA" || "$PR_DATA" == "null" ]]; then
-              echo "No open PR found for branch '$HEAD_BRANCH'. Skipping."
+            # Resolve the exact PR associated with this workflow run, then
+            # compare its live head before authorizing any later mutation.
+            PR_DATA=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER_RUN" \
+              --jq '{number: .number, state: .state, head_ref: .head.ref, head_sha: .head.sha, draft: .draft, labels: [(.labels // [])[]?.name]}')
+
+            if [[ -z "$PR_DATA" || "$PR_DATA" == "null" || "$(echo "$PR_DATA" | jq -r '.state')" != "open" ]]; then
+              echo "No open PR found for workflow run. Skipping."
               write_output "should_continue=false"
               exit 0
             fi
@@ -123,6 +131,12 @@ jobs:
             PR_HEAD_SHA=$(echo "$PR_DATA" | jq -r '.head_sha')
             IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
             HAS_NEEDS_HUMAN=$(echo "$PR_DATA" | jq -r '(.labels // []) | any(. == "needs-human")')
+
+            if [[ "$PR_HEAD_SHA" != "$HEAD_SHA" ]]; then
+              echo "Workflow run head $HEAD_SHA is stale; live PR head is $PR_HEAD_SHA. Skipping."
+              write_output "should_continue=false"
+              exit 0
+            fi
 
             write_output "pr_number=$PR_NUMBER"
             write_output "pr_head_ref=$PR_HEAD_REF"
@@ -410,7 +424,7 @@ jobs:
     name: Label Systemic Blocker
     needs: guard
     if: needs.guard.outputs.is_systemic == 'true'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
       contents: read
@@ -452,7 +466,7 @@ jobs:
 
           **Skipping individual code-fix attempts.** These failures likely originated on \`main\`.
 
-          **Automated remediation:** \`merge-queue-autoenroll\` rebases mergeable agent PRs onto latest \`main\` every ~20 minutes (\`scripts/drain-pr-remediate.mjs\`) to re-trigger CI. If checks stay red after that rebase, fix \`main\` first or address branch-specific failures manually."
+          **Automated remediation:** Event-driven \`merge-queue-autoenroll\` re-evaluates mergeable agent PRs and can rebase them onto latest \`main\` (\`scripts/drain-pr-remediate.mjs\`) to re-trigger CI. If checks stay red after that rebase, fix \`main\` first or address branch-specific failures manually."
 
   # ==========================================================================
   # FIX: Apply fixes using Claude agent (CI failure or CodeRabbit review)
@@ -461,7 +475,7 @@ jobs:
     name: Apply Fixes (${{ needs.guard.outputs.trigger_type }})
     needs: guard
     if: needs.guard.outputs.should_fix == 'true'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
       group: agent-remediation-${{ github.repository }}
@@ -500,6 +514,24 @@ jobs:
             scripts/lib/upsert-pr-comment.sh
           sparse-checkout-cone-mode: false
 
+      - name: Record bounded remediation attempt
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ needs.guard.outputs.pr_number }}
+          TRIGGER_TYPE: ${{ needs.guard.outputs.trigger_type }}
+          ATTEMPT: ${{ needs.guard.outputs.attempt_number }}
+          HEAD_SHA: ${{ needs.guard.outputs.pr_head_sha }}
+        run: |
+          SHORT_SHA="${HEAD_SHA:0:7}"
+          ATTEMPT_LABEL="agent-fix-${TRIGGER_TYPE}-${SHORT_SHA}-${ATTEMPT}"
+          gh label create "$ATTEMPT_LABEL" --repo "$REPOSITORY" \
+            --color D4C5F9 \
+            --description "Bounded Agent Pipeline remediation attempt" 2>/dev/null || true
+          gh api "repos/$REPOSITORY/issues/$PR_NUMBER/labels" \
+            --method POST \
+            --field "labels[]=$ATTEMPT_LABEL" >/dev/null
+
       - name: Queue automated stale-CI remediation
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -512,7 +544,7 @@ jobs:
 
           Privileged workflow execution is intentionally restricted for security — this job does not check out or execute PR branch code.
 
-          **Automated next step:** \`merge-queue-autoenroll\` (every ~20 minutes) will mechanically rebase mergeable agent branches onto latest \`main\` via \`scripts/drain-pr-remediate.mjs\`, then re-enroll with \`merge-queue\`. That re-triggers CI when failures were fixed on \`main\`.
+          **Automated next step:** Event-driven \`merge-queue-autoenroll\` can mechanically rebase mergeable agent branches onto latest \`main\` via \`scripts/drain-pr-remediate.mjs\`, then re-evaluate native queue enrollment. That re-triggers CI when failures were fixed on \`main\`.
 
           **Attempt:** $ATTEMPT/5 (**trigger:** $TRIGGER_TYPE). If checks remain red after the auto-rebase, branch-specific code fixes are still required (coder agent or human)."
       - name: Clean up stale attempt labels
@@ -535,13 +567,13 @@ jobs:
           done
 
   # ==========================================================================
-  # APPROVE: Auto-approve and enable auto-merge for passing agent PRs
+  # APPROVE: Auto-approve and hand passing agent PRs to the queue controller
   # ==========================================================================
   approve:
     name: Auto-Approve Check
     needs: guard
     if: needs.guard.outputs.should_approve == 'true'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
@@ -706,8 +738,10 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          PR_HEAD_SHA="${{ needs.guard.outputs.pr_head_sha }}"
           PR_AUTHOR=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.user.login')
           echo "permission_denied=false" >> "$GITHUB_OUTPUT"
+          echo "approved=false" >> "$GITHUB_OUTPUT"
 
           APPROVER_ERROR_LOG=$(mktemp)
           if ! APPROVER=$(gh api user --jq '.login' 2>"$APPROVER_ERROR_LOG"); then
@@ -731,6 +765,25 @@ jobs:
             echo "All gates passed. Auto-approving PR #$PR_NUMBER"
           fi
 
+          # The guard job is a snapshot. Re-read the exact PR immediately before
+          # the approval mutation so a concurrent hold, draft, or head change
+          # cannot inherit stale automation authorization.
+          CURRENT_STATE=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" \
+            --json state,isDraft,headRefOid,labels)
+          if ! jq -e --arg expected_head "$PR_HEAD_SHA" '
+            .state == "OPEN"
+            and (.isDraft | not)
+            and .headRefOid == $expected_head
+            and ([.labels[].name] | any(
+              . == "needs-human" or . == "hold" or . == "gated"
+              or . == "queue-deferred" or . == "needs-conflict-resolution"
+              or . == "fast"
+            ) | not)
+          ' <<<"$CURRENT_STATE" >/dev/null; then
+            echo "Refusing auto-approval: live PR state, head, or hard-gate labels changed."
+            exit 0
+          fi
+
           # Submit approval review
           APPROVAL_ERROR_LOG=$(mktemp)
           if ! gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
@@ -745,7 +798,7 @@ jobs:
           - [x] Sensitive path check (no auth/billing/migration/CI changes)
 
           This PR was auto-approved because it meets all criteria for low-risk agent changes.
-          It will now enter the merge queue for final validation.
+          The queue controller will independently revalidate its current head and labels before enrollment.
 
           > If this approval is incorrect, dismiss it and add the \`needs-human\` label." \
             >"$APPROVAL_ERROR_LOG" 2>&1; then
@@ -760,27 +813,27 @@ jobs:
           fi
 
           echo "PR #$PR_NUMBER approved"
+          echo "approved=true" >> "$GITHUB_OUTPUT"
 
-      - name: Add to Graphite merge queue
+      - name: Mark approved PR for queue controller
         if: >-
           steps.check-statuses.outputs.all_passed == 'true' &&
           steps.sensitive-check.outputs.is_safe == 'true' &&
           steps.auto-approve.outputs.permission_denied != 'true' &&
+          steps.auto-approve.outputs.approved == 'true' &&
           steps.queue-pressure.outputs.defer_auto_merge != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
 
-          # Graphite enqueues by label; native auto-merge retired
-          gh pr edit $PR_NUMBER --add-label "merge-queue" || { echo "::error::Failed to add merge-queue label to #$PR_NUMBER"; exit 1; }
-
-          # Add label for tracking
+          # Tracking only. The labeled event wakes merge-queue-autoenroll,
+          # which revalidates live gates/head and owns the native transport.
           gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
             --method POST \
-            --field "labels[]=auto-approved" || true
+            --field "labels[]=auto-approved"
 
-          echo "Added PR #$PR_NUMBER to the Graphite merge queue"
+          echo "Recorded approval for #$PR_NUMBER; queue controller will revalidate enrollment."
 
       - name: Defer auto-merge under queue pressure
         if: >-
@@ -810,9 +863,9 @@ jobs:
 
           This keeps quick human-driven PRs moving when the queue is saturated with agent traffic.
 
-          Re-enable auto-merge later with:
+          Re-enable queue consideration later with:
 
-          \`gh pr edit $PR_NUMBER --add-label merge-queue\`"
+          \`gh pr edit $PR_NUMBER --remove-label queue-deferred\`"
 
           echo "Auto-merge deferred for PR #$PR_NUMBER due to queue pressure"
 
@@ -849,7 +902,7 @@ jobs:
       needs.guard.outputs.should_approve == 'false' &&
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read

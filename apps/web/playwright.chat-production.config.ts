@@ -5,14 +5,16 @@ const managedWebServerUrl = new URL(baseURL);
 if (!managedWebServerUrl.port) {
   managedWebServerUrl.port = '3100';
 }
-const smokeDatabaseUrl =
-  process.env.DATABASE_URL || 'postgresql://localhost/noop';
-
-function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
+process.env.DATABASE_URL ??= 'postgresql://localhost/noop';
+process.env.E2E_CLERK_USER_ID ??= 'e2e-chat-timeline';
+process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ??=
+  'pk_test_mock-key-for-testing';
+process.env.CLERK_SECRET_KEY ??= 'sk_test_mock-key-for-testing';
+process.env.URL_ENCRYPTION_KEY ??= 'chat-production-smoke-url-encryption-key';
+process.env.AI_GATEWAY_API_KEY ??= 'mock-ai-gateway-key';
 
 export default defineConfig({
+  captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
   testMatch: /chat-timeline-regression\.spec\.ts/,
   fullyParallel: false,
@@ -24,8 +26,8 @@ export default defineConfig({
   expect: { timeout: 25_000 },
   use: {
     baseURL,
-    trace: 'on-first-retry',
-    video: 'retain-on-failure',
+    trace: process.env.CI ? 'off' : 'on-first-retry',
+    video: process.env.CI ? 'off' : 'retain-on-failure',
     storageState: { cookies: [], origins: [] },
   },
   projects: [
@@ -35,26 +37,14 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm run build && DATABASE_URL=${shellQuote(smokeDatabaseUrl)} pnpm run start`,
+    command: 'pnpm run build && pnpm run start',
     env: {
-      ...process.env,
       NODE_ENV: 'production',
       PORT: managedWebServerUrl.port,
       NEXT_PUBLIC_E2E_MODE: '1',
       E2E_USE_TEST_AUTH_BYPASS: '1',
-      E2E_CLERK_USER_ID: process.env.E2E_CLERK_USER_ID || 'e2e-chat-timeline',
       NEXT_PUBLIC_CLERK_MOCK: '1',
       NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
-        'pk_test_mock-key-for-testing',
-      CLERK_SECRET_KEY:
-        process.env.CLERK_SECRET_KEY || 'sk_test_mock-key-for-testing',
-      URL_ENCRYPTION_KEY:
-        process.env.URL_ENCRYPTION_KEY ||
-        'chat-production-smoke-url-encryption-key',
-      AI_GATEWAY_API_KEY:
-        process.env.AI_GATEWAY_API_KEY || 'mock-ai-gateway-key',
       NEXT_DISABLE_TOOLBAR: '1',
       E2E_ALLOW_DEV_CSP: '1',
       NODE_OPTIONS:

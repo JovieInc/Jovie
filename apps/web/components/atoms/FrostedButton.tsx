@@ -16,9 +16,9 @@ const toneToVariant: Record<
   NonNullable<FrostedButtonProps['tone']>,
   ButtonProps['variant']
 > = {
-  solid: 'frosted',
-  ghost: 'frosted-ghost',
-  outline: 'frosted-outline',
+  solid: 'secondary',
+  ghost: 'ghost',
+  outline: 'secondary',
 };
 
 export const FrostedButton = React.forwardRef<

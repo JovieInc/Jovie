@@ -1,15 +1,13 @@
 name: Stuck Draft Auto-Close
 
-# Closes agent-owned draft PRs that have been idle (>48h since last update)
-# with failing checks. This prevents stale drafts from accumulating and
-# confusing the merge-queue prioritization.
+# Operator-only recovery tool for agent-owned draft PRs that have been idle
+# (>48h since last update) with failing checks. Automatic closing conflicts
+# with the active all-PR drain, so this workflow has no schedule.
 #
 # Opt out per-PR with any of: needs-human, hold, gated.
 # Human-owned branches are never touched.
 
 on:
-  schedule:
-    - cron: '0 */6 * * *'   # every 6 hours
   workflow_dispatch:
 
 concurrency:
@@ -23,7 +21,8 @@ permissions:
 
 jobs:
   autoclose:
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # A manual cleanup must never consume deterministic merge capacity.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 

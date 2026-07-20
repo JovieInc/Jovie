@@ -16,9 +16,8 @@ name: Test Coverage Audit
 
 on:
   schedule:
-    # 06:00 UTC daily — runs after the nightly test suite (02:00 PT = ~10:00 UTC)
-    # so any newly-merged tests are reflected.
-    - cron: '0 6 * * *'
+    # Run after the nightly deterministic lanes and weekly full matrix.
+    - cron: '30 18 * * *'
   workflow_dispatch:
     inputs:
       commit:
@@ -35,7 +34,7 @@ concurrency:
 jobs:
   audit:
     name: Regenerate coverage heatmap
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: write

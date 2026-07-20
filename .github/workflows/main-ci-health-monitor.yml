@@ -1,7 +1,14 @@
 name: Main CI health monitor
 
 on:
+  schedule:
+    # Hosted API monitor, offset from runner routing and cost checks.
+    - cron: '8,28,48 * * * *'
   workflow_dispatch:
+
+concurrency:
+  group: main-ci-health-monitor
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -9,25 +16,33 @@ permissions:
 jobs:
   monitor:
     name: Detect stalled or failing CI on main
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     permissions:
-      actions: read
+      actions: write
       contents: read
       pull-requests: read
+      statuses: write
     outputs:
       should_alert: ${{ steps.evaluate.outputs.should_alert }}
       summary: ${{ steps.evaluate.outputs.summary }}
       details: ${{ steps.evaluate.outputs.details }}
       run_url: ${{ steps.evaluate.outputs.run_url }}
       failed_run_id: ${{ steps.evaluate.outputs.failed_run_id }}
+      should_notify: ${{ steps.dedupe.outputs.should_notify }}
       needs_autofix: ${{ steps.evaluate.outputs.needs_autofix }}
       autofix_skip_reason: ${{ steps.evaluate.outputs.autofix_skip_reason }}
       failing_run_id: ${{ steps.evaluate.outputs.failing_run_id }}
+      failing_run_attempt: ${{ steps.evaluate.outputs.failing_run_attempt }}
+      repair_attempt: ${{ steps.evaluate.outputs.repair_attempt }}
       failing_sha: ${{ steps.evaluate.outputs.failing_sha }}
       failing_short_sha: ${{ steps.evaluate.outputs.failing_short_sha }}
       last_green_sha: ${{ steps.evaluate.outputs.last_green_sha }}
       failed_job_names: ${{ steps.evaluate.outputs.failed_job_names }}
       systemic: ${{ steps.evaluate.outputs.systemic }}
+      repair_in_flight: ${{ steps.evaluate.outputs.repair_in_flight }}
+      repair_marker_owned: ${{ steps.evaluate.outputs.repair_marker_owned }}
+      repair_terminal: ${{ steps.evaluate.outputs.repair_terminal }}
+      repair_state_known: ${{ steps.evaluate.outputs.repair_state_known }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -36,8 +51,49 @@ jobs:
         id: evaluate
         uses: ./.github/actions/eval-main-health
 
+      - name: Deduplicate exact unhealthy run attempt
+        id: dedupe
+        if: ${{ steps.evaluate.outputs.should_alert == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ALERT_KEY: ${{ steps.evaluate.outputs.alert_key }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$ALERT_KEY" =~ ^run-[1-9][0-9]*-attempt-([1-9][0-9]*|unknown)-(failed|stale)$ ]] || {
+            echo "::error::Main CI health signal lacks an exact dedupe identity."
+            exit 1
+          }
+          marker_name="main-ci-health-alert-$ALERT_KEY"
+          artifacts_json="$(gh api \
+            "repos/$GH_REPOSITORY/actions/artifacts?name=$marker_name&per_page=100")"
+          jq -e 'type == "object" and (.artifacts | type == "array")' \
+            >/dev/null <<<"$artifacts_json"
+          active_count="$(jq --arg name "$marker_name" \
+            '[.artifacts[] | select(.name == $name and .expired == false)] | length' \
+            <<<"$artifacts_json")"
+          if [ "$active_count" -gt 0 ]; then
+            echo "should_notify=false" >> "$GITHUB_OUTPUT"
+            echo "Exact unhealthy signal $ALERT_KEY was already handled; suppressing churn."
+            exit 0
+          fi
+          jq -n --arg key "$ALERT_KEY" --arg run "${{ github.run_id }}" \
+            '{alertKey: $key, monitorRun: $run}' \
+            > "$RUNNER_TEMP/main-ci-health-alert.json"
+          echo "marker_name=$marker_name" >> "$GITHUB_OUTPUT"
+          echo "should_notify=true" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve exact health-alert marker
+        if: ${{ steps.dedupe.outputs.should_notify == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.dedupe.outputs.marker_name }}
+          path: ${{ runner.temp }}/main-ci-health-alert.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Slack alert (main CI unhealthy)
-        if: ${{ steps.evaluate.outputs.should_alert == 'true' && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ steps.dedupe.outputs.should_notify == 'true' && env.SLACK_WEBHOOK_URL != '' }}
         run: |
           DETAILS_JSON=$(jq -Rn --arg text "$DETAILS" '$text')
           SUMMARY_JSON=$(jq -Rn --arg text "$SUMMARY" '$text')
@@ -71,7 +127,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Fail job when unhealthy
-        if: ${{ steps.evaluate.outputs.should_alert == 'true' }}
+        if: ${{ steps.dedupe.outputs.should_notify == 'true' }}
         env:
           SUMMARY: ${{ steps.evaluate.outputs.summary }}
           DETAILS: ${{ steps.evaluate.outputs.details }}
@@ -81,28 +137,62 @@ jobs:
           exit 1
 
   auto-rerun:
-    name: Auto-rerun failed deploy (self-healing)
+    name: Auto-rerun failed CI (self-healing)
     needs: monitor
     if: ${{ always() && needs.monitor.outputs.should_alert == 'true' && needs.monitor.outputs.failed_run_id != '' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     permissions:
       actions: write
     steps:
-      - name: Auto-rerun failed deploy (self-healing)
+      - name: Auto-rerun failed CI (self-healing)
+        id: rerun
         env:
           GH_TOKEN: ${{ github.token }}
           FAILED_RUN_ID: ${{ needs.monitor.outputs.failed_run_id }}
           GH_REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
+          echo "requested=false" >> "$GITHUB_OUTPUT"
           echo "Evaluating failed CI run $FAILED_RUN_ID for auto-rerun..."
 
           # Guard: only re-run once per failed run to avoid infinite retry loops.
           # If attempt > 1, autofix takes over (see .github/workflows/main-autofix.yml).
-          ATTEMPT=$(gh api "repos/$GH_REPO/actions/runs/$FAILED_RUN_ID" --jq '.run_attempt' 2>/dev/null || echo "1")
+          ATTEMPT=$(gh api "repos/$GH_REPO/actions/runs/$FAILED_RUN_ID" --jq '.run_attempt // empty')
+          [[ "$ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::Could not establish the exact failed run attempt; refusing a blind rerun."
+            exit 1
+          }
           if [ "$ATTEMPT" -gt 1 ]; then
             echo "Run $FAILED_RUN_ID already re-attempted (attempt $ATTEMPT), skipping — autofix will handle."
             exit 0
           fi
 
+          marker_name="main-ci-rerun-request-${FAILED_RUN_ID}-attempt-${ATTEMPT}"
+          artifacts_json="$(gh api \
+            "repos/$GH_REPO/actions/artifacts?name=$marker_name&per_page=100")"
+          jq -e 'type == "object" and (.artifacts | type == "array")' \
+            >/dev/null <<<"$artifacts_json"
+          accepted_count="$(jq --arg name "$marker_name" \
+            '[.artifacts[] | select(.name == $name and .expired == false)] | length' \
+            <<<"$artifacts_json")"
+          if [ "$accepted_count" -gt 0 ]; then
+            echo "A rerun request for run $FAILED_RUN_ID attempt $ATTEMPT was already accepted."
+            exit 0
+          fi
+
           echo "Re-running failed CI run $FAILED_RUN_ID (failed jobs only)..."
-          gh run rerun "$FAILED_RUN_ID" --failed || echo "Auto-rerun failed (may require manual intervention)"
+          gh run rerun "$FAILED_RUN_ID" --failed
+          jq -n --arg run_id "$FAILED_RUN_ID" --arg attempt "$ATTEMPT" \
+            '{runId: $run_id, sourceAttempt: $attempt, accepted: true}' \
+            > "$RUNNER_TEMP/main-ci-rerun-request.json"
+          echo "marker_name=$marker_name" >> "$GITHUB_OUTPUT"
+          echo "requested=true" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve accepted rerun request
+        if: ${{ steps.rerun.outputs.requested == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.rerun.outputs.marker_name }}
+          path: ${{ runner.temp }}/main-ci-rerun-request.json
+          if-no-files-found: error
+          retention-days: 30

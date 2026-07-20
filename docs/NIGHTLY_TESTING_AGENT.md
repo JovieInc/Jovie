@@ -14,11 +14,12 @@ for the admin ops panel and `docs/NIGHTLY_TESTING_AGENT_REPORT.md`.
 
 | Workflow | Cron (PT) | Purpose |
 |----------|-----------|---------|
-| `Nightly Tests` | `0 2 * * *` | Full unit + E2E suite, Knip audit |
-| `Nightly Testing Agent` | `30 2 * * *` | Risk scoring, unit telemetry, mutation hotspots, daily report |
+| `Nightly Tests` | `30 23 * * *` | Full unit + E2E suite, Knip audit |
+| `Nightly Testing Agent` | `30 4 * * *` | Risk scoring, unit telemetry, mutation hotspots, daily report |
 
-The agent runs 30 minutes after the consolidated nightly suite so fresh failures
-from the main suite are reflected in the next context build.
+The consolidated suite starts at 23:30, clear of the fixed 09:00 UTC screenshot and
+Tuesday harness lanes. The agent then starts at 04:30 after those runners have
+drained, so fresh failures from the main suite are reflected in its context.
 
 ## Cost path (economy / deterministic)
 

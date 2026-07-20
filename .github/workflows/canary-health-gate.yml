@@ -14,12 +14,12 @@ on:
         description: Base64-encoded deployment URL for masked cross-job handoff.
         required: false
         type: string
+      deployment_id:
+        description: Exact Vercel deployment ID produced by the caller.
+        required: false
+        type: string
       commit_sha:
         description: Git commit SHA for the deployment.
-        required: true
-        type: string
-      fallback_health_url:
-        description: Fallback health check endpoint if the deployment URL is rate-limited.
         required: true
         type: string
       wait_seconds:
@@ -53,374 +53,108 @@ jobs:
       canary_status: ${{ steps.canary-status.outputs.canary_status || steps.canary-check.outputs.canary_status }}
       verified_deployment_url: ${{ steps.canary-check.outputs.verified_deployment_url }}
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # The exact-deployment resolver is Node code; pin Node before its first
+      # invocation instead of relying on the mutable hosted-runner default.
+      - uses: ./.github/actions/setup-node-pnpm
+
       - name: Canary health check
         id: canary-check
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           DEPLOYMENT_URL: ${{ inputs.deployment_url }}
           DEPLOYMENT_URL_B64: ${{ inputs.deployment_url_b64 }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
           COMMIT_SHA: ${{ inputs.commit_sha }}
-          FALLBACK_HEALTH_URL: ${{ inputs.fallback_health_url }}
           WAIT_SECONDS: ${{ inputs.wait_seconds }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
+          set -euo pipefail
           echo "Running canary health check..."
           deployment_url="${DEPLOYMENT_URL}"
           if [ -z "$deployment_url" ] && [ -n "${DEPLOYMENT_URL_B64:-}" ]; then
             deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
           fi
-          health_url_fallback="${FALLBACK_HEALTH_URL}"
-          resolved_commit_deployment_url="$(python3 - <<'PY'
-          import json
-          import os
-          import sys
-          import urllib.parse
-          import urllib.request
-
-          token = os.environ.get("VERCEL_TOKEN", "")
-          org_id = os.environ.get("VERCEL_ORG_ID", "")
-          project_id = os.environ.get("VERCEL_PROJECT_ID", "")
-          commit_sha = os.environ.get("COMMIT_SHA", "")
-
-          if not token or not project_id or not commit_sha:
-              print("", end="")
-              sys.exit(0)
-
-          base_url = "https://api.vercel.com/v6/deployments"
-          query_params = {
-              "projectId": project_id,
-              "state": "READY",
-              "limit": 50,
+          deployment_url="${deployment_url%/}"
+          caller_deployment_url="$deployment_url"
+          [[ "$WAIT_SECONDS" =~ ^[0-9]+$ ]] && [ "$WAIT_SECONDS" -le 300 ] || {
+            echo "❌ Canary failed: wait_seconds must be an integer from 0 to 300."
+            echo "canary_status=failed_config" >> "$GITHUB_OUTPUT"
+            exit 1
           }
-
-          # Team-owned projects require teamId scoping to list deployments.
-          if org_id.startswith("team_"):
-              query_params["teamId"] = org_id
-
-          query = urllib.parse.urlencode(query_params)
-          request = urllib.request.Request(
-              f"{base_url}?{query}",
-              headers={"Authorization": f"Bearer {token}"},
-          )
-          with urllib.request.urlopen(request, timeout=15) as response:
-              payload = json.load(response)
-
-          for deployment in payload.get("deployments", []):
-              meta = deployment.get("meta") or {}
-              if meta.get("githubCommitSha") == commit_sha:
-                  print(f"https://{deployment['url']}")
-                  break
-          PY
-          )"
-
-          if [ -z "$deployment_url" ]; then
-            echo "⚠ deployment_url missing from upstream outputs; resolving from Vercel API..."
-            deployment_url="$resolved_commit_deployment_url"
-          fi
-
-          if [ -z "$deployment_url" ]; then
-            echo "❌ Canary failed: could not resolve deployment URL from inputs or Vercel API."
-            echo "canary_status=failed" >> "$GITHUB_OUTPUT"
+          # Honor the documented stabilization delay before the first Vercel API
+          # lookup. The resolver then owns bounded polling for list propagation
+          # and BUILDING/QUEUED/INITIALIZING convergence.
+          sleep "$WAIT_SECONDS"
+          if ! resolved_deployment="$(
+            VERCEL_CANDIDATE_DEPLOYMENT_URL="$deployment_url" \
+            VERCEL_CANDIDATE_DEPLOYMENT_ID="$DEPLOYMENT_ID" \
+            EXPECTED_COMMIT_SHA="$COMMIT_SHA" \
+            VERCEL_DEPLOYMENT_MAX_PAGES=5 \
+            VERCEL_API_TIMEOUT_MS=180000 \
+            VERCEL_DEPLOYMENT_POLL_INTERVAL_MS=5000 \
+              node apps/web/scripts/vercel-protected-origin.cjs resolve-deployment
+          )"; then
+            echo "❌ Canary failed: Vercel could not bind the exact caller URL/ID/full SHA as READY within the absolute deadline."
+            echo "canary_status=failed_config" >> "$GITHUB_OUTPUT"
             exit 1
           fi
-          public_deployment_url="${deployment_url%/}"
-
-          if [[ "$health_url_fallback" = /* ]]; then
-            health_url_fallback="${deployment_url%/}${health_url_fallback}"
+          resolved_commit_deployment_url="$(jq -r '.url // ""' <<<"$resolved_deployment")"
+          resolved_commit_deployment_id="$(jq -r '.id // ""' <<<"$resolved_deployment")"
+          if [ -z "$deployment_url" ]; then
+            deployment_url="$resolved_commit_deployment_url"
           fi
-
-          health_url_primary="${deployment_url%/}/api/health"
-          health_url="$health_url_primary"
-
-          # Wait a moment for deployment to be ready
-          sleep "${WAIT_SECONDS}"
-
+          if { [ -n "$caller_deployment_url" ] &&
+              [ "$caller_deployment_url" != "$resolved_commit_deployment_url" ]; } ||
+            { [ -n "$DEPLOYMENT_ID" ] &&
+              [ "$DEPLOYMENT_ID" != "$resolved_commit_deployment_id" ]; } ||
+            [[ ! "$resolved_commit_deployment_id" =~ ^dpl_[A-Za-z0-9]+$ ]]; then
+            echo "❌ Canary failed: caller deployment URL/ID does not match the exact project-scoped Vercel result."
+            echo "canary_status=failed_config" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
           USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
           COOKIE_JAR="$(mktemp)"
+          trap 'rm -f "$COOKIE_JAR"' EXIT
 
-          # Vercel Deployment Protection / Bot protection bypass for automation
-          # See: https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation
-          BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET:-}"
-          BYPASS_ARGS=()
-          if [ -n "$BYPASS_SECRET" ]; then
-            BYPASS_ARGS+=(
-              -H "x-vercel-protection-bypass: $BYPASS_SECRET"
-              -H "x-vercel-set-bypass-cookie: true"
-              -c "$COOKIE_JAR"
-              -b "$COOKIE_JAR"
-            )
-          else
+          # One Node process owns the only secret-bearing request. It binds the
+          # preview URL, commit, environment, cookie scope, and shared semantic
+          # public surfaces under one absolute deadline.
+          if [ -z "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
             echo "❌ Canary failed: VERCEL_AUTOMATION_BYPASS_SECRET is required for deterministic staging verification."
             echo "canary_status=failed_config" >> "$GITHUB_OUTPUT"
             exit 1
           fi
+          if ! VERCEL_PROBE_URL="$deployment_url" \
+            EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url" \
+            EXPECTED_COMMIT_SHA="$COMMIT_SHA" \
+            EXPECTED_VERCEL_ENVIRONMENT=preview \
+            VERCEL_PROBE_COOKIE_JAR="$COOKIE_JAR" \
+            VERCEL_VERIFY_PUBLIC_SURFACES=true \
+            VERCEL_PROBE_TIMEOUT_MS=180000 \
+              node apps/web/scripts/vercel-protected-origin.cjs bootstrap-cookie-jar; then
+            echo "❌ Canary failed: protected-origin exact build or semantic public-surface verification failed."
+            echo "canary_status=failed_config" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "verified_deployment_url=${deployment_url}" >> "$GITHUB_OUTPUT"
           CURL_TIMEOUT_ARGS=(--connect-timeout 5 --max-time 15)
-
-          attempt=1
-          max_attempts=8
-          response_code="000"
-          while [ $attempt -le $max_attempts ]; do
-            response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
-            response_code="${response##*$'\n'}"
-
-            if [ "$response_code" = "200" ]; then
-              break
-            fi
-
-            if [ "$response_code" = "429" ]; then
-              sleep_seconds=$((attempt * 5))
-              echo "⚠ Canary got HTTP 429 (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
-              sleep "$sleep_seconds"
-              attempt=$((attempt + 1))
-              continue
-            fi
-
-            if [ "$response_code" = "500" ] || [ "$response_code" = "502" ] || [ "$response_code" = "503" ] || [ "$response_code" = "504" ]; then
-              sleep_seconds=$((attempt * 10))
-              echo "⚠ Canary got transient HTTP $response_code (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
-              sleep "$sleep_seconds"
-              attempt=$((attempt + 1))
-              continue
-            fi
-
-            echo "❌ Canary failed: HTTP $response_code"
-            echo "canary_status=failed" >> "$GITHUB_OUTPUT"
-            exit 1
-          done
-
-          if [ "$response_code" != "200" ] && [ -n "$resolved_commit_deployment_url" ] && [ "${deployment_url%/}" != "${resolved_commit_deployment_url%/}" ]; then
-            echo "⚠ Canary primary URL failed with HTTP $response_code. Retrying commit deployment URL ${resolved_commit_deployment_url}..."
-            diagnostic_deployment_url="$resolved_commit_deployment_url"
-
-            diagnostic_health_url="${diagnostic_deployment_url%/}/api/health"
-
-            attempt=1
-            max_attempts=5
-            response_code="000"
-            while [ $attempt -le $max_attempts ]; do
-              response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${diagnostic_health_url}$( [[ "$diagnostic_health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
-              response_code="${response##*$'\n'}"
-
-              if [ "$response_code" = "200" ]; then
-                break
-              fi
-
-              if [ "$response_code" = "429" ]; then
-                sleep_seconds=$((attempt * 5))
-                echo "⚠ Canary commit URL got HTTP 429 (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
-                sleep "$sleep_seconds"
-                attempt=$((attempt + 1))
-                continue
-              fi
-
-              if [ "$response_code" = "500" ] || [ "$response_code" = "502" ] || [ "$response_code" = "503" ] || [ "$response_code" = "504" ]; then
-                sleep_seconds=$((attempt * 10))
-                echo "⚠ Canary commit URL got transient HTTP $response_code (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
-                sleep "$sleep_seconds"
-                attempt=$((attempt + 1))
-                continue
-              fi
-
-              echo "❌ Canary commit URL failed: HTTP $response_code"
-              echo "canary_status=failed" >> "$GITHUB_OUTPUT"
-              exit 1
-            done
-          fi
-
-          if [ "$response_code" != "200" ]; then
-            if [ "$response_code" = "429" ]; then
-              echo "⚠ Canary still rate-limited on deployment URL after retries. Falling back to ${health_url_fallback}..."
-              health_url="$health_url_fallback"
-
-              attempt=1
-              max_attempts=5
-              response_code="000"
-              while [ $attempt -le $max_attempts ]; do
-                response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
-                response_code="${response##*$'\n'}"
-
-                if [ "$response_code" = "200" ]; then
-                  break
-                fi
-
-                if [ "$response_code" = "429" ]; then
-                  response_body="${response%$'\n'*}"
-                  body_preview="${response_body:0:300}"
-                  sleep_seconds=$((attempt * 15))
-                  echo "⚠ Canary fallback got HTTP 429 (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
-                  echo "429 response preview: ${body_preview}"
-                  sleep "$sleep_seconds"
-                  attempt=$((attempt + 1))
-                  continue
-                fi
-
-                if [ "$response_code" = "500" ] || [ "$response_code" = "502" ] || [ "$response_code" = "503" ] || [ "$response_code" = "504" ]; then
-                  sleep_seconds=$((attempt * 15))
-                  echo "⚠ Canary fallback got transient HTTP $response_code (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
-                  sleep "$sleep_seconds"
-                  attempt=$((attempt + 1))
-                  continue
-                fi
-
-                echo "❌ Canary fallback failed: HTTP $response_code"
-                echo "canary_status=failed" >> "$GITHUB_OUTPUT"
-                exit 1
-              done
-
-              if [ "$response_code" != "200" ]; then
-                if [ "$response_code" = "429" ]; then
-                  echo "❌ Canary failed: HTTP 429 after retries even though bypass secret is set."
-                  echo "canary_status=failed" >> "$GITHUB_OUTPUT"
-                  exit 1
-                else
-                  echo "❌ Canary fallback failed after retries: HTTP $response_code"
-                  echo "canary_status=failed" >> "$GITHUB_OUTPUT"
-                  exit 1
-                fi
-              fi
-            else
-              echo "❌ Canary failed after retries: HTTP $response_code"
-              echo "canary_status=failed" >> "$GITHUB_OUTPUT"
-              exit 1
-            fi
-          fi
-
-          verify_build_info_serves_commit() {
-            local base_url="$1"
-            local expected_commit="${COMMIT_SHA:0:7}"
-            local build_info_url="${base_url%/}/api/health/build-info"
-            local attempt=1
-            local max_attempts=15
-            local response status body actual
-
-            echo "Verifying ${base_url%/} serves commit ${expected_commit}..."
-
-            while [ "$attempt" -le "$max_attempts" ]; do
-              if [ "$attempt" -gt 1 ]; then
-                sleep 10
-              fi
-
-              response=$(curl -sS -L \
-                --connect-timeout 5 \
-                --max-time 10 \
-                -A "$USER_AGENT" \
-                -H "Accept: application/json" \
-                -H "Cache-Control: no-cache, no-store, must-revalidate" \
-                -H "Pragma: no-cache" \
-                "${BYPASS_ARGS[@]}" \
-                -w "\n%{http_code}" \
-                "${build_info_url}?_cb=$(date +%s%N)" 2>/dev/null || printf '\n000')
-              status="${response##*$'\n'}"
-              body="${response%$'\n'*}"
-
-              if [ "$status" != "200" ]; then
-                echo "  attempt ${attempt}/${max_attempts}: build-info returned HTTP ${status}"
-                attempt=$((attempt + 1))
-                continue
-              fi
-
-              actual=$(BODY="$body" python3 - <<'PY'
-          import json
-          import os
-          import sys
-
-          try:
-              payload = json.loads(os.environ.get("BODY", ""))
-          except json.JSONDecodeError:
-              print("", end="")
-              sys.exit(0)
-
-          print(payload.get("commitSha") or "", end="")
-          PY
-              )
-
-              if [ -z "$actual" ]; then
-                echo "  attempt ${attempt}/${max_attempts}: build-info returned 200 without commitSha"
-                attempt=$((attempt + 1))
-                continue
-              fi
-
-              echo "  attempt ${attempt}/${max_attempts}: build-info commitSha=${actual}"
-              if [ "$actual" = "$expected_commit" ]; then
-                echo "✅ ${base_url%/} serves ${expected_commit}"
-                return 0
-              fi
-
-              attempt=$((attempt + 1))
-            done
-
-            echo "❌ Canary failed: ${base_url%/} did not serve commit ${expected_commit} within the retry window."
-            echo "canary_status=failed_build_info" >> "$GITHUB_OUTPUT"
-            exit 1
-          }
-
-          verify_build_info_serves_commit "$public_deployment_url"
-          echo "verified_deployment_url=${public_deployment_url}" >> "$GITHUB_OUTPUT"
-
-          health_content=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
-          if [[ "$health_content" != *'"status":"ok"'* ]]; then
-            echo "❌ Canary failed: Health status not ok"
-            echo "Health response: $health_content"
-            echo "canary_status=failed_health" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          # NOTE: If a regression silently drops the database field from /api/health,
-          # this gate will not catch it; the "status":"ok" check above remains the last gate.
-          # Some environments expose only {"status":"ok"} on /api/health.
-          # Validate database state only when the response includes a database field.
-          if [[ "$health_content" == *'"database":'* ]]; then
-            # /api/health returns "database":"ok" (string), while /api/health/deploy
-            # returns "database":{"ok":true,...} (object). Accept both formats.
-            if [[ "$health_content" != *'"database":"ok"'* ]] && [[ "$health_content" != *'"database":{"ok":true'* ]]; then
-              echo "❌ Canary failed: Database health not ok"
-              echo "Health response: $health_content"
-              echo "canary_status=failed_database" >> "$GITHUB_OUTPUT"
-              exit 1
-            fi
-          else
-            echo "ℹ️ Health response has no database field; skipping database-specific validation."
-          fi
-
-          echo "✅ Health endpoint passed"
-
-          # CRITICAL: Verify homepage renders (not just API health)
-          echo "Checking homepage renders..."
-          homepage_url="${deployment_url%/}/"
-          homepage_response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${homepage_url}$( [[ "$homepage_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
-          homepage_code="${homepage_response##*$'\n'}"
-          homepage_body="${homepage_response%$'\n'*}"
-
-          if [ "$homepage_code" != "200" ]; then
-            echo "❌ Canary failed: Homepage returned HTTP $homepage_code"
-            echo "canary_status=failed_homepage" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          # Check homepage has actual content (not blank or error page)
-          if [ ${#homepage_body} -lt 1000 ]; then
-            echo "❌ Canary failed: Homepage body too short (${#homepage_body} chars) - likely broken"
-            echo "canary_status=failed_homepage" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          # Check for common error indicators
-          if echo "$homepage_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found"; then
-            echo "❌ Canary failed: Homepage contains error message"
-            echo "canary_status=failed_homepage" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          echo "✅ Homepage renders correctly"
 
           # This gate verifies the raw Vercel preview deployment. Preview/staging
           # must stay out of search indexes; production SEO is checked separately
           # against jov.ie after promotion.
           echo "Checking preview-safe robots.txt..."
           robots_url="${deployment_url%/}/robots.txt"
-          robots_body=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${robots_url}$( [[ "$robots_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
+          robots_response=$(curl -s --max-redirs 0 "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" -b "$COOKIE_JAR" -w "\n%{http_code}" "${robots_url}$( [[ "$robots_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
+          robots_code="${robots_response##*$'\n'}"
+          robots_body="${robots_response%$'\n'*}"
 
           preview_robots_policy_valid() {
             awk '
@@ -448,7 +182,8 @@ jobs:
             '
           }
 
-          if ! printf '%s\n' "$robots_body" | preview_robots_policy_valid; then
+          if [ "$robots_code" != "200" ] ||
+            ! printf '%s\n' "$robots_body" | preview_robots_policy_valid; then
             echo "❌ Canary failed: preview robots.txt must globally block crawlers with Disallow: /, without Allow: / or Sitemap:"
             echo "canary_status=failed_seo_robots" >> "$GITHUB_OUTPUT"
             exit 1
@@ -456,68 +191,13 @@ jobs:
 
           echo "✅ preview robots.txt blocks indexing"
 
-          check_route_renders() {
-            local route_label="$1"
-            local route_path="$2"
-            local min_chars="$3"
-            local status_key="$4"
-            local route_url="${deployment_url%/}${route_path}"
-            local attempt=1
-            local max_attempts=5
-            local response route_code route_body sleep_seconds
-
-            echo "Checking ${route_label} route renders..."
-
-            while [ "$attempt" -le "$max_attempts" ]; do
-              response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${route_url}$( [[ "$route_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
-              route_code="${response##*$'\n'}"
-              route_body="${response%$'\n'*}"
-
-              if [ "$route_code" = "200" ] && [ ${#route_body} -ge "$min_chars" ] && ! echo "$route_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found\|temporarily unavailable\|auth unavailable\|turnstile is not configured"; then
-                echo "✅ ${route_label} renders correctly"
-                return 0
-              fi
-
-              if [ "$route_code" = "000" ] || [ "$route_code" = "500" ] || [ "$route_code" = "502" ] || [ "$route_code" = "503" ] || [ "$route_code" = "504" ]; then
-                sleep_seconds=$((attempt * 10))
-                echo "⚠ ${route_label} got transient HTTP $route_code (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
-                sleep "$sleep_seconds"
-                attempt=$((attempt + 1))
-                continue
-              fi
-
-              if [ "$route_code" != "200" ]; then
-                echo "❌ Canary failed: ${route_path} returned HTTP $route_code"
-              elif [ ${#route_body} -lt "$min_chars" ]; then
-                echo "❌ Canary failed: ${route_path} body too short (${#route_body} chars) - likely broken"
-              else
-                echo "❌ Canary failed: ${route_path} contains error message"
-              fi
-              echo "canary_status=${status_key}" >> "$GITHUB_OUTPUT"
-              exit 1
-            done
-
-            echo "❌ Canary failed: ${route_path} did not render after transient retries (last HTTP $route_code)"
-            echo "canary_status=${status_key}" >> "$GITHUB_OUTPUT"
-            exit 1
-          }
-
-          # Verify signup still renders because this is the top conversion entrypoint.
-          check_route_renders "Signup" "/signup" 500 "failed_signup"
-
-          # Verify signin still renders because staging auth must stay healthy.
-          check_route_renders "Signin" "/signin" 500 "failed_signin"
-
-          # Verify anonymous onboarding chat can render without Turnstile configuration errors.
-          check_route_renders "Start onboarding chat" "/start" 500 "failed_start"
-
           # Verify /start chat is not accidentally disabled by a default-off
           # feature flag. This intentionally omits a Turnstile token: a healthy
           # production build should reach the bot gate and return 403
           # TURNSTILE_REQUIRED, not 503 ONBOARDING_CHAT_DISABLED.
           echo "Checking onboarding chat reaches the bot gate..."
           onboarding_chat_url="${deployment_url%/}/api/chat"
-          onboarding_chat_response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"mode":"onboarding","messages":[{"id":"canary-onboarding","role":"user","parts":[{"type":"text","text":"canary"}]}]}' -w "\n%{http_code}" "${onboarding_chat_url}" || printf '\n000')
+          onboarding_chat_response=$(curl -s --max-redirs 0 "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" -b "$COOKIE_JAR" -d '{"mode":"onboarding","messages":[{"id":"canary-onboarding","role":"user","parts":[{"type":"text","text":"canary"}]}]}' -w "\n%{http_code}" "${onboarding_chat_url}" || printf '\n000')
           onboarding_chat_code="${onboarding_chat_response##*$'\n'}"
           onboarding_chat_body="${onboarding_chat_response%$'\n'*}"
 
@@ -543,7 +223,7 @@ jobs:
           # this check informational so canary does not block healthy deployments.
           echo "Checking /api/chat is reachable and auth-gated (informational)..."
           chat_url="${deployment_url%/}/api/chat"
-          chat_response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}' -w "\n%{http_code}" "${chat_url}" || printf '\n000')
+          chat_response=$(curl -s --max-redirs 0 "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" -b "$COOKIE_JAR" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}' -w "\n%{http_code}" "${chat_url}" || printf '\n000')
           chat_code="${chat_response##*$'\n'}"
 
           # The chat route checks auth before body parsing, so unauthenticated
@@ -554,46 +234,7 @@ jobs:
             echo "⚠️ /api/chat probe returned HTTP $chat_code (expected 401). Continuing because this check is currently flaky on staging."
           fi
 
-          # Verify the public profile route renders without a server error.
-          # "Profile not found" with HTTP 200 is a valid app response (data issue,
-          # not a code regression), so only block on 5xx or actual error pages.
-          echo "Checking public profile route renders..."
-          profile_url="${deployment_url%/}/tim"
-          profile_response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${profile_url}$( [[ "$profile_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
-          profile_code="${profile_response##*$'\n'}"
-          profile_body="${profile_response%$'\n'*}"
-
-          if [ "$profile_code" -ge 500 ] 2>/dev/null; then
-            echo "❌ Canary failed: /tim returned HTTP $profile_code (server error)"
-            echo "canary_status=failed_public_profile" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          if [ ${#profile_body} -lt 500 ]; then
-            echo "❌ Canary failed: /tim body too short (${#profile_body} chars) - likely broken"
-            echo "canary_status=failed_public_profile" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          if echo "$profile_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred"; then
-            echo "❌ Canary failed: /tim contains error content"
-            echo "canary_status=failed_public_profile" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          if echo "$profile_body" | grep -qi "profile not found\|page could not be found"; then
-            echo "⚠️ /tim shows 'not found' — profile may not be seeded in production (non-blocking)"
-          else
-            echo "✅ /tim profile renders with content"
-          fi
-
-          echo "✅ HTTP canary passed: Deployment healthy and homepage renders"
-
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 1
-
-      - uses: ./.github/actions/setup-node-pnpm
+          echo "✅ HTTP canary passed: shared semantic surfaces and route-specific controls are healthy"
 
       - name: Cache Playwright Browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -614,10 +255,16 @@ jobs:
           auth_smoke_attempt=1
           auth_smoke_max_attempts=3
 
-          # The HTTP canary uses Vercel bypass headers above. This browser smoke
-          # primes Vercel's bypass cookie by URL query instead of headers so
-          # Clerk still reaches its normal interactive ready state.
-          until CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do
+          # The browser smoke exchanges the credential on the exact verified
+          # build-info route, verifies build identity and host-only cookie
+          # behavior, then navigates without credential headers or query params.
+          until CI=true \
+            SMOKE_ONLY=1 \
+            BASE_URL="${DEPLOYMENT_URL}" \
+            EXPECTED_VERCEL_ENVIRONMENT=preview \
+            PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do
             if [ "$auth_smoke_attempt" -ge "$auth_smoke_max_attempts" ]; then
               echo "❌ Public auth controls failed after ${auth_smoke_max_attempts} attempts."
               exit 1
@@ -630,54 +277,9 @@ jobs:
           done
         env:
           DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}
+          EXPECTED_COMMIT_SHA: ${{ inputs.commit_sha }}
+          EXPECTED_VERCEL_DEPLOYMENT_ORIGIN: ${{ steps.canary-check.outputs.verified_deployment_url }}
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-
-      - name: Hard probe — Better Auth handler reachable (GET /api/auth/ok)
-        run: |
-          # Plan Phase 11 (Clerk → Better Auth migration): a 200 from
-          # `/api/auth/ok` proves the BA handler mounted and the runtime wired
-          # up — a separate axis from the OAuth provider redirect_uri probe
-          # below. A 404 here means the static route was shadowed (catch-all
-          # `/api/auth/[...all]` won the route race) or the deploy broke.
-          ok_url="https://staging.jov.ie/api/auth/ok"
-          attempt=1
-          max_attempts=3
-          until curl --fail --silent --show-error -o /dev/null -w "%{http_code}\n" "$ok_url" | grep -q '^200$'; do
-            if [ "$attempt" -ge "$max_attempts" ]; then
-              echo "❌ $ok_url did not return 200 after ${max_attempts} attempts."
-              echo "canary_status=failed_better_auth_handler" >> "$GITHUB_OUTPUT"
-              exit 1
-            fi
-            sleep_seconds=$((attempt * 15))
-            echo "⚠️ $ok_url not 200 on attempt ${attempt}/${max_attempts}; retrying in ${sleep_seconds}s..."
-            sleep "$sleep_seconds"
-            attempt=$((attempt + 1))
-          done
-          echo "✅ $ok_url returned 200 (Better Auth handler healthy)"
-
-      - name: Verify staging OAuth redirect URIs are accepted by Google/Apple
-        run: |
-          # Probe the Google/Apple authorize endpoints with the EXACT redirect_uri
-          # Better Auth hands them (https://staging.jov.ie/api/auth/callback/<provider>).
-          # Catches code regressions in how the redirect_uri is built and staging
-          # Google/Apple console drift before promote. Production's own clients
-          # are covered by the post-promote production-oauth-gate in ci.yml.
-          cd apps/web
-          mkdir -p tests/.auth
-          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          attempt=1
-          max_attempts=3
-          until CI=true SMOKE_ONLY=1 BASE_URL="https://staging.jov.ie" pnpm exec playwright test tests/e2e/oauth-providers.spec.ts --project=chromium --reporter=line; do
-            if [ "$attempt" -ge "$max_attempts" ]; then
-              echo "❌ Staging OAuth redirect URIs are rejected by Google/Apple after ${max_attempts} attempts."
-              echo "canary_status=failed_oauth" >> "$GITHUB_OUTPUT"
-              exit 1
-            fi
-            sleep_seconds=$((attempt * 15))
-            echo "⚠ Staging OAuth probe attempt ${attempt}/${max_attempts} failed; retrying in ${sleep_seconds}s..."
-            sleep "$sleep_seconds"
-            attempt=$((attempt + 1))
-          done
 
       - name: Mark canary verified
         id: canary-status

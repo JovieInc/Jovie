@@ -231,7 +231,7 @@ export const INTERACTION_HOT_PATHS = [
     ],
     selectors: {
       firstFeedback: '[data-testid="slash-command-menu"]',
-      focusOrigin: '[aria-label="Chat message input"]',
+      focusOrigin: '[aria-label="Chat Message Input"]',
       usableState: '[data-testid="slash-command-menu"]',
     },
     firstSlice: true,
@@ -344,7 +344,7 @@ export const INTERACTION_HOT_PATHS = [
     ],
     selectors: {
       firstFeedback: '[data-testid="app-shell-scroll"], main',
-      usableState: '[aria-label="Chat message input"]',
+      usableState: '[aria-label="Chat Message Input"]',
     },
     firstSlice: false,
   },

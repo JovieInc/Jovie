@@ -27,6 +27,15 @@ import { createAuthClient } from 'better-auth/react';
 const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
 /**
+ * Better Auth clients are proxy-backed, so an unknown property can look
+ * callable even when its plugin was not mounted. Keep the compile-time env
+ * gate explicit instead of treating `authClient.oneTap` presence as proof.
+ */
+export function isGoogleOneTapConfigured(): boolean {
+  return Boolean(googleClientId);
+}
+
+/**
  * Plugins:
  * - `emailOTPClient` — email one-time-code sign-in (replaces the Clerk
  *   email-code strategy used by EmailCodeAuthForm).

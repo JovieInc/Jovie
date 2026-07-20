@@ -42,8 +42,8 @@ resolve_vercel_cmd() {
   return 127
 }
 
-parse_deployment_url() {
-  printf '%s\n' "$1" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1 || true
+parse_deployment_url_file() {
+  grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' "$1" | tail -1 || true
 }
 
 write_deployment_url() {
@@ -76,17 +76,17 @@ run_deploy() {
   local deploy_cmd=(timeout --signal=TERM --kill-after="${kill_grace_seconds}s" "$timeout_seconds")
 
   if [ "$mode" = "tgz" ]; then
-    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=tgz "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
+    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=tgz "$@" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
   if [ "$mode" = "split-tgz" ]; then
-    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=split-tgz "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
+    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=split-tgz "$@" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
   if [ "$mode" = "plain" ]; then
-    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
+    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt "$@" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
@@ -100,16 +100,17 @@ run_deploy() {
 
   if [ -n "${VERCEL_GIT_COMMIT_SHA:-}" ]; then
     local build_sha="${VERCEL_GIT_COMMIT_SHA:0:7}"
+    export NEXT_PUBLIC_BUILD_SHA="$build_sha"
     "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" \
-      --build-env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}" \
-      --env "VERCEL_GIT_COMMIT_SHA=${VERCEL_GIT_COMMIT_SHA}" \
-      --build-env "NEXT_PUBLIC_BUILD_SHA=${build_sha}" \
-      --env "NEXT_PUBLIC_BUILD_SHA=${build_sha}" \
-      --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
+      --build-env VERCEL_GIT_COMMIT_SHA \
+      --env VERCEL_GIT_COMMIT_SHA \
+      --build-env NEXT_PUBLIC_BUILD_SHA \
+      --env NEXT_PUBLIC_BUILD_SHA \
+      "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
-  "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
+  "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" "${VERCEL_SCOPE_ARGS[@]}"
 }
 
 try_mode() {
@@ -117,13 +118,15 @@ try_mode() {
   local attempt="$2"
   shift 2
 
-  local deploy_output=""
+  local deploy_output_file=""
   local deploy_status=0
-  deploy_output="$(run_deploy "$mode" "$@" 2>&1)" || deploy_status=$?
+  deploy_output_file="$(mktemp "${RUNNER_TEMP:-/tmp}/jovie-vercel-deploy.XXXXXX")"
+  chmod 600 "$deploy_output_file"
+  run_deploy "$mode" "$@" >"$deploy_output_file" 2>&1 || deploy_status=$?
+  local deployment_url=""
+  deployment_url="$(parse_deployment_url_file "$deploy_output_file")"
+  rm -f "$deploy_output_file"
   if [ "$deploy_status" -eq 0 ]; then
-    echo "$deploy_output"
-    local deployment_url=""
-    deployment_url="$(parse_deployment_url "$deploy_output")"
     if [ -z "$deployment_url" ]; then
       echo "Deploy succeeded but no preview URL was found in Vercel output" >&2
       return 1
@@ -133,11 +136,10 @@ try_mode() {
     return 0
   fi
 
-  echo "$deploy_output"
   if [ "$deploy_status" -eq 124 ] || [ "$deploy_status" -eq 137 ]; then
     echo "Deploy attempt $attempt with ${mode} upload exceeded its time budget" >&2
     local accepted_deployment_url=""
-    accepted_deployment_url="$(parse_deployment_url "$deploy_output")"
+    accepted_deployment_url="$deployment_url"
     if [ -n "$accepted_deployment_url" ]; then
       write_deployment_url "$accepted_deployment_url"
       echo "Vercel accepted ${accepted_deployment_url}; downstream health gates will verify readiness"
@@ -149,6 +151,7 @@ try_mode() {
 
 plain_prebuilt_limit=15000
 plain_prebuilt_requested="${VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK:-false}"
+source_fallback_requested="${VERCEL_ENABLE_SOURCE_FALLBACK:-true}"
 force_source_deploy="${VERCEL_FORCE_SOURCE_DEPLOY:-false}"
 prebuilt_file_count="$(count_prebuilt_files)"
 has_prebuilt_output=true
@@ -174,7 +177,13 @@ resolve_vercel_cmd
 echo "Using Vercel CLI command: ${VERCEL_CMD[*]}"
 echo "Plain prebuilt fallback requested: $plain_prebuilt_requested"
 echo "Plain prebuilt fallback enabled: $can_use_plain_prebuilt"
+echo "Source fallback requested: $source_fallback_requested"
 echo "Force source deploy: $force_source_deploy"
+
+if [ "$force_source_deploy" = "true" ] && [ "$source_fallback_requested" != "true" ]; then
+  echo "Deploy failed: force-source and disabled source fallback are mutually exclusive." >&2
+  exit 1
+fi
 
 deploy_modes=()
 
@@ -186,7 +195,14 @@ if [ "$can_use_plain_prebuilt" = true ] && [ "$force_source_deploy" != "true" ];
   deploy_modes+=(plain)
 fi
 
-deploy_modes+=(source)
+if [ "$force_source_deploy" = "true" ] || [ "$source_fallback_requested" = "true" ]; then
+  deploy_modes+=(source)
+fi
+
+if [ "${#deploy_modes[@]}" -eq 0 ]; then
+  echo "Deploy failed: no prebuilt output is available and source fallback is disabled." >&2
+  exit 1
+fi
 total_attempts="${#deploy_modes[@]}"
 attempt=0
 

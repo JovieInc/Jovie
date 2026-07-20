@@ -25,7 +25,8 @@ export interface TouchTargetViolation {
 export const SCAN_DIRS = ['components', 'app'] as const;
 const EXTENSIONS = ['.tsx'];
 const SKIP_FRAGMENTS = ['.stories.', '.spec.', '.test.', '.storybook/'];
-const CANDIDATE_PATTERN = String.raw`(?:h|size)-(?:10(?:\.5)?|[0-9](?:\.5)?|\[(?:\d+(?:\.\d+)?)px\])`;
+const CANDIDATE_PATTERN = String.raw`(?:h|size)-(?:10(?:\.5)?|[0-9](?:\.5)?|\[(?:\d+(?:\.\d+)?)px\])(?:$|[^0-9.])`;
+const INTERACTIVE_CANDIDATE_PATTERN = String.raw`(?:<(?:button|a)(?:[\s/>])|role\s*=\s*["']button["'])`;
 const TRUSTED_RIPGREP_PATHS = [
   '/usr/bin/rg',
   '/usr/local/bin/rg',
@@ -101,25 +102,18 @@ export function resolveTrustedRipgrepPath(
   return TRUSTED_RIPGREP_PATHS.find(pathExists) ?? null;
 }
 
-export function runRipgrep(
+function runRipgrepPattern(
+  ripgrepPath: string,
   scanRoot: string,
-  resolveRipgrep: () => string | null = resolveTrustedRipgrepPath
+  pattern: string
 ): RipgrepResult {
-  const ripgrepPath = resolveRipgrep();
-  if (!ripgrepPath) {
-    return {
-      status: null,
-      stdout: '',
-      error: new Error('No trusted ripgrep binary found'),
-    };
-  }
-
   const result = spawnSync(
     ripgrepPath,
     [
       '--files-with-matches',
       '--sort',
       'path',
+      '--multiline',
       '--no-messages',
       '--no-ignore',
       '--glob',
@@ -137,7 +131,7 @@ export function runRipgrep(
       '--glob',
       '!**/.next/**',
       '--regexp',
-      CANDIDATE_PATTERN,
+      pattern,
       ...SCAN_DIRS,
     ],
     {
@@ -154,11 +148,63 @@ export function runRipgrep(
   };
 }
 
+function splitRipgrepFiles(stdout: string): string[] {
+  return stdout.split(/\r?\n/).filter(Boolean);
+}
+
+export function intersectRipgrepFileLists(
+  candidateStdout: string,
+  interactiveStdout: string
+): string[] {
+  const interactiveFiles = new Set(splitRipgrepFiles(interactiveStdout));
+  return [...new Set(splitRipgrepFiles(candidateStdout))]
+    .filter(file => interactiveFiles.has(file))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+export function runRipgrep(
+  scanRoot: string,
+  resolveRipgrep: () => string | null = resolveTrustedRipgrepPath
+): RipgrepResult {
+  const ripgrepPath = resolveRipgrep();
+  if (!ripgrepPath) {
+    return {
+      status: null,
+      stdout: '',
+      error: new Error('No trusted ripgrep binary found'),
+    };
+  }
+
+  const candidateResult = runRipgrepPattern(
+    ripgrepPath,
+    scanRoot,
+    CANDIDATE_PATTERN
+  );
+  if (candidateResult.status !== 0) return candidateResult;
+
+  const interactiveResult = runRipgrepPattern(
+    ripgrepPath,
+    scanRoot,
+    INTERACTIVE_CANDIDATE_PATTERN
+  );
+  if (interactiveResult.status !== 0) return interactiveResult;
+
+  const files = intersectRipgrepFileLists(
+    candidateResult.stdout,
+    interactiveResult.stdout
+  );
+
+  return {
+    status: files.length === 0 ? 1 : 0,
+    stdout: files.join('\n'),
+  };
+}
+
 /**
- * Use ripgrep to avoid opening every TSX file from JavaScript on a cold
- * checkout. Exit 1 is ripgrep's successful "no matches" result. A missing or
- * failed binary falls back to the complete Dirent walker so correctness never
- * depends on the optimization being available.
+ * Intersect ripgrep's height-token and interactive-opening file sets before
+ * JavaScript opens source files on a cold checkout. Exit 1 is ripgrep's
+ * successful "no matches" result. A missing or failed binary falls back to the
+ * complete Dirent walker so correctness never depends on the optimization.
  */
 export function findTouchTargetSourceFiles(
   scanRoot: string,

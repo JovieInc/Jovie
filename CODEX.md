@@ -1,8 +1,10 @@
 # Codex Setup Guide for Jovie
 
-This repo uses the shared Jovie setup and archive scripts for Codex. Keep Codex-specific files as thin wrappers so they cannot drift from `CLAUDE.md` (and its `AGENTS.md` symlink), the scoped rules under `.claude/rules/`, `conductor.json`, or the scripts humans run locally.
+Read and obey [`/canon/OPERATING_SYSTEM.md`](canon/OPERATING_SYSTEM.md) first. It defines how to think; this file defines Codex-specific setup and execution.
 
-Codex agents should treat `CLAUDE.md`/`AGENTS.md` as the canonical instruction prefix and keep task-specific context in the user prompt or invoked skills. Do not copy large gstack skill preambles into Codex-specific files; use the generated Codex skill output or the source `.tmpl` files when modifying the skill system.
+This repo uses the shared Jovie setup and archive scripts for Codex. Keep Codex-specific files as thin wrappers so they cannot drift from `/canon/OPERATING_SYSTEM.md`, `CLAUDE.md` (and its `AGENTS.md` symlink), the scoped rules under `.claude/rules/`, `conductor.json`, or the scripts humans run locally.
+
+Codex agents should treat `/canon/OPERATING_SYSTEM.md` plus `CLAUDE.md`/`AGENTS.md` as the canonical instruction prefix and keep task-specific context in the user prompt or invoked skills. Do not copy large gstack skill preambles into Codex-specific files; use the generated Codex skill output or the source `.tmpl` files when modifying the skill system.
 
 ## Automatic Local Setup
 

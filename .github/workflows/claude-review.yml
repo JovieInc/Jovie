@@ -1,11 +1,12 @@
 name: Claude Review (gbrain-aware)
 
-# High-signal PR review that uses the COLLECTIVE intelligence of the codebase +
-# company via gbrain (prior decisions, conventions, post-mortems) — not just the
-# single-PR diff. Posts as jovie-bot. Replaces SaaS review noise on real PRs.
+# Manual high-signal PR review that uses the COLLECTIVE intelligence of the
+# codebase + company via gbrain (prior decisions, conventions, post-mortems).
+# The automatic source-PR trigger is intentionally retired: source CI must be
+# deterministic and PR-controlled code must never run with review credentials.
 #
-# Skips drafts, bots, and mechanical codemods (big-pr / fix(design-system)) to
-# keep signal high and cost low.
+# Manual dispatch is the explicit cost/authority gate; the operator selects one
+# exact open, main-bound PR number.
 #
 # REQUIRED SECRETS (Tim to set — workflow runs without gbrain context until then,
 # and just notes gbrain was unavailable):
@@ -15,16 +16,22 @@ name: Claude Review (gbrain-aware)
 #                             reads to reach your brain backend; confirm the exact
 #                             env var name your `gbrain` build expects)
 
+run-name: Claude Review PR #${{ inputs.pr_number }}
+
 on:
-  pull_request:
-    types: [opened, ready_for_review, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Open main-bound PR number to review
+        required: true
+        type: string
 
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
 
 concurrency:
-  group: claude-review-${{ github.event.pull_request.number }}
+  group: claude-review-${{ inputs.pr_number }}
   cancel-in-progress: true
 
 jobs:
@@ -34,25 +41,133 @@ jobs:
     # self-hosted fast pool does not guarantee those image prerequisites.
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Real PRs only: skip drafts, dependabot, and mechanical codemods.
-    if: >-
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.user.login != 'dependabot[bot]' &&
-      github.event.pull_request.user.login != 'jovie-bot[bot]' &&
-      !contains(github.event.pull_request.labels.*.name, 'big-pr') &&
-      !startsWith(github.event.pull_request.title, 'fix(design-system)')
+    # Dispatch from the protected default branch so the workflow definition and
+    # inline bundle builder are trusted. PR head objects are fetched as data only.
+    if: github.ref == 'refs/heads/main'
     steps:
-      - name: Generate Jovie Bot token
-        id: app-token
+      - name: Generate read-only Jovie Bot review token
+        id: review-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: read
 
-      - name: Checkout
+      - name: Resolve exact open PR metadata
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.review-token.outputs.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::pr_number must be a positive integer"
+            exit 1
+          }
+          pr_json="$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")"
+          jq -e \
+            --arg repository "$REPOSITORY" \
+            '.state == "open" and
+             .base.ref == "main" and
+             .base.repo.full_name == $repository and
+             (.base.sha | test("^[0-9a-f]{40}$")) and
+             (.head.sha | test("^[0-9a-f]{40}$"))' \
+            <<<"$pr_json" >/dev/null || {
+              echo "::error::PR must be open, target main, and expose exact base/head SHAs"
+              exit 1
+            }
+          echo "base_sha=$(jq -r '.base.sha' <<<"$pr_json")" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$(jq -r '.head.sha' <<<"$pr_json")" >> "$GITHUB_OUTPUT"
+          echo "base_branch=$(jq -r '.base.ref' <<<"$pr_json")" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact trusted base
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
+          ref: ${{ steps.pr.outputs.base_sha }}
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch exact PR head as data only
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          head_ref="refs/remotes/origin/manual-review-$PR_NUMBER"
+          git fetch --no-tags origin \
+            "+refs/pull/$PR_NUMBER/head:$head_ref"
+          test "$(git rev-parse "$head_ref")" = "$EXPECTED_HEAD_SHA"
+
+      - name: Build bounded review bundle
+        id: review-bundle
+        env:
+          BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          BASE_BRANCH: ${{ steps.pr.outputs.base_branch }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          MERGE_TRIGGER: workflow_dispatch
+        run: |
+          BUNDLE_DIR="$GITHUB_WORKSPACE/.claude-review-input"
+          test ! -L "$BUNDLE_DIR"
+          install -d -m 700 "$BUNDLE_DIR"
+          BUNDLE_PATH="$BUNDLE_DIR/review-bundle.md"
+          export BUNDLE_PATH
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+
+          base_sha = os.environ["BASE_SHA"]
+          head_sha = os.environ["HEAD_SHA"]
+          diff_range = f"{base_sha}...{head_sha}"
+          max_diff_bytes = 120_000
+          test_path = re.compile(r"(^|/)(test|tests|__tests__|fixtures|mocks)(/|$)|(^|/).*\.(test|spec)\.[^.]+$")
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True)
+
+          changed_files = git("diff", "--name-only", "--diff-filter=ACMRD", diff_range).splitlines()
+          non_test_loc = 0
+          for row in git("diff", "--numstat", "--diff-filter=ACMRD", diff_range).splitlines():
+              added, deleted, path = row.split("\t", 2)
+              if not test_path.search(path):
+                  non_test_loc += sum(int(value) for value in (added, deleted) if value.isdigit())
+
+          diff = subprocess.check_output([
+              "git", "--no-pager", "diff", "--no-ext-diff", "--no-color",
+              "--unified=40", "--binary", diff_range,
+          ])
+          truncated = len(diff) > max_diff_bytes
+          if truncated:
+              diff = diff[:max_diff_bytes] + b"\n\n[review bundle diff truncated at 120000 bytes]\n"
+
+          metadata = {
+              "bundle_version": 1,
+              "pr_number": os.environ["PR_NUMBER"],
+              "base_branch": os.environ["BASE_BRANCH"],
+              "base_sha": base_sha,
+              "head_sha": head_sha,
+              "merge_trigger": os.environ["MERGE_TRIGGER"],
+              "changed_files": changed_files,
+              "non_test_loc": non_test_loc,
+              "blame_pr": os.environ.get("PR_NUMBER") or "unavailable",
+              "blame_commit": head_sha or "unavailable",
+              "diff_context_lines": 40,
+              "diff_max_bytes": max_diff_bytes,
+              "diff_truncated": truncated,
+          }
+          with open(os.environ["BUNDLE_PATH"], "wb") as bundle:
+              bundle.write(b"# Jovie structured review bundle\n")
+              bundle.write(json.dumps(metadata, indent=2, sort_keys=True).encode())
+              bundle.write(b"\n\n## Normalized diff\n\n")
+              bundle.write(diff)
+          print(f"Review bundle: {os.environ['BUNDLE_PATH']}")
+          print(f"Changed files: {len(changed_files)}; non-test LOC: {non_test_loc}; diff truncated: {truncated}")
+          PY
+          echo "path=$BUNDLE_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Set up Bun (for gbrain CLI/MCP)
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -78,27 +193,31 @@ jobs:
             echo "::warning::gbrain unreachable — review will run WITHOUT collective context."
           fi
 
+      - name: Build trusted gbrain MCP config
+        run: |
+          set -euo pipefail
+          umask 077
+          jq -n \
+            '{mcpServers:{gbrain:{command:"bunx",args:["gbrain","serve"],env:{GBRAIN_CONNECTION:"${GBRAIN_CONNECTION}"}}}}' \
+            > "$RUNNER_TEMP/gbrain-mcp.json"
+          chmod 600 "$RUNNER_TEMP/gbrain-mcp.json"
+
       - name: Claude review
-        continue-on-error: true
+        id: claude
         uses: anthropics/claude-code-action@e90deca47693f9457b72f2b53c17d7c445a87342 # v1
         env:
           GBRAIN_CONNECTION: ${{ secrets.GBRAIN_CONNECTION }}
         with:
-          github_token: ${{ steps.app-token.outputs.token }}
+          github_token: ${{ steps.review-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: 'jovie-bot[bot],github-merge-queue[bot]'
-          mcp_config: |
-            {
-              "mcpServers": {
-                "gbrain": {
-                  "command": "bunx",
-                  "args": ["gbrain", "serve"],
-                  "env": { "GBRAIN_CONNECTION": "${{ secrets.GBRAIN_CONNECTION }}" }
-                }
-              }
-            }
+          claude_args: |
+            --max-turns 8
+            --mcp-config "${{ runner.temp }}/gbrain-mcp.json"
+            --allowedTools "Read,Glob,Grep,mcp__gbrain__query,mcp__gbrain__search"
+            --json-schema '{"type":"object","properties":{"review_markdown":{"type":"string","maxLength":20000}},"required":["review_markdown"],"additionalProperties":false}'
           prompt: |
-            You are reviewing PR #${{ github.event.pull_request.number }} in JovieInc/Jovie. Review as jovie-bot.
+            You are reviewing PR #${{ inputs.pr_number }} in JovieInc/Jovie. Review as jovie-bot.
 
             COLLECTIVE CONTEXT FIRST: if the gbrain MCP tools are available
             (mcp__gbrain__query / mcp__gbrain__search), query them for prior
@@ -107,13 +226,33 @@ jobs:
             knowledge of the WHOLE codebase and company — not just this diff. If
             gbrain is unavailable, say so in one line and review from the diff alone.
 
-            Then review the diff (use `gh pr diff ${{ github.event.pull_request.number }}`) for, in priority order:
+            Then review the exact normalized diff in the bounded bundle at
+            `${{ steps.review-bundle.outputs.path }}`. It includes deterministic
+            provenance metadata (PR/base/head/blame commit, changed files, and
+            non-test LOC) followed by the diff. The bundle is the authoritative
+            PR-head input. Do not run `gh`, fetch another ref, or substitute a
+            different diff; use Read/Glob/Grep only against the trusted base and
+            the exact bundle.
             1. Correctness bugs and regressions.
             2. Security / auth / data-loss risks.
             3. Violations of an established decision or convention — CITE the gbrain
                source (page/slug) when you flag one. This is the unique value: catch
                things a single-PR reviewer can't know.
             4. Missing tests on non-trivial logic.
+
+            SCOPE GOVERNOR — classify every accepted finding before proposing a fix:
+            - `in-scope blocker`: a correctness, security, data-loss, or regression
+              issue directly in the PR's original files and intent that must be fixed.
+            - `follow-up`: valid but non-blocking work that can be deferred safely.
+            - `stop-and-escalate`: out-of-scope, ambiguous/high-risk work, or a decision
+              that needs a maintainer rather than an automatic patch.
+            Label every accepted finding with exactly one of those strings. Do not
+            silently turn a follow-up or stop-and-escalate finding into a patch.
+
+            SCOPE BUDGET: Treat the bundle's current changed-file count and non-test
+            LOC as the review boundary. Do not propose edits outside those files;
+            classify out-of-bound work as `stop-and-escalate`. Test-only additions
+            needed to verify an in-scope fix do not count as non-test LOC.
 
             BE HIGH-SIGNAL — this must not become noise:
             - Only comment on things that genuinely matter. No nitpicks, no style
@@ -122,5 +261,91 @@ jobs:
               line saying so.
             - Defer taste/UX/product/copy judgments to human reviewers — do not opine on those.
 
-            Post ONE concise PR review. Each finding: file:line, the issue, why it
-            matters (cite gbrain if relevant), and a concrete fix.
+            Prepare ONE concise PR review. Start with a `Scope governor` line stating
+            the current files/non-test LOC boundary. Each accepted finding must include:
+            `Classification: in-scope blocker|follow-up|stop-and-escalate`, plus
+            file:line, the issue, why it matters (cite gbrain if relevant), and a
+            concrete fix only when its classification permits one.
+
+            SECURITY SUPPRESSION AUDIT: never silently suppress a security finding.
+            If you intentionally suppress one, include this exact machine-readable
+            marker in the review body and keep the human-readable reason next to it:
+            <!-- jovie-security-suppression {"type":"<finding type>","reason":"<why it is accepted>"} -->
+            Suppressed findings must remain auditable by type and author; do not use
+            a generic summary that hides unrelated active security findings.
+
+            Do not post or mutate GitHub. Return the complete review only in the
+            structured `review_markdown` field. A trusted bounded step publishes it.
+
+      - name: Generate Jovie Bot publisher token
+        id: publisher-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: write
+
+      - name: Publish exact bounded PR review
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          EXPECTED_HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          REPOSITORY: ${{ github.repository }}
+          STRUCTURED_OUTPUT: ${{ steps.claude.outputs.structured_output }}
+        with:
+          github-token: ${{ steps.publisher-token.outputs.token }}
+          script: |
+            const raw = process.env.STRUCTURED_OUTPUT ?? '';
+            let output;
+            try {
+              output = JSON.parse(raw);
+            } catch (error) {
+              core.setFailed(`Claude returned invalid structured review JSON: ${error.message}`);
+              return;
+            }
+            const keys = Object.keys(output ?? {});
+            const body = output?.review_markdown;
+            if (
+              keys.length !== 1 ||
+              keys[0] !== 'review_markdown' ||
+              typeof body !== 'string' ||
+              body.trim().length === 0 ||
+              body.length > 20_000
+            ) {
+              core.setFailed('Claude review output violates the bounded review schema.');
+              return;
+            }
+
+            const [owner, repo] = process.env.REPOSITORY.split('/');
+            const pullNumber = Number(process.env.PR_NUMBER);
+            const expectedHead = process.env.EXPECTED_HEAD_SHA;
+            const { data: pull } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: pullNumber,
+            });
+            if (
+              pull.state !== 'open' ||
+              pull.base.ref !== 'main' ||
+              pull.base.repo.full_name !== process.env.REPOSITORY ||
+              pull.head.sha !== expectedHead
+            ) {
+              core.setFailed('PR changed after review input capture; refusing a stale publication.');
+              return;
+            }
+            await github.rest.pulls.createReview({
+              owner,
+              repo,
+              pull_number: pullNumber,
+              commit_id: expectedHead,
+              body: body.trim(),
+              event: 'COMMENT',
+            });
+
+      - name: Remove trusted review inputs
+        if: always()
+        run: |
+          rm -f "${RUNNER_TEMP:?}/gbrain-mcp.json"
+          rm -f "${GITHUB_WORKSPACE:?}/.claude-review-input/review-bundle.md"
+          rmdir "${GITHUB_WORKSPACE:?}/.claude-review-input" 2>/dev/null || true

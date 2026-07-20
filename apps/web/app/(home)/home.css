@@ -4766,7 +4766,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .system-b-mounted-home-workspace-callout
   .system-b-mounted-home-workspace-callout-label {
-  color: var(--color-text-tertiary-token);
+  color: var(--color-text-secondary-token);
 }
 
 .system-b-mounted-home-workspace-callout
@@ -4778,7 +4778,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .system-b-mounted-home-workspace-callout
   .system-b-mounted-home-workspace-callout-body {
-  color: var(--color-text-tertiary-token);
+  color: var(--color-text-secondary-token);
   font-size: var(--text-sm);
 }
 

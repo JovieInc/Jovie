@@ -91,7 +91,7 @@ vi.mock('@/components/jovie/components', () => ({
   }) => (
     <form onSubmit={onSubmit}>
       <textarea
-        aria-label='Chat message input'
+        aria-label='Chat Message Input'
         value={value}
         onChange={event => onChange(event.currentTarget.value)}
       />
@@ -286,7 +286,7 @@ describe('OnboardingChat Turnstile gating', () => {
       />
     );
 
-    expect(screen.getByLabelText('Chat message input')).toHaveValue(
+    expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
       'Hey, I want to get access to Jovie.'
     );
     expect(screen.getByTestId('onboarding-turnstile-slot')).toHaveClass(
@@ -308,7 +308,7 @@ describe('OnboardingChat Turnstile gating', () => {
       />
     );
 
-    const input = screen.getByLabelText('Chat message input');
+    const input = screen.getByLabelText('Chat Message Input');
     fireEvent.change(input, { target: { value: 'help me launch a song' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
 
@@ -333,7 +333,7 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(chatMocks.sendMessage).toHaveBeenCalledWith({
       text: 'Hey, I want to get access to Jovie.',
     });
-    expect(screen.getByLabelText('Chat message input')).toHaveValue('');
+    expect(screen.getByLabelText('Chat Message Input')).toHaveValue('');
   });
 
   it('waits for runtime automation bypass before starter auto-submit', async () => {
@@ -371,7 +371,7 @@ describe('OnboardingChat Turnstile gating', () => {
       );
     });
 
-    const input = screen.getByLabelText('Chat message input');
+    const input = screen.getByLabelText('Chat Message Input');
     fireEvent.change(input, { target: { value: 'Edited access request' } });
 
     rerender(
@@ -469,7 +469,7 @@ describe('OnboardingChat Turnstile gating', () => {
       <TurnstileHarness initialToken='token-1' resetTokenOnRejected={false} />
     );
 
-    const input = screen.getByLabelText('Chat message input');
+    const input = screen.getByLabelText('Chat Message Input');
     fireEvent.change(input, { target: { value: 'I am Test Artist' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
 
@@ -517,7 +517,7 @@ describe('OnboardingChat Turnstile gating', () => {
       },
     ];
 
-    const input = screen.getByLabelText('Chat message input');
+    const input = screen.getByLabelText('Chat Message Input');
     fireEvent.change(input, { target: { value: 'I am Test Artist' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
 
@@ -533,7 +533,7 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(chatMocks.setMessages).toHaveBeenCalled();
     expect(chatMocks.messages).toEqual([]);
     expect(onTurnstileRejected).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('Chat message input')).toHaveValue(
+    expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
       'I am Test Artist'
     );
   });
@@ -578,7 +578,7 @@ describe('OnboardingChat Turnstile gating', () => {
 
     render(<TokenRefreshHarness />);
 
-    const input = screen.getByLabelText('Chat message input');
+    const input = screen.getByLabelText('Chat Message Input');
     fireEvent.change(input, { target: { value: 'I am Test Artist' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
 
@@ -613,14 +613,14 @@ describe('OnboardingChat Turnstile gating', () => {
       />
     );
 
-    const input = screen.getByLabelText('Chat message input');
+    const input = screen.getByLabelText('Chat Message Input');
     fireEvent.change(input, { target: { value: 'I am Test Artist' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
 
     expect(chatMocks.sendMessage).toHaveBeenCalledWith({
       text: 'I am Test Artist',
     });
-    expect(screen.getByLabelText('Chat message input')).toHaveValue('');
+    expect(screen.getByLabelText('Chat Message Input')).toHaveValue('');
 
     errorMocks.metadata = {
       errorCode: 'TURNSTILE_REQUIRED',
@@ -632,7 +632,7 @@ describe('OnboardingChat Turnstile gating', () => {
     });
 
     expect(onTurnstileRejected).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('Chat message input')).toHaveValue(
+    expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
       'I am Test Artist'
     );
     expect(screen.getByText('Verify you are human to send')).toBeVisible();
@@ -641,7 +641,7 @@ describe('OnboardingChat Turnstile gating', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry message' }));
 
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('Chat message input')).toHaveValue(
+    expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
       'I am Test Artist'
     );
     expect(onTurnstileRequired).toHaveBeenCalledWith(

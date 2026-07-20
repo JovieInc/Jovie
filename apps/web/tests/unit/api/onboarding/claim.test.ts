@@ -49,13 +49,6 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-vi.mock('@/lib/db/schema/auth', () => ({
-  users: {
-    id: 'users.id',
-    clerkId: 'users.clerk_id',
-  },
-}));
-
 vi.mock('@/lib/db/schema/chat', () => ({
   chatConversations: {
     id: 'chat_conversations.id',
@@ -109,13 +102,6 @@ function makeRequest(): Request {
     method: 'POST',
     headers: { 'user-agent': 'test-agent/1.0' },
   });
-}
-
-function setupDbSelectForUsers(userId: string | null) {
-  const limit = vi.fn().mockResolvedValue(userId ? [{ id: userId }] : []);
-  const where = vi.fn().mockReturnValue({ limit });
-  const from = vi.fn().mockReturnValue({ where });
-  mockDbSelect.mockReturnValueOnce({ from });
 }
 
 function setupDbSelectForCandidates(
@@ -173,7 +159,11 @@ function pickPrimaryAndOthers<T extends { createdAt: Date }>(
 describe('POST /api/onboarding/claim — race, idempotency, failure paths', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_user_123' });
+    mockGetCachedAuth.mockResolvedValue({
+      userId: '3a53ba3e-150c-4ab5-8e73-2d2499764e2c',
+      sessionId: 'ba_session_123',
+      orgId: null,
+    });
     mockGetCurrentOnboardingSessionId.mockResolvedValue('sess_abc123');
     mockExtractClientIP.mockReturnValue('10.0.0.1');
     mockMaterializeClaimedOnboardingProfile.mockResolvedValue({
@@ -184,12 +174,31 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
   });
 
   it('returns 401 when unauthenticated', async () => {
-    mockGetCachedAuth.mockResolvedValue({ userId: null });
+    mockGetCachedAuth.mockResolvedValue({
+      userId: null,
+      sessionId: null,
+      orgId: null,
+    });
     const res = await POST(makeRequest());
     expect(res.status).toBe(401);
     const json = await res.json();
     expect(json.errorCode).toBe('UNAUTHORIZED');
     expect(mockGetCurrentOnboardingSessionId).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when a Better Auth session has no provisioned app user', async () => {
+    mockGetCachedAuth.mockResolvedValue({
+      userId: null,
+      sessionId: 'ba_session_without_app_user',
+      orgId: null,
+    });
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({ errorCode: 'UNAUTHORIZED' });
+    expect(mockGetCurrentOnboardingSessionId).not.toHaveBeenCalled();
+    expect(mockDbSelect).not.toHaveBeenCalled();
   });
 
   it('returns {claimed: 0} (no-op) when no onboarding session cookie', async () => {
@@ -200,15 +209,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
   });
 
-  it('returns retryAfterWebhook when Clerk user not yet mirrored in DB (webhook race)', async () => {
-    setupDbSelectForUsers(null); // no userRow
-    const res = await POST(makeRequest());
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ claimed: 0, retryAfterWebhook: true });
-  });
-
   it('clears cookie and returns {claimed:0} when no unclaimed conversations for session', async () => {
-    setupDbSelectForUsers('user_db_1');
     setupDbSelectForCandidates([]); // none
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
@@ -217,7 +218,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
   });
 
   it('claims the single (most recent) candidate, writes audit, clears cookie, returns claimed count', async () => {
-    setupDbSelectForUsers('user_db_1');
+    const appUserId = '3a53ba3e-150c-4ab5-8e73-2d2499764e2c';
     setupDbSelectForCandidates([
       { id: 'conv_1', createdAt: new Date('2026-05-01') },
     ]);
@@ -233,12 +234,20 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
     expect(mockDbUpdate).toHaveBeenCalled();
     expect(mockDbInsert).toHaveBeenCalled();
+    expect(mockDbUpdate.mock.results[0]?.value.set).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: appUserId })
+    );
+    expect(mockDbInsert.mock.results[0]?.value.values).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: appUserId, newValue: appUserId })
+    );
+    expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: appUserId })
+    );
     // ip/ua passed via extract
     expect(mockExtractClientIP).toHaveBeenCalled();
   });
 
   it('handles multiple candidates: claims primary (recency order), detaches siblings, writes audit with discarded list', async () => {
-    setupDbSelectForUsers('user_db_1');
     const c1 = { id: 'old_1', createdAt: new Date('2026-04-01') };
     const c2 = { id: 'newer', createdAt: new Date('2026-05-01') };
     setupDbSelectForCandidates([c2, c1]); // desc order: primary = newer
@@ -256,7 +265,6 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
   });
 
   it('idempotent on concurrent claim race: CAS returns 0 rows → soft success with alreadyClaimed, clears cookie', async () => {
-    setupDbSelectForUsers('user_db_1');
     setupDbSelectForCandidates([{ id: 'conv_1', createdAt: new Date() }]);
     setupUpdateForPrimary(0); // race lost
     const res = await POST(makeRequest());
@@ -271,7 +279,6 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
   });
 
   it('returns 409 SESSION_ALREADY_CLAIMED on unique constraint violation (session claimed by different user)', async () => {
-    setupDbSelectForUsers('user_db_1');
     setupDbSelectForCandidates([{ id: 'conv_1', createdAt: new Date() }]);
     setupUpdateForPrimary(1);
     setupInsertAudit(false); // throws unique
@@ -386,9 +393,12 @@ describe('claim route invariants (property tests for recency, idempotency, data 
         ),
         async msg => {
           vi.clearAllMocks();
-          mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_user_123' });
+          mockGetCachedAuth.mockResolvedValue({
+            userId: '3a53ba3e-150c-4ab5-8e73-2d2499764e2c',
+            sessionId: 'ba_session_property',
+            orgId: null,
+          });
           mockGetCurrentOnboardingSessionId.mockResolvedValue('sess_409_prop');
-          setupDbSelectForUsers('user_1');
           setupDbSelectForCandidates([{ id: 'c1', createdAt: new Date() }]);
           setupUpdateForPrimary(1);
           const values = vi.fn().mockRejectedValue(new Error(msg));

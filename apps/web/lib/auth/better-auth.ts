@@ -30,11 +30,20 @@ import {
 import { env } from '@/lib/env';
 import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
 import { generateAppleClientSecret } from './apple-client-secret';
-import { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
+import { oauthProviderErrorReturn } from './oauth-provider-error-return';
+import { provisionAppUser } from './provision';
+import {
+  AUTH_RATE_LIMIT_RULES,
+  isDeterministicTestOtpEmail,
+} from './rate-limit-rules';
 import { secondaryStorage } from './secondary-storage';
 
-export { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
+export {
+  AUTH_RATE_LIMIT_RULES,
+  isDeterministicTestOtpEmail,
+} from './rate-limit-rules';
 
 /**
  * Better Auth server instance (Clerk → Better Auth migration; see
@@ -46,23 +55,6 @@ export { AUTH_RATE_LIMIT_RULES } from './rate-limit-rules';
  */
 
 export const DETERMINISTIC_TEST_OTP = '424242';
-
-/**
- * Deterministic E2E OTP gate (triple-guarded, plan security row 11):
- * requires E2E_TEST_MODE=1, hard-blocked on production deploys, and only for
- * the repo's canonical test-email shapes (`…+e2e…@` / `…+clerk_test…@`,
- * optionally with a trailing `+suffix` segment as used by
- * tests/helpers/clerk-auth.ts).
- */
-const TEST_OTP_EMAIL_PATTERN = /\+(e2e|clerk_test)(\+[^@]*)?@/i;
-
-export function isDeterministicTestOtpEmail(email: string): boolean {
-  return (
-    env.E2E_TEST_MODE === '1' &&
-    env.VERCEL_ENV !== 'production' &&
-    TEST_OTP_EMAIL_PATTERN.test(email)
-  );
-}
 
 /**
  * Trusted origins: production + staging + local dev + native deep-link
@@ -102,9 +94,47 @@ function resolveSecret(): string | undefined {
     : NON_PRODUCTION_FALLBACK_SECRET;
 }
 
-function resolveBaseUrl(): string | undefined {
-  if (env.BETTER_AUTH_URL) return env.BETTER_AUTH_URL;
-  return env.VERCEL_URL ? `https://${env.VERCEL_URL}` : undefined;
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+function resolveLocalBetterAuthUrl(): URL | undefined {
+  if (
+    env.VERCEL_ENV === 'preview' ||
+    env.VERCEL_ENV === 'production' ||
+    !env.BETTER_AUTH_URL
+  ) {
+    return undefined;
+  }
+
+  const configuredUrl = new URL(env.BETTER_AUTH_URL);
+  return LOOPBACK_HOSTNAMES.has(configuredUrl.hostname)
+    ? configuredUrl
+    : undefined;
+}
+
+function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
+  const localBetterAuthUrl = resolveLocalBetterAuthUrl();
+
+  return {
+    allowedHosts: [
+      ...new Set(
+        [
+          'jov.ie',
+          'www.jov.ie',
+          'staging.jov.ie',
+          'localhost:3100',
+          localBetterAuthUrl?.host,
+          env.VERCEL_URL,
+          env.VERCEL_BRANCH_URL,
+        ].filter((host): host is string => Boolean(host))
+      ),
+    ],
+    protocol:
+      localBetterAuthUrl?.protocol === 'http:' ||
+      env.VERCEL_ENV === 'development' ||
+      (!env.VERCEL_ENV && env.NODE_ENV !== 'production')
+        ? 'http'
+        : 'https',
+  };
 }
 
 /** Providers are included only when their credentials exist (env-gated). */
@@ -210,6 +240,7 @@ function buildPlugins() {
       storeTokens: 'hashed',
       cachedTrustedClients: new Set(['logyourbody-ios', 'logyourbody-web']),
     }) as BetterAuthPlugin,
+    oauthProviderErrorReturn(),
     oneTimeToken({
       expiresIn: 5,
       disableClientRequest: true,
@@ -263,6 +294,40 @@ export const auth = betterAuth({
     customRules: AUTH_RATE_LIMIT_RULES,
   },
   trustedOrigins: () => resolveTrustedOrigins(),
+  databaseHooks: {
+    user: {
+      create: {
+        after: async user => {
+          try {
+            await provisionAppUser({
+              betterAuthUserId: user.id,
+              email: user.email,
+              emailVerified: user.emailVerified,
+              name: user.name,
+            });
+          } catch (error) {
+            // provisionAppUser never throws by contract; this is
+            // belt-and-braces so the auth callback can never fail here.
+            // gate.ts lazy-create heals on the next request.
+            try {
+              logger.error('[auth] provision hook failed', error);
+              await captureError('Better Auth provision hook failed', error, {
+                betterAuthUserId: user.id,
+                operation: 'databaseHooks.user.create.after',
+              });
+            } catch (telemetryError) {
+              // Telemetry must never turn the fail-open repair path into an
+              // auth failure. The next request still heals through gate.ts.
+              console.error(
+                '[auth] provision hook telemetry failed',
+                telemetryError
+              );
+            }
+          }
+        },
+      },
+    },
+  },
   telemetry: { enabled: false },
   plugins: buildPlugins(),
 });

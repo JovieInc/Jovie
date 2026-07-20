@@ -21,6 +21,34 @@ def require_env!(name)
   value
 end
 
+def verify_release_sha_is_current_main!
+  release_sha = require_env!("RELEASE_SHA")
+  repository = require_env!("GITHUB_REPOSITORY")
+  github_token = require_env!("GH_TOKEN")
+
+  unless release_sha.match?(/\A[0-9a-f]{40}\z/) &&
+         repository.match?(%r{\A[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\z})
+    UI.user_error!("Malformed TestFlight release identity")
+  end
+
+  current_main_sha, status = Open3.capture2e(
+    { "GH_TOKEN" => github_token },
+    "gh",
+    "api",
+    "repos/#{repository}/commits/main",
+    "--jq",
+    ".sha // empty"
+  )
+  UI.user_error!("Unable to resolve current main before TestFlight upload") unless status.success?
+
+  current_main_sha = current_main_sha.strip
+  unless current_main_sha == release_sha
+    UI.user_error!(
+      "TestFlight generation #{release_sha} was superseded by #{current_main_sha} before upload"
+    )
+  end
+end
+
 def env_present?(name)
   !ENV[name].to_s.strip.empty?
 end
@@ -82,7 +110,6 @@ end
 def write_ios_configuration(
   api_base_url:,
   web_base_url:,
-  clerk_publishable_key:,
   sentry_dsn: "",
   observability_environment: "development"
 )
@@ -90,7 +117,6 @@ def write_ios_configuration(
     [
       "API_BASE_URL=#{api_base_url.shellescape}",
       "WEB_BASE_URL=#{web_base_url.shellescape}",
-      "CLERK_PUBLISHABLE_KEY=#{clerk_publishable_key.shellescape}",
       "JOVIE_IOS_SENTRY_DSN=#{sentry_dsn.shellescape}",
       "JOVIE_IOS_OBSERVABILITY_ENVIRONMENT=#{observability_environment.shellescape}",
       "bash #{repo_path("apps/ios/scripts/write-configuration.sh").shellescape}"
@@ -209,7 +235,6 @@ platform :ios do
     require_match_git_auth!
 
     clerk_domain = require_env!("CLERK_ASSOCIATED_DOMAIN")
-    clerk_publishable_key = require_env!("CLERK_PUBLISHABLE_KEY")
     api_base_url = ENV.fetch("API_BASE_URL", "https://jov.ie")
     web_base_url = ENV.fetch("WEB_BASE_URL", "https://jov.ie")
     sentry_dsn = ENV.fetch("JOVIE_IOS_SENTRY_DSN", ENV.fetch("SENTRY_DSN", ""))
@@ -222,16 +247,12 @@ platform :ios do
     write_ios_configuration(
       api_base_url: api_base_url,
       web_base_url: web_base_url,
-      clerk_publishable_key: clerk_publishable_key,
       sentry_dsn: sentry_dsn,
       observability_environment: observability_environment
     )
 
-    # Re-validate the WRITTEN configuration artifact (not just the env var
-    # checked pre-flight by validate-testflight-env.sh). Closes the drift
-    # window where write-configuration.sh's own fallback chain, or a stale
-    # cached Configuration.local.plist, could embed a non-live key that the
-    # earlier env-only check never saw.
+    # Re-validate the WRITTEN production endpoints and reject stale artifacts
+    # that still embed the retired Clerk client key.
     sh("bash #{repo_path("apps/ios/scripts/validate-testflight-artifact.sh").shellescape}")
 
     setup_ci if ENV["CI"].to_s.downcase == "true"
@@ -286,6 +307,10 @@ platform :ios do
         }
       }
     )
+
+    # Archive work may overlap a newer main generation. Fail closed at the last
+    # safe boundary so a stale binary never reaches App Store Connect.
+    verify_release_sha_is_current_main!
 
     upload_to_testflight(
       api_key: api_key,

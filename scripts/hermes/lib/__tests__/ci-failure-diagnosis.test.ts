@@ -2,6 +2,117 @@ import { describe, expect, it } from 'vitest';
 import { diagnoseCiFailure } from '../../jobs/ci-failure-diagnosis';
 
 describe('diagnoseCiFailure', () => {
+  it('diagnoses required smoke suppressed by a skipped prerequisite without recommending a blind rerun', () => {
+    const diagnosis = diagnoseCiFailure(`PR Ready
+ci-risk-classifier: success (high; rules: auth-identity)
+ci-build-public: success (has_artifact=true)
+neon-db: skipped
+ci-e2e-smoke: skipped
+E2E Smoke (PR Fast Feedback) was required for this PR, but result was skipped`);
+
+    expect(diagnosis.failureClass).toBe(
+      'required_smoke_suppressed_by_dependency_skip'
+    );
+    expect(diagnosis.rootCause).toContain('prerequisite skipped');
+    expect(diagnosis.remediation).toContain('Do not rerun');
+    expect(diagnosis.remediation).toContain('always()');
+  });
+
+  it.each([
+    ['success (has_artifact=false)', 'skipped'],
+    ['success (has_artifact=true)', 'failure'],
+  ])('does not blame implicit skip propagation when build=%s and Neon=%s', (build, neon) => {
+    expect(
+      diagnoseCiFailure(`ci-build-public: ${build}
+neon-db: ${neon}
+ci-e2e-smoke: skipped
+E2E Smoke (PR Fast Feedback) was required for this PR, but result was skipped`)
+        .failureClass
+    ).toBe('unknown');
+  });
+
+  it('diagnoses the paired Storybook setup-import and iframe transport failure', () => {
+    const diagnosis = diagnoseCiFailure(`Complete job name: Storybook A11y
+storybook (chromium) components/atoms/AvatarUploadOverlay.stories.tsx
+Error: Failed to import test file /work/apps/web/.storybook/vitest.setup.ts
+Caused by: TypeError: Failed to fetch dynamically imported module: http://localhost:63315/work/apps/web/.storybook/vitest.setup.ts?import
+Error: Cannot connect to the iframe.
+Received URL: unknown due to CORS
+Test Files 1 failed | 37 passed | 1 skipped (121)
+Tests 289 passed (289)`);
+
+    expect(diagnosis.failureClass).toBe('storybook_browser_iframe_transport');
+    expect(diagnosis.rootCause).toContain('localhost Vitest iframe transport');
+    expect(diagnosis.remediation).toContain(
+      'one targeted Storybook A11y rerun'
+    );
+    expect(diagnosis.remediation).toContain('browser process');
+  });
+
+  it.each([
+    `storybook (chromium)\nFailed to import test file .storybook/vitest.setup.ts\nError [ERR_UNKNOWN_BUILTIN_MODULE]: No such built-in module: node:crypto`,
+    `Storybook A11y\nStorybook packages must use matching versions\n37 passed\n289 passed`,
+    `storybook (chromium)\nCannot connect to the iframe\nReceived URL: unknown due to CORS`,
+  ])('does not infer iframe transport from a partial Storybook signature', log => {
+    expect(diagnoseCiFailure(log).failureClass).toBe('unknown');
+  });
+
+  it('separates Lighthouse protocol transport exhaustion from product assertions', () => {
+    const diagnosis = diagnoseCiFailure(`Lighthouse CI (Production)
+PROTOCOL_TIMEOUT: Waiting for DevTools protocol response has exceeded the allotted time
+pending method: DOMSnapshot.disable
+LIGHTHOUSE_FAILURE_CLASS=transient_protocol LIGHTHOUSE_ATTEMPT=3/3`);
+
+    expect(diagnosis.failureClass).toBe('lighthouse_protocol_timeout');
+    expect(diagnosis.rootCause).toContain('Chrome DevTools protocol');
+    expect(diagnosis.remediation).toContain('bounded transient retry');
+  });
+
+  it('stops Lighthouse assertion failures without retrying', () => {
+    const diagnosis = diagnoseCiFailure(`Lighthouse (public routes PR)
+assertion failure for color-contrast: expected score of at least 1, but got 0
+LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
+
+    expect(diagnosis.failureClass).toBe('lighthouse_deterministic_assertion');
+    expect(diagnosis.remediation).toContain('Do not retry');
+  });
+
+  it('diagnoses the seeded-profile loopback origin drift before the generic assertion class', () => {
+    const diagnosis = diagnoseCiFailure(`BASE_URL: http://127.0.0.1:3000
+Network: http://0.0.0.0:3000
+2 result(s) for http://127.0.0.1:3000/testartist?mode=subscribe :
+categories.best-practices failure for minScore assertion
+expected: >=0.9
+found: 0.78
+errors-in-console warning for minScore assertion
+Assertion failed. Exiting with status code 1.
+LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
+
+    expect(diagnosis.failureClass).toBe('lighthouse_loopback_origin_drift');
+    expect(diagnosis.rootCause).toContain('cross loopback origins');
+    expect(diagnosis.remediation).toContain('HOSTNAME');
+    expect(diagnosis.remediation).toContain('never redirects to 0.0.0.0');
+  });
+
+  it('does not infer loopback drift from an ordinary deterministic assertion', () => {
+    expect(
+      diagnoseCiFailure(`
+        BASE_URL: http://127.0.0.1:3000
+        color-contrast failure for minScore assertion
+        Assertion failed.
+        LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion
+      `).failureClass
+    ).toBe('lighthouse_deterministic_assertion');
+  });
+
+  it.each([
+    'PROTOCOL_TIMEOUT: DOMSnapshot.disable',
+    'LIGHTHOUSE_FAILURE_CLASS=transient_protocol',
+    'assertion failure for color-contrast: expected 1, but got 0',
+  ])('does not classify a partial Lighthouse signature: %s', log => {
+    expect(diagnoseCiFailure(log).failureClass).toBe('unknown');
+  });
+
   it('diagnoses missing draft evidence when no trusted producer ran', () => {
     const diagnosis = diagnoseCiFailure(`
       Complete job name: Verify Draft Agent PR
@@ -75,6 +186,43 @@ describe('diagnoseCiFailure', () => {
     ).toBe('unknown');
   });
 
+  it.each([
+    'production_artifact_failed',
+    'staged_production_not_ready',
+    'staged_production_canary_failed',
+  ])('diagnoses staged Production failure subtype %s', failureSubtype => {
+    const diagnosis = diagnoseCiFailure(`failure_subtype=${failureSubtype}`);
+
+    expect(diagnosis.failureClass).toBe('staged_production_deployment_failed');
+    expect(diagnosis.rootCause).toContain('Production-target prebuilt');
+    expect(diagnosis.remediation).toContain('Never substitute');
+  });
+
+  it('diagnoses canonical production alias convergence failure', () => {
+    const diagnosis = diagnoseCiFailure(
+      'failure_subtype=production_alias_not_updated'
+    );
+
+    expect(diagnosis.failureClass).toBe('production_alias_not_updated');
+    expect(diagnosis.rootCause).toContain('plain, stable, and canary');
+    expect(diagnosis.remediation).toContain('unauthenticated build-info');
+    expect(diagnosis.remediation).toContain('Preview evidence');
+  });
+
+  it.each([
+    'production_promotion_foreign_rollout',
+    'production_promotion_state_invalid',
+    'production_promotion_state_blocked',
+    'production_promotion_failed',
+    'production_promotion_rollback_failed',
+  ])('diagnoses bounded promotion blocker %s', failureSubtype => {
+    const diagnosis = diagnoseCiFailure(`failure_subtype=${failureSubtype}`);
+
+    expect(diagnosis.failureClass).toBe('production_promotion_state_blocked');
+    expect(diagnosis.remediation).toContain('Never resubmit promotion');
+    expect(diagnosis.remediation).toContain('proves this run owns it');
+  });
+
   it('diagnoses ownership preflight slug or latency drift from its structured receipt', () => {
     const diagnosis = diagnoseCiFailure(`
       {"failure_class":"gbrain_ownership_preflight_latency_or_slug_drift","requested_slug":"agent-job-ledger","resolved_slug":null,"engine_ms":3004,"cli_ms":null,"mcp_ms":null,"timeout_tier":"ledger_step","lookup_health":"timeout","db_lock_signal_detected":true,"session_signal_detected":null}
@@ -86,6 +234,178 @@ describe('diagnoseCiFailure', () => {
     expect(diagnosis.remediation).toContain('coordination/agent-job-ledger');
     expect(diagnosis.remediation).toContain('engine/CLI/MCP latency');
     expect(diagnosis.remediation).toContain('timeout tier');
+  });
+
+  it('diagnoses a Golden Path email value erased by hydration', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path (PR)
+      [chromium] tests/e2e/golden-path.spec.ts
+      Continue with Email
+      expect(locator).toBeEnabled() failed: element is not enabled
+    `);
+
+    expect(diagnosis.failureClass).toBe('golden_path_signup_hydration_reset');
+    expect(diagnosis.rootCause).toContain('hydration');
+    expect(diagnosis.remediation).toContain('Refill');
+  });
+
+  it('diagnoses the real-auth Golden Path mounted with signed-out defaults', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path (PR)
+      export E2E_TEST_MODE=1
+      export PUBLIC_NOAUTH_SMOKE=1
+      TimeoutError: page.waitForResponse: Timeout 30000ms exceeded
+      waiting for POST /api/onboarding/claim
+    `);
+
+    expect(diagnosis.failureClass).toBe('golden_path_auth_provider_bypassed');
+    expect(diagnosis.rootCause).toContain('signed-out auth defaults');
+    expect(diagnosis.remediation).toContain('live auth provider');
+  });
+
+  it('diagnoses the pending-user waitlist deadlock before the first claim', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile
+      TimeoutError: page.waitForResponse: Timeout 30000ms exceeded while waiting for event "response"
+      > 309 | const heldClaimResponsePromise = page.waitForResponse(
+      at createFreshUserOnce (tests/e2e/golden-path.spec.ts:309:43)
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'golden_path_waitlist_gate_before_claim'
+    );
+    expect(diagnosis.rootCause).toContain('/waitlist');
+    expect(diagnosis.remediation).toContain('Do not rerun');
+    expect(diagnosis.remediation).toContain('withholding that response');
+  });
+
+  it('diagnoses a Golden Path app-user provisioning gap instead of rerunning', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile
+      Expected: 200
+      Received: 401
+      > 357 | expect(claimResponse.status()).toBe(200);
+      at createFreshUserOnce (tests/e2e/golden-path.spec.ts:357:34)
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'golden_path_app_user_provisioning_gap'
+    );
+    expect(diagnosis.rootCause).toContain('linked app users.id');
+    expect(diagnosis.remediation).toContain('Do not rerun');
+    expect(diagnosis.remediation).toContain('provisionAppUser');
+  });
+
+  it('diagnoses the explicit provisioning barrier when the hook is removed', () => {
+    expect(
+      diagnoseCiFailure(
+        'Better Auth app-user provisioning hook did not create a linked users row'
+      ).failureClass
+    ).toBe('golden_path_app_user_provisioning_gap');
+  });
+
+  it('diagnoses competing OTP and fixture navigation to /start', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path (PR)
+      tests/e2e/golden-path.spec.ts
+      Error: page.goto: net::ERR_ABORTED at http://localhost:3100/start
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'golden_path_competing_start_navigation'
+    );
+    expect(diagnosis.rootCause).toContain('OTP form');
+    expect(diagnosis.remediation).toContain('withhold the sign-in response');
+  });
+
+  it('diagnoses the removed classic onboarding fixture on canonical /start', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path (PR)
+      [chromium] tests/e2e/golden-path.spec.ts
+      page URL: http://localhost:3100/start?handle=tmrlisyuuem7u0e
+      expect(locator('[data-testid="onboarding-form-wrapper"]')).toBeVisible()
+      waiting for locator('[data-testid="onboarding-form-wrapper"]')
+    `);
+
+    expect(diagnosis.failureClass).toBe('golden_path_stale_onboarding_surface');
+    expect(diagnosis.rootCause).toContain('canonical /start');
+    expect(diagnosis.remediation).toContain('anonymous chat');
+  });
+
+  it('diagnoses a stale Golden Path runtime marker assertion', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Golden Path (PR)
+      [chromium] tests/e2e/golden-path.spec.ts:335:5
+      Onboarding runtime policy did not finish initializing
+      expect(locator).toHaveAttribute('data-interaction-ready', 'true')
+      Expected: "true"
+      Received: null
+    `);
+
+    expect(diagnosis.failureClass).toBe('golden_path_stale_runtime_marker');
+    expect(diagnosis.rootCause).toContain('marker attributes');
+    expect(diagnosis.remediation).toContain('real chat input');
+  });
+
+  it('diagnoses the padded profile artwork assertion against the wrong box', () => {
+    const diagnosis = diagnoseCiFailure(`
+      [chromium] tests/e2e/profile-mobile-viewport-stability.spec.ts:636:9
+      Error: iPhone SE 2/3 bento artwork should fill the card width
+      Expected: >= 222
+      Received: 196
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'profile_release_card_content_box_mismatch'
+    );
+    expect(diagnosis.rootCause).toContain('outer card width');
+    expect(diagnosis.remediation).toContain('artwork parent content box');
+    expect(diagnosis.remediation).toContain('instead of widening');
+  });
+
+  it('diagnoses the stale notifications-page dialog fixture after its canonical redirect', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Lighthouse (public routes PR) (1)
+      [chromium] tests/e2e/profile-mobile-viewport-stability.spec.ts:820:9
+      Public Profile Mobile Viewport Stability @smoke @critical › iPhone SE 2/3 alerts walkthrough focus never shifts the shell
+      Error: iPhone SE 2/3 email target should be visible
+      Locator: locator('[role="dialog"][data-testid="profile-mobile-notifications-flow"]').getByTestId('mobile-email-input')
+      Error: element(s) not found
+    `);
+
+    expect(diagnosis.failureClass).toBe(
+      'profile_mobile_legacy_notifications_route'
+    );
+    expect(diagnosis.rootCause).toContain('followed its redirect');
+    expect(diagnosis.remediation).toContain('Do not rerun');
+    expect(diagnosis.remediation).toContain('profile-compact-surface');
+    expect(diagnosis.remediation).toContain(
+      'legacy redirect covered separately'
+    );
+  });
+
+  it('diagnoses an accepted PR preview stuck in Vercel concurrency', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Vercel accepted https://jovie-example.vercel.app
+      Current PR preview deployment state: QUEUED
+      ::error::PR preview is QUEUED after readiness wait (status 0)
+    `);
+
+    expect(diagnosis.failureClass).toBe('vercel_concurrent_build_queue');
+    expect(diagnosis.rootCause).toContain('concurrent-build capacity');
+    expect(diagnosis.remediation).toContain('Do not rerun the unchanged head');
+    expect(diagnosis.remediation).toContain('provably obsolete');
+  });
+
+  it('diagnoses a Vercel source build holding capacity until timeout', () => {
+    const diagnosis = diagnoseCiFailure(`
+      Vercel deployment dpl_example failed
+      errorCode=BUILD_EXCEEDED_MAXIMUM_TIME
+    `);
+
+    expect(diagnosis.failureClass).toBe('vercel_build_exceeded_maximum_time');
+    expect(diagnosis.rootCause).toContain('source deployment');
+    expect(diagnosis.remediation).toContain('runtime-closed prebuilt artifact');
   });
 
   it('diagnoses deterministic Better Auth OTP rejection in the bypass smoke lane', () => {
@@ -149,11 +469,40 @@ describe('diagnoseCiFailure', () => {
     expect(diagnosis.remediation).toContain('fail closed');
   });
 
+  it('diagnoses a Vercel prebuilt whose cross-job artifact omitted traced runtime files', () => {
+    const failures = [
+      `failure_subtype=staged_production_canary_failed
+       Cannot find module 'require-in-the-middle-a99415fa67232f7f'
+       at /var/task/apps/web/.next/server/middleware.js`,
+      `Cannot find package '@opentelemetry/sdk-node' imported from
+       /var/task/apps/web/.next/server/chunks/observability.js`,
+    ];
+
+    const diagnoses = failures.map(diagnoseCiFailure);
+    expect(diagnoses.map(({ failureClass }) => failureClass)).toEqual([
+      'vercel_prebuilt_function_closure_missing',
+      'vercel_prebuilt_function_closure_missing',
+    ]);
+    expect(diagnoses[0]).toMatchObject({
+      rootCause: expect.stringMatching(/filePathMap.*\.vercel\/output/),
+      remediation: expect.stringMatching(
+        /Do not rerun.*same job and workspace.*\/api\/health/
+      ),
+    });
+  });
+
   it('does not infer a launcher mismatch from an unrelated missing module', () => {
     expect(
       diagnoseCiFailure(
         'Error: Failed to load external module require-in-the-middle-deadbeef'
       ).failureClass
+    ).toBe('unknown');
+    expect(
+      diagnoseCiFailure(`
+        Cannot find module 'require-in-the-middle-deadbeef'
+        Require stack:
+        - /home/runner/work/Jovie/Jovie/apps/web/.next/server/middleware.js
+      `).failureClass
     ).toBe('unknown');
   });
 
@@ -197,14 +546,17 @@ describe('diagnoseCiFailure', () => {
   });
 
   it('classifies the analytics scanner timeout separately from runner pressure', () => {
-    const log = `
-      FAIL tests/unit/analytics-metrics-layer-guard.test.ts > canonical metrics layer guard
+    const diagnosis = diagnoseCiFailure(`
+      Complete job name: Unit Tests (Shard 1/5)
+      FAIL tests/unit/analytics-metrics-layer-guard.test.ts:48
       Error: Test timed out in 12000ms.
-      PSI telemetry: sustained I/O pressure
-    `;
+      File body completed after 34.690s under shared I/O load.
+    `);
 
-    expect(diagnoseCiFailure(log).failureClass).toBe(
-      'bounded_source_scan_timeout'
+    expect(diagnosis.failureClass).toBe('bounded_source_scan_timeout');
+    expect(diagnosis.rootCause).toContain('cannot distinguish');
+    expect(diagnosis.remediation).toContain(
+      'unchanged blob plus a focused pass identifies shared-host I/O saturation'
     );
   });
 
@@ -230,19 +582,27 @@ describe('diagnoseCiFailure', () => {
   });
 
   it('classifies the touch-target ratchet as the same bounded scanner class', () => {
-    expect(
-      diagnoseCiFailure(`
-        FAIL tests/unit/design-system/touch-target-ratchet.test.ts
-        Error: Test timed out in 12000ms.
-      `).failureClass
-    ).toBe('bounded_source_scan_timeout');
+    const diagnosis = diagnoseCiFailure(`
+      FAIL tests/unit/design-system/touch-target-ratchet.test.ts
+      Error: Test timed out in 12000ms.
+    `);
+
+    expect(diagnosis.failureClass).toBe('bounded_source_scan_timeout');
+    expect(diagnosis.remediation).toContain(
+      'Intersect native candidate-token and semantic file sets'
+    );
+    expect(diagnosis.remediation).toContain('preserve');
+    expect(diagnosis.remediation).toContain('complete fail-closed fallback');
+    expect(diagnosis.remediation).toContain('blindly rerunning');
   });
 
   it('classifies the destructive dialog audit as bounded scanner work', () => {
     expect(
       diagnoseCiFailure(`
-        FAIL tests/unit/design-system/destructive-confirm-dialog-audit.test.ts
+        Complete job name: Unit Tests (Shard 2/5)
+        FAIL tests/unit/design-system/destructive-confirm-dialog-audit.test.ts:94
         Error: Test timed out in 12000ms.
+        File body completed after 19.388s under shared I/O load.
       `).failureClass
     ).toBe('bounded_source_scan_timeout');
   });
@@ -250,13 +610,18 @@ describe('diagnoseCiFailure', () => {
   it.each([
     'feature-flags-registry.test.ts',
     'arbitrary-values-ratchet.test.ts',
+    'app/exp-import-boundary.test.ts',
   ])('classifies recurring %s scanner timeouts', testFile => {
-    expect(
-      diagnoseCiFailure(`
+    const diagnosis = diagnoseCiFailure(`
         FAIL tests/unit/${testFile}
         Error: Test timed out in 12000ms.
-      `).failureClass
-    ).toBe('bounded_source_scan_timeout');
+      `);
+
+    expect(diagnosis.failureClass).toBe('bounded_source_scan_timeout');
+    expect(diagnosis.rootCause).toContain('shared-host I/O saturation');
+    expect(diagnosis.remediation).toContain('runner CPU quota');
+    expect(diagnosis.remediation).toContain('30-second ceiling');
+    expect(diagnosis.remediation).toContain('do not skip');
   });
 
   it('classifies the exp lint subprocess timeout as bounded scanner work', () => {
@@ -275,6 +640,38 @@ describe('diagnoseCiFailure', () => {
         Error: Test timed out in 5000ms.
       `).failureClass
     ).toBe('test_fixture_import_timeout');
+  });
+
+  it('classifies the mobile overflow sign-in navigation race', () => {
+    const diagnosis = diagnoseCiFailure(`
+        Mobile Overflow Release Guard > 320px > public auth-signin has no horizontal overflow @ 320px
+        page.evaluate: Execution context was destroyed, most likely because of a navigation
+        at getOverflowingElements (tests/e2e/utils/mobile-overflow.ts:61:15)
+      `);
+
+    expect(diagnosis.failureClass).toBe('mobile_overflow_navigation_race');
+    expect(diagnosis.rootCause).toContain('streamed Flight script');
+    expect(diagnosis.remediation).toContain('raw response');
+  });
+
+  it('does not classify a generic destroyed execution context as mobile overflow', () => {
+    expect(
+      diagnoseCiFailure(`
+        Checkout flow
+        page.evaluate: Execution context was destroyed, most likely because of a navigation
+        at tests/e2e/checkout.spec.ts:42:9
+      `).failureClass
+    ).toBe('unknown');
+  });
+
+  it('does not apply the sign-in diagnosis to another mobile overflow surface', () => {
+    expect(
+      diagnoseCiFailure(`
+        Mobile Overflow Release Guard > 320px > public marketing-pricing has no horizontal overflow @ 320px
+        page.evaluate: Execution context was destroyed, most likely because of a navigation
+        at getOverflowingElements (tests/e2e/utils/mobile-overflow.ts:61:15)
+      `).failureClass
+    ).toBe('unknown');
   });
 
   it('keeps process exhaustion and host pressure as distinct failure classes', () => {

@@ -1,6 +1,7 @@
 name: PR Conflict Handler
 
-# Automatically resolves merge conflicts on agent PRs.
+# Classifies PR freshness, requests exact-head GitHub rebases for clean-behind
+# branches, and labels true conflicts for manual resolution.
 # Fires on:
 #   - CI completion (conflict may surface as test failure)
 #   - Schedule weekday safety net
@@ -14,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       apply:
-        description: 'Apply safe mutations (labels/update-branch/guarded rebase). Defaults to dry-run.'
+        description: 'Apply safe labels and exact-head GitHub rebases. Defaults to dry-run.'
         required: false
         default: 'false'
         type: choice
@@ -45,14 +46,25 @@ defaults:
 
 jobs:
   plan:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion != 'cancelled'
+      )
     name: Classify and plan PR freshness
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     concurrency:
-      group: pr-conflict-handler-${{ github.repository }}
-      cancel-in-progress: false
+      # CI-completion audits are read-only and supersedable. Operator dispatches
+      # serialize separately so an incoming CI event cannot cancel manual apply.
+      group: pr-conflict-handler-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && 'operator' || 'audit' }}
+      cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0

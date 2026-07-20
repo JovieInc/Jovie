@@ -145,7 +145,7 @@ test('send and stream stay visible through stale refetch without skeleton cascad
     .locator('[data-testid="chat-composer-surface"]')
     .last();
   const composer = composerSurface.locator(
-    'textarea[aria-label="Chat message input"]'
+    'textarea[aria-label="Chat Message Input"]'
   );
   await expect(composer).toBeEnabled({ timeout: 15_000 });
   await composer.click();
