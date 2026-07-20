@@ -568,6 +568,10 @@ export function useJovieChat({
   } = useChat({
     id: activeConversationId ?? 'new-chat',
     transport,
+    // JOV-3525: batch streaming UI updates to ~20fps so raw token deltas don't
+    // re-render the timeline on every burst; pairs with server-side
+    // smoothStream word-level pacing in lib/chat/run.ts.
+    experimental_throttle: 50,
     onFinish: ({ message }) => {
       const metadata = extractChatTurnMetadata(message.metadata);
       const finishedConversationId =
