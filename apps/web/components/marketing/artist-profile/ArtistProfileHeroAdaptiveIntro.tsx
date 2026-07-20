@@ -10,7 +10,6 @@ interface ArtistProfileHeroAdaptiveIntroProps {
   readonly adaptive: ArtistProfileLandingCopy['adaptive'];
   readonly phoneCaption: string;
   readonly phoneSubcaption: string;
-  readonly showForgeUiMarketingUpdates?: boolean;
 }
 
 export function ArtistProfileHeroAdaptiveIntro({
@@ -18,7 +17,6 @@ export function ArtistProfileHeroAdaptiveIntro({
   adaptive,
   phoneCaption,
   phoneSubcaption,
-  showForgeUiMarketingUpdates = false,
 }: Readonly<ArtistProfileHeroAdaptiveIntroProps>) {
   return (
     <div className='artist-profile-hero-adaptive-intro relative overflow-x-clip bg-black dark:bg-black'>
@@ -41,7 +39,6 @@ export function ArtistProfileHeroAdaptiveIntro({
                   adaptive={adaptive}
                   phoneCaption={phoneCaption}
                   phoneSubcaption={phoneSubcaption}
-                  showForgeUiMarketingUpdates={showForgeUiMarketingUpdates}
                 />
               </div>
             </div>

@@ -37,6 +37,9 @@ vi.mock('@/components/marketing', () => ({
   MarketingContainer: ({ children }: ChildrenProps) => (
     <div data-testid='marketing-container'>{children}</div>
   ),
+}));
+
+vi.mock('@/components/marketing/MarketingPageShell', () => ({
   MarketingPageShell: ({ children }: ChildrenProps) => (
     <main data-testid='marketing-page-shell'>{children}</main>
   ),
