@@ -2,8 +2,8 @@ name: E2E Full Browser Matrix
 
 on:
   schedule:
-    # Run every Monday at 6:00 AM UTC
-    - cron: '0 6 * * 1'
+    # Weekly deep matrix, well after the daily/nightly suites have drained.
+    - cron: '15 15 * * 1'
   workflow_dispatch:
     inputs:
       test_filter:
@@ -19,18 +19,22 @@ jobs:
   e2e-full-matrix:
     name: E2E (Chrome + Firefox)
     environment: Preview – jovie
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
       E2E_FULL_MATRIX: '1'
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     strategy:
       fail-fast: false
+      # Preserve both browsers without occupying two self-hosted runners at once.
+      max-parallel: 1
       matrix:
         browser: [chromium, firefox]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -72,10 +76,10 @@ jobs:
         run: |
           cd apps/web
           if [ -n "${{ github.event.inputs.test_filter }}" ]; then
-            pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} --reporter=line
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} --reporter=line
           else
             # Exclude nightly tests (they run daily in nightly-e2e-tests.yml)
-            pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --reporter=line
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --reporter=line
           fi
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
@@ -94,17 +98,9 @@ jobs:
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
 
-      - name: Upload Playwright Report on Failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: e2e-full-${{ matrix.browser }}-report-${{ github.run_id }}
-          path: apps/web/playwright-report/
-          retention-days: 7
-
       - name: Upload Test Results on Failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}
           path: apps/web/test-results/
@@ -145,7 +141,7 @@ jobs:
     name: Notify Results
     needs: [e2e-full-matrix]
     if: ${{ always() && github.event_name == 'schedule' }}
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     steps:
       - name: Slack notification on failure
         if: ${{ needs.e2e-full-matrix.result == 'failure' }}

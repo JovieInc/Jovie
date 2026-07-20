@@ -1,6 +1,10 @@
 # Jovie — Agent Operating Manual
 
-Controller map for AI agents. `AGENTS.md` symlinks here. Read the scoped rule for your topic before editing. Detail lives in `.claude/rules/*` and `docs/`.
+Read [`/canon/OPERATING_SYSTEM.md`](canon/OPERATING_SYSTEM.md) first: it defines **how to think**; this file defines **how to execute**. If they conflict, the operating system wins.
+
+Before starting, answer: current bottleneck, evidence, success metric, expected improvement. If unknown, gather evidence first.
+
+Controller map for AI agents. `AGENTS.md` symlinks here. Read the scoped rule for your topic before editing. Detail lives in `/canon`, `.claude/rules/*`, and `docs/`.
 
 ## Operating Principles
 
@@ -11,7 +15,7 @@ Controller map for AI agents. `AGENTS.md` symlinks here. Read the scoped rule fo
 - Ask before destructive ops (data deletion, irreversible migrations without CI guard, credential changes, prod scripts). Auth/payment edits do **not** need human merge approval — CI + Migration Guard own that.
 - **Decisions are systems, not events** when quantifiable: **Ship now / Re-evaluate when / Then** with unit-economics triggers; tag `EVENT:` for taste/identity/security permanence. No "later"/"future work" without a Linear ID → [`.claude/rules/code-style.md`](.claude/rules/code-style.md).
 
-Canon principles: [`docs/company/operating-principles.md`](docs/company/operating-principles.md) (supersede [`docs/company/core-values.md`](docs/company/core-values.md)).
+Company constitution: [`/canon/OPERATING_SYSTEM.md`](canon/OPERATING_SYSTEM.md). Domain canon: [`PRODUCT`](canon/PRODUCT.md), [`ENGINEERING`](canon/ENGINEERING.md), [`DESIGN`](canon/DESIGN.md), [`MARKETING`](canon/MARKETING.md), [`VOICE`](canon/VOICE.md). Existing operating principles remain subordinate implementation canon: [`docs/company/operating-principles.md`](docs/company/operating-principles.md).
 
 ## Agent Role Boundary
 
@@ -79,23 +83,7 @@ Skip issues labeled `human-review-required` or containing "This issue requires h
 
 ## Scoped Rules
 
-| File | Topic |
-|---|---|
-| [`.claude/rules/environment.md`](.claude/rules/environment.md) | Setup, Doppler, DB isolation, Turbo, worktrees |
-| [`.claude/rules/auth.md`](.claude/rules/auth.md) | Clerk proxy, E2E auth |
-| [`.claude/rules/db.md`](.claude/rules/db.md) | Driver, migrations, transactions |
-| [`.claude/rules/ui.md`](.claude/rules/ui.md) | Design system, surfaces, taste |
-| [`.claude/rules/security.md`](.claude/rules/security.md) | CSP, webhooks, secrets, entitlements |
-| [`.claude/rules/release.md`](.claude/rules/release.md) | PR discipline, ship, deploy |
-| [`.claude/rules/ci-branching.md`](.claude/rules/ci-branching.md) | Integration branches, train PRs |
-| [`.claude/rules/testing.md`](.claude/rules/testing.md) | E2E, coverage, verify-before-done |
-| [`.claude/rules/infra.md`](.claude/rules/infra.md) | Cron, API budgets, cost disclosure |
-| [`.claude/rules/ios.md`](.claude/rules/ios.md) | SwiftUI guardrails, cache-first loads |
-| [`.claude/rules/code-style.md`](.claude/rules/code-style.md) | TypeScript, React, prior-art gate |
-| [`.claude/rules/linear.md`](.claude/rules/linear.md) | Issue gating, ownership |
-| [`.claude/rules/gstack.md`](.claude/rules/gstack.md) | Skill routing, vendored toolkit |
-| [`.claude/rules/swarm.md`](.claude/rules/swarm.md) | Parallel swarms, worktrees |
-| [`.claude/rules/hermes-air.md`](.claude/rules/hermes-air.md) | Hermes node, voice/Telegram intake |
+Read the relevant `.claude/rules/*` file before touching that area: environment, auth, db, ui, security, release, ci-branching, testing, infra, ios, code-style, linear, gstack, swarm, hermes-air.
 
 ## Skill Routing
 
@@ -105,7 +93,8 @@ Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md
 
 | Doc | Use when |
 |-----|----------|
-| `DESIGN.md` | Any UI decision |
+| `canon/README.md` | Root decision hierarchy: operating system + domain canon |
+| `DESIGN.md` | Operational design-system execution |
 | `docs/PR_FLOW.md` | Shipping, CI tiers, taste gate |
 | `docs/marketing/AGENT_GUIDE.md` | Generating or editing any marketing/landing page |
 | `docs/AI_AGENT_GUIDE.md` | API routes, cron, webhooks inventory |

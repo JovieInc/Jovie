@@ -6,6 +6,14 @@ self-hosted-runner:
     - ubicloud-standard-2
     - ubicloud-standard-8
 
+# GitHub added concurrency.queue before actionlint v1.7.12 learned the schema.
+# Keep this exact, path-scoped compatibility suppression while enforcing every
+# other workflow syntax rule. Remove it when the pinned actionlint accepts it.
+paths:
+  .github/workflows/production-controller.yml:
+    ignore:
+      - 'unexpected key "queue" for "concurrency" section.*'
+
 # Suppress noisy shellcheck codes that are style/info, not bugs.
 # SC2028: echo may not expand escape sequences (info)
 # SC2034: variable appears unused (false positive with GITHUB_OUTPUT)

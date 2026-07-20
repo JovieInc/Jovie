@@ -50,6 +50,14 @@ export const ServerEnvSchema = z.object({
         'VERCEL_URL must be a hostname or hostname:port without a scheme or path',
     })
     .optional(),
+  VERCEL_BRANCH_URL: z
+    .string()
+    .trim()
+    .refine(isHostWithOptionalPort, {
+      message:
+        'VERCEL_BRANCH_URL must be a hostname or hostname:port without a scheme or path',
+    })
+    .optional(),
   VERCEL_AUTOMATION_BYPASS_SECRET: z.string().optional(),
   PUBLIC_NOAUTH_SMOKE: z.string().optional(),
   /**
@@ -410,6 +418,7 @@ export const ENV_KEYS = [
   'VERCEL_GIT_COMMIT_SHA',
   'VERCEL_DEPLOYMENT_TIME',
   'VERCEL_URL',
+  'VERCEL_BRANCH_URL',
   'VERCEL_AUTOMATION_BYPASS_SECRET',
   'PUBLIC_NOAUTH_SMOKE',
   'CHAT_LLM_FAILURE_INJECTION',

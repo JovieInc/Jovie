@@ -18,7 +18,20 @@ if [[ " $* " == *" fetch "* && "${SCAN_TEST_SCENARIO:-}" == "repair-failure" ]];
 fi
 case "${1:-}" in
   rev-parse)
-    printf '%s\n' '0123456789abcdef0123456789abcdef01234567'
+    case "${2:-}" in
+      HEAD)
+        printf '%s\n' "$SCAN_TEST_LOCAL_HEAD"
+        ;;
+      refs/secret-scan/repair-current)
+        printf '%s\n' "$SECRET_SCAN_REMOTE_CURRENT_SHA"
+        ;;
+      refs/secret-scan/repair-base)
+        printf '%s\n' "$SECRET_SCAN_REMOTE_BASE_SHA"
+        ;;
+      *)
+        printf '%s\n' '0123456789abcdef0123456789abcdef01234567'
+        ;;
+    esac
     ;;
   config)
     exit 0
@@ -64,6 +77,10 @@ run_scenario() {
   export GIT_CALLS="$TEST_ROOT/$scenario.git-calls"
   export TRUFFLEHOG_COUNT="$TEST_ROOT/$scenario.trufflehog-count"
   export SCAN_TEST_SCENARIO="$scenario"
+  export SCAN_TEST_LOCAL_HEAD='cccccccccccccccccccccccccccccccccccccccc'
+  export SECRET_SCAN_REMOTE_CURRENT_REF='refs/pull/14493/head'
+  export SECRET_SCAN_REMOTE_CURRENT_SHA='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  export SECRET_SCAN_REMOTE_BASE_SHA='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
   : >"$GIT_CALLS"
   rm -f "$TRUFFLEHOG_COUNT"
 
@@ -80,6 +97,16 @@ status="$(run_scenario corruption)"
   || fail 'corruption must trigger exactly one successful repair fetch'
 grep -q 'Secret scan checkout corruption' "$TEST_ROOT/corruption.output" \
   || fail 'corruption must emit an explicit CI classification'
+grep -q '+refs/pull/14493/head:refs/secret-scan/repair-current' \
+  "$TEST_ROOT/corruption.git-calls" \
+  || fail 'corruption repair must fetch the stable pull request source ref'
+grep -q '+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:refs/secret-scan/repair-base' \
+  "$TEST_ROOT/corruption.git-calls" \
+  || fail 'corruption repair must fetch the exact base SHA'
+if grep -q 'cccccccccccccccccccccccccccccccccccccccc' \
+  "$TEST_ROOT/corruption.git-calls"; then
+  fail 'corruption repair must not ask origin for the local-only scan head'
+fi
 
 status="$(run_scenario finding)"
 [[ $status -eq 183 ]] || fail "secret finding status was not preserved: $status"
@@ -96,5 +123,7 @@ status="$(run_scenario repair-failure)"
   || fail 'repair must try the primary fetch and compatibility fallback'
 grep -q 'Secret scan checkout repair failed' "$TEST_ROOT/repair-failure.output" \
   || fail 'repair failure must emit an explicit CI classification'
+
+bash "$REPO_ROOT/scripts/security/prepare-ci-secret-scan-range.test.sh"
 
 echo 'PASS: scan-secrets corruption recovery regression tests'

@@ -436,6 +436,7 @@ const nextConfig = {
   // See JOV-2322.
   serverExternalPackages: ['@statsig/statsig-node-core'],
   experimental: {
+    cpus: process.env.GITHUB_ACTIONS === 'true' ? 2 : undefined,
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
     // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup
@@ -523,6 +524,7 @@ function exposeBaseStaticConfigForTooling(config) {
   }
 
   return Object.assign(config, {
+    experimental: nextConfig.experimental,
     images: nextConfig.images,
     redirects: nextConfig.redirects,
     rewrites: nextConfig.rewrites,

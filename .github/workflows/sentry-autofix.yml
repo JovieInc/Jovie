@@ -12,7 +12,8 @@ concurrency:
 
 jobs:
   autofix:
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Model repair work is event-driven and must not occupy fixed CI capacity.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write

@@ -167,10 +167,47 @@ repair_partial_clone() {
       git update-ref -d "$ref" 2>/dev/null || true
     done < <(git for-each-ref --format='%(refname)' refs/remotes refs/tags refs/replace refs/prefetch)
   fi
-  # Refetch must cover HEAD's own history too: incremental checkouts on a
-  # blob:none workdir leave the PR branch's older objects promisor-elided, so
-  # repairing only the base branch still fails on the next unreadable object.
-  # Fetching the commit id directly is the same trick actions/checkout uses.
+  # Refetch must cover the scan head's parent histories too: incremental
+  # checkouts on a blob:none workdir can leave older objects promisor-elided,
+  # so repairing only the base still fails on the next unreadable object.
+  local base_sha current_ref current_sha repair_base_ref repair_current_ref
+  base_sha="${SECRET_SCAN_REMOTE_BASE_SHA:-}"
+  current_ref="${SECRET_SCAN_REMOTE_CURRENT_REF:-}"
+  current_sha="${SECRET_SCAN_REMOTE_CURRENT_SHA:-}"
+  repair_base_ref="refs/secret-scan/repair-base"
+  repair_current_ref="refs/secret-scan/repair-current"
+
+  if [[ -n "$base_sha" && -n "$current_ref" && -n "$current_sha" ]]; then
+    if [[ ! "$base_sha" =~ ^[0-9a-f]{40}$ ]] \
+      || [[ "$base_sha" == "0000000000000000000000000000000000000000" ]] \
+      || [[ ! "$current_sha" =~ ^[0-9a-f]{40}$ ]] \
+      || [[ "$current_sha" == "0000000000000000000000000000000000000000" ]] \
+      || [[ "$current_ref" != refs/* ]] \
+      || ! git check-ref-format "$current_ref"; then
+      echo "::error title=Secret scan checkout repair failed::Exact remote repair coordinates are invalid." >&2
+      return 1
+    fi
+    # PR scan HEAD may be a local-only commit that preserves GitHub's checked-
+    # out merge tree. Repair its parent histories from the stable current ref
+    # plus exact base; never ask origin for the local synthetic commit.
+    git fetch --refetch origin \
+      "+${current_ref}:${repair_current_ref}" \
+      "+${base_sha}:${repair_base_ref}" \
+      || git -c fetch.negotiationAlgorithm=noop fetch origin \
+        "+${current_ref}:${repair_current_ref}" \
+        "+${base_sha}:${repair_base_ref}" \
+      || return $?
+    [[ "$(git rev-parse "$repair_current_ref")" == "$current_sha" ]] \
+      || return 1
+    [[ "$(git rev-parse "$repair_base_ref")" == "$base_sha" ]] \
+      || return 1
+    return 0
+  fi
+  if [[ -n "$base_sha$current_ref$current_sha" ]]; then
+    echo "::error title=Secret scan checkout repair failed::Remote repair coordinates must be provided together." >&2
+    return 1
+  fi
+
   local head_sha
   head_sha="$(git rev-parse HEAD)"
   # --refetch needs git >= 2.36; older runner images fall back to a noop

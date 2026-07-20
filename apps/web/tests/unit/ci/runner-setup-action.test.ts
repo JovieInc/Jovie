@@ -29,6 +29,16 @@ describe('self-hosted runner setup action', () => {
     expect(action).toContain('pnpm install --frozen-lockfile');
   });
 
+  it('installs the pinned pnpm directly instead of downgrading a pnpm 11 bootstrap', () => {
+    expect(action).toContain(
+      'uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0'
+    );
+    expect(action).not.toContain(
+      'pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271'
+    );
+    expect(action).toContain('dest: ${{ runner.temp }}/setup-pnpm');
+  });
+
   it('restores an exact baked installed tree and falls back when no marker exists', () => {
     expect(action).toContain(
       'node .github/runner-image/verify-prerequisites.mjs --component dependencies'
@@ -152,7 +162,7 @@ describe('baked runner prerequisite contract', () => {
   const runnerImageCanaryStart = ciWorkflow.indexOf('  runner-image-canary:');
   const runnerImageCanary = ciWorkflow.slice(
     runnerImageCanaryStart,
-    ciWorkflow.indexOf('  # ── CI Optimizer', runnerImageCanaryStart)
+    ciWorkflow.indexOf('  main-queue-provenance:', runnerImageCanaryStart)
   );
   const patchedDependencyPaths = [
     ...(
@@ -365,11 +375,13 @@ describe('baked runner prerequisite contract', () => {
   it('dispatches an exact-SHA canary only to the dedicated image label', () => {
     expect(runnerImageCanaryStart).toBeGreaterThan(-1);
     expect(runnerImageCanary).toContain(
-      "contains(github.event.pull_request.labels.*.name, 'runner-image-canary')"
+      "github.event_name == 'workflow_dispatch'"
     );
     expect(runnerImageCanary).toContain(
-      'ref: ${{ github.event.pull_request.head.sha }}'
+      'inputs.run_runner_image_canary == true'
     );
+    expect(runnerImageCanary).toContain('ref: ${{ github.sha }}');
+    expect(runnerImageCanary).not.toContain('github.event.pull_request');
     expect(runnerImageCanary).toContain(
       `runs-on: [self-hosted, Linux, X64, "\${{ 'jovie-runner-image-canary' }}"]`
     );
@@ -405,8 +417,12 @@ describe('baked runner prerequisite contract', () => {
     expect(runnerImageOfflineProofStart).toBeGreaterThan(-1);
     expect(runnerImageOfflineProof).toContain('runs-on: ubuntu-24.04');
     expect(runnerImageOfflineProof).toContain(
-      "contains(github.event.pull_request.labels.*.name, 'runner-image-canary')"
+      "github.event_name == 'workflow_dispatch'"
     );
+    expect(runnerImageOfflineProof).toContain(
+      'inputs.run_runner_image_canary == true'
+    );
+    expect(runnerImageOfflineProof).not.toContain('github.event.pull_request');
     expect(runnerImageOfflineProof).toContain(
       '.github/runner-image/build-context.sh "$EXPECTED_SHA"'
     );
@@ -439,7 +455,7 @@ describe('baked runner prerequisite contract', () => {
       'runner-image-evidence/cache-proof.json'
     );
     expect(runnerImageOfflineProof).toContain(
-      'name: runner-image-proof-${{ github.event.pull_request.head.sha }}'
+      'name: runner-image-proof-${{ github.sha }}'
     );
     expect(runnerImageOfflineProof).toContain(
       'rm -f runner-image-evidence/context.tar'

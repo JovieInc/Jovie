@@ -17,8 +17,8 @@
   "tiers": [
     {
       "id": "fast-gate",
-      "name": "Fast Gate",
-      "purpose": "Cheap deterministic checks required for every merge candidate."
+      "name": "Source Fast Gate",
+      "purpose": "Cheap deterministic checks required on each source PR and repeated on the synthetic combined head."
     },
     {
       "id": "structural-contract",
@@ -27,18 +27,28 @@
     },
     {
       "id": "risk-triggered-smoke",
-      "name": "Risk-Triggered Smoke",
-      "purpose": "Focused smoke validation for sensitive auth, billing, DB, config, and agent-control-plane changes."
+      "name": "Explicit Deep Evidence",
+      "purpose": "Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready."
     },
     {
       "id": "preview-evidence",
       "name": "Preview Evidence",
-      "purpose": "Preview deploys and visual/a11y/performance evidence for review."
+      "purpose": "Hosted manual/event visual, a11y, performance, and preview evidence outside the source-PR event."
+    },
+    {
+      "id": "combined-integration",
+      "name": "Combined Integration",
+      "purpose": "Affected unit, one hosted build-plus-layout workspace, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head."
     },
     {
       "id": "main-deploy",
-      "name": "Main Deploy",
-      "purpose": "Post-merge staging, canary, production promotion, and deploy-health gates."
+      "name": "Production Release",
+      "purpose": "Each exact successful main CI attempt feeds one fixed production-mutation FIFO from authorization through staging, promotion, centralized rollback, immutable probes, canonical proof, marker, and best-effort notification; one hosted monitor retry is bounded to controller attempt 1."
+    },
+    {
+      "id": "post-deploy",
+      "name": "Post-deploy Verification",
+      "purpose": "Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated smoke runs only when a complete credential pair exists, while public Better Auth/OAuth gates remain blocking."
     },
     {
       "id": "scheduled-cleanup",
@@ -48,108 +58,182 @@
   ],
   "jobs": [
     {
+      "id": "ci-path-changes",
+      "name": "Path Changes",
+      "tier": "fast-gate",
+      "mergeGate": true,
+      "gateStage": "both",
+      "nextLocalCommand": "git diff --name-only origin/main...HEAD",
+      "remediation": "Repair exact base/head resolution; path and brand classification fail closed instead of producing a false docs-only skip."
+    },
+    {
       "id": "ci-fast",
       "name": "ci-fast",
       "tier": "fast-gate",
       "mergeGate": true,
+      "gateStage": "both",
       "nextLocalCommand": "pnpm run typecheck && pnpm run biome:check",
       "remediation": "Fix TypeScript, Biome, ESLint server-boundary, or proxy guard failures before expanding the change."
-    },
-    {
-      "id": "ci-structural-contract",
-      "name": "Structural Contract",
-      "tier": "structural-contract",
-      "mergeGate": true,
-      "nextLocalCommand": "pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors",
-      "remediation": "The CI harness, control-plane characterization suite, Graphite merge-queue config, docs, workflow syntax, proxy, Tailwind, UI guardrails, SEO ratchet, contrast ratchet, doc-freshness registry, or reliability detector registry drifted. Run the local command and update the source rule or manifest, not only the generated output."
     },
     {
       "id": "ci-risk-classifier",
       "name": "CI Risk Classifier",
       "tier": "structural-contract",
       "mergeGate": true,
+      "gateStage": "both",
       "nextLocalCommand": "pnpm ci:harness:check",
       "remediation": "Risk classification failed or the manifest drifted. Validate .github/ci-harness/manifest.json and rerun the classifier on the changed-file list."
+    },
+    {
+      "id": "ci-secret-scan",
+      "name": "Secret Scan (gitleaks + trufflehog)",
+      "tier": "fast-gate",
+      "mergeGate": true,
+      "gateStage": "both",
+      "nextLocalCommand": "./scripts/security/scan-secrets.sh ci-pr origin/main",
+      "remediation": "Remove the detected credential or high-entropy secret from the exact diff and rotate it if it was ever published."
+    },
+    {
+      "id": "drizzle-migration-guard",
+      "name": "Migration Guard",
+      "tier": "fast-gate",
+      "mergeGate": true,
+      "gateStage": "both",
+      "nextLocalCommand": "cd apps/web && ./scripts/check-migrations.sh && ./scripts/validate-migrations.sh",
+      "remediation": "Repair unsafe or invalid migrations; this remains its own exact required ruleset context on source and combined heads."
     },
     {
       "id": "ci-unit-tests",
       "name": "Unit Tests",
       "tier": "fast-gate",
       "mergeGate": true,
+      "gateStage": "merge-group",
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:fast",
       "remediation": "Run the failing Vitest file locally, add or update regression coverage, and keep quarantined tests in the quarantine lane."
     },
     {
-      "id": "ci-build-public",
-      "name": "Build (public routes)",
-      "tier": "preview-evidence",
+      "id": "ci-build-layout",
+      "name": "Build + Layout (combined)",
+      "tier": "combined-integration",
       "mergeGate": true,
-      "nextLocalCommand": "pnpm run build:web",
-      "remediation": "Reproduce the Next.js build locally, then inspect public route, package, or config changes before retrying."
+      "gateStage": "merge-group",
+      "nextLocalCommand": "pnpm run build:web && pnpm --filter @jovie/web exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium",
+      "remediation": "Repair the exact combined-head build or deterministic layout regression; build and layout intentionally share one hosted workspace without artifact transport."
+    },
+    {
+      "id": "ci-ios",
+      "name": "iOS Build + Test (combined)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "pnpm run ios:lint && pnpm run ios:test",
+      "remediation": "Repair the path-selected Xcode build or test regression on the exact combined head; source PRs run only the portable iOS fast contract."
+    },
+    {
+      "id": "ci-promptfoo-evals",
+      "name": "Promptfoo Evals (deterministic)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "pnpm run evals",
+      "remediation": "Repair deterministic chat/eval semantics on the exact combined head. Live model credentials remain disabled in this gate."
+    },
+    {
+      "id": "ci-golden-eval-set",
+      "name": "Golden Eval Set (deterministic)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "pnpm run evals:golden",
+      "remediation": "Repair the model-free golden semantic regression before the combined head can leave the queue."
     },
     {
       "id": "ci-lighthouse-pr",
-      "name": "Lighthouse (public routes PR)",
+      "name": "Lighthouse (public routes manual)",
       "tier": "preview-evidence",
-      "mergeGate": true,
+      "mergeGate": false,
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:lighthouse:public:launch",
       "remediation": "Public route performance or viewport stability regressed. Use the uploaded Lighthouse and Playwright artifacts before changing thresholds."
     },
     {
       "id": "ci-lighthouse-dashboard-pr",
-      "name": "Lighthouse (dashboard PR)",
+      "name": "Lighthouse (dashboard manual)",
       "tier": "preview-evidence",
-      "mergeGate": true,
+      "mergeGate": false,
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:lighthouse:dashboard:pr",
-      "remediation": "Dashboard Lighthouse is required when triggered by risk or the testing label. Fix the route behavior or budget drift instead of bypassing it."
+      "remediation": "An explicitly requested dashboard Lighthouse run regressed. Fix the route behavior or budget drift instead of bypassing it."
     },
     {
       "id": "ci-lighthouse-onboarding-pr",
-      "name": "Lighthouse (onboarding PR)",
+      "name": "Lighthouse (onboarding manual)",
       "tier": "preview-evidence",
-      "mergeGate": true,
+      "mergeGate": false,
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:lighthouse:onboarding:pr",
-      "remediation": "Onboarding Lighthouse is required when onboarding or risk-triggered paths change. Verify /start with the test-auth bypass."
+      "remediation": "An explicitly requested onboarding Lighthouse run regressed. Verify /start with the test-auth bypass."
     },
     {
       "id": "ci-lighthouse-admin-pr",
-      "name": "Lighthouse (admin PR)",
+      "name": "Lighthouse (admin manual)",
       "tier": "preview-evidence",
-      "mergeGate": true,
+      "mergeGate": false,
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:lighthouse:admin:pr",
-      "remediation": "Admin Lighthouse is required when admin or risk-triggered paths change. Verify the admin persona and uploaded artifacts."
+      "remediation": "An explicitly requested admin Lighthouse run regressed. Verify the admin persona and uploaded artifacts."
     },
     {
       "id": "ci-e2e-smoke",
-      "name": "E2E Smoke (PR Fast Feedback)",
+      "name": "E2E Smoke (manual)",
       "tier": "risk-triggered-smoke",
-      "mergeGate": true,
+      "mergeGate": false,
       "nextLocalCommand": "pnpm run test:web:smoke",
-      "remediation": "A sensitive change requires smoke evidence. Use the Playwright report and keep full E2E out of the default PR path."
+      "remediation": "An explicitly requested smoke run regressed. Use the Playwright report and keep full E2E out of the default PR path."
     },
     {
       "id": "ci-golden-path",
-      "name": "Golden Path (PR)",
+      "name": "Golden Path (manual)",
       "tier": "risk-triggered-smoke",
-      "mergeGate": true,
+      "mergeGate": false,
       "nextLocalCommand": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e:golden-path:ci",
       "remediation": "The launch-gate golden path (signup -> onboarding -> import -> live public profile) regressed. Reproduce locally with the pinned Doppler command; do not weaken the spec to pass."
     },
     {
-      "id": "ci-pr-vercel-preview",
-      "name": "Preview Deploy (PR)",
-      "tier": "preview-evidence",
-      "mergeGate": true,
-      "nextLocalCommand": "pnpm run build:web",
-      "remediation": "Preview evidence is required for runtime-sensitive web changes. Check Vercel build/deploy logs and the PR summary URL."
+      "id": "ci-smoke-required",
+      "name": "Extended Smoke (manual)",
+      "tier": "risk-triggered-smoke",
+      "mergeGate": false,
+      "nextLocalCommand": "pnpm --filter @jovie/web exec playwright test --config=playwright.config.smoke.ts",
+      "remediation": "A manually dispatched extended preview smoke suite failed. Inspect the Playwright report and fix the fixture or product regression before rerunning it."
     },
     {
-      "id": "deploy-staging",
-      "name": "Deploy staging",
+      "id": "ci-pr-vercel-preview",
+      "name": "Preview Deploy (manual)",
+      "tier": "preview-evidence",
+      "mergeGate": false,
+      "nextLocalCommand": "pnpm run build:web",
+      "remediation": "An explicitly requested preview failed. Check Vercel build/deploy logs and the PR summary URL."
+    },
+    {
+      "id": "production-release",
+      "name": "Production Release",
       "tier": "main-deploy",
       "mergeGate": false,
       "nextLocalCommand": "gh run view --log-failed",
-      "remediation": "Main deploy failures are handled by the staging/canary/promote pipeline, not by weakening PR gates."
+      "remediation": "Inspect the exact CI-attempt-authorized controller generation. All production mutations share production-mutation FIFO, uncertain gates fail red without rollback, and only one confirmed-regression rollback owner may restore the recorded previous deployment."
+    },
+    {
+      "id": "main-release-ready",
+      "name": "Main Release Ready",
+      "tier": "main-deploy",
+      "mergeGate": false,
+      "nextLocalCommand": "gh run view --log-failed",
+      "remediation": "Use the one-shot exact-SHA merge-group proof or repair every unconditional direct-main fallback lane; API ambiguity fails closed and is never polled into readiness."
+    },
+    {
+      "id": "production-verified",
+      "name": "Production Verified",
+      "tier": "post-deploy",
+      "mergeGate": false,
+      "nextLocalCommand": "gh run view --log-failed",
+      "remediation": "Repair immutable-URL public, homepage, or Lighthouse proof, public Better Auth/OAuth gates, or the leased final canonical ID/SHA check. Authenticated smoke is explicit optional evidence until a complete credential pair is configured."
     },
     {
       "id": "test-flakiness-report",
@@ -170,7 +254,7 @@
         "^\\.github/ci-harness/"
       ],
       "requiresSmoke": true,
-      "requiresPreview": false,
+      "requiresPreview": true,
       "blocksUnattendedAutoMerge": false,
       "reason": "Workflow and CI-control changes can silently alter merge, deploy, or agent feedback behavior."
     },

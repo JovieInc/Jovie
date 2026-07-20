@@ -81,6 +81,11 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const PR_SIZE_GUARD_MANIFEST = [
+  '.github/workflows/pr-size-guard.yml',
+  'scripts/lib/pr-size-guard-policy.mjs',
+  'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
+];
 const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = [
   '.github/workflows/ci.yml',
   'apps/web/scripts/test-performance-guard.ts',
@@ -102,6 +107,23 @@ const PERFORMANCE_PROFILER_REPAIR_ANCHORS = [
 ];
 const PERFORMANCE_PROFILER_REPAIR_MANIFEST = [
   ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
+const SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST = [
+  '.github/workflows/agent-pipeline.yml',
+  '.github/workflows/ci.yml',
+  '.github/workflows/merge-queue-autoenroll.yml',
+  'apps/web/tests/unit/analytics-metrics-layer-guard.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+  'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
+  'apps/web/tests/unit/metrics-layer-guard-logic.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+];
+const SCANNER_LOAD_REPAIR_MANIFEST = [
+  ...SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
 const AUTHENTICATED_A11Y_REPAIR_CORE = [
@@ -173,6 +195,15 @@ const GTMQ_SOURCE_GATE_REAPER_MANIFEST = [
   'scripts/drain-pr-queue.sh',
   'scripts/guard-gtmq-source-authorization.sh',
   'scripts/tests/test_gh_retry.py',
+  'scripts/run-affected-tests.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
+const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = [
+  'apps/web/tests/e2e/mobile-overflow.spec.ts',
+  'apps/web/tests/e2e/utils/mobile-overflow.ts',
+  'apps/web/tests/unit/e2e/mobile-overflow-navigation.test.ts',
+  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
+  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -778,6 +809,71 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('selects the policy regression for the exact PR size guard signature', () => {
+    const plan = buildAffectedTestPlan(PR_SIZE_GUARD_MANIFEST);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
+    ]);
+  });
+
+  it('self-selects selector and policy regressions for this five-file control diff', () => {
+    const plan = buildAffectedTestPlan([
+      ...PR_SIZE_GUARD_MANIFEST,
+      ...AFFECTED_TEST_SELECTOR_MANIFEST,
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/lib/__tests__/pr-size-guard-policy.test.mjs',
+    ]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          'exec',
+          'vitest',
+          '--root',
+          'scripts',
+          '--config',
+          'vitest.config.mts',
+          'run',
+          'lib/__tests__/automation-verify.test.mjs',
+          'lib/__tests__/pr-size-guard-policy.test.mjs',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
+  });
+
+  it.each(
+    PR_SIZE_GUARD_MANIFEST
+  )('fails closed when the PR size guard input %s is standalone', input => {
+    expect(buildAffectedTestPlan([input]).mode).toBe('full');
+  });
+
+  it.each(
+    PR_SIZE_GUARD_MANIFEST
+  )('fails closed when the PR size guard signature is missing %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        PR_SIZE_GUARD_MANIFEST.filter(file => file !== missingInput)
+      ).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when the PR size guard signature includes an unknown peer', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...PR_SIZE_GUARD_MANIFEST,
+        'scripts/lib/unknown-pr-size-helper.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('selects the Graphite source-gate regression and selector self-test for the exact repair signature', () => {
     const plan = buildAffectedTestPlan(GTMQ_SOURCE_GATE_REAPER_MANIFEST);
 
@@ -820,6 +916,53 @@ describe('automation-verify affected scope', () => {
     ]);
   });
 
+  it('keeps Playwright deep and selects deterministic mobile overflow regressions', () => {
+    const plan = buildAffectedTestPlan(
+      MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST
+    );
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/e2e/mobile-overflow-navigation.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+    ]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      [
+        'pnpm',
+        [
+          'exec',
+          'vitest',
+          '--root',
+          'scripts',
+          '--config',
+          'vitest.config.mts',
+          'run',
+          'lib/__tests__/automation-verify.test.mjs',
+          'hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+      [
+        'pnpm',
+        [
+          '--filter',
+          '@jovie/web',
+          'exec',
+          'vitest',
+          'run',
+          'tests/unit/e2e/mobile-overflow-navigation.test.ts',
+          '--passWithNoTests',
+          '--maxWorkers',
+          '2',
+        ],
+      ],
+    ]);
+  });
+
   it.each([
     { manifest: PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST },
     { manifest: PERFORMANCE_PROFILER_REPAIR_MANIFEST },
@@ -842,6 +985,57 @@ describe('automation-verify affected scope', () => {
         ? ['scripts/lib/__tests__/automation-verify.test.mjs']
         : []),
     ]);
+  });
+
+  it.each([
+    { manifest: SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST },
+    { manifest: SCANNER_LOAD_REPAIR_MANIFEST },
+  ])('selects scanner-load and Gem regressions for an exact repair signature', ({
+    manifest,
+  }) => {
+    const plan = buildAffectedTestPlan(manifest);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/analytics-metrics-layer-guard.test.ts',
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
+    ]);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+      ...(manifest.length === SCANNER_LOAD_REPAIR_MANIFEST.length
+        ? ['scripts/lib/__tests__/automation-verify.test.mjs']
+        : []),
+    ]);
+  });
+
+  it.each(
+    SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST
+  )('fails closed when the scanner-load repair is missing %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST.filter(
+          file => file !== missingInput
+        )
+      ).mode
+    ).toBe('full');
+    expect(
+      buildAffectedTestPlan(
+        SCANNER_LOAD_REPAIR_MANIFEST.filter(file => file !== missingInput)
+      ).mode
+    ).toBe('full');
+  });
+
+  it.each(
+    AFFECTED_TEST_SELECTOR_MANIFEST
+  )('fails closed when the scanner-load repair is missing selector input %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        SCANNER_LOAD_REPAIR_MANIFEST.filter(file => file !== missingInput)
+      ).mode
+    ).toBe('full');
   });
 
   it('keeps the Layout Guard contract repair on its focused cross-runtime regressions', () => {
@@ -906,6 +1100,27 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan(
         GTMQ_SOURCE_GATE_REAPER_MANIFEST.filter(file => file !== missingInput)
       ).mode
+    ).toBe('full');
+  });
+
+  it.each(
+    MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST
+  )('fails closed when the mobile overflow navigation repair is missing %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.filter(
+          file => file !== missingInput
+        )
+      ).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when the mobile overflow navigation repair includes an unknown peer', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST,
+        'scripts/hermes/lib/unknown-mobile-overflow-helper.ts',
+      ]).mode
     ).toBe('full');
   });
 

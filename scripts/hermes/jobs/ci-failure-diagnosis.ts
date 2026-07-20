@@ -1,6 +1,14 @@
 export type CiFailureClass =
   | 'agent_gate_evidence_missing_without_producer'
+  | 'staged_production_deployment_failed'
+  | 'production_alias_not_updated'
+  | 'production_promotion_state_blocked'
   | 'gate_dependency_cache_timeout'
+  | 'required_smoke_suppressed_by_dependency_skip'
+  | 'storybook_browser_iframe_transport'
+  | 'lighthouse_protocol_timeout'
+  | 'lighthouse_loopback_origin_drift'
+  | 'lighthouse_deterministic_assertion'
   | 'bounded_source_scan_timeout'
   | 'visual_qa_prune_timestamp_race'
   | 'golden_path_signup_hydration_reset'
@@ -17,6 +25,7 @@ export type CiFailureClass =
   | 'vercel_concurrent_build_queue'
   | 'layout_guard_contract_missing'
   | 'standalone_runtime_launcher_mismatch'
+  | 'vercel_prebuilt_function_closure_missing'
   | 'chat_composer_unsettled_entry_animation'
   | 'neon_endpoint_capacity_admission'
   | 'neon_probe_workspace_dependency_resolution'
@@ -28,9 +37,11 @@ export type CiFailureClass =
   | 'broad_test_performance_regression'
   | 'isolated_stuck_test_regression'
   | 'test_fixture_import_timeout'
+  | 'mobile_overflow_navigation_race'
   | 'runner_slice_task_saturation'
   | 'runner_process_exhaustion'
   | 'runner_io_pressure_admission'
+  | 'runner_io_pressure_post_admission_herd'
   | 'runner_host_pressure'
   | 'shared_neon_endpoint_reaped_while_active'
   | 'runner_image_proof_disk_exhaustion'
@@ -75,6 +86,129 @@ const DIAGNOSES: ReadonlyArray<{
       'The dependency-free CI Risk Classifier exhausted its three-minute job budget restoring and extracting the full pnpm dependency cache before classification started.',
     remediation:
       'Remove dependency restore, pnpm fetch, and pnpm install from dependency-free gates; run the native Node classifier directly instead of blindly rerunning the same cache extraction.',
+  },
+  {
+    failureClass: 'vercel_prebuilt_function_closure_missing',
+    matches: log =>
+      /\/var\/task\/apps\/web\/\.next\/server/i.test(log) &&
+      (/(?:Cannot find module|Failed to load external module) ['"]?(?:require|import)-in-the-middle-[a-z0-9]+['"]?/i.test(
+        log
+      ) ||
+        /Cannot find package ['"]@opentelemetry\/sdk-node['"]/i.test(log)),
+    rootCause:
+      'The prebuilt Vercel function was deployed without repo-relative files referenced by its Build Output filePathMap. Transferring only .vercel/output between jobs can omit those traced runtime sources, so middleware fails before the health handler boots.',
+    remediation:
+      'Do not rerun or promote the unchanged prebuilt. Build and deploy in the same job and workspace so every filePathMap source remains available; never restore .vercel/output alone. Require the exact deployment to pass /api/health before promotion.',
+  },
+  {
+    failureClass: 'staged_production_deployment_failed',
+    matches: log =>
+      /failure_subtype=(?:production_artifact_failed|staged_production_not_ready|staged_production_canary_failed)/i.test(
+        log
+      ),
+    rootCause:
+      'The exact Production-target prebuilt artifact failed to build, become READY, or pass its direct build-info, health, and homepage canary before promotion.',
+    remediation:
+      'Inspect the Production env pull, prebuilt deploy JSON, exact deployment state, and direct canary. Never substitute or promote the Preview deployment.',
+  },
+  {
+    failureClass: 'production_alias_not_updated',
+    matches: log => /failure_subtype=production_alias_not_updated/i.test(log),
+    rootCause:
+      'Vercel accepted the staged Production deployment, but canonical jov.ie did not converge to its deployment ID and exact runtime SHA across plain, stable, and canary routes.',
+    remediation:
+      'Inspect `vercel inspect jov.ie`, rolling-release state, and cache-busted unauthenticated build-info responses. Do not accept direct deployment or Preview evidence as production proof.',
+  },
+  {
+    failureClass: 'production_promotion_state_blocked',
+    matches: log =>
+      /failure_subtype=production_promotion_(?:foreign_rollout|state_invalid|state_blocked|failed|rollback_failed)/i.test(
+        log
+      ),
+    rootCause:
+      'Vercel promotion state was foreign, malformed, failed, or could not be safely returned to a verified terminal state inside the bounded controller window.',
+    remediation:
+      'Inspect the exact active rolling-release target and `vercel inspect jov.ie`. Never resubmit promotion or mutate a rollout unless its deployment ID proves this run owns it.',
+  },
+  {
+    failureClass: 'required_smoke_suppressed_by_dependency_skip',
+    matches: log =>
+      /E2E Smoke \(PR Fast Feedback\) was required for this PR, but result was skipped/i.test(
+        log
+      ) &&
+      /ci-build-public:\s*success\s*\(has_artifact=true\)/i.test(log) &&
+      /neon-db:\s*skipped/i.test(log),
+    rootCause:
+      'The required smoke job was selected by risk policy with its shared build artifact present, but GitHub suppressed it after the path-gated Neon prerequisite skipped, so the job-level condition never materialized the intended evidence.',
+    remediation:
+      'Do not rerun the unchanged workflow. Ensure the smoke job condition begins with always(), preserves explicit accepted prerequisite results, and lets its fallback fixture path run before retrying.',
+  },
+  {
+    failureClass: 'storybook_browser_iframe_transport',
+    matches: log => {
+      const normalizedLog = log.replace(/(?:\u001b\[|\^\[\[)[0-9;]*m/g, '');
+      return (
+        /(?:Complete job name:\s*Storybook A11y|storybook \(chromium\))/i.test(
+          normalizedLog
+        ) &&
+        /Failed to import test file [^\n]*\.storybook\/vitest\.setup\.ts/i.test(
+          normalizedLog
+        ) &&
+        /Failed to fetch dynamically imported module:\s*http:\/\/localhost:\d+\/[^\n]*\.storybook\/vitest\.setup\.ts/i.test(
+          normalizedLog
+        ) &&
+        /Cannot connect to the iframe/i.test(normalizedLog) &&
+        /Received URL:\s*unknown due to CORS/i.test(normalizedLog) &&
+        /Test Files[\s\S]{0,300}\b37 passed\b/i.test(normalizedLog) &&
+        /Tests[\s\S]{0,200}\b289 passed\b/i.test(normalizedLog)
+      );
+    },
+    rootCause:
+      'The Storybook browser runner completed the substantive suite, then lost its localhost Vitest iframe transport while dynamically importing the shared setup module; the paired unknown-CORS iframe error is runner/browser transport drift, not a story assertion.',
+    remediation:
+      'After an exact-head local Storybook proof, allow one targeted Storybook A11y rerun. If the paired signature repeats, stop and collect browser process, iframe URL, open-file, memory, and runner-pressure diagnostics; do not change stories, dependencies, or retry the full CI run.',
+  },
+  {
+    failureClass: 'lighthouse_loopback_origin_drift',
+    matches: log =>
+      /LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion\b/i.test(log) &&
+      /BASE_URL:\s*http:\/\/127\.0\.0\.1:3000/i.test(log) &&
+      /Network:\s*http:\/\/0\.0\.0\.0:3000/i.test(log) &&
+      /result\(s\) for http:\/\/127\.0\.0\.1:3000\/testartist\?mode=subscribe/i.test(
+        log
+      ) &&
+      /categories\.best-practices failure for minScore assertion[\s\S]{0,300}?found:\s*0\.78/i.test(
+        log
+      ) &&
+      /errors-in-console warning for minScore assertion/i.test(log),
+    rootCause:
+      'The public Lighthouse lane requested the seeded profile on 127.0.0.1 while the standalone runtime advertised 0.0.0.0, allowing a host-derived redirect to cross loopback origins and produce deterministic HTTPS/CORS best-practices evidence.',
+    remediation:
+      'Do not retry. Pin HOSTNAME and every canonical app/auth base URL to the same 127.0.0.1 origin before launching the standalone server, then rerun the affected shard and verify the seeded profile never redirects to 0.0.0.0.',
+  },
+  {
+    failureClass: 'lighthouse_deterministic_assertion',
+    matches: log =>
+      /LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion\b/i.test(log) &&
+      /(?:assertion failure for|assertion failed|expected[^\n]*(?:but got|found|received|actual))/i.test(
+        log
+      ),
+    rootCause:
+      'Lighthouse completed collection and reported a deterministic audit or threshold assertion failure; runner or Chrome transport recovery cannot change that product evidence.',
+    remediation:
+      'Do not retry. Fix the named audit, fixture, or threshold regression and rerun the affected Lighthouse route once the exact assertion is addressed.',
+  },
+  {
+    failureClass: 'lighthouse_protocol_timeout',
+    matches: log =>
+      /LIGHTHOUSE_FAILURE_CLASS=transient_protocol\b/i.test(log) &&
+      /(?:\bPROTOCOL_TIMEOUT\b|Waiting for DevTools protocol response has exceeded the allotted time)/i.test(
+        log
+      ),
+    rootCause:
+      'Lighthouse lost the Chrome DevTools protocol transport while collecting evidence; this is a browser/tooling failure rather than a product threshold assertion.',
+    remediation:
+      "Use only the wrapper's bounded transient retry. If it exhausts, stop and collect the protocol method, Chrome process, memory, open-file, and runner-pressure diagnostics; do not add another workflow rerun or weaken assertions.",
   },
   {
     failureClass: 'runner_image_proof_disk_exhaustion',
@@ -420,16 +554,16 @@ const DIAGNOSES: ReadonlyArray<{
   {
     failureClass: 'bounded_source_scan_timeout',
     matches: log =>
-      /(?:analytics-metrics-layer-guard|touch-target-ratchet|destructive-confirm-dialog-audit|feature-flags-registry|arbitrary-values-ratchet|exp-drift-lint-guard)\.test\.ts/i.test(
+      /(?:analytics-metrics-layer-guard|touch-target-ratchet|destructive-confirm-dialog-audit|feature-flags-registry|arbitrary-values-ratchet|exp-import-boundary|exp-drift-lint-guard)\.test\.ts/i.test(
         log
       ) &&
       /(?:test timed out|timeout).*?\b\d+\s*ms|spawnSync\s+\S+\s+ETIMEDOUT/is.test(
         log
       ),
     rootCause:
-      'A source ratchet or nested lint scanner exceeded its bounded test timeout while traversing or analyzing the source tree.',
+      'A source ratchet or nested lint scanner exceeded its bounded test timeout while traversing or analyzing the source tree. The timeout log alone cannot distinguish a scanner regression from shared-host I/O saturation.',
     remediation:
-      'Intersect native candidate-token and semantic file sets before JavaScript source reads, and remove repeated reads, per-entry stat calls, or nested package-manager lint processes; preserve fail-closed fallback instead of classifying this as runner EAGAIN, increasing the timeout, or blindly rerunning.',
+      'Compare the scanner blob with its base and run the exact focused test first. An unchanged blob plus a focused pass identifies shared-host I/O saturation; otherwise inspect and optimize the scanner. Intersect native candidate-token and semantic file sets before JavaScript source reads, preserve a complete fail-closed fallback, match Vitest workers to the runner CPU quota, and keep full-tree scanners within an explicit 30-second ceiling; do not skip the check, add runner fanout, or try to fix the failure by blindly rerunning.',
   },
   {
     failureClass: 'test_fixture_import_timeout',
@@ -440,6 +574,20 @@ const DIAGNOSES: ReadonlyArray<{
       'The HUD page test counted its cold dynamic module transform and import against the per-test timeout after resetting the module graph.',
     remediation:
       'Hoist the mocked HUD page import outside the timed test bodies and avoid resetting modules when the assertions do not require a fresh module graph.',
+  },
+  {
+    failureClass: 'mobile_overflow_navigation_race',
+    matches: log =>
+      /Mobile Overflow/i.test(log) &&
+      /auth-signin/i.test(log) &&
+      /page\.evaluate: Execution context was destroyed, most likely because of a navigation/i.test(
+        log
+      ) &&
+      /utils\/mobile-overflow\.ts/i.test(log),
+    rootCause:
+      'The no-auth mobile overflow lane only recognized a DOM data-dgst redirect marker, but the raw Next.js response carries the digest in its streamed Flight script, so DOM measurement began before navigation completed and invalidated the evaluation context.',
+    remediation:
+      'Parse the NEXT_REDIRECT digest from the raw response and wait for its exact target to finish loading before hydration and overflow measurement; do not retry page.evaluate.',
   },
   {
     failureClass: 'runner_slice_task_saturation',

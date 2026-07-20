@@ -43,8 +43,9 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const { label, investorName, email } = body;
+  const trimmedLabel = typeof label === 'string' ? label.trim() : '';
 
-  if (!label || typeof label !== 'string') {
+  if (!trimmedLabel) {
     return NextResponse.json({ error: 'Label is required' }, { status: 400 });
   }
 
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
     .insert(investorLinks)
     .values({
       token,
-      label: label.trim(),
+      label: trimmedLabel,
       investorName: investorName?.trim() || null,
       email: email?.trim() || null,
     })

@@ -1,12 +1,11 @@
 name: desktop-release
+run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }}
 
 # Triggers:
-# - Auto on push to main when VERSION or this workflow changes
-#   → builds + publishes a production release to GitHub Releases.
-#   Desktop-only code changes alone do NOT trigger a release; bump VERSION to
-#   ship them. This avoids republishing the same semver and producing an
-#   updater no-op when desktop code lands without a version bump.
-# - Manual workflow_dispatch lets you target staging or re-run production.
+# - Auto after Production Controller verifies exact current main, only when
+#   VERSION changed since the last proven publish.
+# - Manual dispatch uploads a short-lived staging artifact, or rebuilds
+#   production after the same Production Verified proof.
 #
 # Signing & notarization:
 # - Requires GH secrets: MAC_CERTIFICATE_BASE64, MAC_CERTIFICATE_PASSWORD,
@@ -22,11 +21,10 @@ name: desktop-release
 # - Canonical prod/staging/local shell matrix: apps/desktop/BUILDS.md (GH-12900).
 
 on:
-  push:
+  workflow_run:
+    workflows: [Production Controller]
+    types: [completed]
     branches: [main]
-    paths:
-      - "VERSION"
-      - ".github/workflows/desktop-release.yml"  # explicit handling for desktop auth allowlist/scheme fixes (e.g. 9870/9812 Clerk wildcard; JOV-3835 CSP-watchdog blank-window fix; GH-12822 per-env callback schemes)
   workflow_dispatch:
     inputs:
       environment:
@@ -40,15 +38,752 @@ on:
 permissions: {}
 
 concurrency:
-  # On push, github.event.inputs.environment is empty → group becomes
-  # "desktop-release-production" (the default for push). On manual dispatch,
-  # the chosen environment is used. cancel-in-progress=false so a queued
-  # production build doesn't get killed by a slow staging build.
-  group: desktop-release-${{ github.event.inputs.environment || 'production' }}
+  # Never cancel in-flight notarization or a partially uploaded release.
+  group: desktop-release-publisher
   cancel-in-progress: false
 
 jobs:
+  authorize-release:
+    name: Authorize verified desktop release
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      release_sha: ${{ steps.authorize.outputs.release_sha }}
+      environment: ${{ steps.authorize.outputs.environment }}
+      baseline_sha: ${{ steps.authorize.outputs.baseline_sha }}
+      should_release: ${{ steps.select.outputs.should_release }}
+    steps:
+      - name: Cross-prove exact production evidence
+        id: authorize
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          DESKTOP_RUN_ATTEMPT: ${{ github.run_attempt }}
+          DESKTOP_RUN_ID: ${{ github.run_id }}
+          MANUAL_ENVIRONMENT: ${{ inputs.environment || 'production' }}
+          MANUAL_SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+          TRIGGER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          TRIGGER_RUN_EVENT: ${{ github.event.workflow_run.event }}
+          TRIGGER_RUN_PATH: ${{ github.event.workflow_run.path }}
+          TRIGGER_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+          TRIGGER_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIGGER_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          TRIGGER_HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          TRIGGER_RUN_STATUS: ${{ github.event.workflow_run.status }}
+          TRIGGER_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "release_sha="
+            echo "environment="
+            echo "baseline_sha="
+            echo "authorized=false"
+            echo "manual=false"
+            echo "already_released=false"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            [[ "$TRIGGER_RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
+              [[ "$TRIGGER_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] &&
+              [[ "$TRIGGER_WORKFLOW_ID" =~ ^[1-9][0-9]*$ ]] &&
+              [[ "$TRIGGER_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] &&
+              [ "$TRIGGER_RUN_EVENT" = "workflow_run" ] &&
+              [ "$TRIGGER_RUN_PATH" = ".github/workflows/production-controller.yml" ] &&
+              [ "$TRIGGER_HEAD_BRANCH" = "main" ] &&
+              [ "$TRIGGER_HEAD_REPOSITORY" = "$REPOSITORY" ] &&
+              [ "$TRIGGER_RUN_STATUS" = "completed" ] &&
+              [ "$TRIGGER_RUN_CONCLUSION" = "success" ] || {
+              echo "::error::Desktop trigger was not an exact successful Production Controller run."
+              exit 1
+            }
+            release_sha="$TRIGGER_HEAD_SHA"
+            environment="production"
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            [[ "$MANUAL_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "::error::Manual desktop dispatch did not resolve a full commit SHA."
+              exit 1
+            }
+            case "$MANUAL_ENVIRONMENT" in
+              staging | production) environment="$MANUAL_ENVIRONMENT" ;;
+              *)
+                echo "::error::Unsupported desktop environment: $MANUAL_ENVIRONMENT"
+                exit 1
+                ;;
+            esac
+            release_sha="$MANUAL_SHA"
+            echo "manual=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Unsupported desktop release event: $EVENT_NAME"
+            exit 1
+          fi
+
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            run_record="$(gh api \
+              "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT")"
+            workflow_record="$(gh api \
+              "repos/$REPOSITORY/actions/workflows/$TRIGGER_WORKFLOW_ID")"
+            jq -e \
+              --arg workflow_id "$TRIGGER_WORKFLOW_ID" '
+                type == "object" and
+                (.id | type == "number" and . >= 1 and floor == .) and
+                (.id | tostring) == $workflow_id and
+                .name == "Production Controller" and
+                .path == ".github/workflows/production-controller.yml"
+              ' >/dev/null <<<"$workflow_record" || {
+              echo "::error::Production Controller workflow identity was not proven."
+              exit 1
+            }
+            controller_generation_selector='
+              if (
+                type == "object" and
+                (.id | type == "number" and . >= 1 and floor == .) and
+                (.id | tostring) == $run_id and
+                (.run_attempt | type == "number" and . >= 1 and floor == .) and
+                (.run_attempt | tostring) == $run_attempt and
+                (.workflow_id | type == "number" and . >= 1 and floor == .) and
+                (.workflow_id | tostring) == $workflow_id and
+                .head_sha == $transport_sha and
+                .head_branch == "main" and
+                .head_repository.full_name == $repo and
+                .event == "workflow_run" and
+                .path == ".github/workflows/production-controller.yml" and
+                .status == "completed" and
+                .conclusion == "success" and
+                (.display_title | type == "string" and
+                  test("^Production Controller [0-9a-f]{40} from CI [1-9][0-9]* attempt [1-9][0-9]*$"))
+              ) then
+                .display_title
+                | capture("^Production Controller (?<generation>[0-9a-f]{40}) from CI [1-9][0-9]* attempt [1-9][0-9]*$")
+                | .generation
+              else
+                empty
+              end
+          '
+            if ! controller_generation="$(jq -er \
+              --arg repo "$REPOSITORY" \
+              --arg run_id "$TRIGGER_RUN_ID" \
+              --arg run_attempt "$TRIGGER_RUN_ATTEMPT" \
+              --arg workflow_id "$TRIGGER_WORKFLOW_ID" \
+              --arg transport_sha "$release_sha" \
+              "$controller_generation_selector" <<<"$run_record")"; then
+              echo "::error::Exact Production Controller attempt evidence did not match the workflow_run signal."
+              exit 1
+            fi
+            if [ "$controller_generation" != "$release_sha" ]; then
+              echo "::notice::Production Controller generation $controller_generation was superseded before desktop observer dispatch; transport head is $release_sha."
+              exit 0
+            fi
+          fi
+
+          echo "environment=$environment" >> "$GITHUB_OUTPUT"
+          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact current main for desktop authorization."
+            exit 1
+          }
+          if [ "$current_main_sha" != "$release_sha" ]; then
+            echo "::notice::Desktop generation $release_sha was superseded by $current_main_sha."
+            exit 0
+          fi
+
+          # Staging can only upload an Actions artifact from current main.
+          if [ "$environment" = "staging" ]; then
+            echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
+            echo "authorized=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          prove_existing_production_marker() {
+            local expected_sha="$1"
+            local marker_name="production-generation-verified-$expected_sha"
+            local artifacts_json marker_candidates marker_count
+            if ! artifacts_json="$(gh api \
+              "repos/$REPOSITORY/actions/artifacts?name=$marker_name&per_page=100")"; then
+              echo "::error::Could not fetch Production Verified markers."
+              return 2
+            fi
+            jq -e 'type == "object" and (.artifacts | type == "array")' \
+              >/dev/null <<<"$artifacts_json" || {
+              echo "::error::GitHub returned malformed Production Verified markers."
+              return 2
+            }
+            marker_count="$(jq --arg sha "$expected_sha" '[
+              .artifacts[]?
+              | select(
+                  .expired == false and
+                  .name == ("production-generation-verified-" + $sha)
+                )
+            ] | length' <<<"$artifacts_json")"
+            [ "$marker_count" -gt 0 ] || return 1
+            marker_candidates="$(jq -r --arg sha "$expected_sha" '
+              [
+                .artifacts[]
+                | select(
+                    .expired == false and
+                    .name == ("production-generation-verified-" + $sha)
+                  )
+              ]
+              | sort_by(.created_at, .id) | reverse
+              | .[] | [.id, .workflow_run.id] | @tsv
+            ' <<<"$artifacts_json")"
+
+            while IFS=$'\t' read -r artifact_id controller_run_id; do
+              [ -n "$controller_run_id" ] || continue
+              [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] &&
+                [[ "$controller_run_id" =~ ^[1-9][0-9]*$ ]] || continue
+
+              local controller_json controller_attempt controller_jobs verified_count
+              local controller_workflow_id workflow_json
+              if ! controller_json="$(gh api \
+                "repos/$REPOSITORY/actions/runs/$controller_run_id")"; then
+                echo "::error::Could not fetch Production Controller run $controller_run_id."
+                return 2
+              fi
+              jq -e '
+                type == "object" and
+                (.workflow_id | type == "number") and
+                (.run_attempt | type == "number" and . >= 1)
+              ' >/dev/null <<<"$controller_json" || {
+                echo "::error::GitHub returned malformed Production Controller evidence."
+                return 2
+              }
+              if ! jq -e \
+                --arg repo "$REPOSITORY" \
+                --arg sha "$expected_sha" '
+                  type == "object" and
+                  .head_sha == $sha and
+                  .head_branch == "main" and
+                  .head_repository.full_name == $repo and
+                  .event == "workflow_run" and
+                  .path == ".github/workflows/production-controller.yml" and
+                  .status == "completed" and
+                  .conclusion == "success" and
+                  (.display_title | test("^Production Controller " + $sha + " from CI [1-9][0-9]* attempt [1-9][0-9]*$"))
+                ' >/dev/null <<<"$controller_json"; then
+                continue
+              fi
+              controller_workflow_id="$(jq -r '.workflow_id' <<<"$controller_json")"
+              if ! workflow_json="$(gh api \
+                "repos/$REPOSITORY/actions/workflows/$controller_workflow_id")"; then
+                echo "::error::Could not fetch Production Controller workflow identity."
+                return 2
+              fi
+              jq -e \
+                --arg workflow_id "$controller_workflow_id" '
+                  type == "object" and
+                  (.id | tostring) == $workflow_id and
+                  .name == "Production Controller" and
+                  .path == ".github/workflows/production-controller.yml"
+                ' >/dev/null <<<"$workflow_json" || continue
+              controller_attempt="$(jq -r '.run_attempt' <<<"$controller_json")"
+              if ! controller_jobs="$(gh api --paginate --slurp \
+                "repos/$REPOSITORY/actions/runs/$controller_run_id/attempts/$controller_attempt/jobs?per_page=100")"; then
+                echo "::error::Could not fetch Production Controller jobs."
+                return 2
+              fi
+              if ! jq -e '
+                type == "array" and length > 0 and
+                all(.[]; type == "object" and (.jobs | type == "array"))
+              ' >/dev/null <<<"$controller_jobs"; then
+                echo "::error::GitHub returned malformed Production Controller jobs."
+                return 2
+              fi
+              verified_count="$(jq --arg sha "$expected_sha" '
+                [
+                  .[].jobs[]?
+                  | select(
+                      .name == "Production Verified" and
+                      .head_sha == $sha and
+                      .status == "completed" and
+                      .conclusion == "success"
+                    )
+                ] | length
+              ' <<<"$controller_jobs")"
+              [ "$verified_count" = "1" ] || continue
+
+              local marker_archive marker_json
+              marker_archive="$RUNNER_TEMP/production-marker-${artifact_id}.zip"
+              marker_json="$RUNNER_TEMP/production-marker-${artifact_id}.json"
+              if ! gh api "repos/$REPOSITORY/actions/artifacts/$artifact_id/zip" \
+                > "$marker_archive"; then
+                echo "::error::Could not download Production Verified marker $artifact_id."
+                return 2
+              fi
+              if unzip -p "$marker_archive" production-generation-verified.json \
+                > "$marker_json" 2>/dev/null &&
+                jq -e \
+                  --arg sha "$expected_sha" \
+                  --arg run "$controller_run_id" '
+                    type == "object" and
+                    .sha == $sha and
+                    (.deploymentId | type == "string" and startswith("dpl_")) and
+                    .controllerRun == $run
+                  ' >/dev/null "$marker_json"; then
+                return 0
+              fi
+            done <<<"$marker_candidates"
+            echo "::error::$marker_count Production Verified marker(s) existed, but none fully proved $expected_sha."
+            return 2
+          }
+
+          production_proven=false
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            jobs_json="$(gh api --paginate --slurp \
+              "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT/jobs?per_page=100")"
+            jq -e '
+              type == "array" and length > 0 and
+              all(.[]; type == "object" and (.jobs | type == "array"))
+            ' >/dev/null <<<"$jobs_json" || {
+              echo "::error::GitHub returned malformed Production Controller job evidence."
+              exit 1
+            }
+            verified_count="$(jq --arg sha "$release_sha" '
+              [
+                .[].jobs[]?
+                | select(
+                    .name == "Production Verified" and
+                    .head_sha == $sha and
+                    .status == "completed" and
+                    .conclusion == "success"
+                  )
+              ] | length
+            ' <<<"$jobs_json")"
+            if [ "$verified_count" = "1" ]; then
+              production_proven=true
+            fi
+          fi
+
+          if [ "$production_proven" != "true" ]; then
+            if prove_existing_production_marker "$release_sha"; then
+              production_proven=true
+              echo "Existing exact Production Verified marker authorized $release_sha."
+            else
+              echo "::error::Current main lacks exact successful Production Verified evidence."
+              exit 1
+            fi
+          fi
+
+          echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
+          echo "authorized=true" >> "$GITHUB_OUTPUT"
+
+          # Manual production may rebuild, but cannot bypass verification.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            exit 0
+          fi
+
+          # Authorize-only green runs never create this publish baseline.
+          baseline_sha=""
+          publish_markers="$(gh api \
+            "repos/$REPOSITORY/actions/artifacts?name=desktop-production-published&per_page=100")"
+          jq -e '
+            type == "object" and (.artifacts | type == "array") and
+            all(.artifacts[];
+              type == "object" and
+              .name == "desktop-production-published" and
+              (.id | type == "number" and . > 0) and
+              (.expired | type == "boolean") and
+              (.created_at | type == "string" and length > 0) and
+              (.workflow_run.id | type == "number" and . > 0)
+            )
+          ' \
+            >/dev/null <<<"$publish_markers" || {
+            echo "::error::GitHub returned malformed desktop publish markers."
+            exit 1
+          }
+          # Any exact-name history is durable evidence that a desktop release
+          # may already have been published. Expired-only evidence may use the
+          # bounded publisher recovery below, but must never become bootstrap.
+          publish_marker_presence_count="$(jq '.artifacts | length' \
+            <<<"$publish_markers")"
+          marker_candidates="$(jq -r '
+            [
+              .artifacts[]?
+              | select(
+                  .expired == false and
+                  .name == "desktop-production-published" and
+                  (.id | type == "number") and
+                  (.workflow_run.id | type == "number")
+                )
+            ]
+            | sort_by(.created_at, .id) | reverse
+            | .[] | [.id, .workflow_run.id] | @tsv
+          ' <<<"$publish_markers")"
+
+          while IFS=$'\t' read -r artifact_id run_id; do
+            [ -n "$run_id" ] || continue
+            [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] &&
+              [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || continue
+
+            if ! run_json="$(gh api "repos/$REPOSITORY/actions/runs/$run_id")"; then
+              echo "::error::Could not fetch desktop publish run $run_id."
+              exit 1
+            fi
+            jq -e '
+              type == "object" and
+              (.workflow_id | type == "number") and
+              (.run_attempt | type == "number" and . >= 1)
+            ' >/dev/null <<<"$run_json" || {
+              echo "::error::GitHub returned malformed desktop publish run evidence."
+              exit 1
+            }
+            if ! jq -e --arg repo "$REPOSITORY" '
+              type == "object" and
+              .head_branch == "main" and
+              .head_repository.full_name == $repo and
+              .path == ".github/workflows/desktop-release.yml" and
+              (.event == "workflow_run" or .event == "workflow_dispatch") and
+              (.head_sha | test("^[0-9a-f]{40}$")) and
+              (. as $run | $run.display_title == ("Desktop release " + $run.head_sha))
+            ' >/dev/null <<<"$run_json"; then
+              continue
+            fi
+            run_sha="$(jq -r '.head_sha' <<<"$run_json")"
+            workflow_id="$(jq -r '.workflow_id' <<<"$run_json")"
+            if ! workflow_json="$(gh api \
+              "repos/$REPOSITORY/actions/workflows/$workflow_id")"; then
+              echo "::error::Could not fetch desktop workflow identity."
+              exit 1
+            fi
+            jq -e --arg workflow_id "$workflow_id" '
+              type == "object" and
+              (.id | tostring) == $workflow_id and
+              .name == "desktop-release" and
+              .path == ".github/workflows/desktop-release.yml"
+            ' >/dev/null <<<"$workflow_json" || continue
+
+            marker_archive="$RUNNER_TEMP/desktop-publish-marker-${artifact_id}.zip"
+            marker_json="$RUNNER_TEMP/desktop-publish-marker-${artifact_id}.json"
+            if ! gh api "repos/$REPOSITORY/actions/artifacts/$artifact_id/zip" \
+              > "$marker_archive"; then
+              echo "::error::Could not download desktop publish marker $artifact_id."
+              exit 1
+            fi
+            if ! unzip -p "$marker_archive" desktop-production-published.json \
+              > "$marker_json" 2>/dev/null; then
+              continue
+            fi
+            if ! jq -e \
+              --arg sha "$run_sha" \
+              --arg run "$run_id" '
+                type == "object" and
+                .schema == 1 and
+                .environment == "production" and
+                .sha == $sha and
+                .runId == $run and
+                (.publisherAttempt | type == "string" and test("^[1-9][0-9]*$")) and
+                (.publisherJobId | type == "string" and test("^[1-9][0-9]*$"))
+              ' >/dev/null "$marker_json"; then
+              continue
+            fi
+            publisher_attempt="$(jq -r '.publisherAttempt' "$marker_json")"
+            publisher_job_id="$(jq -r '.publisherJobId' "$marker_json")"
+            if ! run_jobs="$(gh api --paginate --slurp \
+              "repos/$REPOSITORY/actions/runs/$run_id/attempts/$publisher_attempt/jobs?per_page=100")"; then
+              echo "::error::Could not fetch desktop publisher jobs."
+              exit 1
+            fi
+            if ! jq -e '
+              type == "array" and length > 0 and
+              all(.[]; type == "object" and (.jobs | type == "array"))
+            ' >/dev/null <<<"$run_jobs"; then
+              echo "::error::GitHub returned malformed desktop publisher jobs."
+              exit 1
+            fi
+            publisher_count="$(jq \
+              --arg sha "$run_sha" \
+              --arg job "$publisher_job_id" '
+              [
+                .[].jobs[]?
+                | select(
+                    (.id | tostring) == $job and
+                    .name == "Publish production desktop release" and
+                    .head_sha == $sha and
+                    .status == "completed" and
+                    .conclusion == "success" and
+                    ([.steps[]? | select(
+                      .name == "Publish production desktop release" and
+                      .status == "completed" and
+                      .conclusion == "success"
+                    )] | length) == 1
+                  )
+              ] | length
+            ' <<<"$run_jobs")"
+            [ "$publisher_count" = "1" ] || continue
+            baseline_sha="$run_sha"
+            break
+          done <<<"$marker_candidates"
+
+          # Recover publish truth when the release mutation succeeded but its
+          # dependent marker job failed. This also makes rerun-all idempotent.
+          if [ -z "$baseline_sha" ]; then
+            [[ "$DESKTOP_RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
+              [[ "$DESKTOP_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
+              echo "::error::Current desktop run identity is malformed."
+              exit 1
+            }
+            desktop_workflow="$(gh api \
+              "repos/$REPOSITORY/actions/workflows/desktop-release.yml")"
+            jq -e '
+              type == "object" and
+              (.id | type == "number") and
+              .name == "desktop-release" and
+              .path == ".github/workflows/desktop-release.yml"
+            ' >/dev/null <<<"$desktop_workflow" || {
+              echo "::error::Desktop workflow identity was not proven."
+              exit 1
+            }
+            desktop_workflow_id="$(jq -r '.id' <<<"$desktop_workflow")"
+            recovery_runs="$(gh api \
+              "repos/$REPOSITORY/actions/workflows/$desktop_workflow_id/runs?branch=main&status=completed&per_page=25")"
+            jq -e \
+              --arg repo "$REPOSITORY" \
+              --arg workflow_id "$desktop_workflow_id" '
+                type == "object" and
+                (.workflow_runs | type == "array") and
+                all(.workflow_runs[]?;
+                  (.id | type == "number") and
+                  (.run_attempt | type == "number" and . >= 1 and . <= 10) and
+                  (.workflow_id | tostring) == $workflow_id and
+                  .head_branch == "main" and
+                  .head_repository.full_name == $repo and
+                  .path == ".github/workflows/desktop-release.yml" and
+                  .status == "completed" and
+                  (.head_sha | test("^[0-9a-f]{40}$")) and
+                  (.event | type == "string") and
+                  (.display_title | type == "string")
+                )
+              ' >/dev/null <<<"$recovery_runs" || {
+              echo "::error::GitHub returned malformed desktop recovery history."
+              exit 1
+            }
+            recovery_candidates="$(
+              if [ "$DESKTOP_RUN_ATTEMPT" -gt 1 ]; then
+                for ((attempt = DESKTOP_RUN_ATTEMPT - 1; attempt >= 1; attempt--)); do
+                  printf '%s\t%s\t%s\n' "$DESKTOP_RUN_ID" "$attempt" "$release_sha"
+                done
+              fi
+              jq -r '
+                map(. as $run | select(
+                  ($run.event == "workflow_run" or $run.event == "workflow_dispatch") and
+                  $run.display_title == ("Desktop release " + $run.head_sha)
+                )) |
+                sort_by(.created_at, .id) | reverse | .[] |
+                . as $run |
+                range(.run_attempt; 0; -1) |
+                [$run.id, ., $run.head_sha] | @tsv
+              ' <<<"$(jq -c '.workflow_runs' <<<"$recovery_runs")"
+            )"
+            while IFS=$'\t' read -r recovery_run_id recovery_attempt recovery_sha; do
+              [ -n "$recovery_run_id" ] || continue
+              if ! recovery_jobs="$(gh api --paginate --slurp \
+                "repos/$REPOSITORY/actions/runs/$recovery_run_id/attempts/$recovery_attempt/jobs?per_page=100")"; then
+                echo "::error::Could not fetch desktop recovery publisher jobs."
+                exit 1
+              fi
+              jq -e '
+                type == "array" and length > 0 and
+                all(.[]; type == "object" and (.jobs | type == "array"))
+              ' >/dev/null <<<"$recovery_jobs" || {
+                echo "::error::GitHub returned malformed desktop recovery jobs."
+                exit 1
+              }
+              recovery_publisher_count="$(jq --arg sha "$recovery_sha" '[
+                .[].jobs[]?
+                | select(
+                    .name == "Publish production desktop release" and
+                    .head_sha == $sha and
+                    .status == "completed" and
+                    .conclusion == "success" and
+                    ([.steps[]? | select(
+                      .name == "Publish production desktop release" and
+                      .status == "completed" and
+                      .conclusion == "success"
+                    )] | length) == 1
+                  )
+              ] | length' <<<"$recovery_jobs")"
+              if [ "$recovery_publisher_count" = "1" ]; then
+                baseline_sha="$recovery_sha"
+                echo "Recovered exact desktop publish from run $recovery_run_id attempt $recovery_attempt."
+                break
+              fi
+            done <<<"$recovery_candidates"
+          fi
+
+          if [ "$publish_marker_presence_count" -gt 0 ] && [ -z "$baseline_sha" ]; then
+            echo "::error::$publish_marker_presence_count desktop publish marker(s) existed, but none fully proved a release."
+            exit 1
+          fi
+
+          # Migration-only fallback for the legacy raw-push workflow.
+          if [ -z "$baseline_sha" ]; then
+            legacy_runs_json="$(gh api \
+              "repos/$REPOSITORY/actions/workflows/desktop-release.yml/runs?branch=main&event=push&status=success&per_page=100")"
+            jq -e \
+              --arg repo "$REPOSITORY" \
+              --arg workflow_id "$desktop_workflow_id" '
+              type == "object" and (.workflow_runs | type == "array") and
+              all(.workflow_runs[]?;
+                .head_repository.full_name == $repo and
+                (.workflow_id | tostring) == $workflow_id and
+                (.id | type == "number") and
+                (.run_attempt | type == "number" and . >= 1) and
+                .event == "push" and
+                .status == "completed" and
+                .conclusion == "success" and
+                .head_branch == "main" and
+                .path == ".github/workflows/desktop-release.yml" and
+                (.head_sha | test("^[0-9a-f]{40}$"))
+              )
+            ' >/dev/null <<<"$legacy_runs_json" || {
+              echo "::error::GitHub returned malformed legacy desktop release history."
+              exit 1
+            }
+            legacy_runs="$(jq -c --arg repo "$REPOSITORY" '[
+              .workflow_runs[]?
+              | select(
+                  .event == "push" and
+                  .status == "completed" and
+                  .conclusion == "success" and
+                  .head_branch == "main" and
+                  .head_repository.full_name == $repo and
+                  .path == ".github/workflows/desktop-release.yml" and
+                  (.head_sha | test("^[0-9a-f]{40}$")) and
+                  (.id | type == "number") and
+                  (.run_attempt | type == "number")
+                )
+            ]' <<<"$legacy_runs_json")"
+
+            while IFS=$'\t' read -r run_id run_attempt run_sha; do
+              [[ "$run_id" =~ ^[1-9][0-9]*$ ]] &&
+                [[ "$run_attempt" =~ ^[1-9][0-9]*$ ]] &&
+                [[ "$run_sha" =~ ^[0-9a-f]{40}$ ]] || continue
+              if ! run_jobs="$(gh api --paginate --slurp \
+                "repos/$REPOSITORY/actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100")"; then
+                echo "::error::Could not fetch legacy desktop publisher jobs."
+                exit 1
+              fi
+              jq -e '
+                type == "array" and length > 0 and
+                all(.[]; type == "object" and (.jobs | type == "array"))
+              ' >/dev/null <<<"$run_jobs" || {
+                echo "::error::GitHub returned malformed legacy desktop publisher jobs."
+                exit 1
+              }
+              legacy_publisher_count="$(jq --arg sha "$run_sha" '
+                [
+                  .[].jobs[]?
+                  | select(
+                      .name == "build" and
+                      .head_sha == $sha and
+                      .status == "completed" and
+                      .conclusion == "success" and
+                      ([.steps[]? | select(
+                        .name == "Build desktop app" and
+                        .status == "completed" and
+                        .conclusion == "success"
+                      )] | length) == 1
+                    )
+                ] | length
+              ' <<<"$run_jobs")"
+              if [ "$legacy_publisher_count" = "1" ]; then
+                baseline_sha="$run_sha"
+                echo "Using migration-only legacy desktop publish baseline $baseline_sha."
+                break
+              fi
+            done < <(jq -r '
+              sort_by(.created_at, .id) | reverse | .[] |
+              [.id, .run_attempt, .head_sha] | @tsv
+            ' <<<"$legacy_runs")
+          fi
+
+          if [ -z "$baseline_sha" ]; then
+            echo "::notice::No proven desktop baseline exists; treating current verified main as the first release."
+            exit 0
+          fi
+          if [ "$baseline_sha" = "$release_sha" ]; then
+            echo "already_released=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Exact main generation $release_sha already has a desktop release."
+            exit 0
+          fi
+          echo "baseline_sha=$baseline_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact authorized main
+        if: ${{ steps.authorize.outputs.authorized == 'true' && steps.authorize.outputs.already_released != 'true' && steps.authorize.outputs.manual != 'true' }}
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ steps.authorize.outputs.release_sha }}
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+
+      - name: Select desktop-relevant production generation
+        id: select
+        env:
+          AUTHORIZED: ${{ steps.authorize.outputs.authorized }}
+          ALREADY_RELEASED: ${{ steps.authorize.outputs.already_released }}
+          MANUAL: ${{ steps.authorize.outputs.manual }}
+          RELEASE_SHA: ${{ steps.authorize.outputs.release_sha }}
+          BASELINE_SHA: ${{ steps.authorize.outputs.baseline_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "should_release=false" >> "$GITHUB_OUTPUT"
+          if [ "$AUTHORIZED" != "true" ] || [ "$ALREADY_RELEASED" = "true" ]; then
+            exit 0
+          fi
+          if [ "$MANUAL" = "true" ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "Explicit exact-current-main desktop build authorized."
+            exit 0
+          fi
+
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Desktop comparison SHAs are malformed."
+            exit 1
+          }
+          git cat-file -e "${RELEASE_SHA}^{commit}"
+          if [ -z "$BASELINE_SHA" ]; then
+            BASELINE_SHA="$(git rev-parse "${RELEASE_SHA}^")"
+            echo "No proven publish baseline; comparing the exact prior main generation."
+          fi
+          [[ "$BASELINE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Desktop baseline SHA is malformed."
+            exit 1
+          }
+          git cat-file -e "${BASELINE_SHA}^{commit}"
+          git merge-base --is-ancestor "$BASELINE_SHA" "$RELEASE_SHA" || {
+            echo "::error::The last successful desktop release is not an ancestor of current main."
+            exit 1
+          }
+          release_paths=(
+            VERSION
+          )
+          relevant_changes="$(git diff --name-status --find-renames \
+            "$BASELINE_SHA" "$RELEASE_SHA" -- "${release_paths[@]}")"
+          if [ -n "$relevant_changes" ]; then
+            printf '%s\n' "$relevant_changes"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "Verified production generation contains desktop release changes."
+          else
+            echo "No desktop release changes since the last exact successful publish."
+          fi
+
   build:
+    name: ${{ needs.authorize-release.outputs.environment == 'staging' && 'Build staging desktop package' || 'Publish production desktop release' }}
+    needs: [authorize-release]
+    if: ${{ needs.authorize-release.result == 'success' && needs.authorize-release.outputs.should_release == 'true' }}
     timeout-minutes: 45
     # macOS-only for now. Windows/Linux were removed because we don't ship
     # those binaries today and building them on every release wastes runner
@@ -56,12 +791,32 @@ jobs:
     runs-on: macos-latest
     permissions:
       contents: write
+    outputs:
+      published_sha: ${{ steps.publisher-identity.outputs.published_sha }}
+      publisher_attempt: ${{ steps.publisher-identity.outputs.publisher_attempt }}
     env:
-      ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}
+      ENVIRONMENT: ${{ needs.authorize-release.outputs.environment }}
+      RELEASE_SHA: ${{ needs.authorize-release.outputs.release_sha }}
       HAS_MAC_SIGNING_CREDENTIALS: ${{ secrets.MAC_CERTIFICATE_BASE64 != '' && secrets.MAC_CERTIFICATE_PASSWORD != '' }}
       HAS_APPLE_API_CREDENTIALS: ${{ secrets.APPLE_API_KEY != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.authorize-release.outputs.release_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Revalidate exact current main before packaging
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          [ "$current_main_sha" = "$RELEASE_SHA" ] || {
+            echo "::error::Desktop generation $RELEASE_SHA was superseded by $current_main_sha before packaging."
+            exit 1
+          }
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
@@ -146,10 +901,10 @@ jobs:
           }
           echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
 
-      - name: Build desktop app
+      - name: Package staging desktop app
+        if: env.ENVIRONMENT == 'staging'
         env:
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Apple notarization via App Store Connect API key. All three are
           # required by @electron/notarize when notarize: true is set; if any
           # are missing, electron-builder skips notarization with a warning.
@@ -162,7 +917,100 @@ jobs:
           # using a pre-imported keychain. Left unset; we use the keychain
           # set up above instead.
           CSC_KEYCHAIN: ${{ env.KEYCHAIN_PATH }}
-        run: pnpm --filter @jovie/desktop build:${{ env.ENVIRONMENT }}
+        run: pnpm --filter @jovie/desktop package:staging
+
+      - name: Verify staging desktop artifact set
+        if: env.ENVIRONMENT == 'staging'
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_version="$(tr -d '[:space:]' < VERSION)"
+          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::VERSION is not a valid desktop semver."
+            exit 1
+          }
+          staging_files=(
+            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg"
+            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg.blockmap"
+            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip"
+            "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip.blockmap"
+            "apps/desktop/dist/staging-mac.yml"
+          )
+          for staging_file in "${staging_files[@]}"; do
+            [ -f "$staging_file" ] || {
+              echo "::error::Expected staging desktop artifact is missing: $staging_file"
+              exit 1
+            }
+          done
+
+      - name: Upload staging desktop package
+        if: env.ENVIRONMENT == 'staging'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-staging-${{ needs.authorize-release.outputs.release_sha }}
+          path: |
+            apps/desktop/dist/Jovie-Staging-*-universal.dmg
+            apps/desktop/dist/Jovie-Staging-*-universal.dmg.blockmap
+            apps/desktop/dist/Jovie-Staging-*-universal.zip
+            apps/desktop/dist/Jovie-Staging-*-universal.zip.blockmap
+            apps/desktop/dist/staging-mac.yml
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Package production desktop app
+        if: env.ENVIRONMENT == 'production'
+        env:
+          ELECTRON_ENV: ${{ env.ENVIRONMENT }}
+          APPLE_API_KEY: ${{ env.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_KEYCHAIN: ${{ env.KEYCHAIN_PATH }}
+        run: pnpm --filter @jovie/desktop package:production
+
+      - name: Publish production desktop release
+        id: publish-production
+        if: env.ENVIRONMENT == 'production'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_version="$(tr -d '[:space:]' < VERSION)"
+          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::VERSION is not a valid desktop semver."
+            exit 1
+          }
+          publish_files=(
+            "dist/Jovie-${release_version}-universal.dmg"
+            "dist/Jovie-${release_version}-universal.dmg.blockmap"
+            "dist/Jovie-${release_version}-universal.zip"
+            "dist/Jovie-${release_version}-universal.zip.blockmap"
+            "dist/latest-mac.yml"
+          )
+          for relative_file in "${publish_files[@]}"; do
+            [ -f "apps/desktop/$relative_file" ] || {
+              echo "::error::Expected packaged desktop artifact is missing: $relative_file"
+              exit 1
+            }
+          done
+          current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          [ "$current_main_sha" = "$RELEASE_SHA" ] || {
+            echo "::error::Desktop generation $RELEASE_SHA was superseded by $current_main_sha before publication."
+            exit 1
+          }
+          pnpm --filter @jovie/desktop exec electron-builder publish \
+            --config electron-builder.yml \
+            --version "$release_version" \
+            --files "${publish_files[@]}"
+
+      - name: Capture production publisher identity
+        id: publisher-identity
+        if: env.ENVIRONMENT == 'production'
+        run: |
+          echo "published_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "publisher_attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
       - name: Clean up keychain
         if: always() && env.KEYCHAIN_PATH != ''
@@ -173,3 +1021,122 @@ jobs:
         if: always() && env.APPLE_API_KEY != ''
         run: |
           rm -f "$APPLE_API_KEY"
+
+  record-production-publish:
+    name: Record production desktop publish
+    needs: [authorize-release, build]
+    if: >-
+      needs.build.result == 'success' &&
+      needs.authorize-release.outputs.environment == 'production' &&
+      needs.build.outputs.published_sha != '' &&
+      needs.build.outputs.publisher_attempt != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Cross-prove exact production publisher
+        id: prove-publisher
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISHED_SHA: ${{ needs.build.outputs.published_sha }}
+          PUBLISHER_ATTEMPT: ${{ needs.build.outputs.publisher_attempt }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$PUBLISHED_SHA" =~ ^[0-9a-f]{40}$ ]] &&
+            [[ "$PUBLISHER_ATTEMPT" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::Desktop publisher identity is malformed."
+            exit 1
+          }
+          run_record="$(gh api \
+            "repos/$REPOSITORY/actions/runs/$RUN_ID/attempts/$PUBLISHER_ATTEMPT")"
+          jq -e \
+            --arg repo "$REPOSITORY" \
+            --arg run "$RUN_ID" \
+            --arg attempt "$PUBLISHER_ATTEMPT" \
+            --arg sha "$PUBLISHED_SHA" '
+              type == "object" and
+              (.id | tostring) == $run and
+              (.run_attempt | tostring) == $attempt and
+              (.workflow_id | type == "number") and
+              .head_sha == $sha and
+              .head_branch == "main" and
+              .head_repository.full_name == $repo and
+              .path == ".github/workflows/desktop-release.yml" and
+              (.event == "workflow_run" or .event == "workflow_dispatch") and
+              .display_title == ("Desktop release " + $sha)
+            ' >/dev/null <<<"$run_record" || {
+            echo "::error::Exact desktop publisher run was not proven."
+            exit 1
+          }
+          workflow_id="$(jq -r '.workflow_id' <<<"$run_record")"
+          workflow_record="$(gh api \
+            "repos/$REPOSITORY/actions/workflows/$workflow_id")"
+          jq -e --arg workflow_id "$workflow_id" '
+            type == "object" and
+            (.id | tostring) == $workflow_id and
+            .name == "desktop-release" and
+            .path == ".github/workflows/desktop-release.yml"
+          ' >/dev/null <<<"$workflow_record" || {
+            echo "::error::Desktop publisher workflow identity was not proven."
+            exit 1
+          }
+          jobs_json="$(gh api --paginate --slurp \
+            "repos/$REPOSITORY/actions/runs/$RUN_ID/attempts/$PUBLISHER_ATTEMPT/jobs?per_page=100")"
+          jq -e '
+            type == "array" and length > 0 and
+            all(.[]; type == "object" and (.jobs | type == "array"))
+          ' >/dev/null <<<"$jobs_json" || {
+            echo "::error::GitHub returned malformed desktop publisher jobs."
+            exit 1
+          }
+          publisher="$(jq -c --arg sha "$PUBLISHED_SHA" '[
+            .[].jobs[]?
+            | select(
+                .name == "Publish production desktop release" and
+                .head_sha == $sha and
+                .status == "completed" and
+                .conclusion == "success" and
+                ([.steps[]? | select(
+                  .name == "Publish production desktop release" and
+                  .status == "completed" and
+                  .conclusion == "success"
+                )] | length) == 1
+              )
+          ]' <<<"$jobs_json")"
+          [ "$(jq 'length' <<<"$publisher")" = "1" ] || {
+            echo "::error::Exact successful desktop publisher job was not proven."
+            exit 1
+          }
+          publisher_job_id="$(jq -r '.[0].id' <<<"$publisher")"
+          [[ "$publisher_job_id" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::Desktop publisher job ID is malformed."
+            exit 1
+          }
+          jq -n \
+            --arg sha "$PUBLISHED_SHA" \
+            --arg run "$RUN_ID" \
+            --arg attempt "$PUBLISHER_ATTEMPT" \
+            --arg job "$publisher_job_id" \
+            '{
+              schema: 1,
+              environment: "production",
+              sha: $sha,
+              runId: $run,
+              publisherAttempt: $attempt,
+              publisherJobId: $job
+            }' > "$RUNNER_TEMP/desktop-production-published.json"
+
+      - name: Upload production desktop publish marker
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-production-published
+          path: ${{ runner.temp }}/desktop-production-published.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 90

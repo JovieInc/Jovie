@@ -60,7 +60,7 @@
       },
       "pr": {
         "web": "ci-fast biome + eslint lanes",
-        "ios": "ios-ci.yml best-practices lint"
+        "ios": "ci-fast iOS Fast Contract"
       }
     },
     {
@@ -92,8 +92,8 @@
         "ios": "pnpm run ios:test (when exercising native changes)"
       },
       "pr": {
-        "web": "Unit Tests (ci-unit-tests shards)",
-        "ios": "ios-ci.yml unit/UI tests"
+        "web": "merge-group Unit Tests (ci-unit-tests shards)",
+        "ios": "merge-group ci-ios → ios-ci.yml unit/UI tests"
       }
     },
     {
@@ -129,7 +129,7 @@
       "prePush": null,
       "pr": {
         "web": "CI / PR Ready (ci-pr-ready)",
-        "ios": "ios-ci required checks"
+        "ios": "CI / PR Ready includes path-selected ci-ios on merge_group"
       }
     }
   ],
@@ -143,8 +143,8 @@
     "ios": {
       "preCommitHook": ".husky/pre-commit (shared secret + conflict rungs)",
       "prePushHook": "pnpm run ios:lint via scripts/hooks when Swift files staged",
-      "prWorkflow": ".github/workflows/ios-ci.yml",
-      "notes": "SwiftFormat/SwiftLint run in ios-ci; local best-practices lint is scripts/ios-best-practices-lint.sh."
+      "prWorkflow": ".github/workflows/ci.yml",
+      "notes": "Source PRs run the portable iOS Fast Contract. Exact merge-group and direct-main fallback heads call .github/workflows/ios-ci.yml for hosted Xcode build/test evidence."
     }
   }
 }
