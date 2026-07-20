@@ -48,7 +48,7 @@
     {
       "id": "post-deploy",
       "name": "Post-deploy Verification",
-      "purpose": "Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated smoke runs only when a complete credential pair exists, while public Better Auth/OAuth gates remain blocking."
+      "purpose": "Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated smoke runs only when a complete credential pair exists, while public Better Auth/OAuth gates remain blocking. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease."
     },
     {
       "id": "scheduled-cleanup",
@@ -298,6 +298,14 @@
       "mergeGate": false,
       "nextLocalCommand": "gh run view --log-failed",
       "remediation": "Repair immutable-URL public, homepage, or Lighthouse proof, public Better Auth/OAuth gates, or the leased final canonical ID/SHA check. Authenticated smoke is explicit optional evidence until a complete credential pair is configured."
+    },
+    {
+      "id": "postdeploy-probes",
+      "name": "Post-Deploy Probes (supersession follow-up)",
+      "tier": "post-deploy",
+      "mergeGate": false,
+      "nextLocalCommand": "gh run view --log-failed",
+      "remediation": "A controller generation was superseded before its in-lease probes ran, so the follow-up re-probed the landed canonical production deployment. Inspect the resolved exact deployment ID/URL/SHA evidence and fix the product regression; never repair by gating deploys on this read-only lane."
     },
     {
       "id": "test-flakiness-report",

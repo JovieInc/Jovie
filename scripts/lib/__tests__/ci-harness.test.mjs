@@ -124,6 +124,7 @@ describe('ci-harness manifest', () => {
       'Production Release',
       'Main Release Ready',
       'Production Verified',
+      'Post-Deploy Probes (supersession follow-up)',
       'Test Flakiness Report',
     ]);
   });

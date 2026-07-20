@@ -15,6 +15,14 @@ const PRODUCTION_CONTROLLER_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/production-controller.yml'),
   'utf8'
 );
+const POSTDEPLOY_PROBES_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/postdeploy-probes.yml'),
+  'utf8'
+);
+const CANARY_HEALTH_GATE_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/canary-health-gate.yml'),
+  'utf8'
+);
 const FORK_GATE_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/fork-pr-gate.yml'),
   'utf8'
@@ -349,6 +357,137 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('  deploy-notify:');
     expect(CI_WORKFLOW).not.toContain('  production-release:');
     expect(CI_WORKFLOW).not.toContain('  production-verified:');
+  });
+
+  it('keeps the supersession probe gap additive with gates untouched', () => {
+    // Fences: the deploy-gate exactness contract, the released gating, the
+    // canary-health-gate probe semantics, and the required-check set all stay
+    // exactly as they were; the follow-up path lives outside them.
+    const authorize = getJobBlock(
+      PRODUCTION_CONTROLLER_WORKFLOW,
+      'authorize-production'
+    );
+    expect(authorize).toContain('.name == "Main Release Ready"');
+    expect(authorize).toContain('if [ "$evidence_count" != "1" ]; then');
+
+    for (const jobId of [
+      'ci-public-profile-smoke',
+      'ci-post-deploy-auth-smoke',
+      'lighthouse-ci',
+    ]) {
+      const job = getJobBlock(PRODUCTION_CONTROLLER_WORKFLOW, jobId);
+      expect(job, jobId).toContain(
+        "needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true'"
+      );
+    }
+    expect(PRODUCTION_CONTROLLER_WORKFLOW).not.toContain(
+      'postdeploy-probes.yml'
+    );
+    expect(PRODUCTION_RELEASE_WORKFLOW).not.toContain('postdeploy-probes.yml');
+
+    const releaseResult = getJobBlock(
+      PRODUCTION_RELEASE_WORKFLOW,
+      'release-result'
+    );
+    expect(releaseResult).toContain('echo "released=false"');
+    expect(releaseResult).toContain('echo "released=true" >> "$GITHUB_OUTPUT"');
+    expect(releaseResult.indexOf('echo "released=false"')).toBeLessThan(
+      releaseResult.indexOf('echo "released=true" >> "$GITHUB_OUTPUT"')
+    );
+    expect(releaseResult).toContain('boundary_sha=');
+
+    // The canary gate stays a preview/staging gate; production probes never
+    // reuse it (its robots and build-info semantics are preview-specific).
+    expect(CANARY_HEALTH_GATE_WORKFLOW).toContain(
+      'EXPECTED_VERCEL_ENVIRONMENT=preview'
+    );
+    expect(CANARY_HEALTH_GATE_WORKFLOW).toContain(
+      'preview robots.txt must globally block crawlers'
+    );
+    expect(CANARY_HEALTH_GATE_WORKFLOW).not.toContain(
+      'EXPECTED_VERCEL_ENVIRONMENT=production'
+    );
+  });
+
+  it('re-probes landed production only when in-lease probes went dark', () => {
+    const header = POSTDEPLOY_PROBES_WORKFLOW.slice(
+      0,
+      POSTDEPLOY_PROBES_WORKFLOW.indexOf('\njobs:')
+    );
+    expect(header).toContain('workflows: [Production Controller]');
+    expect(header).toContain('types: [completed]');
+    expect(header).toContain('branches: [main]');
+    expect(header).toMatch(/^  workflow_dispatch:\s*$/m);
+    expect(header).not.toMatch(/^  (pull_request|push|merge_group|schedule):/m);
+
+    // Read-only evidence must never hold the deploy lease; coalescing keeps
+    // only the newest probe run during drains.
+    expect(header).toContain('group: postdeploy-probes');
+    expect(header).toContain('cancel-in-progress: true');
+    expect(header).toContain('contents: read');
+    expect(header).toContain('actions: read');
+    expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain(
+      'group: production-mutation'
+    );
+    expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain('secrets: inherit');
+    expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain('environment:');
+
+    const resolve = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, 'resolve-target');
+    expect(resolve).toContain('runs-on: ubuntu-latest');
+    expect(resolve).toContain('timeout-minutes:');
+    expect(resolve).toContain('persist-credentials: false');
+    // Exact trigger cross-proof, same observer shape as the release observers.
+    expect(resolve).toContain(
+      '[ "$TRIGGER_RUN_PATH" = ".github/workflows/production-controller.yml" ]'
+    );
+    expect(resolve).toContain('[ "$TRIGGER_HEAD_BRANCH" = "main" ]');
+    expect(resolve).toContain(
+      'actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT'
+    );
+    expect(resolve).toContain('.conclusion == $conclusion');
+    // Skips only on one exact successful in-lease Lighthouse probe.
+    expect(resolve).toContain('.name == "Lighthouse CI (Production)"');
+    expect(resolve).toContain('probe_evidence_count');
+    expect(resolve).toContain('.conclusion == "success"');
+    // Resolves the landed canonical deployment, never a release candidate.
+    expect(resolve).toContain('vercel inspect jov.ie');
+    expect(resolve).toContain('.meta.githubCommitSha // .gitSource.sha');
+    expect(resolve).toContain('[ "$deployment_state" != "READY" ]');
+    expect(resolve).toContain('[ "$deployment_target" != "production" ]');
+    expect(resolve).toContain(
+      '^https://jovie-[a-z0-9-]+-jovie\\.vercel\\.app$'
+    );
+    expect(resolve).toContain('resolve-deployment');
+    expect(resolve).toContain('should_probe');
+
+    for (const jobId of ['smoke', 'auth-smoke', 'lighthouse']) {
+      const job = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, jobId);
+      expect(job, jobId).toContain('needs: [resolve-target]');
+      expect(job, jobId).toContain(
+        "needs.resolve-target.outputs.should_probe == 'true'"
+      );
+      expect(job, jobId).toContain(
+        'ref: ${{ needs.resolve-target.outputs.commit_sha }}'
+      );
+      expect(job, jobId).toContain(
+        'EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}'
+      );
+      expect(job, jobId).toContain(
+        'PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}'
+      );
+      expect(job, jobId).toContain('runs-on: ubuntu-latest');
+      expect(job, jobId).toContain('timeout-minutes:');
+      expect(job, jobId).not.toContain('needs.production-release');
+      expect(job, jobId).not.toContain('needs.authorize-production');
+      expect(job, jobId).not.toContain('concurrency:');
+    }
+
+    const controllerLighthouse = getJobBlock(
+      PRODUCTION_CONTROLLER_WORKFLOW,
+      'lighthouse-ci'
+    );
+    // The skip signal keys on this exact job name; drift must fail here.
+    expect(controllerLighthouse).toContain('name: Lighthouse CI (Production)');
   });
 
   it('revalidates submitted and dismissed reviews for main-bound forks', () => {
