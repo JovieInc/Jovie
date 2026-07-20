@@ -1,6 +1,5 @@
 'use client';
 
-import { Bell } from 'lucide-react';
 import { type MouseEvent, memo, useMemo } from 'react';
 import {
   EntityCard,
@@ -124,19 +123,12 @@ function HomeAlertsCard({
   };
 
   return (
-    <ProfileEmptyBentoCard
-      accent='alerts'
-      icon={Bell}
-      title={title}
-      body={description}
-      // Carousel card geometry: the prominent column layout fills the fixed
-      // 3:4 card box; the inline strip layout is gone with the stacked rail.
-      layout='prominent'
-      className='h-full'
-      trailing={<HomeAlertsSwitch />}
-      href={isInteractive ? subscribeHref : undefined}
-      onClick={handleClick}
-      ariaLabel={ariaLabel}
+    <EntityCard
+      model={model}
+      treatment='detailed'
+      surface='pearl'
+      anatomy='unified'
+      className='h-full w-full overflow-hidden'
       dataTestId='profile-home-alerts-fallback-card'
       onClick={handleClick}
     />

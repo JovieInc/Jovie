@@ -554,14 +554,8 @@ export function showToEntityCard(show: ShowEntityInput): EntityCardModel {
     // renders it as plain muted text, never a dead Tickets link.
     cta: canBuyTickets
       ? { label: preset.ctaLabel, href: show.ticketUrl, external: true }
-      : {
-          label: isCancelled
-            ? 'Cancelled'
-            : isSoldOut
-              ? 'Sold Out'
-              : 'No Tickets',
-          href: null,
-          disabled: true,
-        },
+      : // No ticket URL: keep the bottom slot honest — a target-less CTA the
+        // card renders as plain muted text, never as button chrome.
+        { label: 'No Tickets', href: null, disabled: true },
   };
 }

@@ -33,14 +33,24 @@ interface EntityCardProps {
   readonly className?: string;
   readonly priority?: boolean;
   readonly dataTestId?: string;
-  readonly onClick?: () => void;
+  readonly onClick?: (event: MouseEvent<HTMLElement>) => void;
   /**
    * 'square' (default): the art zone is a fixed square — for content-driven
    * card heights. 'fill': the art zone flexes to fill whatever height the
-   * content zone leaves — for height-locked cards (profile home carousel),
-   * where a fixed square would push the CTA out of the card.
+   * content zone leaves — for height-locked cards where a fixed square would
+   * push the CTA out of the card. Ignored when `anatomy='unified'` (the art
+   * zone is always a full-width square there).
    */
   readonly artFit?: 'square' | 'fill';
+  /**
+   * 'unified': the single profile-card anatomy — full-bleed square art zone
+   * (object-cover, no letterboxing), eyebrow/title/meta text zone, and a
+   * full-width 36px CTA anchored to the bottom. Used by every card in the
+   * profile home carousel so the featured card, entity cards, and slot cards
+   * share one design. 'default' keeps the legacy per-treatment layout
+   * (chat/app consumers).
+   */
+  readonly anatomy?: 'default' | 'unified';
 }
 
 type SizeConfig = {
@@ -213,6 +223,7 @@ export function EntityCard({
   dataTestId,
   onClick,
   artFit = 'square',
+  anatomy = 'default',
 }: EntityCardProps) {
   const size = SIZE[treatment];
   const isUnified = anatomy === 'unified';
@@ -222,8 +233,11 @@ export function EntityCard({
   const shapeClassName = shape
     ? cn(getProfileCardShapeClassName(shape), 'overflow-hidden')
     : null;
-  const artClassName =
-    artFit === 'fill'
+  const artClassName = isUnified
+    ? // Unified anatomy: the art zone is a full-width square (album art is
+      // square by default; non-square art object-covers the square zone).
+      'aspect-square rounded-none'
+    : artFit === 'fill'
       ? 'min-h-0 w-full flex-1 rounded-xl'
       : shape
         ? cn(
@@ -231,8 +245,11 @@ export function EntityCard({
             treatment === 'big' ? 'rounded-2xl' : 'rounded-xl'
           )
         : size.artClass;
-  const titleClampClassName =
-    shape && treatment !== 'big' ? 'line-clamp-1' : 'line-clamp-2';
+  const titleClampClassName = isUnified
+    ? 'line-clamp-1'
+    : shape && treatment !== 'big'
+      ? 'line-clamp-1'
+      : 'line-clamp-2';
   const preset = KIND_PRESETS[model.kind];
   const accent = model.accent ?? preset.accent;
   const Icon = preset.icon;
@@ -278,7 +295,7 @@ export function EntityCard({
       <div
         className={cn(
           'relative flex w-full items-center justify-center overflow-hidden border border-subtle',
-          artFit === 'fill' ? null : 'shrink-0',
+          !isUnified && artFit === 'fill' ? null : 'shrink-0',
           artClassName,
           (treatment === 'big' || isUnified) && 'rounded-none border-0',
           isUnified && 'border-b border-subtle'
@@ -327,13 +344,24 @@ export function EntityCard({
       <div
         className={cn(
           'flex min-h-0 min-w-0 flex-1 flex-col gap-1.5',
-          treatment === 'big' && 'p-3'
+          treatment === 'big' && 'p-3',
+          // Unified: the text zone + 36px CTA share (card height − card
+          // width), which is tight on small cards — keep chrome minimal so
+          // eyebrow + title + CTA always fit; the meta line hides entirely
+          // below the card-height threshold where it would clip (see
+          // .entity-card-meta in design-system.css).
+          isUnified && 'px-3 py-1.5'
         )}
       >
         {/* Text zone — when the card is height-locked it clips so the CTA
             footer below never moves (#11899: content fits the shape, button
             never shifts). */}
-        <div className='flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden'>
+        <div
+          className={cn(
+            'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
+            isUnified ? 'gap-1' : 'gap-1.5'
+          )}
+        >
           <div className='flex min-w-0 items-center justify-between gap-2'>
             <span
               className={cn(
@@ -441,7 +469,7 @@ export function EntityCard({
               ) : (
                 <span
                   className={cn(
-                    'inline-flex h-9 w-full shrink-0 items-center justify-center rounded-full bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle group-hover:bg-btn-primary-hover'
+                    'inline-flex h-9 w-full shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle group-hover:border-(--linear-btn-primary-hover) group-hover:bg-btn-primary-hover'
                   )}
                 >
                   {model.cta.label}
