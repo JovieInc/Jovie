@@ -140,7 +140,7 @@ export function WorkflowRunRow({
         type='button'
         variant='ghost'
         onClick={() => onSelect(artifact)}
-className='grid h-auto w-full gap-2 rounded-none text-left hover:bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
+        className='grid h-auto w-full gap-2 rounded-none text-left hover:bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
         aria-pressed={isSelected}
       >
         {mainContent}

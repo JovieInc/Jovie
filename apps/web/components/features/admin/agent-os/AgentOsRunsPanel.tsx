@@ -119,7 +119,7 @@ function AgentRunDetailPopover({
           variant='ghost'
           size='icon'
           aria-label={`Inspect ${artifact.title}`}
-className='h-auto w-auto rounded-md p-1 text-tertiary-token opacity-70 transition-colors hover:bg-surface-1 hover:text-primary-token hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+          className='h-auto w-auto rounded-md p-1 text-tertiary-token opacity-70 transition-colors hover:bg-surface-1 hover:text-primary-token hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
         >
           <Info className='size-3.5' aria-hidden='true' />
         </Button>
@@ -220,7 +220,7 @@ function AgentOsBoardCard({
           onClick={() => onSelect(artifact)}
           aria-label={artifact.title}
           aria-pressed={isSelected}
-className='min-w-0 h-auto flex-1 justify-start rounded-md text-left hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
+          className='min-w-0 h-auto flex-1 justify-start rounded-md text-left hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
         >
           <p className='line-clamp-2 text-app font-[560] leading-5 text-primary-token'>
             {artifact.title}
@@ -299,7 +299,7 @@ function AgentOsBoard({
                 aria-pressed={statusFilter === status}
                 aria-label={`Filter by ${RUN_STATUS_LABEL[status]} (${laneRows.length})`}
                 className={cn(
-'h-auto rounded px-1 text-2xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                  'h-auto rounded px-1 text-2xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
                   statusFilter === status
                     ? 'bg-surface-0 font-[560] text-primary-token'
                     : 'text-tertiary-token hover:bg-surface-0 hover:text-secondary-token'
