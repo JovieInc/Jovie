@@ -148,7 +148,7 @@ describe('ProfileHomeRail', () => {
     expect(screen.getAllByText('Never Say A Word')).toHaveLength(1);
   });
 
-  it('renders the alerts card as a standard unified-anatomy card (no gradient)', () => {
+  it('renders a prominent gradient alerts card when the home rail is empty', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
@@ -188,12 +188,12 @@ describe('ProfileHomeRail', () => {
     );
 
     const carousel = screen.getByTestId('profile-home-carousel');
-    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
-    expect(alertsCard).toBeInTheDocument();
-    // The alerts card shares the unified entity-card anatomy (full-bleed
-    // square art zone, full-width CTA).
-    expect(alertsCard.className).toContain('p-0');
-    expect(screen.getByText('Get Updates')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-home-alerts-fallback-card')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-home-alerts-switch')
+    ).toBeInTheDocument();
     // No entity items → the carousel still hosts the slot cards.
     expect(carousel.querySelectorAll(':scope > li').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('entity-card-music')).not.toBeInTheDocument();

@@ -328,28 +328,9 @@
   height: 100%;
   max-height: 104vw;
   align-self: center;
-  /* Size container so card content can respond to the card's own height. */
-  container-type: size;
   transition:
     transform var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
     opacity var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
-}
-
-/* Unified card anatomy: the art zone is a full-width square, so the text
-   zone + CTA share (card height − card width). Progressive disclosure keeps
-   every line whole instead of clipping mid-line: the meta line hides below
-   the height where it fits (~448px), and the eyebrow hides below the height
-   where it fits next to the title (~360px) — title and CTA always fit. */
-@container (max-height: 447px) {
-  :where(.profile-entity-card) .entity-card-meta {
-    display: none;
-  }
-}
-
-@container (max-height: 359px) {
-  :where(.profile-entity-card) .entity-card-eyebrow {
-    display: none;
-  }
 }
 
 /* Scroll-driven edge treatment (transform/opacity only; applied via

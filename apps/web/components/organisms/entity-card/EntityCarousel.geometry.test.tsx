@@ -84,36 +84,17 @@ describe('EntityCarousel profile geometry', () => {
     }
   });
 
-  it('locks the art zone to a full-width square with cover-fitted artwork', () => {
+  it('flexes the art zone inside the height-locked card without cropping artwork', () => {
     render(<EntityCarousel items={items} />);
 
     for (const image of screen.getAllByRole('img')) {
-      // Unified card anatomy: the art zone is a square matched to the full
-      // card width (no letterbox bands), and artwork object-covers the
-      // square zone — square art fills it exactly, non-square art crops.
-      expect(image.parentElement?.className).toContain('aspect-square');
-      expect(image.parentElement?.className).not.toContain('flex-1');
-      expect(image.className).toContain('object-cover');
+      // Height-locked 3:4 cards: the art zone flexes to fill whatever the
+      // content zone leaves (a fixed square would push the CTA out), and
+      // release artwork is fitted (object-contain), never cropped.
+      expect(image.parentElement?.className).toContain('flex-1');
+      expect(image.parentElement?.className).not.toContain('aspect-square');
+      expect(image.className).toContain('object-contain');
     }
-  });
-
-  it('renders a full-width 36px CTA at the bottom of every card', () => {
-    const withCta: EntityCardModel[] = [
-      {
-        id: 'release-1',
-        kind: 'music',
-        href: '/tim/release-1',
-        imageUrl: '/release-1.jpg',
-        imageAlt: 'Release one',
-        title: 'Release One',
-        cta: { label: 'Listen', href: '/tim/release-1' },
-      },
-    ];
-    render(<EntityCarousel items={withCta} />);
-
-    const cta = screen.getByText('Listen');
-    expect(cta.className).toContain('h-9');
-    expect(cta.className).toContain('w-full');
   });
 
   it('renders leading and trailing slot cards in the same geometry', () => {

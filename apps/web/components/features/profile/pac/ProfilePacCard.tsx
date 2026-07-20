@@ -179,9 +179,7 @@ function SubjectText({
       <p className='truncate text-sm font-semibold leading-tight text-primary-token'>
         {title}
       </p>
-      <p className='entity-card-meta mt-0.5 truncate text-xs text-tertiary-token'>
-        {meta}
-      </p>
+      <p className='mt-0.5 truncate text-xs text-tertiary-token'>{meta}</p>
     </div>
   );
 }
@@ -766,15 +764,14 @@ export function ProfilePacCard({
         className
       )}
     >
-      <div className='relative aspect-square w-full flex-none overflow-hidden border-b border-subtle bg-surface-2'>
+      <div className='relative min-h-0 w-full flex-1 overflow-hidden border-b border-subtle bg-surface-2'>
         {artImageUrl ? (
           <ImageWithFallback
             src={artImageUrl}
             alt={artImageAlt}
             fill
-            priority={artPriority}
             sizes='(max-width: 767px) 70vw, 300px'
-            className='object-cover'
+            className='object-contain'
             fallbackVariant='release'
             fallbackClassName='bg-transparent'
           />
@@ -785,22 +782,20 @@ export function ProfilePacCard({
         )}
       </div>
 
-      <div className='flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 px-3 py-1.5'>
-        {/* Text zone — clips under tight card heights so the action footer
-            below never moves and never clips (zero-CLS contract). */}
-        <div className='flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden'>
-          <div className='flex items-center justify-between gap-2'>
-            <p className='entity-card-eyebrow truncate text-3xs font-semibold uppercase leading-none tracking-wide text-tertiary-token'>
-              {contextLabel}
-            </p>
-            {contextAside}
-          </div>
-
-          {subject}
+      <div className='flex min-h-0 min-w-0 flex-none flex-col gap-2 p-3'>
+        <div className='flex items-center justify-between gap-2'>
+          <p className='truncate text-3xs font-semibold uppercase leading-none tracking-wide text-tertiary-token'>
+            {contextLabel}
+          </p>
+          {contextAside}
         </div>
 
-        <div className='flex min-w-0 flex-none flex-col gap-1.5'>
-          {isCaptureState ? <div className='min-w-0'>{action}</div> : action}
+        {subject}
+
+        {isCaptureState ? <div className='min-w-0'>{action}</div> : null}
+
+        <div className='mt-auto flex min-w-0 flex-col gap-2 pt-1'>
+          {isCaptureState ? null : action}
           <div aria-live='polite' className='min-w-0 empty:hidden'>
             {status}
           </div>
