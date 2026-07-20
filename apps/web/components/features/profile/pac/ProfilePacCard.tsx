@@ -73,6 +73,11 @@ interface ProfilePacCardProps {
   readonly isSubscribed?: boolean;
   readonly renderMode?: ProfileRenderMode;
   readonly className?: string;
+  /**
+   * Priority-load the artwork image. Set by the surface when there is no
+   * hero photo — then this card's art is the page LCP and must not lazy-load.
+   */
+  readonly artPriority?: boolean;
 }
 
 interface CaptureCopy {
@@ -189,6 +194,7 @@ export function ProfilePacCard({
   isSubscribed = false,
   renderMode = 'interactive',
   className,
+  artPriority = false,
 }: Readonly<ProfilePacCardProps>) {
   const isInteractive = renderMode === 'interactive';
   const previewUrl = release?.previewUrl ?? null;
@@ -764,6 +770,7 @@ export function ProfilePacCard({
             src={artImageUrl}
             alt={artImageAlt}
             fill
+            priority={artPriority}
             sizes='(max-width: 767px) 70vw, 300px'
             className='object-contain'
             fallbackVariant='release'
