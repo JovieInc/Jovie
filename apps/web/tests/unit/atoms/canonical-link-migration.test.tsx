@@ -40,7 +40,7 @@ describe('canonical Link primitive migrations (JOV-3574)', () => {
     expect(link).toHaveClass('text-muted-foreground');
   });
 
-  it('NavLink primary keeps its button-styled appearance without buttonVariants', () => {
+  it('NavLink primary keeps its button-styled appearance via Button asChild composition', () => {
     render(
       <NavLink href='/upgrade' variant='primary'>
         Upgrade
@@ -48,9 +48,13 @@ describe('canonical Link primitive migrations (JOV-3574)', () => {
     );
 
     const link = screen.getByRole('link', { name: 'Upgrade' });
-    expect(link).toHaveAttribute('data-variant', 'link');
+    // Button (asChild) owns the button-styled visual + data contract…
+    expect(link).toHaveAttribute('data-variant', 'primary');
     expect(link).toHaveClass('bg-btn-primary');
     expect(link).toHaveClass('text-btn-primary-foreground');
+    // …while the canonical Link primitive composed the anchor underneath it
+    // (its base underline-offset survives).
+    expect(link.className).toContain('underline-offset-4');
   });
 
   it('FooterLink renders through the primitive with tone and external security intact', () => {
