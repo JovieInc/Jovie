@@ -114,15 +114,44 @@ test.describe('Artist Profiles Landing', () => {
     await expect(page.getByLabel(/choose your handle/i)).toBeVisible();
     await expectFullyInViewport(page, claimForm);
     await expectFullyInViewport(page, claimButton);
+
+    await page.getByLabel(/choose your handle/i).fill('@river-signal');
+    await page.route('**/start?**', route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<!doctype html><title>Claim profile</title>',
+      })
+    );
+    await Promise.all([
+      page.waitForURL(url => {
+        return (
+          url.pathname === '/start' &&
+          url.searchParams.get('handle') === 'river-signal' &&
+          url.searchParams
+            .get('starter_prompt')
+            ?.includes('jov.ie/river-signal') === true
+        );
+      }),
+      claimButton.click(),
+    ]);
   });
 
   test('final CTA renders with claim form', async ({ page }) => {
+    const finalCta = page.getByTestId('artist-profile-section-final-cta');
     await expect(
-      page.getByRole('heading', { name: /claim your profile\./i })
+      finalCta.getByRole('heading', {
+        name: 'Claim your profile.',
+        exact: true,
+      })
     ).toBeVisible();
     await expect(
       page.getByTestId('final-cta-action').getByText(/claim your profile/i)
     ).toBeVisible();
+    await expect(page.getByTestId('final-cta-action')).toHaveAttribute(
+      'href',
+      '/signup'
+    );
   });
 
   test('hero stays intact on mobile', async ({ page }) => {
@@ -222,7 +251,6 @@ test.describe('Artist Profiles Landing', () => {
       const adaptiveSection = page.getByTestId(
         'artist-profile-section-adaptive'
       );
-      const trust = page.getByTestId('homepage-trust');
       const phone = adaptiveSection.getByRole('img').first();
       const tabList = adaptiveSection.getByRole('tablist', {
         name: 'Profile Modes',
@@ -245,7 +273,6 @@ test.describe('Artist Profiles Landing', () => {
         panel: await getGeometrySnapshot(panelSlot),
         phone: await getGeometrySnapshot(phone),
         tabList: await getGeometrySnapshot(tabList),
-        trust: await getGeometrySnapshot(trust),
       };
 
       for (const label of ARTIST_PROFILE_MODE_LABELS) {
@@ -275,11 +302,6 @@ test.describe('Artist Profiles Landing', () => {
           await getGeometrySnapshot(panelSlot),
           `${viewport.name} panel slot`
         );
-        expectStableGeometry(
-          baseline.trust,
-          await getGeometrySnapshot(trust),
-          `${viewport.name} trust section`
-        );
       }
 
       await page.waitForTimeout(2500);
@@ -287,6 +309,49 @@ test.describe('Artist Profiles Landing', () => {
         adaptiveSection.getByRole('tab', { name: 'Live Support' })
       ).toHaveAttribute('aria-selected', 'true');
     }
+  });
+
+  test('canonical sections render in order and proof remains gated', async ({
+    page,
+  }) => {
+    const sectionIds = [
+      'artist-profile-section-hero',
+      'artist-profile-section-adaptive',
+      'artist-profile-section-outcomes',
+      'artist-profile-section-capture',
+      'artist-profile-section-opinionated',
+      'artist-profile-section-spec-wall',
+      'artist-profile-section-how-it-works',
+      'artist-profile-section-faq',
+      'artist-profile-section-final-cta',
+    ];
+
+    for (const sectionId of sectionIds) {
+      await expect(page.getByTestId(sectionId)).toHaveCount(1);
+    }
+
+    const documentOrder = await page.evaluate(ids => {
+      return ids.map(id => {
+        const element = document.querySelector(`[data-testid="${id}"]`);
+        return element
+          ? element.getBoundingClientRect().top + window.scrollY
+          : -1;
+      });
+    }, sectionIds);
+    expect(documentOrder).toEqual([...documentOrder].sort((a, b) => a - b));
+
+    await expect(
+      page.getByTestId('artist-profile-section-social-proof')
+    ).toHaveCount(0);
+    await expect(page.getByTestId('artist-profile-section-trust')).toHaveCount(
+      0
+    );
+    await expect(
+      page.getByTestId('artist-profile-section-reactivation')
+    ).toHaveCount(0);
+    await expect(
+      page.getByTestId('artist-profile-section-monetization')
+    ).toHaveCount(0);
   });
 
   test('five fan outcomes keep a stable rail across breakpoints', async ({
@@ -336,6 +401,38 @@ test.describe('Artist Profiles Landing', () => {
     );
     expect(captureTop).toBeGreaterThan(outcomesTop);
 
+    const previousButton = outcomesSection.locator(
+      'button[aria-label="Scroll Outcomes Left"]:visible'
+    );
+    const nextButton = outcomesSection.locator(
+      'button[aria-label="Scroll Outcomes Right"]:visible'
+    );
+    await expect(previousButton).toHaveCount(1);
+    await expect(nextButton).toHaveCount(1);
+
+    for (const control of [previousButton, nextButton]) {
+      const box = await control.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+
+    const initialScrollLeft = await grid.evaluate(
+      element => element.scrollLeft
+    );
+    await nextButton.click();
+    await expect
+      .poll(() => grid.evaluate(element => element.scrollLeft))
+      .toBeGreaterThan(initialScrollLeft);
+    const forwardScrollLeft = await grid.evaluate(
+      element => element.scrollLeft
+    );
+
+    await previousButton.click();
+    await expect
+      .poll(() => grid.evaluate(element => element.scrollLeft))
+      .toBeLessThan(forwardScrollLeft);
+
     const startScrollY = await page.evaluate(() => window.scrollY);
     await grid.locator('article').first().hover();
     await page.mouse.wheel(0, 720);
@@ -364,9 +461,40 @@ test.describe('Artist Profiles Landing', () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test('spec wall renders the final eight cards without legacy philosophy copy', async ({
+  test('capture, opinionated decisions, product truth, steps, and FAQ match the plan', async ({
     page,
   }) => {
+    const captureSection = page.getByTestId('artist-profile-section-capture');
+    await expect(
+      captureSection.getByRole('heading', {
+        name: 'Capture every fan, not just the click.',
+      })
+    ).toBeVisible();
+    await expect(captureSection.getByText('You’re on the list')).toBeVisible();
+    await expect(
+      captureSection.getByText('Opt in once', { exact: true })
+    ).toBeVisible();
+    await expect(captureSection.getByText('Reach the moment')).toBeVisible();
+    await expect(captureSection.getByText('Keep the audience')).toBeVisible();
+    const capturePreview = captureSection.getByRole('img', {
+      name: /example fan opt-in with an email or phone field/i,
+    });
+    await expect(capturePreview).toBeVisible();
+    await expect(capturePreview.locator('input, button')).toHaveCount(0);
+
+    const opinionatedSection = page.getByTestId(
+      'artist-profile-section-opinionated'
+    );
+    await expect(
+      opinionatedSection.getByRole('heading', {
+        name: 'Built to convert, not decorate.',
+      })
+    ).toBeVisible();
+    await expect(opinionatedSection.locator('article')).toHaveCount(3);
+    await expect(
+      opinionatedSection.getByText('No template maze.')
+    ).toBeVisible();
+
     const specWallSection = page.getByTestId(
       'artist-profile-section-spec-wall'
     );
@@ -374,88 +502,47 @@ test.describe('Artist Profiles Landing', () => {
 
     await expect(
       specWallSection.getByRole('heading', {
-        name: 'Audience Quality Filtering',
-      })
-    ).toBeVisible();
-    await expect(
-      specWallSection.getByText(
-        'Jovie identifies bots, your own team, and test traffic so your fan metrics measure actual fans.'
-      )
-    ).toBeVisible();
-    await expect(
-      specWallSection.getByRole('heading', {
-        name: 'Rich Analytics',
-      })
-    ).toBeVisible();
-    await expect(
-      specWallSection.getByRole('heading', { name: 'Geo Insights' })
-    ).toBeVisible();
-    await expect(
-      specWallSection.getByRole('heading', { name: 'Always in Sync' })
-    ).toBeVisible();
-    await expect(
-      specWallSection.getByRole('heading', { name: 'Activate Creators' })
-    ).toBeVisible();
-    await expect(
-      specWallSection.getByRole('heading', { name: 'Press-Ready Assets' })
-    ).toBeVisible();
-    await expect(
-      specWallSection.getByRole('heading', { name: 'UTM Builder' })
-    ).toBeVisible();
-    await expect(
-      specWallSection.getByRole('heading', { name: 'Blazing Fast' })
-    ).toBeVisible();
-    await expect(
-      specWallSection.getByRole('heading', {
         name: 'Built for artists.',
       })
     ).toBeVisible();
     await expect(
-      specWallSection.getByText(
-        'The product truth behind one fast, music-native profile—kept compact on purpose.'
-      )
+      specWallSection.getByTestId('artist-profile-truth-tile')
+    ).toHaveCount(10);
+    await expect(specWallSection.getByText('Fast load')).toBeVisible();
+    await expect(
+      specWallSection.getByText('Views, clicks, referrers')
+    ).toBeVisible();
+
+    const howSection = page.getByTestId('artist-profile-section-how-it-works');
+    await expect(
+      howSection.getByRole('heading', { name: 'One link. Three steps.' })
     ).toBeVisible();
     await expect(
-      specWallSection.getByText(
-        'A slow profile kills conversions. Jovie is built to a much higher speed bar than a typical link-in-bio page.'
-      )
+      howSection.getByRole('heading', { name: 'Claim your profile.' })
     ).toBeVisible();
-    await expect(specWallSection.getByText('Power features')).toHaveCount(0);
-    await expect(specWallSection.getByText('Opinionated design')).toHaveCount(
-      0
-    );
-    await expect(specWallSection.getByText('Product philosophy')).toHaveCount(
-      0
-    );
-    await expect(specWallSection.getByText('Own your fan list')).toHaveCount(0);
-    await expect(specWallSection.getByText('Retarget warm fans')).toHaveCount(
-      0
-    );
-    await expect(specWallSection.getByText('Quality view')).toHaveCount(0);
-    await expect(specWallSection.getByText('Low signal')).toHaveCount(0);
-    await expect(specWallSection.getByText('Export-ready')).toHaveCount(0);
-
-    await expectNoHorizontalOverflow(page);
-  });
-
-  test('monetization carousel renders without overflow', async ({ page }) => {
-    const section = page.getByTestId('artist-profile-section-monetization');
-    await section.scrollIntoViewIfNeeded();
-
-    const scroller = page.getByTestId('artist-profile-monetization-scroller');
-    const firstCard = page
-      .getByTestId('artist-profile-monetization-card')
-      .first();
-
     await expect(
-      section.getByRole('heading', { name: 'Get paid. Again and again.' })
+      howSection.getByRole('heading', {
+        name: 'Connect your music and links.',
+      })
     ).toBeVisible();
-    await expect(scroller).toBeVisible();
-    await expect(firstCard).toBeVisible();
+    await expect(
+      howSection.getByRole('heading', { name: 'Share one link everywhere.' })
+    ).toBeVisible();
 
-    await scroller.evaluate(node => {
-      node.scrollTo({ left: 320, behavior: 'instant' });
+    const faqSection = page.getByTestId('artist-profile-section-faq');
+    await expect(
+      faqSection.getByRole('heading', { name: 'Questions, answered.' })
+    ).toBeVisible();
+    await expect(faqSection.getByRole('button')).toHaveCount(4);
+    const firstQuestion = faqSection.getByRole('button', {
+      name: 'How is this different from Linktree?',
     });
+    await expect(firstQuestion).toHaveAttribute('aria-expanded', 'false');
+    await firstQuestion.click();
+    await expect(firstQuestion).toHaveAttribute('aria-expanded', 'true');
+    await expect(
+      faqSection.getByText(/Jovie is built for music release behavior/i)
+    ).toBeVisible();
 
     await expectNoHorizontalOverflow(page);
   });

@@ -7,10 +7,6 @@ import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 interface ArtistProfileHeroAdaptiveIntroProps {
   readonly hero: ArtistProfileLandingCopy['hero'];
   readonly adaptive: ArtistProfileLandingCopy['adaptive'];
-  /** Compatibility props are removed with the landing composition update. */
-  readonly phoneCaption?: string;
-  readonly phoneSubcaption?: string;
-  readonly showForgeUiMarketingUpdates?: boolean;
 }
 
 export function ArtistProfileHeroAdaptiveIntro({

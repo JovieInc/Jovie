@@ -1,13 +1,8 @@
-import { MarketingPageShell } from '@/components/marketing/MarketingPageShell';
+import { MarketingPageShell } from '@/components/marketing';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
-import {
-  ARTIST_PROFILE_LAUNCH_FEATURES,
-  ARTIST_PROFILE_SPEC_TILES,
-  ARTIST_PROFILE_SPEC_TILES_BASE,
-} from '@/data/artistProfileFeatures';
+import { ARTIST_PROFILE_TRUTH_TILES } from '@/data/artistProfileFeatures';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import { ARTIST_PROFILE_FLAGS } from '@/lib/featureFlags';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { ArtistProfileLandingPage } from './ArtistProfileLandingPage';
 
 export function ArtistProfileLandingRoute() {
@@ -15,15 +10,9 @@ export function ArtistProfileLandingRoute() {
     <MarketingPageShell>
       <ArtistProfileLandingPage
         copy={ARTIST_PROFILE_COPY}
-        launchFeatures={ARTIST_PROFILE_LAUNCH_FEATURES}
-        specTiles={
-          FEATURE_FLAGS.SHOW_FORGEUI_MARKETING_UPDATES
-            ? ARTIST_PROFILE_SPEC_TILES
-            : ARTIST_PROFILE_SPEC_TILES_BASE
-        }
+        truthTiles={ARTIST_PROFILE_TRUTH_TILES}
         socialProof={ARTIST_PROFILE_SOCIAL_PROOF}
         flags={ARTIST_PROFILE_FLAGS}
-        payFlowVideoUrl={process.env.ARTIST_PROFILES_PAY_FLOW_VIDEO_URL}
       />
     </MarketingPageShell>
   );
