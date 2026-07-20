@@ -32,8 +32,28 @@ export function loadEvalManifest() {
   return JSON.parse(readFileSync(manifestPath, 'utf8'));
 }
 
+// Git hooks (pre-push) leak repo-redirecting variables into child processes.
+// Under a linked worktree they make `git ls-files` emit repo-root-relative
+// paths, so every filter below misses and the manifest looks empty.
+const LEAKED_GIT_ENV_VARS = [
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_PREFIX',
+  'GIT_INDEX_FILE',
+];
+
+function gitDiscoveryEnv(sourceEnv = process.env) {
+  const env = { ...sourceEnv };
+  for (const name of LEAKED_GIT_ENV_VARS) delete env[name];
+  return env;
+}
+
 export function discoverEvalFiles() {
-  return execFileSync('git', ['ls-files'], { cwd: webRoot, encoding: 'utf8' })
+  return execFileSync('git', ['ls-files'], {
+    cwd: webRoot,
+    encoding: 'utf8',
+    env: gitDiscoveryEnv(),
+  })
     .trim()
     .split('\n')
     .filter(Boolean)
