@@ -3,6 +3,14 @@
 import { AlertCircle, ArrowRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+/**
+ * Elevated empty-state / inbox CTA card.
+ *
+ * Quiet tool-call activity in the transcript uses the subordinate
+ * `.system-b-chat-activity-*` pattern (indented, book weight, secondary
+ * color) — not this surface. Keep action cards full-weight and unindented
+ * so CTAs stay scannable; agent status steps stay visually quieter (issue 13897).
+ */
 interface ChatActionCardProps {
   readonly title: string;
   readonly body: string;

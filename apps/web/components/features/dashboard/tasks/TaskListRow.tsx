@@ -233,7 +233,7 @@ export const TaskListRow = memo(function TaskListRow({
                 event.stopPropagation();
                 onOpenRelease(task);
               }}
-              className='inline-flex min-w-0 max-w-full items-center gap-1 text-secondary-token transition-colors duration-subtle ease-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) focus-visible:text-primary-token'
+              className='inline-flex min-w-0 max-w-full items-center gap-1 text-secondary-token transition-colors duration-subtle ease-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) focus-visible:text-primary-token'
               title={task.releaseTitle}
             >
               <Disc3 className='h-3 w-3 shrink-0 text-tertiary-token' />

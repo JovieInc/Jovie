@@ -80,7 +80,7 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
           <button
             type='button'
             className={cn(
-              'inline-flex h-6 items-center gap-1 rounded-full border border-transparent px-1.5 py-0 text-2xs font-normal text-tertiary-token transition-colors duration-subtle hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30',
+              'inline-flex h-6 items-center gap-1 rounded-full border border-transparent px-1.5 py-0 text-2xs font-normal text-tertiary-token transition-colors duration-subtle hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
               className
             )}
             aria-label={ariaLabel ?? 'Analytics Time Range'}
@@ -214,7 +214,7 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
               title={
                 disabled ? 'Upgrade to Pro for extended analytics' : undefined
               }
-              className={`relative h-7 rounded-full border border-transparent px-2.5 text-xs font-caption tracking-tight shadow-none transition-[background-color,color,border-color,box-shadow] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface) ${stateClass}`}
+              className={`relative h-7 rounded-full border border-transparent px-2.5 text-xs font-caption tracking-tight shadow-none transition-[background-color,color,border-color,box-shadow] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface) ${stateClass}`}
             >
               {getTimeRangeLabel(range, 'short')}
             </button>

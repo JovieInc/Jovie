@@ -25,7 +25,7 @@ export function DrawerActionRow({
       className={cn(
         'flex min-h-9 w-full items-center gap-2 rounded-full border border-transparent px-2.5 py-1.5 text-left text-xs text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle',
         'hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-primary-token',
-        'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+        'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-ring',
         className
       )}
     >

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { captureError } from '@/lib/error-tracking';
 import { createReleaseAndApplyGeneratedAlbumArt } from '@/lib/services/album-art/apply';
 import { logger } from '@/lib/utils/logger';
@@ -16,7 +17,7 @@ function isValidIsoDate(value: string): boolean {
   );
 }
 
-const createReleaseAndApplySchema = z.object({
+const createReleaseAndApplySchema = chatToolSchema({
   profileId: z.string().uuid(),
   title: z.string().min(1).max(200),
   releaseType: z

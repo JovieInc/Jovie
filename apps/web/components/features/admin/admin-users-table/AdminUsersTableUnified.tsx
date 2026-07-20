@@ -105,7 +105,7 @@ function AdminUserMobileCard({
             type='checkbox'
             checked={isSelected}
             onChange={() => onToggleSelect(user.id)}
-            className='mt-0.5 h-4 w-4 rounded border-(--linear-border-strong) bg-surface-0 text-(--linear-accent) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+            className='mt-0.5 h-4 w-4 rounded border-(--linear-border-strong) bg-surface-0 text-(--linear-accent) focus-visible:ring-1 focus-visible:ring-ring'
             aria-label={`Select ${user.name ?? user.email ?? 'user'}`}
           />
           <div className='min-w-0'>
