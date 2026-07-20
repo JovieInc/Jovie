@@ -1,7 +1,13 @@
 'use client';
 
-import { Archive, Check, Loader2, Play, Rocket, X } from 'lucide-react';
+import { Button } from '@jovie/ui';
+import { Archive, Check, Loader2, Pause, Play, Rocket, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import {
+  dismissProposal,
+  isProposalDismissed,
+  undismissProposal,
+} from '@/lib/chat/proposal-dismiss-ledger';
 import {
   type ConfirmChatMerchActionType,
   useConfirmChatMerchActionMutation,
@@ -21,6 +27,8 @@ interface ChatMerchActionCardProps {
    * drop the outer card chrome to avoid card-in-card (JOV-3551).
    */
   readonly nested?: boolean;
+  /** Stable tool call id for durable dismiss/undo ledger (JOV-3549). */
+  readonly toolCallId?: string;
 }
 
 type CardState = 'pending' | 'confirming' | 'confirmed' | 'dismissed';
@@ -31,6 +39,7 @@ const ACTION_CONFIG: Record<
     readonly label: string;
     readonly confirmLabel: string;
     readonly successLabel: string;
+    readonly consequence?: string;
     readonly Icon: typeof Rocket;
     readonly destructive?: boolean;
   }
@@ -48,10 +57,19 @@ const ACTION_CONFIG: Record<
     // Play (not Pause) — "Make Live" is a resume action (JOV-3551)
     Icon: Play,
   },
+  pause: {
+    label: 'Pause Merch',
+    confirmLabel: 'Pause Sale',
+    successLabel: 'Merch paused',
+    consequence: 'Fans can no longer buy this item until you unpause it.',
+    Icon: Pause,
+    destructive: true,
+  },
   archive: {
     label: 'Archive Merch',
     confirmLabel: 'Archive',
     successLabel: 'Merch archived',
+    consequence: 'Removes this item from the public profile.',
     Icon: Archive,
     destructive: true,
   },
@@ -65,8 +83,11 @@ export function ChatMerchActionCard({
   currentStatus,
   retailPrice,
   nested = false,
+  toolCallId,
 }: ChatMerchActionCardProps) {
-  const [state, setState] = useState<CardState>('pending');
+  const [state, setState] = useState<CardState>(() =>
+    isProposalDismissed(toolCallId) ? 'dismissed' : 'pending'
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const confirmAction = useConfirmChatMerchActionMutation();
   const config = ACTION_CONFIG[action];
@@ -79,18 +100,27 @@ export function ChatMerchActionCard({
     confirmAction.mutate(
       { profileId, merchCardId, action },
       {
-        onSuccess: () => setState('confirmed'),
+        onSuccess: () => {
+          undismissProposal(toolCallId);
+          setState('confirmed');
+        },
         onError: () => {
           setState('pending');
           setErrorMessage('Unable to apply merch action. Please try again.');
         },
       }
     );
-  }, [profileId, merchCardId, action, confirmAction]);
+  }, [profileId, merchCardId, action, confirmAction, toolCallId]);
 
   const handleDismiss = useCallback(() => {
+    dismissProposal(toolCallId);
     setState('dismissed');
-  }, []);
+  }, [toolCallId]);
+
+  const handleUndoDismiss = useCallback(() => {
+    undismissProposal(toolCallId);
+    setState('pending');
+  }, [toolCallId]);
 
   if (state === 'confirmed') {
     return (
@@ -106,9 +136,21 @@ export function ChatMerchActionCard({
   if (state === 'dismissed') {
     return (
       <ChatToolSurface tone={nested ? 'flat' : 'cancelled'}>
-        <div className='flex items-center gap-2 text-secondary-token'>
-          <X className='h-4 w-4' />
-          <span className='text-sm'>{CHAT_TOOL_CANCELLED_LABEL}</span>
+        <div className='flex items-center justify-between gap-2 text-secondary-token'>
+          <div className='flex items-center gap-2'>
+            <X className='h-4 w-4' />
+            <span className='text-sm'>{CHAT_TOOL_CANCELLED_LABEL}</span>
+          </div>
+          <Button
+            type='button'
+            variant='link'
+            size='sm'
+            onClick={handleUndoDismiss}
+            className='h-auto px-0 text-xs font-medium text-primary-token underline-offset-2'
+            data-testid='chat-merch-dismiss-undo'
+          >
+            Undo
+          </Button>
         </div>
       </ChatToolSurface>
     );
@@ -135,6 +177,11 @@ export function ChatMerchActionCard({
           <p className='text-xs text-tertiary-token'>
             {currentStatus} · {retailPrice}
           </p>
+          {config.consequence ? (
+            <p className='mt-1 text-xs text-secondary-token'>
+              {config.consequence}
+            </p>
+          ) : null}
           {errorMessage ? (
             <output className='mt-1 block text-xs text-error'>
               {errorMessage}

@@ -93,10 +93,19 @@ describe('feature flag registry integrity', () => {
   it('keeps runtime app flags default-on for internal v1 access', () => {
     // INBOX_HOME is an intentional default-off rollout gate (JOV-3931 / GH #13171).
     const defaultsExcludingRolloutGates = Object.entries(APP_FLAG_DEFAULTS)
-      .filter(([name]) => name !== 'INBOX_HOME')
+      .filter(
+        ([name]) =>
+          ![
+            'INBOX_HOME',
+            'PROFILES_WORKSPACE',
+            'PROFILE_SEARCH_MONITORING',
+          ].includes(name)
+      )
       .map(([, value]) => value);
     expect(defaultsExcludingRolloutGates.every(Boolean)).toBe(true);
     expect(APP_FLAG_DEFAULTS.INBOX_HOME).toBe(false);
+    expect(APP_FLAG_DEFAULTS.PROFILES_WORKSPACE).toBe(false);
+    expect(APP_FLAG_DEFAULTS.PROFILE_SEARCH_MONITORING).toBe(false);
   });
 
   it('keeps all runtime app-flag references registered', () => {

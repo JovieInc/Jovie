@@ -24,6 +24,39 @@ test('manifest classifies every eval test and script exactly once', () => {
   expect([...deterministic, ...live].sort()).toEqual(discoverEvalFiles());
 });
 
+test('discovery ignores git hook environment leaked into pre-push', () => {
+  const expected = discoverEvalFiles();
+  const absoluteGitDir = execFileSync(
+    'git',
+    ['rev-parse', '--absolute-git-dir'],
+    { cwd: webRoot, encoding: 'utf8' }
+  ).trim();
+  const leakedNames = [
+    'GIT_DIR',
+    'GIT_WORK_TREE',
+    'GIT_PREFIX',
+    'GIT_INDEX_FILE',
+  ];
+  const previous = Object.fromEntries(
+    leakedNames.map(name => [name, process.env[name]])
+  );
+  // Mirrors `git push` from a linked worktree: GIT_DIR points at the absolute
+  // worktree gitdir and GIT_PREFIX is empty, which makes `git ls-files` print
+  // repo-root-relative paths unless the variables are scrubbed.
+  process.env.GIT_DIR = absoluteGitDir;
+  process.env.GIT_PREFIX = '';
+  delete process.env.GIT_WORK_TREE;
+  delete process.env.GIT_INDEX_FILE;
+  try {
+    expect(discoverEvalFiles()).toEqual(expected);
+  } finally {
+    for (const name of leakedNames) {
+      if (previous[name] === undefined) delete process.env[name];
+      else process.env[name] = previous[name];
+    }
+  }
+});
+
 test('manifest validation rejects malformed lane and command structures', () => {
   expect(validateEvalManifest(null)).toEqual([
     'manifest root must be an object',

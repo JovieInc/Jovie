@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileContactSidebar } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileContactSidebar';
 
 const mockState = vi.hoisted(() => ({
@@ -7,6 +7,10 @@ const mockState = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
   setPreviewData: vi.fn(),
+  refetchDspMatches: vi.fn(),
+  dspMatches: [] as Record<string, unknown>[],
+  dspMatchesLoading: false,
+  dspMatchesError: null as Error | null,
   previewData: {
     username: 'tim',
     displayName: 'Tim White',
@@ -95,7 +99,10 @@ vi.mock('@/lib/queries', () => ({
     isError: false,
   }),
   useDspMatchesQuery: () => ({
-    data: [],
+    data: mockState.dspMatches,
+    isLoading: mockState.dspMatchesLoading,
+    error: mockState.dspMatchesError,
+    refetch: mockState.refetchDspMatches,
   }),
   usePressPhotosQuery: () => ({
     data: [],
@@ -114,7 +121,33 @@ vi.mock('@/lib/queries', () => ({
   }),
 }));
 
+vi.mock('@/features/dashboard/organisms/dsp-matches/hooks', () => ({
+  useDspMatchActions: () => ({
+    confirmMatch: vi.fn(),
+    rejectMatch: vi.fn(),
+    isMatchConfirming: () => false,
+    isMatchRejecting: () => false,
+  }),
+}));
+
+const suggestedMatch = {
+  id: 'match-1',
+  providerId: 'deezer',
+  externalArtistName: 'Tim White',
+  externalArtistUrl: null,
+  externalArtistImageUrl: null,
+  confidenceScore: 0.92,
+  matchingIsrcCount: 12,
+};
+
 describe('ProfileContactSidebar scroll contract', () => {
+  beforeEach(() => {
+    mockState.dspMatches = [];
+    mockState.dspMatchesLoading = false;
+    mockState.dspMatchesError = null;
+    mockState.refetchDspMatches.mockReset();
+  });
+
   it('uses child-owned scrolling without the legacy full-height wrapper', () => {
     const { container } = render(<ProfileContactSidebar />);
 
@@ -133,5 +166,54 @@ describe('ProfileContactSidebar scroll contract', () => {
     expect(tabbedCard.closest('.min-h-full')).toBeNull();
     expect(scrollRegion).toHaveAttribute('data-scroll-mode', 'internal');
     expect(scrollRegion).toHaveClass('overflow-y-auto');
+  });
+
+  it('keeps loading, empty, populated, and error suggestion transitions at the fixed scroll tail', () => {
+    mockState.dspMatchesLoading = true;
+
+    const view = render(<ProfileContactSidebar />);
+    fireEvent.click(screen.getByRole('button', { name: /edit profile/i }));
+    fireEvent.click(screen.getByTestId('drawer-tab-dsp'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add Music link' }));
+
+    const tabbedCard = screen.getByTestId('profile-contact-tabbed-card');
+    const scrollRegion = screen.getByTestId(
+      'profile-contact-tabbed-card-scroll-region'
+    );
+    const linkInput = screen.getByRole('textbox', { name: 'Add link' });
+    expect(tabbedCard).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden');
+    const rerenderState = () => {
+      view.rerender(<ProfileContactSidebar />);
+      expect(
+        screen.getByTestId('profile-contact-tabbed-card-scroll-region')
+      ).toBe(scrollRegion);
+      expect(scrollRegion).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
+      expect(scrollRegion).toContainElement(linkInput);
+    };
+
+    rerenderState();
+    expect(screen.queryByTestId('suggested-dsp-matches')).toBeNull();
+
+    mockState.dspMatchesLoading = false;
+    rerenderState();
+    expect(screen.queryByTestId('suggested-dsp-matches')).toBeNull();
+
+    mockState.dspMatches = [suggestedMatch];
+    rerenderState();
+    const populatedSuggestions = screen.getByTestId('suggested-dsp-matches');
+    expect(populatedSuggestions).toHaveAttribute('data-state', 'ready');
+    expect(scrollRegion.lastElementChild).toBe(populatedSuggestions);
+
+    mockState.dspMatches = [];
+    mockState.dspMatchesLoading = true;
+    rerenderState();
+    expect(screen.queryByTestId('suggested-dsp-matches')).toBeNull();
+
+    mockState.dspMatchesLoading = false;
+    mockState.dspMatchesError = new Error('Network error');
+    rerenderState();
+    const errorSuggestions = screen.getByTestId('suggested-dsp-matches');
+    expect(errorSuggestions).toHaveAttribute('data-state', 'error');
+    expect(scrollRegion.lastElementChild).toBe(errorSuggestions);
   });
 });

@@ -2,10 +2,7 @@ import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
-import {
-  ARTIST_PROFILE_LAUNCH_FEATURES,
-  ARTIST_PROFILE_SPEC_TILES,
-} from '@/data/artistProfileFeatures';
+import { ARTIST_PROFILE_TRUTH_TILES } from '@/data/artistProfileFeatures';
 import {
   ARTIST_PROFILE_SECTION_ORDER,
   ARTIST_PROFILE_SECTION_TEST_IDS,
@@ -42,14 +39,6 @@ vi.mock('@/components/marketing', () => ({
   ),
 }));
 
-vi.mock('@/components/features/home/HomeTrustSection', () => ({
-  HomeTrustSection: () => <section>Trusted by Artists</section>,
-}));
-
-vi.mock('@/features/home/HomeTrustSection', () => ({
-  HomeTrustSection: () => <section>Trusted by Artists</section>,
-}));
-
 vi.mock('@/components/marketing/artist-profile/ArtistProfileHero', () => ({
   ArtistProfileHero: ({
     hero,
@@ -70,13 +59,9 @@ vi.mock(
     ArtistProfileHeroAdaptiveIntro: ({
       hero,
       adaptive,
-      phoneCaption,
-      phoneSubcaption,
     }: {
       readonly hero: typeof ARTIST_PROFILE_COPY.hero;
       readonly adaptive: typeof ARTIST_PROFILE_COPY.adaptive;
-      readonly phoneCaption: string;
-      readonly phoneSubcaption: string;
     }) => (
       <>
         <section data-testid='artist-profile-section-hero'>
@@ -85,8 +70,8 @@ vi.mock(
         </section>
         <section data-testid='artist-profile-section-adaptive'>
           <div data-testid='artist-profile-adaptive-sequence'>
-            <h2>{phoneCaption}</h2>
-            <p>{phoneSubcaption}</p>
+            <h2>{adaptive.headline}</h2>
+            <p>{adaptive.body}</p>
             <img alt={adaptive.restingScreenshotAlt} src='/test-shot.png' />
             {adaptive.modes.map(mode => (
               <button key={mode.id} type='button'>
@@ -94,9 +79,6 @@ vi.mock(
               </button>
             ))}
           </div>
-        </section>
-        <section data-testid='artist-profile-section-trust'>
-          Trusted by Artists
         </section>
       </>
     ),
@@ -114,7 +96,7 @@ vi.mock(
       <section>
         <h2>{outcomes.headline}</h2>
         <div data-testid='artist-profile-outcomes-grid'>
-          {outcomes.cards.map(card => (
+          {outcomes.landingCards.map(card => (
             <article key={card.id} data-testid='artist-profile-outcome-card'>
               {card.title}
             </article>
@@ -142,43 +124,17 @@ vi.mock(
 );
 
 vi.mock(
-  '@/components/marketing/artist-profile/ArtistProfileReactivationSection',
+  '@/components/marketing/artist-profile/ArtistProfileOpinionatedSection',
   () => ({
-    ArtistProfileReactivationSection: ({
-      reactivation,
+    ArtistProfileOpinionatedSection: ({
+      opinionated,
     }: {
-      readonly reactivation: typeof ARTIST_PROFILE_COPY.reactivation;
+      readonly opinionated: typeof ARTIST_PROFILE_COPY.opinionated;
     }) => (
       <section>
-        <h2>{reactivation.headline}</h2>
-        <p>{reactivation.outputs[0]?.title}</p>
-      </section>
-    ),
-  })
-);
-
-vi.mock(
-  '@/components/marketing/artist-profile/ArtistProfileMonetizationSection',
-  () => ({
-    ArtistProfileMonetizationSection: ({
-      monetization,
-    }: {
-      readonly monetization: typeof ARTIST_PROFILE_COPY.monetization;
-    }) => (
-      <section>
-        <h2>{monetization.headline}</h2>
-        {[
-          monetization.irlPaymentsCard,
-          monetization.captureCard,
-          monetization.thanksCard,
-          monetization.reengageCard,
-        ].map(card => (
-          <article
-            data-testid='artist-profile-monetization-card'
-            key={card.title}
-          >
-            {card.title}
-          </article>
+        <h2>{opinionated.headline}</h2>
+        {opinionated.decisions.map(decision => (
+          <article key={decision.id}>{decision.action}</article>
         ))}
       </section>
     ),
@@ -188,15 +144,17 @@ vi.mock(
 vi.mock('@/components/marketing/artist-profile/ArtistProfileSpecWall', () => ({
   ArtistProfileSpecWall: ({
     specWall,
-    tiles,
+    truthTiles,
   }: {
     readonly specWall: typeof ARTIST_PROFILE_COPY.specWall;
-    readonly tiles: typeof ARTIST_PROFILE_SPEC_TILES;
+    readonly truthTiles: typeof ARTIST_PROFILE_TRUTH_TILES;
   }) => (
     <section>
       <h2>{specWall.headline}</h2>
-      {tiles.map(tile => (
-        <article key={tile.title}>{tile.title}</article>
+      {truthTiles.map(tile => (
+        <article data-testid='artist-profile-truth-tile' key={tile.title}>
+          {tile.title}
+        </article>
       ))}
     </section>
   ),
@@ -271,13 +229,14 @@ vi.mock('@/components/marketing/artist-profile/ArtistProfileFinalCta', () => ({
 
 function getEnabledSectionTestIds(flags: ArtistProfileSectionFlags) {
   if (!flags.FULL_PAGE) {
-    return ARTIST_PROFILE_SECTION_ORDER.filter(section =>
-      ['hero', 'trust'].includes(section.id)
-    ).map(section => section.testId);
+    return [ARTIST_PROFILE_SECTION_TEST_IDS.hero];
   }
 
   return ARTIST_PROFILE_SECTION_ORDER.filter(
-    section => !section.enabledByFlag || flags[section.enabledByFlag]
+    section =>
+      (!section.enabledByFlag || flags[section.enabledByFlag]) &&
+      (section.id !== 'socialProof' ||
+        ARTIST_PROFILE_SOCIAL_PROOF.hasRealQuotes)
   ).map(section => section.testId);
 }
 
@@ -310,8 +269,7 @@ async function renderArtistProfileLandingPage(
   render(
     <ArtistProfileLandingPage
       copy={ARTIST_PROFILE_COPY}
-      launchFeatures={ARTIST_PROFILE_LAUNCH_FEATURES}
-      specTiles={ARTIST_PROFILE_SPEC_TILES}
+      truthTiles={ARTIST_PROFILE_TRUTH_TILES}
       socialProof={ARTIST_PROFILE_SOCIAL_PROOF}
       flags={flags}
     />
@@ -356,23 +314,35 @@ describe('ArtistProfilesPage', () => {
     });
     expect(
       screen.getByRole('heading', {
-        name: ARTIST_PROFILE_COPY.hero.phoneCaption,
+        name: ARTIST_PROFILE_COPY.adaptive.headline,
       })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', {
-        name:
-          ARTIST_PROFILE_COPY.adaptive.modes.find(mode => mode.id === 'contact')
-            ?.label ?? 'Contact',
-      })
-    ).toBeInTheDocument();
+    for (const mode of ARTIST_PROFILE_COPY.adaptive.modes) {
+      expect(
+        screen.getByRole('button', { name: mode.label })
+      ).toBeInTheDocument();
+    }
+    expect(ARTIST_PROFILE_COPY.adaptive.modes).toHaveLength(4);
     expect(screen.getAllByTestId('artist-profile-outcome-card')).toHaveLength(
-      ARTIST_PROFILE_COPY.outcomes.cards.length
+      5
     );
+    expect(screen.getAllByTestId('artist-profile-truth-tile')).toHaveLength(10);
+    expect(ARTIST_PROFILE_COPY.faq.items).toHaveLength(4);
     expect(
-      screen.getAllByTestId('artist-profile-monetization-card')
-    ).toHaveLength(4);
-    expect(screen.getByText('And 24 others.')).toBeInTheDocument();
+      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.socialProof)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('artist-profile-section-trust')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('artist-profile-section-reactivation')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('artist-profile-section-monetization')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(ARTIST_PROFILE_COPY.howItWorks.sync.otherProvidersLabel)
+    ).toBeInTheDocument();
   });
 
   it('omits optional social proof and FAQ sections when their flags are off', async () => {
@@ -393,7 +363,7 @@ describe('ArtistProfilesPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders only hero and trust sections when the full page flag is off', async () => {
+  it('renders only the hero when the full page flag is off', async () => {
     await renderArtistProfileLandingPage({
       FULL_PAGE: false,
       SOCIAL_PROOF: false,
@@ -412,7 +382,10 @@ describe('ArtistProfilesPage', () => {
       screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.adaptive)
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.monetization)
+      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.outcomes)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('artist-profile-section-trust')
     ).not.toBeInTheDocument();
   });
 });

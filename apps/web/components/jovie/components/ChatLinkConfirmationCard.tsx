@@ -1,9 +1,15 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Check, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import {
+  dismissProposal,
+  isProposalDismissed,
+  undismissProposal,
+} from '@/lib/chat/proposal-dismiss-ledger';
 import { useConfirmChatLinkMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { CHAT_TOOL_CANCELLED_LABEL, ChatToolSurface } from './ChatToolSurface';
@@ -18,9 +24,11 @@ interface ChatLinkConfirmationCardProps {
   };
   readonly normalizedUrl: string;
   readonly originalUrl: string;
+  /** Stable tool call id for durable dismiss/undo ledger (JOV-3549). */
+  readonly toolCallId?: string;
 }
 
-type CardState = 'pending' | 'adding' | 'added' | 'dismissed';
+type CardState = 'pending' | 'adding' | 'added' | 'updated' | 'dismissed';
 
 /** Canonical SocialIcon platform values. Falls back to 'link' for unknown platforms. */
 const VALID_SOCIAL_PLATFORMS = new Set([
@@ -59,8 +67,11 @@ export function ChatLinkConfirmationCard({
   platform,
   normalizedUrl,
   originalUrl,
+  toolCallId,
 }: ChatLinkConfirmationCardProps) {
-  const [state, setState] = useState<CardState>('pending');
+  const [state, setState] = useState<CardState>(() =>
+    isProposalDismissed(toolCallId) ? 'dismissed' : 'pending'
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const confirmLink = useConfirmChatLinkMutation();
   const previewPanel = usePreviewPanelContext();
@@ -96,8 +107,9 @@ export function ChatLinkConfirmationCard({
         normalizedUrl,
       },
       {
-        onSuccess: () => {
-          setState('added');
+        onSuccess: data => {
+          undismissProposal(toolCallId);
+          setState(data.outcome === 'updated' ? 'updated' : 'added');
         },
         onError: () => {
           setState('pending');
@@ -115,19 +127,28 @@ export function ChatLinkConfirmationCard({
     normalizedUrl,
     confirmLink,
     previewPanel,
+    toolCallId,
   ]);
 
   const handleDismiss = useCallback(() => {
+    dismissProposal(toolCallId);
     setState('dismissed');
-  }, []);
+  }, [toolCallId]);
 
-  if (state === 'added') {
+  const handleUndoDismiss = useCallback(() => {
+    undismissProposal(toolCallId);
+    setState('pending');
+  }, [toolCallId]);
+
+  if (state === 'added' || state === 'updated') {
     return (
       <ChatToolSurface tone='success'>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>
-            {platform.name} link added
+            {state === 'updated'
+              ? `${platform.name} link updated`
+              : `${platform.name} link added`}
           </span>
         </div>
       </ChatToolSurface>
@@ -137,9 +158,21 @@ export function ChatLinkConfirmationCard({
   if (state === 'dismissed') {
     return (
       <ChatToolSurface tone='cancelled'>
-        <div className='flex items-center gap-2 text-secondary-token'>
-          <X className='h-4 w-4' />
-          <span className='text-sm'>{CHAT_TOOL_CANCELLED_LABEL}</span>
+        <div className='flex items-center justify-between gap-2 text-secondary-token'>
+          <div className='flex items-center gap-2'>
+            <X className='h-4 w-4' />
+            <span className='text-sm'>{CHAT_TOOL_CANCELLED_LABEL}</span>
+          </div>
+          <Button
+            type='button'
+            variant='link'
+            size='sm'
+            onClick={handleUndoDismiss}
+            className='h-auto px-0 text-xs font-medium text-primary-token underline-offset-2'
+            data-testid='chat-link-dismiss-undo'
+          >
+            Undo
+          </Button>
         </div>
       </ChatToolSurface>
     );

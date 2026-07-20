@@ -22,6 +22,7 @@ describe('DashboardNav', () => {
   it('renders primary navigation items', () => {
     const { getByRole, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
+      appFlags: { PROFILES_WORKSPACE: true },
     });
 
     expect(getByRole('link', { name: 'New Chat' }).getAttribute('href')).toBe(
@@ -31,7 +32,10 @@ describe('DashboardNav', () => {
     expect(getByRole('link', { name: 'Releases' }).getAttribute('href')).toBe(
       buildLibraryViewRoute('releases')
     );
-    expect(getByRole('button', { name: 'Artist Profile' })).toBeDefined();
+    expect(getByRole('link', { name: 'Profiles' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.PROFILES
+    );
     expect(getByRole('link', { name: 'Touring' }).getAttribute('href')).toBe(
       APP_ROUTES.SETTINGS_TOURING
     );
@@ -47,7 +51,7 @@ describe('DashboardNav', () => {
   it('renders Releases in the grouped shell top nav', () => {
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
+      appFlags: { DESIGN_V1: true, PROFILES_WORKSPACE: true },
     });
 
     expect(getByRole('link', { name: 'Releases' }).getAttribute('href')).toBe(
@@ -55,10 +59,24 @@ describe('DashboardNav', () => {
     );
   });
 
+  it('shows Profiles only when its rollout flag is enabled', () => {
+    const disabled = renderDashboardNav({ renderFn: fastRender });
+    expect(disabled.queryByRole('link', { name: 'Profiles' })).toBeNull();
+    disabled.unmount();
+
+    const enabled = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { PROFILES_WORKSPACE: true },
+    });
+    expect(
+      enabled.getByRole('link', { name: 'Profiles' }).getAttribute('href')
+    ).toBe(APP_ROUTES.PROFILES);
+  });
+
   it('renders artist work under the artist group in Design V1', () => {
     const { getByRole, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
+      appFlags: { DESIGN_V1: true, PROFILES_WORKSPACE: true },
       overrides: {
         selectedProfile: {
           id: 'profile_123',
@@ -73,7 +91,10 @@ describe('DashboardNav', () => {
       'aria-expanded',
       'true'
     );
-    expect(getByRole('button', { name: 'Tim White' })).toBeDefined();
+    expect(getByRole('link', { name: 'Profiles' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.PROFILES
+    );
     const releasesLink = getByRole('link', { name: 'Releases' });
     expect(releasesLink.getAttribute('href')).toBe(
       buildLibraryViewRoute('releases')
@@ -111,7 +132,7 @@ describe('DashboardNav', () => {
 
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
+      appFlags: { DESIGN_V1: true, PROFILES_WORKSPACE: true },
     });
 
     expect(
@@ -233,7 +254,7 @@ describe('DashboardNav', () => {
   it('renders the grouped top nav and artist group without a duplicate Settings row', () => {
     const { getByRole, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
+      appFlags: { DESIGN_V1: true, PROFILES_WORKSPACE: true },
     });
 
     expect(getByRole('link', { name: 'New Chat' })).toHaveAttribute(
@@ -244,7 +265,10 @@ describe('DashboardNav', () => {
       'href',
       buildLibraryViewRoute('releases')
     );
-    expect(getByRole('button', { name: 'Artist Profile' })).toBeDefined();
+    expect(getByRole('link', { name: 'Profiles' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.PROFILES
+    );
     expect(getByRole('link', { name: 'Touring' })).toHaveAttribute(
       'href',
       APP_ROUTES.SETTINGS_TOURING

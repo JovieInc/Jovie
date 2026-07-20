@@ -69,6 +69,8 @@ export const APP_FLAG_REGISTRY = {
   BULK_PRESS_PHOTO_IMPORT: buildBooleanFlag('BULK_PRESS_PHOTO_IMPORT'),
   TELEPROMPTER_RECORDING: buildBooleanFlag('TELEPROMPTER_RECORDING'),
   INBOX_HOME: buildBooleanFlag('INBOX_HOME'),
+  PROFILES_WORKSPACE: buildBooleanFlag('PROFILES_WORKSPACE'),
+  PROFILE_SEARCH_MONITORING: buildBooleanFlag('PROFILE_SEARCH_MONITORING'),
 } as const satisfies Record<AppFlagName, Flag<boolean>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<

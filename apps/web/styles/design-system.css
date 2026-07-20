@@ -8522,7 +8522,10 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     color-mix(in oklab, var(--color-border-focus) 42%, transparent);
 }
 
-/* Web composer focus mode — sidebar dims, right rail slides off (desktop only). */
+/* Web composer focus mode — sidebar dims; right rail fully yields (desktop).
+   Partial translate left the rail slot occupying width/stacking so the focus
+   picker painted over the profile card (JOV-4041). Collapse width to 0 so the
+   main column owns the full canvas; blur restores prior rail state. */
 @media (min-width: 1024px) {
   :where(
     [data-app-shell-frame][data-composer-focus="true"]
@@ -8535,7 +8538,14 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     [data-app-shell-frame][data-composer-focus="true"]
       [data-testid="app-shell-right-rail"]
   ) {
-    transform: translateX(40%);
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    border: none;
+    transform: none;
   }
 }
 

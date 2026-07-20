@@ -73,7 +73,7 @@ function formatRankedLabel(label: string): string {
 }
 
 /** Single stage in the vertical funnel waterfall */
-function FunnelStage({
+export function FunnelStage({
   label,
   value,
   rate,
@@ -90,7 +90,7 @@ function FunnelStage({
 }) {
   if (loading) {
     return (
-      <div className='space-y-1.5 px-3 py-2'>
+      <div className='space-y-1.5 px-3.5 py-2.5'>
         <div className='flex items-center justify-between'>
           <LoadingSkeleton height='h-3' width='w-20' rounded='sm' />
           <LoadingSkeleton height='h-3' width='w-12' rounded='sm' />

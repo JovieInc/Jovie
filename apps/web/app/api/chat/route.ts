@@ -137,7 +137,6 @@ import {
   showArtistPayouts,
   showMerchSales,
   updateMerchCardDetails,
-  updateMerchCardStatus,
 } from '@/lib/merch/service';
 import {
   albumArtGenerationBurstLimiter,
@@ -1267,28 +1266,13 @@ function _createSelectMerchDesignTool(params: {
   });
 }
 
-function getMerchCardUpdateStatus(
-  action: 'pause' | 'unpause' | 'archive'
-): 'paused' | 'archived' | 'live' {
-  if (action === 'pause') {
-    return 'paused';
-  }
-
-  if (action === 'archive') {
-    return 'archived';
-  }
-
-  return 'live';
-}
-
 function createMerchStatusTool(params: {
   readonly action: 'publish' | 'pause' | 'unpause' | 'archive';
   readonly profileId: string | null;
-  readonly clerkUserId: string;
 }) {
   return tool({
     description:
-      'Change a merch card status. Use publish for live, pause for kill temporarily, unpause to bring back, and archive for delete/remove. Publish, unpause, and archive require user confirmation — they return a confirmation card and do not write immediately.',
+      'Propose a merch card status change. Use publish for live, pause to take off sale (destructive for fans), unpause to bring back, and archive for delete/remove. All four actions return a confirmation card and do not write until the artist confirms (JOV-3549).',
     inputSchema: chatToolSchema({
       merchCardId: z.string().uuid(),
     }),
@@ -1297,31 +1281,12 @@ function createMerchStatusTool(params: {
         return { success: false as const, error: 'Profile ID required' };
       }
 
-      if (
-        params.action === 'publish' ||
-        params.action === 'unpause' ||
-        params.action === 'archive'
-      ) {
-        return proposeMerchAction({
-          action: params.action,
-          merchCardId,
-          profileId: params.profileId,
-        });
-      }
-
-      const status = getMerchCardUpdateStatus(params.action);
-      const card = await updateMerchCardStatus({
-        cardId: merchCardId,
+      // All destructive / status flips are propose-then-confirm (JOV-3549).
+      return proposeMerchAction({
+        action: params.action,
+        merchCardId,
         profileId: params.profileId,
-        clerkUserId: params.clerkUserId,
-        status,
       });
-      return {
-        success: true as const,
-        merchCardId: card.id,
-        status: card.status,
-        title: card.title,
-      };
     },
   });
 }
@@ -2157,22 +2122,18 @@ function buildChatTools(
           publishMerchCard: createMerchStatusTool({
             action: 'publish',
             profileId: resolvedProfileId,
-            clerkUserId,
           }),
           pauseMerchCard: createMerchStatusTool({
             action: 'pause',
             profileId: resolvedProfileId,
-            clerkUserId,
           }),
           unpauseMerchCard: createMerchStatusTool({
             action: 'unpause',
             profileId: resolvedProfileId,
-            clerkUserId,
           }),
           deleteOrArchiveMerchCard: createMerchStatusTool({
             action: 'archive',
             profileId: resolvedProfileId,
-            clerkUserId,
           }),
           reorderMerchCards: tool({
             description:

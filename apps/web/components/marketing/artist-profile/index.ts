@@ -8,6 +8,7 @@ export { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
 export { ArtistProfileLandingPage } from './ArtistProfileLandingPage';
 export { ArtistProfileModeSwitcher } from './ArtistProfileModeSwitcher';
 export { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
+export { ArtistProfileOpinionatedSection } from './ArtistProfileOpinionatedSection';
 export { ArtistProfileOutcomeDuo } from './ArtistProfileOutcomeDuo';
 export { ArtistProfileOutcomesCarousel } from './ArtistProfileOutcomesCarousel';
 export { ArtistProfileReactivationSection } from './ArtistProfileReactivationSection';

@@ -1,5 +1,5 @@
-import { FaqSection } from '@/components/marketing';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import { FaqSection } from '../FaqSection';
 import { SHELL_H2_CLASS } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
