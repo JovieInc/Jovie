@@ -10,23 +10,17 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
   return (
     <section
       data-testid='homepage-hero'
-      className='homepage-hero homepage-hero--artist-profile relative overflow-hidden border-b border-white/[0.03] bg-black dark:bg-black'
+      className='homepage-hero homepage-hero--artist-profile relative overflow-hidden border-b border-subtle bg-black dark:bg-black'
       aria-labelledby='artist-profile-hero-heading'
     >
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.09),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_48%)]'
-      />
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-x-0 top-0 h-[28rem] bg-[radial-gradient(circle_at_50%_0%,rgba(83,131,255,0.14),transparent_52%)]'
-      />
-
       <MarketingContainer
         width='page'
-        className='relative !max-w-(--linear-content-max) !px-5 sm:!px-6 lg:!px-0'
+        className='relative !px-5 sm:!px-6 lg:!px-0'
       >
-        <div className='mx-auto flex max-w-3xl flex-col items-center pb-10 pt-[calc(var(--linear-header-height)+3rem)] text-center sm:pb-12 sm:pt-[calc(var(--linear-header-height)+3.5rem)] lg:pb-14 lg:pt-[calc(var(--linear-header-height)+4rem)]'>
+        <div className='mx-auto flex min-h-[72svh] max-w-3xl flex-col items-center justify-center pb-16 pt-[calc(var(--public-shell-header-offset)+4rem)] text-center sm:min-h-[76svh] sm:pb-20 lg:min-h-[80svh]'>
+          <p className='mb-6 text-xs font-medium tracking-wide text-secondary-token'>
+            {hero.eyebrow}
+          </p>
           <h1
             id='artist-profile-hero-heading'
             className='max-w-[11ch] text-[clamp(3.125rem,7.15vw,5.625rem)] font-[660] leading-[0.95] tracking-[-0.055em] text-primary-token'
@@ -39,6 +33,9 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
           <div className='mt-7 flex justify-center'>
             <HomeHeroCTA />
           </div>
+          <p className='mt-5 font-mono text-xs tracking-tight text-tertiary-token'>
+            {hero.signature}
+          </p>
         </div>
       </MarketingContainer>
     </section>
