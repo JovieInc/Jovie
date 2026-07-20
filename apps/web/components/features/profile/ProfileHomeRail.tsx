@@ -283,6 +283,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
           city: show.city,
           startDate: show.startDate,
           ticketUrl: show.ticketUrl,
+          ticketStatus: show.ticketStatus,
         })
       );
     }

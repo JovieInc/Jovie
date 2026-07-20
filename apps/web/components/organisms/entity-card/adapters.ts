@@ -1,6 +1,6 @@
 import { getMerchPriceDisplay } from '@/lib/merch/pricing';
 import type { PublicMerchCard } from '@/lib/merch/types';
-import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import type { TicketStatus, TourDateViewModel } from '@/lib/tour-dates/types';
 import { formatLocationString } from '@/lib/utils/string-utils';
 import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 import { KIND_PRESETS } from './kind-presets';
@@ -133,6 +133,7 @@ export interface ShowEntityInput {
   readonly startDate?: Date | string | null;
   readonly ticketUrl?: string | null;
   readonly status?: EntityStatusTone | null;
+  readonly ticketStatus?: TicketStatus | null;
 }
 
 export interface ChatReleaseContextInput {
@@ -383,11 +384,14 @@ export function showToEntityCard(show: ShowEntityInput): EntityCardModel {
   const date = toDate(show.startDate);
   const title = show.title?.trim() || show.venueName?.trim() || 'Show';
   const location = [show.venueName, show.city].filter(Boolean).join(' · ');
+  const isCancelled = show.ticketStatus === 'cancelled';
+  const isSoldOut = show.ticketStatus === 'sold_out';
+  const canBuyTickets = Boolean(show.ticketUrl) && !isCancelled && !isSoldOut;
 
   return {
     id: show.id,
     kind: 'show',
-    href: show.ticketUrl ?? null,
+    href: canBuyTickets ? show.ticketUrl : null,
     imageUrl: null,
     imageAlt: title,
     accent: preset.accent,
@@ -398,10 +402,18 @@ export function showToEntityCard(show: ShowEntityInput): EntityCardModel {
       ? { month: monthFormatter.format(date), day: dayFormatter.format(date) }
       : null,
     status: null,
-    cta: show.ticketUrl
+    // A show that cannot sell tickets gets a target-less CTA — the card
+    // renders it as plain muted text, never a dead Tickets link.
+    cta: canBuyTickets
       ? { label: preset.ctaLabel, href: show.ticketUrl, external: true }
-      : // No ticket URL: keep the bottom slot honest — a target-less CTA the
-        // card renders as plain muted text, never as button chrome.
-        { label: 'No Tickets', href: null, disabled: true },
+      : {
+          label: isCancelled
+            ? 'Cancelled'
+            : isSoldOut
+              ? 'Sold Out'
+              : 'No Tickets',
+          href: null,
+          disabled: true,
+        },
   };
 }

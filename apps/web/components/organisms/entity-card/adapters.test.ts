@@ -308,4 +308,34 @@ describe('showToEntityCard', () => {
     });
     expect(model.datePill).toEqual({ month: 'Jul', day: '29' });
   });
+
+  it('never links a cancelled or sold-out show to tickets', () => {
+    const cancelled = showToEntityCard({
+      id: 's4',
+      venueName: 'Enmore Theatre',
+      startDate: '2026-11-29T08:00:00.000Z',
+      ticketUrl: 'https://tickets.test/enmore',
+      ticketStatus: 'cancelled',
+    });
+    expect(cancelled.href).toBeNull();
+    expect(cancelled.cta).toEqual({
+      label: 'Cancelled',
+      href: null,
+      disabled: true,
+    });
+
+    const soldOut = showToEntityCard({
+      id: 's5',
+      venueName: 'The Echo',
+      startDate: '2026-07-29T02:30:00.000Z',
+      ticketUrl: 'https://tickets.test/echo',
+      ticketStatus: 'sold_out',
+    });
+    expect(soldOut.href).toBeNull();
+    expect(soldOut.cta).toEqual({
+      label: 'Sold Out',
+      href: null,
+      disabled: true,
+    });
+  });
 });
