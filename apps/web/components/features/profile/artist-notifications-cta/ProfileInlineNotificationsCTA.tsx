@@ -9,6 +9,10 @@ import { captureError } from '@/lib/error-tracking';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
+import {
+  getCaptureDismissalStatus,
+  invalidateCaptureDismissalStatus,
+} from '@/lib/profile/capture-dismissal-client';
 import { readProfileAccentTheme } from '@/lib/profile/profile-theme';
 import {
   useUpdateContentPreferencesMutation,
@@ -401,19 +405,11 @@ export function ProfileInlineNotificationsCTA({
     }
 
     let isActive = true;
-    fetch(`/api/profile/capture-dismissal?artist_id=${artist.id}`, {
-      cache: 'no-store',
-    })
-      .then(async response => {
-        if (!response.ok) return;
-        const data = (await response.json()) as {
-          readonly suppressed?: boolean;
-        };
-        if (isActive) {
-          setCaptureSuppressed(Boolean(data.suppressed));
-        }
-      })
-      .catch(() => {});
+    void getCaptureDismissalStatus(artist.id).then(data => {
+      if (isActive) {
+        setCaptureSuppressed(Boolean(data?.suppressed));
+      }
+    });
 
     return () => {
       isActive = false;
@@ -579,6 +575,7 @@ export function ProfileInlineNotificationsCTA({
         throw new Error('Capture dismissal failed');
       }
 
+      invalidateCaptureDismissalStatus(artist.id);
       handleClose();
     } catch (error) {
       void captureError('Profile capture dismissal failed', error, {

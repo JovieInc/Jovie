@@ -23,6 +23,10 @@ import type {
 import type { PublicMerchCard } from '@/lib/merch/types';
 import { subscribeToNotifications } from '@/lib/notifications/client';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
+import {
+  getCaptureDismissalStatus,
+  invalidateCaptureDismissalStatus,
+} from '@/lib/profile/capture-dismissal-client';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PacState as PacEventState } from '@/lib/tracking/pac-events-contract';
 import { cn } from '@/lib/utils';
@@ -258,19 +262,13 @@ export function ProfilePacCard({
   // the prompt eligible and the API re-validates on write.
   useEffect(() => {
     if (!isInteractive || isSubscribed) return;
-    const controller = new AbortController();
-    void fetch(
-      `/api/profile/capture-dismissal?artist_id=${encodeURIComponent(artist.id)}`,
-      { signal: controller.signal, credentials: 'same-origin' }
-    )
-      .then(res => (res.ok ? res.json() : null))
-      .then((data: { suppressed?: boolean } | null) => {
-        if (data?.suppressed) setCaptureSuppressed(true);
-      })
-      .catch(() => {
-        // Best-effort only.
-      });
-    return () => controller.abort();
+    let cancelled = false;
+    void getCaptureDismissalStatus(artist.id).then(data => {
+      if (!cancelled && data?.suppressed) setCaptureSuppressed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [artist.id, isInteractive, isSubscribed]);
 
   // --- Playback: register with the single global audio engine (#12330).
@@ -462,9 +460,13 @@ export function ProfilePacCard({
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
       body: JSON.stringify({ artist_id: artist.id, source: 'profile_pac' }),
-    }).catch(() => {
-      // Best-effort — suppression is also held in memory for this session.
-    });
+    })
+      .then(res => {
+        if (res.ok) invalidateCaptureDismissalStatus(artist.id);
+      })
+      .catch(() => {
+        // Best-effort — suppression is also held in memory for this session.
+      });
   }, [artist.id, assignment.dismissAffordance, dispatch, emit]);
 
   const handleSecondaryClick = useCallback(
