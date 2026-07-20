@@ -93,6 +93,7 @@ if [[ " $* " == *" --prebuilt "* ]]; then
   sleep 5
   exit 1
 fi
+printf '%s|%s\n' "${VERCEL_GIT_COMMIT_SHA:-}" "${NEXT_PUBLIC_BUILD_SHA:-}" > "${VERCEL_ENV_LOG}"
 echo "https://jovie-source-fallback.vercel.app"
 """
     )
@@ -116,6 +117,7 @@ echo "https://jovie-source-fallback.vercel.app"
             "VERCEL_DEPLOY_KILL_GRACE_SECONDS": "1",
             "VERCEL_GIT_COMMIT_SHA": "0123456789abcdef",
             "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
+            "VERCEL_ENV_LOG": str(tmp_path / "vercel-env"),
         }
     )
 
@@ -139,10 +141,15 @@ echo "https://jovie-source-fallback.vercel.app"
     assert len(calls) == 2
     assert "--prebuilt --archive=tgz" in calls[0]
     assert "--prebuilt" not in calls[1]
-    assert "--build-env VERCEL_GIT_COMMIT_SHA=0123456789abcdef" in calls[1]
-    assert "--env VERCEL_GIT_COMMIT_SHA=0123456789abcdef" in calls[1]
-    assert "--build-env NEXT_PUBLIC_BUILD_SHA=0123456" in calls[1]
-    assert "--env NEXT_PUBLIC_BUILD_SHA=0123456" in calls[1]
+    assert "--build-env VERCEL_GIT_COMMIT_SHA" in calls[1]
+    assert "--env VERCEL_GIT_COMMIT_SHA" in calls[1]
+    assert "--build-env NEXT_PUBLIC_BUILD_SHA" in calls[1]
+    assert "--env NEXT_PUBLIC_BUILD_SHA" in calls[1]
+    assert "VERCEL_GIT_COMMIT_SHA=" not in calls[1]
+    assert "NEXT_PUBLIC_BUILD_SHA=" not in calls[1]
+    assert (tmp_path / "vercel-env").read_text().strip() == (
+        "0123456789abcdef|0123456"
+    )
 
 
 def test_failed_prebuilt_with_url_still_falls_back_to_source(tmp_path: Path) -> None:
@@ -324,16 +331,25 @@ def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
 
     deploy_index = workflow.index("- name: Deploy (staging preview, prebuilt)")
     wait_index = workflow.index("- name: Wait for staging deployment readiness")
+    attestation_index = workflow.index("  attest-staging-build:")
     canary_index = workflow.index("  canary-health-gate:")
     alias_job_index = workflow.index("  alias-staging:")
     promote_index = workflow.index("  promote-production:")
 
-    assert deploy_index < wait_index < canary_index < alias_job_index < promote_index
+    assert (
+        deploy_index
+        < wait_index
+        < attestation_index
+        < canary_index
+        < alias_job_index
+        < promote_index
+    )
     assert "vercel inspect" in workflow[wait_index:canary_index]
     assert "--wait" in workflow[wait_index:canary_index]
-    assert "needs: [deploy-staging, canary-health-gate, alias-staging, production-head]" in workflow[
-        promote_index:
-    ]
+    assert (
+        "needs: [deploy-staging, attest-staging-build, canary-health-gate, "
+        "alias-staging, production-head]" in workflow[promote_index:]
+    )
 
     source_workflow = CI_WORKFLOW.read_text()
     preview_deploy_index = source_workflow.index(
@@ -434,9 +450,12 @@ def test_staging_job_budget_contains_deploy_and_readiness_steps() -> None:
         r"- name: Deploy \(staging preview, prebuilt\)\n        timeout-minutes: ([0-9]+)",
         staging_block,
     )
+    readiness_block = staging_block[
+        staging_block.index("- name: Wait for staging deployment readiness") :
+        staging_block.index("- name: Encode deployment URL for downstream jobs")
+    ]
     readiness_timeout = re.search(
-        r"- name: Wait for staging deployment readiness\n        timeout-minutes: ([0-9]+)",
-        staging_block,
+        r"^        timeout-minutes: ([0-9]+)$", readiness_block, re.M
     )
 
     assert job_timeout is not None
@@ -456,7 +475,9 @@ def _staging_build_step(workflow: str) -> str:
     return staging[
         staging.index(
             "- name: Build (preview target for staging verification)"
-        ) : staging.index("- name: Package build output for provenance attestation")
+        ) : staging.index(
+            "- name: Hash fixed staging build subject for isolated attestation"
+        )
     ]
 
 

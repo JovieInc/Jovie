@@ -13,9 +13,9 @@ import expected from '@/lib/auth/oauth-redirect-uris.expected.json';
  * deployment's app host and the console registrations that MUST exist for
  * it, so a host change forces a console re-sync before shipping.
  *
- * The runtime safety net is `oauth-providers.spec.ts` (staging canary +
- * post-promote production-oauth-gate) plus the `GET /api/auth/ok` hard
- * probe added in plan Phase 11.
+ * The runtime safety net is `oauth-providers.spec.ts` after the staging and
+ * production aliases are bound: it clicks the deployed UI, requires the real
+ * Better Auth social POST, and inspects the emitted provider redirect URI.
  */
 
 const googleCallback = (appHost: string) =>

@@ -4229,6 +4229,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           clean: true
+          persist-credentials: false
 
       - name: Materialize full tree (self-hosted)
         if: runner.environment != 'github-hosted'
@@ -4258,12 +4259,12 @@ jobs:
             scope_args=(--scope "$VERCEL_ORG_ID")
           fi
           for i in {1..3}; do
-            if ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+            if ./node_modules/.bin/vercel pull --yes --environment=preview "${scope_args[@]}"; then
               break
             fi
             echo "Vercel pull attempt $i failed, retrying in 10s..."
             sleep 10
-            if [ $i -eq 3 ]; then exit 1; fi
+            if [ "$i" -eq 3 ]; then exit 1; fi
           done
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -4285,12 +4286,12 @@ jobs:
             scope_args=(--scope "$VERCEL_ORG_ID")
           fi
           for i in {1..3}; do
-            if env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"; then
+            if env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build "${scope_args[@]}"; then
               break
             fi
             echo "Vercel build attempt $i failed, retrying in 10s..."
             sleep 10
-            if [ $i -eq 3 ]; then exit 1; fi
+            if [ "$i" -eq 3 ]; then exit 1; fi
           done
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
@@ -4316,16 +4317,18 @@ jobs:
             POOLED_URL="postgresql://stub:***@localhost:5432/main_stub"
             echo "Using stub database URL for UI-only deployment"
           fi
+          export DATABASE_URL="$POOLED_URL"
+          export GIT_BRANCH
 
           for i in {1..3}; do
             if bash .github/scripts/vercel-prebuilt-deploy.sh deployment_url \
-              --env DATABASE_URL="$POOLED_URL" \
-              --env GIT_BRANCH="${GIT_BRANCH}"; then
+              --env DATABASE_URL \
+              --env GIT_BRANCH; then
               break
             fi
             echo "Vercel deploy attempt $i failed, retrying in 10s..."
             sleep 10
-            if [ $i -eq 3 ]; then exit 1; fi
+            if [ "$i" -eq 3 ]; then exit 1; fi
           done
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -4351,11 +4354,9 @@ jobs:
           ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
             --wait \
             --timeout 8m \
-            --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID" || inspect_wait_status=$?
           deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
             --format=json \
-            --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID")"
           deployment_state="$(jq -r '(.readyState // .state // .status // "unknown") | ascii_upcase' \
             <<<"$deployment_json")"
