@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+
 import { AlertTriangle, Copy, X } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -93,17 +95,18 @@ export function ErrorBanner({
     }
 
     return (
-      <button
+      <Button
         key={`${action.label}-${index}`}
         type='button'
+        variant='ghost'
         onClick={action.onClick}
         className={cn(
           actionClass,
-          'border border-error/50 bg-error/15 text-error-foreground shadow-lg hover:bg-error/25 hover:border-error/70'
+          'h-auto border border-error/50 bg-error/15 text-error-foreground shadow-lg hover:bg-error/25 hover:border-error/70'
         )}
       >
         {action.label || 'Action'}
-      </button>
+      </Button>
     );
   };
 
@@ -140,13 +143,14 @@ export function ErrorBanner({
           ) : null}
 
           <div className='mt-3'>
-            <button
+            <Button
               type='button'
+              variant='link'
               onClick={() => setShowDetails(!showDetails)}
-              className='text-xs text-red-100/70 hover:text-red-100 dark:text-red-200/70 dark:hover:text-red-200 underline decoration-dotted'
+              className='h-auto text-xs text-red-100/70 hover:text-red-100 dark:text-red-200/70 dark:hover:text-red-200 underline decoration-dotted'
             >
-              {showDetails ? 'Hide' : 'Show'} error details
-            </button>
+              {showDetails ? 'Hide Error Details' : 'Show Error Details'}
+            </Button>
 
             {showDetails && (
               <div className='mt-2 pt-2 border-t border-red-500/20 dark:border-red-900/40 space-y-1.5'>
@@ -159,15 +163,17 @@ export function ErrorBanner({
                   Time: {timestamp.toLocaleString()}
                 </p>
 
-                <button
+                <Button
                   type='button'
+                  variant='ghost'
+                  size='sm'
                   onClick={handleCopyErrorDetails}
-                  className='inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-red-100 hover:text-white hover:bg-red-500/20 transition-colors dark:text-red-200 dark:hover:text-red-50'
-                  aria-label='Copy error details to clipboard'
+                  className='inline-flex h-auto items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-red-100 hover:text-white hover:bg-red-500/20 transition-colors dark:text-red-200 dark:hover:text-red-50'
+                  aria-label='Copy Error Details To Clipboard'
                 >
                   <Copy className='h-3 w-3' aria-hidden='true' />
                   Copy Error Details
-                </button>
+                </Button>
 
                 {process.env.NODE_ENV === 'development' && error?.message && (
                   <details className='mt-2 rounded-md bg-red-900/30 dark:bg-red-950/50 p-2'>
@@ -186,14 +192,16 @@ export function ErrorBanner({
         </div>
 
         {onDismiss ? (
-          <button
+          <Button
             type='button'
+            variant='ghost'
+            size='icon'
             onClick={onDismiss}
-            aria-label='Dismiss error'
-            className='mt-0.5 shrink-0 self-start rounded-full border border-red-500/30 bg-transparent p-1.5 text-red-700 transition-colors hover:bg-red-500/10 hover:text-red-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 focus-visible:ring-offset-1 focus-visible:ring-offset-red-50 dark:border-red-800/50 dark:text-red-300 dark:hover:bg-red-900/40 dark:hover:text-red-100 dark:focus-visible:ring-offset-red-950'
+            aria-label='Dismiss Error'
+            className='mt-0.5 h-auto w-auto shrink-0 self-start rounded-full border border-red-500/30 bg-transparent p-1.5 text-red-700 transition-colors hover:bg-red-500/10 hover:text-red-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 focus-visible:ring-offset-1 focus-visible:ring-offset-red-50 dark:border-red-800/50 dark:text-red-300 dark:hover:bg-red-900/40 dark:hover:text-red-100 dark:focus-visible:ring-offset-red-950'
           >
             <X className='h-4 w-4' aria-hidden='true' />
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>

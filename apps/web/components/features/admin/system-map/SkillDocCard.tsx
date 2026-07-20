@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
@@ -31,9 +33,10 @@ export function SkillDocCard({
       className='rounded-lg border border-subtle bg-surface-1'
       data-testid={`skill-card-${id}`}
     >
-      <button
+      <Button
         type='button'
-        className='flex w-full items-start gap-3 p-4 text-left'
+        variant='ghost'
+        className='flex h-auto w-full items-start justify-start gap-3 rounded-none p-4 text-left hover:bg-transparent'
         onClick={() => setOpen(prev => !prev)}
         aria-expanded={open}
       >
@@ -61,7 +64,7 @@ export function SkillDocCard({
             {model}
           </p>
         </div>
-      </button>
+      </Button>
 
       {open && promptContent ? (
         <div

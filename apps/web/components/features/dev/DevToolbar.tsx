@@ -229,7 +229,7 @@ function getSwButtonProps(enabled: boolean) {
     title: enabled
       ? 'Service worker active — click to disable'
       : 'Service worker disabled — click to enable',
-    className: `flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
+    className: `h-auto flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
       enabled
         ? 'text-accent bg-accent/10'
         : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
@@ -933,12 +933,13 @@ export function DevToolbar({
             { value: 'light', icon: Sun, label: 'Light Theme' },
             { value: 'system', icon: Monitor, label: 'System Theme' },
           ].map(({ value, icon: Icon, label }) => (
-            <button
+            <Button
               type='button'
+              variant='ghost'
               key={value}
               onClick={() => setTheme(value)}
               title={label}
-              className={`p-1.5 rounded transition-colors ${
+              className={`h-auto p-1.5 rounded transition-colors ${
                 mounted && theme === value
                   ? 'text-accent bg-accent/10'
                   : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
@@ -946,7 +947,7 @@ export function DevToolbar({
               aria-label={label}
             >
               <Icon size={12} />
-            </button>
+            </Button>
           ))}
 
           <div className='w-px h-4 mx-1 bg-subtle' />
@@ -1005,14 +1006,15 @@ export function DevToolbar({
 
           {env !== 'production' && (
             <div className='relative'>
-              <button
+              <Button
                 type='button'
+                variant='ghost'
                 onClick={() => setPersonaPanelOpen(value => !value)}
                 title='Switch test persona'
                 aria-label='Test Persona'
                 aria-expanded={personaPanelOpen}
                 aria-haspopup='menu'
-                className={`flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors ${
+                className={`h-auto flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors ${
                   personaSession?.active ? 'text-accent bg-accent/10' : ''
                 }`}
               >
@@ -1020,7 +1022,7 @@ export function DevToolbar({
                 <span className='max-sm:hidden sm:inline text-3xs'>
                   Persona
                 </span>
-              </button>
+              </Button>
 
               {personaPanelOpen && (
                 <div
@@ -1062,13 +1064,14 @@ export function DevToolbar({
                           personaSession?.persona === option.persona;
                         const isSwitching = personaAction === option.persona;
                         return (
-                          <button
+                          <Button
                             key={option.persona}
                             type='button'
+                            variant='ghost'
                             role='menuitem'
                             disabled={Boolean(personaAction) || isActive}
                             onClick={() => handleSelectPersona(option.persona)}
-                            className='flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-2 disabled:cursor-default disabled:opacity-75'
+                            className='h-auto w-full justify-start rounded-none flex items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-2 disabled:cursor-default disabled:opacity-75'
                           >
                             <span className='flex size-4 shrink-0 items-center justify-center text-accent'>
                               {isSwitching ? (
@@ -1090,17 +1093,18 @@ export function DevToolbar({
                                 {option.description}
                               </span>
                             </span>
-                          </button>
+                          </Button>
                         );
                       })}
 
                       {personaSession?.active && (
-                        <button
+                        <Button
                           type='button'
+                          variant='ghost'
                           role='menuitem'
                           disabled={Boolean(personaAction)}
                           onClick={handleExitPersona}
-                          className='mt-1 flex w-full items-center gap-2 border-t border-subtle px-3 py-2 text-left text-2xs text-(--color-text-tertiary) transition-colors hover:bg-surface-2 hover:text-(--color-text-primary) disabled:cursor-not-allowed disabled:opacity-50'
+                          className='mt-1 h-auto w-full justify-start rounded-none flex items-center gap-2 border-t border-subtle px-3 py-2 text-left text-2xs text-(--color-text-tertiary) transition-colors hover:bg-surface-2 hover:text-(--color-text-primary) disabled:cursor-not-allowed disabled:opacity-50'
                         >
                           <span className='flex size-4 shrink-0 items-center justify-center'>
                             {personaAction === 'exit' ? (
@@ -1110,7 +1114,7 @@ export function DevToolbar({
                             )}
                           </span>
                           Exit Persona
-                        </button>
+                        </Button>
                       )}
                     </div>
                   )}
@@ -1129,50 +1133,53 @@ export function DevToolbar({
           <PlanToggle />
 
           {env !== 'production' && (
-            <button
+            <Button
               type='button'
+              variant='ghost'
               onClick={handleClearSession}
               disabled={
                 clearSessionState === 'loading' || clearSessionState === 'done'
               }
               title='Clear all cookies, localStorage, and sessionStorage'
-              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              className='h-auto flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Clear Session'
             >
               <AsyncActionIcon state={clearSessionState} idleIcon={Trash2} />
               <span className='max-sm:hidden sm:inline text-3xs'>
                 {ASYNC_ACTION_LABELS.clear[clearSessionState]}
               </span>
-            </button>
+            </Button>
           )}
 
           {env !== 'production' && (
-            <button
+            <Button
               type='button'
+              variant='ghost'
               onClick={handleUnwaitlist}
               disabled={
                 unwaitlistState === 'loading' || unwaitlistState === 'done'
               }
               title='Approve your own waitlist entry (dev only)'
-              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              className='h-auto flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Unwaitlist'
             >
               <AsyncActionIcon state={unwaitlistState} idleIcon={UserCheck} />
               <span className='max-sm:hidden sm:inline text-3xs'>
                 {ASYNC_ACTION_LABELS.unwaitlist[unwaitlistState]}
               </span>
-            </button>
+            </Button>
           )}
 
           {env !== 'production' && (
-            <button
+            <Button
               type='button'
+              variant='ghost'
               onClick={handleSyncClerk}
               disabled={
                 syncClerkState === 'loading' || syncClerkState === 'done'
               }
               title='Sync Clerk user ID to DB (fixes clerk_id mismatch between dev/prod)'
-              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              className='h-auto flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Sync Clerk ID'
             >
               {syncClerkState === 'loading' && (
@@ -1198,12 +1205,13 @@ export function DevToolbar({
                   }[syncClerkState]
                 }
               </span>
-            </button>
+            </Button>
           )}
 
           {env !== 'production' && (
-            <button
+            <Button
               type='button'
+              variant='ghost'
               onClick={async () => {
                 const next = !swEnabled;
                 setSwEnabled(next);
@@ -1219,7 +1227,7 @@ export function DevToolbar({
             >
               <Globe size={11} />
               <span className='max-sm:hidden sm:inline text-3xs'>SW</span>
-            </button>
+            </Button>
           )}
 
           {/* Promote to production — preview only */}
@@ -1228,14 +1236,15 @@ export function DevToolbar({
             promoteState !== 'checking' && (
               <>
                 <div className='w-px h-4 mx-1 bg-subtle' />
-                <button
+                <Button
                   type='button'
+                  variant='ghost'
                   onClick={handlePromote}
                   disabled={
                     promoteState === 'promoting' || promoteState === 'done'
                   }
                   title={getPromoteTitle(promoteSha)}
-                  className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getPromoteButtonColor(promoteState)}`}
+                  className={`h-auto flex items-center gap-1 px-1.5 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getPromoteButtonColor(promoteState)}`}
                   aria-label='Promote To Production'
                 >
                   <PromoteIcon state={promoteState} />
@@ -1247,29 +1256,31 @@ export function DevToolbar({
                       {promoteSha.staging}→{promoteSha.prod}
                     </span>
                   )}
-                </button>
+                </Button>
               </>
             )}
 
           <div className='w-px h-4 mx-1 bg-subtle' />
 
           {/* Expand/collapse + hide */}
-          <button
+          <Button
             type='button'
+            variant='ghost'
             onClick={toggleOpen}
-            className='flex items-center gap-1 px-2 py-1 rounded text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
+            className='h-auto flex items-center gap-1 px-2 py-1 rounded text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
             aria-label={open ? 'Collapse Dev Toolbar' : 'Expand Dev Toolbar'}
           >
             <ExpandCollapseIcon open={open} />
-          </button>
-          <button
+          </Button>
+          <Button
             type='button'
+            variant='ghost'
             onClick={hide}
-            className='flex items-center px-2 py-1 rounded text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
+            className='h-auto flex items-center px-2 py-1 rounded text-(--color-text-tertiary) hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
             aria-label='Hide Dev Toolbar'
           >
             <X size={13} />
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+
 import { BadgeCheck, Link2 } from 'lucide-react';
 import Image from 'next/image';
 import {
@@ -216,14 +218,15 @@ export function WaitlistSpotifySearch({
             <span className='flex-1 text-sm text-primary-token truncate'>
               {selectedArtistName}
             </span>
-            <button
+            <Button
               type='button'
+              variant='link'
               onClick={handleBackToSearch}
-              className={AUTH_SURFACE.inlineAction}
+              className={cn(AUTH_SURFACE.inlineAction, 'h-auto')}
               disabled={isSubmitting}
             >
               Change
-            </button>
+            </Button>
           </div>
         ) : (
           <>
@@ -246,17 +249,18 @@ export function WaitlistSpotifySearch({
                   ? 'waitlist-spotify-url-error'
                   : undefined
               }
-              placeholder='open.spotify.com/artist/... (optional)'
+              placeholder='Open.spotify.com/artist/... (optional)'
               disabled={isSubmitting}
             />
-            <button
+            <Button
               type='button'
+              variant='link'
               onClick={handleBackToSearch}
-              className={AUTH_SURFACE.inlineAction}
+              className={cn(AUTH_SURFACE.inlineAction, 'h-auto')}
               disabled={isSubmitting}
             >
-              Search for artist instead
-            </button>
+              Search For Artist Instead
+            </Button>
           </>
         )}
         <div className={FORM_LAYOUT.errorContainer}>
@@ -327,7 +331,7 @@ export function WaitlistSpotifySearch({
             id='spotify-search-results'
             className='sr-only'
             size={Math.min(totalItems, 6)}
-            aria-label='Spotify artist results'
+            aria-label='Spotify Artist Results'
             value={
               activeIndex === manualAddIndex
                 ? '__manual__'
@@ -405,12 +409,13 @@ export function WaitlistSpotifySearch({
               aria-hidden='true'
             >
               {results.map((artist, index) => (
-                <button
+                <Button
                   key={artist.id}
                   type='button'
+                  variant='ghost'
                   tabIndex={0}
                   className={cn(
-                    'flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors',
+                    'flex h-auto w-full items-center justify-start gap-3 rounded-lg p-3 text-left transition-colors',
                     index === activeIndex
                       ? 'bg-surface-2'
                       : 'hover:bg-surface-2/50'
@@ -457,17 +462,18 @@ export function WaitlistSpotifySearch({
                       <BadgeCheck className='h-4 w-4' aria-hidden='true' />
                     </div>
                   )}
-                </button>
+                </Button>
               ))}
             </div>
           )}
 
           {/* Always-visible "Manually add URL" option */}
-          <button
+          <Button
             type='button'
+            variant='ghost'
             tabIndex={0}
             className={cn(
-              'flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors',
+              'flex h-auto w-full items-center justify-start gap-3 rounded-lg p-3 text-left transition-colors',
               activeIndex === manualAddIndex
                 ? 'bg-surface-2'
                 : 'hover:bg-surface-2/50'
@@ -492,7 +498,7 @@ export function WaitlistSpotifySearch({
                 Paste a Spotify artist link
               </div>
             </div>
-          </button>
+          </Button>
         </ContentSurfaceCard>
       )}
 

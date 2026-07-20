@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+
 import {
   ArrowRight,
   MessageSquarePlus,
@@ -256,21 +258,24 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             {rowContent}
           </Link>
         ) : (
-          <button
+          <Button
             type='button'
+            variant='ghost'
             onClick={() => onSelect?.(thread.id)}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
             aria-pressed={active}
-            className={rowClasses}
+            className={cn(rowClasses, 'h-auto hover:bg-transparent')}
           >
             {rowContent}
-          </button>
+          </Button>
         )}
       </Tooltip>
       {onThreadContextMenu ? (
         <Tooltip label='Chat Actions' side='right'>
-          <button
+          <Button
             type='button'
+            variant='ghost'
+            size='icon'
             onClick={e => onThreadContextMenu(e, thread)}
             aria-label={`Chat Actions for ${thread.title}`}
             className={cn(
@@ -283,7 +288,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
               strokeWidth={2.25}
               aria-hidden='true'
             />
-          </button>
+          </Button>
         </Tooltip>
       ) : null}
     </div>
@@ -363,8 +368,10 @@ export function SidebarThreadsSection({
               Conversations unavailable
             </span>
             {onRetry ? (
-              <button
+              <Button
                 type='button'
+                variant='ghost'
+                size='icon'
                 onClick={onRetry}
                 aria-label='Retry Chats'
                 className='grid h-5 w-5 shrink-0 place-items-center rounded text-quaternary-token transition-[background-color] duration-subtle ease-subtle hover:bg-sidebar-accent/55 hover:text-primary-token'
@@ -374,20 +381,21 @@ export function SidebarThreadsSection({
                   aria-hidden='true'
                   strokeWidth={2.25}
                 />
-              </button>
+              </Button>
             ) : null}
           </div>
         ) : null}
         {state === 'idle' && !hasThreads && onNewThread ? (
-          <button
+          <Button
             type='button'
+            variant='ghost'
             onClick={onNewThread}
             className={cn(
               getSidebarNavRowClassName({
                 tight,
                 tone: 'primary',
               }),
-              'text-left'
+              'h-auto text-left hover:bg-transparent'
             )}
           >
             <MessageSquarePlus
@@ -398,7 +406,7 @@ export function SidebarThreadsSection({
             <span className='min-w-0 truncate justify-self-start'>
               New Chat
             </span>
-          </button>
+          </Button>
         ) : null}
         {visible.map(t => {
           const active = activeThreadId === t.id;

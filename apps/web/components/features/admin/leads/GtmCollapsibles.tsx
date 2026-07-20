@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+
 import { ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
@@ -63,11 +65,12 @@ function AccordionSection({
 }: AccordionSectionProps) {
   return (
     <ContentSurfaceCard className='overflow-hidden'>
-      <button
+      <Button
         type='button'
+        variant='ghost'
         onClick={onToggle}
         aria-expanded={isOpen}
-        className='flex w-full items-center gap-2 px-(--linear-app-content-padding-x) py-3 text-left'
+        className='flex h-auto w-full items-center justify-start gap-2 rounded-none px-(--linear-app-content-padding-x) py-3 text-left hover:bg-transparent'
       >
         <ChevronRight
           className={cn(
@@ -76,7 +79,7 @@ function AccordionSection({
           )}
         />
         <span className='text-app font-medium text-primary-token'>{title}</span>
-      </button>
+      </Button>
       <AnimatedAccordion isOpen={isOpen}>{children}</AnimatedAccordion>
     </ContentSurfaceCard>
   );

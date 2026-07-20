@@ -106,7 +106,7 @@ export function IngestProfileDropdown({
             onValueChange={value => setNetwork(value)}
             options={networkOptions}
             size='sm'
-            aria-label='Select social network for ingestion'
+            aria-label='Select Social Network For Ingestion'
           />
 
           {isSuccess && (
@@ -136,15 +136,16 @@ export function IngestProfileDropdown({
             spotifyResults.length > 0 && (
               <div className='max-h-44 overflow-auto rounded-md border border-subtle bg-background-elevated p-1'>
                 {spotifyResults.map(artist => (
-                  <button
+                  <Button
                     key={artist.id}
                     type='button'
-                    className='flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent/15'
+                    variant='ghost'
+                    className='flex h-auto w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent/15'
                     onClick={() => selectSpotifyArtist(artist)}
                   >
                     <span>{artist.name}</span>
                     <span className='text-tertiary-token'>Use</span>
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}

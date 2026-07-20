@@ -1,7 +1,7 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Badge } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from '@/components/feedback';
@@ -109,14 +109,16 @@ function CopyButton({
   }, [value, label]);
 
   return (
-    <button
+    <Button
       type='button'
+      variant='ghost'
+      size='icon'
       onClick={handleCopy}
-      className='inline-flex items-center text-secondary-token hover:text-primary-token transition-colors'
+      className='inline-flex h-auto w-auto items-center p-0 text-secondary-token hover:bg-transparent hover:text-primary-token transition-colors'
       aria-label={`Copy ${label}`}
     >
       <Copy className='h-3 w-3' />
-    </button>
+    </Button>
   );
 }
 

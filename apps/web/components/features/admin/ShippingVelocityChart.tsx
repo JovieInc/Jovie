@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
 import type {
@@ -351,10 +353,11 @@ export function ShippingVelocityChart({
           </p>
           {/* Legend */}
           <div className='flex items-center gap-2.5'>
-            <button
+            <Button
               type='button'
+              variant='ghost'
               onClick={() => handleLineClick('merged')}
-              className='flex items-center gap-1 opacity-80 transition-opacity hover:opacity-100'
+              className='h-auto flex items-center gap-1 opacity-80 transition-opacity hover:opacity-100 hover:bg-transparent'
               aria-label='Toggle Merged Series Spotlight'
             >
               <span
@@ -362,11 +365,12 @@ export function ShippingVelocityChart({
                 style={{ backgroundColor: SERIES_COLORS.merged }}
               />
               <span className='text-3xs text-tertiary-token'>Merged</span>
-            </button>
-            <button
+            </Button>
+            <Button
               type='button'
+              variant='ghost'
               onClick={() => handleLineClick('opened')}
-              className='flex items-center gap-1 opacity-80 transition-opacity hover:opacity-100'
+              className='h-auto flex items-center gap-1 opacity-80 transition-opacity hover:opacity-100 hover:bg-transparent'
               aria-label='Toggle Opened Series Spotlight'
             >
               <span
@@ -374,11 +378,12 @@ export function ShippingVelocityChart({
                 style={{ backgroundColor: SERIES_COLORS.opened }}
               />
               <span className='text-3xs text-tertiary-token'>Opened</span>
-            </button>
-            <button
+            </Button>
+            <Button
               type='button'
+              variant='ghost'
               onClick={() => setShowClosed(prev => !prev)}
-              className='flex items-center gap-1 transition-opacity hover:opacity-100'
+              className='h-auto flex items-center gap-1 transition-opacity hover:opacity-100 hover:bg-transparent'
               style={{ opacity: showClosed ? 0.8 : 0.4 }}
               aria-label='Toggle Closed Series Visibility'
             >
@@ -387,26 +392,28 @@ export function ShippingVelocityChart({
                 style={{ backgroundColor: SERIES_COLORS.closed }}
               />
               <span className='text-3xs text-tertiary-token'>Closed</span>
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Range toggle */}
         <div className='flex items-center gap-0.5 rounded-lg border border-subtle bg-surface-0 p-0.5'>
           {RANGE_OPTIONS.map(opt => (
-            <button
+            <Button
               key={opt.value}
               type='button'
+              variant='ghost'
+              size='sm'
               onClick={() => handleRangeChange(opt.value)}
               className={
                 range === opt.value
-                  ? 'rounded-md bg-surface-2 px-2.5 py-1 text-2xs font-semibold text-primary-token'
-                  : 'rounded-md px-2.5 py-1 text-2xs font-medium text-tertiary-token transition-colors hover:text-secondary-token'
+                  ? 'h-auto rounded-md bg-surface-2 px-2.5 py-1 text-2xs font-semibold text-primary-token'
+                  : 'h-auto rounded-md px-2.5 py-1 text-2xs font-medium text-tertiary-token transition-colors hover:text-secondary-token'
               }
               aria-pressed={range === opt.value}
             >
               {opt.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -422,15 +429,17 @@ export function ShippingVelocityChart({
               Last updated {formatCachedAgo(cachedAt)}
             </p>
           ) : null}
-          <button
+          <Button
             type='button'
+            variant='secondary'
+            size='sm'
             onClick={() => {
               fetchData(range).catch(() => {});
             }}
-            className='mt-1 rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-2xs font-medium text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+            className='mt-1 h-auto rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-2xs font-medium text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
           >
             Retry
-          </button>
+          </Button>
         </div>
       ) : isEmpty ? (
         <div className='flex h-50 items-center justify-center'>

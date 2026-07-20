@@ -1,6 +1,6 @@
 'use client';
 
-import { CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
+import { Button, CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
 import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -41,8 +41,10 @@ export function DrawerSplitButton({
 
   if (!hasMenu && primaryAction) {
     return (
-      <button
+      <Button
         type='button'
+        variant='ghost'
+        size='sm'
         aria-label={primaryAction.ariaLabel}
         onClick={primaryAction.onClick}
         disabled={primaryAction.disabled}
@@ -56,7 +58,7 @@ export function DrawerSplitButton({
       >
         {primaryAction.icon}
         {primaryAction.label ? <span>{primaryAction.label}</span> : null}
-      </button>
+      </Button>
     );
   }
 
@@ -68,8 +70,10 @@ export function DrawerSplitButton({
         items={[...menuItems]}
         align='end'
         trigger={
-          <button
+          <Button
             type='button'
+            variant='ghost'
+            size='icon'
             aria-label={menuAriaLabel}
             className={cn(
               DRAWER_SPLIT_BUTTON_BASE_CLASSNAME,
@@ -79,7 +83,7 @@ export function DrawerSplitButton({
             )}
           >
             <ChevronDown className='h-3.5 w-3.5' aria-hidden='true' />
-          </button>
+          </Button>
         }
       />
     );
@@ -88,20 +92,23 @@ export function DrawerSplitButton({
   return (
     <div className={cn(DRAWER_SPLIT_BUTTON_BASE_CLASSNAME, className)}>
       {primaryAction ? (
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='sm'
           aria-label={primaryAction.ariaLabel}
           onClick={primaryAction.onClick}
           disabled={primaryAction.disabled}
           data-testid={primaryAction.testId}
           className={cn(
             DRAWER_SPLIT_BUTTON_SEGMENT_CLASSNAME,
+            'h-auto rounded-none',
             primaryAction.label ? 'px-2.5' : 'w-7 px-0'
           )}
         >
           {primaryAction.icon}
           {primaryAction.label ? <span>{primaryAction.label}</span> : null}
-        </button>
+        </Button>
       ) : null}
       <CommonDropdown
         variant='dropdown'
@@ -109,16 +116,18 @@ export function DrawerSplitButton({
         items={[...menuItems]}
         align='end'
         trigger={
-          <button
+          <Button
             type='button'
+            variant='ghost'
+            size='icon'
             aria-label={menuAriaLabel}
             className={cn(
               DRAWER_SPLIT_BUTTON_SEGMENT_CLASSNAME,
-              'w-7 border-l border-subtle px-0'
+              'h-auto w-7 rounded-none border-l border-subtle px-0'
             )}
           >
             <ChevronDown className='h-3.5 w-3.5' aria-hidden='true' />
-          </button>
+          </Button>
         }
       />
     </div>
