@@ -54,7 +54,11 @@ concurrency:
   # Include the event name so review re-evaluation does not cancel the initial
   # metadata gate for the same PR.
   group: fork-pr-gate-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}
-  cancel-in-progress: true
+  # pull_request/_target/review: never cancel — duplicate same-head-SHA
+  # deliveries must each reach a terminal state so this required context
+  # always resolves from a completed run (same JOV-3580 race as
+  # pr-size-guard). merge_group stays keyed by exact head SHA.
+  cancel-in-progress: ${{ github.event_name == 'merge_group' }}
 
 jobs:
   merge-group-gate:
