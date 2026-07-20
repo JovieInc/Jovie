@@ -180,6 +180,38 @@
       "remediation": "An explicitly requested admin Lighthouse run regressed. Verify the admin persona and uploaded artifacts."
     },
     {
+      "id": "ci-lighthouse-chat-pr",
+      "name": "Lighthouse (chat manual)",
+      "tier": "preview-evidence",
+      "mergeGate": false,
+      "nextLocalCommand": "pnpm --filter=@jovie/web run test:lighthouse:chat:pr",
+      "remediation": "An explicitly requested chat Lighthouse run regressed. Fix the chat route behavior or budget drift instead of bypassing the informational baseline."
+    },
+    {
+      "id": "ci-a11y",
+      "name": "A11y (axe)",
+      "tier": "preview-evidence",
+      "mergeGate": false,
+      "nextLocalCommand": "pnpm --filter=@jovie/web exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium",
+      "remediation": "An explicitly requested public-route axe audit regressed. Fix the WCAG violation in the page or component instead of raising the allowed-violation baseline."
+    },
+    {
+      "id": "ci-a11y-authed",
+      "name": "A11y (authenticated, informational)",
+      "tier": "preview-evidence",
+      "mergeGate": false,
+      "nextLocalCommand": "pnpm --filter=@jovie/web exec playwright test tests/e2e/a11y.spec.ts tests/e2e/chat-axe.spec.ts --config=playwright.config.ts --project=chromium",
+      "remediation": "An explicitly requested authenticated axe run regressed. Fix the violation behind auth; the lane is informational evidence and never feeds PR Ready."
+    },
+    {
+      "id": "ci-storybook-a11y",
+      "name": "Storybook A11y",
+      "tier": "preview-evidence",
+      "mergeGate": false,
+      "nextLocalCommand": "pnpm --filter @jovie/web test:a11y",
+      "remediation": "An explicitly requested Storybook a11y run regressed. Fix the component-level violation in the story instead of disabling the rule."
+    },
+    {
       "id": "ci-e2e-smoke",
       "name": "E2E Smoke (manual)",
       "tier": "risk-triggered-smoke",
@@ -202,6 +234,46 @@
       "mergeGate": false,
       "nextLocalCommand": "pnpm --filter @jovie/web exec playwright test --config=playwright.config.smoke.ts",
       "remediation": "A manually dispatched extended preview smoke suite failed. Inspect the Playwright report and fix the fixture or product regression before rerunning it."
+    },
+    {
+      "id": "ci-pr-neon-migrate",
+      "name": "DB Migrate (manual deep lane)",
+      "tier": "risk-triggered-smoke",
+      "mergeGate": false,
+      "nextLocalCommand": "pnpm --filter=@jovie/web run drizzle:migrate:ci",
+      "remediation": "An explicitly requested migration deep lane failed against the ephemeral Neon branch. Reproduce with the same drizzle migrations locally and repair the migration instead of skipping the lane."
+    },
+    {
+      "id": "ci-e2e-migrate",
+      "name": "E2E DB Migrate",
+      "tier": "risk-triggered-smoke",
+      "mergeGate": false,
+      "nextLocalCommand": "pnpm --filter=@jovie/web run drizzle:migrate:ci && pnpm --filter=@jovie/web run seed:test-data",
+      "remediation": "An explicitly requested E2E migrate/seed producer failed against the ephemeral Neon branch. Fix the migration or seed drift before requesting full preview E2E evidence."
+    },
+    {
+      "id": "ci-e2e-tests",
+      "name": "Full E2E (Preview)",
+      "tier": "risk-triggered-smoke",
+      "mergeGate": false,
+      "nextLocalCommand": "pnpm --filter=@jovie/web run e2e:smoke:tagged --project=chromium",
+      "remediation": "An explicitly requested full preview E2E run regressed. Use the sharded Playwright report, keep quarantined specs in the quarantine lane, and fix the product or fixture regression before rerunning."
+    },
+    {
+      "id": "ci-admin-smoke",
+      "name": "Admin E2E Smoke",
+      "tier": "risk-triggered-smoke",
+      "mergeGate": false,
+      "nextLocalCommand": "pnpm --filter=@jovie/web exec playwright test tests/e2e/dashboard-pages-health.spec.ts --grep \"Admin Pages Health Check\" --project=chromium",
+      "remediation": "An explicitly requested admin smoke run regressed. Verify the admin persona credentials and fix the admin page regression instead of quarantining the spec."
+    },
+    {
+      "id": "neon-db",
+      "name": "Neon DB",
+      "tier": "risk-triggered-smoke",
+      "mergeGate": false,
+      "nextLocalCommand": "gh run view --log-failed",
+      "remediation": "The ephemeral Neon branch producer failed or hit the branch limit. Inspect the cleanup and admission-probe output; downstream manual evidence lanes cannot start without its connection artifact."
     },
     {
       "id": "ci-pr-vercel-preview",
