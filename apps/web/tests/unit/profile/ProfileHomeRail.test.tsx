@@ -118,7 +118,7 @@ describe('ProfileHomeRail', () => {
     ).toEqual(['merch-1', 'show-1']);
   });
 
-  it('renders alerts above content cards in the home rail DOM order (JOV-11084)', () => {
+  it('renders the PAC card first and the alerts card last inside the carousel', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
@@ -132,18 +132,23 @@ describe('ProfileHomeRail', () => {
       />
     );
 
-    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
     const carousel = screen.getByTestId('profile-home-carousel');
+    const pacCard = screen.getByTestId('profile-pac');
+    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
 
-    expect(alertsCard.compareDocumentPosition(carousel)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
-    expect(
-      screen.getByRole('heading', { name: 'Never Say A Word' })
-    ).toBeInTheDocument();
+    // Both live inside the single carousel — no stacked sections.
+    expect(carousel.contains(pacCard)).toBe(true);
+    expect(carousel.contains(alertsCard)).toBe(true);
+
+    const footprints = [...carousel.querySelectorAll(':scope > li')];
+    expect(footprints[0]?.contains(pacCard)).toBe(true);
+    expect(footprints[footprints.length - 1]?.contains(alertsCard)).toBe(true);
+    // The featured release renders once, inside the PAC card (not as a
+    // duplicate plain catalog card).
+    expect(screen.getAllByText('Never Say A Word')).toHaveLength(1);
   });
 
-  it('renders a prominent gradient alerts bento when the home rail is empty', () => {
+  it('renders a prominent gradient alerts card when the home rail is empty', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
@@ -162,7 +167,7 @@ describe('ProfileHomeRail', () => {
     expect(alertsCard.className).toContain('min-h-44');
   });
 
-  it('pins the alerts bento above the carousel and renders no carousel when empty', () => {
+  it('keeps the carousel shell with PAC and alerts cards even when the catalog is empty', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
@@ -176,19 +181,19 @@ describe('ProfileHomeRail', () => {
       />
     );
 
+    const carousel = screen.getByTestId('profile-home-carousel');
     expect(
       screen.getByTestId('profile-home-alerts-fallback-card')
     ).toBeInTheDocument();
     expect(
       screen.getByTestId('profile-home-alerts-switch')
     ).toBeInTheDocument();
-    // No items → carousel renders nothing (no empty shell).
-    expect(
-      screen.queryByTestId('profile-home-carousel')
-    ).not.toBeInTheDocument();
+    // No entity items → the carousel still hosts the slot cards.
+    expect(carousel.querySelectorAll(':scope > li').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('entity-card-music')).not.toBeInTheDocument();
   });
 
-  it('renders the latest release as the featured carousel card', () => {
+  it('renders the latest release as the featured PAC card, not a catalog card', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
@@ -202,17 +207,22 @@ describe('ProfileHomeRail', () => {
       />
     );
 
-    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
+    const pacCard = screen.getByTestId('profile-pac');
     const carousel = screen.getByTestId('profile-home-carousel');
+    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
 
-    expect(alertsCard).toBeInTheDocument();
+    expect(pacCard).toBeInTheDocument();
+    expect(pacCard.dataset.state).toBe('idle');
     expect(carousel).toBeInTheDocument();
-    expect(alertsCard.compareDocumentPosition(carousel)).toBe(
+    expect(alertsCard).toBeInTheDocument();
+    // Featured release title lives in the PAC card only.
+    expect(screen.getAllByText('The Deep End')).toHaveLength(1);
+    expect(
+      screen.queryByRole('heading', { name: 'The Deep End' })
+    ).not.toBeInTheDocument();
+    expect(pacCard.compareDocumentPosition(alertsCard)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
-    expect(
-      screen.getByRole('heading', { name: 'The Deep End' })
-    ).toBeInTheDocument();
   });
 
   it('adds back-catalog releases without duplicating the featured release', () => {
@@ -242,9 +252,8 @@ describe('ProfileHomeRail', () => {
     );
 
     expect(screen.getByTestId('profile-home-carousel')).toBeInTheDocument();
-    expect(
-      screen.getAllByRole('heading', { name: 'The Deep End' })
-    ).toHaveLength(1);
+    // The featured release appears exactly once (inside the PAC card).
+    expect(screen.getAllByText('The Deep End')).toHaveLength(1);
     expect(
       screen.getByRole('heading', { name: 'Under Lights' })
     ).toBeInTheDocument();
@@ -268,8 +277,9 @@ describe('ProfileHomeRail', () => {
       screen.queryByTestId('profile-home-alerts-fallback-card')
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('profile-home-carousel')).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'The Deep End' })
-    ).toBeInTheDocument();
+    // Subscribed visitor: the PAC card resolves to the S2 'following' state.
+    const pacCard = screen.getByTestId('profile-pac');
+    expect(pacCard.dataset.state).toBe('following');
+    expect(screen.getByText('You follow Tim White')).toBeInTheDocument();
   });
 });

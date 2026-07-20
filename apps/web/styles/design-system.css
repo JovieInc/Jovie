@@ -52,7 +52,7 @@
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);
   --avatar-size: clamp(88px, 22vw, 144px);
-  --cover-height: clamp(300px, min(94vw, 46svh), 430px);
+  --cover-height: clamp(220px, 34svh, 400px);
   --content-max: 720px;
   --profile-bottom-nav-height: calc(
     3.125rem +
@@ -178,7 +178,7 @@
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);
   --avatar-size: clamp(88px, 22vw, 144px);
-  --cover-height: clamp(300px, min(94vw, 46svh), 430px);
+  --cover-height: clamp(220px, 34svh, 400px);
   --content-max: 720px;
 }
 
@@ -301,6 +301,45 @@
   );
 }
 
+/* Single hero legibility gradient, limited to the bottom ~55% of the cover so
+   the artist photo stays clearly visible in the upper zone. Replaces the old
+   stacked full-height scrims (profile-cover-home-gradient +
+   profile-cover-home-fade) that darkened the whole photo. */
+:where(.profile-cover-home-gradient) {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 55%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(3, 4, 6, 0.42) 52%,
+    rgba(5, 6, 8, 0.9) 86%,
+    var(--profile-stage-bg) 100%
+  );
+}
+
+/* Profile home carousel card geometry: one 3:4 shape that fills the remaining
+   viewport height. Width derives from height via aspect-ratio; the max-height
+   cap keeps width at or under ~78vw (width = 0.75 × height). Cards center
+   vertically when the track is taller than the capped card height. */
+:where(.profile-entity-card) {
+  aspect-ratio: 3 / 4;
+  height: 100%;
+  max-height: 104vw;
+  align-self: center;
+  transition:
+    transform var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
+    opacity var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
+}
+
+/* Scroll-driven edge treatment (transform/opacity only; applied via
+   IntersectionObserver and skipped entirely under reduced motion). */
+:where(.profile-entity-card[data-edge="true"]) {
+  transform: scale(0.96);
+  opacity: 0.75;
+}
+
 :where(.profile-horizontal-rail) {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -414,16 +453,10 @@
   }
 }
 
-/* Compact mobile home hero: reserve room for the showcase release card below.
-   On short viewports (≤820px tall) cap the cover at 190px so the bento card
-   stays above the fold (profile-mobile-viewport-stability). Media crops via
-   object-cover; content below the hero scrolls. */
-[data-testid="profile-compact-surface"][data-mode="profile"] {
-  @media (max-height: 820px) {
-    --cover-height: 190px;
-  }
-}
-
+/* Compact mobile home hero: one definite token-driven height on every
+   viewport (--cover-height, clamp(220px, 34svh, 400px)). The hero never
+   shrink-wraps; media crops via object-cover and the carousel below owns the
+   remaining viewport height. */
 /* Query-mode profile URLs are served from the ISR home shell, then hydrate into
    the requested mode from window.location. Match the mode header on first paint
    so hydration does not move the compact profile frame. */
@@ -451,9 +484,6 @@ html[data-profile-initial-mode]
 html[data-profile-initial-mode]
   [data-testid="profile-compact-surface"][data-mode="profile"]
   .profile-cover-home-gradient,
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-home-fade,
 html[data-profile-initial-mode]
   [data-testid="profile-compact-surface"][data-mode="profile"]
   [data-testid="profile-hero-identity-block"] {
