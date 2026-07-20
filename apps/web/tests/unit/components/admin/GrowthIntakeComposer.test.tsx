@@ -110,7 +110,7 @@ describe('GrowthIntakeComposer', () => {
     const user = userEvent.setup();
     render(<GrowthIntakeComposer initialMode='queue' />);
 
-    const queueInput = screen.getByLabelText('Queue URLs input');
+    const queueInput = screen.getByLabelText('Queue URLs Input');
     await user.type(queueInput, 'instagram.com/testartist');
     await user.click(screen.getByRole('button', { name: 'Queue Lead URLs' }));
 
@@ -132,7 +132,7 @@ describe('GrowthIntakeComposer', () => {
     const user = userEvent.setup();
     render(<GrowthIntakeComposer initialMode='queue' />);
 
-    await user.type(screen.getByLabelText('Queue URLs input'), '   {enter}   ');
+    await user.type(screen.getByLabelText('Queue URLs Input'), '   {enter}   ');
     await user.click(screen.getByRole('button', { name: 'Queue Lead URLs' }));
 
     await waitFor(() => {
@@ -155,7 +155,7 @@ describe('GrowthIntakeComposer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Batch URLs' }));
     await user.type(
-      screen.getByLabelText('Batch URLs input'),
+      screen.getByLabelText('Batch URLs Input'),
       'https://instagram.com/artistone{enter}https://instagram.com/artisttwo'
     );
     await user.click(screen.getByRole('button', { name: 'Run Batch Import' }));
@@ -186,7 +186,7 @@ describe('GrowthIntakeComposer', () => {
     render(<GrowthIntakeComposer />);
 
     await user.click(screen.getByRole('button', { name: 'Spotify' }));
-    await user.type(screen.getByLabelText('Single profile input'), 'phoebe');
+    await user.type(screen.getByLabelText('Single Profile Input'), 'phoebe');
 
     await waitFor(() => {
       expect(artistSearchMock).toHaveBeenCalledWith('phoebe');
