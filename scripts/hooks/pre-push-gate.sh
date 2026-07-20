@@ -15,6 +15,17 @@ if [[ "${JOVIE_SKIP_PRE_PUSH_GATE:-}" == "1" ]]; then
   exit 0
 fi
 
+# Self-select a repo-conforming Node instead of inheriting the shell's
+# (JOV-4329): the ambient Node may violate engines and fail the
+# runner-prerequisite contract tests mid-gate.
+if ! RESOLVED_NODE_BIN="$(bash scripts/hooks/resolve-repo-node.sh)"; then
+  exit 1
+fi
+if [[ -n "$RESOLVED_NODE_BIN" ]]; then
+  echo "[pre-push-gate] using repo-pinned Node at $RESOLVED_NODE_BIN (ambient: $(node --version 2>/dev/null || echo none))"
+  export PATH="$RESOLVED_NODE_BIN:$PATH"
+fi
+
 MODE="${1:-lint}"
 
 run_lint() {

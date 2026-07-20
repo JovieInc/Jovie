@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "tool": "scripts/typecheck-scripts.mjs",
+  "generatedAt": "2026-07-20T21:19:18.004Z",
+  "totalErrors": 202,
+  "files": {
+    ".github/scripts/verify-main-release-readiness.mjs": {
+      "TS2339": 3
+    },
+    "apps/web/scripts/generate-brand-assets.ts": {
+      "TS1470": 2,
+      "TS2339": 3
+    },
+    "scripts/agent/preflight.mjs": {
+      "TS2339": 2
+    },
+    "scripts/agent/preflight.test.mjs": {
+      "TS2322": 1
+    },
+    "scripts/audit-test-coverage.ts": {
+      "TS1470": 1
+    },
+    "scripts/auth-redirect-uris.ts": {
+      "TS1470": 1
+    },
+    "scripts/browse-auth.ts": {
+      "TS1470": 1,
+      "TS2304": 2
+    },
+    "scripts/ci/neon-orphan-reaper.mjs": {
+      "TS2339": 2
+    },
+    "scripts/doc-freshness-lint.mjs": {
+      "TS2339": 10
+    },
+    "scripts/ds-offscale-report.mjs": {
+      "TS2362": 1
+    },
+    "scripts/generate-footer-cta-video.ts": {
+      "TS1470": 1
+    },
+    "scripts/generated-artifact-retention.mjs": {
+      "TS2339": 2
+    },
+    "scripts/generated-artifact-retention.test.mjs": {
+      "TS2339": 1,
+      "TS2362": 1
+    },
+    "scripts/github-transition-issue.mjs": {
+      "TS2305": 1,
+      "TS2353": 1
+    },
+    "scripts/hermes/jobs/agent-config-health.ts": {
+      "TS1470": 1
+    },
+    "scripts/hermes/jobs/agentcookie-sync.ts": {
+      "TS1470": 1,
+      "TS2305": 1
+    },
+    "scripts/hermes/jobs/ci-failure-monitor.ts": {
+      "TS1470": 2
+    },
+    "scripts/hermes/jobs/codex-issue-shipper.ts": {
+      "TS2339": 1,
+      "TS2345": 1
+    },
+    "scripts/hermes/jobs/daily-briefing.ts": {
+      "TS1470": 1
+    },
+    "scripts/hermes/jobs/gbrain-health-summary.ts": {
+      "TS1470": 1,
+      "TS2305": 1,
+      "TS2345": 4
+    },
+    "scripts/hermes/jobs/pipeline-scoreboard.ts": {
+      "TS2305": 1
+    },
+    "scripts/hermes/jobs/pr-stuck-monitor.ts": {
+      "TS1470": 1
+    },
+    "scripts/knowledge/distill.ts": {
+      "TS1470": 1
+    },
+    "scripts/knowledge/fetch.ts": {
+      "TS1470": 1,
+      "TS2304": 2,
+      "TS2307": 1,
+      "TS2584": 8
+    },
+    "scripts/lib/__tests__/agent-config-health.test.mjs": {
+      "TS2345": 1
+    },
+    "scripts/lib/__tests__/automation-verify.test.mjs": {
+      "TS2345": 1
+    },
+    "scripts/lib/__tests__/ci-harness.test.mjs": {
+      "TS2345": 1
+    },
+    "scripts/lib/__tests__/codex-issue-shipper.test.mjs": {
+      "TS2345": 3
+    },
+    "scripts/lib/__tests__/main-release-readiness.test.mjs": {
+      "TS2322": 5
+    },
+    "scripts/lib/__tests__/merge-queue-backend.test.mjs": {
+      "TS2345": 3,
+      "TS2353": 4,
+      "TS2561": 8
+    },
+    "scripts/lib/__tests__/merge-queue-guard.test.mjs": {
+      "TS2322": 18
+    },
+    "scripts/lib/__tests__/qa-swarm.test.mjs": {
+      "TS2345": 5
+    },
+    "scripts/lib/__tests__/ship-ledger.test.mjs": {
+      "TS2339": 4
+    },
+    "scripts/lib/__tests__/tracker-client.test.mjs": {
+      "TS2339": 2,
+      "TS2353": 3
+    },
+    "scripts/lib/ci-duration-ratchet.mjs": {
+      "TS2353": 1
+    },
+    "scripts/lib/github-update-branch.mjs": {
+      "TS2339": 1
+    },
+    "scripts/lib/merge-group-admission.mjs": {
+      "TS2339": 2,
+      "TS2353": 1
+    },
+    "scripts/lib/merge-group-member-policy.mjs": {
+      "TS2339": 3,
+      "TS2353": 5
+    },
+    "scripts/lib/merge-queue-guard.mjs": {
+      "TS2339": 2,
+      "TS2362": 1,
+      "TS2363": 1
+    },
+    "scripts/lib/pr-check-failures.mjs": {
+      "TS2339": 1
+    },
+    "scripts/lib/pr-comment-analysis.mjs": {
+      "TS2345": 1
+    },
+    "scripts/lib/tracker.mjs": {
+      "TS2362": 1,
+      "TS2363": 1
+    },
+    "scripts/linear-claim-issue.mjs": {
+      "TS2339": 3
+    },
+    "scripts/linear-query-todo.mjs": {
+      "TS2339": 3
+    },
+    "scripts/linear-transition-issue.mjs": {
+      "TS2339": 3
+    },
+    "scripts/merge-queue-backend.mjs": {
+      "TS2339": 13,
+      "TS2353": 3,
+      "TS2561": 1
+    },
+    "scripts/observability-issue-github.mjs": {
+      "TS2345": 1
+    },
+    "scripts/observability-issue-github.test.mjs": {
+      "TS2339": 4,
+      "TS2345": 1
+    },
+    "scripts/pr-comment-retro.mjs": {
+      "TS2339": 1
+    },
+    "scripts/pr-conflict-handler.mjs": {
+      "TS2339": 1
+    },
+    "scripts/qa-swarm/linear.mjs": {
+      "TS2339": 4
+    },
+    "scripts/qa-swarm/types.mjs": {
+      "TS2304": 1
+    },
+    "scripts/send-changelog-email.mjs": {
+      "TS2307": 2,
+      "TS2339": 2
+    },
+    "scripts/ship-swarm/next-batch.mjs": {
+      "TS2339": 3
+    },
+    "scripts/skill-governance-guard.mjs": {
+      "TS2339": 1
+    },
+    "scripts/turnstile-config.ts": {
+      "TS1470": 1,
+      "TS2540": 8
+    },
+    "scripts/voice-stack-bake-off/validate-test-script.ts": {
+      "TS1470": 1,
+      "TS2307": 1
+    }
+  }
+}

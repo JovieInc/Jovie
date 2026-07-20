@@ -180,6 +180,8 @@
     "prepare": "husky",
     "next:proxy-guard": "pnpm --filter=@jovie/web run next:proxy-guard",
     "typecheck:web:fast": "pnpm --filter @jovie/web run typecheck -- --pretty false",
+    "typecheck:scripts": "node scripts/typecheck-scripts.mjs",
+    "typecheck:scripts:update": "node scripts/typecheck-scripts.mjs --update-baseline",
     "pre-push": "bash scripts/hooks/biome-pre-push.sh && pnpm --filter=@jovie/web run pre-push",
     "pre-push:gate": "bash scripts/hooks/pre-push-gate.sh lint",
     "pre-push:gate:test": "bash scripts/hooks/pre-push-gate.sh test",
@@ -221,10 +223,10 @@
     "knip": "^6.0.4",
     "lint-staged": "^17.0.7",
     "playwright": "1.60.0",
-    "tsx": "^4.22.4",
+    "tsx": "^4.23.1",
     "turbo": "^2.9.14",
     "typescript": "^6.0.3",
-    "vercel": "54.14.5",
+    "vercel": "56.3.2",
     "vitest": "4.1.8"
   },
   "lint-staged": {
