@@ -1,0 +1,510 @@
+name: Post-Deploy Probes
+
+# Additive post-deploy evidence for controller generations whose in-lease
+# probes never ran. The production controller gates its immutable-URL probes on
+# `production-release.outputs.released == 'true'`, which requires the expected
+# SHA to still be main HEAD after the release soak. During active PR drains
+# every generation is superseded inside that window, so the probes go dark
+# exactly when velocity is highest. This workflow re-probes the landed
+# canonical production deployment — production health, not release candidacy —
+# after each completed controller run, and skips itself when the in-lease
+# probes already produced exact evidence.
+#
+# Hard boundaries (do not relax):
+# - Read-only evidence. No production mutation, no marker writes, no
+#   notification, no rollback. It must never join the `production-mutation`
+#   FIFO lease, so deploys never wait on it.
+# - It changes nothing about release authorization: the controller's exact
+#   CI-attempt + Main Release Ready contract is untouched.
+
+on:
+  workflow_run:
+    workflows: [Production Controller]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+# Probes are read-only against an immutable deployment URL, so only the newest
+# run carries relevant evidence. Coalescing is safe and bounds drain queues.
+concurrency:
+  group: postdeploy-probes
+  cancel-in-progress: true
+
+jobs:
+  resolve-target:
+    name: Resolve landed production target
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      should_probe: ${{ steps.trigger.outputs.should_probe }}
+      deployment_id: ${{ steps.target.outputs.deployment_id }}
+      deployment_url_b64: ${{ steps.target.outputs.deployment_url_b64 }}
+      commit_sha: ${{ steps.target.outputs.commit_sha }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Cross-prove trigger and decide probe need
+        id: trigger
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+          TRIGGER_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          TRIGGER_RUN_EVENT: ${{ github.event.workflow_run.event }}
+          TRIGGER_RUN_PATH: ${{ github.event.workflow_run.path }}
+          TRIGGER_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIGGER_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          TRIGGER_HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          TRIGGER_RUN_STATUS: ${{ github.event.workflow_run.status }}
+          TRIGGER_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "should_probe=false" >> "$GITHUB_OUTPUT"
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "should_probe=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch: probing the landed production deployment."
+            exit 0
+          fi
+          if [ "$EVENT_NAME" != "workflow_run" ]; then
+            echo "::error::Unsupported post-deploy probe event: $EVENT_NAME"
+            exit 1
+          fi
+
+          [[ "$TRIGGER_RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$TRIGGER_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$TRIGGER_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] &&
+            [[ "$TRIGGER_RUN_CONCLUSION" =~ ^(success|failure|cancelled|timed_out|action_required|neutral|skipped|stale)$ ]] &&
+            [ "$TRIGGER_RUN_EVENT" = "workflow_run" ] &&
+            [ "$TRIGGER_RUN_PATH" = ".github/workflows/production-controller.yml" ] &&
+            [ "$TRIGGER_HEAD_BRANCH" = "main" ] &&
+            [ "$TRIGGER_HEAD_REPOSITORY" = "$REPOSITORY" ] &&
+            [ "$TRIGGER_RUN_STATUS" = "completed" ] || {
+            echo "::error::Post-deploy probe trigger was not an exact completed Production Controller run."
+            exit 1
+          }
+
+          controller_workflow_json="$(gh api \
+            "repos/$REPOSITORY/actions/workflows/production-controller.yml")"
+          jq -e '
+            type == "object" and
+            (.id | type == "number" and . > 0) and
+            .name == "Production Controller" and
+            .path == ".github/workflows/production-controller.yml" and
+            .state == "active"
+          ' >/dev/null <<<"$controller_workflow_json" || {
+            echo "::error::Authoritative Production Controller workflow identity is malformed."
+            exit 1
+          }
+          controller_workflow_id="$(jq -r '.id' <<<"$controller_workflow_json")"
+
+          run_record="$(gh api \
+            "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT")"
+          jq -e \
+            --arg repo "$REPOSITORY" \
+            --arg sha "$TRIGGER_HEAD_SHA" \
+            --arg run_id "$TRIGGER_RUN_ID" \
+            --arg run_attempt "$TRIGGER_RUN_ATTEMPT" \
+            --arg conclusion "$TRIGGER_RUN_CONCLUSION" \
+            --argjson workflow_id "$controller_workflow_id" '
+            type == "object" and
+            (.id | tostring) == $run_id and
+            (.run_attempt | tostring) == $run_attempt and
+            .workflow_id == $workflow_id and
+            .head_sha == $sha and
+            .event == "workflow_run" and
+            .head_branch == "main" and
+            .path == ".github/workflows/production-controller.yml" and
+            .head_repository.full_name == $repo and
+            .status == "completed" and
+            .conclusion == $conclusion
+          ' >/dev/null <<<"$run_record" || {
+            echo "::error::Exact Production Controller attempt evidence did not match the workflow_run signal."
+            exit 1
+          }
+
+          jobs_json="$(gh api \
+            "repos/$REPOSITORY/actions/runs/$TRIGGER_RUN_ID/attempts/$TRIGGER_RUN_ATTEMPT/jobs?per_page=100")"
+          jq -e '
+            type == "object" and
+            (.total_count | type == "number") and
+            (.jobs | type == "array") and
+            .total_count == (.jobs | length) and
+            all(.jobs[];
+              (.id | type == "number" and . > 0) and
+              (.run_id | type == "number" and . > 0) and
+              (.run_attempt | type == "number" and . > 0) and
+              (.name | type == "string" and length > 0) and
+              (.head_sha | type == "string" and length > 0) and
+              (.head_branch | type == "string" and length > 0) and
+              (.status | type == "string" and length > 0) and
+              ((.conclusion | type) == "string" or .conclusion == null)
+            )
+          ' >/dev/null <<<"$jobs_json" || {
+            echo "::error::GitHub returned malformed exact Production Controller job evidence."
+            exit 1
+          }
+
+          # The controller's in-lease Lighthouse probe only succeeds when its
+          # generation stayed current through release and the immutable-URL
+          # probes ran. One exact success means post-deploy evidence exists;
+          # anything else (superseded skip, failed or cancelled release) leaves
+          # the evidence gap this workflow closes.
+          probe_evidence_count="$(jq \
+            --arg sha "$TRIGGER_HEAD_SHA" \
+            --argjson run_id "$TRIGGER_RUN_ID" \
+            --argjson run_attempt "$TRIGGER_RUN_ATTEMPT" '
+            [
+              .jobs[]
+              | select(
+                  .name == "Lighthouse CI (Production)" and
+                  .run_id == $run_id and
+                  .run_attempt == $run_attempt and
+                  .head_sha == $sha and
+                  .head_branch == "main" and
+                  .status == "completed" and
+                  .conclusion == "success"
+                )
+            ]
+            | length
+          ' <<<"$jobs_json")"
+          case "$probe_evidence_count" in
+            0)
+              echo "should_probe=true" >> "$GITHUB_OUTPUT"
+              echo "Controller attempt $TRIGGER_RUN_ID/$TRIGGER_RUN_ATTEMPT produced no in-lease post-deploy probes; following up against landed production."
+              ;;
+            1)
+              echo "Controller attempt $TRIGGER_RUN_ID/$TRIGGER_RUN_ATTEMPT already produced exact in-lease post-deploy probe evidence; neutral."
+              ;;
+            *)
+              echo "::error::Malformed probe evidence count ($probe_evidence_count) for controller attempt $TRIGGER_RUN_ID/$TRIGGER_RUN_ATTEMPT."
+              exit 1
+              ;;
+          esac
+
+      - name: Resolve exact canonical production deployment
+        id: target
+        if: ${{ steps.trigger.outputs.should_probe == 'true' }}
+        env:
+          SHOULD_PROBE: ${{ steps.trigger.outputs.should_probe }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "should_probe=$SHOULD_PROBE"
+            echo "deployment_id="
+            echo "deployment_url_b64="
+            echo "commit_sha="
+          } >> "$GITHUB_OUTPUT"
+          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::$key is required to resolve the canonical production deployment."
+              exit 1
+            fi
+          done
+
+          # Read the canonical alias the same way the centralized rollback
+          # proves ownership: one project-scoped inspection of jov.ie.
+          canonical_json="$(./node_modules/.bin/vercel inspect jov.ie \
+            --format=json --scope "$VERCEL_ORG_ID")"
+          jq -e '
+            type == "object" and
+            (.id | type == "string") and
+            (.url | type == "string") and
+            (.readyState | type == "string") and
+            (.target | type == "string")
+          ' >/dev/null <<<"$canonical_json" || {
+            echo "::error::Canonical Vercel ownership response is malformed."
+            exit 1
+          }
+          deployment_id="$(jq -r '.id' <<<"$canonical_json")"
+          deployment_url="$(jq -r '.url' <<<"$canonical_json")"
+          deployment_state="$(jq -r '.readyState | ascii_upcase' <<<"$canonical_json")"
+          deployment_target="$(jq -r '.target | ascii_downcase' <<<"$canonical_json")"
+          commit_sha="$(jq -r '.meta.githubCommitSha // .gitSource.sha // ""' <<<"$canonical_json")"
+          if [[ "$deployment_url" != *://* && "$deployment_url" == *.vercel.app ]]; then
+            deployment_url="https://${deployment_url}"
+          fi
+          deployment_url="${deployment_url%/}"
+          if [[ "$deployment_id" != dpl_* ]] ||
+            [ "$deployment_state" != "READY" ] ||
+            [ "$deployment_target" != "production" ] ||
+            [[ ! "$deployment_url" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] ||
+            [[ ! "$commit_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Canonical production is not an exact READY production deployment with a full commit SHA."
+            exit 1
+          fi
+
+          # Bind the inspected triple against the project-scoped deployment
+          # list before spending probe capacity on it.
+          exact_json="$(
+            VERCEL_CANDIDATE_DEPLOYMENT_URL="$deployment_url" \
+            VERCEL_CANDIDATE_DEPLOYMENT_ID="$deployment_id" \
+            EXPECTED_COMMIT_SHA="$commit_sha" \
+            VERCEL_DEPLOYMENT_MAX_PAGES=5 \
+            VERCEL_API_TIMEOUT_MS=120000 \
+            VERCEL_DEPLOYMENT_POLL_INTERVAL_MS=3000 \
+              node apps/web/scripts/vercel-protected-origin.cjs resolve-deployment
+          )"
+          [ "$(jq -r '.id // ""' <<<"$exact_json")" = "$deployment_id" ] || {
+            echo "::error::Exact landed production deployment identity did not converge."
+            exit 1
+          }
+
+          {
+            echo "deployment_id=$deployment_id"
+            printf 'deployment_url_b64=%s\n' \
+              "$(printf '%s' "$deployment_url" | base64 | tr -d '\n')"
+            echo "commit_sha=$commit_sha"
+          } >> "$GITHUB_OUTPUT"
+          echo "Resolved landed production target: $deployment_id ($deployment_url) at $commit_sha."
+
+  smoke:
+    name: Post-Deploy Smoke (Landed Production)
+    needs: [resolve-target]
+    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_probe == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.resolve-target.outputs.commit_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Verify production endpoints are healthy
+        env:
+          EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+          PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          set -euo pipefail
+
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
+          PRODUCTION_BASE_URL="${PRODUCTION_BASE_URL%/}"
+          [[ "$PRODUCTION_BASE_URL" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] || {
+            echo "::error::Exact production deployment URL is missing or invalid."
+            exit 1
+          }
+          COOKIE_JAR="$(mktemp)"
+          trap 'rm -f "$COOKIE_JAR"' EXIT
+          if [ -z "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
+            echo "::error::VERCEL_AUTOMATION_BYPASS_SECRET is required for exact production deployment probes."
+            exit 1
+          fi
+
+          # One Node process owns the only secret-bearing request, verifies the
+          # exact build identity, and checks every common public surface under
+          # one absolute deadline before emitting a host-only cookie jar.
+          VERCEL_PROBE_URL="$PRODUCTION_BASE_URL" \
+          EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
+          EXPECTED_VERCEL_ENVIRONMENT=production \
+          VERCEL_PROBE_COOKIE_JAR="$COOKIE_JAR" \
+          VERCEL_VERIFY_PUBLIC_SURFACES=true \
+          VERCEL_PROBE_TIMEOUT_MS=180000 \
+            node apps/web/scripts/vercel-protected-origin.cjs bootstrap-cookie-jar
+
+          echo "=== Exact-Deployment SEO Surfaces ==="
+          VERCEL_PROBE_COOKIE_JAR="$COOKIE_JAR" BASE_URL="$PRODUCTION_BASE_URL" \
+            pnpm --filter=@jovie/web exec tsx scripts/seo-ratchet-live.ts
+
+          echo "=== Canonical Production SEO Surfaces ==="
+          BASE_URL="https://jov.ie" \
+            pnpm --filter=@jovie/web exec tsx scripts/seo-ratchet-live.ts
+
+          echo "Post-deploy smoke passed: exact build, semantic surfaces, and SEO verified."
+
+  # Post-deploy authenticated smoke against the landed immutable deployment
+  # URL. Mirrors the controller lane: explicit skip without a complete
+  # credential pair, never release proof on its own.
+  auth-smoke:
+    name: Post-Deploy Auth Smoke (Landed Production)
+    needs: [resolve-target]
+    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_probe == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      credentials_configured: ${{ steps.check-creds.outputs.credentials_configured }}
+      auth_smoke_status: ${{ steps.auth-result.outputs.auth_smoke_status || steps.check-creds.outputs.auth_smoke_status }}
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.resolve-target.outputs.commit_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check for production auth credentials
+        id: check-creds
+        env:
+          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
+          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if { [ -n "$E2E_PROD_USER_EMAIL" ] &&
+              [ -n "$E2E_PROD_USER_PASSWORD" ]; } ||
+            { [ -n "$E2E_CLERK_USER_USERNAME" ] &&
+              [ -n "$E2E_CLERK_USER_PASSWORD" ]; }; then
+            {
+              echo "credentials_configured=true"
+              echo "skip=false"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Production auth credentials are not configured; authenticated smoke is explicitly skipped and is not release proof."
+            {
+              echo "credentials_configured=false"
+              echo "auth_smoke_status=not-configured"
+              echo "skip=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check-creds.outputs.skip != 'true'
+
+      - name: Setup Playwright (Chromium)
+        if: steps.check-creds.outputs.skip != 'true'
+        uses: ./.github/actions/setup-playwright
+
+      - name: Run production auth smoke tests
+        id: auth-result
+        if: steps.check-creds.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
+          [[ "$PRODUCTION_BASE_URL" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] || {
+            echo "::error::Exact production deployment URL is missing or invalid."
+            exit 1
+          }
+          cd apps/web
+
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          test -n "$PRODUCTION_BASE_URL"
+          CI=true \
+          BASE_URL="$PRODUCTION_BASE_URL" \
+          EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
+          EXPECTED_VERCEL_ENVIRONMENT=production \
+          PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
+          echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
+        env:
+          EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+          PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
+          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
+          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
+          E2E_PROD_USER_CODE: ${{ secrets.E2E_PROD_USER_CODE }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+
+      - name: Upload Playwright Artifacts on Failure
+        if: ${{ failure() && steps.check-creds.outputs.skip != 'true' && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: postdeploy-auth-smoke-${{ github.run_id }}
+          path: |
+            apps/web/test-results/
+          retention-days: 3
+
+  lighthouse:
+    name: Lighthouse CI (Landed Production)
+    needs: [resolve-target]
+    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_probe == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.resolve-target.outputs.commit_sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Install production Lighthouse Chromium
+        uses: ./.github/actions/setup-playwright
+      - name: Resolve production Lighthouse Chrome
+        shell: bash
+        run: |
+          set -euo pipefail
+          chrome_path="$(cd apps/web && node -e "process.stdout.write(require('playwright').chromium.executablePath())")"
+          if [ ! -x "$chrome_path" ]; then
+            echo "::error::Playwright Chromium is not executable at $chrome_path"
+            exit 1
+          fi
+          echo "CHROME_PATH=$chrome_path" >> "$GITHUB_ENV"
+          echo "Resolved Lighthouse Chrome: $chrome_path"
+      - name: Build exact-deployment Lighthouse config
+        env:
+          PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
+        run: |
+          set -euo pipefail
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
+          base_url="${PRODUCTION_BASE_URL%/}"
+          [[ "$base_url" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] || {
+            echo "::error::Exact production deployment URL is missing or invalid."
+            exit 1
+          }
+          echo "EXPECTED_VERCEL_DEPLOYMENT_ORIGIN=$base_url" >> "$GITHUB_ENV"
+          echo "EXPECTED_VERCEL_ENVIRONMENT=production" >> "$GITHUB_ENV"
+          jq --arg base "$base_url" '
+            ($base | gsub("\\."; "\\.")) as $base_pattern |
+            .ci.collect.url = [$base + "/", $base + "/tim"] |
+            .ci.collect.puppeteerScript = "scripts/lighthouse-vercel-bypass.cjs" |
+            .ci.collect.puppeteerLaunchOptions.args = [
+              "--no-sandbox",
+              "--disable-setuid-sandbox",
+              "--disable-dev-shm-usage"
+            ] |
+            .ci.collect.settings.disableStorageReset = true |
+            del(.ci.collect.settings.chromeFlags) |
+            .ci.assert.includePassedAssertions = true |
+            .ci.assert.assertMatrix[0].matchingUrlPattern = ("^" + $base_pattern + "/$") |
+            .ci.assert.assertMatrix[1].matchingUrlPattern = ("^" + $base_pattern + "/tim$")
+          ' apps/web/.lighthouserc.json > "$RUNNER_TEMP/lighthouse-production-exact.json"
+          pnpm --filter @jovie/web exec tsx scripts/lighthouse-exact-target-guard.ts \
+            --config="$RUNNER_TEMP/lighthouse-production-exact.json"
+      - name: Collect Lighthouse against exact production deployment
+        env:
+          EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+          LIGHTHOUSE_SENSITIVE_VALUES_FILE: ${{ runner.temp }}/lighthouse-sensitive-values
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: node scripts/lighthouse-retry.mjs -- pnpm --filter @jovie/web exec lhci collect --config="$RUNNER_TEMP/lighthouse-production-exact.json"
+      - name: Assert Lighthouse production budgets
+        run: pnpm --filter @jovie/web exec lhci assert --config="$RUNNER_TEMP/lighthouse-production-exact.json"
+      - name: Validate and upload hash-sealed Lighthouse evidence
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          pnpm --filter @jovie/web exec tsx scripts/lighthouse-exact-target-guard.ts \
+            --config="$RUNNER_TEMP/lighthouse-production-exact.json" \
+            --reports-dir=".lighthouseci" \
+            --assertions=".lighthouseci/assertion-results.json" \
+            --sensitive-values-file="$RUNNER_TEMP/lighthouse-sensitive-values" \
+            --upload
+      - name: Remove Lighthouse sensitive probe state
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/lighthouse-sensitive-values"
