@@ -27,17 +27,6 @@ export function normalizeCheckName(check) {
   );
 }
 
-// Exact names only. Merge-gate names such as `Preview Deploy (PR)` and
-// `E2E Smoke (PR Fast Feedback)` must never become advisory because they share
-// words with an informational check.
-export const ADVISORY_CHECK_NAMES = Object.freeze([
-  'A11y (authenticated, informational)',
-  'Homepage Smoke (Informational)',
-  'Open PR',
-  'Preview Deploy',
-  'Slop Gate (advisory)',
-]);
-
 const branchProtectionYaml = readFileSync(
   new URL('../../.github/rulesets/branch-protection.yml', import.meta.url),
   'utf8'
@@ -49,6 +38,47 @@ const harnessManifest = JSON.parse(
   )
 );
 
+// Exact names only. The harness manifest is the source of truth for staged
+// evidence: jobs explicitly marked non-gates must not secretly block native
+// queue enrollment through the controller's all-check scan.
+export const ADVISORY_CHECK_NAMES = Object.freeze(
+  [
+    'A11y (authenticated, informational)',
+    'Homepage Smoke (Informational)',
+    'Open PR',
+    'Preview Deploy',
+    'Slop Gate (advisory)',
+    // Historical check runs remain attached to existing PR heads after the
+    // duplicate Agent PR Verify workflow is retired. They must not strand
+    // drafts or native queue enrollment forever.
+    'Verify Draft Agent PR',
+    // Exact model/review checks are steering signals. They stay hosted and a
+    // terminal failure cannot override the deterministic safety contract.
+    'Classify PR taste',
+    'Taste Label Guard',
+    'Claude Review',
+    'Seer Code Review',
+    'scope-judge',
+    'Scope Alignment Check',
+    // Folded into ci-fast's Structural Contract; retained for old PR heads
+    // produced before the standalone workflow was retired from source events.
+    'actionlint',
+    // Legacy evidence names can remain attached to already-open PR heads while
+    // the manual-only job names roll out. They remain advisory for enrollment.
+    'Lighthouse (public routes PR)',
+    'Lighthouse (dashboard PR)',
+    'Lighthouse (onboarding PR)',
+    'Lighthouse (admin PR)',
+    'E2E Smoke (PR Fast Feedback)',
+    'Golden Path (PR)',
+    'Extended Smoke (Preview)',
+    'Preview Deploy (PR)',
+    ...harnessManifest.jobs
+      .filter(job => job.mergeGate !== true)
+      .map(job => job.name),
+  ].filter((name, index, names) => names.indexOf(name) === index)
+);
+
 export const REQUIRED_CHECK_NAMES = Object.freeze(
   parseRequiredStatusChecksFromYaml(branchProtectionYaml).map(name => ({
     context: name,
@@ -58,7 +88,13 @@ export const REQUIRED_CHECK_NAMES = Object.freeze(
 
 export const MERGE_GATE_CHECK_NAMES = Object.freeze(
   harnessManifest.jobs
-    .filter(job => job.mergeGate === true)
+    // This controller classifies source PR checks before native enrollment.
+    // Queue-only unit/build/layout evidence is enforced by merge_group PR Ready.
+    .filter(
+      job =>
+        job.mergeGate === true &&
+        (job.gateStage === 'source-pr' || job.gateStage === 'both')
+    )
     .map(job => job.name)
 );
 
@@ -189,12 +225,13 @@ export function collapseNewestCheckAttempts(checks) {
 }
 
 /** Positive readiness proof shared by auto-ready and queue enrollment. */
-export function classifyQueueCheckBlockers(
-  checks,
-  { requireVerifyDraft = false } = {}
-) {
+export function classifyQueueCheckBlockers(checks) {
   const latest = collapseNewestCheckAttempts(checks);
   const allChecks = latest.checks;
+  // Native enrollment is fail-closed for every terminal red check unless the
+  // exact check name is explicitly advisory. A canonical allow-list is unsafe:
+  // newly added safety jobs (for example Brand Scrub) would otherwise be
+  // silently ignored until this controller was updated.
   const blockers = new Set(extractTerminalFailures(allChecks));
   for (const name of latest.ambiguousNames) {
     if (!isAdvisoryCheckName(name)) {
@@ -230,18 +267,6 @@ export function classifyQueueCheckBlockers(
       !matches.some(check => isSuccessfulCheck(check) || isSkippedCheck(check))
     ) {
       blockers.add(`${name} (not complete)`);
-    }
-  }
-
-  if (requireVerifyDraft) {
-    const matches = allChecks.filter(
-      check => normalizeCheckName(check) === 'Verify Draft Agent PR'
-    );
-    if (matches.some(isPendingCheck)) {
-      blockers.add('Verify Draft Agent PR (pending)');
-    }
-    if (!matches.some(isSuccessfulCheck)) {
-      blockers.add('Verify Draft Agent PR (missing exact-head success)');
     }
   }
 
@@ -345,6 +370,7 @@ export async function listBlockedAgentPrs(repo, { limit = 200 } = {}) {
       title: pr.title,
       headRefName: pr.headRefName,
       updatedAt: pr.updatedAt,
+      labels: pr.labels,
       failures,
     });
   }
@@ -406,9 +432,10 @@ if (
     const chunks = [];
     for await (const chunk of process.stdin) chunks.push(chunk);
     const checks = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    const blockers = classifyQueueCheckBlockers(checks, {
-      requireVerifyDraft: process.argv[2] === '--classify-auto-ready',
-    });
+    // `--classify-auto-ready` is a compatibility alias for the canonical queue
+    // policy. The retired Agent PR Verify workflow must not remain a hidden
+    // prerequisite for draft promotion.
+    const blockers = classifyQueueCheckBlockers(checks);
     process.stdout.write(`${JSON.stringify(blockers)}\n`);
   }
 }

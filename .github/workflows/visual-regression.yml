@@ -1,12 +1,8 @@
 # Visual regression for public marketing/auth surfaces + admin chrome (JOV-4060/4062).
 #
-# Two modes, one job:
-#   - compare (pull_request): runs tests/e2e/visual-regression.spec.ts against the
-#     committed baselines in apps/web/tests/e2e/__snapshots__/visual-regression.spec.ts/.
-#     Informational for now (continue-on-error) — flip to blocking once the baseline
-#     set is complete and fresh (see the follow-up issue linked in the PR that added
-#     this workflow). Diff artifacts upload on failure.
-#   - refresh (push:main / schedule / dispatch): re-runs the suite with
+# Scheduled/manual baseline refresh. Source PR visual work is covered by the
+# deterministic queue Build + Layout gate; screenshot comparison stays off the
+# source and merge-queue runner paths. This workflow re-runs the suite with
 #     --update-snapshots and opens/updates a single auto-PR when baselines change
 #     (same JOVIE_BOT + merge-queue pattern as screenshots.yml). This is what heals
 #     the currently stale/missing baseline set without a human in the loop.
@@ -16,39 +12,6 @@
 name: Visual Regression
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'apps/web/app/(marketing)/**'
-      - 'apps/web/app/(home)/**'
-      - 'apps/web/app/(auth)/**'
-      - 'apps/web/app/layout.tsx'
-      - 'apps/web/app/globals.css'
-      - 'apps/web/components/**'
-      - 'apps/web/features/**'
-      - 'apps/web/styles/**'
-      - 'apps/web/tailwind.config.*'
-      - 'packages/ui/**'
-      - 'apps/web/tests/e2e/visual-regression.spec.ts'
-      - 'apps/web/tests/e2e/admin-visual-regression.spec.ts'
-      - 'apps/web/tests/e2e/__snapshots__/visual-regression.spec.ts/**'
-      - '.github/workflows/visual-regression.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'apps/web/app/(marketing)/**'
-      - 'apps/web/app/(home)/**'
-      - 'apps/web/app/(auth)/**'
-      - 'apps/web/app/layout.tsx'
-      - 'apps/web/app/globals.css'
-      - 'apps/web/components/**'
-      - 'apps/web/features/**'
-      - 'apps/web/styles/**'
-      - 'apps/web/tailwind.config.*'
-      - 'packages/ui/**'
-      - 'apps/web/tests/e2e/visual-regression.spec.ts'
-      - 'apps/web/tests/e2e/admin-visual-regression.spec.ts'
-      - '.github/workflows/visual-regression.yml'
   schedule:
     # Daily catch-up so baselines never drift more than a day behind main.
     - cron: '0 10 * * *'
@@ -57,14 +20,12 @@ on:
 permissions: {}
 
 concurrency:
-  group: visual-regression-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'baseline-refresh' }}
+  group: visual-regression-baseline-refresh
   cancel-in-progress: true
 
 jobs:
   visual-regression:
-    name: Visual Regression (${{ github.event_name == 'pull_request' && 'compare' || 'baseline refresh' }})
-    # Fork PRs are excluded (no secrets). Dependabot PRs are excluded (no Neon access).
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.login != 'dependabot[bot]') }}
+    name: Visual Regression (baseline refresh)
     environment: Preview – jovie
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -72,21 +33,16 @@ jobs:
       actions: read
       contents: read
     env:
-      REFRESH_MODE: ${{ github.event_name != 'pull_request' && 'true' || 'false' }}
+      REFRESH_MODE: 'true'
       SNAPSHOT_DIR: apps/web/tests/e2e/__snapshots__
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
     steps:
-      - name: Generate Jovie Bot token (refresh only)
-        id: app-token
-        if: env.REFRESH_MODE == 'true'
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          token: ${{ steps.app-token.outputs.token || github.token }}
           fetch-depth: 1
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -149,8 +105,8 @@ jobs:
 
       - name: Run visual regression suite
         id: visual
-        # Informational on PRs until the baseline set is complete — see workflow header.
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        # Scheduled/manual deep evidence only; source PRs and merge groups never
+        # provision this secret-bound Neon + Playwright lane.
         run: |
           cd apps/web
 
@@ -161,6 +117,7 @@ jobs:
 
           cleanup() {
             kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
           }
           trap cleanup EXIT
 
@@ -192,13 +149,13 @@ jobs:
           fi
 
           # Public marketing/auth baselines (JOV-4060)
-          pnpm exec playwright test tests/e2e/visual-regression.spec.ts \
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/visual-regression.spec.ts \
             --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
 
-          # Admin surfaces (JOV-4062) — same server, refresh heals stale admin baselines.
-          # Compare stays informational with the public suite (continue-on-error on PRs).
+          # Admin surfaces (JOV-4062) — the same refresh server heals stale
+          # admin baselines only after functional assertions pass.
           E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=admin \
-            pnpm exec playwright test tests/e2e/admin-visual-regression.spec.ts \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/admin-visual-regression.spec.ts \
             --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
         env:
           BASE_URL: http://localhost:3100
@@ -211,12 +168,14 @@ jobs:
           URL_ENCRYPTION_KEY: visual-regression-ci-url-encryption-key
           AI_GATEWAY_API_KEY: visual-regression-ci
 
-      - name: Upload Playwright report on failure
-        if: steps.visual.outcome == 'failure'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - name: Upload Playwright results on failure
+        if: ${{ always() && steps.visual.outcome == 'failure' && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/playwright-report/
+          path: apps/web/test-results/
+          allow-images: 'true'
+          allow-markdown: 'true'
           retention-days: 7
 
       - name: Check for baseline changes (refresh only)
@@ -232,6 +191,14 @@ jobs:
             git status --short "$SNAPSHOT_DIR"
           fi
 
+      - name: Generate Jovie Bot token (refresh only)
+        id: app-token
+        if: env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Create or update baseline PR (refresh only)
         if: env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true'
         env:
@@ -241,6 +208,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           BRANCH="visual-baselines/auto-update"
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
 
           EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number \
             -q '.[0].number' 2>/dev/null || true)
@@ -256,7 +224,7 @@ jobs:
           PUSHED=false
           for ATTEMPT in 1 2 3; do
             set +e
-            PUSH_OUTPUT=$(git push --force origin "$BRANCH" 2>&1)
+            PUSH_OUTPUT=$(git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push --force origin "$BRANCH" 2>&1)
             PUSH_EXIT=$?
             set -e
 
@@ -293,7 +261,7 @@ jobs:
           else
             PR_URL=$(gh pr create \
               --title "chore: refresh visual regression baselines" \
-              --body "Auto-generated baseline refresh triggered by ${GITHUB_SHA::8}. Generated on ubuntu-latest + Chromium (pinned via pnpm), same environment the compare lane runs in.")
+              --body "Auto-generated scheduled/manual baseline refresh triggered by ${GITHUB_SHA::8}. Generated on ubuntu-latest + Chromium (pinned via pnpm).")
             gh pr edit --add-label "merge-queue" "$PR_URL" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
           fi
 
@@ -313,8 +281,3 @@ jobs:
           pnpm dlx neonctl branches delete "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" || {
             echo "Branch '$BRANCH_NAME' not found or already deleted; ignoring." >&2
           }
-
-      - name: Surface compare outcome (PR only)
-        if: github.event_name == 'pull_request' && steps.visual.outcome == 'failure'
-        run: |
-          echo "::warning::Visual regression compare failed — informational for now. Download the visual-regression-report artifact to inspect diffs. This lane flips to blocking once the baseline set is complete."

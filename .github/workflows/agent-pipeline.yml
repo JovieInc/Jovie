@@ -51,8 +51,10 @@ jobs:
   # ==========================================================================
   guard:
     name: Trigger Guard
-    if: github.actor != 'copilot-swe-agent[bot]'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    if: >-
+      github.actor != 'copilot-swe-agent[bot]' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
       actions: read
@@ -76,8 +78,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR_NUMBER_RUN: ${{ github.event.workflow_run.pull_requests[0].number }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
           PR_REVIEW_USER: ${{ github.event.review.user.login }}
@@ -107,13 +109,19 @@ jobs:
               exit 0
             fi
 
-            # Find the PR for this branch
-            # gh api --paginate returns one JSON array per page; jq -s joins the pages.
-            PR_DATA=$(gh api --paginate "repos/$REPOSITORY/pulls?state=open&per_page=100" \
-              | jq -s --arg branch "$HEAD_BRANCH" '([.[][] | select(.head.ref == $branch and .state == "open")] | first) as $pr | if $pr == null then null else {number: $pr.number, head_ref: $pr.head.ref, head_sha: $pr.head.sha, draft: $pr.draft, labels: [($pr.labels // [])[]?.name]} end')
+            if [[ -z "$PR_NUMBER_RUN" ]]; then
+              echo "Completed workflow is not associated with an open pull request. Skipping."
+              write_output "should_continue=false"
+              exit 0
+            fi
 
-            if [[ -z "$PR_DATA" || "$PR_DATA" == "null" ]]; then
-              echo "No open PR found for branch '$HEAD_BRANCH'. Skipping."
+            # Resolve the exact PR associated with this workflow run, then
+            # compare its live head before authorizing any later mutation.
+            PR_DATA=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER_RUN" \
+              --jq '{number: .number, state: .state, head_ref: .head.ref, head_sha: .head.sha, draft: .draft, labels: [(.labels // [])[]?.name]}')
+
+            if [[ -z "$PR_DATA" || "$PR_DATA" == "null" || "$(echo "$PR_DATA" | jq -r '.state')" != "open" ]]; then
+              echo "No open PR found for workflow run. Skipping."
               write_output "should_continue=false"
               exit 0
             fi
@@ -123,6 +131,12 @@ jobs:
             PR_HEAD_SHA=$(echo "$PR_DATA" | jq -r '.head_sha')
             IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
             HAS_NEEDS_HUMAN=$(echo "$PR_DATA" | jq -r '(.labels // []) | any(. == "needs-human")')
+
+            if [[ "$PR_HEAD_SHA" != "$HEAD_SHA" ]]; then
+              echo "Workflow run head $HEAD_SHA is stale; live PR head is $PR_HEAD_SHA. Skipping."
+              write_output "should_continue=false"
+              exit 0
+            fi
 
             write_output "pr_number=$PR_NUMBER"
             write_output "pr_head_ref=$PR_HEAD_REF"
@@ -410,7 +424,7 @@ jobs:
     name: Label Systemic Blocker
     needs: guard
     if: needs.guard.outputs.is_systemic == 'true'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
       contents: read
@@ -461,7 +475,7 @@ jobs:
     name: Apply Fixes (${{ needs.guard.outputs.trigger_type }})
     needs: guard
     if: needs.guard.outputs.should_fix == 'true'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
       group: agent-remediation-${{ github.repository }}
@@ -499,6 +513,24 @@ jobs:
           sparse-checkout: |
             scripts/lib/upsert-pr-comment.sh
           sparse-checkout-cone-mode: false
+
+      - name: Record bounded remediation attempt
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ needs.guard.outputs.pr_number }}
+          TRIGGER_TYPE: ${{ needs.guard.outputs.trigger_type }}
+          ATTEMPT: ${{ needs.guard.outputs.attempt_number }}
+          HEAD_SHA: ${{ needs.guard.outputs.pr_head_sha }}
+        run: |
+          SHORT_SHA="${HEAD_SHA:0:7}"
+          ATTEMPT_LABEL="agent-fix-${TRIGGER_TYPE}-${SHORT_SHA}-${ATTEMPT}"
+          gh label create "$ATTEMPT_LABEL" --repo "$REPOSITORY" \
+            --color D4C5F9 \
+            --description "Bounded Agent Pipeline remediation attempt" 2>/dev/null || true
+          gh api "repos/$REPOSITORY/issues/$PR_NUMBER/labels" \
+            --method POST \
+            --field "labels[]=$ATTEMPT_LABEL" >/dev/null
 
       - name: Queue automated stale-CI remediation
         env:
@@ -541,7 +573,7 @@ jobs:
     name: Auto-Approve Check
     needs: guard
     if: needs.guard.outputs.should_approve == 'true'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
@@ -870,7 +902,7 @@ jobs:
       needs.guard.outputs.should_approve == 'false' &&
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success'
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read

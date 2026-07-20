@@ -2,7 +2,8 @@ name: Nightly Testing Agent
 
 on:
   schedule:
-    - cron: '30 2 * * *'
+    # Starts well after the consolidated 23:30 deep suite has released its runner.
+    - cron: '30 4 * * *'
       timezone: 'America/Los_Angeles'
   workflow_dispatch:
     inputs:
@@ -29,12 +30,13 @@ concurrency:
 jobs:
   context:
     name: Build Agent Context
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 20
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -49,21 +51,26 @@ jobs:
           --out apps/web/test-results/nightly-agent/context
 
       - name: Upload agent context
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/context/context.json') != '' && hashFiles('apps/web/test-results/nightly-agent/context/selected-targets.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: nightly-agent-context-${{ github.run_id }}
-          path: apps/web/test-results/nightly-agent/
+          path: |
+            apps/web/test-results/nightly-agent/context/context.json
+            apps/web/test-results/nightly-agent/context/selected-targets.json
           retention-days: 30
 
   deterministic:
     name: Deterministic Unit Telemetry
     needs: [context]
     if: ${{ github.event_name == 'schedule' || inputs.run_unit }}
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 35
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -79,20 +86,21 @@ jobs:
       - name: Normalize unit telemetry
         if: always()
         run: >-
+          node .github/scripts/guard-playwright-artifacts.mjs --run --
           pnpm --filter=@jovie/web run test:nightly-agent:normalize --
           --junit apps/web/test-report.junit.xml
           --out apps/web/test-results/nightly-agent/deterministic
           --name normalized-results.json
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Upload deterministic telemetry
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/deterministic/normalized-results.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: nightly-agent-deterministic-${{ github.run_id }}
-          path: |
-            apps/web/test-report.junit.xml
-            apps/web/test-results/nightly-agent/
-          if-no-files-found: ignore
+          path: apps/web/test-results/nightly-agent/deterministic/
           retention-days: 30
 
       - name: Preserve unit failure signal
@@ -101,14 +109,18 @@ jobs:
 
   mutation-hotspots:
     name: Mutation Hotspots
-    needs: [context]
-    if: ${{ github.event_name == 'schedule' || inputs.run_mutation }}
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    needs: [context, deterministic]
+    if: >-
+      always() &&
+      needs.context.result == 'success' &&
+      (github.event_name == 'schedule' || inputs.run_mutation)
+    runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 20
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -128,15 +140,11 @@ jobs:
           --name normalized-results.json
 
       - name: Upload mutation telemetry
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/mutation/normalized-results.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: nightly-agent-mutation-${{ github.run_id }}
-          path: |
-            apps/web/reports/mutation/
-            apps/web/reports/stryker-incremental.json
-            apps/web/test-results/nightly-agent/
-          if-no-files-found: ignore
+          path: apps/web/test-results/nightly-agent/mutation/
           retention-days: 30
 
       - name: Preserve mutation setup failure signal
@@ -147,10 +155,12 @@ jobs:
     name: Candidate Test Validation
     needs: [context]
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.validate_candidates }}
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -161,26 +171,28 @@ jobs:
           --execute true
 
       - name: Upload candidate validation report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/candidate-validation/candidate-validation.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: nightly-agent-candidate-validation-${{ github.run_id }}
-          path: apps/web/test-results/nightly-agent/
-          if-no-files-found: ignore
+          path: apps/web/test-results/nightly-agent/candidate-validation/candidate-validation.json
           retention-days: 30
 
   report:
     name: Emit Agent Report
     needs: [context, deterministic, mutation-hotspots, candidate-validation]
     if: always()
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
+          persist-credentials: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: ./.github/actions/setup-node-pnpm
@@ -216,8 +228,14 @@ jobs:
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           WORKFLOW_CONCLUSION: ${{ steps.conclusion.outputs.value }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          PLAYWRIGHT_ARTIFACT_PATHS: |
+            apps/web/test-results/nightly-agent/nightly-report.md
+            apps/web/test-results/nightly-agent/skill-delta.json
+            docs/NIGHTLY_TESTING_AGENT_REPORT.md
+            apps/web/reports/nightly-agent/last-run.json
         run: >-
-          pnpm --filter=@jovie/web run test:nightly-agent:publish-status --
+          node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web run test:nightly-agent:publish-status --
           --input-dir apps/web/test-results/nightly-agent/incoming
           --workflow-run-url "$WORKFLOW_RUN_URL"
           --workflow-conclusion "$WORKFLOW_CONCLUSION"
@@ -227,6 +245,8 @@ jobs:
 
       - name: Commit daily report when changed
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if git diff --quiet docs/NIGHTLY_TESTING_AGENT_REPORT.md apps/web/reports/nightly-agent/last-run.json 2>/dev/null; then
             echo "No nightly report changes."
@@ -234,7 +254,8 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --rebase --autostash origin main || {
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" pull --rebase --autostash origin main || {
             echo "Rebase failed — exiting without push."
             exit 1
           }
@@ -246,16 +267,17 @@ jobs:
           git commit -m "chore(testing): nightly testing agent daily report" \
             -m "Auto-generated by .github/workflows/nightly-testing-agent.yml." \
             -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
-          git push
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push
 
       - name: Upload final report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/nightly-report.md') != '' && hashFiles('apps/web/test-results/nightly-agent/skill-delta.json') != '' && hashFiles('docs/NIGHTLY_TESTING_AGENT_REPORT.md') != '' && hashFiles('apps/web/reports/nightly-agent/last-run.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: nightly-agent-report-${{ github.run_id }}
           path: |
-            apps/web/test-results/nightly-agent/
+            apps/web/test-results/nightly-agent/nightly-report.md
+            apps/web/test-results/nightly-agent/skill-delta.json
             docs/NIGHTLY_TESTING_AGENT_REPORT.md
             apps/web/reports/nightly-agent/last-run.json
-          if-no-files-found: ignore
+          allow-markdown: 'true'
           retention-days: 90

@@ -1,5 +1,12 @@
-import { expect, Page, test } from '@playwright/test';
+import { expect, Page, type TestInfo, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  assertExactNavigationUrl,
+  isExactNavigationUrl,
+  requireExactNavigationOrigin,
+} from '../helpers/vercel-preview';
+import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
+import { resolveProductionAuthCredentials } from './utils/production-auth-credentials';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
@@ -21,29 +28,15 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 function hasProdAuthCredentials(): boolean {
-  const email =
-    process.env.E2E_PROD_USER_EMAIL ||
-    process.env.E2E_CLERK_USER_USERNAME ||
-    '';
-  const password =
-    process.env.E2E_PROD_USER_PASSWORD ||
-    process.env.E2E_CLERK_USER_PASSWORD ||
-    '';
-  return email.length > 0 && password.length > 0;
+  return resolveProductionAuthCredentials() !== null;
 }
 
 function getProdCredentials() {
-  return {
-    email:
-      process.env.E2E_PROD_USER_EMAIL ||
-      process.env.E2E_CLERK_USER_USERNAME ||
-      '',
-    password:
-      process.env.E2E_PROD_USER_PASSWORD ||
-      process.env.E2E_CLERK_USER_PASSWORD ||
-      '',
-    verificationCode: process.env.E2E_PROD_USER_CODE || '',
-  };
+  const credentials = resolveProductionAuthCredentials();
+  if (!credentials) {
+    throw new Error('Production auth smoke requires one complete named pair.');
+  }
+  return credentials;
 }
 
 async function waitForClerk(page: Page): Promise<void> {
@@ -89,10 +82,22 @@ type SignInResult =
 
 type SignInNextStep = 'redirected' | 'password' | 'email_code' | 'unknown';
 
-async function detectNextStep(page: Page): Promise<SignInNextStep> {
+function exactOriginForTest(testInfo: TestInfo): string {
+  const baseUrl = testInfo.project.use.baseURL;
+  if (typeof baseUrl !== 'string') {
+    throw new Error('Production auth smoke requires an exact baseURL.');
+  }
+  return requireExactNavigationOrigin(baseUrl);
+}
+
+async function detectNextStep(
+  page: Page,
+  expectedOrigin: string
+): Promise<SignInNextStep> {
   return page
     .waitForFunction(
-      () => {
+      exactOrigin => {
+        if (window.location.origin !== exactOrigin) return false;
         if (window.location.pathname.startsWith('/app')) return 'redirected';
         if (
           document.querySelector(
@@ -110,7 +115,7 @@ async function detectNextStep(page: Page): Promise<SignInNextStep> {
         }
         return false;
       },
-      undefined,
+      expectedOrigin,
       { timeout: 15_000 }
     )
     .then(handle => handle.jsonValue() as Promise<SignInNextStep>)
@@ -119,15 +124,20 @@ async function detectNextStep(page: Page): Promise<SignInNextStep> {
 
 async function signInViaRenderedFlow(
   page: Page,
-  credentials: ReturnType<typeof getProdCredentials>
+  credentials: ReturnType<typeof getProdCredentials>,
+  expectedOrigin: string
 ): Promise<SignInResult> {
+  assertExactNavigationUrl(page.url(), expectedOrigin, 'Rendered sign-in flow');
   const identifierInput = await getIdentifierInput(page);
   const hasIdentifierInput = await identifierInput
     .isVisible({ timeout: 15_000 })
     .catch(() => false);
 
   if (!hasIdentifierInput) {
-    if (page.url().includes('/app')) {
+    if (
+      isExactNavigationUrl(page.url(), expectedOrigin) &&
+      new URL(page.url()).pathname.startsWith('/app')
+    ) {
       return 'authenticated';
     }
     return 'signin-form-unavailable';
@@ -136,7 +146,7 @@ async function signInViaRenderedFlow(
   await identifierInput.fill(credentials.email);
   await (await getSubmitButton(page)).click();
 
-  const nextStep = await detectNextStep(page);
+  const nextStep = await detectNextStep(page, expectedOrigin);
 
   if (nextStep === 'redirected') {
     return 'authenticated';
@@ -149,9 +159,11 @@ async function signInViaRenderedFlow(
     await expect(passwordInput).toBeVisible({ timeout: 10_000 });
     await passwordInput.fill(credentials.password);
     await (await getSubmitButton(page)).click();
-    await page.waitForURL(url => url.pathname.startsWith('/app'), {
-      timeout: 30_000,
-    });
+    await page.waitForURL(
+      url => url.origin === expectedOrigin && url.pathname.startsWith('/app'),
+      { timeout: 30_000 }
+    );
+    assertExactNavigationUrl(page.url(), expectedOrigin, 'Password redirect');
     return 'authenticated';
   }
 
@@ -168,9 +180,11 @@ async function signInViaRenderedFlow(
     await expect(codeInput).toBeVisible({ timeout: 10_000 });
     await codeInput.fill(credentials.verificationCode);
     await (await getSubmitButton(page)).click();
-    await page.waitForURL(url => url.pathname.startsWith('/app'), {
-      timeout: 30_000,
-    });
+    await page.waitForURL(
+      url => url.origin === expectedOrigin && url.pathname.startsWith('/app'),
+      { timeout: 30_000 }
+    );
+    assertExactNavigationUrl(page.url(), expectedOrigin, 'Email-code redirect');
     return 'authenticated';
   }
 
@@ -180,38 +194,53 @@ async function signInViaRenderedFlow(
 test.describe('Production Auth Smoke @production-smoke', () => {
   test.setTimeout(120_000);
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ context }, testInfo) => {
     if (!hasProdAuthCredentials()) {
       test.skip(true, 'No production auth credentials configured');
+      return;
     }
+
+    const baseUrl = testInfo.project.use.baseURL;
+    if (typeof baseUrl !== 'string') {
+      throw new Error('Production auth smoke requires an exact baseURL.');
+    }
+    await primeOriginBoundVercelBypass(context, baseUrl);
   });
 
-  test('sign-in works and dashboard loads', async ({ page }) => {
+  test('sign-in works and dashboard loads', async ({ page }, testInfo) => {
     const credentials = getProdCredentials();
+    const expectedOrigin = exactOriginForTest(testInfo);
 
     await page.goto(APP_ROUTES.SIGNIN, {
       waitUntil: 'domcontentloaded',
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
+    assertExactNavigationUrl(page.url(), expectedOrigin, 'Sign-in navigation');
     await waitForClerk(page);
 
-    const result = await signInViaRenderedFlow(page, credentials);
+    const result = await signInViaRenderedFlow(
+      page,
+      credentials,
+      expectedOrigin
+    );
 
     if (result === 'verification-required') {
-      test.skip(
-        true,
+      throw new Error(
         'Clerk rendered email-code verification and E2E_PROD_USER_CODE is not configured'
       );
-      return;
     }
     if (result === 'signin-form-unavailable') {
-      test.skip(true, 'Clerk sign-in form not available');
-      return;
+      throw new Error('Clerk sign-in form not available');
     }
 
     expect(result).toBe('authenticated');
 
     await waitForHydration(page);
+    assertExactNavigationUrl(
+      page.url(),
+      expectedOrigin,
+      'Hydrated dashboard navigation'
+    );
 
     const main = page.locator('main').first();
     await expect(main, 'Dashboard should be visible after sign-in').toBeVisible(
@@ -231,38 +260,50 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     expect(lower).not.toContain('something went wrong');
   });
 
-  test('dashboard tab navigation works', async ({ page }) => {
+  test('dashboard tab navigation works', async ({ page }, testInfo) => {
     const credentials = getProdCredentials();
+    const expectedOrigin = exactOriginForTest(testInfo);
 
     await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
       waitUntil: 'domcontentloaded',
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
+    const profileUrl = assertExactNavigationUrl(
+      page.url(),
+      expectedOrigin,
+      'Dashboard profile navigation'
+    );
 
     if (
-      page.url().includes(APP_ROUTES.SIGNIN) ||
-      page.url().includes('/sign-in')
+      profileUrl.pathname.startsWith(APP_ROUTES.SIGNIN) ||
+      profileUrl.pathname.startsWith('/sign-in')
     ) {
       await waitForClerk(page);
 
-      const result = await signInViaRenderedFlow(page, credentials);
+      const result = await signInViaRenderedFlow(
+        page,
+        credentials,
+        expectedOrigin
+      );
 
       if (result === 'verification-required') {
-        test.skip(
-          true,
+        throw new Error(
           'Clerk rendered email-code verification and E2E_PROD_USER_CODE is not configured'
         );
-        return;
       }
       if (result === 'signin-form-unavailable') {
-        test.skip(true, 'Sign-in form not available for tab navigation test');
-        return;
+        throw new Error('Sign-in form not available for tab navigation test');
       }
 
       expect(result).toBe('authenticated');
     }
 
     await waitForHydration(page);
+    assertExactNavigationUrl(
+      page.url(),
+      expectedOrigin,
+      'Hydrated dashboard profile navigation'
+    );
 
     const tabs = [APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES];
 
@@ -271,12 +312,21 @@ test.describe('Production Auth Smoke @production-smoke', () => {
         waitUntil: 'domcontentloaded',
         timeout: SMOKE_TIMEOUTS.NAVIGATION,
       });
+      assertExactNavigationUrl(
+        page.url(),
+        expectedOrigin,
+        `Dashboard tab navigation for ${tabPath}`
+      );
 
       await waitForHydration(page);
+      const currentUrl = assertExactNavigationUrl(
+        page.url(),
+        expectedOrigin,
+        `Hydrated dashboard tab navigation for ${tabPath}`
+      );
 
-      const currentUrl = page.url();
-      expect(currentUrl).not.toContain(APP_ROUTES.SIGNIN);
-      expect(currentUrl).not.toContain('/sign-in');
+      expect(currentUrl.pathname).not.toContain(APP_ROUTES.SIGNIN);
+      expect(currentUrl.pathname).not.toContain('/sign-in');
 
       const main = page.locator('main').first();
       const mainVisible = await main

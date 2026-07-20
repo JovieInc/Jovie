@@ -16,7 +16,8 @@ name: Taste Classifier
 # on label events created a loop where the classifier reverted human unlabels
 # (JOV-3808, PR #12688). Classification runs only when the content changes.
 on:
-  pull_request:
+  # Base-controlled workflow definition; PR head is API data only.
+  pull_request_target:
     types: [opened, ready_for_review, synchronize]
 
 permissions:
@@ -30,7 +31,8 @@ concurrency:
 jobs:
   classify:
     name: Classify PR taste
-    runs-on: ${{ vars.CI_FAST_RUNNER }}
+    # Advisory/model-assisted classification never consumes fixed CI capacity.
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       # Dedup guard (#13348): classify once per head SHA, not once per event.
@@ -60,26 +62,19 @@ jobs:
               core.info(`Head ${headSha} already classified in comment ${existing.id}; skipping.`);
             }
 
-      - name: Checkout repository
+      - name: Checkout exact trusted base policy
         if: steps.dedupe.outputs.skip != 'true'
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 1
+          persist-credentials: false
 
-      - name: Setup Node 24
+      - name: Setup Node 22
         if: steps.dedupe.outputs.skip != 'true'
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: '24'
-          cache: 'pnpm'
-
-      - name: Enable corepack
-        if: steps.dedupe.outputs.skip != 'true'
-        env:
-          COREPACK_HOME: /tmp/corepack
-        run: corepack enable --install-directory /tmp/corepack
-
-      - name: Install dependencies
-        if: steps.dedupe.outputs.skip != 'true'
-        run: pnpm install --frozen-lockfile
+          node-version: '22'
 
       - name: Run taste classifier
         id: classify

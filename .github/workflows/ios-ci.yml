@@ -1,22 +1,10 @@
 name: iOS CI
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "apps/ios/**"
-      - "fastlane/**"
-      - "Gemfile"
-      - "Gemfile.lock"
-      - ".github/workflows/ios-ci.yml"
-  push:
-    branches: [main]
-    paths:
-      - "apps/ios/**"
-      - "fastlane/**"
-      - "Gemfile"
-      - "Gemfile.lock"
-      - ".github/workflows/ios-ci.yml"
+  # Full Xcode work is called by ci.yml only for an iOS-changing merge-group
+  # combined head or an unproven direct-main fallback. Source PRs receive the
+  # portable iOS contract inside ci-fast.
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -38,8 +26,11 @@ jobs:
       - name: iOS best-practices lint
         run: bash scripts/ios-best-practices-lint.sh apps/ios/Jovie
 
-      - name: Test write-configuration script
-        run: node --test apps/ios/scripts/write-configuration.test.mjs
+      - name: Test iOS release configuration scripts
+        run: |
+          node --test apps/ios/scripts/write-configuration.test.mjs \
+          apps/ios/scripts/validate-testflight-env.test.mjs \
+          apps/ios/scripts/validate-testflight-artifact.test.mjs
 
       - name: Ensure iOS local configuration exists
         run: bash apps/ios/scripts/ensure-configuration.sh

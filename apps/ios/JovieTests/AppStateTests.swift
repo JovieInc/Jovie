@@ -558,17 +558,34 @@ struct AppStateTests {
     #expect(result == nil)
   }
 
-  @Test func mobileAuthReturnParserAcceptsProviderErrorCallback() {
+  @Test func mobileAuthReturnParserAcceptsSanitizedProviderDenialCallback() {
     let result = MobileAuthReturnParser.parseProviderError(
       URL(
-        string: "ie.jov.jovie://auth/complete?error=access_denied&error_description=Denied&state=state_123"
+        string: "ie.jov.jovie://auth/complete?error=access_denied&state=state_123&iss=https%3A%2F%2Fjov.ie%2Fapi%2Fauth"
       )!
     )
 
     #expect(
       result == MobileAuthProviderError(
         error: "access_denied",
-        errorDescription: "Denied",
+        errorDescription: nil,
+        state: "state_123"
+      )
+    )
+    #expect(result?.userMessage == "Couldn't finish sign-in. Try again.")
+  }
+
+  @Test func mobileAuthReturnParserAcceptsSanitizedServerErrorCallback() {
+    let result = MobileAuthReturnParser.parseProviderError(
+      URL(
+        string: "ie.jov.jovie://auth/complete?error=server_error&state=state_123&iss=https%3A%2F%2Fjov.ie%2Fapi%2Fauth"
+      )!
+    )
+
+    #expect(
+      result == MobileAuthProviderError(
+        error: "server_error",
+        errorDescription: nil,
         state: "state_123"
       )
     )

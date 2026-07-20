@@ -1,6 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, unlinkSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildCiHarnessArtifact,
@@ -19,31 +26,67 @@ import { extractWorkflowJobBlock } from '../merge-queue-guard.mjs';
 
 const manifest = loadCiHarnessManifest();
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-function runWorkflowBash(source, pattern, env = {}, suffix = '') {
-  const script = source.match(pattern)?.[0];
-  expect(script).toBeTruthy();
-  // biome-ignore format: executable workflow fixture stays compact for the integration-train cap
-  return spawnSync('bash', ['-c', `${script.replace(/^ {10}/gm, '')}\n${suffix}`], { env: { ...process.env, ...env }, encoding: 'utf8' });
-}
-
 /** Locked PR merge-gate set (manifest is source of truth for harness docs + artifact). */
 const EXPECTED_MERGE_GATE_NAMES = [
+  'Path Changes',
   'ci-fast',
-  'Structural Contract',
   'CI Risk Classifier',
+  'Secret Scan (gitleaks + trufflehog)',
+  'Migration Guard',
   'Unit Tests',
-  'Build (public routes)',
-  'Lighthouse (public routes PR)',
-  'Lighthouse (dashboard PR)',
-  'Lighthouse (onboarding PR)',
-  'Lighthouse (admin PR)',
-  'E2E Smoke (PR Fast Feedback)',
-  'Golden Path (PR)',
-  'Extended Smoke (Preview)',
-  'Preview Deploy (PR)',
+  'Build + Layout (combined)',
+  'iOS Build + Test (combined)',
+  'Promptfoo Evals (deterministic)',
+  'Golden Eval Set (deterministic)',
 ];
 
 describe('ci-harness manifest', () => {
+  it('counts migration files relative to the apps/web working directory', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-migration-guard-'));
+    const webRoot = resolve(root, 'apps/web');
+    const migrations = resolve(webRoot, 'drizzle/migrations');
+    const runGit = (...args) =>
+      spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+
+    try {
+      mkdirSync(migrations, { recursive: true });
+      writeFileSync(resolve(migrations, '0080_existing.sql'), 'SELECT 1;\n');
+      expect(runGit('init', '-q').status).toBe(0);
+      expect(runGit('config', 'user.name', 'Migration Guard Test').status).toBe(
+        0
+      );
+      expect(
+        runGit('config', 'user.email', 'migration-guard@example.com').status
+      ).toBe(0);
+      expect(runGit('add', '.').status).toBe(0);
+      expect(runGit('commit', '-q', '--no-gpg-sign', '-m', 'base').status).toBe(
+        0
+      );
+      const base = runGit('rev-parse', 'HEAD').stdout.trim();
+
+      writeFileSync(resolve(migrations, '0081_new.sql'), 'SELECT 2;\n');
+      expect(runGit('add', '.').status).toBe(0);
+      expect(
+        runGit('commit', '-q', '--no-gpg-sign', '-m', 'migration').status
+      ).toBe(0);
+
+      const result = spawnSync(
+        'bash',
+        [resolve(REPO_ROOT, 'apps/web/scripts/check-migrations.sh'), base],
+        {
+          cwd: webRoot,
+          encoding: 'utf8',
+          env: { ...process.env, SKIP_MIGRATION_GUARD: '' },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('A\tdrizzle/migrations/0081_new.sql');
+      expect(result.stdout).toContain('Added: 1 files');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('validates the checked-in manifest', () => {
     const validation = validateCiHarnessManifest(manifest);
     expect(validation.errors).toEqual([]);
@@ -62,7 +105,17 @@ describe('ci-harness manifest', () => {
     // Non-gate deploy/cleanup jobs must not pollute PR Ready documentation.
     const nonGates = (manifest.jobs ?? []).filter(job => !job.mergeGate);
     expect(nonGates.map(job => job.name)).toEqual([
-      'Deploy staging',
+      'Lighthouse (public routes manual)',
+      'Lighthouse (dashboard manual)',
+      'Lighthouse (onboarding manual)',
+      'Lighthouse (admin manual)',
+      'E2E Smoke (manual)',
+      'Golden Path (manual)',
+      'Extended Smoke (manual)',
+      'Preview Deploy (manual)',
+      'Production Release',
+      'Main Release Ready',
+      'Production Verified',
       'Test Flakiness Report',
     ]);
   });
@@ -114,16 +167,18 @@ describe('ci-harness manifest', () => {
   });
 
   it('keeps merge-queue branch protection on aggregates, not harness merge gates', () => {
-    // Branch protection pins PR Ready / Migration Guard / Fork PR Gate only.
+    // Branch protection pins aggregate/metadata contexts only.
     expect(REQUIRED_MERGE_STATUSES).toEqual([
       'PR Ready',
       'Migration Guard',
       'Fork PR Gate',
+      'PR Size Guard',
     ]);
     // Individual harness merge-gate job names must stay in the forbidden pin list
     // so a batch failure bisects instead of evicting siblings. ci-fast is a real
     // collapsed job (JOV-3464) but must never be pinned alone — only PR Ready is.
     for (const name of EXPECTED_MERGE_GATE_NAMES) {
+      if (REQUIRED_MERGE_STATUSES.includes(name)) continue;
       expect(
         FORBIDDEN_PINNED_JOB_CONTEXTS.includes(name) ||
           FORBIDDEN_PINNED_JOB_CONTEXTS.includes(`CI / ${name}`),
@@ -132,125 +187,305 @@ describe('ci-harness manifest', () => {
     }
   });
 
-  it('executes intended heavy-evidence prerequisites before PR Ready', () => {
+  it('keeps required source PR Ready deterministic and runner-light', () => {
     const workflow = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/ci.yml'),
       'utf8'
     );
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
-    expect(prReady).not.toContain('!cancelled()');
-    // biome-ignore format: executable gate selector stays compact for the integration-train cap
-    const runPrReadyGate = (variable, env) => runWorkflowBash(prReady, new RegExp(`^ {10}if \\[\\[ "\\$${variable}"[\\s\\S]*?^ {10}fi`, 'm'), env).status;
-    expect(runPrReadyGate('GRAPHITE_SKIP', { GRAPHITE_SKIP: 'true' })).toBe(1);
-    // biome-ignore format: executable preview fixture stays compact for the integration-train cap
-    const skippedPreview = { RISK_REQUIRES_PREVIEW: 'true', PREVIEW_RESULT: 'skipped', BUILD_RESULT: 'success', BUILD_HAS_ARTIFACT: 'true' };
-    // biome-ignore format: executable preview matrix stays compact for the integration-train cap
-    for (const [isDependabot, hasArtifact, previewResult, status] of [['true', 'true', 'skipped', 0], ['true', 'false', 'skipped', 1], ['false', 'true', 'skipped', 1], ['true', 'true', 'failure', 1]])
-      expect(
-        runPrReadyGate('RISK_REQUIRES_PREVIEW', {
-          ...skippedPreview,
-          IS_DEPENDABOT: isDependabot,
-          BUILD_HAS_ARTIFACT: hasArtifact,
-          PREVIEW_RESULT: previewResult,
-        })
-      ).toBe(status);
-    const pathChanges = extractWorkflowJobBlock(workflow, 'ci-path-changes');
-    // biome-ignore format: unique command-file path stays compact for the integration-train cap
-    const exactHeadOutput = resolve(process.env.RUNNER_TEMP || process.env.TMPDIR || '/tmp', `ci-exact-head-${process.pid}-${Date.now()}`);
-    const exactHead = runWorkflowBash(
-      pathChanges,
-      /^ {10}if \[\[ "\$GRAPHITE_SKIP_REQUESTED"[\s\S]*?^ {10}done/m,
-      // biome-ignore format: executable exact-head fixture stays compact for the integration-train cap
-      { GRAPHITE_SKIP_REQUESTED: 'true', GITHUB_OUTPUT: exactHeadOutput }
+
+    expect(prReady).toContain(
+      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan]'
     );
-    const exactHeadCommandFile = readFileSync(exactHeadOutput, 'utf8');
-    unlinkSync(exactHeadOutput);
-    expect(exactHead.status).toBe(0);
-    expect(exactHeadCommandFile).toContain('skip=false');
-    // biome-ignore format: intended evidence matrix stays compact for the integration-train cap
-    const intendedGates = { 'ci-e2e-smoke': 'E2E_SMOKE', 'ci-golden-path': 'GOLDEN_PATH', 'ci-smoke-required': 'EXTENDED_SMOKE', 'ci-lighthouse-pr': 'PUBLIC_LIGHTHOUSE', 'ci-lighthouse-dashboard-pr': 'DASHBOARD_LIGHTHOUSE', 'ci-lighthouse-onboarding-pr': 'ONBOARDING_LIGHTHOUSE', 'ci-lighthouse-admin-pr': 'ADMIN_LIGHTHOUSE' };
-    for (const [jobId, prefix] of Object.entries(intendedGates)) {
-      expect(prReady).toMatch(new RegExp(`\\b${jobId},`));
-      expect(prReady).toContain(
-        `require_evidence "$${prefix}_INTENDED" "$${prefix}_RESULT"`
-      );
+    expect(prReady).toContain('Evaluate deterministic source PR checks');
+    expect(prReady).toContain('All deterministic source PR checks passed.');
+    expect(workflow).not.toContain('withgraphite/graphite-ci-action');
+    expect(workflow).not.toContain('steps.graphite');
+    for (const heavyJob of [
+      'ci-unit-tests',
+      'ci-build-public',
+      'neon-db',
+      'ci-pr-vercel-preview',
+      'ci-e2e-smoke',
+      'ci-golden-path',
+      'ci-smoke-required',
+      'ci-lighthouse-pr',
+      'ci-a11y',
+      'ci-storybook-a11y',
+      'ci-layout-guard',
+      'ci-build-layout',
+      'ci-ios',
+      'ci-promptfoo-evals',
+      'ci-golden-eval-set',
+    ]) {
+      expect(prReady).not.toContain(heavyJob);
     }
-    const neon = extractWorkflowJobBlock(workflow, 'neon-db');
-    expect(neon).toContain(
-      "contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-path-changes.outputs.run_e2e == 'true'"
-    );
-    const chatNeedsE2e = new RegExp(
-      workflow.match(/E2E_PATTERN='([^']+)'/)?.[1]
-    ).test('apps/web/components/chat/Composer.tsx');
-    const neonDecision = runWorkflowBash(
-      neon,
-      /^ {10}if \[\[ "\$REQUIRES_GOLDEN_PATH"[\s\S]*?^ {10}fi/m,
-      // biome-ignore format: executable Neon fixture stays compact for the integration-train cap
-      { REQUIRES_EXTENDED_SMOKE: String(chatNeedsE2e), GITHUB_OUTPUT: exactHeadOutput }
-    );
-    const neonCommandFile = readFileSync(exactHeadOutput, 'utf8');
-    unlinkSync(exactHeadOutput);
-    expect(neonDecision.status).toBe(0);
-    expect(neonCommandFile).toContain('needs_db=true');
-    const evidenceStatus = (intended, result) =>
-      runWorkflowBash(
-        prReady,
-        /^ {10}require_evidence\(\) \{[\s\S]*?^ {10}\}/m,
-        {},
-        `require_evidence ${intended} ${result} gate`
-      ).status;
-    // biome-ignore format: executable status matrix stays compact for the integration-train cap
-    for (const result of ['failure', 'cancelled', 'skipped', 'pending', 'queued']) {
-      expect(evidenceStatus('true', result), result).toBe(1);
+
+    const manualJobs = [
+      'ci-knip',
+      'neon-db',
+      'ci-drizzle-check',
+      'ci-build-public',
+      'ci-layout-guard',
+      'ci-mobile-overflow',
+      'ci-lighthouse-pr',
+      'ci-lighthouse-dashboard-pr',
+      'ci-lighthouse-onboarding-pr',
+      'ci-lighthouse-admin-pr',
+      'ci-lighthouse-chat-pr',
+      'ci-pr-neon-migrate',
+      'ci-a11y',
+      'ci-a11y-authed',
+      'ci-e2e-smoke',
+      'ci-golden-path',
+      'ci-admin-smoke',
+      'ci-e2e-migrate',
+      'ci-e2e-tests',
+      'ci-test-performance',
+      'ci-pr-vercel-preview',
+      'ci-storybook-a11y',
+      'ci-summary',
+      'ci-smoke-required',
+    ];
+    for (const jobId of manualJobs) {
+      const job = extractWorkflowJobBlock(workflow, jobId);
+      const controller = job.slice(0, job.indexOf('    steps:'));
+      expect(controller).toContain("github.event_name == 'workflow_dispatch'");
+      expect(controller).not.toContain("github.event_name == 'pull_request'");
     }
-    expect(evidenceStatus('true', 'success')).toBe(0);
-    expect(evidenceStatus('false', 'skipped')).toBe(0);
-    // biome-ignore format: launch prerequisite matrix stays compact for the integration-train cap
-    for (const jobId of ['neon-db', 'ci-golden-path', 'ci-lighthouse-dashboard-pr', 'ci-lighthouse-onboarding-pr'])
-      expect(extractWorkflowJobBlock(workflow, jobId)).toContain(
-        "'launch-candidate'"
-      );
-    const dashboard = extractWorkflowJobBlock(
-      workflow,
-      'ci-lighthouse-dashboard-pr'
+    expect(
+      extractWorkflowJobBlock(workflow, 'ci-pr-vercel-preview')
+    ).not.toContain(
+      "needs.ci-risk-classifier.outputs.requires_preview == 'true'"
     );
-    expect(dashboard).toContain('|| "$IS_LAUNCH_CANDIDATE" == "true" ]]');
-    for (const intended of [
-      'GOLDEN_PATH_INTENDED',
-      'DASHBOARD_LIGHTHOUSE_INTENDED',
-      'ONBOARDING_LIGHTHOUSE_INTENDED',
-    ])
-      expect(prReady).toMatch(
-        new RegExp(
-          `${intended}=false[\\s\\S]*?HAS_LAUNCH_CANDIDATE_LABEL.*?true[\\s\\S]*?${intended}=true`
-        )
-      );
+    expect(extractWorkflowJobBlock(workflow, 'ci-e2e-smoke')).not.toContain(
+      "needs.ci-risk-classifier.outputs.requires_smoke == 'true'"
+    );
+
+    const visualWorkflow = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/visual-regression.yml'),
+      'utf8'
+    );
+    expect(visualWorkflow).not.toMatch(/^\s*pull_request:/m);
+    expect(visualWorkflow).not.toContain("'testing'");
+    expect(workflow).not.toContain(
+      "contains(github.event.pull_request.labels.*.name, 'testing')"
+    );
+    expect(workflow).not.toMatch(
+      /contains\(github\.event\.pull_request\.labels[^\n]*(?:deep-ci|launch-candidate|deploy-preview|testing)/
+    );
   });
 
-  it('defaults bare merge queue checks to the active Graphite backend', () => {
+  it('binds the production Sentry gate to its environment before reading secrets', () => {
+    const workflow = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/production-release.yml'),
+      'utf8'
+    );
+    const sentryGate = extractWorkflowJobBlock(workflow, 'sentry-error-gate');
+
+    expect(sentryGate).not.toContain(
+      'uses: ./.github/workflows/sentry-error-gate.yml'
+    );
+    expect(sentryGate).toContain('runs-on: ubuntu-latest');
+    expect(sentryGate).toContain('name: Production – jovie');
+    expect(sentryGate).toContain('uses: ./.github/actions/sentry-error-gate');
+    expect(sentryGate).toContain(
+      'sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}'
+    );
+    expect(sentryGate.indexOf('name: Production – jovie')).toBeLessThan(
+      sentryGate.indexOf('sentry-auth-token:')
+    );
+    expect(sentryGate).not.toContain('secrets: inherit');
+
+    const action = readFileSync(
+      resolve(REPO_ROOT, '.github/actions/sentry-error-gate/action.yml'),
+      'utf8'
+    );
+    expect(action).toContain(
+      "SENTRY_AUTH_TOKEN: ${{ inputs['sentry-auth-token'] }}"
+    );
+    expect(action).not.toContain('secrets.');
+  });
+
+  it('neutralizes only well-formed superseded production observer signals', () => {
+    const fixture = JSON.parse(
+      readFileSync(
+        resolve(
+          REPO_ROOT,
+          'scripts/lib/__tests__/fixtures/production-controller-observer-signals.json'
+        ),
+        'utf8'
+      )
+    );
+    const workflows = [
+      {
+        job: 'authorize-release',
+        path: '.github/workflows/ios-testflight.yml',
+        workflowIdentityMarker: 'production_controller_workflow="$(gh api',
+      },
+      {
+        job: 'authorize-release',
+        path: '.github/workflows/desktop-release.yml',
+        workflowIdentityMarker: 'workflow_record="$(gh api',
+      },
+    ];
+
+    for (const observer of workflows) {
+      const workflow = readFileSync(resolve(REPO_ROOT, observer.path), 'utf8');
+      const authorize = extractWorkflowJobBlock(workflow, observer.job);
+      const selectorStartMarker = "controller_generation_selector='\n";
+      const selectorStart = authorize.indexOf(selectorStartMarker);
+      const selectorEnd = authorize.indexOf("\n          '\n", selectorStart);
+
+      expect(selectorStart, observer.path).toBeGreaterThanOrEqual(0);
+      expect(selectorEnd, observer.path).toBeGreaterThan(selectorStart);
+      const selector = authorize.slice(
+        selectorStart + selectorStartMarker.length,
+        selectorEnd
+      );
+      const resolveGeneration = runRecord =>
+        spawnSync(
+          'jq',
+          [
+            '-er',
+            '--arg',
+            'repo',
+            fixture.repository,
+            '--arg',
+            'run_id',
+            fixture.signal.runId,
+            '--arg',
+            'run_attempt',
+            fixture.signal.runAttempt,
+            '--arg',
+            'workflow_id',
+            fixture.signal.workflowId,
+            '--arg',
+            'transport_sha',
+            fixture.signal.transportHeadSha,
+            selector,
+          ],
+          { encoding: 'utf8', input: JSON.stringify(runRecord) }
+        );
+
+      const matching = resolveGeneration(fixture.records.matching);
+      expect(matching.status, matching.stderr).toBe(0);
+      expect(matching.stdout.trim()).toBe(fixture.signal.transportHeadSha);
+
+      const superseded = resolveGeneration(fixture.records.superseded);
+      expect(superseded.status, superseded.stderr).toBe(0);
+      expect(superseded.stdout.trim()).toBe(
+        '23eb0f7c03af2efb4687787cf05fea0fb1506970'
+      );
+      expect(superseded.stdout.trim()).not.toBe(
+        fixture.signal.transportHeadSha
+      );
+
+      const malformed = resolveGeneration(fixture.records.malformedTitle);
+      expect(malformed.status, observer.path).not.toBe(0);
+      const wrongRunIdentity = resolveGeneration({
+        ...fixture.records.matching,
+        id: fixture.records.matching.id + 1,
+      });
+      expect(wrongRunIdentity.status, observer.path).not.toBe(0);
+
+      const workflowIdentity = authorize.indexOf(
+        observer.workflowIdentityMarker
+      );
+      const selectorIndex = authorize.indexOf(
+        'controller_generation_selector='
+      );
+      const neutralIndex = authorize.indexOf(
+        'if [ "$controller_generation" != "$release_sha" ]'
+      );
+      const jobsIndex = authorize.indexOf('jobs_json=', neutralIndex);
+      const currentMainIndex = authorize.indexOf('current_main_sha=');
+      const markerIndex = authorize.indexOf(
+        'if prove_existing_production_marker "$release_sha"',
+        neutralIndex
+      );
+      const authorizedIndex = authorize.indexOf(
+        'echo "authorized=true"',
+        neutralIndex
+      );
+
+      expect(workflowIdentity, observer.path).toBeGreaterThanOrEqual(0);
+      expect(workflowIdentity, observer.path).toBeLessThan(selectorIndex);
+      expect(selectorIndex, observer.path).toBeLessThan(neutralIndex);
+      expect(neutralIndex, observer.path).toBeLessThan(currentMainIndex);
+      expect(neutralIndex, observer.path).toBeLessThan(jobsIndex);
+      expect(neutralIndex, observer.path).toBeLessThan(markerIndex);
+      expect(neutralIndex, observer.path).toBeLessThan(authorizedIndex);
+      expect(authorize.slice(neutralIndex, jobsIndex)).toContain('exit 0');
+      expect(authorize.slice(neutralIndex)).toContain(
+        '.name == "Production Verified"'
+      );
+      expect(authorize.slice(neutralIndex)).toContain(
+        '[ "$verified_count" = "1" ]'
+      );
+    }
+  });
+
+  it('keeps build and layout in one hosted merge-group workspace', () => {
+    const workflow = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+      'utf8'
+    );
+    const buildLayout = extractWorkflowJobBlock(workflow, 'ci-build-layout');
+    const sourceReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
+    const mergeReady = extractWorkflowJobBlock(
+      workflow,
+      'ci-merge-group-ready'
+    );
+    const unitTests = extractWorkflowJobBlock(workflow, 'ci-unit-tests');
+
+    expect(buildLayout).toContain('runs-on: ubuntu-latest');
+    expect(buildLayout).toContain('Build exact combined head');
+    expect(buildLayout).toContain('Run deterministic layout behavior guard');
+    expect(buildLayout).not.toContain('actions/upload-artifact');
+    expect(buildLayout).not.toContain('actions/download-artifact');
+
+    expect(sourceReady).not.toContain('ci-unit-tests');
+    expect(unitTests).toContain("github.event_name == 'merge_group'");
+    expect(unitTests).not.toContain("github.event_name == 'pull_request'");
+    expect(mergeReady).toContain('ci-unit-tests');
+    expect(mergeReady).toContain('ci-build-layout');
+    expect(mergeReady).toContain('ci-ios');
+    expect(mergeReady).toContain('drizzle-migration-guard');
+    expect(mergeReady).not.toContain(
+      'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
+    );
+    expect(mergeReady).toContain('Five affected Unit Test shards did not pass');
+    expect(unitTests).toContain('run: echo "run_full_ci=true"');
+  });
+
+  it('defaults bare merge queue checks to the active native backend', () => {
     const { MERGE_QUEUE_BACKEND: _ignored, ...env } = process.env;
     // biome-ignore format: executable CLI regression stays compact for the integration-train cap
     const run = command => spawnSync(process.execPath, [resolve(REPO_ROOT, 'scripts/ci-merge-queue-check.mjs'), command], { env: { ...env, PATH: '' }, encoding: 'utf8' });
     const validate = run('validate');
     const verify = run('verify');
     // biome-ignore format: executable offline/live status matrix stays compact for the integration-train cap
-    expect([validate.status, validate.stderr.includes('Graphite remains active'), verify.status, verify.stderr.includes('Live GitHub ruleset verification failed')]).toEqual([0, true, 1, true]);
+    expect([validate.status, validate.stderr, validate.stdout.includes('Repo config OK'), verify.status, verify.stderr.includes('Live GitHub ruleset verification failed')]).toEqual([0, '', true, 1, true]);
   });
 
   it('generates stable docs from tiers, merge gates, and risk rules', () => {
     const docs = generateCiHarnessDocs(manifest, 'CI Agent Harness');
     expect(docs).toContain('Generated from `.github/ci-harness/manifest.json`');
-    expect(docs).toContain('| Fast Gate |');
+    expect(docs).toContain('| Source Fast Gate |');
+    expect(docs).toContain('| Direct/admin main |');
+    expect(docs).toContain('| Post-deploy |');
     expect(docs).toContain(
-      '`PR Ready` may require only jobs declared as merge gates'
+      'Source `PR Ready` may require only `source-pr`/`both` jobs'
     );
+    expect(docs).toContain('| `Unit Tests` | merge-group |');
     expect(docs).toContain('| Auth and identity | high | yes | yes | no |');
     // Docs must list every locked merge gate + remediation command.
     for (const name of EXPECTED_MERGE_GATE_NAMES) {
       expect(docs).toContain(`\`${name}\``);
     }
     expect(docs).toContain('`pnpm run typecheck && pnpm run biome:check`');
-    expect(docs).toContain('`pnpm run test:web:smoke`');
+    expect(docs).toContain('no PR label allocates a heavy source-event lane');
   });
 
   it('replaces an existing generated docs block', () => {
@@ -280,7 +515,7 @@ describe('ci-harness risk classifier', () => {
     expect(high.requiresPreview).toBe(true);
     expect(high.blocksUnattendedAutoMerge).toBe(false);
     expect(high.matchedRules.map(rule => rule.id)).toContain('billing-money');
-    expect(high.recommendedLabels).toEqual(['testing']);
+    expect(high.recommendedLabels).toEqual([]);
     expect(riskLocalCommands(high)).toEqual([
       'pnpm ci:harness:check',
       'pnpm run test:web:smoke',
@@ -468,20 +703,24 @@ describe('ci-harness artifact formatter', () => {
       risk,
       jobResults: [
         { id: 'ci-fast', status: 'success' },
-        { id: 'ci-structural-contract', status: 'failure' },
-        { id: 'ci-build-public', status: 'skipped', skipReason: 'docs only' },
+        { id: 'ci-risk-classifier', status: 'failure' },
+        { id: 'ci-build-layout', status: 'skipped', skipReason: 'source PR' },
       ],
     });
 
     expect(artifact.schemaVersion).toBe(1);
     expect(artifact.evidence.previewUrl).toBe('https://preview.example.com');
     expect(artifact.evidence.risk.requiresSmoke).toBe(true);
+    expect(artifact.requiredGates.map(job => job.id)).toContain('ci-fast');
     expect(artifact.requiredGates.map(job => job.id)).toContain(
-      'ci-structural-contract'
+      'ci-risk-classifier'
+    );
+    expect(artifact.requiredGates.map(job => job.id)).not.toContain(
+      'ci-build-layout'
     );
     expect(
       artifact.nextLocalCommands.some(command =>
-        command.includes('pnpm doc:freshness:check')
+        command.includes('pnpm ci:harness:check')
       )
     ).toBe(true);
   });

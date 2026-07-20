@@ -7,7 +7,10 @@ import {
 } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
-import { expectNoDocumentOverflow } from './utils/mobile-overflow';
+import {
+  expectNoDocumentOverflow,
+  waitForPendingNextRedirect,
+} from './utils/mobile-overflow';
 import {
   type ResolvedPublicSurfaceSpec,
   resolvePublicSurfaceManifestSync,
@@ -265,6 +268,13 @@ async function navigateToPublicSurface(
     `${surface.id} should not server-error`
   ).toBeLessThan(500);
 
+  if (surface.family === 'auth-entry') {
+    await waitForPendingNextRedirect(
+      page,
+      response,
+      surface.readyVisibleTimeoutMs ?? SMOKE_TIMEOUTS.VISIBILITY
+    );
+  }
   await waitForHydration(page, {
     timeout: surface.readyVisibleTimeoutMs ?? SMOKE_TIMEOUTS.VISIBILITY,
   });

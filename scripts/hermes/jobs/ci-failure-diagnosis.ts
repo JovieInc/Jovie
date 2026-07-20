@@ -25,6 +25,7 @@ export type CiFailureClass =
   | 'vercel_concurrent_build_queue'
   | 'layout_guard_contract_missing'
   | 'standalone_runtime_launcher_mismatch'
+  | 'vercel_prebuilt_function_closure_missing'
   | 'chat_composer_unsettled_entry_animation'
   | 'neon_endpoint_capacity_admission'
   | 'neon_probe_workspace_dependency_resolution'
@@ -36,6 +37,7 @@ export type CiFailureClass =
   | 'broad_test_performance_regression'
   | 'isolated_stuck_test_regression'
   | 'test_fixture_import_timeout'
+  | 'mobile_overflow_navigation_race'
   | 'runner_slice_task_saturation'
   | 'runner_process_exhaustion'
   | 'runner_io_pressure_admission'
@@ -84,6 +86,19 @@ const DIAGNOSES: ReadonlyArray<{
       'The dependency-free CI Risk Classifier exhausted its three-minute job budget restoring and extracting the full pnpm dependency cache before classification started.',
     remediation:
       'Remove dependency restore, pnpm fetch, and pnpm install from dependency-free gates; run the native Node classifier directly instead of blindly rerunning the same cache extraction.',
+  },
+  {
+    failureClass: 'vercel_prebuilt_function_closure_missing',
+    matches: log =>
+      /\/var\/task\/apps\/web\/\.next\/server/i.test(log) &&
+      (/(?:Cannot find module|Failed to load external module) ['"]?(?:require|import)-in-the-middle-[a-z0-9]+['"]?/i.test(
+        log
+      ) ||
+        /Cannot find package ['"]@opentelemetry\/sdk-node['"]/i.test(log)),
+    rootCause:
+      'The prebuilt Vercel function was deployed without repo-relative files referenced by its Build Output filePathMap. Transferring only .vercel/output between jobs can omit those traced runtime sources, so middleware fails before the health handler boots.',
+    remediation:
+      'Do not rerun or promote the unchanged prebuilt. Build and deploy in the same job and workspace so every filePathMap source remains available; never restore .vercel/output alone. Require the exact deployment to pass /api/health before promotion.',
   },
   {
     failureClass: 'staged_production_deployment_failed',
@@ -559,6 +574,20 @@ const DIAGNOSES: ReadonlyArray<{
       'The HUD page test counted its cold dynamic module transform and import against the per-test timeout after resetting the module graph.',
     remediation:
       'Hoist the mocked HUD page import outside the timed test bodies and avoid resetting modules when the assertions do not require a fresh module graph.',
+  },
+  {
+    failureClass: 'mobile_overflow_navigation_race',
+    matches: log =>
+      /Mobile Overflow/i.test(log) &&
+      /auth-signin/i.test(log) &&
+      /page\.evaluate: Execution context was destroyed, most likely because of a navigation/i.test(
+        log
+      ) &&
+      /utils\/mobile-overflow\.ts/i.test(log),
+    rootCause:
+      'The no-auth mobile overflow lane only recognized a DOM data-dgst redirect marker, but the raw Next.js response carries the digest in its streamed Flight script, so DOM measurement began before navigation completed and invalidated the evaluation context.',
+    remediation:
+      'Parse the NEXT_REDIRECT digest from the raw response and wait for its exact target to finish loading before hydration and overflow measurement; do not retry page.evaluate.',
   },
   {
     failureClass: 'runner_slice_task_saturation',

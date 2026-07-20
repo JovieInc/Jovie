@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAuth = vi.hoisted(() => vi.fn());
+const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockRequireAdmin = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockServerFetch = vi.hoisted(() => vi.fn());
 const mockLimit = vi.hoisted(() => vi.fn());
 const mockCreateRateLimitHeaders = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: mockGetCachedAuth,
 }));
 
 vi.mock('@/lib/admin', () => ({
@@ -50,7 +50,7 @@ describe('POST /api/deploy/promote', () => {
     vi.resetModules();
     vi.stubEnv('VERCEL_PRODUCTION_DEPLOY_HOOK', 'https://example.com/hook');
 
-    mockAuth.mockResolvedValue({ userId: 'admin_123' });
+    mockGetCachedAuth.mockResolvedValue({ userId: 'admin_123' });
     mockRequireAdmin.mockResolvedValue(null);
     mockCreateRateLimitHeaders.mockReturnValue({
       'X-RateLimit-Limit': '1',

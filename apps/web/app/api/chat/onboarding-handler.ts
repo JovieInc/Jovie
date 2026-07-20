@@ -312,24 +312,34 @@ export async function tryHandleAnonymousOnboardingChat(
   }
 
   // --- Rate limits: IP + ASN + session ---
-  const rate = await checkAnonymousChatRateLimit({ ip, sessionId, asn });
-  if (!rate.success) {
-    return NextResponse.json(
-      {
-        error: 'Rate limit exceeded',
-        message: rate.reason,
-        errorCode: 'RATE_LIMITED',
-        requestId,
-      },
-      {
-        status: 429,
-        headers: {
-          ...corsHeaders,
-          ...createRateLimitHeaders(rate),
-          'x-request-id': requestId,
+  // E2E exemption (same triple-guard shape as the OTP rule in
+  // lib/auth/rate-limit-rules.ts): these limiters are requireRedis and FAIL
+  // CLOSED (success:false) when Redis is absent, and their IP key collapses to
+  // loopback in CI where one shared Upstash bucket is raced by external
+  // dev/agent runs — deterministic test traffic would 429 nondeterministically
+  // either way, so the guard skips the check entirely. Never on production.
+  const skipAnonymousChatRateLimit =
+    env.E2E_TEST_MODE === '1' && env.VERCEL_ENV !== 'production';
+  if (!skipAnonymousChatRateLimit) {
+    const rate = await checkAnonymousChatRateLimit({ ip, sessionId, asn });
+    if (!rate.success) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          message: rate.reason,
+          errorCode: 'RATE_LIMITED',
+          requestId,
         },
-      }
-    );
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            ...createRateLimitHeaders(rate),
+            'x-request-id': requestId,
+          },
+        }
+      );
+    }
   }
 
   // --- Validate and shape the UIMessage payload ---

@@ -7,7 +7,7 @@ import { waitForHydration } from './utils/smoke-test-utils';
 
 test.use({
   storageState: { cookies: [], origins: [] },
-  video: 'on',
+  video: process.env.CI ? 'off' : 'on',
 });
 
 type StreamChunk = Record<string, unknown>;

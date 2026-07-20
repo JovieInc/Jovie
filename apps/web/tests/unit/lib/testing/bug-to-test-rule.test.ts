@@ -46,6 +46,39 @@ describe('bug-to-test rule', () => {
     expect(buildBugToTestPrSection(evaluation)).toBe('bug-to-test: satisfied');
   });
 
+  it.each([
+    'session.test.mjs',
+    'session.spec.cjs',
+    'session.test.mts',
+    'session.spec.cts',
+    'session.test.jsx',
+    'session.spec.tsx',
+  ])('accepts repo-standard regression test extension %s', testFile => {
+    const evaluation = evaluateBugToTestRule({
+      changedFiles: [
+        'apps/web/lib/auth/session.ts',
+        `apps/web/tests/unit/lib/auth/${testFile}`,
+      ],
+      commitMessages: ['fix(auth): clear stale session cookie'],
+    });
+
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.hasRegressionTestEvidence).toBe(true);
+  });
+
+  it('rejects non-test lookalike extensions', () => {
+    const evaluation = evaluateBugToTestRule({
+      changedFiles: [
+        'apps/web/lib/auth/session.ts',
+        'apps/web/tests/unit/lib/auth/session.test.md',
+      ],
+      commitMessages: ['fix(auth): clear stale session cookie'],
+    });
+
+    expect(evaluation.passed).toBe(false);
+    expect(evaluation.hasRegressionTestEvidence).toBe(false);
+  });
+
   it('passes bug fixes with an explicit waiver in the PR body', () => {
     const evaluation = evaluateBugToTestRule({
       changedFiles: ['apps/web/lib/auth/session.ts'],
