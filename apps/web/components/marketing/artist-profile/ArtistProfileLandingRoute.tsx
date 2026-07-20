@@ -1,4 +1,4 @@
-import { MarketingPageShell } from '@/components/marketing';
+import { MarketingPageShell } from '@/components/marketing/MarketingPageShell';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import {
   ARTIST_PROFILE_LAUNCH_FEATURES,
@@ -24,9 +24,6 @@ export function ArtistProfileLandingRoute() {
         socialProof={ARTIST_PROFILE_SOCIAL_PROOF}
         flags={ARTIST_PROFILE_FLAGS}
         payFlowVideoUrl={process.env.ARTIST_PROFILES_PAY_FLOW_VIDEO_URL}
-        showForgeUiMarketingUpdates={
-          FEATURE_FLAGS.SHOW_FORGEUI_MARKETING_UPDATES
-        }
       />
     </MarketingPageShell>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { SegmentControl, type SegmentControlOption, Tabs } from '@jovie/ui';
+import { Tabs } from '@jovie/ui';
 import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -8,14 +8,13 @@ import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
-import { SHELL_H2_CLASS } from './ArtistProfileSectionHeader';
+import { SHELL_H2_CLASS, SHELL_LEAD_CLASS } from './ArtistProfileSectionHeader';
 
 interface ArtistProfileModeSwitcherProps {
   readonly adaptive: ArtistProfileLandingCopy['adaptive'];
-  readonly phoneCaption: string;
-  readonly phoneSubcaption: string;
+  readonly phoneCaption?: string;
+  readonly phoneSubcaption?: string;
   readonly showIntroHeading?: boolean;
-  readonly showForgeUiMarketingUpdates?: boolean;
 }
 
 export function ArtistProfileModeSwitcher({
@@ -23,24 +22,17 @@ export function ArtistProfileModeSwitcher({
   phoneCaption,
   phoneSubcaption,
   showIntroHeading = true,
-  showForgeUiMarketingUpdates = false,
 }: Readonly<ArtistProfileModeSwitcherProps>) {
   const rootRef = useRef<HTMLDivElement>(null);
   const sequenceTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const sequenceStartedRef = useRef(false);
   const manualSelectionRef = useRef(false);
   const reducedMotion = useReducedMotion();
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [introVisible, setIntroVisible] = useState(false);
-  const [tabsVisible, setTabsVisible] = useState(reducedMotion);
-  const activeMode =
-    activeIndex === null ? null : (adaptive.modes[activeIndex] ?? null);
-  const selectedModeId = activeMode?.id ?? '__resting__';
-  const modeOptions: readonly SegmentControlOption<string>[] =
-    adaptive.modes.map(mode => ({
-      value: mode.id,
-      label: mode.label,
-    }));
+  const [activeIndex, setActiveIndex] = useState(0);
+  const activeMode = adaptive.modes[activeIndex] ?? adaptive.modes[0];
+  const compactAccessibleContext = [phoneCaption, phoneSubcaption]
+    .filter(Boolean)
+    .join(' ');
 
   const clearSequenceTimers = useCallback(() => {
     for (const timer of sequenceTimersRef.current) {
@@ -48,6 +40,27 @@ export function ArtistProfileModeSwitcher({
     }
     sequenceTimersRef.current = [];
   }, []);
+
+  const stopSequence = useCallback(() => {
+    manualSelectionRef.current = true;
+    clearSequenceTimers();
+  }, [clearSequenceTimers]);
+
+  const selectMode = useCallback(
+    (modeId: string, manual = true) => {
+      const nextIndex = adaptive.modes.findIndex(mode => mode.id === modeId);
+      if (nextIndex < 0) {
+        return;
+      }
+
+      if (manual) {
+        stopSequence();
+      }
+
+      setActiveIndex(nextIndex);
+    },
+    [adaptive.modes, stopSequence]
+  );
 
   const startSequence = useCallback(() => {
     if (manualSelectionRef.current || sequenceStartedRef.current) {
@@ -63,7 +76,6 @@ export function ArtistProfileModeSwitcher({
     const firstIndex = Math.max(upcomingReleaseIndex, 0);
 
     sequenceStartedRef.current = true;
-    setTabsVisible(true);
 
     if (reducedMotion) {
       return;
@@ -89,340 +101,239 @@ export function ArtistProfileModeSwitcher({
   }, [adaptive.modes, reducedMotion]);
 
   useEffect(() => {
-    const syncIntroVisibility = () => {
-      const root = rootRef.current;
-      if (!root) {
-        return;
-      }
+    const root = rootRef.current;
+    if (!root || globalThis.IntersectionObserver === undefined) {
+      startSequence();
+      return;
+    }
 
-      if (globalThis.innerWidth < 768) {
-        setIntroVisible(true);
+    const observer = new globalThis.IntersectionObserver(
+      entries => {
+        if (!entries[0]?.isIntersecting) {
+          return;
+        }
         startSequence();
-        return;
-      }
+        observer.disconnect();
+      },
+      { threshold: 0.35 }
+    );
 
-      const rect = root.getBoundingClientRect();
-      const activationOffset = Math.min(globalThis.innerHeight * 0.22, 220);
-      const shouldReveal = rect.top <= activationOffset;
-      setIntroVisible(shouldReveal);
-
-      if (shouldReveal) {
-        startSequence();
-      }
-    };
-
-    syncIntroVisibility();
-    globalThis.addEventListener('scroll', syncIntroVisibility, {
-      passive: true,
-    });
-    globalThis.addEventListener('resize', syncIntroVisibility);
-
-    return () => {
-      globalThis.removeEventListener('scroll', syncIntroVisibility);
-      globalThis.removeEventListener('resize', syncIntroVisibility);
-    };
+    observer.observe(root);
+    return () => observer.disconnect();
   }, [startSequence]);
 
-  useEffect(() => {
-    return () => {
-      clearSequenceTimers();
-    };
-  }, [clearSequenceTimers]);
+  useEffect(() => clearSequenceTimers, [clearSequenceTimers]);
+
+  if (!activeMode) {
+    return null;
+  }
 
   return (
     <div
       ref={rootRef}
-      className='artist-profile-mode-switcher mx-auto flex w-full max-w-lg flex-col items-center text-center'
+      onFocusCapture={stopSequence}
+      onPointerEnter={stopSequence}
+      className={cn(
+        showIntroHeading
+          ? 'grid items-center gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(22rem,1.1fr)] lg:gap-16'
+          : 'mx-auto flex w-full max-w-lg flex-col items-center text-center'
+      )}
     >
-      {showIntroHeading ? (
-        <motion.div
-          className='artist-profile-mode-switcher-heading mx-auto max-w-sm'
-          initial={false}
-          animate={
-            introVisible
-              ? { opacity: 1, y: 0, filter: 'blur(0px)' }
-              : { opacity: 0, y: 18, filter: 'blur(8px)' }
-          }
-          transition={{
-            duration: reducedMotion ? 0.16 : 0.34,
-            ease: [0.22, 1, 0.36, 1],
-          }}
-        >
-          <div className='min-h-[3.25rem] sm:min-h-[3.75rem]'>
-            <h2 className={cn(SHELL_H2_CLASS, 'mx-auto max-w-[11ch]')}>
-              {phoneCaption}
-            </h2>
-          </div>
-          <div className='min-h-[1.75rem]'>
-            <p className='mt-2 text-sm font-medium leading-[1.4] tracking-[-0.011em] text-secondary-token sm:text-mid'>
-              {phoneSubcaption}
-            </p>
-          </div>
-        </motion.div>
+      {!showIntroHeading && (phoneCaption || phoneSubcaption) ? (
+        <p className='sr-only'>{compactAccessibleContext}</p>
       ) : null}
+      <div
+        className={cn(
+          'max-w-2xl',
+          showIntroHeading ? null : 'order-2 w-full max-w-[29rem] text-center'
+        )}
+      >
+        {showIntroHeading ? (
+          <>
+            <p className='text-xs font-medium tracking-wide text-secondary-token'>
+              {adaptive.eyebrow}
+            </p>
+            <h2 className={cn(SHELL_H2_CLASS, 'mt-5 max-w-[13ch]')}>
+              {adaptive.headline}
+            </h2>
+            <p className={cn(SHELL_LEAD_CLASS, 'mt-6 max-w-xl')}>
+              {adaptive.body}
+            </p>
+          </>
+        ) : null}
 
-      <div className='artist-profile-mode-switcher-phone relative mt-3.5 w-full max-w-[15.75rem] sm:mt-4 sm:max-w-[16.75rem]'>
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-5 top-4 h-[4.5rem] rounded-full bg-white/10 blur-3xl'
-        />
-        <ArtistProfilePhoneFrame className='relative z-10 max-w-none'>
-          <div className='relative h-full w-full'>
-            <AnimatePresence initial={false}>
-              <motion.div
-                key={activeMode?.id ?? 'resting'}
-                className='absolute inset-0'
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{
-                  duration: reducedMotion ? 0.18 : 0.36,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
+        <Tabs.Root
+          value={activeMode.id}
+          onValueChange={value => selectMode(value)}
+          className={cn(showIntroHeading ? 'mt-9 w-full' : 'w-full')}
+        >
+          <Tabs.List
+            aria-label='Profile Modes'
+            className={cn(
+              'grid border border-subtle bg-surface-0 p-1',
+              showIntroHeading
+                ? 'grid-cols-2 gap-1 rounded-xl sm:grid-cols-4'
+                : 'grid-cols-4 rounded-full'
+            )}
+          >
+            {adaptive.modes.map(mode => {
+              const isActive = mode.id === activeMode.id;
+
+              return (
+                <Tabs.Trigger
+                  key={mode.id}
+                  value={mode.id}
+                  className={cn(
+                    'relative flex min-w-0 items-center justify-center px-2 text-center text-3xs font-semibold leading-tight text-tertiary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus data-[state=active]:text-primary-token sm:text-xs',
+                    showIntroHeading
+                      ? 'min-h-12 rounded-lg'
+                      : 'min-h-11 rounded-full'
+                  )}
+                >
+                  {isActive ? (
+                    <motion.span
+                      aria-hidden='true'
+                      className={cn(
+                        'absolute inset-0 border border-subtle bg-surface-2 shadow-sm',
+                        showIntroHeading ? 'rounded-lg' : 'rounded-full'
+                      )}
+                      layoutId='artist-profile-mode-active-tab'
+                      transition={
+                        reducedMotion
+                          ? { duration: 0 }
+                          : {
+                              duration: 0.24,
+                              ease: [0.22, 1, 0.36, 1],
+                            }
+                      }
+                    />
+                  ) : null}
+                  <span className='relative'>{mode.label}</span>
+                </Tabs.Trigger>
+              );
+            })}
+          </Tabs.List>
+          <div
+            className={cn(
+              showIntroHeading
+                ? 'mt-6 min-h-28 border-l border-subtle pl-5'
+                : 'mt-2.5 min-h-10 px-2'
+            )}
+          >
+            {adaptive.modes.map(mode => (
+              <Tabs.Content
+                key={`${mode.id}-panel`}
+                value={mode.id}
+                className='focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
               >
-                <Image
-                  src={
-                    activeMode?.screenshotSrc ?? adaptive.restingScreenshotSrc
-                  }
-                  alt={
-                    activeMode?.screenshotAlt ?? adaptive.restingScreenshotAlt
-                  }
-                  fill
-                  sizes='(max-width: 640px) 100vw, 330px'
-                  className='object-cover object-top'
-                  priority={
-                    activeMode?.id === 'upcoming-release' || activeMode === null
-                  }
-                />
-              </motion.div>
-            </AnimatePresence>
-            <div
-              aria-hidden='true'
-              className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08),transparent_22%,transparent_78%,rgba(0,0,0,0.2))]'
-            />
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: reducedMotion ? 0 : 0.22 }}
+                >
+                  {showIntroHeading ? (
+                    <p className='text-xs font-semibold text-secondary-token'>
+                      {mode.label}
+                    </p>
+                  ) : null}
+                  <p
+                    className={cn(
+                      'max-w-lg font-semibold leading-snug tracking-tight text-primary-token',
+                      showIntroHeading ? 'mt-2 text-xl' : 'text-sm sm:text-mid'
+                    )}
+                  >
+                    {mode.headline}
+                  </p>
+                  {showIntroHeading ? (
+                    <p className='mt-3 font-mono text-xs tracking-tight text-tertiary-token'>
+                      {mode.pathLabel}
+                    </p>
+                  ) : null}
+                </motion.div>
+              </Tabs.Content>
+            ))}
           </div>
-        </ArtistProfilePhoneFrame>
+        </Tabs.Root>
+
+        {showIntroHeading ? (
+          <ul
+            className='mt-7 flex flex-wrap gap-x-5 gap-y-2'
+            aria-label='Profile Context Signals'
+          >
+            {adaptive.contextCues.map(cue => (
+              <li
+                key={cue}
+                className='flex items-center gap-2 text-xs font-medium text-tertiary-token'
+              >
+                <span
+                  aria-hidden='true'
+                  className='h-1 w-1 rounded-full bg-secondary-token'
+                />
+                {cue}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
 
       <div
         className={cn(
-          'artist-profile-mode-switcher-tabs relative mx-auto mt-4 w-full max-w-[29rem] px-0 transition-opacity duration-cinematic',
-          tabsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
+          'relative mx-auto w-full',
+          showIntroHeading
+            ? 'max-w-lg rounded-3xl border border-subtle bg-surface-0 p-6 sm:p-8'
+            : 'order-1 mb-4 max-w-[15.75rem] sm:max-w-[16.75rem]'
         )}
       >
+        {showIntroHeading ? (
+          <div className='mb-5 flex min-h-13 items-center justify-between gap-4 lg:min-h-0'>
+            <div>
+              <p className='text-xs font-semibold text-primary-token'>
+                {adaptive.productLabel}
+              </p>
+              <p className='mt-1 text-xs text-tertiary-token'>
+                {adaptive.productDetail}
+              </p>
+            </div>
+            <span className='inline-flex min-h-11 items-center rounded-full border border-subtle bg-surface-1 px-3 py-1.5 font-mono text-3xs text-secondary-token lg:min-h-0'>
+              {activeMode.label}
+            </span>
+          </div>
+        ) : null}
+
         <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-10 top-1/2 h-8 -translate-y-1/2 rounded-full bg-white/[0.08] blur-2xl'
-        />
-        <div className='w-full pb-1'>
-          {showForgeUiMarketingUpdates ? (
-            <AnimatedProfileModeTabs
-              modes={adaptive.modes}
-              reducedMotion={reducedMotion}
-              value={selectedModeId}
-              onValueChange={nextModeId => {
-                manualSelectionRef.current = true;
-                clearSequenceTimers();
-                setTabsVisible(true);
-
-                const nextIndex = adaptive.modes.findIndex(
-                  mode => mode.id === nextModeId
-                );
-
-                if (nextIndex >= 0) {
-                  setActiveIndex(nextIndex);
-                }
-              }}
-            />
-          ) : (
-            <SegmentControl
-              value={selectedModeId}
-              onValueChange={nextModeId => {
-                manualSelectionRef.current = true;
-                clearSequenceTimers();
-                setTabsVisible(true);
-
-                const nextIndex = adaptive.modes.findIndex(
-                  mode => mode.id === nextModeId
-                );
-
-                if (nextIndex >= 0) {
-                  setActiveIndex(nextIndex);
-                }
-              }}
-              options={modeOptions}
-              variant='linear-pill'
-              layout='fill'
-              size='sm'
-              aria-label='Profile Modes'
-              className='mx-auto w-full supports-[backdrop-filter]:backdrop-blur-xl'
-              triggerClassName='min-h-11 min-w-0 px-2.5 data-[state=active]:!text-white sm:px-3.5'
-            />
+          className={cn(
+            'relative mx-auto w-full',
+            showIntroHeading ? 'max-w-xs' : 'max-w-none'
           )}
+        >
+          <ArtistProfilePhoneFrame className='relative z-10 max-w-none'>
+            <div className='relative h-full w-full'>
+              <AnimatePresence initial={false} mode='sync'>
+                <motion.div
+                  key={activeMode.id}
+                  className='absolute inset-0'
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: reducedMotion ? 0 : 0.32 }}
+                >
+                  <Image
+                    src={activeMode.screenshotSrc}
+                    alt={activeMode.screenshotAlt}
+                    fill
+                    sizes={
+                      showIntroHeading
+                        ? '(max-width: 640px) 78vw, 320px'
+                        : '(max-width: 640px) 100vw, 330px'
+                    }
+                    className='object-cover object-top'
+                  />
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </ArtistProfilePhoneFrame>
         </div>
       </div>
-
-      <div className='artist-profile-mode-switcher-active relative mx-auto mt-2.5 min-h-[2.4rem] w-full max-w-[19rem] px-2 sm:mt-3'>
-        <AnimatePresence initial={false}>
-          {activeMode ? (
-            <motion.p
-              key={activeMode.id}
-              className='absolute inset-x-0 text-balance text-sm font-medium leading-[1.34] tracking-normal text-white/86 sm:text-mid'
-              initial={false}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{
-                duration: reducedMotion ? 0.16 : 0.3,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-            >
-              {activeMode.headline}
-            </motion.p>
-          ) : null}
-        </AnimatePresence>
-      </div>
-
-      <style>{`
-        @media (max-height: 820px) {
-          .artist-profile-mode-switcher-heading h2 {
-            font-size: clamp(1.9rem, 3.6vw, 3.15rem);
-          }
-
-          .artist-profile-mode-switcher-heading p {
-            margin-top: 0.35rem;
-            font-size: clamp(0.85rem, 1.05vw, 0.95rem);
-          }
-
-          .artist-profile-mode-switcher-phone {
-            max-width: 14.75rem;
-            margin-top: 0.75rem;
-          }
-
-          .artist-profile-mode-switcher-tabs {
-            margin-top: 0.75rem;
-          }
-
-          .artist-profile-mode-switcher-active {
-            margin-top: 0.55rem;
-            min-height: 2rem;
-          }
-        }
-
-        @media (max-width: 640px) {
-          .artist-profile-mode-switcher-tabs button {
-            font-size: 11px;
-            padding-left: 0.5rem;
-            padding-right: 0.5rem;
-          }
-
-          .artist-profile-mode-switcher-active {
-            min-height: 2.5rem;
-          }
-
-          .artist-profile-mode-switcher-active p {
-            font-size: 14px;
-          }
-
-          .artist-profile-mode-switcher-phone {
-            max-width: 15.5rem;
-          }
-        }
-      `}</style>
     </div>
-  );
-}
-
-function AnimatedProfileModeTabs({
-  modes,
-  onValueChange,
-  reducedMotion,
-  value,
-}: Readonly<{
-  modes: ArtistProfileLandingCopy['adaptive']['modes'];
-  onValueChange: (value: string) => void;
-  reducedMotion: boolean;
-  value: string;
-}>) {
-  const selectModeFromKey = (currentModeId: string, key: string) => {
-    const currentIndex = modes.findIndex(mode => mode.id === currentModeId);
-    if (currentIndex < 0) {
-      return false;
-    }
-
-    if (key === 'Home') {
-      onValueChange(modes[0]?.id ?? currentModeId);
-      return true;
-    }
-
-    if (key === 'End') {
-      onValueChange(modes.at(-1)?.id ?? currentModeId);
-      return true;
-    }
-
-    if (key !== 'ArrowRight' && key !== 'ArrowLeft') {
-      return false;
-    }
-
-    const direction = key === 'ArrowRight' ? 1 : -1;
-    const nextIndex = (currentIndex + direction + modes.length) % modes.length;
-    onValueChange(modes[nextIndex]?.id ?? currentModeId);
-    return true;
-  };
-
-  return (
-    <Tabs.Root
-      value={value}
-      onValueChange={onValueChange}
-      className='mx-auto w-full'
-    >
-      <Tabs.List
-        aria-label='Profile Modes'
-        className='relative grid w-full grid-cols-4 rounded-full border border-white/[0.09] bg-white/[0.045] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_44px_rgba(0,0,0,0.24)] supports-[backdrop-filter]:backdrop-blur-xl'
-      >
-        {modes.map(mode => {
-          const isActive = mode.id === value;
-
-          return (
-            <Tabs.Trigger
-              key={mode.id}
-              value={mode.id}
-              onClick={() => {
-                onValueChange(mode.id);
-              }}
-              onKeyDown={event => {
-                if (selectModeFromKey(mode.id, event.key)) {
-                  event.preventDefault();
-                }
-              }}
-              className='relative z-10 flex min-h-11 min-w-0 items-center justify-center rounded-full px-1.5 text-center text-3xs font-semibold tracking-normal text-white/50 transition-colors duration-subtle hover:text-white/78 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 data-[state=active]:text-black sm:px-3.5 sm:text-xs'
-            >
-              {isActive ? (
-                <motion.span
-                  aria-hidden='true'
-                  className='absolute inset-0 z-[-1] rounded-full border border-white/30 bg-white dark:bg-surface-1 shadow-[0_8px_22px_rgba(0,0,0,0.24)]'
-                  layoutId='artist-profile-mode-active-tab'
-                  transition={{
-                    duration: reducedMotion ? 0 : undefined,
-                    type: 'spring',
-                    stiffness: 500,
-                    damping: 36,
-                  }}
-                />
-              ) : null}
-              <span className='whitespace-nowrap'>{mode.label}</span>
-            </Tabs.Trigger>
-          );
-        })}
-      </Tabs.List>
-      {modes.map(mode => (
-        <Tabs.Content
-          key={`${mode.id}-panel`}
-          value={mode.id}
-          forceMount
-          className='hidden'
-          aria-hidden='true'
-        />
-      ))}
-    </Tabs.Root>
   );
 }

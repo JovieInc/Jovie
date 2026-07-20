@@ -58,6 +58,52 @@ async function getClientRect(locator: import('@playwright/test').Locator) {
   });
 }
 
+const MODE_TRANSITION_SETTLE_MS = 400;
+const GEOMETRY_TOLERANCE_PX = 1;
+const ARTIST_PROFILE_MODE_LABELS = [
+  'Upcoming Release',
+  'Release Day',
+  'Touring',
+  'Live Support',
+] as const;
+
+interface GeometrySnapshot {
+  readonly documentTop: number;
+  readonly height: number;
+  readonly width: number;
+  readonly x: number;
+  readonly y: number;
+}
+
+async function getGeometrySnapshot(
+  locator: import('@playwright/test').Locator
+): Promise<GeometrySnapshot> {
+  return locator.evaluate(el => {
+    const rect = el.getBoundingClientRect();
+
+    return {
+      documentTop: window.scrollY + rect.top,
+      height: rect.height,
+      width: rect.width,
+      x: rect.x,
+      y: rect.y,
+    };
+  });
+}
+
+function expectStableGeometry(
+  baseline: GeometrySnapshot,
+  current: GeometrySnapshot,
+  surface: string
+) {
+  for (const key of ['documentTop', 'height', 'width', 'x', 'y'] as const) {
+    expect(
+      Math.abs(current[key] - baseline[key]),
+      `${surface} ${key} shifted`
+    ).toBeLessThanOrEqual(GEOMETRY_TOLERANCE_PX);
+  }
+}
+
 async function expectFullyInViewport(
   page: import('@playwright/test').Page,
   locator: import('@playwright/test').Locator
@@ -247,6 +293,90 @@ test.describe('Artist Profiles Landing', () => {
     await scrollToY(page, Math.max(0, trustTop - 80));
     await expect(trust).toBeVisible();
     await expectNotPartiallyVisible(page, phone);
+  });
+
+  test('adaptive mode changes preserve desktop and mobile geometry', async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { name: 'desktop', width: 1440, height: 960 },
+      { name: 'mobile', width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      await page.goto('/artist-profiles', { waitUntil: 'domcontentloaded' });
+      await waitForHydration(page);
+
+      const adaptiveSection = page.getByTestId(
+        'artist-profile-section-adaptive'
+      );
+      const trust = page.getByTestId('homepage-trust');
+      const phone = adaptiveSection.getByRole('img').first();
+      const tabList = adaptiveSection.getByRole('tablist', {
+        name: 'Profile Modes',
+      });
+      const panelSlot = tabList.locator('xpath=following-sibling::*[1]');
+      const upcomingRelease = adaptiveSection.getByRole('tab', {
+        name: 'Upcoming Release',
+      });
+
+      await tabList.scrollIntoViewIfNeeded();
+      await expect(phone).toBeVisible();
+      await expect(tabList).toBeVisible();
+      await expect(panelSlot).toBeVisible();
+      await upcomingRelease.click();
+      await expect(upcomingRelease).toHaveAttribute('aria-selected', 'true');
+      await page.waitForTimeout(MODE_TRANSITION_SETTLE_MS);
+
+      const baseline = {
+        adaptive: await getGeometrySnapshot(adaptiveSection),
+        panel: await getGeometrySnapshot(panelSlot),
+        phone: await getGeometrySnapshot(phone),
+        tabList: await getGeometrySnapshot(tabList),
+        trust: await getGeometrySnapshot(trust),
+      };
+
+      for (const label of ARTIST_PROFILE_MODE_LABELS) {
+        const tab = adaptiveSection.getByRole('tab', { name: label });
+        await tab.click();
+        await expect(tab).toHaveAttribute('aria-selected', 'true');
+        await page.waitForTimeout(MODE_TRANSITION_SETTLE_MS);
+
+        await expectNoHorizontalOverflow(page);
+        expectStableGeometry(
+          baseline.adaptive,
+          await getGeometrySnapshot(adaptiveSection),
+          `${viewport.name} adaptive section`
+        );
+        expectStableGeometry(
+          baseline.phone,
+          await getGeometrySnapshot(phone),
+          `${viewport.name} phone`
+        );
+        expectStableGeometry(
+          baseline.tabList,
+          await getGeometrySnapshot(tabList),
+          `${viewport.name} tab list`
+        );
+        expectStableGeometry(
+          baseline.panel,
+          await getGeometrySnapshot(panelSlot),
+          `${viewport.name} panel slot`
+        );
+        expectStableGeometry(
+          baseline.trust,
+          await getGeometrySnapshot(trust),
+          `${viewport.name} trust section`
+        );
+      }
+
+      await page.waitForTimeout(2500);
+      await expect(
+        adaptiveSection.getByRole('tab', { name: 'Live Support' })
+      ).toHaveAttribute('aria-selected', 'true');
+    }
   });
 
   test('outcomes section comes right after the trust strip and keeps a stable grid across breakpoints', async ({
