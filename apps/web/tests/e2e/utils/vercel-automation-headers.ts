@@ -3,13 +3,13 @@ export function vercelAutomationHeaders(): {
   readonly headers: Record<string, string>;
 } {
   const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (secret) {
+    throw new Error(
+      'Global Vercel bypass headers are forbidden; use the origin-bound cookie bootstrap.'
+    );
+  }
   return {
-    active: Boolean(secret),
-    headers: secret
-      ? {
-          'x-vercel-protection-bypass': secret,
-          'x-vercel-set-bypass-cookie': 'samesitenone',
-        }
-      : {},
+    active: false,
+    headers: {},
   };
 }
