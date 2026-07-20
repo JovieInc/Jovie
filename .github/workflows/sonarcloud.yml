@@ -21,8 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      SONAR_SCAN_ENABLED: ${{ secrets.SONAR_TOKEN != '' }}
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_SCAN_ENABLED: ${{ secrets.SONAR_TOKEN != '' }} # trufflehog:ignore (secret reference, not a value)
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} # trufflehog:ignore (secret reference, not a value)
 
     steps:
       - name: Skip SonarCloud scan when SONAR_TOKEN is unavailable
