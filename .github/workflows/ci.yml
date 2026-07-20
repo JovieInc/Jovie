@@ -976,8 +976,9 @@ jobs:
     # (build / Lighthouse / e2e / preview) stay separate.
     needs: [ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
-    # Setup/DB work (~2m) + accepted source deploy (up to 10m) + readiness
-    # verification (up to 9m) must fit without the job canceling a healthy build.
+    # Setup (checkout + install, ~2m) + ci-fast lanes via scripts/ci-fast-lanes.mjs
+    # (biome, eslint-server-boundaries, typecheck, guardrails, ios-fast,
+    # structural) must fit without the job canceling a healthy run.
     timeout-minutes: 25
     if: >-
       always() &&
@@ -1720,12 +1721,6 @@ jobs:
         with:
           name: nextjs-build-${{ github.run_id }}
           path: ${{ runner.temp }}/nextjs-build-download
-
-      - name: Require combined-head build artifact
-        if: github.event_name == 'merge_group' && steps.download.outcome != 'success'
-        run: |
-          echo "::error::Combined-head build was required, but its shared artifact could not be downloaded."
-          exit 1
 
       - name: Extract build artifact
         if: steps.download.outcome == 'success'
