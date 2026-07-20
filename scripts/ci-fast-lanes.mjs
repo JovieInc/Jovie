@@ -46,6 +46,12 @@ const LANES = [
     run: runTypecheck,
   },
   {
+    id: 'scripts-typecheck',
+    name: 'Scripts Typecheck (shrink-only baseline)',
+    nextLocalCommand: 'pnpm run typecheck:scripts',
+    run: runScriptsTypecheck,
+  },
+  {
     id: 'guardrails',
     name: 'Guardrails (proxy)',
     nextLocalCommand: 'pnpm next:proxy-guard',
@@ -175,6 +181,13 @@ function runEslintServerBoundaries() {
 function runTypecheck() {
   // --force is mandatory (JOV-3499). Gate guard scans this file + ci.yml.
   return shell('pnpm turbo typecheck --affected --force');
+}
+
+function runScriptsTypecheck() {
+  // JOV-4327: scripts/ tree typecheck vs shrink-only baseline. Runs
+  // unconditionally (no path gating) — the baseline comparison is ~6s and the
+  // error graph also covers imported files outside scripts/.
+  return shell('pnpm run typecheck:scripts');
 }
 
 function runGuardrails() {

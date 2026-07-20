@@ -1,0 +1,42 @@
+{
+  // Typecheck coverage for the scripts/ tree (JOV-4327).
+  //
+  // Why this exists: scripts/*.mjs run on plain Node and scripts/**/*.ts run via
+  // tsx in prod hermes monitors, but nothing type-checked them — a nonexistent
+  // `chdirSync` import from `node:fs` survived review and crash-looped two
+  // monitors (fixed in #14527). This config + scripts/typecheck-scripts.mjs close
+  // that gap. The lane is a shrink-only ratchet: pre-existing errors live in
+  // scripts/typecheck-baseline.json; any NEW error fails the lane.
+  //
+  // Compiler choices:
+  // - nodenext: matches plain-Node ESM resolution for the .mjs tree, so missing
+  //   extensions / bad named imports are caught the way Node would fail.
+  // - strict:false: strict on the legacy .mjs tree yields ~1900 implicit-any
+  //   noise errors that would swamp the baseline. The incident class (TS2305
+  //   bad named import, TS2307 missing module, TS2304 unknown name, TS2339
+  //   unknown property) is reported regardless of strict mode.
+  // - typeRoots: @types/node is already a pinned devDependency of @jovie/web,
+  //   installed at apps/web/node_modules/@types by every workspace install.
+  //   Pointing there avoids adding a root devDependency + lockfile churn. If
+  //   @jovie/web ever drops @types/node this fails loudly (TS2688) — re-point
+  //   typeRoots or promote @types/node to the root package.
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "allowImportingTsExtensions": true,
+    "allowJs": true,
+    "checkJs": true,
+    "strict": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": ["node"],
+    "typeRoots": ["../apps/web/node_modules/@types"]
+  },
+  "include": ["**/*.mjs", "**/*.mts", "**/*.ts"],
+  "exclude": ["node_modules", "__pycache__", "**/node_modules"]
+}
