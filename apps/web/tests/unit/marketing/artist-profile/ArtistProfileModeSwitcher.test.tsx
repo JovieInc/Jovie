@@ -1,6 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArtistProfileModeSwitcher } from '@/components/marketing/artist-profile/ArtistProfileModeSwitcher';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 
@@ -10,61 +9,35 @@ vi.mock('@/lib/hooks/useReducedMotion', () => ({
   useReducedMotion: () => reducedMotionMock.value,
 }));
 
-vi.mock('motion/react', () => ({
-  AnimatePresence: ({ children }: { children: ReactNode }) => <>{children}</>,
-  motion: {
-    div: ({
-      animate: _animate,
-      children,
-      initial: _initial,
-      transition: _transition,
-      ...props
-    }: HTMLAttributes<HTMLDivElement> & {
-      animate?: unknown;
-      initial?: unknown;
-      transition?: unknown;
-      children?: ReactNode;
-    }) => <div {...props}>{children}</div>,
-    p: ({
-      animate: _animate,
-      children,
-      exit: _exit,
-      initial: _initial,
-      transition: _transition,
-      ...props
-    }: HTMLAttributes<HTMLParagraphElement> & {
-      animate?: unknown;
-      exit?: unknown;
-      initial?: unknown;
-      transition?: unknown;
-      children?: ReactNode;
-    }) => <p {...props}>{children}</p>,
-  },
-}));
+let intersectionCallback: IntersectionObserverCallback | undefined;
+const observeMock = vi.fn();
+const disconnectMock = vi.fn();
 
-vi.mock('next/image', () => ({
-  default: ({
-    alt,
-    fill: _fill,
-    priority: _priority,
-    ...props
-  }: ImgHTMLAttributes<HTMLImageElement> & {
-    fill?: boolean;
-    priority?: boolean;
-  }) => <img alt={alt} {...props} />,
-}));
+class IntersectionObserverMock {
+  readonly root = null;
+  readonly rootMargin = '0px';
+  readonly thresholds = [0.35];
 
-function renderSwitcher() {
-  return render(
-    <ArtistProfileModeSwitcher
-      adaptive={ARTIST_PROFILE_COPY.adaptive}
-      phoneCaption={ARTIST_PROFILE_COPY.hero.phoneCaption}
-      phoneSubcaption={ARTIST_PROFILE_COPY.hero.phoneSubcaption}
-    />
-  );
+  constructor(callback: IntersectionObserverCallback) {
+    intersectionCallback = callback;
+  }
+
+  observe = observeMock;
+  unobserve = vi.fn();
+  disconnect = disconnectMock;
+  takeRecords = () => [];
 }
 
-function expectSelectedMode(name: string) {
+function triggerIntersection(isIntersecting: boolean) {
+  act(() => {
+    intersectionCallback?.(
+      [{ isIntersecting } as IntersectionObserverEntry],
+      {} as IntersectionObserver
+    );
+  });
+}
+
+function expectSelectedTab(name: string) {
   expect(screen.getByRole('tab', { name })).toHaveAttribute(
     'aria-selected',
     'true'
@@ -72,87 +45,150 @@ function expectSelectedMode(name: string) {
 }
 
 describe('ArtistProfileModeSwitcher', () => {
-  afterEach(() => {
+  beforeEach(() => {
+    vi.useFakeTimers();
     reducedMotionMock.value = false;
+    intersectionCallback = undefined;
+    observeMock.mockClear();
+    disconnectMock.mockClear();
+    vi.stubGlobal('IntersectionObserver', IntersectionObserverMock);
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
-  it('keeps the accessible two-stage release-to-tour cadence in the scheduled mode IDs', () => {
-    vi.useFakeTimers();
-    const { container } = renderSwitcher();
-
-    expect(
-      screen.getByRole('tablist', { name: 'Profile Modes' })
-    ).toBeInTheDocument();
-    expect(screen.getAllByRole('tab')).toHaveLength(4);
-
-    const activeSlot = container.querySelector(
-      '.artist-profile-mode-switcher-active'
+  it('keeps the accessible two-stage release-to-tour cadence in the scheduled mode IDs after the section intersects', () => {
+    render(
+      <ArtistProfileModeSwitcher adaptive={ARTIST_PROFILE_COPY.adaptive} />
     );
-    expect(activeSlot).toHaveClass('min-h-[2.4rem]');
 
-    act(() => {
-      vi.advanceTimersByTime(220);
-    });
-    expectSelectedMode('Upcoming Release');
+    expect(observeMock).toHaveBeenCalledTimes(1);
+    expectSelectedTab('Upcoming Release');
 
-    act(() => {
-      vi.advanceTimersByTime(1100);
-    });
-    expectSelectedMode('Touring');
+    triggerIntersection(false);
+    act(() => vi.advanceTimersByTime(1500));
+    expectSelectedTab('Upcoming Release');
 
-    act(() => {
-      vi.advanceTimersByTime(5000);
-    });
-    expectSelectedMode('Touring');
-    expect(
-      container.querySelector('.artist-profile-mode-switcher-active')
-    ).toBe(activeSlot);
+    triggerIntersection(true);
+    act(() => vi.advanceTimersByTime(220));
+    expectSelectedTab('Upcoming Release');
+
+    act(() => vi.advanceTimersByTime(1100));
+    expectSelectedTab('Touring');
+
+    act(() => vi.advanceTimersByTime(5000));
+    expectSelectedTab('Touring');
+    expect(disconnectMock).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps a manual accessible selection after cancelling the scheduled cadence', () => {
-    vi.useFakeTimers();
-    renderSwitcher();
+  it('lets a manual choice cancel the automatic sequence', () => {
+    render(
+      <ArtistProfileModeSwitcher adaptive={ARTIST_PROFILE_COPY.adaptive} />
+    );
 
-    act(() => {
-      vi.advanceTimersByTime(220);
+    triggerIntersection(true);
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Live Support' }), {
+      button: 0,
+      ctrlKey: false,
     });
-    const upcomingReleaseTab = screen.getByRole('tab', {
-      name: 'Upcoming Release',
-    });
-    upcomingReleaseTab.focus();
-    fireEvent.keyDown(upcomingReleaseTab, { key: 'ArrowRight' });
-    act(() => {
-      vi.advanceTimersByTime(0);
-    });
-    expectSelectedMode('Release Day');
+    expectSelectedTab('Live Support');
 
-    act(() => {
-      vi.advanceTimersByTime(5000);
-    });
-    expectSelectedMode('Release Day');
+    act(() => vi.advanceTimersByTime(3000));
+    expectSelectedTab('Live Support');
   });
 
-  it('does not auto-select a mode for reduced motion while retaining tab controls', () => {
-    reducedMotionMock.value = true;
-    vi.useFakeTimers();
-    renderSwitcher();
+  it('keeps all four accessible modes in one reserved panel slot', () => {
+    render(
+      <ArtistProfileModeSwitcher adaptive={ARTIST_PROFILE_COPY.adaptive} />
+    );
 
-    act(() => {
-      vi.advanceTimersByTime(5000);
-    });
-    for (const tab of screen.getAllByRole('tab')) {
-      expect(tab).toHaveAttribute('aria-selected', 'false');
+    const panelSlot = screen.getByRole('tabpanel').parentElement;
+    expect(panelSlot).toHaveClass('min-h-28');
+
+    for (const mode of ARTIST_PROFILE_COPY.adaptive.modes) {
+      fireEvent.mouseDown(screen.getByRole('tab', { name: mode.label }), {
+        button: 0,
+        ctrlKey: false,
+      });
+      expectSelectedTab(mode.label);
+      expect(screen.getByRole('tabpanel').parentElement).toBe(panelSlot);
     }
+  });
 
-    const upcomingReleaseTab = screen.getByRole('tab', {
-      name: 'Upcoming Release',
+  it('stops automatic selection when keyboard focus enters the tabs', () => {
+    render(
+      <ArtistProfileModeSwitcher adaptive={ARTIST_PROFILE_COPY.adaptive} />
+    );
+
+    triggerIntersection(true);
+    fireEvent.focus(screen.getByRole('tab', { name: 'Upcoming Release' }));
+    act(() => vi.advanceTimersByTime(3000));
+
+    expectSelectedTab('Upcoming Release');
+  });
+
+  it('does not autoplay when reduced motion is requested', () => {
+    reducedMotionMock.value = true;
+    render(
+      <ArtistProfileModeSwitcher adaptive={ARTIST_PROFILE_COPY.adaptive} />
+    );
+
+    triggerIntersection(true);
+    act(() => vi.advanceTimersByTime(3000));
+
+    expectSelectedTab('Upcoming Release');
+  });
+
+  it('keeps compact consumers descriptive and interactive', () => {
+    render(
+      <ArtistProfileModeSwitcher
+        adaptive={ARTIST_PROFILE_COPY.adaptive}
+        phoneCaption='One profile.'
+        phoneSubcaption='Adapts to every fan.'
+        showIntroHeading={false}
+      />
+    );
+
+    expect(
+      screen.getByText('One profile. Adapts to every fan.')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', {
+        name: ARTIST_PROFILE_COPY.adaptive.headline,
+      })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('img', {
+        name: ARTIST_PROFILE_COPY.adaptive.modes[0].screenshotAlt,
+      })
+    ).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Release Day' }), {
+      button: 0,
+      ctrlKey: false,
     });
-    upcomingReleaseTab.focus();
-    fireEvent.keyDown(upcomingReleaseTab, { key: 'ArrowRight' });
-    act(() => {
-      vi.advanceTimersByTime(0);
-    });
-    expectSelectedMode('Release Day');
+    expectSelectedTab('Release Day');
+    expect(
+      screen.getByRole('img', {
+        name: ARTIST_PROFILE_COPY.adaptive.modes[1].screenshotAlt,
+      })
+    ).toBeInTheDocument();
+  });
+
+  it('disconnects its observer and clears scheduled work on unmount', () => {
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+    const { unmount } = render(
+      <ArtistProfileModeSwitcher adaptive={ARTIST_PROFILE_COPY.adaptive} />
+    );
+
+    triggerIntersection(true);
+    unmount();
+
+    expect(disconnectMock).toHaveBeenCalled();
+    expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+    clearTimeoutSpy.mockRestore();
   });
 });
