@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-07-20T23:53:45.686Z",
-  "totalErrors": 198,
+  "generatedAt": "2026-07-21T02:49:23.022Z",
+  "totalErrors": 197,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -45,9 +45,6 @@
     "scripts/generated-artifact-retention.test.mjs": {
       "TS2339": 1,
       "TS2362": 1
-    },
-    "scripts/github-transition-issue.mjs": {
-      "TS2353": 1
     },
     "scripts/hermes/jobs/agent-config-health.ts": {
       "TS1470": 1
