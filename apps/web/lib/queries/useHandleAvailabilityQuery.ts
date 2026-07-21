@@ -6,10 +6,15 @@ import { queryKeys } from './keys';
 
 /**
  * Response from the handle availability check API.
+ * Mirrors the canonical `HandleAvailabilityResult` contract fields used by UI.
  */
 export interface HandleAvailabilityResponse {
   available: boolean;
+  handle?: string;
+  reason?: string;
   error?: string;
+  /** Explicit alternatives when taken — never silent renames. */
+  suggestedAlternatives?: readonly string[];
 }
 
 /**

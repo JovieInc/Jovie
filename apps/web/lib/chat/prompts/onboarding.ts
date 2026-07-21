@@ -9,8 +9,24 @@ import { buildOnboardingPromptSecuritySection } from '@/lib/chat/prompt-disclosu
 /** Shared opener / waitlist receipts — imported by the script bank to avoid copy drift. */
 export const ONBOARDING_OPENER_PRIMARY =
   "Hey — I'm Jovie. Early access is limited — some artists waitlist first. I'll remember this chat if you sign up. What are you working on?";
+/** Waitlist receipt without promising email (no contact address confirmed yet). */
 export const ONBOARDING_WAITLIST_RECEIPT =
+  'On the early list. Return here or /start to resume when a spot opens.';
+/** Waitlist receipt only when a concrete email is known. */
+export const ONBOARDING_WAITLIST_RECEIPT_WITH_EMAIL =
   "On the early list. We'll email when a spot opens — return here or /start to resume.";
+
+/**
+ * Choose waitlist receipt copy. Email promise is gated on a known contact.
+ */
+export function waitlistReceiptForEmail(
+  email: string | null | undefined
+): string {
+  const trimmed = email?.trim();
+  return trimmed
+    ? ONBOARDING_WAITLIST_RECEIPT_WITH_EMAIL
+    : ONBOARDING_WAITLIST_RECEIPT;
+}
 
 export const ONBOARDING_CALIBRATION_EXAMPLES = {
   opener: ONBOARDING_OPENER_PRIMARY,

@@ -1,20 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockEnforceHandleCheckRateLimit = vi.hoisted(() => vi.fn());
 const mockExtractClientIP = vi.hoisted(() => vi.fn());
 const mockGetCachedHandleAvailability = vi.hoisted(() => vi.fn());
 const mockCacheHandleAvailability = vi.hoisted(() => vi.fn());
-
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: mockDbSelect,
-  },
-}));
-
-vi.mock('@/lib/db/schema', () => ({
-  creatorProfiles: {},
-}));
+const mockCheckOnboardingHandleAvailability = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/onboarding/rate-limit', () => ({
   enforceHandleCheckRateLimit: mockEnforceHandleCheckRateLimit,
@@ -27,6 +17,10 @@ vi.mock('@/lib/utils/ip-extraction', () => ({
 vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
   getCachedHandleAvailability: mockGetCachedHandleAvailability,
   cacheHandleAvailability: mockCacheHandleAvailability,
+}));
+
+vi.mock('@/lib/onboarding/reserved-handle', () => ({
+  checkOnboardingHandleAvailability: mockCheckOnboardingHandleAvailability,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -46,6 +40,11 @@ describe('GET /api/handle/check', () => {
     mockEnforceHandleCheckRateLimit.mockResolvedValue(undefined);
     mockGetCachedHandleAvailability.mockResolvedValue(null);
     mockCacheHandleAvailability.mockResolvedValue(undefined);
+    mockCheckOnboardingHandleAvailability.mockResolvedValue({
+      handle: 'available-handle',
+      available: true,
+      reason: 'available',
+    });
   });
 
   it('returns 400 when handle is missing', async () => {
@@ -58,9 +57,17 @@ describe('GET /api/handle/check', () => {
     expect(response.status).toBe(400);
     expect(data.available).toBe(false);
     expect(data.error).toBe('Handle is required');
+    expect(mockCheckOnboardingHandleAvailability).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when handle is too short', async () => {
+  it('returns 400 when handle is too short via canonical helper', async () => {
+    mockCheckOnboardingHandleAvailability.mockResolvedValue({
+      handle: 'ab',
+      available: false,
+      reason: 'invalid_format',
+      error: 'Username must be at least 3 characters',
+    });
+
     const { GET } = await import('@/app/api/handle/check/route');
     const request = new Request('http://localhost/api/handle/check?handle=ab');
 
@@ -72,10 +79,16 @@ describe('GET /api/handle/check', () => {
     expect(data.error).toContain('at least 3');
   });
 
-  it('returns 400 when handle is too long', async () => {
-    const { GET } = await import('@/app/api/handle/check/route');
-    // USERNAME_MAX_LENGTH is 30 in the canonical validator; 31 is rejected
+  it('returns 400 when handle is too long via canonical helper', async () => {
     const longHandle = 'a'.repeat(31);
+    mockCheckOnboardingHandleAvailability.mockResolvedValue({
+      handle: longHandle,
+      available: false,
+      reason: 'invalid_format',
+      error: 'Username must be no more than 30 characters',
+    });
+
+    const { GET } = await import('@/app/api/handle/check/route');
     const request = new Request(
       `http://localhost/api/handle/check?handle=${longHandle}`
     );
@@ -88,7 +101,15 @@ describe('GET /api/handle/check', () => {
     expect(data.error).toContain('no more than 30');
   });
 
-  it('returns 400 when handle has invalid characters', async () => {
+  it('returns 400 when handle has invalid characters via canonical helper', async () => {
+    mockCheckOnboardingHandleAvailability.mockResolvedValue({
+      handle: 'test@user',
+      available: false,
+      reason: 'invalid_format',
+      error:
+        'Username can only contain letters, numbers, hyphens, underscores, and dots',
+    });
+
     const { GET } = await import('@/app/api/handle/check/route');
     const request = new Request(
       'http://localhost/api/handle/check?handle=test%40user'
@@ -99,18 +120,14 @@ describe('GET /api/handle/check', () => {
 
     expect(response.status).toBe(400);
     expect(data.available).toBe(false);
-    // Canonical error message now aligns with the onboarding form validator:
-    // letters, numbers, hyphens, underscores, and dots are accepted.
     expect(data.error).toContain('letters, numbers');
   });
 
-  it('accepts dotted handles like real.name and delegates to DB lookup', async () => {
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
+  it('accepts dotted handles and returns available true', async () => {
+    mockCheckOnboardingHandleAvailability.mockResolvedValue({
+      handle: 'real.name',
+      available: true,
+      reason: 'available',
     });
 
     const { GET } = await import('@/app/api/handle/check/route');
@@ -121,20 +138,16 @@ describe('GET /api/handle/check', () => {
     const response = await GET(request);
     const data = await response.json();
 
-    // Pre-fix this returned 400 "letters, numbers, and hyphens" even though the
-    // onboarding form (and completeOnboarding) happily accept real.name.
     expect(response.status).toBe(200);
     expect(data.available).toBe(true);
     expect(mockCacheHandleAvailability).toHaveBeenCalledWith('real.name', true);
   });
 
-  it('accepts underscored handles like real_name and delegates to DB lookup', async () => {
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
+  it('accepts underscored handles and returns available true', async () => {
+    mockCheckOnboardingHandleAvailability.mockResolvedValue({
+      handle: 'real_name',
+      available: true,
+      reason: 'available',
     });
 
     const { GET } = await import('@/app/api/handle/check/route');
@@ -150,7 +163,15 @@ describe('GET /api/handle/check', () => {
     expect(mockCacheHandleAvailability).toHaveBeenCalledWith('real_name', true);
   });
 
-  it('rejects reserved handles before hitting the database', async () => {
+  it('rejects reserved handles before DB via canonical helper', async () => {
+    mockCheckOnboardingHandleAvailability.mockResolvedValue({
+      handle: 'admin',
+      available: false,
+      reason: 'reserved',
+      error: 'This handle is reserved',
+      suggestedAlternatives: ['admin1', 'admin2', 'admin3'],
+    });
+
     const { GET } = await import('@/app/api/handle/check/route');
     const request = new Request(
       'http://localhost/api/handle/check?handle=admin'
@@ -161,11 +182,11 @@ describe('GET /api/handle/check', () => {
 
     expect(response.status).toBe(400);
     expect(data.available).toBe(false);
-    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(data.suggestedAlternatives).toEqual(['admin1', 'admin2', 'admin3']);
   });
 
-  it('uses cached availability when present', async () => {
-    mockGetCachedHandleAvailability.mockResolvedValue(true);
+  it('uses cached availability when present and still surfaces alternatives when taken', async () => {
+    mockGetCachedHandleAvailability.mockResolvedValue(false);
 
     const { GET } = await import('@/app/api/handle/check/route');
     const request = new Request(
@@ -176,17 +197,16 @@ describe('GET /api/handle/check', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.available).toBe(true);
-    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(data.available).toBe(false);
+    expect(data.suggestedAlternatives?.[0]).toMatch(/^cachedhandle\d+$/);
+    expect(mockCheckOnboardingHandleAvailability).not.toHaveBeenCalled();
   });
 
   it('returns available true when handle is not taken', async () => {
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
+    mockCheckOnboardingHandleAvailability.mockResolvedValue({
+      handle: 'available-handle',
+      available: true,
+      reason: 'available',
     });
 
     const { GET } = await import('@/app/api/handle/check/route');
@@ -199,19 +219,19 @@ describe('GET /api/handle/check', () => {
 
     expect(response.status).toBe(200);
     expect(data.available).toBe(true);
+    expect(data.suggestedAlternatives).toBeUndefined();
     expect(mockCacheHandleAvailability).toHaveBeenCalledWith(
       'available-handle',
       true
     );
   });
 
-  it('returns available false when handle is taken', async () => {
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ username: 'takenhandle' }]),
-        }),
-      }),
+  it('returns available false with suggestedAlternatives when taken', async () => {
+    mockCheckOnboardingHandleAvailability.mockResolvedValue({
+      handle: 'takenhandle',
+      available: false,
+      reason: 'taken',
+      suggestedAlternatives: ['takenhandle1', 'takenhandle2', 'takenhandle3'],
     });
 
     const { GET } = await import('@/app/api/handle/check/route');
@@ -224,6 +244,16 @@ describe('GET /api/handle/check', () => {
 
     expect(response.status).toBe(200);
     expect(data.available).toBe(false);
+    expect(data.reason).toBe('taken');
+    expect(data.suggestedAlternatives).toEqual([
+      'takenhandle1',
+      'takenhandle2',
+      'takenhandle3',
+    ]);
+    expect(mockCacheHandleAvailability).toHaveBeenCalledWith(
+      'takenhandle',
+      false
+    );
   });
 
   it('returns 429 when rate limited', async () => {

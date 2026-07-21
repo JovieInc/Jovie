@@ -27,6 +27,7 @@ import {
   SUGGESTED_AVAILABLE_HANDLE_LABEL,
   toHandleAvailabilityResult,
 } from '@/lib/onboarding/handle-availability';
+import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useHandleAvailabilityQuery } from '@/lib/queries/useHandleAvailabilityQuery';
 import { cn } from '@/lib/utils';
@@ -636,6 +637,7 @@ export function OnboardingHandleCheckCard({
     handle: normalizedDraft || handle || '',
     available: loading ? null : (availabilityQuery.data?.available ?? null),
     error: availabilityQuery.data?.error,
+    suggestedAlternatives: availabilityQuery.data?.suggestedAlternatives,
     checking: loading,
   });
   const available =
@@ -783,10 +785,19 @@ export function OnboardingSocialLinkCard({
   }
 
   const trimmed = draftUrl.trim();
-  const host = hostnameFor(trimmed || undefined);
+  const parsed = parseSocialLinkInput(trimmed);
+  const attachableUrl = parsed.ok ? parsed.url : null;
+  const host = attachableUrl
+    ? hostnameFor(attachableUrl)
+    : hostnameFor(trimmed || undefined);
+  const parseHint =
+    !trimmed || parsed.ok
+      ? null
+      : parsed.reason === 'missing_account_path'
+        ? 'Add the account path (e.g. instagram.com/yourname).'
+        : 'Paste a full profile URL with the account path.';
   const canAttach =
-    Boolean(trimmed) &&
-    Boolean(host) &&
+    Boolean(attachableUrl) &&
     !disabled &&
     !attached &&
     Boolean(onAttachAccount);
@@ -806,7 +817,9 @@ export function OnboardingSocialLinkCard({
         </span>
         <div className='min-w-0 flex-1'>
           <p className='text-sm font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
-            {host ? 'Link ready to attach' : 'Attach a public social account'}
+            {attachableUrl
+              ? 'Link ready to attach'
+              : 'Attach a public social account'}
           </p>
           <label className='mt-2 flex h-9 items-center rounded-lg border border-subtle bg-surface-0 px-2.5 focus-within:border-white/[0.16] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.035)]'>
             <span className='sr-only'>Social Profile URL</span>
@@ -823,7 +836,7 @@ export function OnboardingSocialLinkCard({
             />
           </label>
           <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
-            {host ?? 'Paste the full URL fans already use.'}
+            {parseHint ?? host ?? 'Paste the full URL fans already use.'}
           </p>
           {onAttachAccount ? (
             <Button
@@ -831,9 +844,9 @@ export function OnboardingSocialLinkCard({
               data-testid='onboarding-attach-account'
               disabled={!canAttach}
               onClick={() => {
-                if (!canAttach || !trimmed) return;
+                if (!canAttach || !attachableUrl) return;
                 setAttached(true);
-                onAttachAccount(trimmed);
+                onAttachAccount(attachableUrl);
               }}
               className={cn(
                 'mt-3 h-9 rounded-full px-3.5 text-app font-semibold',

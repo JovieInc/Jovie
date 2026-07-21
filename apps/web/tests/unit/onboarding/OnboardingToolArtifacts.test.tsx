@@ -304,9 +304,30 @@ describe('onboarding tool artifacts', () => {
     ).toBeDefined();
     expect(screen.queryByText('proposeSocialLink')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Attach Account' }));
+    // Canonical parse normalizes to full Instagram profile URL with path.
     expect(onAttachAccount).toHaveBeenCalledWith(
-      'https://instagram.com/testartist'
+      'https://www.instagram.com/testartist/'
     );
+  });
+
+  it('disables Attach Account for bare instagram.com host without path', () => {
+    const onAttachAccount = vi.fn();
+    fastRender(
+      <OnboardingSocialLinkCard
+        state='output-available'
+        output={{
+          action: 'propose_social_link',
+          url: 'https://instagram.com',
+        }}
+        onAttachAccount={onAttachAccount}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: 'Attach Account' });
+    expect(button).toHaveProperty('disabled', true);
+    fireEvent.click(button);
+    expect(onAttachAccount).not.toHaveBeenCalled();
+    expect(screen.getByText(/Add the account path/i)).toBeDefined();
   });
 
   it('offers None of These when artist results are present', () => {
