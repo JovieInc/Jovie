@@ -297,7 +297,7 @@ export function AdminFeedbackTable({
 
   return (
     <div className='flex h-full min-h-155 overflow-hidden'>
-      <div className='h-full w-full border-r border-subtle bg-(--linear-app-content-surface) lg:w-[58%]'>
+      <div className='h-full w-full border-r border-subtle bg-(--app-shell-content-surface) lg:w-[58%]'>
         <AdminTableHeader
           title='Feedback'
           subtitle='Triage product feedback and close the loop with clear status.'

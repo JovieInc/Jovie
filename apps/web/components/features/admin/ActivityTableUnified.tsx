@@ -129,7 +129,7 @@ const ACTIVITY_SUBHEADER = (
 );
 
 const ACTIVITY_CONTAINER_CLASSNAME =
-  'h-full border-0 bg-(--linear-app-content-surface)';
+  'h-full border-0 bg-(--app-shell-content-surface)';
 
 export function ActivityTableUnified({
   items,

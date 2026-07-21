@@ -51,7 +51,7 @@ export function AdminTableSubheader({
       className={cn(
         hasToolbar
           ? 'bg-surface-1'
-          : 'border-b border-(--linear-app-frame-seam) bg-surface-1 px-app-header py-1',
+          : 'border-b border-(--app-shell-frame-seam) bg-surface-1 px-app-header py-1',
         className
       )}
     >

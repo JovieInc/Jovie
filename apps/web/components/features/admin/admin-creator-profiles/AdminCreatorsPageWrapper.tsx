@@ -52,7 +52,7 @@ export function AdminCreatorsPageWrapper(
         <IngestProfileDropdown onIngestPending={handleIngestPending} />
 
         <div
-          className='h-5 w-px bg-(--linear-app-frame-seam)'
+          className='h-5 w-px bg-(--app-shell-frame-seam)'
           aria-hidden='true'
         />
 

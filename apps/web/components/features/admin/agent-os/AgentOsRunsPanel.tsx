@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
+import { Badge } from '@jovie/ui';
 import {
   Popover,
   PopoverContent,
@@ -114,21 +114,19 @@ function AgentRunDetailPopover({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button
+        <button
           type='button'
-          variant='ghost'
-          size='icon'
           aria-label={`Inspect ${artifact.title}`}
-          className='h-auto w-auto rounded-md p-1 text-tertiary-token opacity-70 transition-colors hover:bg-surface-1 hover:text-primary-token hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+          className='rounded-md p-1 text-tertiary-token opacity-70 transition-colors hover:bg-surface-1 hover:text-primary-token hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
         >
           <Info className='size-3.5' aria-hidden='true' />
-        </Button>
+        </button>
       </PopoverTrigger>
       <PopoverContent
         align='end'
         side='top'
         sideOffset={6}
-        className='w-85 rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-3 shadow-popover'
+        className='w-85 rounded-xl border border-(--app-shell-frame-seam) bg-surface-1 p-3 shadow-popover'
       >
         <div className='space-y-3'>
           <div className='min-w-0'>
@@ -214,13 +212,12 @@ function AgentOsBoardCard({
       )}
     >
       <div className='flex min-w-0 items-start justify-between gap-2'>
-        <Button
+        <button
           type='button'
-          variant='ghost'
           onClick={() => onSelect(artifact)}
           aria-label={artifact.title}
           aria-pressed={isSelected}
-          className='min-w-0 h-auto flex-1 justify-start rounded-md text-left hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
+          className='min-w-0 flex-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
         >
           <p className='line-clamp-2 text-app font-[560] leading-5 text-primary-token'>
             {artifact.title}
@@ -238,7 +235,7 @@ function AgentOsBoardCard({
               {formatGateProgressLabel(artifact)}
             </p>
           </div>
-        </Button>
+        </button>
         <div className='flex shrink-0 items-center gap-1'>
           <AgentRunDetailPopover artifact={artifact} />
         </div>
@@ -289,24 +286,22 @@ function AgentOsBoard({
               <p className='text-xs font-[560] text-primary-token'>
                 {RUN_STATUS_LABEL[status]}
               </p>
-              <Button
+              <button
                 type='button'
-                variant='ghost'
-                size='sm'
                 onClick={() =>
                   onStatusFilterChange(statusFilter === status ? null : status)
                 }
                 aria-pressed={statusFilter === status}
                 aria-label={`Filter by ${RUN_STATUS_LABEL[status]} (${laneRows.length})`}
                 className={cn(
-                  'h-auto rounded px-1 text-2xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                  'rounded px-1 text-2xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
                   statusFilter === status
                     ? 'bg-surface-0 font-[560] text-primary-token'
                     : 'text-tertiary-token hover:bg-surface-0 hover:text-secondary-token'
                 )}
               >
                 {laneRows.length}
-              </Button>
+              </button>
             </div>
             {laneRows.length > 0 ? (
               laneRows.map(artifact => (
@@ -439,10 +434,8 @@ function ViewModeButton({
   const isActive = mode === activeMode;
 
   return (
-    <Button
+    <button
       type='button'
-      variant='ghost'
-      size='sm'
       onClick={() => onSelect(mode)}
       aria-pressed={isActive}
       className={cn(
@@ -454,7 +447,7 @@ function ViewModeButton({
     >
       {icon}
       {label}
-    </Button>
+    </button>
   );
 }
 
@@ -560,7 +553,7 @@ export function AgentOsRunsPanel({
               onStatusFilterChange={setStatusFilter}
             />
           ) : (
-            <div className='min-w-0 rounded-lg border border-subtle bg-(--linear-app-content-surface)'>
+            <div className='min-w-0 rounded-lg border border-subtle bg-(--app-shell-content-surface)'>
               <AdminDataTable
                 data={rows}
                 columns={columns}
