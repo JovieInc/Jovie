@@ -4,7 +4,10 @@ import { upload } from '@vercel/blob/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+  AUDIO_FILE_ACCEPT,
   AUDIO_MAX_FILE_SIZE_BYTES,
+  canonicalizeAudioFileForUpload,
+  getCanonicalAudioMimeType,
   isSupportedAudioFile,
 } from '@/lib/audio/constants';
 import {
@@ -34,16 +37,7 @@ const ACCEPTED_TYPES = [
   'image/heif',
   'image/gif',
   'image/tiff',
-  'audio/aac',
-  'audio/aiff',
-  'audio/flac',
-  'audio/mp4',
-  'audio/mpeg',
-  'audio/wav',
-  'audio/x-aiff',
-  'audio/x-flac',
-  'audio/x-m4a',
-  'audio/x-wav',
+  AUDIO_FILE_ACCEPT,
   'video/mp4',
   'video/quicktime',
   'video/webm',
@@ -236,9 +230,8 @@ function shouldSkipZipEntry(name: string): boolean {
 }
 
 function guessMimeFromExtension(ext: string): string {
-  if (['wav', 'aiff', 'flac', 'mp3', 'aac', 'm4a'].includes(ext)) {
-    return `audio/${ext === 'mp3' ? 'mpeg' : ext}`;
-  }
+  const audioMimeType = getCanonicalAudioMimeType(`file.${ext}`);
+  if (audioMimeType) return audioMimeType;
   if (['mp4', 'mov', 'webm', 'avi'].includes(ext)) {
     return `video/${ext === 'mov' ? 'quicktime' : ext}`;
   }
@@ -352,7 +345,8 @@ async function uploadAudioAttachment(
 ): Promise<void> {
   updateFile(id, { status: 'uploading', progress: 0 });
   try {
-    const blob = await upload(file.name, file, {
+    const uploadFile = canonicalizeAudioFileForUpload(file);
+    const blob = await upload(uploadFile.name, uploadFile, {
       access: 'public',
       handleUploadUrl: '/api/library/audio/upload-token',
     });
@@ -362,9 +356,9 @@ async function uploadAudioAttachment(
       body: JSON.stringify({
         blobUrl: blob.url,
         blobPathname: blob.pathname,
-        fileName: file.name,
-        fileMimeType: file.type,
-        fileSizeBytes: file.size,
+        fileName: uploadFile.name,
+        fileMimeType: uploadFile.type,
+        fileSizeBytes: uploadFile.size,
       }),
     });
     const body = (await response.json().catch(() => ({}))) as {

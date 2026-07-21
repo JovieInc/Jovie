@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import {
-  SUPPORTED_AUDIO_MIME_TYPES_SET,
+  isSupportedAudioMimeType,
   validateAudioFile,
 } from '@/lib/audio/constants';
 import { createSmartLinkContentTag } from '@/lib/cache/tags';
@@ -216,7 +216,7 @@ export async function routeChatAudioUpload(
     throw new Error(validationError);
   }
 
-  if (!SUPPORTED_AUDIO_MIME_TYPES_SET.has(input.fileMimeType)) {
+  if (!isSupportedAudioMimeType(input.fileMimeType)) {
     throw new Error('Unsupported audio file type');
   }
 

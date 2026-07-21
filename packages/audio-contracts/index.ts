@@ -233,6 +233,12 @@ export function getCanonicalAudioMimeType(fileName: string): string | null {
   return getAudioFormatByFileName(fileName)?.canonicalMimeType ?? null;
 }
 
+export function getCanonicalAudioUploadMimeType(
+  file: AudioFileDescriptor
+): string | null {
+  return getAudioFormat(file)?.canonicalMimeType ?? null;
+}
+
 export function getAudioFormatLabel(mimeType: string): string {
   return getAudioFormatByMimeType(mimeType)?.label ?? 'Audio';
 }

@@ -8,8 +8,8 @@
 import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  ALLOWED_AUDIO_MIME_TYPES,
-  AUDIO_MAX_FILE_SIZE_BYTES,
+  AUDIO_UPLOAD_POLICIES,
+  SUPPORTED_AUDIO_MIME_TYPES,
 } from '@/lib/audio/constants';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
         }
 
         return {
-          allowedContentTypes: [...ALLOWED_AUDIO_MIME_TYPES],
-          maximumSizeInBytes: AUDIO_MAX_FILE_SIZE_BYTES,
+          allowedContentTypes: [...SUPPORTED_AUDIO_MIME_TYPES],
+          maximumSizeInBytes: AUDIO_UPLOAD_POLICIES.library.maxFileSizeBytes,
           tokenPayload: JSON.stringify({
             creatorProfileId: profile.id,
             userId: clerkUserId,

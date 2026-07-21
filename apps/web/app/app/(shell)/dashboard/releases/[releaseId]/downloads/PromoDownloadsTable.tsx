@@ -4,6 +4,7 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { Music, Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
+import { getAudioFormatLabel } from '@/lib/audio/constants';
 import { cn } from '@/lib/utils';
 
 export interface PromoDownloadFile {
@@ -23,15 +24,6 @@ export interface PromoDownloadsTableProps {
   readonly onDelete: (fileId: string) => void;
 }
 
-const FILE_TYPE_LABELS: Record<string, string> = {
-  'audio/mpeg': 'MP3',
-  'audio/wav': 'WAV',
-  'audio/flac': 'FLAC',
-  'audio/aiff': 'AIFF',
-  'audio/mp4': 'M4A',
-  'audio/x-m4a': 'M4A',
-};
-
 function formatFileSize(bytes: number | null): string {
   if (!bytes) return '';
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -39,7 +31,7 @@ function formatFileSize(bytes: number | null): string {
 }
 
 function formatExtension(mimeType: string): string {
-  return FILE_TYPE_LABELS[mimeType] ?? 'Audio';
+  return getAudioFormatLabel(mimeType);
 }
 
 function getFileMeta(file: PromoDownloadFile): string {

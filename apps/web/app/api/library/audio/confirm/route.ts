@@ -10,7 +10,7 @@ import { and, eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ALLOWED_AUDIO_MIME_TYPES } from '@/lib/audio/constants';
+import { isSupportedAudioMimeType } from '@/lib/audio/constants';
 import { resolvePrimaryRecordingForRelease } from '@/lib/audio/resolve-release-recording';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { releaseId, blobUrl, fileMimeType } = parsed.data;
-    if (!ALLOWED_AUDIO_MIME_TYPES.has(fileMimeType)) {
+    if (!isSupportedAudioMimeType(fileMimeType)) {
       return NextResponse.json(
         { error: 'Unsupported audio file type' },
         { status: 400, headers: NO_STORE_HEADERS }

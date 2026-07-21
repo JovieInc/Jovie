@@ -7,6 +7,7 @@
 
 import { APP_NAME } from '@/constants/app';
 import { BASE_URL } from '@/constants/domains';
+import { getAudioFormatLabel } from '@/lib/audio/constants';
 import { escapeHtml } from '../utils';
 
 export interface PromoDownloadFile {
@@ -36,15 +37,7 @@ function formatFileSize(bytes: number | null): string {
 }
 
 function formatExtension(mimeType: string): string {
-  const map: Record<string, string> = {
-    'audio/mpeg': 'MP3',
-    'audio/wav': 'WAV',
-    'audio/flac': 'FLAC',
-    'audio/aiff': 'AIFF',
-    'audio/mp4': 'M4A',
-    'audio/x-m4a': 'M4A',
-  };
-  return map[mimeType] ?? 'Audio';
+  return getAudioFormatLabel(mimeType);
 }
 
 export function getPromoDownloadThankYouSubject(

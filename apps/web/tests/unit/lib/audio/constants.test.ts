@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AUDIO_MAX_FILE_SIZE_BYTES,
+  canonicalizeAudioFileForUpload,
   isSupportedAudioFile,
   parseAudioTitleFromFileName,
   validateAudioFile,
@@ -50,5 +51,25 @@ describe('audio constants', () => {
     expect(parseAudioTitleFromFileName('Take_Me_Over-final.wav')).toBe(
       'Take Me Over final'
     );
+  });
+
+  it('canonicalizes missing and aliased MIME before upload', () => {
+    const missingMime = new File(['audio'], 'master.m4a', {
+      type: '',
+      lastModified: 123,
+    });
+    const canonical = canonicalizeAudioFileForUpload(missingMime);
+    expect(canonical).not.toBe(missingMime);
+    expect(canonical).toMatchObject({
+      name: 'master.m4a',
+      type: 'audio/mp4',
+      size: missingMime.size,
+      lastModified: 123,
+    });
+
+    const standardMime = new File(['audio'], 'track.mp3', {
+      type: 'audio/mpeg',
+    });
+    expect(canonicalizeAudioFileForUpload(standardMime)).toBe(standardMime);
   });
 });
