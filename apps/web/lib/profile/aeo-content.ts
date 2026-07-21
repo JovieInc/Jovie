@@ -258,7 +258,9 @@ function buildFacts(
 
 function getPlatformLabel(platform: string): string {
   const key = normalizePlatformKey(platform);
-  return (key ? getRegistryEntry(key)?.name : undefined) ?? platform;
+  return (
+    (key ? getRegistryEntry(key)?.name : undefined) ?? sentenceCase(platform)
+  );
 }
 
 function buildLinkSections(
