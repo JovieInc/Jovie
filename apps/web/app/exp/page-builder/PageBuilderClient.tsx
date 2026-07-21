@@ -13,7 +13,7 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
@@ -46,12 +46,12 @@ type StudioMode = 'pages' | 'sections' | 'product' | 'screenshots';
 
 /**
  * Default body composition. Mirrors a "complete" landing page so reviewers
- * see header → hero → trust → feature → testimonial → FAQ → CTA → footer
- * without configuring anything.
+ * see header → hero → feature → testimonial → FAQ → CTA → footer without
+ * configuring anything. No separate logo-bar section: `marketing-hero`
+ * already embeds the distributor logo-bar proof.
  */
 const DEFAULT_BODY: readonly string[] = [
   'marketing-hero',
-  'home-trust-default',
   'feature-card-grid-3up',
   'testimonial-card-3up',
   'faq-section-default',
@@ -93,7 +93,6 @@ export function PageBuilderClient({
 }: Readonly<{
   designV1Enabled: boolean;
 }>) {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const mode = designV1Enabled ? parseMode(searchParams.get('mode')) : 'pages';
@@ -116,9 +115,16 @@ export function PageBuilderClient({
         if (v === undefined) params.delete(k);
         else params.set(k, v);
       }
-      router.replace(`/exp/page-builder?${params.toString()}`);
+      // Native History API, not router.replace: updates `useSearchParams`
+      // without a server round-trip, so chrome toggles stay instant and the
+      // router never re-fetches the route or resets scroll position.
+      window.history.replaceState(
+        null,
+        '',
+        `/exp/page-builder?${params.toString()}`
+      );
     },
-    [router, searchParams]
+    [searchParams]
   );
 
   const setBody = useCallback(
@@ -153,6 +159,13 @@ export function PageBuilderClient({
 
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Mode switches swap the entire workspace, so a preserved mid-page scroll
+  // offset would land the reviewer in the middle of an unrelated view.
+  // Chrome toggles (header/footer/cta/body) keep scroll untouched.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [mode]);
+
   // Resolve body section variants. Skip ids that aren't in the registry
   // (e.g. typed manually into the URL) so the page always renders.
   const bodyVariants = useMemo(
@@ -169,7 +182,13 @@ export function PageBuilderClient({
   );
 
   return (
-    <div className='relative min-h-screen w-full overflow-x-hidden bg-(--linear-app-content-surface)'>
+    /*
+      `system-b-marketing dark` opts the route into document scrolling (the
+      app-shell global locks `body` to the viewport) and gives the composed
+      marketing sections their token/font context. `overflow-x-clip` (not
+      `-hidden`) avoids creating a scroll container that would break sticky.
+    */
+    <div className='page-builder-root system-b-marketing dark relative min-h-screen w-full overflow-x-clip bg-(--linear-app-content-surface)'>
       <Toolbar
         headerMode={headerMode}
         footerMode={footerMode}
@@ -188,10 +207,12 @@ export function PageBuilderClient({
 
       {mode === 'pages' ? (
         /*
-          The composed landing page. Padding-top = toolbar height so the
-          header always renders below the toolbar without overlap.
+          The composed landing page. `pt-14` clears exactly the toolbar
+          height; page-builder.css offsets the fixed marketing header by the
+          same amount, so header and content stack exactly like production
+          and toggling chrome never shifts layout.
         */
-        <div className='pt-16'>
+        <div className='page-builder-stage pt-14'>
           <MarketingHeader
             variant={headerMode === 'transparent' ? 'homepage' : 'landing'}
           />
@@ -255,12 +276,12 @@ function Toolbar({
   onOpenDrawer,
 }: ToolbarProps) {
   return (
-    <div className='fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-4 border-b border-white/10 bg-black/85 px-4 text-white dark:text-white shadow-lg backdrop-blur-md'>
+    <div className='page-builder-toolbar fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-4 overflow-x-auto border-b border-white/10 bg-black/85 px-4 text-white dark:text-white shadow-lg backdrop-blur-md'>
       <span
         className={
           designV1Enabled
-            ? 'text-xs font-semibold text-white/80'
-            : 'text-2xs font-semibold uppercase tracking-wider text-white/70'
+            ? 'shrink-0 whitespace-nowrap text-xs font-semibold text-white/80'
+            : 'shrink-0 whitespace-nowrap text-2xs font-semibold uppercase tracking-wider text-white/70'
         }
       >
         {designV1Enabled ? 'Design Studio' : 'Page Builder'}
@@ -704,7 +725,7 @@ function SectionDrawer({
 
   return (
     <div
-      className='fixed right-0 top-0 z-[60] flex h-screen w-full max-w-95 flex-col border-l border-white/10 bg-black dark:bg-black text-white dark:text-white shadow-2xl'
+      className='page-builder-drawer fixed right-0 top-0 flex h-screen w-full max-w-95 flex-col border-l border-white/10 bg-black dark:bg-black text-white dark:text-white shadow-2xl'
       role='dialog'
       aria-modal='true'
       aria-label='Body section composer'

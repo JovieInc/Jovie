@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { getAppFlagValue } from '@/lib/flags/server';
 import { PageBuilderClient } from './PageBuilderClient';
+import './page-builder.css';
 
 export const metadata: Metadata = {
   title: 'Page builder — Jovie',
