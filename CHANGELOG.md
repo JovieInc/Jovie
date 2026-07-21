@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Suggested DSP matches no longer flash a skeleton then collapse (JOV-4159):** when the Music drawer loads with no match suggestions (the common case), the section stays empty instead of flashing three skeleton rows and shifting sibling content.
 - **Entity mention hover cards now use the same rich entity card as the chat rail:** hovering an inline release, artist, track, or event mention opens the canonical compact EntityCard instead of a one-off popover layout.
 - **Chat tool activity is quieter and indented:** agent tool-call rows sit one rhythm step in from assistant prose with secondary color and book weight, so narrative stays primary and consecutive steps form a quiet run.
 - **Artist profiles now adapt to release, touring, and live-support moments:** one music-native link brings listening, tickets, support, fan capture, setup guidance, and product truth into a clearer responsive journey.
