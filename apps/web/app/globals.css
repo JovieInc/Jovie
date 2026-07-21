@@ -123,7 +123,6 @@ html[data-desktop-runtime="electron"] [data-shell-design="shellChatV1"]
 /* Marketing pages use document scrolling rather than app-shell scroll panes.
    Only override html — setting overflow-y:auto on body promotes overflow-x:clip
    to overflow-x:hidden, which creates a scroll container that breaks sticky. */
-html:has(.linear-marketing),
 html:has(.system-b-marketing),
 html:has(.home-viewport) {
   height: auto;
@@ -131,7 +130,6 @@ html:has(.home-viewport) {
   overflow-y: auto;
   overscroll-behavior: auto;
 }
-body:has(.linear-marketing),
 body:has(.system-b-marketing),
 body:has(.home-viewport) {
   height: auto;
