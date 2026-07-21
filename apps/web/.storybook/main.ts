@@ -9,8 +9,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const config: StorybookConfig = {
   stories: [
     '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
-    // packages/ui atoms — highest-reuse surface; must enter Chromatic/Storybook
-    // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
+    // packages/ui primitives (atoms, etc.) live outside apps/web; the glob is
+    // relative to this .storybook dir → repo-root packages/ui.
     '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
   ],
   addons: [
