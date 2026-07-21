@@ -309,7 +309,9 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   },
   {
     icon: 'Link2',
-    label: "What's Working For Me Right Now?",
+    // Shorter label avoids “What’s Working Fo…” truncation in the rail;
+    // full prompt remains available as the submitted text + pill title.
+    label: "What's Working Right Now?",
     prompt:
       "What's working for me right now? Help me see what's gaining traction.",
     accent: 'blue',

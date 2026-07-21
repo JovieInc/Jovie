@@ -52,6 +52,11 @@ interface SuggestedPromptsProps {
   readonly albumArtCapability?: PromptCapability;
   /** When true, hides the "Build artist profile" chip — profile setup is done. */
   readonly isProfileComplete?: boolean;
+  /**
+   * Labels already covered by empty-state action cards (or other scaffolds).
+   * Prevents a chip from advertising a conflicting enabled state vs a card.
+   */
+  readonly excludeLabels?: readonly string[];
   readonly layout?: 'rail' | 'grid' | 'flat';
   /**
    * Variant F: while the slash picker is open, fade chips out (don't unmount)
@@ -76,6 +81,9 @@ function SuggestionPill({
   readonly disabledReason?: string | null;
 }) {
   const IconComponent = ICON_MAP[suggestion.icon];
+  // Always expose full title via native tooltip so truncated labels
+  // ("What's Working Fo…") remain discoverable.
+  const title = disabledReason ?? suggestion.label;
 
   return (
     <button
@@ -92,7 +100,7 @@ function SuggestionPill({
       )}
       aria-label={suggestion.label}
       aria-disabled={disabled}
-      title={disabledReason ?? undefined}
+      title={title}
     >
       <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token transition-colors duration-fast group-hover:text-primary-token'>
         {IconComponent && <IconComponent className='h-3.5 w-3.5 shrink-0' />}
@@ -104,6 +112,17 @@ function SuggestionPill({
   );
 }
 
+function filterExcludedLabels(
+  suggestions: readonly ChatSuggestion[],
+  excludeLabels: readonly string[] | undefined
+): readonly ChatSuggestion[] {
+  if (!excludeLabels || excludeLabels.length === 0) return suggestions;
+  const excluded = new Set(excludeLabels.map(label => label.toLowerCase()));
+  return suggestions.filter(
+    suggestion => !excluded.has(suggestion.label.toLowerCase())
+  );
+}
+
 export function SuggestedPrompts({
   onSelect,
   isFirstSession = false,
@@ -111,15 +130,18 @@ export function SuggestedPrompts({
   canUseAdvancedTools = false,
   albumArtCapability,
   isProfileComplete = false,
+  excludeLabels,
   layout = 'rail',
   dimmed = false,
 }: SuggestedPromptsProps) {
-  const filterProfileSuggestion = (suggestions: readonly ChatSuggestion[]) =>
-    isProfileComplete
+  const filterProfileSuggestion = (suggestions: readonly ChatSuggestion[]) => {
+    const withoutProfile = isProfileComplete
       ? suggestions.filter(
           suggestion => suggestion.label !== 'Build Artist Profile'
         )
       : suggestions;
+    return filterExcludedLabels(withoutProfile, excludeLabels);
+  };
 
   const promptSuggestions = isFirstSession
     ? filterProfileSuggestion(FIRST_SESSION_SUGGESTIONS).map(suggestion => {
@@ -160,7 +182,6 @@ export function SuggestedPrompts({
     resolvedAlbumArtCapability.availability === 'unavailable'
       ? {
           icon: 'Camera',
-          // eslint-disable-next-line @jovie/canonical-ui-label-casing -- title-case hyphen false positive
           label: 'Draft Album-art Brief',
           prompt:
             'Draft an album-art brief for my latest release with visual direction, mood, palette, typography, and production notes.',
@@ -212,6 +233,11 @@ export function SuggestedPrompts({
     FEEDBACK_SUGGESTION,
   ];
 
+  const isAlbumArtSuggestion = (label: string) =>
+    label === 'Generate Album Art';
+  const albumArtPillDisabledReason = (label: string) =>
+    isAlbumArtSuggestion(label) ? resolvedAlbumArtCapability.reason : null;
+
   // `inert` removes the subtree from the tab order AND blocks pointer events,
   // so dimmed chips can't be reached by Tab/Shift+Tab while the slash picker
   // is open. `aria-hidden` on the wrapper hides them from SR.
@@ -241,9 +267,9 @@ export function SuggestedPrompts({
               onSelect={onSelect}
               className='min-w-0 max-w-none justify-start px-3.5 py-2'
               disabled={
-                suggestion.label === 'Generate Album Art' && albumArtDisabled
+                isAlbumArtSuggestion(suggestion.label) && albumArtDisabled
               }
-              disabledReason={resolvedAlbumArtCapability.reason}
+              disabledReason={albumArtPillDisabledReason(suggestion.label)}
             />
           ))}
         </div>
@@ -258,9 +284,9 @@ export function SuggestedPrompts({
                 density='compact'
                 className='min-w-0 max-w-none px-3'
                 disabled={
-                  suggestion.label === 'Generate Album Art' && albumArtDisabled
+                  isAlbumArtSuggestion(suggestion.label) && albumArtDisabled
                 }
-                disabledReason={resolvedAlbumArtCapability.reason}
+                disabledReason={albumArtPillDisabledReason(suggestion.label)}
               />
             ))}
           </div>
@@ -302,9 +328,9 @@ export function SuggestedPrompts({
               className='group h-auto w-full justify-start rounded-full px-3 py-2 text-left text-secondary-token hover:bg-surface-0 hover:text-primary-token disabled:cursor-not-allowed disabled:opacity-50'
               aria-label={suggestion.label}
               title={
-                suggestion.label === 'Generate Album Art'
-                  ? (resolvedAlbumArtCapability.reason ?? undefined)
-                  : undefined
+                isAlbumArtSuggestion(suggestion.label)
+                  ? (resolvedAlbumArtCapability.reason ?? suggestion.label)
+                  : suggestion.label
               }
             >
               <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-fast group-hover:text-primary-token'>
@@ -346,9 +372,9 @@ export function SuggestedPrompts({
               onSelect={onSelect}
               className='snap-start'
               disabled={
-                suggestion.label === 'Generate Album Art' && albumArtDisabled
+                isAlbumArtSuggestion(suggestion.label) && albumArtDisabled
               }
-              disabledReason={resolvedAlbumArtCapability.reason}
+              disabledReason={albumArtPillDisabledReason(suggestion.label)}
             />
           ))}
           {pitchSuggestion && (

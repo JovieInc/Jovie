@@ -942,8 +942,11 @@ export function OnboardingChat({
     isStreaming,
     onStop: stop,
     // Raw "Securing chat..." text is replaced in follow-up pass with
-    // statusBanner skeleton treatment; placeholder stays stable.
-    placeholder: 'Artist, release, or link...',
+    // statusBanner skeleton treatment. Handle step gets a confirm-oriented
+    // placeholder so incomplete free-text is less tempting.
+    placeholder: handleDraft
+      ? 'Confirm handle or type a different one…'
+      : 'Artist, release, or link...',
     onPickerOpenChange: setComposerPickerOpen,
     chips: chipTray.chips,
     onRemoveChipAt: chipTray.removeAt,
