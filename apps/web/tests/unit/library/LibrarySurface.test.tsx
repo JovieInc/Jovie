@@ -431,6 +431,129 @@ describe('LibrarySurface', () => {
     });
   });
 
+  it('disambiguates Release Draft from Approval Draft when both axes are draft (#10384)', () => {
+    renderLibraryWithSidebarOverride([
+      buildAsset({
+        status: 'draft',
+        approvalStatus: 'draft',
+      }),
+    ]);
+
+    expect(
+      screen.getByTestId('library-release-status-release-1')
+    ).toHaveAccessibleName('Release Status: Draft');
+    expect(
+      screen.getByTestId('library-approval-status-release-1')
+    ).toHaveAccessibleName('Approval Status: Draft');
+
+    clickGridView();
+
+    expect(
+      screen.getByTestId('library-release-status-release-1')
+    ).toHaveAccessibleName('Release Status: Draft');
+    expect(
+      screen.getByTestId('library-approval-status-release-1')
+    ).toHaveAccessibleName('Approval Status: Draft');
+  });
+
+  it('filters Release Draft and Approval Draft independently in the filter rail (#10384)', async () => {
+    renderLibraryWithSidebarOverride([
+      buildAsset({
+        id: 'release-a',
+        title: 'Release Draft Only',
+        status: 'draft',
+        approvalStatus: 'approved',
+      }),
+      buildAsset({
+        id: 'release-b',
+        title: 'Approval Draft Only',
+        status: 'released',
+        approvalStatus: 'draft',
+      }),
+      buildAsset({
+        id: 'release-c',
+        title: 'Both Draft',
+        status: 'draft',
+        approvalStatus: 'draft',
+      }),
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    const rail = screen.getByRole('navigation', { name: 'Library Filters' });
+
+    const approvalSection = within(rail)
+      .getByText('Approval Status')
+      .closest('div');
+    expect(approvalSection).not.toBeNull();
+    const releaseSection = within(rail)
+      .getByText('Release Status')
+      .closest('div');
+    expect(releaseSection).not.toBeNull();
+
+    // Scope Draft clicks to each section so dual "Draft" chips stay independent.
+    const releaseDraftChip = within(releaseSection as HTMLElement).getByRole(
+      'button',
+      { name: /^Draft /u }
+    );
+    fireEvent.click(releaseDraftChip);
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('library-release-status-release-a')
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId('library-release-status-release-c')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('library-release-status-release-b')
+      ).toBeNull();
+    });
+
+    fireEvent.click(
+      within(rail).getByRole('button', { name: /Clear Filters/u })
+    );
+
+    const approvalDraftChip = within(approvalSection as HTMLElement).getByRole(
+      'button',
+      { name: /^Draft /u }
+    );
+    fireEvent.click(approvalDraftChip);
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('library-approval-status-release-b')
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId('library-approval-status-release-c')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('library-approval-status-release-a')
+      ).toBeNull();
+    });
+  });
+
+  it('renders Archived approval status on list and grid badges (#10384)', () => {
+    renderLibraryWithSidebarOverride([
+      buildAsset({
+        status: 'released',
+        approvalStatus: 'archived',
+      }),
+    ]);
+
+    expect(
+      screen.getByTestId('library-approval-status-release-1')
+    ).toHaveTextContent('Archived');
+    expect(
+      screen.getByTestId('library-approval-status-release-1')
+    ).toHaveAccessibleName('Approval Status: Archived');
+
+    clickGridView();
+
+    expect(
+      screen.getByTestId('library-approval-status-release-1')
+    ).toHaveTextContent('Archived');
+  });
+
   it('keeps Approval Status once in the detail rail editor only', () => {
     renderLibrary([
       buildAsset({ status: 'released', approvalStatus: 'draft' }),

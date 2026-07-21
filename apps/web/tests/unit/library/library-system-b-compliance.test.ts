@@ -85,9 +85,17 @@ describe('library right-rail System B structural compliance', () => {
     expect(surface).toContain("label='Approval Status'");
     expect(surface).toContain("case 'approval':");
     expect(surface).toMatch(/allowedFields:\s*\[[^\]]*['"]approval['"]/s);
-    // Dual-axis list columns share the same breakpoint (no lone Draft).
+    // Dual-axis list columns share the same md breakpoint (no lone Draft).
     expect(surface).toContain("id: 'status',\n    header: 'Release',");
     expect(surface).toContain("id: 'approval',\n    header: 'Approval',");
+    const statusColumnMatch = surface.match(
+      /id: 'status',\s*header: 'Release',[\s\S]*?meta: \{ className: '([^']+)' \}/
+    );
+    const approvalColumnMatch = surface.match(
+      /id: 'approval',\s*header: 'Approval',[\s\S]*?meta: \{ className: '([^']+)' \}/
+    );
+    expect(statusColumnMatch?.[1]).toBe('hidden md:table-cell px-2');
+    expect(approvalColumnMatch?.[1]).toBe(statusColumnMatch?.[1]);
     // Drawer hero must not render a second approval pill next to release.
     // Editable approval lives only in ApprovalStatusEditor under Details.
     expect(surface).toContain('ApprovalStatusEditor');
