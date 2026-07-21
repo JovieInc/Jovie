@@ -40,6 +40,16 @@ const TRANSIENT_VERCEL_API_STATUSES = new Set([
 ]);
 const PUBLIC_ERROR_CONTENT =
   /application error|internal server error|something went wrong|error occurred|this page could not be found|page could not be found|profile not found|temporarily unavailable|auth unavailable|turnstile is not configured/i;
+// Next.js serializes error/not-found boundary templates into the RSC flight
+// payload (<script>self.__next_f.push(...)</script>) of every healthy page, so
+// error phrases like "Profile not found" legitimately appear inside inline
+// scripts without ever rendering. Strip script blocks before the error-content
+// scan; a genuinely rendered error page carries the phrase in visible markup.
+const INLINE_SCRIPT_BLOCK = /<script\b[^>]*>[\s\S]*?<\/script\s*>/gi;
+
+function stripInlineScripts(html) {
+  return html.replace(INLINE_SCRIPT_BLOCK, '');
+}
 const PUBLIC_HTML_SURFACES = Object.freeze([
   { label: 'Homepage', path: '/', minimumBytes: 1_000 },
   { label: 'Public profile', path: '/tim', minimumBytes: 500 },
@@ -946,7 +956,7 @@ async function verifyPublicSurfaceOnce(
   ) {
     throw new Error(`${surface.label} returned an incomplete document.`);
   }
-  if (PUBLIC_ERROR_CONTENT.test(body)) {
+  if (PUBLIC_ERROR_CONTENT.test(stripInlineScripts(body))) {
     throw new Error(`${surface.label} returned error or not-found content.`);
   }
 }
@@ -1355,6 +1365,7 @@ module.exports = {
   requireExpectedEnvironment,
   resolveAuthorizedVercelDeployment,
   safeRouteLabel,
+  stripInlineScripts,
   validateBuildInfo,
   verifyPublicDeploymentSurfaces,
   writeExactHostCookieJar,
