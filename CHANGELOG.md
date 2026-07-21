@@ -15,8 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- **Library Approval Status is first-class again (#10384):** every Library asset surfaces Draft / Needs Review / Approved / Archived as a badge on grid cards, a list column, and filter chips (rail + pill search), with Release Status kept as a separate labeled axis so the two never collapse into one bare “Draft”.
-- **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; it uses the build-time release version from build-info, or omits the version when unavailable.
+- **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; build-info prefers the stamped release version (and falls back to bundled `version.json`), and both shell/legacy banners omit the version when unavailable.
 - **Entity mention hover cards now use the same rich entity card as the chat rail:** hovering an inline release, artist, track, or event mention opens the canonical compact EntityCard instead of a one-off popover layout.
 - **Chat tool activity is quieter and indented:** agent tool-call rows sit one rhythm step in from assistant prose with secondary color and book weight, so narrative stays primary and consecutive steps form a quiet run.
 - **Artist profiles now adapt to release, touring, and live-support moments:** one music-native link brings listening, tickets, support, fan capture, setup guidance, and product truth into a clearer responsive journey.

@@ -2,6 +2,7 @@
 
 import { RefreshCw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getVersionUpdateTitle } from '@/components/shell/getVersionUpdateTitle';
 import { env } from '@/lib/env-client';
 import {
   useVersionMonitor,
@@ -77,9 +78,9 @@ export function SidebarInstallBanner() {
     return null;
   }
 
-  const title = versionUpdate.newVersion
-    ? `New version available (v${versionUpdate.newVersion})`
-    : 'New version available';
+  const title = getVersionUpdateTitle(versionUpdate.newVersion, {
+    titleCase: false,
+  });
 
   return (
     <div className='group-data-[collapsible=icon]:hidden px-2.5 pb-1.5'>
