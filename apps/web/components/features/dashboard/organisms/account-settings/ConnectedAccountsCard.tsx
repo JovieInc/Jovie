@@ -111,7 +111,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
               className='flex items-start justify-between gap-3 px-4 py-3 sm:px-5'
             >
               <div className='flex min-w-0 items-center gap-3'>
-                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
+                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-0'>
                   <Link2 className='h-4 w-4 text-secondary-token' aria-hidden />
                 </div>
                 <div className='min-w-0'>

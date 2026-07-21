@@ -329,7 +329,7 @@ const TipLinkSection = memo(function TipLinkSection({
         <h3 className='text-app font-caption text-primary-token'>Pay Link</h3>
       </div>
 
-      <div className='flex items-center gap-2 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5'>
+      <div className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2.5'>
         <Copy className='max-sm:hidden h-3.5 w-3.5 shrink-0 text-tertiary-token' />
         <span className='min-w-0 flex-1 truncate text-app text-secondary-token'>
           {tipUrl}

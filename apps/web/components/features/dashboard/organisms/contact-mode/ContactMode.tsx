@@ -58,7 +58,7 @@ const ContactListItem = memo(function ContactListItem({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <ContentSurfaceCard className='group flex items-center justify-between gap-4 px-4 py-3 transition-[background-color,border-color,box-shadow] duration-subtle ease-subtle hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'>
+        <ContentSurfaceCard className='group flex items-center justify-between gap-4 px-4 py-3 transition-[background-color,border-color,box-shadow] duration-subtle ease-subtle hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base'>
           <div className='min-w-0 flex-1'>
             <div className='flex items-center gap-2'>
               <p className='text-app font-caption text-primary-token'>
@@ -82,7 +82,7 @@ const ContactListItem = memo(function ContactListItem({
                   size='sm'
                   variant='ghost'
                   asChild
-                  className='h-8 w-8 p-0 text-tertiary-token transition-[color,background-color] duration-subtle ease-subtle hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/50 focus-visible:ring-offset-1'
+                  className='h-8 w-8 p-0 text-tertiary-token transition-[color,background-color] duration-subtle ease-subtle hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50 focus-visible:ring-offset-1'
                   title={`Email ${contact.email}`}
                 >
                   <a href={emailHref ?? '#'}>
@@ -96,7 +96,7 @@ const ContactListItem = memo(function ContactListItem({
                   size='sm'
                   variant='ghost'
                   asChild
-                  className='h-8 w-8 p-0 text-tertiary-token transition-[color,background-color] duration-subtle ease-subtle hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/50 focus-visible:ring-offset-1'
+                  className='h-8 w-8 p-0 text-tertiary-token transition-[color,background-color] duration-subtle ease-subtle hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50 focus-visible:ring-offset-1'
                   title={`Call ${contact.phone}`}
                 >
                   <a href={phoneHref ?? '#'}>
@@ -169,7 +169,7 @@ export function ContactMode({
       <div className='flex h-full flex-col items-center justify-center gap-3 px-4 text-center'>
         <p className='text-secondary-token'>Unable to load contacts</p>
         <Button size='sm' variant='secondary' onClick={() => router.refresh()}>
-          Try again
+          Try Again
         </Button>
       </div>
     );
@@ -184,7 +184,7 @@ export function ContactMode({
           variant='secondary'
           onClick={() => router.push(APP_ROUTES.SETTINGS_CONTACTS)}
         >
-          Add contacts
+          Add Contacts
         </Button>
       </div>
     );
@@ -211,14 +211,14 @@ export function ContactMode({
         </div>
       </div>
 
-      <div className='border-t border-(--linear-app-frame-seam) p-4'>
+      <div className='border-t border-subtle p-4'>
         <Button
           size='sm'
           variant='ghost'
           onClick={() => router.push(APP_ROUTES.SETTINGS_CONTACTS)}
           className='w-full text-app text-secondary-token'
         >
-          Manage contacts
+          Manage Contacts
         </Button>
       </div>
     </ContentSurfaceCard>

@@ -496,7 +496,7 @@ export function TourDateSidebar({
                           'flex-1 rounded-full border px-3 py-2 text-xs font-caption transition-[background-color,border-color,color] duration-subtle',
                           formData.ticketStatus === status
                             ? 'border-accent/35 bg-accent/10 text-accent'
-                            : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+                            : 'border-subtle bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
                         )}
                       >
                         {status === 'available' && 'On Sale'}

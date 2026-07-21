@@ -116,7 +116,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
       <div className='px-4 py-2.5 sm:px-5 sm:py-3'>
         <div className='mb-2.5 flex items-center gap-2'>
           <div
-            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'
+            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-0'
             aria-hidden='true'
           >
             <ShoppingBag className='h-3.5 w-3.5 text-secondary-token' />
@@ -188,7 +188,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
               disabled={saveState === 'saving'}
               variant='ghost'
               size='sm'
-              className='h-7 rounded-lg border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+              className='h-7 rounded-lg border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
             >
               Disconnect
             </Button>
@@ -200,7 +200,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
             href={shopPageUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='inline-flex items-center gap-1.5 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-xs font-caption text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token'
+            className='inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface-0 px-2.5 py-1.5 text-xs font-caption text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token'
           >
             <ExternalLink className='h-3 w-3' />
             Preview shop link

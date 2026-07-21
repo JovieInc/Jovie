@@ -7,7 +7,5 @@
  * Note: This is a purely decorative element and does not need ARIA attributes.
  */
 export function VerticalDivider() {
-  return (
-    <div className='h-5 w-px bg-(--linear-border-subtle)' aria-hidden='true' />
-  );
+  return <div className='h-5 w-px bg-subtle' aria-hidden='true' />;
 }

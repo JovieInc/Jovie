@@ -32,9 +32,9 @@ export function DspPresenceCard({
     <ContentSurfaceCard
       className={cn(
         'cursor-pointer p-3.5 transition-[border-color,background-color,box-shadow] duration-subtle',
-        'bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)] hover:border-default hover:bg-(--linear-bg-surface-0)',
+        'bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)] hover:border-default hover:bg-surface-0',
         isSelected &&
-          'border-(--linear-border-focus) bg-(--linear-bg-surface-0) ring-1 ring-ring'
+          'border-(--linear-border-focus) bg-surface-0 ring-1 ring-ring'
       )}
       data-testid={`presence-card-${item.providerId}`}
     >
@@ -46,7 +46,7 @@ export function DspPresenceCard({
         <div className='flex items-start justify-between gap-2.5'>
           <div className='flex items-center gap-2.5'>
             {item.externalArtistImageUrl ? (
-              <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
+              <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-0'>
                 <Image
                   src={item.externalArtistImageUrl}
                   alt={item.externalArtistName ?? label}
@@ -57,7 +57,7 @@ export function DspPresenceCard({
                 />
               </div>
             ) : (
-              <div className='flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
+              <div className='flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-0'>
                 <DspProviderIcon provider={item.providerId} size='lg' />
               </div>
             )}

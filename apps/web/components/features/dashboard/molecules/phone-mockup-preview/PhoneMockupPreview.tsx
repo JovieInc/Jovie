@@ -34,7 +34,7 @@ export function PhoneMockupPreview({
         className={cn(
           'relative w-full max-w-75 mx-auto',
           'aspect-9/19 rounded-3xl',
-          'bg-surface-1 border border-(--linear-app-frame-seam)',
+          'bg-surface-1 border border-subtle',
           'overflow-hidden'
         )}
       >
@@ -42,7 +42,7 @@ export function PhoneMockupPreview({
         <div
           className={cn(
             'relative w-full h-full rounded-3xl overflow-hidden',
-            'border border-(--linear-app-frame-seam) bg-surface-0',
+            'border border-subtle bg-surface-0',
             'transition-colors duration-cinematic'
           )}
         >
@@ -146,7 +146,7 @@ export function PhoneMockupPreview({
                     aria-hidden='true'
                     tabIndex={-1}
                     className={cn(
-                      'relative block rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 p-4 hover:bg-surface-1',
+                      'relative block rounded-lg border border-subtle bg-surface-0 p-4 hover:bg-surface-1',
                       'transition-colors duration-subtle',
                       'overflow-hidden',
                       activeLink === link.id && 'ring-2 ring-primary-500/20'
@@ -202,7 +202,7 @@ export function PhoneMockupPreview({
                 ))
               ) : (
                 <div className='h-full flex flex-col items-center justify-center text-center p-6'>
-                  <div className='mb-3 flex h-12 w-12 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
+                  <div className='mb-3 flex h-12 w-12 items-center justify-center rounded-lg border border-subtle bg-surface-0'>
                     <Link2
                       className='w-6 h-6 text-tertiary-token'
                       aria-hidden='true'

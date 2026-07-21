@@ -69,7 +69,7 @@ export function ReleaseEditDialog({
           className='h-4.5 w-4.5 text-secondary-token'
           aria-hidden='true'
         />
-        Edit release links
+        Edit Release Links
       </DialogTitle>
       <DialogDescription className='text-app text-secondary-token'>
         Swap in a preferred DSP link or revert back to our detected URL. All
@@ -81,11 +81,11 @@ export function ReleaseEditDialog({
             {/* Release info header */}
             <DrawerSurfaceCard
               variant='card'
-              className='rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3.5'
+              className='rounded-lg border border-subtle bg-(--linear-app-content-surface) p-3.5'
             >
               <EntityHeaderCard
                 image={
-                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
+                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-subtle bg-surface-0'>
                     <ImageWithFallback
                       src={release.artworkUrl}
                       alt={`${release.title} artwork`}
@@ -101,7 +101,7 @@ export function ReleaseEditDialog({
                 badge={
                   <Badge
                     variant='secondary'
-                    className='rounded-md border border-(--linear-app-frame-seam) bg-surface-1 px-2 py-0.5 text-2xs text-secondary-token'
+                    className='rounded-md border border-subtle bg-surface-1 px-2 py-0.5 text-2xs text-secondary-token'
                   >
                     {release.releaseDate
                       ? formatReleaseDateShort(release.releaseDate)
@@ -127,7 +127,7 @@ export function ReleaseEditDialog({
                   <DrawerSurfaceCard
                     key={`${release.id}-${provider.key}`}
                     variant='card'
-                    className='rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-2.5'
+                    className='rounded-lg border border-subtle bg-(--linear-app-content-surface) p-2.5'
                   >
                     <div className='flex items-center justify-between gap-2'>
                       <div className='flex items-center gap-2'>
@@ -191,7 +191,7 @@ export function ReleaseEditDialog({
           </div>
         ) : null}
       </DialogBody>
-      <DialogActions className='justify-end border-t border-(--linear-app-frame-seam) pt-4'>
+      <DialogActions className='justify-end border-t border-subtle pt-4'>
         <DrawerButton
           onClick={onClose}
           className='h-7 rounded-lg px-2.5 text-2xs'

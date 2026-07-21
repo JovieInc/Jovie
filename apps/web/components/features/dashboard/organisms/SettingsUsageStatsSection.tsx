@@ -145,11 +145,11 @@ function UsageSummaryRow({ label, value, detail }: UsageSummaryRowProps) {
 function UsageLoadingState() {
   return (
     <UsagePanelShell>
-      <div className='border-b border-(--linear-app-frame-seam) px-4 py-4 sm:px-5'>
+      <div className='border-b border-subtle px-4 py-4 sm:px-5'>
         <div className='h-4 w-32 animate-pulse rounded bg-surface-2 motion-reduce:animate-none' />
         <div className='mt-2 h-3 w-64 max-w-full animate-pulse rounded bg-surface-2 motion-reduce:animate-none' />
       </div>
-      <div className='divide-y divide-(--linear-app-frame-seam)'>
+      <div className='divide-y divide-subtle'>
         {['daily', 'monthly'].map(key => (
           <div key={key} className='px-4 py-4 sm:px-5'>
             <div className='flex justify-between gap-4'>
@@ -234,7 +234,7 @@ export function SettingsUsageStatsSection() {
 
   return (
     <UsagePanelShell>
-      <div className='flex flex-wrap items-start justify-between gap-3 border-b border-(--linear-app-frame-seam) px-4 py-4 sm:px-5'>
+      <div className='flex flex-wrap items-start justify-between gap-3 border-b border-subtle px-4 py-4 sm:px-5'>
         <div className='min-w-0 space-y-1'>
           <div className='flex flex-wrap items-center gap-2'>
             <p className='text-app font-caption text-primary-token'>
@@ -266,7 +266,7 @@ export function SettingsUsageStatsSection() {
       </div>
 
       {isStale ? (
-        <div className='border-b border-(--linear-app-frame-seam) px-4 py-3.5 sm:px-5'>
+        <div className='border-b border-subtle px-4 py-3.5 sm:px-5'>
           <div className='flex items-start gap-2 text-warning'>
             <AlertCircle className='mt-0.5 h-4 w-4 shrink-0' aria-hidden />
             <p className='text-app leading-[18px]'>
@@ -277,7 +277,7 @@ export function SettingsUsageStatsSection() {
         </div>
       ) : null}
 
-      <div className='divide-y divide-(--linear-app-frame-seam)'>
+      <div className='divide-y divide-subtle'>
         <UsageMeterRow
           title='Daily Messages'
           description='Quota for the current 24-hour window.'
@@ -298,7 +298,7 @@ export function SettingsUsageStatsSection() {
         />
       </div>
 
-      <div className='mt-auto divide-y divide-(--linear-app-frame-seam) border-t border-(--linear-app-frame-seam)'>
+      <div className='mt-auto divide-y divide-subtle border-t border-subtle'>
         <UsageSummaryRow
           label='Plan'
           value={copy.planLabel}

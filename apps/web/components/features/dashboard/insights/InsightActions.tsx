@@ -18,7 +18,7 @@ export function InsightActions({ insightId }: InsightActionsProps) {
         size='sm'
         disabled={isPending}
         onClick={() => mutate({ insightId, status: 'dismissed' })}
-        className='h-7 gap-1 rounded-lg border border-transparent px-2.5 text-2xs font-caption tracking-tight text-tertiary-token transition-[background-color,color,border-color,box-shadow] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-secondary-token focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-ring/20'
+        className='h-7 gap-1 rounded-lg border border-transparent px-2.5 text-2xs font-caption tracking-tight text-tertiary-token transition-[background-color,color,border-color,box-shadow] duration-subtle hover:border-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-ring/20'
       >
         <X className='h-3 w-3' />
         Dismiss
@@ -28,7 +28,7 @@ export function InsightActions({ insightId }: InsightActionsProps) {
         size='sm'
         disabled={isPending}
         onClick={() => mutate({ insightId, status: 'acted_on' })}
-        className='h-7 gap-1 rounded-lg border border-transparent px-2.5 text-2xs font-caption tracking-tight text-secondary-token transition-[background-color,color,border-color,box-shadow] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-primary-token focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-ring/20'
+        className='h-7 gap-1 rounded-lg border border-transparent px-2.5 text-2xs font-caption tracking-tight text-secondary-token transition-[background-color,color,border-color,box-shadow] duration-subtle hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-ring/20'
       >
         <Check className='h-3 w-3' />
         Done

@@ -154,7 +154,7 @@ export const cardTokens = {
     // Elevated card — shared card surface inside the shell
     elevated: tw`
       bg-surface-1
-      border border-(--linear-app-frame-seam)
+      border border-subtle
       rounded-xl
       p-4 sm:p-6
       transition-[background-color,border-color] ${timing.slow} ${timing.easing}
@@ -163,7 +163,7 @@ export const cardTokens = {
     // Floating card — shared card surface with seam border
     floating: tw`
       bg-surface-1
-      border border-(--linear-app-frame-seam)
+      border border-subtle
       rounded-xl
       p-4 sm:p-6
       transition-[background-color,border-color] ${timing.slow} ${timing.easing}
@@ -173,7 +173,7 @@ export const cardTokens = {
     onboarding: tw`
       relative
       bg-surface-1
-      border border-(--linear-app-frame-seam)
+      border border-subtle
       rounded-2xl
       transition-[background-color,border-color] ${timing.slow} ${timing.easing}
     `,
@@ -181,7 +181,7 @@ export const cardTokens = {
     // Feature card — shared card surface with seam border
     feature: tw`
       bg-surface-1
-      border border-(--linear-app-frame-seam)
+      border border-subtle
       rounded-2xl
       p-6 sm:p-8
       transition-[background-color,border-color] ${timing.slow} ${timing.easing}

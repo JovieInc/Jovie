@@ -221,8 +221,8 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
   return (
     // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for accessibility
     <div
-      className={`rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-2.5 ${className ?? ''}`}
-      aria-label='Ingested link suggestions'
+      className={`rounded-lg border border-subtle bg-(--linear-app-content-surface) px-3 py-2.5 ${className ?? ''}`}
+      aria-label='Ingested Link Suggestions'
     >
       <div className='flex flex-wrap items-center justify-center gap-2'>
         {suggestions.map(suggestion => {
@@ -256,7 +256,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
 
               <AppIconButton
                 ariaLabel={`Dismiss ${suggestion.platform.name} suggestion`}
-                className='absolute top-1/2 right-2 z-10 h-6 w-6 -translate-y-1/2 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
+                className='absolute top-1/2 right-2 z-10 h-6 w-6 -translate-y-1/2 rounded-lg border border-subtle bg-surface-0 text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-ring/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
                 onClick={event => handleDismiss(suggestion, event)}
               >
                 <X className='h-3.5 w-3.5' aria-hidden />

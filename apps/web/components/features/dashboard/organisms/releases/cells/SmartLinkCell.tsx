@@ -34,7 +34,7 @@ export const SmartLinkCell = memo(function SmartLinkCell({
     return (
       <div
         className={cn(
-          'flex h-7 items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5',
+          'flex h-7 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2.5',
           'text-2xs font-[430] tracking-tight text-tertiary-token select-none transition-[background-color,border-color,color] duration-subtle'
         )}
         title={

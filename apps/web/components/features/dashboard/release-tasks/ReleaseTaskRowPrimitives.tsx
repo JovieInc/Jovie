@@ -46,7 +46,7 @@ export function ReleaseTaskCheckbox({
       disabled={isAutomated}
       onChange={() => onToggle(task.id, !isDone)}
       className={cn(
-        'flex-shrink-0 rounded accent-accent cursor-pointer disabled:cursor-default disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-bg-page) outline-none transition-[box-shadow] duration-subtle ease-subtle',
+        'flex-shrink-0 rounded accent-accent cursor-pointer disabled:cursor-default disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-1 focus-visible:ring-offset-base outline-none transition-[box-shadow] duration-subtle ease-subtle',
         className
       )}
       aria-label={`Mark "${task.title}" as ${isDone ? 'incomplete' : 'complete'}`}

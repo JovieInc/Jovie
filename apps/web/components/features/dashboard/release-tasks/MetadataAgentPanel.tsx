@@ -328,7 +328,7 @@ export function MetadataAgentPanel({
   }
 
   return (
-    <section className='mb-6 rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
+    <section className='mb-6 rounded-xl border border-subtle bg-(--linear-app-content-surface) p-4'>
       <div className='flex flex-col gap-2 md:flex-row md:items-start md:justify-between'>
         <div>
           <p className='text-2xs font-medium text-tertiary-token'>
@@ -343,13 +343,13 @@ export function MetadataAgentPanel({
           </p>
         </div>
 
-        <div className='rounded-full border border-(--linear-app-frame-seam) px-3 py-1 text-xs font-medium text-secondary-token'>
+        <div className='rounded-full border border-subtle px-3 py-1 text-xs font-medium text-secondary-token'>
           {currentStatusLabel}
         </div>
       </div>
 
       <div className='mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
-        <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
+        <div className='rounded-lg border border-subtle bg-surface-1 p-3'>
           <p className='text-2xs font-medium text-tertiary-token'>
             Source Of Truth
           </p>
@@ -360,7 +360,7 @@ export function MetadataAgentPanel({
           </p>
         </div>
 
-        <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
+        <div className='rounded-lg border border-subtle bg-surface-1 p-3'>
           <p className='text-2xs font-medium text-tertiary-token'>
             Destinations
           </p>
@@ -376,7 +376,7 @@ export function MetadataAgentPanel({
           </p>
         </div>
 
-        <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
+        <div className='rounded-lg border border-subtle bg-surface-1 p-3'>
           <p className='text-2xs font-medium text-tertiary-token'>Review</p>
           <p className='mt-2 text-sm text-primary-token'>{reviewLabel}</p>
           <p className='mt-1 text-xs text-secondary-token'>
@@ -384,7 +384,7 @@ export function MetadataAgentPanel({
           </p>
         </div>
 
-        <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
+        <div className='rounded-lg border border-subtle bg-surface-1 p-3'>
           <p className='text-2xs font-medium text-tertiary-token'>Tracking</p>
           <p className='mt-2 text-sm text-primary-token'>{trackingLabel}</p>
           <p className='mt-1 text-xs text-secondary-token'>
@@ -416,7 +416,7 @@ export function MetadataAgentPanel({
                 void handleApproveSend();
               }}
               disabled={actionState === 'loading' || isPending}
-              className='rounded-md border border-(--linear-app-frame-seam) px-3 py-2 text-sm font-medium text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
+              className='rounded-md border border-subtle px-3 py-2 text-sm font-medium text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
             >
               Approve And Send
             </button>
@@ -429,7 +429,7 @@ export function MetadataAgentPanel({
                 void handleDraftCorrection();
               }}
               disabled={actionState === 'loading' || isPending}
-              className='rounded-md border border-(--linear-app-frame-seam) px-3 py-2 text-sm font-medium text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
+              className='rounded-md border border-subtle px-3 py-2 text-sm font-medium text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
             >
               Draft Correction
             </button>
@@ -468,7 +468,7 @@ export function MetadataAgentPanel({
 
       {latestRequest && (
         <div className='mt-4 grid gap-4 lg:grid-cols-2'>
-          <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
+          <div className='rounded-lg border border-subtle bg-surface-1 p-3'>
             <p className='text-2xs font-medium text-tertiary-token'>Timeline</p>
             <div className='mt-2 space-y-2 text-sm text-primary-token'>
               <p>Prepared: {formatTimestamp(latestRequest.createdAt)}</p>
@@ -490,7 +490,7 @@ export function MetadataAgentPanel({
             ) : null}
           </div>
 
-          <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3'>
+          <div className='rounded-lg border border-subtle bg-surface-1 p-3'>
             <p className='text-2xs font-medium text-tertiary-token'>
               Tracking State
             </p>
@@ -502,7 +502,7 @@ export function MetadataAgentPanel({
                       href={target.canonicalUrl}
                       target='_blank'
                       rel='noreferrer'
-                      className='underline decoration-(--linear-app-frame-seam) underline-offset-2'
+                      className='underline decoration-subtle underline-offset-2'
                     >
                       {formatStatusLabel(target.targetType)}
                     </a>

@@ -109,7 +109,7 @@ const SOCIAL_PLATFORM_GROUPS = [
     ),
   },
   {
-    label: 'All supported platforms',
+    label: 'All Supported Platforms',
     platforms: SOCIAL_LINK_PLATFORM_CANDIDATES.filter(
       platform =>
         !SUGGESTED_PLATFORM_SET.has(platform.id) &&
@@ -273,7 +273,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
 
   if (loading) {
     return (
-      <ContentSurfaceCard className='divide-y divide-(--linear-border-subtle) overflow-hidden p-0'>
+      <ContentSurfaceCard className='divide-y divide-subtle overflow-hidden p-0'>
         {SOCIALS_FORM_LOADING_KEYS.map(key => (
           <div key={key} className='flex items-center gap-3 px-4 py-3'>
             <div className='h-8 w-8 rounded-md skeleton shrink-0' />
@@ -316,7 +316,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className='space-y-0'>
-          <ContentSurfaceCard className='divide-y divide-(--linear-border-subtle) overflow-hidden p-0'>
+          <ContentSurfaceCard className='divide-y divide-subtle overflow-hidden p-0'>
             {socialLinks.map((link, index) => (
               <div
                 key={link.id || `new-${index}`}

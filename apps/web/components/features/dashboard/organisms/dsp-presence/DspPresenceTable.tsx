@@ -77,7 +77,7 @@ const LinkCell = memo(function LinkCell({
       href={item.externalArtistUrl}
       target='_blank'
       rel='noopener noreferrer'
-      className='flex h-6 w-6 items-center justify-center rounded text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
+      className='flex h-6 w-6 items-center justify-center rounded text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base'
       aria-label={`View on ${label}`}
       onClick={e => e.stopPropagation()}
     >
@@ -144,7 +144,7 @@ export const DspPresenceTable = memo(function DspPresenceTable({
           'bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,var(--linear-bg-surface-0))]',
           'shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_14%,var(--linear-app-frame-seam))]',
           'hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,var(--linear-bg-surface-0))]',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base',
         ].join(' ');
       }
 
@@ -154,7 +154,7 @@ export const DspPresenceTable = memo(function DspPresenceTable({
         'hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)]',
         'hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)]',
         '[&:hover_span]:text-primary-token',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base',
       ].join(' ');
     },
     [selectedMatchId]

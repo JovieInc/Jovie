@@ -101,7 +101,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                     size='sm'
                     disabled={syncingEmailId === email.id}
                     onClick={() => handleMakePrimary(email)}
-                    className='h-7 rounded-lg border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                    className='h-7 rounded-lg border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
                   >
                     {syncingEmailId === email.id ? 'Updating…' : 'Make primary'}
                   </Button>
@@ -189,7 +189,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   variant='ghost'
                   size='sm'
                   onClick={resetEmailForm}
-                  className='h-7 rounded-lg border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                  className='h-7 rounded-lg border border-transparent px-2.5 text-2xs font-caption text-secondary-token hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
                 >
                   Cancel
                 </Button>

@@ -76,7 +76,7 @@ export const MusicImportHero = memo(function MusicImportHero({
   // Failed state
   if (isFailed && !hasReleases) {
     return (
-      <div className='rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
+      <div className='rounded-lg border border-subtle bg-(--linear-app-content-surface) p-4'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <AlertCircle className='h-4 w-4 shrink-0' />
           <p className='text-sm'>

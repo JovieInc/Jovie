@@ -24,7 +24,7 @@ export function SetupTaskItem({
         <div
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-app font-caption ${
             complete
-              ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'
+              ? 'border border-subtle bg-surface-0 text-secondary-token'
               : 'border border-accent/20 bg-accent/10 text-accent'
           }`}
           aria-hidden='true'

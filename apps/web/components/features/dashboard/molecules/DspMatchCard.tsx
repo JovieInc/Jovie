@@ -98,7 +98,7 @@ export function DspMatchCard({
         <div className='flex items-center gap-3'>
           {/* Provider Icon or Artist Image */}
           {externalArtistImageUrl ? (
-            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
+            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-subtle bg-surface-0'>
               <Image
                 src={externalArtistImageUrl}
                 alt={externalArtistName}
@@ -109,7 +109,7 @@ export function DspMatchCard({
               />
             </div>
           ) : (
-            <div className='flex h-10 w-10 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
+            <div className='flex h-10 w-10 items-center justify-center rounded-lg border border-subtle bg-surface-0'>
               <DspProviderIcon provider={providerId} size='lg' />
             </div>
           )}
@@ -125,7 +125,7 @@ export function DspMatchCard({
                   href={externalArtistUrl}
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                  className='flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
                   title={`View on ${PROVIDER_LABELS[providerId]}`}
                 >
                   <Icon name='ExternalLink' className='h-3.5 w-3.5' />
@@ -150,11 +150,11 @@ export function DspMatchCard({
 
       {/* Expandable Confidence Breakdown */}
       {confidenceBreakdown && (
-        <div className='mt-3 border-t border-(--linear-app-frame-seam) pt-3'>
+        <div className='mt-3 border-t border-subtle pt-3'>
           <button
             type='button'
             onClick={() => setIsExpanded(!isExpanded)}
-            className='flex h-7 w-full items-center justify-between rounded-lg border border-transparent px-2 text-xs text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-ring'
+            className='flex h-7 w-full items-center justify-between rounded-lg border border-transparent px-2 text-xs text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-ring'
           >
             <span>Confidence breakdown</span>
             <Icon
@@ -176,14 +176,14 @@ export function DspMatchCard({
 
       {/* Actions */}
       {isActionable && (
-        <div className='mt-3 flex items-center justify-end gap-2 border-t border-(--linear-app-frame-seam) pt-3'>
+        <div className='mt-3 flex items-center justify-end gap-2 border-t border-subtle pt-3'>
           {onReject && (
             <Button
               variant='ghost'
               size='sm'
               onClick={() => onReject(matchId)}
               disabled={isLoading}
-              className='h-7 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-2xs font-caption text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+              className='h-7 rounded-lg border border-subtle bg-surface-0 px-2.5 text-2xs font-caption text-secondary-token hover:bg-surface-1 hover:text-primary-token'
             >
               {isRejecting ? 'Rejecting...' : 'Reject'}
             </Button>

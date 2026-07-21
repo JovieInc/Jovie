@@ -187,7 +187,7 @@ export function ProfileEditPreviewCard({
       </div>
 
       <div className='space-y-2 px-3 py-2'>
-        <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
+        <div className='rounded-lg border border-subtle bg-surface-0 px-2.5 py-2'>
           <div className='mb-0.5 text-app font-caption tracking-normal text-secondary-token'>
             Current
           </div>
@@ -210,7 +210,7 @@ export function ProfileEditPreviewCard({
         </div>
       </div>
 
-      <div className='flex items-center gap-1.5 border-t border-(--linear-app-frame-seam) px-3 py-2'>
+      <div className='flex items-center gap-1.5 border-t border-subtle px-3 py-2'>
         <DrawerButton
           type='button'
           tone='primary'

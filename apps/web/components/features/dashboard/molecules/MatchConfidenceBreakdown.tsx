@@ -170,7 +170,7 @@ export function MatchConfidenceBreakdown({
       ))}
 
       {/* Total */}
-      <div className='border-t border-(--linear-app-frame-seam) pt-2'>
+      <div className='border-t border-subtle pt-2'>
         <div className='flex items-center justify-between text-app'>
           <span className='font-caption text-primary-token'>
             Total Confidence

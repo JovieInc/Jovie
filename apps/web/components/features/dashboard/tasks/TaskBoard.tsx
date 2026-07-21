@@ -345,7 +345,7 @@ function SortableTaskBoardCard({
         {...listeners}
         data-testid={`task-board-card-${task.id}`}
         onClick={() => onOpenTask(task)}
-        className='block w-full cursor-grab text-left active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
+        className='block w-full cursor-grab text-left active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base'
       >
         <TaskBoardCard
           task={task}
