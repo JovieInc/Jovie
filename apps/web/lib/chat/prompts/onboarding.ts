@@ -8,7 +8,7 @@ import { buildOnboardingPromptSecuritySection } from '@/lib/chat/prompt-disclosu
  */
 /** Shared opener / waitlist receipts — imported by the script bank to avoid copy drift. */
 export const ONBOARDING_OPENER_PRIMARY =
-  "Hey — I'm Jovie. I'll remember this chat if you sign up. What are you working on?";
+  "Hey — I'm Jovie. Early access is limited — some artists waitlist first. I'll remember this chat if you sign up. What are you working on?";
 export const ONBOARDING_WAITLIST_RECEIPT =
   "On the early list. We'll email when a spot opens — return here or /start to resume.";
 
