@@ -23,10 +23,14 @@ export type { MarketingContentShellProps } from './MarketingContentShell';
 export { MarketingContentShell } from './MarketingContentShell';
 export type { MarketingFeatureGridProps } from './MarketingFeatureGrid';
 export { MarketingFeatureGrid } from './MarketingFeatureGrid';
-export type { MarketingHeroCta, MarketingHeroProps } from './MarketingHero';
+export type {
+  MarketingHeroContentProps,
+  MarketingHeroCta,
+  MarketingHeroLandingProps,
+  MarketingHeroProps,
+  MarketingHeroShellProps,
+} from './MarketingHero';
 export { MarketingHero } from './MarketingHero';
-export type { MarketingHeroLayoutProps } from './MarketingHeroLayout';
-export { MarketingHeroLayout } from './MarketingHeroLayout';
 export type { MarketingMetricCardProps } from './MarketingMetricCard';
 export { MarketingMetricCard } from './MarketingMetricCard';
 export type { MarketingPageShellProps } from './MarketingPageShell';

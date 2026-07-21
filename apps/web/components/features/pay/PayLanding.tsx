@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import {
   MarketingContainer,
-  MarketingHeroLayout,
+  MarketingHero,
   MarketingPageShell,
 } from '@/components/marketing';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
@@ -24,8 +24,9 @@ function TipsHero() {
   return (
     <section className='relative overflow-hidden'>
       <div className='hero-glow pointer-events-none absolute inset-0' />
-      <MarketingHeroLayout variant='centered' className='items-start text-left'>
+      <MarketingHero variant='centered' className='items-start text-left'>
         <p className='marketing-kicker'>Pay</p>
+        {/* ui-casing-allow: marketing display headline */}
         <h1 className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'>
           Turn every payment into a fan.
         </h1>
@@ -42,7 +43,7 @@ function TipsHero() {
         <p className='mt-4 text-[length:var(--linear-label-size)] text-tertiary-token'>
           Free forever. No credit card required.
         </p>
-      </MarketingHeroLayout>
+      </MarketingHero>
     </section>
   );
 }
@@ -80,6 +81,7 @@ function HowItWorksSection() {
           <div className='homepage-section-intro'>
             <div>
               <p className='marketing-kicker'>How it works</p>
+              {/* ui-casing-allow: marketing display headline */}
               <h2 className='marketing-h2-linear mt-6 max-w-[12ch] text-primary-token'>
                 Three steps to your first fan.
               </h2>
@@ -155,6 +157,7 @@ function BenefitsSection() {
           <div className='homepage-section-intro'>
             <div>
               <p className='marketing-kicker'>Why it matters</p>
+              {/* ui-casing-allow: marketing display headline */}
               <h2 className='marketing-h2-linear mt-6 max-w-[11ch] text-primary-token'>
                 Payments are just the beginning.
               </h2>
@@ -197,8 +200,11 @@ function BenefitsSection() {
 
 const USE_CASES = [
   { icon: Music, label: 'Buskers' },
+  // ui-casing-allow: marketing display label
   { icon: Mic, label: 'Open mic nights' },
+  // ui-casing-allow: marketing display label
   { icon: Store, label: 'Merch tables' },
+  // ui-casing-allow: marketing display label
   { icon: Users, label: 'House shows' },
 ] as const;
 
@@ -210,6 +216,7 @@ function SocialProofSection() {
           <div className='homepage-section-intro'>
             <div>
               <p className='marketing-kicker'>Built for real-world artists</p>
+              {/* ui-casing-allow: marketing display headline */}
               <h2 className='marketing-h2-linear mt-6 max-w-[10ch] text-primary-token'>
                 Perfect for every stage.
               </h2>
@@ -256,6 +263,7 @@ function TipsFinalCTA() {
         <div className='grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start'>
           <div className='max-w-[31rem]'>
             <p className='marketing-kicker'>Claim your handle</p>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='marketing-h2-linear mt-6 text-primary-token'>
               Start turning payments into fans.
             </h2>

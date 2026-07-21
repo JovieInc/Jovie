@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import {
   FaqSection,
   MarketingContainer,
-  MarketingHeroLayout,
+  MarketingHero,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import {
@@ -96,7 +96,7 @@ export default function AboutPage() {
       <script type='application/ld+json'>{FAQ_SCHEMA}</script>
       <script type='application/ld+json'>{BREADCRUMB_SCHEMA}</script>
 
-      <MarketingHeroLayout variant='left'>
+      <MarketingHero variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>About</p>
         <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'>
           Release More Music. Do Less Release Work.
@@ -106,7 +106,7 @@ export default function AboutPage() {
           artist profiles, audience intelligence, release automation, and AI —
           all in one place.
         </p>
-      </MarketingHeroLayout>
+      </MarketingHero>
 
       {/* Origin Story */}
       <MarketingContainer width='prose' className='pb-16'>

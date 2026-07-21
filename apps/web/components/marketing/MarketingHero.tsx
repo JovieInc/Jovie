@@ -2,6 +2,8 @@ import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import type { ElementType, ReactNode } from 'react';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
+import { LandingCTAButton } from '@/components/features/landing/LandingCTAButton';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from './MarketingContainer';
 
@@ -20,7 +22,34 @@ export interface MarketingHeroCta {
   readonly prefetch?: boolean;
 }
 
-export interface MarketingHeroProps {
+interface MarketingHeroBaseProps {
+  readonly className?: string;
+  /** Id applied to the hero heading and referenced by `aria-labelledby`. */
+  readonly headingId?: string;
+}
+
+/**
+ * Shell mode — hero section layout primitive for content-heavy page
+ * sections (blog, changelog, support, compare) that are not marketing
+ * heroes. Renders a full-width section with Linear hero spacing and
+ * caller-provided children.
+ */
+export interface MarketingHeroShellProps extends MarketingHeroBaseProps {
+  /**
+   * - `centered`: single column, text centered, constrained to page width
+   * - `left`: single column, text left-aligned, constrained to page width
+   * - `split`: two-column grid on md+, text left / media right
+   */
+  readonly variant: 'split' | 'centered' | 'left';
+  readonly children: ReactNode;
+}
+
+/**
+ * Content mode — the canonical content-driven landing hero: one-line 56px
+ * headline, 18px subtitle, dual CTA (primary + ghost) on the canonical
+ * button system, and the distributor logo bar as the proof element.
+ */
+export interface MarketingHeroContentProps extends MarketingHeroBaseProps {
   /** One-line value prop. 56px Inter at `--font-weight-bold` (680). */
   readonly headline: string;
   /** 1-2 line supporting copy. 18px Inter at 400. */
@@ -41,14 +70,71 @@ export interface MarketingHeroProps {
   readonly media?: ReactNode;
   /** Copy alignment when no `media` column is present. */
   readonly align?: 'center' | 'left';
-  readonly headingId?: string;
   readonly testId?: string;
-  readonly className?: string;
   /**
    * Link renderer override (e.g. an analytics-tracked link component).
    * Defaults to `next/link`.
    */
   readonly linkComponent?: ElementType;
+}
+
+/**
+ * Landing mode — feature-landing hero (`/voice`) with eyebrow, rich
+ * ReactNode title/body, tracked primary CTA, text secondary CTA, subcopy,
+ * proof chips, and a media column over the Linear hero backdrop.
+ */
+export interface MarketingHeroLandingProps extends MarketingHeroBaseProps {
+  readonly eyebrow: string;
+  readonly title: ReactNode;
+  readonly body: ReactNode;
+  readonly media: ReactNode;
+  readonly headingId: string;
+  readonly titleTestId?: string;
+  readonly sectionTestId?: string;
+  readonly primaryCtaLabel?: string;
+  readonly primaryCtaHref?: string;
+  readonly ctaEventName?: string;
+  readonly primaryCtaTestId?: string;
+  readonly secondaryCtaLabel?: string;
+  readonly secondaryCtaHref?: string;
+  readonly subcopy?: string;
+  readonly proofPoints?: readonly string[];
+  readonly copyClassName?: string;
+  readonly titleClassName?: string;
+  readonly mediaClassName?: string;
+  readonly gridClassName?: string;
+}
+
+export type MarketingHeroProps =
+  | MarketingHeroShellProps
+  | MarketingHeroContentProps
+  | MarketingHeroLandingProps;
+
+const shellVariantClasses = {
+  centered:
+    'mx-auto flex max-w-300 flex-col items-center px-6 text-center sm:px-8 lg:px-10',
+  left: 'mx-auto flex max-w-300 flex-col items-start px-6 text-left sm:px-8 lg:px-10',
+  split:
+    'mx-auto grid max-w-320 grid-cols-1 items-center gap-10 px-6 sm:px-8 md:grid-cols-2 md:gap-16 lg:px-10',
+} as const;
+
+function MarketingHeroShell({
+  variant,
+  className,
+  children,
+}: MarketingHeroShellProps) {
+  return (
+    <section
+      className={cn(
+        'relative w-full',
+        'pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32',
+        shellVariantClasses[variant],
+        className
+      )}
+    >
+      {children}
+    </section>
+  );
 }
 
 function MarketingHeroCtaLink({
@@ -86,17 +172,7 @@ function MarketingHeroCtaLink({
   );
 }
 
-/**
- * Canonical marketing hero — one hero, dual CTA, logo-bar proof.
- *
- * The single hero for landing surfaces (`/`, `/pricing`, feature pages):
- * a one-line 56px Inter headline, an 18px subtitle, a dual CTA on the
- * canonical button system (primary + ghost), and the distributor logo bar
- * as the proof element below the copy. Stacks to a single column below
- * 768px. Replaces the previous placeholder hero variants
- * (centered / left / split demo content).
- */
-export function MarketingHero({
+function MarketingHeroContent({
   headline,
   subtitle,
   primaryCta,
@@ -108,7 +184,7 @@ export function MarketingHero({
   testId,
   className,
   linkComponent = Link,
-}: MarketingHeroProps) {
+}: MarketingHeroContentProps) {
   const layout = media ? 'split' : align;
 
   return (
@@ -153,4 +229,140 @@ export function MarketingHero({
       )}
     </section>
   );
+}
+
+function MarketingHeroLanding({
+  eyebrow,
+  title,
+  body,
+  media,
+  headingId,
+  titleTestId = 'hero-heading',
+  sectionTestId = 'marketing-hero-section',
+  primaryCtaLabel = 'Get started',
+  primaryCtaHref = APP_ROUTES.SIGNUP,
+  ctaEventName = 'landing_cta_get_started',
+  primaryCtaTestId,
+  secondaryCtaLabel,
+  secondaryCtaHref,
+  subcopy,
+  proofPoints = [],
+  copyClassName,
+  titleClassName,
+  mediaClassName,
+  gridClassName,
+}: MarketingHeroLandingProps) {
+  return (
+    <section
+      className='relative overflow-hidden pb-12 pt-[5.75rem] md:pb-16 md:pt-[6.25rem] lg:pb-20'
+      data-testid={sectionTestId}
+      aria-labelledby={headingId}
+    >
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-0'
+        style={{ background: 'var(--linear-hero-backdrop)' }}
+      />
+      <div className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-[36rem]' />
+
+      {/* Padding override preserves the legacy landing-hero spacing
+          (px-5 sm:px-6 lg:px-8) while the max-width comes from the
+          canonical MarketingContainer token. */}
+      <MarketingContainer width='page' className='px-5 sm:px-6 lg:px-8'>
+        <div className='mx-auto max-w-300'>
+          <div
+            className={cn(
+              'grid items-center gap-12 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-10',
+              gridClassName
+            )}
+          >
+            <div className={cn('max-w-[34rem]', copyClassName)}>
+              {eyebrow ? (
+                <p className='homepage-section-eyebrow'>{eyebrow}</p>
+              ) : null}
+              <h1
+                id={headingId}
+                data-testid={titleTestId}
+                className={cn(
+                  'marketing-h1-linear mt-5 text-primary-token',
+                  titleClassName
+                )}
+              >
+                {title}
+              </h1>
+              <div className='mt-5 max-w-[34rem] text-base leading-[1.7] text-secondary-token sm:text-lg'>
+                {body}
+              </div>
+
+              <div className='mt-8 flex flex-wrap items-center gap-3'>
+                <LandingCTAButton
+                  href={primaryCtaHref}
+                  label={primaryCtaLabel}
+                  eventName={ctaEventName}
+                  section='hero'
+                  testId={primaryCtaTestId}
+                />
+
+                {secondaryCtaLabel && secondaryCtaHref ? (
+                  <Link
+                    href={secondaryCtaHref}
+                    className='inline-flex h-10 items-center rounded-full border border-subtle px-4 text-sm font-medium text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+                  >
+                    {secondaryCtaLabel}
+                  </Link>
+                ) : null}
+
+                {subcopy ? (
+                  <span className='text-xs text-tertiary-token'>{subcopy}</span>
+                ) : null}
+              </div>
+
+              {proofPoints.length > 0 ? (
+                <div className='mt-7 flex flex-wrap gap-2.5'>
+                  {proofPoints.map(label => (
+                    <span
+                      key={label}
+                      className='inline-flex items-center rounded-full border border-subtle bg-surface-1 px-3.5 py-1.5 text-xs font-medium tracking-tight text-secondary-token'
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div
+              className={cn(
+                'lg:justify-self-center xl:justify-self-end',
+                mediaClassName
+              )}
+            >
+              {media}
+            </div>
+          </div>
+        </div>
+      </MarketingContainer>
+    </section>
+  );
+}
+
+/**
+ * The single marketing hero section primitive.
+ *
+ * Three modes, discriminated by required props:
+ * - Shell (`variant` + `children`): layout shell for content-heavy page
+ *   heroes — support, about, blog, changelog, compare, alternatives, pay.
+ * - Content (`headline` + `subtitle` + `primaryCta`): the canonical
+ *   content-driven landing hero with dual CTA and logo-bar proof.
+ * - Landing (`eyebrow` + `title` + `body` + `media`): feature-landing
+ *   hero (`/voice`) over the Linear hero backdrop.
+ */
+export function MarketingHero(props: MarketingHeroProps) {
+  if ('variant' in props) {
+    return <MarketingHeroShell {...props} />;
+  }
+  if ('title' in props) {
+    return <MarketingHeroLanding {...props} />;
+  }
+  return <MarketingHeroContent {...props} />;
 }

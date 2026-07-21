@@ -19,9 +19,9 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-// Mock SharedMarketingHero children rendering for isolation while still exercising page
-vi.mock('@/components/features/landing/SharedMarketingHero', () => ({
-  SharedMarketingHero: (props: any) => (
+// Mock MarketingHero children rendering for isolation while still exercising page
+vi.mock('@/components/marketing/MarketingHero', () => ({
+  MarketingHero: (props: any) => (
     <section data-testid={props.sectionTestId || 'marketing-hero-section'}>
       <h1 data-testid={props.titleTestId || 'hero-heading'}>{props.title}</h1>
       <div>{props.body}</div>

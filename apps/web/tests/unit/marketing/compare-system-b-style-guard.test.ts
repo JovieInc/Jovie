@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
  * gradient colors, raw color scales, inline styles, or the System A editorial
  * type classes (marketing-*-linear / marketing-kicker). Named System B token
  * utilities only. The .linear-marketing bridge (layout-owned) and shared
- * marketing components (MarketingHeroLayout / MarketingContainer / FaqSection /
+ * marketing components (MarketingHero / MarketingContainer / FaqSection /
  * ClientFaqAccordion) stay until the final coordinated teardown; this guard
  * only governs the page's own files.
  */
