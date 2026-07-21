@@ -3540,7 +3540,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .system-b-mounted-home-footer-cta-action {
-  min-height: calc(var(--space-10) + var(--space-0-5));
   margin-top: var(--space-8);
   letter-spacing: 0;
 }
@@ -4038,6 +4037,22 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-tight);
   letter-spacing: 0;
+}
+
+/* Feature differentiation: Geist feature accent on card TITLE TEXT ONLY
+   (design/jovie-design-decision-log 2026-07-05 — never on container
+   backgrounds, CTAs, icon backgrounds, or decorative glows).
+   Streams = track/analytics blue, Fans = artist purple, Paid = success green. */
+.homepage-artist-outcome:nth-child(1) h3 {
+  color: var(--color-accent-blue);
+}
+
+.homepage-artist-outcome:nth-child(2) h3 {
+  color: var(--color-accent-purple);
+}
+
+.homepage-artist-outcome:nth-child(3) h3 {
+  color: var(--color-accent-green);
 }
 
 .homepage-artist-outcome__media {
