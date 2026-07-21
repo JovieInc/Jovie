@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import {
   AlertCircle,
   AtSign,
@@ -435,18 +436,19 @@ export function OnboardingSpotifyArtistPickerCard({
         ))}
 
         {!isSearching && results.length > 0 && onNoneOfThese ? (
-          <button
+          <Button
             type='button'
+            variant='ghost'
             onClick={() => {
               if (disabled) return;
               onNoneOfThese();
             }}
             disabled={disabled || selectedId !== null}
-            className='flex w-full items-center justify-center rounded-lg px-2.5 py-2 text-xs font-medium text-secondary-token transition-colors duration-fast hover:bg-white/[0.045] hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
+            className='flex h-auto w-full items-center justify-center rounded-lg px-2.5 py-2 text-xs font-medium text-secondary-token hover:bg-white/[0.045] hover:text-primary-token'
             data-testid='onboarding-artist-none-of-these'
           >
             {NONE_OF_THESE_CTA_LABEL}
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>
@@ -669,7 +671,7 @@ export function OnboardingHandleCheckCard({
                 : (profilePath ?? 'Edit the handle before it is claimed.'))}
           </p>
           {onConfirmHandle ? (
-            <button
+            <Button
               type='button'
               data-testid='onboarding-confirm-handle'
               disabled={!canConfirm}
@@ -679,14 +681,14 @@ export function OnboardingHandleCheckCard({
                 onConfirmHandle(normalizedDraft);
               }}
               className={cn(
-                'mt-3 inline-flex h-9 items-center justify-center rounded-full px-3.5 text-app font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20',
+                'mt-3 h-9 rounded-full px-3.5 text-app font-semibold',
                 canConfirm
                   ? 'bg-white text-black hover:bg-white/90 dark:bg-white dark:text-black'
                   : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
               )}
             >
               {confirmed ? 'Handle Confirmed' : CONFIRM_HANDLE_CTA_LABEL}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -778,7 +780,7 @@ export function OnboardingSocialLinkCard({
             {host ?? 'Paste the full URL fans already use.'}
           </p>
           {onAttachAccount ? (
-            <button
+            <Button
               type='button'
               data-testid='onboarding-attach-account'
               disabled={!canAttach}
@@ -788,14 +790,14 @@ export function OnboardingSocialLinkCard({
                 onAttachAccount(trimmed);
               }}
               className={cn(
-                'mt-3 inline-flex h-9 items-center justify-center rounded-full px-3.5 text-app font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20',
+                'mt-3 h-9 rounded-full px-3.5 text-app font-semibold',
                 canAttach
                   ? 'bg-white text-black hover:bg-white/90 dark:bg-white dark:text-black'
                   : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
               )}
             >
               {attached ? 'Account Attached' : ATTACH_ACCOUNT_CTA_LABEL}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
