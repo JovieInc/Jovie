@@ -1,0 +1,42 @@
+/* ArtistProfileOutcomeDuo — System B tokenized drawer-preview details.
+   Section/tile layout stays in app/(home)/home.css (homepage-profile-*). */
+
+.ap-outcome-drawer__handle {
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 14%,
+    transparent
+  );
+}
+
+.ap-outcome-drawer__row {
+  border-color: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 8%,
+    transparent
+  );
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 4%,
+    transparent
+  );
+}
+
+.ap-outcome-drawer__row--featured {
+  border-color: var(--color-bg-base);
+  background: var(--color-bg-base);
+}
+
+.ap-outcome-drawer__cta {
+  background: var(--color-bg-base);
+  letter-spacing: -0.01em;
+}
+
+.ap-outcome-date {
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
+
+.ap-outcome-tracking {
+  letter-spacing: -0.02em;
+}

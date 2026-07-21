@@ -15,6 +15,7 @@ import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { cn } from '@/lib/utils';
+import './ArtistProfileMonetizationSection.css';
 import {
   clampOutcomeIndex,
   getNearestOutcomeIndex,
@@ -209,18 +210,19 @@ export function ArtistProfileMonetizationSection({
 
   return (
     <ArtistProfileSectionShell
-      className='bg-(--color-bg-base)'
+      className='bg-base'
       containerClassName='!max-w-none !px-0'
       width='page'
     >
       <div>
-        <div className='mx-auto max-w-(--linear-content-max) px-5 sm:px-6 lg:px-0'>
-          <div className='max-w-[34rem]'>
+        <div className='ap-monetization__header mx-auto px-5 sm:px-6 lg:px-0'>
+          <div className='max-w-136'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className={SHELL_H2_CLASS}>
               <span className='block'>Get paid.</span>
               <span className='block'>Again and again.</span>
             </h2>
-            <p className={`${SHELL_LEAD_CLASS} mt-5 max-w-[30rem] sm:mt-6`}>
+            <p className={`${SHELL_LEAD_CLASS} mt-5 max-w-120 sm:mt-6`}>
               {monetization.subhead}
             </p>
           </div>
@@ -231,18 +233,18 @@ export function ArtistProfileMonetizationSection({
             ref={scrollerRef}
             data-testid='artist-profile-monetization-scroller'
             aria-label='Monetization Card Carousel'
-            className='relative grid grid-cols-1 gap-3 overflow-visible px-5 pb-2 sm:flex sm:gap-4 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-contain sm:scroll-smooth sm:snap-x sm:snap-mandatory sm:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] sm:pr-[10vw] sm:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2+1.5rem))] lg:pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] lg:pr-[12vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--linear-content-max))/2))] [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide [&::-webkit-scrollbar]:hidden'
+            className='ap-monetization__scroller relative grid grid-cols-1 gap-3 overflow-visible px-5 pb-2 sm:flex sm:gap-4 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-contain sm:scroll-smooth sm:snap-x sm:snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide [&::-webkit-scrollbar]:hidden'
           >
             <button
               type='button'
               onClick={() => {
                 scrollByDirection('next');
               }}
-              className='sr-only focus:not-sr-only focus:absolute focus:left-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] focus:top-4 focus:z-30 focus:rounded-full focus:border focus:border-black/12 focus:bg-(--color-cell-hover) focus:px-4 focus:py-2 focus:text-xs focus:font-semibold focus:text-black focus:shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+              className='ap-monetization__skip sr-only focus:not-sr-only focus:absolute focus:top-4 focus:z-30'
             >
               Browse monetization cards
             </button>
-            <div className='pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--linear-content-max))/2+1.25rem))] top-5 z-20 hidden items-center gap-2 lg:flex'>
+            <div className='ap-monetization__nav pointer-events-none absolute top-5 z-20 hidden items-center gap-2 lg:flex'>
               <button
                 type='button'
                 onClick={() => {
@@ -250,10 +252,8 @@ export function ArtistProfileMonetizationSection({
                 }}
                 disabled={activeCardIndex === 0}
                 className={cn(
-                  'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
-                  activeCardIndex === 0
-                    ? 'cursor-not-allowed opacity-35'
-                    : 'hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white'
+                  'ap-monetization__nav-btn pointer-events-auto rounded-full p-2.5 backdrop-blur-xl transition-colors',
+                  activeCardIndex === 0 && 'cursor-not-allowed opacity-35'
                 )}
                 aria-label='Scroll Monetization Left'
               >
@@ -266,10 +266,9 @@ export function ArtistProfileMonetizationSection({
                 }}
                 disabled={activeCardIndex === cards.length - 1}
                 className={cn(
-                  'pointer-events-auto rounded-full border border-white/10 bg-black/62 p-2.5 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors',
-                  activeCardIndex === cards.length - 1
-                    ? 'cursor-not-allowed opacity-35'
-                    : 'hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white'
+                  'ap-monetization__nav-btn pointer-events-auto rounded-full p-2.5 backdrop-blur-xl transition-colors',
+                  activeCardIndex === cards.length - 1 &&
+                    'cursor-not-allowed opacity-35'
                 )}
                 aria-label='Scroll Monetization Right'
               >
@@ -336,16 +335,16 @@ const MonetizationCard = forwardRef<HTMLElement, MonetizationCardProps>(
     const textBlock = (
       <div
         className={cn(
-          'relative z-10 max-w-[17rem]',
+          'relative z-10 max-w-68',
           textAnchor === 'top'
             ? 'self-start text-left'
-            : 'self-end text-right sm:max-w-[15.5rem]'
+            : 'self-end text-right sm:max-w-62'
         )}
       >
-        <h3 className='text-[1.4rem] font-semibold leading-[1.02] tracking-[-0.05em] text-white dark:text-white'>
+        <h3 className='ap-monetization__card-title font-semibold text-primary-token'>
           {title}
         </h3>
-        <p className='mt-3 text-app leading-[1.58] tracking-[-0.02em] text-white/72'>
+        <p className='ap-monetization__card-body mt-3 text-app text-secondary-token'>
           {body}
         </p>
       </div>
@@ -368,16 +367,13 @@ const MonetizationCard = forwardRef<HTMLElement, MonetizationCardProps>(
         ref={ref}
         data-testid='artist-profile-monetization-card'
         className={cn(
-          'relative flex w-full shrink-0 snap-start flex-col overflow-hidden rounded-[1.45rem] bg-black p-5 text-white dark:bg-black dark:text-white shadow-[0_22px_64px_rgba(0,0,0,0.26)] sm:w-[25rem] sm:p-6 lg:w-[27rem] lg:p-6.5',
+          'ap-monetization__card relative flex w-full shrink-0 snap-start flex-col overflow-hidden p-5 sm:w-100 sm:p-6 lg:w-108 lg:p-6.5',
           isCaptureCard
-            ? 'min-h-[22.75rem] sm:min-h-[23.75rem] lg:min-h-[24.5rem]'
-            : 'min-h-[27rem] sm:min-h-[29rem] lg:min-h-[30rem]'
+            ? 'min-h-91 sm:min-h-95 lg:min-h-98'
+            : 'min-h-108 sm:min-h-116 lg:min-h-120'
         )}
       >
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-[1.45rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.7),transparent)]'
-        />
+        <div aria-hidden='true' className='ap-monetization__card-sheen' />
         {textAnchor === 'top' ? textBlock : visualBlock}
         <div className='flex-1' />
         {textAnchor === 'top' ? visualBlock : textBlock}
@@ -390,7 +386,7 @@ function IrlPaymentsVisual({}: Readonly<{
   card: ArtistProfileLandingCopy['monetization']['irlPaymentsCard'];
 }>) {
   return (
-    <div className='relative h-[12.5rem] w-full max-w-[16rem] overflow-hidden rounded-t-[1.45rem] rounded-b-none bg-(--color-bg-input) shadow-[0_-20px_48px_rgba(0,0,0,0.24)] sm:h-[14.5rem] sm:w-[19rem] sm:max-w-none'>
+    <div className='ap-monetization__pay-shot relative h-50 w-full max-w-64 overflow-hidden bg-surface-input sm:h-58 sm:w-76 sm:max-w-none'>
       <Image
         alt='Pay drawer open inside an artist profile payment flow'
         className='object-cover object-bottom'
@@ -398,10 +394,7 @@ function IrlPaymentsVisual({}: Readonly<{
         sizes='(max-width: 640px) 18rem, 19rem'
         src={getMarketingExportImage('tim-white-profile-pay-mobile').publicUrl}
       />
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-x-0 top-0 h-12 bg-[linear-gradient(180deg,rgba(13,16,21,0.06),transparent)]'
-      />
+      <div aria-hidden='true' className='ap-monetization__pay-shot-scrim' />
     </div>
   );
 }
@@ -412,27 +405,27 @@ function CaptureFanVisual({
   card: ArtistProfileLandingCopy['monetization']['captureCard'];
 }>) {
   return (
-    <div className='w-[14.75rem] rounded-[1.15rem] bg-(--color-bg-input) px-4 py-3.5 text-white dark:text-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]'>
+    <div className='ap-monetization__fan-card w-59 bg-surface-input px-4 py-3.5 text-primary-token'>
       <div className='flex items-start justify-between gap-3'>
         <div>
-          <p className='text-sm font-semibold tracking-[-0.03em] text-white dark:text-white'>
+          <p className='ap-monetization__fan-name text-sm font-semibold text-primary-token'>
             {card.fanName}
           </p>
-          <div className='mt-1 inline-flex items-center gap-1.5 text-2xs font-medium text-white/72'>
+          <div className='mt-1 inline-flex items-center gap-1.5 text-2xs font-medium text-secondary-token'>
             <MapPin className='h-3.5 w-3.5' strokeWidth={1.9} />
             {card.fanLocation}
           </div>
         </div>
-        <div className='rounded-full bg-white dark:bg-surface-1 px-2.5 py-1 text-2xs font-semibold text-black dark:text-white'>
+        <div className='rounded-full bg-surface-1 px-2.5 py-1 text-2xs font-semibold text-primary-token'>
           {card.fanAmount}
         </div>
       </div>
-      <div className='mt-3 rounded-[0.95rem] bg-white/[0.06] px-3 py-2.5'>
-        <p className='text-xs font-medium tracking-[-0.02em] text-white/76'>
+      <div className='ap-monetization__fan-intent mt-3 px-3 py-2.5'>
+        <p className='text-xs font-medium text-secondary-token'>
           {card.fanIntent}
         </p>
       </div>
-      <div className='mt-2.5 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.25 text-3xs font-semibold text-white/74'>
+      <div className='ap-monetization__fan-pill mt-2.5 inline-flex rounded-full px-3 py-1.25 text-3xs font-semibold text-secondary-token'>
         New music notifications enabled
       </div>
     </div>
@@ -445,25 +438,25 @@ function SayThanksVisual({
   card: ArtistProfileLandingCopy['monetization']['thanksCard'];
 }>) {
   return (
-    <div className='w-[15rem] rounded-[1.1rem] bg-(--color-bg-input) p-3.5 text-white dark:text-white shadow-[0_18px_34px_rgba(0,0,0,0.16)]'>
+    <div className='ap-monetization__thanks-card w-60 bg-surface-input p-3.5 text-primary-token'>
       <div className='flex items-start gap-3'>
-        <span className='mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-white dark:text-white'>
+        <span className='ap-monetization__thanks-icon mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full text-primary-token'>
           <Mail className='h-4 w-4' strokeWidth={1.9} />
         </span>
         <div className='min-w-0 flex-1'>
           <div className='flex items-center justify-between gap-3'>
-            <p className='text-xs font-semibold tracking-[-0.02em] text-white dark:text-white'>
+            <p className='ap-monetization__thanks-app text-xs font-semibold text-primary-token'>
               {card.appName}
             </p>
-            <p className='text-2xs font-medium text-white/72'>now</p>
+            <p className='text-2xs font-medium text-secondary-token'>now</p>
           </div>
-          <p className='mt-0.5 text-2xs font-medium text-white/72'>
+          <p className='mt-0.5 text-2xs font-medium text-secondary-token'>
             {card.sender}
           </p>
-          <p className='mt-3 text-app font-semibold leading-[1.28] tracking-[-0.03em] text-white dark:text-white'>
+          <p className='ap-monetization__thanks-title mt-3 text-app font-semibold text-primary-token'>
             {card.notificationTitle}
           </p>
-          <p className='mt-1.5 text-xs leading-[1.45] text-white/74'>
+          <p className='ap-monetization__thanks-preview mt-1.5 text-xs text-secondary-token'>
             {card.notificationPreview}
           </p>
         </div>
@@ -490,27 +483,27 @@ function ReengageVisual({
   } as const;
 
   return (
-    <div className='relative w-full max-w-[15rem] sm:w-[15.75rem] sm:max-w-none'>
+    <div className='relative w-full max-w-60 sm:w-63 sm:max-w-none'>
       {card.outputs.map((output, index) => {
         const Icon = iconMap[output.id];
         return (
           <div
             key={output.id}
             className={cn(
-              'relative rounded-xl bg-(--color-bg-input) px-3.5 py-3.5 text-white dark:text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]',
+              'ap-monetization__output relative rounded-xl bg-surface-input px-3.5 py-3.5 text-primary-token',
               getOutputTransformClass(index),
               index > 0 && 'mt-2.5'
             )}
           >
             <div className='flex items-start gap-3'>
-              <span className='mt-0.5 inline-flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-white/88'>
+              <span className='ap-monetization__output-icon mt-0.5 inline-flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-full text-primary-token'>
                 <Icon className='h-4 w-4' strokeWidth={1.9} />
               </span>
               <div className='min-w-0'>
-                <p className='text-xs font-semibold leading-[1.3] tracking-[-0.02em] text-white dark:text-white'>
+                <p className='ap-monetization__output-title text-xs font-semibold text-primary-token'>
                   {output.title}
                 </p>
-                <p className='mt-1.5 text-2xs leading-[1.45] text-white/72'>
+                <p className='ap-monetization__output-detail mt-1.5 text-2xs text-secondary-token'>
                   {output.detail}
                 </p>
               </div>

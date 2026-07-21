@@ -1,0 +1,13 @@
+/*
+ * Artist-profile logo bar (System B).
+ *
+ * Same barely-there light tint as the adaptive sequence shell; alpha tints
+ * are not expressible with surface tokens, so the exact color is kept here
+ * as a color-mix. Layout utilities stay in the TSX.
+ *
+ * Scoped to the `ap-logo-bar` prefix.
+ */
+
+.ap-logo-bar {
+  background-color: color-mix(in oklab, #fff 1.2%, transparent);
+}
