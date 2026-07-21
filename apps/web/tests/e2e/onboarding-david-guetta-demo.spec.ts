@@ -532,7 +532,7 @@ test('records David Guetta Spotify-first onboarding demo', async ({
   const handleCard = page.getByTestId('onboarding-handle-check');
   await expect(handleCard.getByText('@davidguetta')).toBeVisible();
   await expect(handleCard.getByText('is available')).toBeVisible();
-  await expect(handleCard.getByLabel('Edit proposed handle')).toBeVisible();
+  await expect(handleCard.getByLabel('Edit Proposed Handle')).toBeVisible();
   await attachDemoScreenshot(page, testInfo, 'editable-handle');
   await attachDemoScreenshot(page, testInfo, 'profile-bento-preview');
 
