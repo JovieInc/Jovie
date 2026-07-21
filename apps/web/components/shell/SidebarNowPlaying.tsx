@@ -17,9 +17,11 @@ export interface NowPlayingTrack {
 }
 
 /**
- * SidebarNowPlaying — floating now-playing card pinned to the canvas
- * left-edge, just above the audio bar. Collapsed mode renders just the
- * artwork (10×10) — used when the sidebar itself is collapsed to icons.
+ * SidebarNowPlaying — now-playing track row rendered inside the docked
+ * audio bar surface (JOV-3511: flat, not a floating/elevated card — the
+ * caller supplies surface styling via `className`). Collapsed mode renders
+ * just the artwork (10×10) — used when the sidebar itself is collapsed to
+ * icons.
  *
  * Pure presentational. Caller controls `isPlaying` + `onPlay`. Pass
  * `playOverlayVisible={true}` when the audio bar is hidden so the artwork

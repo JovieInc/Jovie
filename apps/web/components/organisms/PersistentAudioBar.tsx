@@ -36,8 +36,11 @@ const SHELL_AUDIO_BAR_TRANSITION =
   'max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)';
 const SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME =
   'transition-[max-height,opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
+// Docked flat into the expanded bar surface (JOV-3511): no card border,
+// surface fill, or drop shadow — the track row sits directly on the docked
+// bar instead of floating elevated above it.
 const SHELL_NOW_PLAYING_CARD_CLASSNAME =
-  'max-w-56 rounded-lg border border-(--app-shell-border)/75 bg-(--app-shell-content-surface) px-2 py-2 shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform] duration-cinematic ease-cinematic';
+  'max-w-56 px-2 py-2 transition-[opacity,transform] duration-cinematic ease-cinematic';
 const SHELL_NOW_PLAYING_ROW_CLASSNAME =
   'max-w-64 border border-(--app-shell-border)/75 bg-(--app-shell-content-surface) shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
 
@@ -245,15 +248,28 @@ export function PersistentAudioBar({
   ]);
 
   useEffect(() => {
-    if (!isShellAudioBar || !activeTrackId) {
+    if (!activeTrackId) {
       resetAudioChromeSnapshot();
       return;
     }
 
+    if (isShellAudioBar) {
+      setAudioChromeSnapshot({
+        activeTrackId,
+        compactPlayerVisible,
+        fullPlayerVisible: !compactPlayerVisible,
+      });
+      return;
+    }
+
+    // Legacy variant: the docked legacy bar is the only persistent surface
+    // and it renders whenever a track is active — publish full-player
+    // ownership so the sidebar mini-player reserves instead of doubling
+    // (JOV-3511).
     setAudioChromeSnapshot({
       activeTrackId,
-      compactPlayerVisible,
-      fullPlayerVisible: !compactPlayerVisible,
+      compactPlayerVisible: false,
+      fullPlayerVisible: true,
     });
   }, [activeTrackId, compactPlayerVisible, isShellAudioBar]);
 

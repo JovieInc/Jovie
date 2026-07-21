@@ -539,6 +539,53 @@ describe('PersistentAudioBar', () => {
     });
   });
 
+  it('publishes full-player chrome ownership in the legacy variant and clears on unmount (JOV-3511)', () => {
+    setPlaying({ artistName: 'DJ Cool' });
+
+    const { unmount } = render(<PersistentAudioBar variant='legacy' />);
+
+    // The legacy docked bar is the only persistent surface and renders
+    // whenever a track is active — it must claim full-player ownership so
+    // the sidebar mini-player reserves instead of doubling.
+    expect(getAudioChromeSnapshot()).toEqual({
+      activeTrackId: 'track-1',
+      compactPlayerVisible: false,
+      fullPlayerVisible: true,
+    });
+
+    unmount();
+
+    expect(getAudioChromeSnapshot()).toEqual({
+      activeTrackId: null,
+      compactPlayerVisible: false,
+      fullPlayerVisible: false,
+    });
+  });
+
+  it('docks the shell V1 now-playing card flat into the bar surface (JOV-3511)', () => {
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
+    // The bar itself stays docked below content with its top seam.
+    expect(expandedSurface).toHaveClass('border-t');
+
+    const card = expandedSurface.querySelector('.max-w-56');
+    expect(card).not.toBeNull();
+    // Flattened: the now-playing row carries no floating-card treatment
+    // (drop shadow, rounded card chrome, border, elevated surface fill).
+    expect(card?.className).not.toMatch(/shadow-/);
+    expect(card?.className).not.toMatch(/rounded-/);
+    expect(card?.className).not.toMatch(/border/);
+    expect(card?.className).not.toContain('bg-(--app-shell-content-surface)');
+    // Content is unchanged: artwork, title, and artist still render.
+    expect(
+      within(expandedSurface).getByText('Midnight Drive')
+    ).toBeInTheDocument();
+    expect(within(expandedSurface).getByText('DJ Cool')).toBeInTheDocument();
+  });
+
   it('handles shell V1 active-track keyboard shortcuts', () => {
     setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
     pathname = APP_ROUTES.CHAT;

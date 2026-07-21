@@ -9,8 +9,16 @@ import { useAudioChromeSnapshot } from './audio-chrome-state';
 /**
  * SidebarBottomNowPlayingBridge — production audio adapter for the shell
  * `SidebarBottomNowPlaying` atom inside `UnifiedSidebar`. Renders only when
- * there's an active track and the persistent compact player does not already
- * own the same now-playing surface.
+ * there's an active track and no persistent audio surface (compact OR
+ * full/expanded bar, in either shell variant) already owns the same
+ * now-playing track (JOV-3511: never both at once).
+ *
+ * Ownership semantics: `PersistentAudioBar` publishes an audio-chrome
+ * snapshot whenever it has an active track. An empty snapshot therefore
+ * means no persistent bar is mounted, and the sidebar mini-player is the
+ * canonical now-playing surface and stays visible. When a persistent
+ * surface owns the track, the slot stays mounted at its fixed height in a
+ * reserved state (opacity-0 + inert) so hiding never shifts layout.
  *
  * Adapter: production `useTrackAudioPlayer().playbackState` →
  * `NowPlayingTrack` (trackTitle / artistName / artworkUrl). Tap-to-play
@@ -34,19 +42,21 @@ export function SidebarBottomNowPlayingBridge() {
   );
   if (!hasActiveTrack) return null;
 
-  const compactPlayerOwnsTrack =
-    audioChrome.compactPlayerVisible &&
-    audioChrome.activeTrackId === playbackState.activeTrackId;
+  const persistentSurfaceOwnsTrack =
+    audioChrome.activeTrackId === playbackState.activeTrackId &&
+    (audioChrome.compactPlayerVisible || audioChrome.fullPlayerVisible);
 
   return (
     <div
       data-shell-audio-surface='sidebar-compact'
-      data-state={compactPlayerOwnsTrack ? 'reserved' : 'visible'}
-      aria-hidden={compactPlayerOwnsTrack}
-      inert={compactPlayerOwnsTrack ? true : undefined}
+      data-state={persistentSurfaceOwnsTrack ? 'reserved' : 'visible'}
+      aria-hidden={persistentSurfaceOwnsTrack}
+      inert={persistentSurfaceOwnsTrack ? true : undefined}
       className={cn(
         'h-(--app-shell-audio-compact-height) overflow-hidden px-2 pb-2 pt-1 transition-[opacity,transform] duration-cinematic ease-cinematic',
-        compactPlayerOwnsTrack ? 'pointer-events-none opacity-0' : 'opacity-100'
+        persistentSurfaceOwnsTrack
+          ? 'pointer-events-none opacity-0'
+          : 'opacity-100'
       )}
     >
       <SidebarBottomNowPlaying
