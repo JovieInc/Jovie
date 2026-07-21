@@ -2890,10 +2890,11 @@ jobs:
     timeout-minutes: 40
     strategy:
       fail-fast: false
-      # Hosted capacity runs all five logical shards without consuming Gem.
-      max-parallel: 5
+      # Org hosted capacity ceiling ~120 concurrent jobs. Do not artificially
+      # serialize unit shards — wall-clock merge latency is the bottleneck.
+      max-parallel: 120
       matrix:
-        shard: ['1/5', '2/5', '3/5', '4/5', '5/5']
+        shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:

@@ -638,7 +638,7 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     assert "runs-on: ubuntu-latest" in units
     assert "runs-on: jovie-runner" not in units
     assert "vars.CI_UNIT_RUNNER" not in units
-    assert "max-parallel: 5" in units
+    assert "max-parallel: 120" in units
     assert "all five named" in units
 
 
