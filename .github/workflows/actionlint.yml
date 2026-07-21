@@ -3,6 +3,10 @@ name: Workflow Lint
 # Source, merge-group, and direct-main workflow edits are enforced inside
 # ci-fast's Structural Contract. Keep this standalone surface manual for
 # operator diagnosis without duplicating installs and runner allocation.
+#
+# Hygiene (#10463): do NOT add push/pull_request triggers here — every agent
+# branch push would mint a runner. Acceptance: push without workflow changes
+# triggers zero actionlint runs.
 on:
   workflow_dispatch:
 
