@@ -426,13 +426,13 @@ describe('surface elevation guardrails', () => {
     // Guardrails must match production classes exactly — [var(...)] form drifts
     // and fails Unit Tests after #13831.
     expect(shellFrame).toContain(
-      'lg:gap-(--linear-app-shell-gap) lg:p-(--linear-app-shell-gap)'
+      'lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)'
     );
     expect(linearTokens).toContain('--linear-app-sidebar-shadow:');
     expect(sidebar).not.toContain(
       'group-data-[variant=sidebar]:lg:shadow-[var(--linear-app-sidebar-shadow)]'
     );
-    expect(rightDrawer).toContain('border-l border-(--linear-app-frame-seam)');
+    expect(rightDrawer).toContain('border-l border-(--app-shell-frame-seam)');
     // Mobile overlay retains shadow; desktop drawer is flat so elevation
     // comes from DrawerSurfaceCard cards inside the shell, not the outer aside.
     expect(rightDrawer).toContain('shadow-(--linear-app-drawer-shadow)');

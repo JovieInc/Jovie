@@ -37,9 +37,9 @@ const SHELL_AUDIO_BAR_TRANSITION =
 const SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME =
   'transition-[max-height,opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
 const SHELL_NOW_PLAYING_CARD_CLASSNAME =
-  'max-w-56 rounded-lg border border-(--linear-app-shell-border)/75 bg-(--linear-app-content-surface) px-2 py-2 shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform] duration-cinematic ease-cinematic';
+  'max-w-56 rounded-lg border border-(--app-shell-border)/75 bg-(--app-shell-content-surface) px-2 py-2 shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform] duration-cinematic ease-cinematic';
 const SHELL_NOW_PLAYING_ROW_CLASSNAME =
-  'max-w-64 border border-(--linear-app-shell-border)/75 bg-(--linear-app-content-surface) shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
+  'max-w-64 border border-(--app-shell-border)/75 bg-(--app-shell-content-surface) shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
 
 function isLyricsRoutePath(pathname: string | null): boolean {
   return (
@@ -290,7 +290,7 @@ export function PersistentAudioBar({
     <section
       aria-label='Audio Player'
       className={cn(
-        'animate-in fade-in slide-in-from-bottom-2 duration-cinematic shrink-0 border-t border-subtle bg-(--linear-app-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]',
+        'animate-in fade-in slide-in-from-bottom-2 duration-cinematic shrink-0 border-t border-subtle bg-(--app-shell-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]',
         className
       )}
     >
@@ -402,13 +402,11 @@ export function PersistentAudioBar({
         data-shell-audio-surface='persistent-expanded'
         aria-hidden={barCollapsed}
         className={cn(
-          'hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-bg-page) lg:block',
+          'hidden shrink-0 overflow-hidden border-t border-(--app-shell-border) bg-(--linear-bg-page) lg:block',
           SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
         )}
         style={{
-          maxHeight: barCollapsed
-            ? 0
-            : 'var(--linear-app-audio-bar-max-height)',
+          maxHeight: barCollapsed ? 0 : 'var(--app-shell-audio-bar-max-height)',
           opacity: revealed && !barCollapsed ? 1 : 0,
           transform: !revealed
             ? 'translateY(100%)'
@@ -462,13 +460,11 @@ export function PersistentAudioBar({
         data-shell-audio-surface='persistent-compact'
         aria-hidden={!barCollapsed}
         className={cn(
-          'hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-3 lg:block',
+          'hidden shrink-0 overflow-hidden border-t border-(--app-shell-border) bg-(--app-shell-content-surface) px-3 lg:block',
           SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
         )}
         style={{
-          maxHeight: barCollapsed
-            ? 'var(--linear-app-audio-compact-height)'
-            : 0,
+          maxHeight: barCollapsed ? 'var(--app-shell-audio-compact-height)' : 0,
           opacity: barCollapsed ? 1 : 0,
           transform: barCollapsed ? 'translateY(0)' : 'translateY(8px)',
           pointerEvents: barCollapsed ? 'auto' : 'none',

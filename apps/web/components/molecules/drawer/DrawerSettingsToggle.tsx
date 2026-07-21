@@ -46,8 +46,8 @@ export function DrawerSettingsToggle({
       className={cn(
         'flex items-center justify-between gap-3 rounded-lg border py-px transition-[background-color,border-color] duration-subtle',
         density === 'compact'
-          ? 'border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'
-          : 'border-(--linear-app-frame-seam) bg-surface-0',
+          ? 'border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'
+          : 'border-(--app-shell-frame-seam) bg-surface-0',
         !disabled &&
           'hover:border-default hover:bg-surface-1 focus-within:border-default focus-within:bg-surface-1',
         density === 'compact' ? 'min-h-7' : 'min-h-9 lg:min-h-0',

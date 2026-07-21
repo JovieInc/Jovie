@@ -338,7 +338,7 @@ export function ReleaseEntityHeader({
         />
       </div>
       {footer ? (
-        <div className='border-t border-(--linear-app-frame-seam) px-3 py-2.5'>
+        <div className='border-t border-(--app-shell-frame-seam) px-3 py-2.5'>
           {footer}
         </div>
       ) : null}
@@ -430,7 +430,7 @@ export function ReleaseActivitySection({
       testId='release-activity-card'
       contentClassName='p-0'
     >
-      <div className='divide-y divide-(--linear-app-frame-seam)'>
+      <div className='divide-y divide-(--app-shell-frame-seam)'>
         {activityRows.map(row => (
           <div
             key={`${row.providerKey}-${row.updatedAt}`}

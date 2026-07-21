@@ -428,7 +428,7 @@ export function TrackSidebar({
                       onClick={handleTogglePlayback}
                       aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
                       aria-pressed={isPlaying}
-                      className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+                      className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--app-shell-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
                     >
                       {isPlaying ? (
                         <Pause className='h-4 w-4' />
@@ -437,7 +437,7 @@ export function TrackSidebar({
                       )}
                     </button>
                   ) : (
-                    <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-quaternary-token'>
+                    <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--app-shell-frame-seam) bg-surface-0 text-quaternary-token'>
                       <VolumeX className='h-4 w-4' />
                     </span>
                   )}

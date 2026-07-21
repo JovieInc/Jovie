@@ -33,7 +33,7 @@ export function ContentSectionHeader({
         variant === 'default' && 'border-b border-subtle bg-transparent',
         density === 'compact'
           ? 'min-h-10 py-1.5'
-          : 'min-h-(--linear-app-header-height) py-1.5',
+          : 'min-h-(--app-shell-header-height) py-1.5',
         className
       )}
     >

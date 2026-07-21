@@ -121,7 +121,7 @@ export function WorkspaceTabsSurface<
     <div className='space-y-4'>
       {headerless ? (
         shouldShowTabControls ? (
-          <div className='border-b border-(--linear-app-frame-seam) pb-3'>
+          <div className='border-b border-(--app-shell-frame-seam) pb-3'>
             <div className='flex flex-col gap-3'>
               {shouldShowPrimaryControl ? (
                 <LinkedTabBar

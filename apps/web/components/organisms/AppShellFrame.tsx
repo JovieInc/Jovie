@@ -82,8 +82,7 @@ export const AppShellFrame = memo(function AppShellFrame({
         data-app-shell-body='true'
         className={cn(
           'flex min-h-0 min-w-0 flex-1 overflow-hidden',
-          isShellChatV1 &&
-            'lg:gap-(--linear-app-shell-gap) lg:p-(--linear-app-shell-gap)'
+          isShellChatV1 && 'lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)'
         )}
       >
         <div
@@ -101,7 +100,7 @@ export const AppShellFrame = memo(function AppShellFrame({
             // beneath the in-flow header/content (#13386).
             'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
             isShellChatV1
-              ? 'lg:rounded-(--linear-app-shell-radius) lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-(--linear-app-shell-shadow)'
+              ? 'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
               : 'lg:border-l lg:border-subtle'
           )}
         >
@@ -118,7 +117,7 @@ export const AppShellFrame = memo(function AppShellFrame({
             <div
               aria-hidden='true'
               data-testid='chat-ambient-gradient'
-              className='pointer-events-none absolute inset-0 -z-10 bg-(--linear-app-content-surface)'
+              className='pointer-events-none absolute inset-0 -z-10 bg-(--app-shell-content-surface)'
               style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
             />
           ) : null}
@@ -127,7 +126,7 @@ export const AppShellFrame = memo(function AppShellFrame({
           <div
             className={cn(
               'flex flex-1 min-h-0 min-w-0 overflow-hidden',
-              isShellChatV1 && 'lg:gap-(--linear-app-shell-gap)'
+              isShellChatV1 && 'lg:gap-(--app-shell-gap)'
             )}
           >
             <div

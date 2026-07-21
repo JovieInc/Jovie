@@ -39,7 +39,7 @@ export function DrawerLoadingSkeleton({
       >
         <div
           className={cn(
-            'sticky top-0 z-10 flex min-h-8 shrink-0 items-center justify-between border-b border-(--linear-app-frame-seam) bg-surface-1 px-2 py-1 backdrop-blur-[10px]'
+            'sticky top-0 z-10 flex min-h-8 shrink-0 items-center justify-between border-b border-(--app-shell-frame-seam) bg-surface-1 px-2 py-1 backdrop-blur-[10px]'
           )}
         >
           <Skeleton className='h-2.5 w-28' />
@@ -65,7 +65,7 @@ export function DrawerLoadingSkeleton({
                   <Skeleton className='h-2.5 w-2/3' />
                 </div>
               </div>
-              <div className='mt-3 border-t border-(--linear-app-frame-seam) pt-2.5'>
+              <div className='mt-3 border-t border-(--app-shell-frame-seam) pt-2.5'>
                 <Skeleton className='h-6 w-full' rounded='md' />
               </div>
             </div>
@@ -74,10 +74,10 @@ export function DrawerLoadingSkeleton({
               className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
               data-testid='drawer-loading-analytics-card'
             >
-              <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+              <div className='border-b border-(--app-shell-frame-seam) px-3 py-2'>
                 <Skeleton className='h-2.5 w-16' />
               </div>
-              <div className='grid grid-cols-2 divide-x divide-(--linear-app-frame-seam) p-3'>
+              <div className='grid grid-cols-2 divide-x divide-(--app-shell-frame-seam) p-3'>
                 <div className='space-y-1'>
                   <Skeleton className='h-2.5 w-14' />
                   <Skeleton className='h-4.5 w-10' />

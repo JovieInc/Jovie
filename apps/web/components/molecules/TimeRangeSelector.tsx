@@ -214,7 +214,7 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
               title={
                 disabled ? 'Upgrade to Pro for extended analytics' : undefined
               }
-              className={`relative h-7 rounded-full border border-transparent px-2.5 text-xs font-caption tracking-tight shadow-none transition-[background-color,color,border-color,box-shadow] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface) ${stateClass}`}
+              className={`relative h-7 rounded-full border border-transparent px-2.5 text-xs font-caption tracking-tight shadow-none transition-[background-color,color,border-color,box-shadow] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--app-shell-content-surface) ${stateClass}`}
             >
               {getTimeRangeLabel(range, 'short')}
             </button>

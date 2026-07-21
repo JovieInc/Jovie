@@ -24,9 +24,9 @@ describe('AppShellFrame', () => {
     expect(mainContent).toHaveClass('lg:shadow-(--linear-app-shell-shadow)');
     // #main-content keeps its full rounded shell radius — no Electron override
     // strips the top corners now that the header lives inside the card.
-    expect(mainContent).toHaveClass('lg:rounded-(--linear-app-shell-radius)');
+    expect(mainContent).toHaveClass('lg:rounded-(--app-shell-radius)');
     expect(mainContent.querySelector('div.flex.flex-1')).toHaveClass(
-      'lg:gap-(--linear-app-shell-gap)'
+      'lg:gap-(--app-shell-gap)'
     );
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
     expect(screen.getByText('Main Content')).toBeInTheDocument();
@@ -74,7 +74,7 @@ describe('AppShellFrame', () => {
       'lg:shadow-(--linear-app-shell-shadow)'
     );
     expect(mainContent.querySelector('div.flex.flex-1')).not.toHaveClass(
-      'lg:gap-(--linear-app-shell-gap)'
+      'lg:gap-(--app-shell-gap)'
     );
   });
 

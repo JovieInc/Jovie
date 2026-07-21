@@ -93,7 +93,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
         type='button'
         onClick={handleCardClick}
         aria-label={`View details for ${displayName}`}
-        className='absolute inset-0 outline-none focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-app-shell-border)'
+        className='absolute inset-0 outline-none focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--app-shell-border)'
       />
 
       <div

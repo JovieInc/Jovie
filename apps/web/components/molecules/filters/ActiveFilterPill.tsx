@@ -23,7 +23,7 @@ export function ActiveFilterPill({
     values.length > 1 ? `${values.length} selected` : values[0];
 
   return (
-    <div className='flex items-center gap-0.5 rounded-md border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) text-2xs'>
+    <div className='flex items-center gap-0.5 rounded-md border border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) text-2xs'>
       <div className='flex items-center gap-1 py-1 pl-2 pr-0.5'>
         {icon && (
           <span className='flex h-3.5 w-3.5 items-center justify-center text-tertiary-token'>

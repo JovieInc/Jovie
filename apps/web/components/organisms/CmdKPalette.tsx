@@ -257,14 +257,14 @@ export function CmdKPalette({
         className={cn(
           'left-0 top-0 h-dvh w-full max-w-none [translate:0_0]',
           'grid gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none',
-          'bg-(--linear-app-content-surface)',
+          'bg-(--app-shell-content-surface)',
           'sm:max-w-none',
           // Full-page: fade only (no zoom — zoom reads as a modal card)
           'data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100'
         )}
         hideClose
         overlayProps={{
-          className: 'bg-(--linear-app-content-surface)',
+          className: 'bg-(--app-shell-content-surface)',
         }}
         testId='cmdk-full-page'
       >
@@ -279,7 +279,7 @@ export function CmdKPalette({
           data-testid='shared-command-palette'
           data-surface='cmdk'
         >
-          <div className='flex shrink-0 items-center gap-2 border-b border-(--linear-app-frame-seam) px-3.5 py-2.5'>
+          <div className='flex shrink-0 items-center gap-2 border-b border-(--app-shell-frame-seam) px-3.5 py-2.5'>
             <Search
               className='size-4 shrink-0 text-tertiary-token'
               aria-hidden='true'
