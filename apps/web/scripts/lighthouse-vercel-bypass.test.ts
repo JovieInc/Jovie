@@ -25,6 +25,7 @@ const {
   parseExactHostCookieJar,
   readExactHostCookieJar,
   resolveAuthorizedVercelDeployment,
+  stripInlineScriptContent,
   verifyPublicDeploymentSurfaces,
 } = require('./vercel-protected-origin.cjs') as {
   readonly BYPASS_HEADER: string;
@@ -104,11 +105,8 @@ const {
     readonly candidateId?: string;
     readonly allowMissingCommitSha?: boolean;
     readonly maxPages?: number;
-  }) => Promise<{
-    readonly id: string;
-    readonly url: string;
-    readonly commitSha?: string | null;
-  }>;
+  }) => Promise<{ readonly id: string; readonly url: string }>;
+  readonly stripInlineScriptContent: (html: unknown) => string;
   readonly verifyPublicDeploymentSurfaces: (
     url: string,
     options: {
@@ -1642,5 +1640,175 @@ describe('origin-bound Vercel protection bypass', () => {
       expect(options.headers).not.toHaveProperty(BYPASS_HEADER);
       expect(options.redirect).toBe('manual');
     }
+  });
+
+  // Regression coverage for the #14654 canary false positive: a healthy Next.js
+  // App Router page serializes its RSC flight payload into inline <script> tags,
+  // which echo component copy such as "Profile not found" even when the page
+  // rendered successfully. The semantic error scan must ignore inline script
+  // contents while still catching error/not-found copy in the rendered markup.
+  describe('inline-script-aware semantic error scan (#14654)', () => {
+    it('strips inline <script> payloads before the semantic error scan', () => {
+      const flightPayload =
+        '<html><head><script>self.__next_f.push([1,"Profile not found"])</script></head>' +
+        '<body><main>tim white</main></body></html>';
+      const stripped = stripInlineScriptContent(flightPayload);
+      expect(stripped).not.toContain('Profile not found');
+      expect(stripped).toContain('tim white');
+    });
+
+    it.each([
+      {
+        label: 'attributes on the script tag',
+        html: '<html><body>ok<script type="application/json" nonce="abc123">{"m":"internal server error"}</script></body></html>',
+      },
+      {
+        label: 'uppercase SCRIPT tag',
+        html: '<html><body>ok<SCRIPT>var e="turnstile is not configured";</SCRIPT></body></html>',
+      },
+      {
+        label: 'multiline flight payload',
+        html: '<html><body>ok<script>\nself.__next_f.push([1,\n"temporarily unavailable"\n])\n</script></body></html>',
+      },
+      {
+        label: 'whitespace in the closing tag',
+        html: '<html><body>ok<script>e="auth unavailable"</script >tail</body></html>',
+      },
+      {
+        label: 'multiple benign scripts',
+        html: '<html><body>fine<script>x "something went wrong"</script>more<script>y "page could not be found"</script>end</body></html>',
+      },
+      {
+        label: 'unterminated trailing script (truncated document)',
+        html: '<html><body>ok<script>partial... error occurred and this page could not be found',
+      },
+    ])('removes error copy hidden in $label', ({ html }) => {
+      const stripped = stripInlineScriptContent(html);
+      expect(stripped).not.toMatch(
+        /application error|internal server error|something went wrong|error occurred|this page could not be found|page could not be found|profile not found|temporarily unavailable|auth unavailable|turnstile is not configured/i
+      );
+    });
+
+    it('preserves visible markup rendered between two inline scripts', () => {
+      const stripped = stripInlineScriptContent(
+        '<html><body><script>a "auth unavailable"</script>VISIBLE application error<script>b</script></body></html>'
+      );
+      expect(stripped).toContain('VISIBLE application error');
+    });
+
+    it('coerces a non-string body to an empty string', () => {
+      expect(stripInlineScriptContent(undefined)).toBe('');
+      expect(stripInlineScriptContent(null)).toBe('');
+    });
+
+    it('accepts a healthy deploy whose flight payload echoes error copy on every surface', async () => {
+      const healthyBody =
+        '<html><body><main>' +
+        'content '.repeat(120) +
+        '</main>' +
+        '<script>self.__next_f.push([1,"Profile not found: this page could not be found"])</script>' +
+        '</body></html>';
+      const fetchImpl = vi.fn(async (rawUrl: URL) => {
+        const url = new URL(rawUrl);
+        const isHealth = url.pathname === '/api/health';
+        return {
+          status: 200,
+          url: url.href,
+          headers: {
+            get: (name: string) =>
+              name.toLowerCase() === 'content-type'
+                ? isHealth
+                  ? 'application/json'
+                  : 'text/html; charset=utf-8'
+                : null,
+          },
+          text: vi
+            .fn()
+            .mockResolvedValue(
+              isHealth
+                ? JSON.stringify({ status: 'ok', database: 'ok' })
+                : healthyBody
+            ),
+        };
+      });
+
+      await expect(
+        verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
+          cookieHeader: '__vercel_live_token=opaque-cookie',
+          fetchImpl,
+          attempts: 1,
+        })
+      ).resolves.toBeUndefined();
+    });
+
+    it('still rejects visible not-found copy that is not inside a script tag', async () => {
+      const fetchImpl = vi.fn(async (rawUrl: URL) => {
+        const url = new URL(rawUrl);
+        const isHealth = url.pathname === '/api/health';
+        const isBroken = url.pathname === '/tim';
+        const body = isHealth
+          ? JSON.stringify({ status: 'ok', database: 'ok' })
+          : isBroken
+            ? '<html><body><main>Profile not found</main>' +
+              'x'.repeat(600) +
+              '<script>self.__next_f.push([1,"ignore"])</script></body></html>'
+            : '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
+        return {
+          status: 200,
+          url: url.href,
+          headers: {
+            get: (name: string) =>
+              name.toLowerCase() === 'content-type'
+                ? isHealth
+                  ? 'application/json'
+                  : 'text/html; charset=utf-8'
+                : null,
+          },
+          text: vi.fn().mockResolvedValue(body),
+        };
+      });
+
+      await expect(
+        verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
+          cookieHeader: '__vercel_live_token=opaque-cookie',
+          fetchImpl,
+          attempts: 1,
+        })
+      ).rejects.toThrow('error or not-found content');
+    });
+
+    it('still rejects a surface whose raw body is below the minimum byte floor', async () => {
+      const fetchImpl = vi.fn(async (rawUrl: URL) => {
+        const url = new URL(rawUrl);
+        const isHealth = url.pathname === '/api/health';
+        const isTiny = url.pathname === '/pricing';
+        const body = isHealth
+          ? JSON.stringify({ status: 'ok', database: 'ok' })
+          : isTiny
+            ? '<html><body>hi</body></html>'
+            : '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
+        return {
+          status: 200,
+          url: url.href,
+          headers: {
+            get: (name: string) =>
+              name.toLowerCase() === 'content-type'
+                ? isHealth
+                  ? 'application/json'
+                  : 'text/html; charset=utf-8'
+                : null,
+          },
+          text: vi.fn().mockResolvedValue(body),
+        };
+      });
+
+      await expect(
+        verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
+          cookieHeader: '__vercel_live_token=opaque-cookie',
+          fetchImpl,
+          attempts: 1,
+        })
+      ).rejects.toThrow('incomplete document');
+    });
   });
 });
