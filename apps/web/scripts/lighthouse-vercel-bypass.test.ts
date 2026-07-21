@@ -1251,9 +1251,9 @@ describe('origin-bound Vercel protection bypass', () => {
       fetchImpl,
       attempts: 1,
     });
-    expect(fetchImpl.mock.calls.some(([url]) => new URL(url).pathname === '/tim')).toBe(
-      true
-    );
+    expect(
+      fetchImpl.mock.calls.some(([url]) => new URL(url).pathname === '/tim')
+    ).toBe(true);
   });
 
   it('still rejects rendered error content outside inline scripts', async () => {
