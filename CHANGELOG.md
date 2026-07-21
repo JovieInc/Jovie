@@ -14,6 +14,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **[notifications] Outbound SMS connector (JOV-3626)**: `providers/sms/outbound-sms.ts` gates live Twilio POSTs behind `OUTBOUND_SMS_ENABLED`; `sendNotification()` SMS channel and inbound webhook auto-replies both use it; unit-economics spike documented in `NOTIFICATION_GUIDELINES.md`.
 
 ## [Unreleased]
+- [internal] **App shell loading skeleton** matches `DESIGN_V1` so flag-on users no longer flash the legacy sidebar/header on first `/app` paint.
 
 - **[internal] Staging Better Auth Google OAuth credentials now reach the Vercel build and runtime deploy (#14659):** the release workflow allowlists and forwards both Google client keys, failing closed when either is absent.
 - **Suggested DSP matches no longer flash a skeleton then collapse (JOV-4159):** when the Music drawer loads with no match suggestions (the common case), the section stays empty instead of flashing skeleton rows and shifting sibling content.
