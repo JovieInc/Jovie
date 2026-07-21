@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { chatAuditLog, chatConversations } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { materializeClaimedOnboardingProfile } from '@/lib/onboarding/claim-profile';
+import { isOnboardingOwnershipError } from '@/lib/onboarding/ownership-gate';
 import {
   clearOnboardingSessionCookie,
   getCurrentOnboardingSessionId,
@@ -182,6 +183,19 @@ export async function POST(req: Request) {
         ...profilePayload(profile),
       });
     } catch (error) {
+      // Ownership gate: unauthenticated / non-owner / missing conversation.
+      // Fail closed — never surface reserved / locked-in success without verify.
+      if (isOnboardingOwnershipError(error)) {
+        logger.warn('[onboarding/claim] ownership gate rejected claim', {
+          errorCode: error.errorCode,
+          sessionId: `${sessionId.slice(0, 8)}…`,
+        });
+        return NextResponse.json(
+          { error: error.message, errorCode: error.errorCode },
+          { status: error.status }
+        );
+      }
+
       // Unique-constraint violation on the partial index = this sessionId was
       // already claimed onto a different user. Surface a friendly 409.
       const message = error instanceof Error ? error.message.toLowerCase() : '';

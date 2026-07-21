@@ -101,6 +101,25 @@ describe('useOnboardingClaim', () => {
     );
   });
 
+  it('fails closed on 403 ownership rejection without navigating to checkout', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(
+          { error: 'Forbidden', errorCode: 'FORBIDDEN' },
+          { status: 403 }
+        )
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(renderClaimHarness(0));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('error')
+    );
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
   it('fires exactly one POST per unique claimTrigger and does not fire again for the same trigger after completion', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ claimed: 0 }));
     vi.stubGlobal('fetch', fetchMock);
