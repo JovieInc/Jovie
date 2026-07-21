@@ -1924,6 +1924,7 @@ function AssetDrawer({
   getContextMenuItems,
   profileId,
   artistHandle,
+  pressKitCandidates,
   onApprovalStatusChange,
   onShareChange,
 }: {
@@ -1938,6 +1939,7 @@ function AssetDrawer({
   readonly getContextMenuItems: LibraryContextMenuBuilder;
   readonly profileId: string | null;
   readonly artistHandle: string | null;
+  readonly pressKitCandidates: readonly LibraryReleaseAsset[];
   readonly onApprovalStatusChange: (
     assetId: string,
     approvalStatus: LibraryApprovalStatus
@@ -2120,6 +2122,10 @@ function AssetDrawer({
                       >
                         <LibraryShareDropCreator
                           releaseIds={[current.id]}
+                          candidateAssets={pressKitCandidates.map(item => ({
+                            id: item.id,
+                            title: item.title,
+                          }))}
                           defaultTitle={`${current.title} press kit`}
                         />
                       </DrawerSection>
@@ -2774,6 +2780,9 @@ export function LibrarySurface({
           getContextMenuItems={getContextMenuItems}
           profileId={profileId}
           artistHandle={artistHandle}
+          pressKitCandidates={effectiveAssets.filter(
+            item => getLibraryItemKind(item) === 'release'
+          )}
           onApprovalStatusChange={handleApprovalStatusChange}
           onShareChange={handleShareChange}
         />

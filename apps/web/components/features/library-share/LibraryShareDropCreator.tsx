@@ -2,35 +2,87 @@
 
 import { Button } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Share2 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
 import {
   type LibraryShareExpiryPreset,
   resolveLibraryShareExpiryIso,
 } from '@/lib/library-share/expiry';
 
+export interface LibraryShareDropCandidate {
+  readonly id: string;
+  readonly title: string;
+}
+
 interface LibraryShareDropCreatorProps {
+  /**
+   * Default release ids to include. When `candidateAssets` is omitted these are
+   * the fixed selection sent on create (legacy single-release path).
+   */
   readonly releaseIds: readonly string[];
+  /**
+   * Optional release assets the artist can curate into the drop. When provided,
+   * the create form exposes multi-select so press kits can include a set.
+   */
+  readonly candidateAssets?: readonly LibraryShareDropCandidate[];
   readonly defaultTitle: string;
   readonly onCreated?: (shareUrl: string) => void;
 }
 
+function uniqueIds(ids: readonly string[]): string[] {
+  return [...new Set(ids.filter(Boolean))];
+}
+
 export function LibraryShareDropCreator({
   releaseIds,
+  candidateAssets,
   defaultTitle,
   onCreated,
 }: LibraryShareDropCreatorProps) {
+  const candidates = useMemo(() => {
+    // Explicit empty `candidateAssets` must stay empty (no phantom fallback ids).
+    if (candidateAssets) {
+      return candidateAssets;
+    }
+    return releaseIds.map(id => ({ id, title: defaultTitle }));
+  }, [candidateAssets, defaultTitle, releaseIds]);
+
+  const defaultSelectedIds = useMemo(() => {
+    const preferred = uniqueIds(releaseIds).filter(id =>
+      candidates.some(candidate => candidate.id === id)
+    );
+    if (preferred.length > 0) return preferred;
+    return candidates[0] ? [candidates[0].id] : [];
+  }, [candidates, releaseIds]);
+
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(defaultTitle);
+  const [includeComment, setIncludeComment] = useState(false);
   const [message, setMessage] = useState('');
   const [layout, setLayout] = useState<'grid' | 'list' | 'reel'>('grid');
   const [downloadsEnabled, setDownloadsEnabled] = useState(true);
   const [expiryPreset, setExpiryPreset] =
     useState<LibraryShareExpiryPreset>('never');
   const [passphrase, setPassphrase] = useState('');
+  const [selectedIds, setSelectedIds] =
+    useState<readonly string[]>(defaultSelectedIds);
   const [loading, setLoading] = useState(false);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const selectedCount = selectedIds.length;
+  const showAssetPicker = candidates.length > 1;
+
+  function toggleAsset(id: string) {
+    setSelectedIds(current => {
+      if (current.includes(id)) {
+        // Keep at least one asset selected to avoid an empty create path.
+        if (current.length === 1) return current;
+        return current.filter(item => item !== id);
+      }
+      return [...current, id];
+    });
+  }
 
   async function copyShareUrl(url: string) {
     try {
@@ -44,6 +96,12 @@ export function LibraryShareDropCreator({
   }
 
   async function handleCreate() {
+    const releaseIdsToShare = uniqueIds(selectedIds);
+    if (releaseIdsToShare.length === 0) {
+      toast.error('Select at least one asset');
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch('/api/library/share-drops', {
@@ -51,12 +109,13 @@ export function LibraryShareDropCreator({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
-          message: message.trim() || null,
+          message:
+            includeComment && message.trim().length > 0 ? message.trim() : null,
           layout,
           downloadsEnabled,
           expiresAt: resolveLibraryShareExpiryIso(expiryPreset),
           passphrase: passphrase.trim() || null,
-          releaseIds,
+          releaseIds: releaseIdsToShare,
         }),
       });
       const body = (await response.json()) as {
@@ -90,7 +149,8 @@ export function LibraryShareDropCreator({
           Share drop ready
         </p>
         <p className='mt-1 text-xs text-secondary-token'>
-          Anyone with this link can view the press kit.
+          Anyone with this link can view the press kit
+          {selectedCount > 1 ? ` (${selectedCount} assets)` : ''}.
         </p>
         <div className='mt-3 flex items-center gap-1.5 rounded-xl border border-subtle bg-surface-1 p-1 pl-3'>
           <span
@@ -138,6 +198,7 @@ export function LibraryShareDropCreator({
             setCreatedUrl(null);
             setCopied(false);
             setOpen(false);
+            setSelectedIds(defaultSelectedIds);
           }}
           className='mt-3 h-auto p-0 text-xs font-medium text-secondary-token normal-case hover:text-primary-token'
           data-testid='library-share-done-button'
@@ -152,7 +213,10 @@ export function LibraryShareDropCreator({
     return (
       <button
         type='button'
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setSelectedIds(defaultSelectedIds);
+          setOpen(true);
+        }}
         className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1.5 text-xs font-medium text-primary-token transition-colors hover:bg-surface-1'
         data-testid='library-share-create-trigger'
       >
@@ -171,10 +235,39 @@ export function LibraryShareDropCreator({
         Create share drop
       </p>
       <p className='mt-1 text-xs text-secondary-token'>
-        Send a branded press-kit page with {releaseIds.length} selected asset
-        {releaseIds.length === 1 ? '' : 's'}.
+        Send a branded press-kit page with {selectedCount} selected asset
+        {selectedCount === 1 ? '' : 's'}.
       </p>
       <div className='mt-4 space-y-3'>
+        {showAssetPicker ? (
+          <fieldset
+            className='space-y-2'
+            data-testid='library-share-asset-picker'
+          >
+            <legend className='text-xs font-medium text-secondary-token'>
+              Assets
+            </legend>
+            <div className='max-h-40 space-y-1 overflow-y-auto rounded-xl border border-subtle bg-surface-1 p-2'>
+              {candidates.map(candidate => {
+                const checked = selectedIds.includes(candidate.id);
+                return (
+                  <label
+                    key={candidate.id}
+                    className='flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-primary-token transition-colors hover:bg-surface-0'
+                  >
+                    <input
+                      type='checkbox'
+                      checked={checked}
+                      onChange={() => toggleAsset(candidate.id)}
+                      data-testid={`library-share-asset-${candidate.id}`}
+                    />
+                    <span className='min-w-0 truncate'>{candidate.title}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        ) : null}
         <label className='block text-xs font-medium text-secondary-token'>
           Title
           <input
@@ -183,14 +276,37 @@ export function LibraryShareDropCreator({
             className='mt-1 w-full rounded-xl border border-subtle bg-surface-1 px-3 py-2 text-sm text-primary-token'
           />
         </label>
-        <label className='block text-xs font-medium text-secondary-token'>
+        <label className='flex items-center gap-2 text-xs text-secondary-token'>
+          <input
+            type='checkbox'
+            checked={includeComment}
+            onChange={event => setIncludeComment(event.target.checked)}
+            data-testid='library-share-comment-toggle'
+            aria-controls='library-share-comment-input'
+          />
+          Include Comment
+        </label>
+        {/*
+          Always reserve the comment field height so toggling does not shift
+          the Create/Cancel row (layout-shift rule).
+        */}
+        <label
+          className={
+            includeComment
+              ? 'block text-xs font-medium text-secondary-token'
+              : 'block text-xs font-medium text-secondary-token opacity-50'
+          }
+        >
           Comment
           <textarea
+            id='library-share-comment-input'
             value={message}
             onChange={event => setMessage(event.target.value)}
             rows={3}
-            className='mt-1 w-full rounded-xl border border-subtle bg-surface-1 px-3 py-2 text-sm text-primary-token'
+            disabled={!includeComment}
+            className='mt-1 w-full rounded-xl border border-subtle bg-surface-1 px-3 py-2 text-sm text-primary-token disabled:cursor-not-allowed'
             placeholder='Optional note for press or label review'
+            data-testid='library-share-comment-input'
           />
         </label>
         <label className='block text-xs font-medium text-secondary-token'>
@@ -201,6 +317,7 @@ export function LibraryShareDropCreator({
               setLayout(event.target.value as 'grid' | 'list' | 'reel')
             }
             className='mt-1 w-full rounded-xl border border-subtle bg-surface-1 px-3 py-2 text-sm text-primary-token'
+            data-testid='library-share-layout-select'
           >
             <option value='grid'>Grid</option>
             <option value='list'>List</option>
@@ -212,8 +329,9 @@ export function LibraryShareDropCreator({
             type='checkbox'
             checked={downloadsEnabled}
             onChange={event => setDownloadsEnabled(event.target.checked)}
+            data-testid='library-share-downloads-toggle'
           />
-          Allow downloads
+          Allow Downloads
         </label>
         <label className='block text-xs font-medium text-secondary-token'>
           Expires
@@ -239,17 +357,19 @@ export function LibraryShareDropCreator({
             onChange={event => setPassphrase(event.target.value)}
             className='mt-1 w-full rounded-xl border border-subtle bg-surface-1 px-3 py-2 text-sm text-primary-token'
             placeholder='Leave blank for public access'
+            data-testid='library-share-passphrase-input'
           />
         </label>
       </div>
       <div className='mt-4 flex items-center gap-2'>
         <button
           type='button'
-          disabled={loading || title.trim().length === 0}
+          disabled={loading || title.trim().length === 0 || selectedCount === 0}
           onClick={() => {
             handleCreate().catch(() => {});
           }}
           className='rounded-xl border border-(--linear-btn-primary-border) bg-btn-primary px-4 py-2 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-50'
+          data-testid='library-share-create-submit'
         >
           {loading ? 'Creating…' : 'Create link'}
         </button>
@@ -257,6 +377,7 @@ export function LibraryShareDropCreator({
           type='button'
           onClick={() => setOpen(false)}
           className='rounded-xl border border-subtle px-4 py-2 text-sm text-secondary-token'
+          data-testid='library-share-create-cancel'
         >
           Cancel
         </button>
