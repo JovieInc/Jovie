@@ -37,27 +37,33 @@ const APPLE_MUSIC_PRIVATE_KEY = env.APPLE_MUSIC_PRIVATE_KEY;
 const APPLE_ID_REGEX = /^[A-Za-z0-9]{10}$/;
 
 /**
- * Validate that environment variables have correct format.
- * Called once at module initialization to catch configuration errors early.
- *
- * @throws Error if any configured value has invalid format
+ * Validate env format at module load.
+ * Must NOT throw — Next page-data collection imports admin/API routes that pull
+ * this module; corrupt Vercel preview env values would otherwise fail the entire
+ * staging/prod build (ERR: Invalid APPLE_MUSIC_KEY_ID...).
  */
+let appleMusicCredentialsValid = true;
+
 function validateEnvFormat(): void {
-  // Only validate if credentials are configured
   if (!APPLE_MUSIC_KEY_ID && !APPLE_MUSIC_TEAM_ID && !APPLE_MUSIC_PRIVATE_KEY) {
-    return; // Not configured - skip validation
+    appleMusicCredentialsValid = false;
+    return;
   }
 
   if (APPLE_MUSIC_KEY_ID && !APPLE_ID_REGEX.test(APPLE_MUSIC_KEY_ID)) {
-    throw new Error(
-      `Invalid APPLE_MUSIC_KEY_ID format: expected 10 alphanumeric characters, got "${APPLE_MUSIC_KEY_ID.slice(0, 20)}${APPLE_MUSIC_KEY_ID.length > 20 ? '...' : ''}"`
+    console.error(
+      `[apple-music-auth] Invalid APPLE_MUSIC_KEY_ID format (len=${APPLE_MUSIC_KEY_ID.length}); treating as unconfigured`
     );
+    appleMusicCredentialsValid = false;
+    return;
   }
 
   if (APPLE_MUSIC_TEAM_ID && !APPLE_ID_REGEX.test(APPLE_MUSIC_TEAM_ID)) {
-    throw new Error(
-      `Invalid APPLE_MUSIC_TEAM_ID format: expected 10 alphanumeric characters, got "${APPLE_MUSIC_TEAM_ID.slice(0, 20)}${APPLE_MUSIC_TEAM_ID.length > 20 ? '...' : ''}"`
+    console.error(
+      `[apple-music-auth] Invalid APPLE_MUSIC_TEAM_ID format (len=${APPLE_MUSIC_TEAM_ID.length}); treating as unconfigured`
     );
+    appleMusicCredentialsValid = false;
+    return;
   }
 
   if (APPLE_MUSIC_PRIVATE_KEY) {
@@ -66,14 +72,15 @@ function validateEnvFormat(): void {
     const hasPemFooter = normalizedKey.includes('-----END');
 
     if (!hasPemHeader || !hasPemFooter) {
-      throw new Error(
-        'Invalid APPLE_MUSIC_PRIVATE_KEY format: expected PEM format with BEGIN/END markers'
+      console.error(
+        '[apple-music-auth] Invalid APPLE_MUSIC_PRIVATE_KEY PEM; treating as unconfigured'
       );
+      appleMusicCredentialsValid = false;
     }
   }
 }
 
-// Validate environment format once at module load
+// Validate once at module load (fail-soft)
 validateEnvFormat();
 
 /**
@@ -213,10 +220,13 @@ export async function getAppleMusicToken(): Promise<string> {
  * @returns True if all required environment variables are set
  */
 export function isAppleMusicConfigured(): boolean {
-  return Boolean(
-    env.APPLE_MUSIC_KEY_ID &&
-      env.APPLE_MUSIC_TEAM_ID &&
-      env.APPLE_MUSIC_PRIVATE_KEY
+  return (
+    appleMusicCredentialsValid &&
+    Boolean(
+      env.APPLE_MUSIC_KEY_ID &&
+        env.APPLE_MUSIC_TEAM_ID &&
+        env.APPLE_MUSIC_PRIVATE_KEY
+    )
   );
 }
 
