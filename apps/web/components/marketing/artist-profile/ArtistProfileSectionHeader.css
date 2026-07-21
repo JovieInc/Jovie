@@ -1,0 +1,34 @@
+/*
+ * Artist-profile shell typography (System B).
+ *
+ * The shared SHELL_* class constants in ArtistProfileSectionHeader.tsx point
+ * at these rules so every landing chapter renders the same display heading,
+ * eyebrow, and lead. Only the values Tailwind utilities cannot express
+ * (fluid clamp() type sizes, exact leading/tracking) live here; color stays
+ * on the token utilities in the TSX so the style guard keeps seeing them.
+ *
+ * Scoped to the `ap-shell-` prefix. Anything wider belongs in globals.css.
+ */
+
+.ap-shell-h2 {
+  font-size: clamp(2.25rem, 4.8vw, 3.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+}
+
+.ap-shell-eyebrow {
+  letter-spacing: 0.06em;
+}
+
+.ap-shell-lead {
+  font-size: clamp(1.0625rem, 1.4vw, 1.25rem);
+  line-height: 1.45;
+}
+
+.ap-shell-header--centered {
+  max-width: 46rem;
+}
+
+.ap-shell-header__body--centered {
+  max-width: 38rem;
+}

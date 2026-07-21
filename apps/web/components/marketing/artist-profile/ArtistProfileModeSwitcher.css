@@ -1,0 +1,36 @@
+/*
+ * Artist-profile mode switcher (System B).
+ *
+ * Measure limits and the active-tab elevation that Tailwind utilities
+ * cannot express without arbitrary values or the banned named shadow
+ * scale. Elevation uses the cinematic black token at the same 10% alpha
+ * as the retired shadow-sm utility.
+ *
+ * Scoped to the `ap-mode-switcher` prefix.
+ */
+
+.ap-mode-switcher__headline {
+  max-width: 13ch;
+}
+
+.ap-mode-switcher__copy--compact {
+  max-width: 29rem;
+}
+
+.ap-mode-switcher__phone--compact {
+  max-width: 15.75rem;
+}
+
+@media (min-width: 40rem) {
+  .ap-mode-switcher__phone--compact {
+    max-width: 16.75rem;
+  }
+}
+
+.ap-mode-switcher__active-tab {
+  box-shadow:
+    0 1px 3px 0
+    color-mix(in oklab, var(--system-b-cinematic-black) 10%, transparent),
+    0 1px 2px -1px
+    color-mix(in oklab, var(--system-b-cinematic-black) 10%, transparent);
+}
