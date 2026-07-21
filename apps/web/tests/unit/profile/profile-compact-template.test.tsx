@@ -723,9 +723,12 @@ describe('ProfileCompactTemplate', () => {
 
     expect(alertsCard).toHaveTextContent('Alerts');
     expect(carousel).toHaveTextContent('Listen');
-    expect(alertsCard.compareDocumentPosition(carousel)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
+    // The alerts card is the LAST card of the single home carousel — no
+    // stacked sections outside the track.
+    expect(carousel.contains(alertsCard)).toBe(true);
+    expect(
+      screen.getByTestId('profile-pac').compareDocumentPosition(alertsCard)
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
