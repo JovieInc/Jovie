@@ -1,0 +1,87 @@
+/* ArtistProfilePlaceholderShot — System B tokenized skeleton fills. Alpha
+   levels match the original white-alpha utilities exactly. */
+
+.ap-placeholder-block {
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 8%,
+    transparent
+  );
+}
+
+.ap-placeholder-block--dim {
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 6%,
+    transparent
+  );
+}
+
+.ap-placeholder-panel {
+  border: 1px solid
+    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
+  border-radius: 1.1rem;
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 3.5%,
+    transparent
+  );
+}
+
+.ap-placeholder-panel--soft {
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 5%,
+    transparent
+  );
+}
+
+.ap-placeholder-panel--raised {
+  border-color: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 10%,
+    transparent
+  );
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 6%,
+    transparent
+  );
+}
+
+.ap-placeholder-panel--strong {
+  border-color: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 10%,
+    transparent
+  );
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 7%,
+    transparent
+  );
+}
+
+.ap-placeholder-panel--bold {
+  border-color: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 10%,
+    transparent
+  );
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 8%,
+    transparent
+  );
+}
+
+.ap-placeholder-tile {
+  border: 1px solid
+    color-mix(in oklab, var(--color-text-primary-token) 10%, transparent);
+  border-radius: 1.8rem;
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 4.5%,
+    transparent
+  );
+}

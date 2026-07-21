@@ -1,0 +1,13 @@
+/*
+ * Artist-profile reactivation section (System B).
+ *
+ * The centered shell header body is narrowed from the shared 38rem default
+ * to 35rem for this chapter. The two-class selector keeps the override
+ * order-independent of CSS bundle ordering.
+ *
+ * Scoped to the `ap-reactivation` prefix.
+ */
+
+.ap-shell-header__body--centered.ap-reactivation__body {
+  max-width: 35rem;
+}

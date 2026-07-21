@@ -2,7 +2,6 @@
 
 import { Check, ChevronLeft, ChevronRight, Mail } from 'lucide-react';
 import Image from 'next/image';
-import type { CSSProperties } from 'react';
 import { useId, useRef } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import {
@@ -13,6 +12,7 @@ import {
 import { ProfilePrimaryActionCard } from '@/features/profile/ProfilePrimaryActionCard';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
+import './ArtistProfileOutcomesCarousel.css';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
@@ -23,28 +23,16 @@ interface ArtistProfileOutcomesCarouselProps {
 type OutcomeId =
   ArtistProfileLandingCopy['outcomes']['landingCards'][number]['id'];
 
-type QrPreviewStyle = CSSProperties & {
-  readonly '--qr-preview-ink': string;
-  readonly '--qr-preview-paper': string;
-};
-
-// QR ink and paper are protocol colors, not theme colors. Keeping them local
-// prevents dark mode from reducing the code's contrast or changing its meaning.
-const QR_PREVIEW_STYLE: QrPreviewStyle = {
-  '--qr-preview-ink': '#000',
-  '--qr-preview-paper': '#fff',
-};
-
 // Per-card widths. Horizontal rail lets each outcome take the room its
 // mockup actually needs. Drive streams and Sell out need side-by-side
 // proofs, so they get wider slots; Share anywhere is a single QR card
 // and can stay narrow.
 const OUTCOME_CARD_WIDTHS: Record<OutcomeId, string> = {
-  'straight-to-listen': 'w-full sm:w-[34rem] lg:w-[38rem]',
-  'local-dates-first': 'w-full sm:w-[36rem] lg:w-[40rem]',
-  'support-without-friction': 'w-full sm:w-[30rem] lg:w-[32rem]',
-  'capture-the-fan': 'w-full sm:w-[27rem] lg:w-[29rem]',
-  'one-link-everywhere': 'w-full sm:w-[24rem] lg:w-[26rem]',
+  'straight-to-listen': 'w-full sm:w-136 lg:w-152',
+  'local-dates-first': 'w-full sm:w-144 lg:w-160',
+  'support-without-friction': 'w-full sm:w-120 lg:w-128',
+  'capture-the-fan': 'w-full sm:w-108 lg:w-116',
+  'one-link-everywhere': 'w-full sm:w-96 lg:w-104',
 };
 
 const SHOWCASE_VIEWER_LOCATION = {
@@ -76,7 +64,7 @@ export function ArtistProfileOutcomesCarousel({
 
   return (
     <ArtistProfileSectionShell
-      className='bg-white/[0.01]'
+      className='ap-outcomes'
       containerClassName='!max-w-none !px-0'
       width='page'
     >
@@ -86,8 +74,8 @@ export function ArtistProfileOutcomesCarousel({
             align='left'
             headline={outcomes.headline}
             body={outcomes.body}
-            className='max-w-[38rem]'
-            bodyClassName='max-w-[30rem]'
+            className='max-w-152'
+            bodyClassName='max-w-120'
           />
         </div>
 
@@ -111,7 +99,7 @@ export function ArtistProfileOutcomesCarousel({
               onClick={() => {
                 scrollByDirection('prev');
               }}
-              className='pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-black/62 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              className='ap-outcomes__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors'
             >
               <ChevronLeft className='h-4 w-4' aria-hidden='true' />
             </button>
@@ -122,7 +110,7 @@ export function ArtistProfileOutcomesCarousel({
               onClick={() => {
                 scrollByDirection('next');
               }}
-              className='pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-black/62 text-white dark:text-white shadow-[0_18px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:bg-white dark:hover:bg-surface-1 hover:text-black dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              className='ap-outcomes__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors'
             >
               <ChevronRight className='h-4 w-4' aria-hidden='true' />
             </button>
@@ -137,7 +125,7 @@ export function ArtistProfileOutcomesCarousel({
                 onClick={() => {
                   scrollByDirection('prev');
                 }}
-                className='min-h-11 min-w-11 rounded-full border border-black/12 bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold text-black dark:text-white shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+                className='ap-outcomes__rail-btn min-h-11 min-w-11 rounded-full bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold'
               >
                 Prev
               </button>
@@ -148,7 +136,7 @@ export function ArtistProfileOutcomesCarousel({
                 onClick={() => {
                   scrollByDirection('next');
                 }}
-                className='min-h-11 min-w-11 rounded-full border border-black/12 bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold text-black dark:text-white shadow-[0_18px_42px_rgba(0,0,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/15'
+                className='ap-outcomes__rail-btn min-h-11 min-w-11 rounded-full bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold'
               >
                 Next
               </button>
@@ -189,16 +177,16 @@ function OutcomeCard({
     <article
       data-testid='artist-profile-outcome-card'
       className={cn(
-        'group relative flex shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-subtle bg-surface-0 shadow-lg',
+        'ap-outcomes__card group relative flex shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-subtle bg-surface-0',
         OUTCOME_CARD_WIDTHS[card.id]
       )}
     >
       <div className='relative flex h-full flex-col p-4 sm:p-5'>
-        <div className='max-w-[18rem]'>
-          <h3 className='max-w-[12ch] text-2xl font-semibold leading-tight tracking-tight text-primary-token sm:text-3xl'>
+        <div className='max-w-72'>
+          <h3 className='ap-outcomes__card-title text-2xl font-semibold leading-tight tracking-tight text-primary-token sm:text-3xl'>
             {card.title}
           </h3>
-          <p className='mt-3 max-w-[38ch] text-app leading-relaxed text-secondary-token'>
+          <p className='ap-outcomes__card-body mt-3 text-app leading-relaxed text-secondary-token'>
             {card.description}
           </p>
         </div>
@@ -285,8 +273,8 @@ function SellOutProof({
         />
       </div>
 
-      <div className='flex h-full flex-col rounded-[1.08rem] border border-white/8 bg-white/[0.02] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-        <p className='text-xs font-semibold tracking-[-0.02em] text-white dark:text-white'>
+      <div className='ap-outcomes__drawer flex h-full flex-col border border-subtle px-3.5 py-3'>
+        <p className='ap-outcomes__drawer-title text-xs font-semibold text-primary-token'>
           {proof.drawerTitle}
         </p>
         <p className='mt-1 text-2xs text-tertiary-token'>
@@ -298,14 +286,14 @@ function SellOutProof({
               key={row.id}
               className='grid grid-cols-[2.45rem_minmax(0,1fr)_auto] items-center gap-2 py-2.25'
             >
-              <span className='text-2xs font-medium leading-[1.15] tracking-[-0.01em] text-secondary-token'>
+              <span className='ap-outcomes__tour-month text-2xs font-medium text-secondary-token'>
                 {row.month}
-                <span className='block text-sm font-semibold tracking-[-0.04em] text-white dark:text-white'>
+                <span className='ap-outcomes__tour-day block text-sm font-semibold text-primary-token'>
                   {row.day}
                 </span>
               </span>
               <span className='min-w-0'>
-                <span className='block truncate text-xs font-semibold text-white dark:text-white'>
+                <span className='block truncate text-xs font-semibold text-primary-token'>
                   {row.venue}
                 </span>
                 <span className='block truncate text-2xs text-tertiary-token'>
@@ -330,18 +318,18 @@ function GetPaidProof({
 }>) {
   return (
     <div className='grid gap-2 sm:grid-cols-[0.9fr_1.1fr]'>
-      <div className='flex flex-col justify-between rounded-[1.08rem] border border-white/8 bg-white/[0.02] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:pt-3.5'>
+      <div className='ap-outcomes__drawer flex flex-col justify-between border border-subtle px-3 py-3 sm:pt-3.5'>
         <div>
-          <p className='text-2xs font-medium tracking-[-0.01em] text-tertiary-token'>
+          <p className='ap-outcomes__drawer-label text-2xs font-medium text-tertiary-token'>
             {proof.drawerTitle}
           </p>
-          <p className='mt-1 text-app font-semibold tracking-[-0.03em] text-white dark:text-white'>
+          <p className='ap-outcomes__drawer-subtitle mt-1 text-app font-semibold text-primary-token'>
             {proof.drawerSubtitle}
           </p>
         </div>
 
         <div className='mt-3 space-y-1.5'>
-          <p className='text-2xs font-medium tracking-[-0.01em] text-tertiary-token'>
+          <p className='ap-outcomes__drawer-label text-2xs font-medium text-tertiary-token'>
             {proof.chooseAmountLabel}
           </p>
           <div className='grid gap-1.5'>
@@ -349,13 +337,11 @@ function GetPaidProof({
               <div
                 key={row.id}
                 className={cn(
-                  'flex items-center justify-between rounded-[0.82rem] border px-3 py-1.75 text-xs',
-                  row.featured
-                    ? 'border-white/18 bg-white dark:bg-surface-1 text-black dark:text-white'
-                    : 'border-white/8 bg-white/[0.03] text-white dark:text-white'
+                  'ap-outcomes__amount flex items-center justify-between px-3 py-1.75 text-xs',
+                  row.featured && 'ap-outcomes__amount--featured'
                 )}
               >
-                <span className='font-semibold tracking-[-0.02em]'>
+                <span className='ap-outcomes__amount-value font-semibold'>
                   {row.amount}
                 </span>
                 <span
@@ -373,12 +359,12 @@ function GetPaidProof({
           </div>
         </div>
 
-        <span className='mt-3 inline-flex w-fit rounded-full bg-white dark:bg-surface-1 px-3.5 py-2 text-2xs font-semibold text-black dark:text-white'>
+        <span className='mt-3 inline-flex w-fit rounded-full bg-surface-1 px-3.5 py-2 text-2xs font-semibold text-primary-token'>
           {proof.ctaLabel}
         </span>
       </div>
 
-      <article className='relative min-h-[13.25rem] overflow-hidden rounded-[1.08rem] border border-white/8 bg-(--color-bg-input) shadow-[0_14px_32px_rgba(0,0,0,0.22)] sm:-translate-y-2'>
+      <article className='ap-outcomes__shot relative min-h-53 overflow-hidden border border-subtle bg-surface-input sm:-translate-y-2'>
         <Image
           alt={proof.screenshotAlt}
           fill
@@ -440,15 +426,12 @@ function ShareProof({
 }>) {
   return (
     <div className='flex justify-center sm:pt-2'>
-      <div className='relative ml-auto flex w-full max-w-[15.5rem] flex-col items-center rounded-[1.2rem] bg-(--color-badge-text) px-4 py-4.5 text-center text-black dark:text-white shadow-[0_16px_32px_rgba(0,0,0,0.14)]'>
-        <p className='text-2xs font-semibold tracking-[0.02em] text-secondary-token'>
+      <div className='ap-outcomes__qr-card relative ml-auto flex w-full max-w-62 flex-col items-center bg-badge-text px-4 py-4.5 text-center text-primary-token'>
+        <p className='ap-outcomes__qr-title text-2xs font-semibold text-secondary-token'>
           {proof.title}
         </p>
 
-        <div
-          className='mt-3.5 flex h-39 w-39 items-center justify-center rounded-xl bg-(--qr-preview-paper) shadow-[inset_0_0_0_1px_rgba(17,17,17,0.06)]'
-          style={QR_PREVIEW_STYLE}
-        >
+        <div className='ap-outcomes__qr-frame mt-3.5 flex h-39 w-39 items-center justify-center rounded-xl'>
           <div className='grid grid-cols-7 gap-2'>
             {QR_CELLS.map(cell => (
               <span
@@ -456,15 +439,15 @@ function ShareProof({
                 className={cn(
                   'h-2.5 w-2.5 rounded-xs',
                   cell.filled
-                    ? 'bg-(--qr-preview-ink)'
-                    : 'bg-(--qr-preview-paper)'
+                    ? 'ap-outcomes__qr-cell--filled'
+                    : 'ap-outcomes__qr-cell--empty'
                 )}
               />
             ))}
           </div>
         </div>
 
-        <p className='mt-3.5 font-mono text-2xs font-semibold tracking-[-0.02em] text-black dark:text-white'>
+        <p className='ap-outcomes__qr-url mt-3.5 font-mono text-2xs font-semibold text-primary-token'>
           {proof.url}
         </p>
         <p className='mt-2 text-2xs font-medium text-tertiary-token'>
