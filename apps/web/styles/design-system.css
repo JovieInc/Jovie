@@ -4875,6 +4875,31 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   );
 }
 
+/* Inline entity links in public profile bio/AEO copy. The entity-kind accent
+   is provided via the `--jovie-entity-accent` custom property on the link. */
+.profile-entity-mention {
+  color: var(--jovie-entity-accent);
+  text-decoration-color: color-mix(
+    in srgb,
+    var(--jovie-entity-accent) 45%,
+    transparent
+  );
+  transition:
+    color var(--system-b-duration-fast) var(--system-b-ease),
+    text-decoration-color var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+.profile-entity-mention:hover,
+.profile-entity-mention:focus-visible {
+  text-decoration-color: var(--jovie-entity-accent);
+}
+
+.profile-entity-mention:focus-visible {
+  outline: 2px solid var(--jovie-entity-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 .system-b-assistant-skill-mention {
   color: var(--color-text-secondary-token);
   font-weight: var(--font-weight-medium);

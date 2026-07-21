@@ -435,6 +435,84 @@ describe('Profile AEO content', () => {
     expect(html).toContain('Source: Official merch card');
   });
 
+  it('links entity mentions in the description while keeping plain-text paragraphs', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        tagline:
+          'DJ Test broke through with "Neon Circuit" and tours with Guest Vocalist.',
+      },
+      genres: ['tech house'],
+      releases: [
+        {
+          id: 'release-1',
+          title: 'Neon Circuit',
+          slug: 'neon-circuit',
+          releaseType: 'single',
+          releaseDate: '2026-05-01T00:00:00.000Z',
+          artworkUrl: null,
+          artistNames: ['DJ Test', 'Guest Vocalist'],
+        },
+      ],
+      entityMentions: {
+        ownHandle: 'dj-test',
+        releases: [{ title: 'Neon Circuit', slug: 'neon-circuit' }],
+        artists: [{ name: 'Guest Vocalist', handle: 'guestvocalist' }],
+      },
+      now,
+    });
+
+    // Plain-text accessor is unchanged for meta/JSON-LD consumers.
+    expect(content.description.join(' ')).toContain('Neon Circuit');
+
+    const linkedSegments = content.descriptionSegments
+      .flat()
+      .filter(segment => segment.type !== 'text');
+    expect(linkedSegments).toContainEqual({
+      type: 'release',
+      text: 'Neon Circuit',
+      href: '/dj-test/neon-circuit',
+    });
+    expect(linkedSegments).toContainEqual({
+      type: 'artist',
+      text: 'Guest Vocalist',
+      href: '/guestvocalist',
+    });
+
+    render(<ProfileAeoContent content={content} />);
+
+    // The release title appears in both the tagline and the generated
+    // latest-release sentence — every mention is linked.
+    const releaseLinks = screen.getAllByRole('link', { name: 'Neon Circuit' });
+    expect(releaseLinks.length).toBeGreaterThan(0);
+    for (const link of releaseLinks) {
+      expect(link).toHaveAttribute('href', '/dj-test/neon-circuit');
+      expect(link).toHaveAttribute('data-entity-kind', 'release');
+    }
+
+    const artistLinks = screen.getAllByRole('link', {
+      name: 'Guest Vocalist',
+    });
+    expect(artistLinks.length).toBeGreaterThan(0);
+    for (const link of artistLinks) {
+      expect(link).toHaveAttribute('href', '/guestvocalist');
+      expect(link).toHaveAttribute('data-entity-kind', 'artist');
+    }
+  });
+
+  it('defaults to plain-text segments when no entity context is provided', () => {
+    const content = buildContent();
+
+    expect(content.descriptionSegments).toHaveLength(
+      content.description.length
+    );
+    for (const [index, segments] of content.descriptionSegments.entries()) {
+      expect(segments).toEqual([
+        { type: 'text', text: content.description[index] },
+      ]);
+    }
+  });
+
   it('renders the editorial claim card only when a claim destination is provided', () => {
     const content = buildContent();
     const { rerender } = render(
