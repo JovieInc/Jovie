@@ -1855,16 +1855,15 @@ html[data-profile-initial-mode]
    ============================================
 
    Activate Linear styling on marketing pages by adding
-   [data-theme="linear"] to a parent element or using
-   the legacy .linear-marketing class or the semantic .system-b-marketing
-   wrapper while the remaining legacy surfaces migrate separately.
+   [data-theme="linear"] to a parent element or the semantic
+   .system-b-marketing wrapper. The legacy .linear-marketing class is
+   retired (System A teardown, 2026-07-21).
 
    This maps Linear tokens to the existing design system
    variables for seamless integration.
 */
 
 [data-theme="linear"],
-.linear-marketing,
 .system-b-marketing {
   /* Unified type (one system, two languages): Inter body + UI; Satoshi reserved
      for display/headings (approved exception). DM Sans retired 2026-06-18. */
@@ -1903,7 +1902,6 @@ html[data-profile-initial-mode]
   --color-border-focus: var(--linear-border-focus);
 }
 
-.linear-marketing.dark,
 .system-b-marketing.dark,
 .home-viewport.dark,
 .system-b-root-not-found-page.dark {
@@ -1991,7 +1989,6 @@ html:not(.dark) [data-testid^="profile-mode-drawer"] :where(a, button, span) {
   transition: none !important;
 }
 
-html:not(.dark) .linear-marketing :where(a, button, span),
 html:not(.dark) .system-b-marketing :where(a, button, span),
 html:not(.dark) [data-testid="header-nav"] a[href="/signin"],
 html:not(.dark) [data-testid="not-found"] :where(a, button, span),
@@ -2004,24 +2001,12 @@ html:not(.dark) .smart-link-powered-by {
 }
 
 /* Marketing typography: headings use Satoshi (display font). Product controls
-   on semantic System B surfaces use Inter; the legacy wrapper keeps its
-   existing display treatment until System A is fully retired. */
-.linear-marketing h1,
-.linear-marketing h2,
-.linear-marketing h3,
-.linear-marketing h4,
+   on semantic System B surfaces use Inter. */
 .system-b-marketing h1,
 .system-b-marketing h2,
 .system-b-marketing h3,
 .system-b-marketing h4 {
   font-family: var(--marketing-font-display);
-}
-
-.linear-marketing button,
-.linear-marketing [role="button"],
-.linear-marketing a[class*="btn"] {
-  font-family: var(--marketing-font-display);
-  letter-spacing: -0.01em;
 }
 
 .system-b-marketing button,
@@ -12525,7 +12510,7 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
    stops: -bg (subtle fill / atmosphere), -solid (text/icon/halo), -fg (legible
    text on -solid). Used to rotate accents across feature surfaces (Bento,
    Profile hero, Loop diagram). Never use as primary CTA color — primary CTA
-   stays white-on-black per .linear-marketing contract above.
+   stays white-on-black per the neutral-CTA rule (DESIGN.md, 2026-04-11).
 
    Source: home-page-hero handoff bundle (Claude Design 2026-04).
 */
