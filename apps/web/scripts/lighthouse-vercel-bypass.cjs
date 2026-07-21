@@ -17,6 +17,7 @@ const {
   isExactVercelDeploymentUrl,
   isTrustedVercelProtectedAliasUrl,
   maskSensitiveValues,
+  NO_SENSITIVE_VALUES_RECEIPT,
   parseProbeUrl,
   PUBLIC_PROBE_COOKIE_NAMES,
   readVerifiedBuildInfo,
@@ -27,7 +28,7 @@ const {
 const COOKIE_SCOPE_PROBE_PATH = '/__jovie_cookie_scope_probe__';
 
 function recordSensitiveValues(path, values) {
-  const safeValues = maskSensitiveValues(values);
+  const safeValues = values.length === 0 ? [] : maskSensitiveValues(values);
   if (!path) return;
   let expectedIdentity;
   let flags = constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW;
@@ -54,7 +55,12 @@ function recordSensitiveValues(path, values) {
       );
     }
     fchmodSync(descriptor, 0o600);
-    writeSync(descriptor, `${safeValues.join('\n')}\n`, null, 'utf8');
+    writeSync(
+      descriptor,
+      `${safeValues.length === 0 ? NO_SENSITIVE_VALUES_RECEIPT : safeValues.join('\n')}\n`,
+      null,
+      'utf8'
+    );
   } finally {
     closeSync(descriptor);
   }

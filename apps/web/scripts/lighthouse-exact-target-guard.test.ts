@@ -12,6 +12,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -27,6 +28,18 @@ import {
   validateLighthouseArtifactSeal,
   validateNoSensitiveArtifactValues,
 } from './lighthouse-exact-target-guard';
+
+const require = createRequire(import.meta.url);
+const { recordSensitiveValues, sensitiveCookieValues } =
+  require('./lighthouse-vercel-bypass.cjs') as {
+    readonly recordSensitiveValues: (
+      path: string,
+      values: readonly string[]
+    ) => void;
+    readonly sensitiveCookieValues: (
+      cookies: readonly { readonly name: string; readonly value: string }[]
+    ) => readonly string[];
+  };
 
 const BASE_URL = 'https://jovie-5sy8pmjja-jovie.vercel.app';
 const HOME_URL = `${BASE_URL}/`;
@@ -69,6 +82,59 @@ function reportFixture(requestedUrl: string, finalUrl = requestedUrl) {
 }
 
 describe('exact production Lighthouse evidence guard', () => {
+  it('accepts an explicit producer receipt when only public metadata cookies exist', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-lhci-empty-receipt-'));
+    const receipt = join(root, 'sensitive-values');
+    try {
+      const values = sensitiveCookieValues([
+        { name: 'jv_country', value: 'US' },
+        { name: 'jv_cc_required', value: '1' },
+      ]);
+      recordSensitiveValues(receipt, values);
+
+      expect(readSensitiveValues(receipt)).toEqual([]);
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('still scans and rejects a real secret alongside public metadata', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-lhci-secret-receipt-'));
+    const receipt = join(root, 'sensitive-values');
+    try {
+      const values = sensitiveCookieValues([
+        { name: 'jv_country', value: 'US' },
+        { name: 'jv_cc_required', value: '1' },
+        { name: '__vercel_live_token', value: 'real-secret' },
+      ]);
+      recordSensitiveValues(receipt, values);
+
+      expect(() =>
+        validateNoSensitiveArtifactValues(
+          [{ name: 'lhr-1.json', contents: 'real-secret' }],
+          readSensitiveValues(receipt)
+        )
+      ).toThrow('protected probe state');
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('rejects an unknown short cookie value instead of recording it', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-lhci-short-receipt-'));
+    const receipt = join(root, 'sensitive-values');
+    try {
+      expect(() =>
+        recordSensitiveValues(
+          receipt,
+          sensitiveCookieValues([{ name: 'unknown_cookie', value: '' }])
+        )
+      ).toThrow('malformed sensitive state');
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
   it('allowlists only non-credential process state for the third-party uploader', () => {
     const environment = createLighthouseUploadEnvironment({
       PATH: '/safe/bin',

@@ -15,6 +15,7 @@ const {
 const BYPASS_HEADER = 'x-vercel-protection-bypass';
 const SET_BYPASS_COOKIE_HEADER = 'x-vercel-set-bypass-cookie';
 const PUBLIC_PROBE_COOKIE_NAMES = new Set(['jv_country', 'jv_cc_required']);
+const NO_SENSITIVE_VALUES_RECEIPT = 'JOVIE_LIGHTHOUSE_SENSITIVE_VALUES_NONE_V1';
 const BUILD_INFO_PATH = '/api/health/build-info';
 const DEFAULT_PROBE_TIMEOUT_MS = 120_000;
 const DEFAULT_VERCEL_API_PAGES = 5;
@@ -525,7 +526,11 @@ function escapeWorkflowCommandValue(value) {
 
 function maskSensitiveValues(values, writeLine = value => console.log(value)) {
   const safeValues = [...new Set(values.filter(validateCookieField))];
-  if (safeValues.length !== values.length || safeValues.length === 0) {
+  if (
+    safeValues.length !== values.length ||
+    safeValues.includes(NO_SENSITIVE_VALUES_RECEIPT) ||
+    safeValues.length === 0
+  ) {
     throw new Error('Protected probe produced malformed sensitive state.');
   }
   if (process.env.GITHUB_ACTIONS === 'true') {
@@ -1355,6 +1360,7 @@ module.exports = {
   isExactVercelDeploymentUrl,
   isTrustedVercelProtectedAliasUrl,
   maskSensitiveValues,
+  NO_SENSITIVE_VALUES_RECEIPT,
   parseOriginBoundCookies,
   parseExactHostCookieJar,
   parseProbeUrl,

@@ -24,6 +24,7 @@ import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   isExactVercelDeploymentUrl,
+  NO_SENSITIVE_VALUES_RECEIPT,
   parseProbeUrl,
 } from './vercel-protected-origin.cjs';
 
@@ -508,8 +509,15 @@ export function readSensitiveValues(
   } finally {
     closeSync(descriptor);
   }
-  const values = contents.split(/\r?\n/).filter(Boolean);
-  if (values.length === 0) {
+  const lines = contents.split(/\r?\n/).filter(Boolean);
+  const markerCount = lines.filter(
+    line => line === NO_SENSITIVE_VALUES_RECEIPT
+  ).length;
+  if (markerCount > 1) {
+    throw new Error('Lighthouse sensitive-values receipt is malformed.');
+  }
+  const values = lines.filter(line => line !== NO_SENSITIVE_VALUES_RECEIPT);
+  if (values.length === 0 && markerCount !== 1) {
     throw new Error('Lighthouse sensitive-values receipt is empty.');
   }
   return values;
