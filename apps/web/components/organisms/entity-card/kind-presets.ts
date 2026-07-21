@@ -76,11 +76,11 @@ export function entityCardArtStyle(accent: EntityAccent): CSSProperties {
   };
 }
 
-/** Color for a status dot, sourced from design tokens. */
+/** Color for a status dot, sourced from semantic status tokens. */
 export function statusDotVar(tone: EntityStatusTone | undefined): string {
   switch (tone) {
     case 'live':
-      return 'var(--color-accent-green)';
+      return 'var(--color-success)';
     case 'scheduled':
       return 'var(--color-accent-orange)';
     case 'draft':

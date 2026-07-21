@@ -365,7 +365,7 @@ export function EntityCard({
           <div className='flex min-w-0 items-center justify-between gap-2'>
             <span
               className={cn(
-                'inline-flex min-w-0 items-center gap-1.5 text-3xs font-semibold uppercase leading-none tracking-[0.08em] text-tertiary-token',
+                'inline-flex min-w-0 items-center gap-1.5 text-3xs font-semibold leading-none text-tertiary-token',
                 isUnified && 'entity-card-eyebrow'
               )}
             >
@@ -375,7 +375,7 @@ export function EntityCard({
               </span>
             </span>
             {size.showStatus && !isUnified && model.status ? (
-              <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium uppercase tracking-[0.06em] text-secondary-token'>
+              <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium text-secondary-token'>
                 <span
                   className='h-1.5 w-1.5 shrink-0 rounded-full'
                   style={{ background: statusDotVar(model.status.tone) }}

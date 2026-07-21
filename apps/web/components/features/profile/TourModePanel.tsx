@@ -247,7 +247,7 @@ function TourDatesContent({
     <div data-testid='tour-drawer-list'>
       {groups.map(group => (
         <section key={group.label} className='pb-4'>
-          <div className='px-4 pb-2 pt-3 text-2xs font-bold uppercase tracking-[0.16em] text-white/32'>
+          <div className='px-4 pb-2 pt-3 text-2xs font-semibold text-tertiary-token'>
             {group.label}
           </div>
           <div className='border-y border-white/[0.075]'>
