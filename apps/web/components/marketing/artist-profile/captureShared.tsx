@@ -15,6 +15,7 @@ import type {
 } from '@/data/artistProfileCopy';
 import { ACCENT_ROTATION, getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
+import './captureShared.css';
 
 export const AUDIENCE_ICON = {
   spotify: Radio,
@@ -46,125 +47,13 @@ export type PillAccentStyle = CSSProperties & {
   readonly '--pill-accent': string;
 };
 
-export const CAPTURE_ANIMATION_STYLES = `
-  .artist-profile-audience-mask {
-    mask-image: linear-gradient(90deg, transparent, black 7%, black 93%, transparent);
-  }
-
-  .artist-profile-audience-pill {
-    position: relative;
-    isolation: isolate;
-    display: flex;
-    min-height: 3rem;
-    max-width: min(21rem, calc(100vw - 4rem));
-    flex-shrink: 0;
-    align-items: center;
-    overflow: hidden;
-    border-radius: 9999px;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
-      rgba(5, 6, 8, 0.82);
-    color: rgba(255, 255, 255, 0.92);
-    font-size: 12.5px;
-    font-weight: 500;
-    line-height: 1.3;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.03),
-      0 10px 24px rgba(0, 0, 0, 0.18);
-    backdrop-filter: blur(14px);
-  }
-
-  .artist-profile-audience-rail {
-    animation: artist-profile-audience-drift 64s linear infinite;
-  }
-
-  .artist-profile-audience-rail-reverse {
-    animation-direction: reverse;
-    animation-duration: 72s;
-  }
-
-  .artist-profile-capture-shell:hover .artist-profile-audience-rail {
-    animation-play-state: paused;
-  }
-
-  .artist-profile-capture-typed {
-    width: 0ch;
-    animation: artist-profile-capture-type 0.95s steps(15, end) forwards;
-  }
-
-  .artist-profile-capture-caret {
-    animation: artist-profile-capture-caret 0.9s steps(1, end) infinite;
-  }
-
-  @keyframes artist-profile-audience-drift {
-    from {
-      transform: translate3d(0, 0, 0);
-    }
-
-    to {
-      transform: translate3d(-50%, 0, 0);
-    }
-  }
-
-  @keyframes artist-profile-capture-type {
-    from {
-      width: 0ch;
-    }
-
-    to {
-      width: 15ch;
-    }
-  }
-
-  @keyframes artist-profile-capture-caret {
-    0%,
-    45%,
-    100% {
-      opacity: 1;
-    }
-
-    50% {
-      opacity: 0;
-    }
-  }
-
-  @media (max-width: 767px) {
-    .artist-profile-audience-mask {
-      mask-image: none;
-      overflow: visible;
-    }
-
-    .artist-profile-audience-rail {
-      display: grid;
-      width: 100%;
-      grid-template-columns: minmax(0, 1fr);
-      animation: none;
-      transform: none;
-    }
-
-    .artist-profile-audience-rail > :nth-child(n + 5) {
-      display: none;
-    }
-
-    .artist-profile-audience-pill {
-      width: 100%;
-      max-width: 100%;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .artist-profile-audience-rail,
-    .artist-profile-capture-typed,
-    .artist-profile-capture-caret {
-      animation: none;
-    }
-
-    .artist-profile-capture-typed {
-      width: 15ch;
-    }
-  }
-`;
+/**
+ * @deprecated The animation/effect styles now live in `./captureShared.css`,
+ * which this module imports for side effects. Kept as an empty string so the
+ * existing `<style>` injection in MarketingStoryPrimitives keeps typechecking
+ * until that consumer migrates.
+ */
+export const CAPTURE_ANIMATION_STYLES = '';
 
 export function CaptureActionPill({
   capture,
@@ -179,44 +68,44 @@ export function CaptureActionPill({
 
   return (
     <div
-      className='w-full max-w-[27rem] rounded-full border border-white/10 bg-white/[0.035] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl'
+      className='ap-capture-action w-full max-w-108 rounded-full p-1.5 backdrop-blur-xl'
       aria-live='polite'
     >
       <div
         className={cn(
-          'flex min-h-[4rem] items-center rounded-full px-2 py-1.5 transition-[background-color,transform,opacity] duration-subtle',
+          'flex min-h-16 items-center rounded-full px-2 py-1.5 transition-[background-color,transform,opacity] duration-subtle',
           isDone
-            ? 'justify-center bg-white dark:bg-surface-1 text-black dark:text-white'
-            : 'gap-2 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))]'
+            ? 'justify-center bg-surface-1 text-primary-token'
+            : 'ap-capture-action__inner--idle gap-2'
         )}
       >
         {isDone ? (
           <div className='flex items-center justify-center gap-2.5 px-3'>
-            <span className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-black dark:bg-black text-white dark:text-white'>
+            <span className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-surface-0 text-primary-token'>
               <Check className='h-3.5 w-3.5' strokeWidth={2.4} />
             </span>
-            <span className='rounded-full bg-white dark:bg-surface-1 px-1 text-xs font-semibold tracking-[-0.02em] text-black dark:text-white'>
+            <span className='ap-capture-tracking rounded-full bg-surface-1 px-1 text-xs font-semibold text-primary-token'>
               {capture.action.confirmedLabel}
             </span>
           </div>
         ) : (
           <>
-            <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-primary-token'>
+            <span className='ap-capture-action__icon flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-primary-token'>
               <Mail className='h-4 w-4' strokeWidth={1.9} />
             </span>
 
-            <span className='flex min-w-0 flex-1 items-center rounded-full border border-white/8 bg-black/34 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
+            <span className='ap-capture-action__field flex min-w-0 flex-1 items-center rounded-full px-3.5 py-3'>
               {isTyping || isSubmitting ? (
                 <>
-                  <span className='artist-profile-capture-typed inline-block overflow-hidden whitespace-nowrap font-mono text-xs font-medium tracking-[-0.02em] text-primary-token'>
+                  <span className='artist-profile-capture-typed ap-capture-tracking inline-block overflow-hidden whitespace-nowrap font-mono text-xs font-medium text-primary-token'>
                     {DEMO_SUBSCRIBE_EMAIL}
                   </span>
                   {isTyping ? (
-                    <span className='artist-profile-capture-caret ml-0.5 inline-block h-3.5 w-px bg-white/58' />
+                    <span className='artist-profile-capture-caret ap-capture-action__caret ml-0.5 inline-block h-3.5 w-px' />
                   ) : null}
                 </>
               ) : (
-                <span className='text-xs font-medium tracking-[-0.02em] text-white/36'>
+                <span className='ap-capture-tracking text-xs font-medium text-tertiary-token'>
                   {capture.action.detail}
                 </span>
               )}
@@ -224,10 +113,10 @@ export function CaptureActionPill({
 
             <span
               className={cn(
-                'rounded-full px-4 py-2.5 text-xs font-semibold tracking-[-0.02em] transition-[background-color,color,transform] duration-subtle',
+                'ap-capture-tracking rounded-full px-4 py-2.5 text-xs font-semibold transition-[background-color,color,transform] duration-subtle',
                 isSubmitting
-                  ? 'scale-[0.96] bg-white/88 text-black dark:text-white'
-                  : 'bg-white dark:bg-surface-1 text-black dark:text-white'
+                  ? 'ap-capture-action__cta--submitting scale-[0.96] text-primary-token'
+                  : 'bg-surface-1 text-primary-token'
               )}
             >
               {capture.action.ctaLabel}
@@ -247,18 +136,18 @@ export function AudiencePill({
   pill: ArtistProfileAudiencePill;
 }>) {
   const Icon = AUDIENCE_ICON[pill.icon];
-  const style: PillAccentStyle = {
-    '--pill-accent': PILL_ACCENTS[accentIndex % PILL_ACCENTS.length],
-  };
 
   return (
-    <li className='artist-profile-audience-pill group' style={style}>
+    <li
+      className='artist-profile-audience-pill group'
+      data-accent={accentIndex % PILL_ACCENTS.length}
+    >
       <span className='relative z-10 flex items-center gap-2.5 px-4 py-3'>
         <Icon
-          className='h-4 w-4 shrink-0 text-[color:var(--pill-accent)]'
+          className='artist-profile-audience-pill__icon h-4 w-4 shrink-0'
           strokeWidth={1.9}
         />
-        <span className='leading-[1.35] text-primary-token'>
+        <span className='artist-profile-audience-pill__text text-primary-token'>
           {pill.sentence}
         </span>
       </span>

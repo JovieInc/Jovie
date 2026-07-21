@@ -1,0 +1,49 @@
+/*
+ * Artist-profile pay-flow video section (System B).
+ *
+ * Cinematic frame, dark poster overlay, and the light-on-dark play
+ * affordance. Alpha overlays on top of video use color-mix against the
+ * cinematic black token; the named shadow scale is reproduced with the
+ * same 10% alpha. Layout and motion utilities stay in the TSX.
+ *
+ * Scoped to the `ap-payflow` prefix.
+ */
+
+.ap-payflow__frame {
+  background-color: var(--system-b-cinematic-black);
+}
+
+.ap-payflow__overlay {
+  background-color: color-mix(
+    in oklab,
+    var(--system-b-cinematic-black) 40%,
+    transparent
+  );
+}
+
+.ap-payflow__play {
+  background-color: color-mix(in oklab, #fff 95%, transparent);
+  color: var(--system-b-cinematic-black);
+  box-shadow:
+    0 10px 15px -3px
+    color-mix(in oklab, var(--system-b-cinematic-black) 10%, transparent),
+    0 4px 6px -4px
+    color-mix(in oklab, var(--system-b-cinematic-black) 10%, transparent);
+}
+
+.ap-payflow__play:hover {
+  background-color: #fff;
+}
+
+.dark .ap-payflow__play {
+  color: #fff;
+}
+
+.dark .ap-payflow__play:hover {
+  background-color: var(--color-bg-surface-1);
+}
+
+.ap-payflow__spinner {
+  border-color: color-mix(in oklab, #fff 20%, transparent);
+  border-top-color: color-mix(in oklab, #fff 80%, transparent);
+}

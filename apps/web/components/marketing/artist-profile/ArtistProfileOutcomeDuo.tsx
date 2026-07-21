@@ -1,5 +1,6 @@
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { cn } from '@/lib/utils';
+import './ArtistProfileOutcomeDuo.css';
 
 export type ArtistProfileOutcomeDuoCopy =
   ArtistProfileLandingCopy['outcomeDuo'];
@@ -19,13 +20,14 @@ export function ArtistProfileOutcomeDuo({
     <section
       data-testid='artist-profile-outcome-duo'
       className={cn(
-        'homepage-profile-outcome-duo relative w-full bg-black dark:bg-black',
+        'homepage-profile-outcome-duo relative w-full bg-base',
         className
       )}
       aria-label='Artist Profiles Outcomes'
     >
       <div className='homepage-profile-outcome-inner mx-auto w-full'>
-        <h2 className='homepage-profile-outcome-heading mx-auto text-center text-white dark:text-white'>
+        {/* ui-casing-allow: marketing display headline */}
+        <h2 className='homepage-profile-outcome-heading mx-auto text-center text-primary-token'>
           {headline}
         </h2>
 
@@ -55,10 +57,10 @@ function OutcomeTile({
         aria-hidden='true'
         className='homepage-profile-outcome-tile__glow pointer-events-none absolute inset-0'
       />
-      <div className='relative z-[1] flex w-full flex-1 items-center justify-center'>
+      <div className='relative z-10 flex w-full flex-1 items-center justify-center'>
         {children}
       </div>
-      <h3 className='homepage-profile-outcome-title relative z-[1] text-center text-white dark:text-white'>
+      <h3 className='homepage-profile-outcome-title relative z-10 text-center text-primary-token'>
         {label}
       </h3>
     </article>
@@ -71,14 +73,14 @@ function DrawerHandle() {
   return (
     <span
       aria-hidden='true'
-      className='mx-auto mb-5 block h-1 w-9 rounded-xs bg-white/[0.14]'
+      className='ap-outcome-drawer__handle mx-auto mb-5 block h-1 w-9 rounded-xs'
     />
   );
 }
 
 function DrawerTitle({ title }: Readonly<{ title: string }>) {
   return (
-    <p className='mb-4 px-1 text-base font-semibold tracking-[-0.02em] text-white dark:text-white'>
+    <p className='ap-outcome-tracking mb-4 px-1 text-base font-semibold text-primary-token'>
       {title}
     </p>
   );
@@ -100,24 +102,17 @@ function PayDrawerPreview({
               className={cn(
                 'flex items-center justify-between rounded-xl border px-5 py-4',
                 featured
-                  ? 'border-(--color-bg-base) bg-(--color-bg-base)'
-                  : 'border-white/[0.08] bg-white/[0.04]'
+                  ? 'ap-outcome-drawer__row--featured'
+                  : 'ap-outcome-drawer__row'
               )}
             >
-              <span
-                className={cn(
-                  'text-base font-semibold tracking-[-0.02em]',
-                  featured
-                    ? 'text-black dark:text-white'
-                    : 'text-white dark:text-white'
-                )}
-              >
+              <span className='ap-outcome-tracking text-base font-semibold text-primary-token'>
                 {row.amount}
               </span>
               <span
                 className={cn(
                   'text-xs font-medium',
-                  featured ? 'text-black/60' : 'text-white/56'
+                  featured ? 'text-secondary-token' : 'text-tertiary-token'
                 )}
               >
                 {row.currency}
@@ -126,7 +121,7 @@ function PayDrawerPreview({
           );
         })}
       </div>
-      <div className='mt-4 block w-full rounded-xl bg-(--color-bg-base) py-4 text-center text-sm font-semibold tracking-[-0.01em] text-black dark:text-white'>
+      <div className='ap-outcome-drawer__cta mt-4 block w-full rounded-xl py-4 text-center text-sm font-semibold text-primary-token'>
         {card.ctaLabel}
       </div>
     </div>
@@ -146,24 +141,24 @@ function TourDrawerPreview({
             key={row.id}
             className={cn(
               'grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3.5 px-1 py-4',
-              index === 0 ? 'pt-1.5' : 'border-t border-white/[0.08]'
+              index === 0 ? 'pt-1.5' : 'border-t border-subtle'
             )}
           >
-            <span className='text-2xs font-medium uppercase leading-[1.1] tracking-[0.02em] text-white/56'>
+            <span className='ap-outcome-date text-2xs font-medium uppercase text-tertiary-token'>
               {row.month}
-              <strong className='mt-0.5 block text-lg font-semibold normal-case tracking-[-0.02em] text-white dark:text-white'>
+              <strong className='ap-outcome-tracking mt-0.5 block text-lg font-semibold normal-case text-primary-token'>
                 {row.day}
               </strong>
             </span>
             <span className='min-w-0'>
-              <span className='block truncate text-sm font-semibold tracking-[-0.02em] text-white dark:text-white'>
+              <span className='ap-outcome-tracking block truncate text-sm font-semibold text-primary-token'>
                 {row.venue}
               </span>
-              <span className='mt-0.5 block truncate text-xs text-white/56'>
+              <span className='mt-0.5 block truncate text-xs text-tertiary-token'>
                 {row.location}
               </span>
             </span>
-            <span className='text-xs font-medium text-white/62'>
+            <span className='text-xs font-medium text-secondary-token'>
               {row.ctaLabel}
             </span>
           </div>
