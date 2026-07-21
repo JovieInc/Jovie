@@ -172,7 +172,7 @@ export function AudioBar({
   );
 
   const rightCluster = (
-    <div className='flex items-center gap-1.5 justify-self-end'>
+    <div className='flex items-center gap-1 justify-self-end'>
       {track.hasLyrics && onOpenLyrics && (
         <IconBtn
           label={lyricsActive ? 'Close lyrics' : 'Lyrics'}
@@ -223,13 +223,13 @@ export function AudioBar({
         // Visibility is owned by shell parents (e.g. PersistentAudioBar surfaces).
         // Avoid nested `hidden lg:*` here — when Tailwind is active in CI/jsdom,
         // it leaves sibling now-playing chrome visible while hiding transport controls.
-        'group/bar shrink-0 grid grid-cols-[1fr_minmax(360px,_720px)_1fr] gap-4 items-center px-8 py-2',
+        // Single-row dock: parent may own the left now-playing column (JOV-3511).
+        'group/bar shrink-0 grid grid-cols-[minmax(240px,_1fr)_auto] gap-3 items-center px-2 py-1.5',
         className
       )}
     >
-      <div />
       {/* Center column: waveform drawer above (collapsible), transport below. */}
-      <div className='flex flex-col items-center justify-center min-h-13'>
+      <div className='flex flex-col items-center justify-center min-h-11 min-w-0'>
         <div
           aria-hidden={!waveformOn}
           className='w-full overflow-hidden'

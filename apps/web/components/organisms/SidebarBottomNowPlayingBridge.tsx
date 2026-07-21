@@ -8,9 +8,9 @@ import { useAudioChromeSnapshot } from './audio-chrome-state';
 
 /**
  * SidebarBottomNowPlayingBridge — production audio adapter for the shell
- * `SidebarBottomNowPlaying` atom inside `UnifiedSidebar`. Renders only when
- * there's an active track and the persistent compact player does not already
- * own the same now-playing surface.
+ * `SidebarBottomNowPlaying` atom inside `UnifiedSidebar`. This is the MINI
+ * player. It renders only when the full bottom bar is hidden (minimized);
+ * full + mini never co-reside (JOV-3511).
  *
  * Adapter: production `useTrackAudioPlayer().playbackState` →
  * `NowPlayingTrack` (trackTitle / artistName / artworkUrl). Tap-to-play
@@ -34,19 +34,21 @@ export function SidebarBottomNowPlayingBridge() {
   );
   if (!hasActiveTrack) return null;
 
-  const compactPlayerOwnsTrack =
-    audioChrome.compactPlayerVisible &&
+  // Mini (sidebar) yields while the full docked bar owns this track.
+  // When the full bar is minimized, the mini becomes the sole chrome.
+  const fullPlayerOwnsTrack =
+    audioChrome.fullPlayerVisible &&
     audioChrome.activeTrackId === playbackState.activeTrackId;
 
   return (
     <div
       data-shell-audio-surface='sidebar-compact'
-      data-state={compactPlayerOwnsTrack ? 'reserved' : 'visible'}
-      aria-hidden={compactPlayerOwnsTrack}
-      inert={compactPlayerOwnsTrack ? true : undefined}
+      data-state={fullPlayerOwnsTrack ? 'reserved' : 'visible'}
+      aria-hidden={fullPlayerOwnsTrack}
+      inert={fullPlayerOwnsTrack ? true : undefined}
       className={cn(
         'h-(--app-shell-audio-compact-height) overflow-hidden px-2 pb-2 pt-1 transition-[opacity,transform] duration-cinematic ease-cinematic',
-        compactPlayerOwnsTrack ? 'pointer-events-none opacity-0' : 'opacity-100'
+        fullPlayerOwnsTrack ? 'pointer-events-none opacity-0' : 'opacity-100'
       )}
     >
       <SidebarBottomNowPlaying
@@ -57,7 +59,7 @@ export function SidebarBottomNowPlayingBridge() {
         }}
         isPlaying={playbackState.isPlaying}
         onPlay={handlePlay}
-        className='border border-(--app-shell-border)/75 bg-(--app-shell-content-surface) shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform,border-color,background-color] duration-cinematic ease-cinematic'
+        className='border-0 bg-transparent shadow-none transition-[opacity,transform,background-color] duration-cinematic ease-cinematic'
       />
     </div>
   );

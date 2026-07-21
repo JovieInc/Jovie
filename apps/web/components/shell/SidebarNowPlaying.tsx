@@ -97,14 +97,15 @@ export const SidebarNowPlaying = React.memo(function SidebarNowPlaying({
   }
 
   return (
-    <div className={cn('px-1 flex items-center gap-2.5', className)}>
-      <div className='relative h-9 w-9 rounded overflow-hidden shrink-0'>
+    <div className={cn('flex min-w-0 items-center gap-2 px-0.5', className)}>
+      {/* Small docked thumbnail — never full-bleed artwork (JOV-3511). */}
+      <div className='relative h-8 w-8 shrink-0 overflow-hidden rounded-md bg-surface-2'>
         {artworkUrl && (
           <Image
             src={artworkUrl}
             alt=''
             fill
-            sizes='36px'
+            sizes='32px'
             className='object-cover'
             unoptimized
           />

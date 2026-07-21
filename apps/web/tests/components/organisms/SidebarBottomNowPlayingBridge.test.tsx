@@ -74,7 +74,36 @@ describe('SidebarBottomNowPlayingBridge', () => {
     expect(screen.getByLabelText('Play')).toBeInTheDocument();
   });
 
-  it('reserves the slot when the persistent compact player owns the active track', () => {
+  it('reserves the slot when the full player owns the active track', () => {
+    _state = {
+      ..._state,
+      activeTrackId: 'track-1',
+      trackTitle: 'Lost in the Light',
+      artistName: 'Bahamas',
+      isPlaying: false,
+    };
+    setAudioChromeSnapshot({
+      activeTrackId: 'track-1',
+      compactPlayerVisible: false,
+      fullPlayerVisible: true,
+    });
+
+    render(<SidebarBottomNowPlayingBridge />);
+
+    const slot = document.querySelector(
+      '[data-shell-audio-surface="sidebar-compact"]'
+    );
+    expect(slot).toHaveAttribute('data-state', 'reserved');
+    expect(slot).toHaveAttribute('aria-hidden', 'true');
+    expect(slot).toHaveAttribute('inert');
+    expect(slot).toHaveClass('opacity-0');
+    expect(slot).not.toHaveClass('invisible');
+    expect(
+      screen.queryByRole('button', { name: 'Play' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the mini player when the full player is minimized', () => {
     _state = {
       ..._state,
       activeTrackId: 'track-1',
@@ -93,17 +122,12 @@ describe('SidebarBottomNowPlayingBridge', () => {
     const slot = document.querySelector(
       '[data-shell-audio-surface="sidebar-compact"]'
     );
-    expect(slot).toHaveAttribute('data-state', 'reserved');
-    expect(slot).toHaveAttribute('aria-hidden', 'true');
-    expect(slot).toHaveAttribute('inert');
-    expect(slot).toHaveClass('opacity-0');
-    expect(slot).not.toHaveClass('invisible');
-    expect(
-      screen.queryByRole('button', { name: 'Play' })
-    ).not.toBeInTheDocument();
+    expect(slot).toHaveAttribute('data-state', 'visible');
+    expect(screen.getByText('Lost in the Light')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
   });
 
-  it('still renders when compact state belongs to a different track', () => {
+  it('still renders when full-player state belongs to a different track', () => {
     _state = {
       ..._state,
       activeTrackId: 'track-1',
@@ -113,8 +137,8 @@ describe('SidebarBottomNowPlayingBridge', () => {
     };
     setAudioChromeSnapshot({
       activeTrackId: 'track-2',
-      compactPlayerVisible: true,
-      fullPlayerVisible: false,
+      compactPlayerVisible: false,
+      fullPlayerVisible: true,
     });
 
     render(<SidebarBottomNowPlayingBridge />);
