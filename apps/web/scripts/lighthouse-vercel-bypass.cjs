@@ -24,10 +24,19 @@ const {
 } = require('./vercel-protected-origin.cjs');
 
 const COOKIE_SCOPE_PROBE_PATH = '/__jovie_cookie_scope_probe__';
+const NON_SECRET_METADATA_COOKIE_NAMES = new Set([
+  'jv_cc_required',
+  'jv_country',
+]);
 
-function recordSensitiveValues(path, values) {
+function recordSensitiveValues(path, values, cookies) {
+  const sensitiveCookieValues = new Set(
+    cookies
+      .filter(cookie => !NON_SECRET_METADATA_COOKIE_NAMES.has(cookie.name))
+      .map(cookie => cookie.value)
+  );
   const safeValues = maskSensitiveValues(
-    values.filter(value => value.length >= 4)
+    values.filter(value => sensitiveCookieValues.has(value))
   );
   if (!path) return;
   let expectedIdentity;
@@ -183,8 +192,8 @@ async function primeLighthouseVercelAliasBypass(
     expectedCommitSha,
     expectedAliasOrigin,
     expectedEnvironment,
-    onSensitiveValues: values =>
-      recordSensitiveValuesImpl(sensitiveValuesPath, values),
+    onSensitiveValues: (values, cookies) =>
+      recordSensitiveValuesImpl(sensitiveValuesPath, values, cookies),
     onCookies: async (cookies, verifiedTargetUrl) => {
       await browser.defaultBrowserContext().setCookie(...cookies);
       await assertBrowserCookieOriginBoundaryImpl(
@@ -227,8 +236,8 @@ async function primeLighthouseVercelBypass(
     expectedCommitSha,
     expectedDeploymentOrigin,
     expectedEnvironment,
-    onSensitiveValues: values =>
-      recordSensitiveValuesImpl(sensitiveValuesPath, values),
+    onSensitiveValues: (values, cookies) =>
+      recordSensitiveValuesImpl(sensitiveValuesPath, values, cookies),
     onCookies: async (cookies, verifiedTargetUrl) => {
       await browser.defaultBrowserContext().setCookie(...cookies);
       await assertBrowserCookieOriginBoundaryImpl(

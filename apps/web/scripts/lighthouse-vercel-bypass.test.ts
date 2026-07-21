@@ -120,7 +120,8 @@ const {
       readonly sensitiveValuesPath?: string;
       readonly recordSensitiveValuesImpl?: (
         path: string | undefined,
-        values: readonly string[]
+        values: readonly string[],
+        cookies: readonly { readonly name: string; readonly value: string }[]
       ) => void;
     }
   ) => Promise<void>;
@@ -141,7 +142,8 @@ const {
       readonly sensitiveValuesPath?: string;
       readonly recordSensitiveValuesImpl?: (
         path: string | undefined,
-        values: readonly string[]
+        values: readonly string[],
+        cookies: readonly { readonly name: string; readonly value: string }[]
       ) => void;
     }
   ) => Promise<void>;
@@ -557,7 +559,16 @@ describe('origin-bound Vercel protection bypass', () => {
     });
     expect(recordSensitiveValuesImpl).toHaveBeenCalledWith(
       '/runner-temp/lighthouse-sensitive-values',
-      ['opaque-cookie']
+      ['opaque-cookie'],
+      [
+        {
+          name: '__vercel_live_token',
+          value: 'opaque-cookie',
+          url: DEPLOYMENT_URL.slice(0, -1),
+          secure: true,
+          httpOnly: true,
+        },
+      ]
     );
   });
 
@@ -623,21 +634,26 @@ describe('origin-bound Vercel protection bypass', () => {
     });
   });
 
-  it('records only scan-worthy bootstrap cookie values', () => {
+  it('records every non-metadata cookie, including short values', () => {
     const directory = mkdtempSync(join(tmpdir(), 'jovie-sensitive-values-'));
     const receipt = join(directory, 'receipt');
+    const cookies = [
+      { name: 'jv_cc_required', value: '1' },
+      { name: 'jv_country', value: 'US' },
+      { name: 'future_metadata', value: 'x' },
+      { name: '__vercel_live_token', value: 'opaque-cookie-value' },
+    ];
     try {
-      recordSensitiveValues(receipt, [
-        '0',
-        'Phoenix',
-        'AZ',
-        'opaque-cookie-value',
-      ]);
-
-      expect(readFileSync(receipt, 'utf8')).toBe(
-        'Phoenix\nopaque-cookie-value\n'
+      recordSensitiveValues(
+        receipt,
+        cookies.map(cookie => cookie.value),
+        cookies
       );
-      expect(() => recordSensitiveValues(receipt, ['0', 'AZ'])).toThrow();
+
+      expect(readFileSync(receipt, 'utf8')).toBe('x\nopaque-cookie-value\n');
+      expect(() =>
+        recordSensitiveValues(receipt, ['1', 'US'], cookies.slice(0, 2))
+      ).toThrow();
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

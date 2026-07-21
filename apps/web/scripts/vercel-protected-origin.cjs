@@ -745,7 +745,7 @@ async function bootstrapOriginBoundAccess(
       cookies.map(cookie => cookie.value)
     );
     if (onSensitiveValues) {
-      await deadline.run(() => onSensitiveValues(sensitiveValues));
+      await deadline.run(() => onSensitiveValues(sensitiveValues, cookies));
     }
     await deadline.run(() => discardResponseBody(bootstrapResponse));
     if (onCookies) await deadline.run(() => onCookies(cookies, targetUrl));
@@ -846,7 +846,7 @@ async function bootstrapAliasBoundAccess(
       cookies.map(cookie => cookie.value)
     );
     if (onSensitiveValues) {
-      await deadline.run(() => onSensitiveValues(sensitiveValues));
+      await deadline.run(() => onSensitiveValues(sensitiveValues, cookies));
     }
     await deadline.run(() => discardResponseBody(bootstrapResponse));
     if (onCookies) await deadline.run(() => onCookies(cookies, targetUrl));
