@@ -420,19 +420,22 @@ export async function completeOnboarding({
       );
     }
 
-    // Steps 8-9: Durable bounded sync + trial activation, then completion cookie
+    // ENG-002: Set completion cookie to prevent redirect loop race condition.
+    // Onboarding is complete at this point regardless of the finalization
+    // path — direct_profile claims skip finalizePostOnboarding but still
+    // need the cookie so the proxy doesn't bounce the user back to /start.
+    const cookieStore = await cookies();
+    cookieStore.set('jovie_onboarding_complete', '1', {
+      httpOnly: true,
+      secure: isSecureEnv(),
+      sameSite: 'lax',
+      maxAge: 120,
+      path: '/',
+    });
+
+    // Steps 8-9: Durable bounded sync + trial activation
     if (shouldFinalizeOnboarding) {
       await finalizePostOnboarding(userId, completion.username);
-
-      // ENG-002: Set completion cookie to prevent redirect loop race condition
-      const cookieStore = await cookies();
-      cookieStore.set('jovie_onboarding_complete', '1', {
-        httpOnly: true,
-        secure: isSecureEnv(),
-        sameSite: 'lax',
-        maxAge: 120,
-        path: '/',
-      });
     }
 
     // Invalidate dashboard data cache to prevent stale data causing redirect loops
