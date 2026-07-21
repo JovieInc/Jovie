@@ -1,5 +1,5 @@
 import { SkipToContent } from '@/components/atoms/SkipToContent';
-import { HomeLegalFooter } from '@/components/homepage/HomeLegalFooter';
+import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
@@ -22,7 +22,7 @@ export default function BrandLayout({
       <main id='main-content' className='system-b-brand-main'>
         {children}
       </main>
-      <HomeLegalFooter />
+      <MarketingFooter variant='expanded' />
     </div>
   );
 }

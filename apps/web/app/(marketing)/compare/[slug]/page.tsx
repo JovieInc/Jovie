@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import {
   FaqSection,
   MarketingContainer,
-  MarketingHeroLayout,
+  MarketingHero,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -61,7 +61,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
       <script type='application/ld+json'>{faqSchema}</script>
       <script type='application/ld+json'>{breadcrumbSchema}</script>
 
-      <MarketingHeroLayout variant='left'>
+      <MarketingHero variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>Compare</p>
         <h1 className='mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
           {data.heroHeadline}
@@ -69,7 +69,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
         <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
           {data.heroSubheadline}
         </p>
-      </MarketingHeroLayout>
+      </MarketingHero>
 
       {/* Feature Comparison Table */}
       <MarketingContainer width='prose' className='pb-16'>

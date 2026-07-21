@@ -942,7 +942,7 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     status: 'proven',
     referenceRoute: '/about', // also /support
     audience: 'general',
-    // Per codebase-baseline — /about and /support use MarketingHeroLayout + FaqSection + schemas.
+    // Per codebase-baseline — /about and /support use MarketingHero + FaqSection + schemas.
     sectionOrder: ['hero', 'content-prose', 'faq', 'cta'],
     arc: [
       { beat: 'frame', feeling: 'what is this about', section: 'hero' },

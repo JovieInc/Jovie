@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { FaqSection, MarketingHeroLayout } from '@/components/marketing';
+import { FaqSection, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL, SUPPORT_EMAIL } from '@/constants/domains';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
@@ -64,7 +64,7 @@ export default function SupportPage() {
       <script type='application/ld+json'>{FAQ_SCHEMA}</script>
       <script type='application/ld+json'>{BREADCRUMB_SCHEMA}</script>
 
-      <MarketingHeroLayout variant='left'>
+      <MarketingHero variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>Support</p>
         <h1 className='mt-6 text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'>
           We&apos;re Here To Help.
@@ -72,7 +72,7 @@ export default function SupportPage() {
         <p className='mt-6 max-w-xl text-lg leading-relaxed text-secondary-token'>
           Browse our docs or reach out to our team.
         </p>
-      </MarketingHeroLayout>
+      </MarketingHero>
 
       <SupportChannels />
       <FaqSection

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { SharedMarketingHero } from '@/components/features/landing/SharedMarketingHero';
 import { VoiceDemoVisual } from '@/components/features/landing/VoiceDemoVisual';
+import { MarketingHero } from '@/components/marketing/MarketingHero';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
@@ -48,7 +48,7 @@ export default function VoiceLandingPage() {
 
   return (
     <main className='bg-base text-primary-token'>
-      <SharedMarketingHero
+      <MarketingHero
         eyebrow='Voice Cloning'
         title={
           <>

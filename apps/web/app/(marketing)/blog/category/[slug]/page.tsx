@@ -1,8 +1,5 @@
 import { notFound } from 'next/navigation';
-import {
-  MarketingContainer,
-  MarketingHeroLayout,
-} from '@/components/marketing';
+import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getCategoryBySlug } from '@/lib/blog/categories';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
@@ -105,7 +102,7 @@ export default async function CategoryPage({
 
       <div className='min-h-screen'>
         {/* Hero */}
-        <MarketingHeroLayout variant='left'>
+        <MarketingHero variant='left'>
           <p className='marketing-kicker mb-0 text-tertiary-token'>Blog</p>
           <h1 className='marketing-h1-linear mb-6 mt-6 text-primary-token'>
             {category.name}
@@ -113,7 +110,7 @@ export default async function CategoryPage({
           <p className='marketing-lead-linear max-w-[34rem] text-secondary-token'>
             {category.description}
           </p>
-        </MarketingHeroLayout>
+        </MarketingHero>
 
         {/* Posts Grid */}
         <MarketingContainer width='page' className='pb-20 sm:pb-28'>
