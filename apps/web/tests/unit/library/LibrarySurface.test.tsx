@@ -351,7 +351,7 @@ describe('LibrarySurface', () => {
     expect(portraitCard?.className).toContain('aspect-[9/16]');
   });
 
-  it('shows release status on cards/rows and keeps the approval axis out of the filter rail', async () => {
+  it('surfaces Approval Status on list rows, grid cards, and filter chips (#10384)', async () => {
     renderLibraryWithSidebarOverride([
       buildAsset({
         status: 'released',
@@ -370,10 +370,25 @@ describe('LibrarySurface', () => {
         approvalStatus: 'approved',
       }),
     ]);
+
+    // List view includes the Approval column cell for every row.
+    expect(
+      screen.getByTestId('library-approval-status-release-1')
+    ).toHaveTextContent('Draft');
+    expect(
+      screen.getByTestId('library-approval-status-release-1')
+    ).toHaveAccessibleName('Approval Status: Draft');
+    expect(
+      screen.getByTestId('library-approval-status-release-2')
+    ).toHaveTextContent('Needs Review');
+    expect(
+      screen.getByTestId('library-release-status-release-1')
+    ).toHaveTextContent('Released');
+
     clickGridView();
 
-    // Grid cards surface Release Status (not Approval) so a Released item never
-    // reads as a bare "Draft" (JOV-3333).
+    // Grid cards surface both axes with explicit labels so Release "Draft"
+    // never collides with Approval "Draft" (#10384 / JOV-3333).
     expect(
       screen.getByTestId('library-release-status-release-1')
     ).toHaveTextContent('Released');
@@ -381,30 +396,37 @@ describe('LibrarySurface', () => {
       screen.getByTestId('library-release-status-release-1')
     ).toHaveAccessibleName('Release Status: Released');
     expect(
-      screen.queryByTestId('library-approval-status-release-1')
-    ).not.toBeInTheDocument();
+      screen.getByTestId('library-approval-status-release-1')
+    ).toHaveTextContent('Draft');
+    expect(
+      screen.getByTestId('library-approval-status-release-1')
+    ).toHaveAccessibleName('Approval Status: Draft');
+    expect(
+      screen.getByTestId('library-approval-status-release-2')
+    ).toHaveTextContent('Needs Review');
 
-    // Approval Status stays hidden until a review workflow exists (JOV-3089):
-    // the rail offers exactly one status vocabulary — Release Status.
+    // Filter rail exposes Approval Status as a first-class chip group (#10384).
     fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
     const rail = screen.getByRole('navigation', { name: 'Library Filters' });
+    expect(within(rail).getByText('Approval Status')).toBeInTheDocument();
     expect(within(rail).getByText('Release Status')).toBeInTheDocument();
-    expect(within(rail).queryByText('Approval Status')).not.toBeInTheDocument();
     expect(
-      within(rail).queryByRole('button', { name: /Needs Review/u })
-    ).toBeNull();
+      within(rail).getByRole('button', { name: /Needs Review/u })
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /^Draft /u }));
+    fireEvent.click(
+      within(rail).getByRole('button', { name: /Needs Review/u })
+    );
 
     await waitFor(() => {
       expect(
-        screen.getByTestId('library-release-status-release-3')
+        screen.getByTestId('library-approval-status-release-2')
       ).toBeInTheDocument();
       expect(
-        screen.queryByTestId('library-release-status-release-1')
+        screen.queryByTestId('library-approval-status-release-1')
       ).toBeNull();
       expect(
-        screen.queryByTestId('library-release-status-release-2')
+        screen.queryByTestId('library-approval-status-release-3')
       ).toBeNull();
     });
   });

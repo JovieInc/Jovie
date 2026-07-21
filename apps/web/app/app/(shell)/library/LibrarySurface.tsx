@@ -192,6 +192,7 @@ const LibraryPreviewContext = createContext<{
 
 type LibraryFilters = {
   readonly statuses: Set<LibraryReleaseAsset['status']>;
+  readonly approvalStatuses: Set<LibraryApprovalStatus>;
   readonly releaseTypes: Set<LibraryReleaseAsset['releaseType']>;
   readonly assetKinds: Set<LibraryAssetKind>;
   readonly providers: Set<string>;
@@ -269,6 +270,7 @@ const PRESETS: readonly {
 function emptyFilters(): LibraryFilters {
   return {
     statuses: new Set(),
+    approvalStatuses: new Set(),
     releaseTypes: new Set(),
     assetKinds: new Set(),
     providers: new Set(),
@@ -315,6 +317,12 @@ function assetMatchesFilters(
   filters: LibraryFilters
 ): boolean {
   if (filters.statuses.size > 0 && !filters.statuses.has(asset.status)) {
+    return false;
+  }
+  if (
+    filters.approvalStatuses.size > 0 &&
+    !filters.approvalStatuses.has(asset.approvalStatus)
+  ) {
     return false;
   }
   if (
@@ -367,7 +375,14 @@ function assetMatchesPills(
       case 'status':
         return valuesMatchPill([asset.status], pill);
       case 'approval':
-        return valuesMatchPill([asset.approvalStatus], pill);
+        // Accept raw enum (`needs_review`) or human label (`Needs Review`).
+        return valuesMatchPill(
+          [
+            asset.approvalStatus,
+            formatLibraryApprovalStatus(asset.approvalStatus),
+          ],
+          pill
+        );
       case 'has':
         return valuesMatchPill(asset.assetKinds, pill);
       case 'album':
@@ -379,6 +394,7 @@ function assetMatchesPills(
 function hasActiveFilters(filters: LibraryFilters): boolean {
   return (
     filters.statuses.size +
+      filters.approvalStatuses.size +
       filters.releaseTypes.size +
       filters.assetKinds.size +
       filters.providers.size >
@@ -497,10 +513,26 @@ const StatusCell = memo(function StatusCell({
   );
 });
 
-/**
- * Approval Status stays out of the library rail/columns until a real review
- * workflow exists (JOV-3089) — one visible status vocabulary: release status.
- */
+const ApprovalStatusCell = memo(function ApprovalStatusCell({
+  asset,
+}: {
+  readonly asset: LibraryReleaseAsset;
+}) {
+  return (
+    <span
+      role='status'
+      className={cn(
+        'system-b-library-status-pill inline-flex h-6 w-fit items-center border px-2 leading-4',
+        libraryApprovalStatusClasses(asset.approvalStatus)
+      )}
+      data-testid={`library-approval-status-${asset.id}`}
+      aria-label={`Approval Status: ${formatLibraryApprovalStatus(asset.approvalStatus)}`}
+    >
+      {formatLibraryApprovalStatus(asset.approvalStatus)}
+    </span>
+  );
+});
+
 function assetMatchesSearchQuery(
   asset: LibraryReleaseAsset,
   normalizedQuery: string
@@ -653,13 +685,23 @@ const LIBRARY_TABLE_COLUMNS = [
     enableSorting: false,
     meta: { className: 'pl-2.5 pr-2' },
   }),
+  // Release + Approval share the same md breakpoint so a Released+Draft
+  // row never shows bare "Draft" alone (JOV-3333 / #10384).
   libraryColumnHelper.display({
     id: 'status',
     header: 'Release',
     cell: ({ row }) => <StatusCell asset={row.original} />,
     size: 112,
     minSize: 96,
-    meta: { className: 'hidden xl:table-cell px-2' },
+    meta: { className: 'hidden md:table-cell px-2' },
+  }),
+  libraryColumnHelper.display({
+    id: 'approval',
+    header: 'Approval',
+    cell: ({ row }) => <ApprovalStatusCell asset={row.original} />,
+    size: 128,
+    minSize: 108,
+    meta: { className: 'hidden md:table-cell px-2' },
   }),
   createLibraryTypeColumn('hidden lg:table-cell px-2', 104, 88),
   libraryColumnHelper.display({
@@ -855,6 +897,9 @@ function LibraryRail({
 }) {
   const releaseTypes = uniqueSorted(assets.map(asset => asset.releaseType));
   const statuses = uniqueSorted(assets.map(asset => asset.status));
+  const approvalStatuses = uniqueSorted(
+    assets.map(asset => asset.approvalStatus)
+  );
   const providerKeys = uniqueSorted(
     assets.flatMap(asset => asset.providers.map(provider => provider.key))
   );
@@ -871,6 +916,7 @@ function LibraryRail({
   const counts = {
     releaseTypes: countBy(assets, asset => [asset.releaseType]),
     statuses: countBy(assets, asset => [asset.status]),
+    approvalStatuses: countBy(assets, asset => [asset.approvalStatus]),
     providers: countBy(
       assets,
       asset => asset.providers.map(provider => provider.key) as string[]
@@ -879,6 +925,7 @@ function LibraryRail({
   };
   const activeFilterCount =
     filters.statuses.size +
+    filters.approvalStatuses.size +
     filters.releaseTypes.size +
     filters.assetKinds.size +
     filters.providers.size;
@@ -921,6 +968,24 @@ function LibraryRail({
             </Button>
           ) : null}
         </div>
+
+        <FilterSection label='Approval Status'>
+          {approvalStatuses.map(status => (
+            <FilterRow
+              key={status}
+              active={filters.approvalStatuses.has(status)}
+              count={counts.approvalStatuses.get(status) ?? 0}
+              label={formatLibraryApprovalStatus(status)}
+              dotClassName={libraryApprovalStatusDotClasses(status)}
+              onClick={() =>
+                onFilters({
+                  ...filters,
+                  approvalStatuses: toggleSet(filters.approvalStatuses, status),
+                })
+              }
+            />
+          ))}
+        </FilterSection>
 
         <FilterSection label='Release Status'>
           {statuses.map(status => (
@@ -1365,17 +1430,34 @@ const AssetCard = memo(function AssetCard({
             )}
           >
             <LibraryMediaThumbnail asset={asset} size='card' />
-            <span
-              role='status'
-              className={cn(
-                'system-b-library-card-status absolute left-2 top-2 border px-1.5 py-0.5 leading-4',
-                releaseStatusClasses(asset.status)
-              )}
-              data-testid={`library-release-status-${asset.id}`}
-              aria-label={`Release Status: ${formatLibraryStatus(asset)}`}
-            >
-              {formatLibraryStatus(asset)}
-            </span>
+            {/*
+              Two status axes, always reserved in a fixed stack so card layout
+              never shifts between draft/approved states (#10384 / JOV-3333).
+            */}
+            <div className='absolute left-2 top-2 flex max-w-[calc(100%-3.5rem)] flex-col items-start gap-1'>
+              <span
+                role='status'
+                className={cn(
+                  'system-b-library-card-status border px-1.5 py-0.5 leading-4',
+                  releaseStatusClasses(asset.status)
+                )}
+                data-testid={`library-release-status-${asset.id}`}
+                aria-label={`Release Status: ${formatLibraryStatus(asset)}`}
+              >
+                {formatLibraryStatus(asset)}
+              </span>
+              <span
+                role='status'
+                className={cn(
+                  'system-b-library-card-status border px-1.5 py-0.5 leading-4',
+                  libraryApprovalStatusClasses(asset.approvalStatus)
+                )}
+                data-testid={`library-approval-status-${asset.id}`}
+                aria-label={`Approval Status: ${formatLibraryApprovalStatus(asset.approvalStatus)}`}
+              >
+                {formatLibraryApprovalStatus(asset.approvalStatus)}
+              </span>
+            </div>
           </div>
           <div className='min-w-0 p-3'>
             <div className='flex min-w-0 items-start justify-between gap-2'>
@@ -2417,6 +2499,15 @@ export function LibrarySurface({
     () => uniqueSorted(effectiveAssets.map(asset => asset.status)),
     [effectiveAssets]
   );
+  const approvalOptions = useMemo(
+    () =>
+      uniqueSorted(
+        effectiveAssets.map(asset =>
+          formatLibraryApprovalStatus(asset.approvalStatus)
+        )
+      ),
+    [effectiveAssets]
+  );
   const hasOptions = useMemo(
     () => uniqueSorted(effectiveAssets.flatMap(asset => asset.assetKinds)),
     [effectiveAssets]
@@ -2592,6 +2683,7 @@ export function LibrarySurface({
 
   const activeFilterCount =
     filters.statuses.size +
+    filters.approvalStatuses.size +
     filters.releaseTypes.size +
     filters.assetKinds.size +
     filters.providers.size;
@@ -2608,6 +2700,7 @@ export function LibrarySurface({
             titleOptions,
             albumOptions: [],
             statusOptions,
+            approvalOptions,
             hasOptions,
             totalCount: effectiveAssets.length,
             visibleCount: visibleAssets.length,
@@ -2617,9 +2710,16 @@ export function LibrarySurface({
                 : 'Filter Library',
             ariaLabel: 'Filter library assets',
             placeholder: 'Search library',
-            allowedFields: ['artist', 'title', 'status', 'has'] as const,
+            allowedFields: [
+              'artist',
+              'title',
+              'status',
+              'approval',
+              'has',
+            ] as const,
           },
     [
+      approvalOptions,
       artistOptions,
       effectiveAssets.length,
       hasOptions,
