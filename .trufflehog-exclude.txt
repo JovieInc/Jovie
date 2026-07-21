@@ -1,2 +1,8 @@
 scripts/security/gitleaks-fixture.txt
 scripts/security/gitleaks-backup-fixture.txt
+# sonarcloud.yml: SONAR_TOKEN secret-REFERENCES + 40-hex action pins are
+# SonarCloud-detector bait (8+ unverified hits per bump, all non-credentials).
+# trufflehog git-mode does not honor inline trufflehog:ignore markers on
+# diff-scanned lines (verified 2026-07-20, runs 29785483353/29784648947).
+# gitleaks (.gitleaks.toml) and GitHub secret scanning still cover this file.
+.github/workflows/sonarcloud.yml

@@ -70,8 +70,18 @@ ensure_trufflehog() {
 }
 
 trufflehog_exclude_args() {
+  # --exclude-globs, not --exclude-paths: trufflehog git mode does not honor
+  # --exclude-paths entries (verified 2026-07-20 with 3.95.9 — findings in
+  # excluded files still fired), while comma-separated globs suppress in
+  # both git and filesystem modes. Entries in EXCLUDE_PATHS are plain
+  # repo-relative paths, which are valid globs as-is; comment lines and
+  # blanks are dropped when building the list.
   if [[ -f "$EXCLUDE_PATHS" ]]; then
-    printf '%s' "--exclude-paths=$EXCLUDE_PATHS"
+    local globs
+    globs="$(grep -vE '^\s*(#|$)' "$EXCLUDE_PATHS" | paste -sd, -)"
+    if [[ -n "$globs" ]]; then
+      printf '%s' "--exclude-globs=$globs"
+    fi
   fi
 }
 

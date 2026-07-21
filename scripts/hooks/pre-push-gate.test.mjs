@@ -46,8 +46,8 @@ test('.no-mistakes.yaml points lint/test/format at pre-push-gate.sh', () => {
   assert.match(config, /format: bash scripts\/hooks\/pre-push-gate\.sh format/);
 });
 
-test('.husky/pre-push delegates to pre-push-gate lint profile', () => {
+test('.husky/pre-push delegates to the pre-push-gate affected profile', () => {
   const hook = readFileSync(path.join(repoRoot, '.husky/pre-push'), 'utf8');
   assert.match(hook, /set -e/);
-  assert.match(hook, /pre-push-gate\.sh lint/);
+  assert.match(hook, /pre-push-gate\.sh affected/);
 });

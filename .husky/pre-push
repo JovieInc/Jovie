@@ -1,4 +1,11 @@
 #!/usr/bin/env sh
 set -e  # Required: ensures pre-push-gate.sh failure actually blocks pushes
 
+# Hook-driven pushes coincide with peak contention on the orchestration host
+# (JOV-4329): a signal-killed vitest shard surfaces as exit 128 with no test
+# summary. Default to a single vitest worker in hook context to shrink peak
+# shard memory; standalone runs keep 2 and either way
+# AUTOMATION_VERIFY_MAX_WORKERS overrides.
+export AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-1}"
+
 bash scripts/hooks/pre-push-gate.sh affected
