@@ -54,7 +54,7 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
 - Grouping strategy: `ALLGREEN`
 - Minimum entries to merge: `1`
 - Maximum entries per merge: `10`
-- Maximum entries building concurrently: `2`
+- Maximum entries building concurrently: `8` (sized for ~120 org job concurrency; ~10 peak jobs per merge_group)
 - Check response timeout: `60` minutes
 - Signed-commit and non-fast-forward rules: dormant/not applied. The checked-in
   payload intentionally matches live ruleset `10512119`; enabling either is a

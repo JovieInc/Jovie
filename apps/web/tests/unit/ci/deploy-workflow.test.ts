@@ -2354,11 +2354,11 @@ describe('CI bounded evidence parallelism', () => {
     expect(lighthouse).toContain("PUBLIC_LIGHTHOUSE_TOTAL_SHARDS: '4'");
   });
 
-  it('runs two mobile widths while retaining the three-width evidence set', () => {
+  it('runs all three mobile widths in parallel under expanded job headroom', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const mobile = getJobBlock(workflow, 'ci-mobile-overflow');
 
-    expect(mobile).toContain('max-parallel: 2');
+    expect(mobile).toContain('max-parallel: 3');
     expect(mobile).toContain('width: [320, 390, 430]');
   });
 });

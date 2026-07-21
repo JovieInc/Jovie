@@ -33,7 +33,11 @@ export const GRAPHITE_QUEUE_POLICY = Object.freeze({
 export const NATIVE_QUEUE_POLICY = Object.freeze({
   check_response_timeout_minutes: 60,
   grouping_strategy: 'ALLGREEN',
-  max_entries_to_build: 2,
+  // 2→8 on 2026-07-21: org Actions concurrency headroom ~120 jobs.
+  // merge_group peak ~10 concurrent jobs/entry → 8 builds ≈ 80 peak MQ jobs,
+  // leaving room for source-PR CI + release. Re-evaluate toward 10–12 if
+  // queue depth stays >8 while runner/job queue wait stays <3m.
+  max_entries_to_build: 8,
   max_entries_to_merge: 10,
   merge_method: 'SQUASH',
   min_entries_to_merge: 1,

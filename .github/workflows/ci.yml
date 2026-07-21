@@ -1805,9 +1805,9 @@ jobs:
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
       fail-fast: false
-      # The expanded runner pool supports two widths while the third remains
-      # bounded; non-320 widths already wait for the shared seed explicitly.
-      max-parallel: 2
+      # All three widths can run in parallel under the expanded org job
+      # concurrency ceiling (~120). Seed wait still serializes non-320 setup.
+      max-parallel: 3
       matrix:
         width: [320, 390, 430]
     steps:
