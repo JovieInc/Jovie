@@ -149,7 +149,7 @@ describe('ReleaseEditDialog', () => {
       />
     );
 
-    expect(screen.getByText('Edit release links')).toBeInTheDocument();
+    expect(screen.getByText('Edit Release Links')).toBeInTheDocument();
     expect(screen.getByText('Skyline Dreams')).toBeInTheDocument();
     expect(screen.getByText('Manual')).toBeInTheDocument();
     expect(

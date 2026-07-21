@@ -180,7 +180,7 @@ describe('ProfileContactSidebar scroll contract', () => {
     const scrollRegion = screen.getByTestId(
       'profile-contact-tabbed-card-scroll-region'
     );
-    const linkInput = screen.getByRole('textbox', { name: 'Add link' });
+    const linkInput = screen.getByRole('textbox', { name: 'Add Link' });
     expect(tabbedCard).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden');
     const rerenderState = () => {
       view.rerender(<ProfileContactSidebar />);
