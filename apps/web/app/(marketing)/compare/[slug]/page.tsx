@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import { Check, Minus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -159,12 +160,9 @@ export default async function ComparePage({ params }: ComparePageProps) {
             {data.bottomLine}
           </p>
           <div className='mt-8'>
-            <Link
-              href={APP_ROUTES.SIGNUP}
-              className='inline-flex items-center rounded-lg bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:bg-btn-primary-hover'
-            >
-              Try {APP_NAME} Free
-            </Link>
+            <Button asChild variant='primary' size='lg'>
+              <Link href={APP_ROUTES.SIGNUP}>Try {APP_NAME} Free</Link>
+            </Button>
           </div>
         </section>
       </MarketingContainer>

@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
@@ -29,12 +30,12 @@ export default function AiPage() {
             without exposing the private investor portal.
           </p>
           <div className='flex flex-wrap gap-3'>
-            <Link className='btn-linear-primary' href={APP_ROUTES.PRICING}>
-              See Pricing
-            </Link>
-            <Link className='btn-linear-secondary' href={APP_ROUTES.SUPPORT}>
-              Contact The Team
-            </Link>
+            <Button asChild variant='primary'>
+              <Link href={APP_ROUTES.PRICING}>See Pricing</Link>
+            </Button>
+            <Button asChild variant='secondary'>
+              <Link href={APP_ROUTES.SUPPORT}>Contact The Team</Link>
+            </Button>
           </div>
         </section>
 
@@ -103,18 +104,14 @@ export default function AiPage() {
               creator-facing offer.
             </p>
             <div className='flex flex-wrap gap-3'>
-              <Link
-                className='btn-linear-secondary'
-                href={APP_ROUTES.INVESTORS}
-              >
-                Investor Overview
-              </Link>
-              <Link
-                className='btn-linear-secondary'
-                href={APP_ROUTES.BLOG_THE_MYSPACE_PROBLEM}
-              >
-                Read The Memo
-              </Link>
+              <Button asChild variant='secondary'>
+                <Link href={APP_ROUTES.INVESTORS}>Investor Overview</Link>
+              </Button>
+              <Button asChild variant='secondary'>
+                <Link href={APP_ROUTES.BLOG_THE_MYSPACE_PROBLEM}>
+                  Read The Memo
+                </Link>
+              </Button>
             </div>
           </div>
         </section>

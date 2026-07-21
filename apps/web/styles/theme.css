@@ -366,7 +366,7 @@
   box-shadow: 0 0 0 2px rgba(113, 112, 255, 0.28);
 }
 
-/* Auth-tier primary — tighter than marketing ShellCtaButton (h-12 / 15px). */
+/* Auth-tier primary — tighter than the marketing Button lg CTA (h-11 / 14px). */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary {
   height: 2.5rem;
   min-height: 2.5rem;

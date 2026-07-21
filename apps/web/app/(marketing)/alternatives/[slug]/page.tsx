@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -123,12 +124,9 @@ export default async function AlternativesPage({
             <p className='mt-2 text-sm text-secondary-token'>
               Create your free profile in under a minute.
             </p>
-            <Link
-              href={APP_ROUTES.SIGNUP}
-              className='mt-6 inline-flex items-center rounded-lg bg-btn-primary px-6 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:bg-btn-primary-hover'
-            >
-              Request Access
-            </Link>
+            <Button asChild variant='primary' size='lg' className='mt-6'>
+              <Link href={APP_ROUTES.SIGNUP}>Request Access</Link>
+            </Button>
           </div>
         </section>
       </MarketingContainer>

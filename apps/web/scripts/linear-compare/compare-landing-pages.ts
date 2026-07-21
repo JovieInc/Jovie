@@ -201,7 +201,7 @@ const OUR_LANDING_SELECTORS = [
   { name: 'hero', selector: 'main section:first-of-type' },
   { name: 'hero-heading', selector: 'main h1' }, // Specific to main content
   { name: 'hero-subheading', selector: 'main h1 + div p, main section p' },
-  { name: 'cta-button', selector: '.btn-linear-primary' }, // Our specific CTA class
+  { name: 'cta-button', selector: 'a[data-variant="primary"]' }, // Canonical @jovie/ui Button primary CTA
   { name: 'main', selector: 'main' },
   { name: 'footer', selector: 'footer' },
 ];

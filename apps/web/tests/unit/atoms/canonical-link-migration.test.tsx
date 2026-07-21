@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { FooterLink } from '@/components/atoms/FooterLink';
 import { FrostedButton } from '@/components/atoms/FrostedButton';
 import { NavLink } from '@/components/atoms/NavLink';
-import { ShellCtaButton } from '@/components/marketing/artist-profile/ShellCtaButton';
 
 // Render next/link as a plain anchor (forwardRef so the Radix Slot chain in
 // the canonical Link primitive can compose refs without warnings).
@@ -21,12 +20,15 @@ vi.mock('next/link', () => {
 });
 
 /**
- * JOV-3574: the four ad-hoc anchors (NavLink, FooterLink, FrostedButton,
- * ShellCtaButton) render through the canonical Link primitive from
- * packages/ui/atoms/link.tsx with their existing props/classes intact.
+ * JOV-3574: the ad-hoc anchors (NavLink, FooterLink, FrostedButton) render
+ * through the canonical Link primitive from packages/ui/atoms/link.tsx with
+ * their existing props/classes intact.
  *
  * These tests intentionally do NOT mock @jovie/ui: they exercise the real
  * primitive (and, for FrostedButton, the real Button -> Link Slot chain).
+ *
+ * Note: ShellCtaButton was retired in the Wave 2 marketing CTA consolidation —
+ * its consumers now render the canonical @jovie/ui Button directly.
  */
 describe('canonical Link primitive migrations (JOV-3574)', () => {
   it('NavLink renders through the primitive with its props intact', () => {
@@ -105,29 +107,5 @@ describe('canonical Link primitive migrations (JOV-3574)', () => {
     const link = screen.getByRole('link', { name: 'Open' });
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-  });
-
-  it('ShellCtaButton renders through the primitive with CTA pill classes intact', () => {
-    render(<ShellCtaButton href='/claim'>Claim Your Profile</ShellCtaButton>);
-
-    const link = screen.getByRole('link', { name: 'Claim Your Profile' });
-    expect(link).toHaveAttribute('data-variant', 'link');
-    expect(link).toHaveAttribute('data-state', 'idle');
-    expect(link).toHaveAttribute('href', '/claim');
-    expect(link.className).toContain('rounded-full');
-    expect(link.className).toContain('bg-primary-token');
-    expect(link.className).toContain('h-11');
-  });
-
-  it('ShellCtaButton on-dark secondary keeps its tone classes', () => {
-    render(
-      <ShellCtaButton href='/docs' tone='secondary' context='on-dark' size='lg'>
-        Docs
-      </ShellCtaButton>
-    );
-
-    const link = screen.getByRole('link', { name: 'Docs' });
-    expect(link.className).toContain('text-white');
-    expect(link.className).toContain('h-12');
   });
 });

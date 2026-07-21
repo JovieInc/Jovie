@@ -1602,48 +1602,6 @@ body {
         color-mix(in oklab, var(--linear-border-focus) 55%, transparent);
     }
   }
-  /* Linear Button - Primary CTA styling using tokens */
-  .btn-linear-primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--linear-gap-buttons);
-    height: var(--linear-button-height-sm);
-    padding: 0 var(--linear-space-4);
-    border-radius: var(--radius-pill);
-    font-size: var(--linear-caption-size);
-    font-weight: var(--linear-font-weight-medium);
-    line-height: var(--linear-button-height-sm);
-    letter-spacing: var(--linear-tracking-normal);
-    background-color: var(--color-btn-primary-bg);
-    color: var(--color-btn-primary-fg);
-    border: 1px solid
-      color-mix(in oklab, var(--color-btn-primary-bg) 94%, white 6%);
-    max-width: 100%;
-    box-shadow:
-      var(--shadow-button-inset),
-      0 1px 1px rgba(0, 0, 0, 0.14);
-    transition:
-      background-color var(--ds-motion-subtle-duration)
-      var(--ds-motion-subtle-easing),
-      border-color var(--ds-motion-subtle-duration)
-      var(--ds-motion-subtle-easing),
-      box-shadow var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
-      color var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
-    &:hover {
-      background-color: var(--color-btn-primary-hover);
-    }
-    /* WCAG SC 2.4.7 — visible focus ring for keyboard users */
-    &:focus-visible {
-      outline: none;
-      box-shadow:
-        var(--shadow-button-inset),
-        0 1px 1px rgba(0, 0, 0, 0.14),
-        0 0 0 2px var(--linear-bg-page),
-        0 0 0 4px
-        color-mix(in oklab, var(--linear-border-focus) 55%, transparent);
-    }
-  }
   /* Linear Spacing System — symmetric section padding from tokens */
   .section-spacing-linear {
     padding-top: var(--linear-section-pt-sm);

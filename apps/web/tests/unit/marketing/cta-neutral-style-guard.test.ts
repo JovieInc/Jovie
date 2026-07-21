@@ -36,14 +36,12 @@ function expectCentralCtaUsesNeutralPrimary(
   ).not.toMatch(
     /\bbg-accent-token\b[\s\S]*\btext-white\b|\btext-white\b[\s\S]*\bbg-accent-token\b/
   );
+  // The canonical CTA is the @jovie/ui Button primary variant (white-on-black
+  // neutral fill via bg-btn-primary/text-btn-primary-foreground tokens).
   expect(
-    classNames,
-    `${sourcePath} should use neutral primary CTA fill`
-  ).toMatch(/\bbg-btn-primary\b/);
-  expect(
-    classNames,
-    `${sourcePath} should use neutral primary CTA foreground`
-  ).toMatch(/\btext-btn-primary-foreground\b/);
+    source,
+    `${sourcePath} should render the central CTA via the neutral primary Button variant`
+  ).toContain("variant='primary'");
 }
 
 describe('central conversion CTA neutral styling', () => {

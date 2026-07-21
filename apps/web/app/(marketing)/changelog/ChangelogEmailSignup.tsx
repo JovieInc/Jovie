@@ -216,13 +216,12 @@ export function ChangelogEmailSignup() {
 
               <Button
                 type='submit'
-                size='xl'
+                size='lg'
                 loading={status === 'submitting'}
                 disabled={
                   status === 'submitting' ||
                   (turnstileRequired && !turnstileToken)
                 }
-                className='rounded-full px-5'
               >
                 Subscribe
               </Button>
