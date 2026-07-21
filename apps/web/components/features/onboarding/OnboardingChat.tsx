@@ -33,6 +33,7 @@ import {
 } from '@/lib/chat/onboarding-script/widget-events';
 import { useAppFlag } from '@/lib/flags/client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import { cn } from '@/lib/utils';
 import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
 import { ChatProposeNextStepCard } from './ChatProposeNextStepCard';
@@ -836,9 +837,12 @@ export function OnboardingChat({
 
   const handleAttachAccount = useCallback(
     (url: string) => {
+      // Fail closed: incomplete hosts (e.g. instagram.com/) never advance the SM.
+      const parsed = parseSocialLinkInput(url);
+      if (!parsed.ok) return;
       const payload = {
         onboardingEvent: ONBOARDING_WIDGET_EVENTS.SOCIAL_ATTACHED,
-        url,
+        url: parsed.url,
       } as const;
       submitText(widgetEventDisplayText(payload), payload);
     },

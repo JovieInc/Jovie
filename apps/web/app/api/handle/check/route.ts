@@ -1,18 +1,19 @@
 import crypto from 'node:crypto';
-import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { RETRY_AFTER_TRANSIENT } from '@/lib/http/headers';
+import {
+  type HandleAvailabilityResult,
+  toHandleAvailabilityResult,
+} from '@/lib/onboarding/handle-availability';
 import {
   cacheHandleAvailability,
   getCachedHandleAvailability,
 } from '@/lib/onboarding/handle-availability-cache';
 import { enforceHandleCheckRateLimit } from '@/lib/onboarding/rate-limit';
+import { checkOnboardingHandleAvailability } from '@/lib/onboarding/reserved-handle';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
-import { validateUsername } from '@/lib/validation/username';
 
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -28,10 +29,8 @@ const NO_STORE_HEADERS = {
  * 2. Constant-time responses: All responses padded to ~100ms to prevent timing attacks
  * 3. Cryptographically secure random jitter: ±10ms jitter to prevent statistical analysis
  *
- * This prevents:
- * - Username enumeration attacks
- * - Timing-based username discovery
- * - Brute-force handle checking
+ * Availability semantics come from `checkOnboardingHandleAvailability` so taken
+ * handles always surface explicit `suggestedAlternatives` (never silent swaps).
  */
 
 // Target response time in ms (with ±10ms jitter)
@@ -66,6 +65,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function serializeHandleCheck(result: HandleAvailabilityResult) {
+  return {
+    available: result.available,
+    handle: result.handle,
+    reason: result.reason,
+    ...(result.error ? { error: result.error } : {}),
+    ...(result.suggestedAlternatives && result.suggestedAlternatives.length > 0
+      ? { suggestedAlternatives: result.suggestedAlternatives }
+      : {}),
+  };
+}
+
 export async function GET(request: Request) {
   const startTime = Date.now();
   const { searchParams } = new URL(request.url);
@@ -88,44 +99,12 @@ export async function GET(request: Request) {
 
   if (!handle) {
     return respondWithConstantTime(
-      { available: false, error: 'Handle is required' },
-      { status: 400 }
-    );
-  }
-
-  // Validate handle format using the canonical shared validator so this API
-  // accepts the same inputs as the onboarding form and completeOnboarding
-  // server action. Previously this route used a stricter local regex that
-  // rejected dots and underscores, even though those characters are allowed
-  // throughout the rest of the system — users would see a "green" client-side
-  // validation for "my.handle" but then get blocked here with a confusing
-  // "letters, numbers, and hyphens" error.
-  //
-  // Wrapped in try/catch so that an unexpected throw from the validator
-  // (e.g. content-filter loaded at runtime) still produces a constant-time
-  // response rather than bypassing the constant-time guarantee with a 500.
-  //
-  // A validator throw is a transient internal failure, not bad client input,
-  // so return 503 — a 400 here would mislead clients into believing their
-  // input was rejected and hide incident semantics from monitoring.
-  let formatCheck: { isValid: boolean; error?: string };
-  try {
-    formatCheck = validateUsername(handle);
-  } catch (error) {
-    await captureError('validateUsername threw', error, {
-      handle,
-      route: '/api/handle/check',
-    });
-    return respondWithConstantTime(
-      { available: false, error: 'Handle check temporarily unavailable' },
-      { status: 503 }
-    );
-  }
-  if (!formatCheck.isValid) {
-    // `validateUsername` always populates `error` on the `isValid: false`
-    // branch (see `validateUsernameCore`), so no runtime fallback is needed.
-    return respondWithConstantTime(
-      { available: false, error: formatCheck.error },
+      serializeHandleCheck(
+        toHandleAvailabilityResult({
+          handle: '',
+          error: 'Handle is required',
+        })
+      ),
       { status: 400 }
     );
   }
@@ -138,37 +117,45 @@ export async function GET(request: Request) {
 
     const handleLower = handle.toLowerCase();
 
+    // Fast path: cached boolean availability still goes through the canonical
+    // contract so taken handles expose suggestedAlternatives consistently.
     const cachedAvailability = await getCachedHandleAvailability(handleLower);
     if (cachedAvailability !== null) {
-      return respondWithConstantTime({ available: cachedAvailability });
+      const cachedResult = toHandleAvailabilityResult({
+        handle: handleLower,
+        available: cachedAvailability,
+      });
+      return respondWithConstantTime(serializeHandleCheck(cachedResult));
     }
 
-    // Add timeout to prevent hanging on database issues
+    // Canonical check (format/reserved/taken + explicit alternatives).
+    // Timeout protects against hanging DB issues while preserving constant-time
+    // response shape.
     let timerId: ReturnType<typeof setTimeout> | undefined;
-    let data: Array<{ username: string }>;
+    let result: HandleAvailabilityResult;
     try {
       const timeoutPromise = new Promise<never>((_, reject) => {
-        timerId = setTimeout(() => reject(new Error('Database timeout')), 3000); // 3 second timeout
+        timerId = setTimeout(() => reject(new Error('Database timeout')), 3000);
       });
-
-      data = await Promise.race([
-        db
-          .select({ username: creatorProfiles.username })
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.usernameNormalized, handleLower))
-          .limit(1),
+      result = await Promise.race([
+        checkOnboardingHandleAvailability(handle),
         timeoutPromise,
       ]);
     } finally {
       if (timerId !== undefined) clearTimeout(timerId);
     }
 
-    const isAvailable = !data || data.length === 0;
-    await cacheHandleAvailability(handleLower, isAvailable);
+    // Only cache definitive available/taken outcomes.
+    if (result.reason === 'available' || result.reason === 'taken') {
+      await cacheHandleAvailability(result.handle, result.available);
+    }
 
-    // SECURITY: Return with constant timing to prevent timing attacks
-    // An attacker cannot determine if a handle exists based on response time
-    return respondWithConstantTime({ available: isAvailable });
+    const status =
+      result.reason === 'invalid_format' || result.reason === 'reserved'
+        ? 400
+        : 200;
+
+    return respondWithConstantTime(serializeHandleCheck(result), { status });
   } catch (error: unknown) {
     await captureError('Error checking handle availability', error, {
       handle,
@@ -178,7 +165,13 @@ export async function GET(request: Request) {
     // Handle rate limiting - still use constant time
     if (error instanceof Error && error.message.includes('RATE_LIMITED')) {
       return respondWithConstantTime(
-        { available: false, error: 'Too many requests. Please wait.' },
+        serializeHandleCheck(
+          toHandleAvailabilityResult({
+            handle,
+            available: false,
+            error: 'Too many requests. Please wait.',
+          })
+        ),
         { status: 429 }
       );
     }
@@ -189,13 +182,25 @@ export async function GET(request: Request) {
       (error as Error)?.message?.includes('Database timeout')
     ) {
       return respondWithConstantTime(
-        { available: false, error: 'Service temporarily unavailable' },
+        serializeHandleCheck(
+          toHandleAvailabilityResult({
+            handle,
+            available: false,
+            error: 'Service temporarily unavailable',
+          })
+        ),
         { status: 503, headers: { 'Retry-After': RETRY_AFTER_TRANSIENT } }
       );
     }
 
     return respondWithConstantTime(
-      { available: false, error: 'Database connection failed' },
+      serializeHandleCheck(
+        toHandleAvailabilityResult({
+          handle,
+          available: false,
+          error: 'Database connection failed',
+        })
+      ),
       { status: 500 }
     );
   }

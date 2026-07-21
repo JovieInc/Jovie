@@ -19,63 +19,79 @@ interface WaitlistOutcomeViewProps {
   readonly email?: string | null;
 }
 
-const OUTCOME_COPY: Record<
-  WaitlistOutcomeViewProps['outcome'],
-  {
-    readonly title: string;
-    readonly body: string;
-    readonly icon: typeof CheckCircle2;
-    readonly actionLabel?: string;
-    readonly actionHref?: string;
-    readonly showNextSteps?: boolean;
-  }
-> = {
+type OutcomeCopy = {
+  readonly title: string;
+  /** Body may depend on whether a contact email is known (never invent one). */
+  readonly body: (hasEmail: boolean) => string;
+  readonly icon: typeof CheckCircle2;
+  readonly actionLabel?: string;
+  readonly actionHref?: string;
+  readonly showNextSteps?: boolean;
+};
+
+const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
   accepted: {
     title: 'You Have Access',
-    body: 'We saved your release context. Continue setup to finish your profile and open Jovie.',
+    body: () =>
+      'We saved your release context. Continue setup to finish your profile and open Jovie.',
     icon: CheckCircle2,
     actionLabel: 'Continue Setup',
     actionHref: APP_ROUTES.START,
   },
   already_accepted: {
     title: 'You Have Access',
-    body: 'Your request has already been approved. Continue setup to finish your profile.',
+    body: () =>
+      'Your request has already been approved. Continue setup to finish your profile.',
     icon: CheckCircle2,
     actionLabel: 'Continue Setup',
     actionHref: APP_ROUTES.START,
   },
   waitlisted_gate_on: {
     title: 'Request Saved',
-    body: 'Jovie is in a private rollout. We saved your release context and will email you when access opens — usually within a few days of capacity.',
+    body: hasEmail =>
+      hasEmail
+        ? 'Jovie is in a private rollout. We saved your release context and will email you when access opens — usually within a few days of capacity.'
+        : 'Jovie is in a private rollout. We saved your release context. Return to /start when a spot opens — usually within a few days of capacity.',
     icon: Clock3,
     showNextSteps: true,
   },
   waitlisted_capacity_full: {
     title: "Today's Access Is Full",
-    body: "Your request is saved. Today's slots are full, so you are on the waitlist. We email when a spot opens.",
+    body: hasEmail =>
+      hasEmail
+        ? "Your request is saved. Today's slots are full, so you are on the waitlist. We email when a spot opens."
+        : "Your request is saved. Today's slots are full, so you are on the waitlist. Check back via /start when capacity opens.",
     icon: Clock3,
     showNextSteps: true,
   },
   already_waitlisted: {
     title: 'Request Already Received',
-    body: 'Your request is already saved with your latest answers. Watch for an email when access opens.',
+    body: hasEmail =>
+      hasEmail
+        ? 'Your request is already saved with your latest answers. Watch for an email when access opens.'
+        : 'Your request is already saved with your latest answers. Return via /start when access opens.',
     icon: Clock3,
     showNextSteps: true,
   },
   pending: {
     title: "You're on the list",
-    body: "Request saved. We'll email you when a spot opens — typically within a few days of capacity.",
+    body: hasEmail =>
+      hasEmail
+        ? "Request saved. We'll email you when a spot opens — typically within a few days of capacity."
+        : 'Request saved. Return via /start when a spot opens — typically within a few days of capacity.',
     icon: Clock3,
     showNextSteps: true,
   },
   save_failed: {
     title: "We Couldn't Save This",
-    body: 'Your answers are still on this device. Try again so we can save the required fields before reviewing access.',
+    body: () =>
+      'Your answers are still on this device. Try again so we can save the required fields before reviewing access.',
     icon: RotateCcw,
   },
   rate_limited: {
     title: 'Too Many Attempts',
-    body: 'Please wait a moment before trying again. Your answers are still on this device.',
+    body: () =>
+      'Please wait a moment before trying again. Your answers are still on this device.',
     icon: Clock3,
   },
 };
@@ -86,16 +102,17 @@ const SECONDARY_BTN_CLASS =
   'inline-flex h-10 items-center justify-center gap-2 rounded-full border border-white/[0.12] px-4 text-app font-semibold text-white/86 transition-colors hover:bg-white/[0.04] focus-ring-themed';
 
 function NextSteps({ email }: { readonly email?: string | null }) {
-  const emailLine = email?.trim()
-    ? `Watch ${email.trim()} for the access email.`
-    : 'Watch the email you used on this request.';
+  const knownEmail = email?.trim() || null;
+  const contactLine = knownEmail
+    ? `Watch ${knownEmail} for the access email.`
+    : 'Add a contact email at sign-in if you want a heads-up when access opens.';
 
   return (
     <ol
       className='mt-4 list-decimal space-y-1.5 pl-5 text-sm leading-6 text-white/62'
       data-testid='waitlist-next-steps'
     >
-      <li>{emailLine}</li>
+      <li>{contactLine}</li>
       <li>Expected timing: a few days once capacity opens — not instant.</li>
       <li>
         Resume anytime at{' '}
@@ -135,6 +152,8 @@ export function WaitlistOutcomeView({
 }: Readonly<WaitlistOutcomeViewProps>) {
   const copy = OUTCOME_COPY[outcome];
   const Icon = copy.icon;
+  const hasEmail = Boolean(email?.trim());
+  const body = copy.body(hasEmail);
   const canRetry =
     (outcome === 'save_failed' || outcome === 'rate_limited') && onRetry;
   const { signOut } = useAuthSafe();
@@ -152,7 +171,7 @@ export function WaitlistOutcomeView({
           {copy.title}
         </h1>
       </div>
-      <p className='text-sm leading-6 text-white/62'>{copy.body}</p>
+      <p className='text-sm leading-6 text-white/62'>{body}</p>
       {copy.showNextSteps ? <NextSteps email={email} /> : null}
 
       <div className='mt-6 flex flex-col gap-2 sm:flex-row'>
