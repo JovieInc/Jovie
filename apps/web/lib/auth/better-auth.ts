@@ -154,15 +154,24 @@ function buildSocialProviders(): NonNullable<
     env.AUTH_APPLE_KEY_ID &&
     env.AUTH_APPLE_PRIVATE_KEY
   ) {
-    providers.apple = {
-      clientId: env.AUTH_APPLE_CLIENT_ID,
-      // better-auth@1.6.23 requires a pre-signed ES256 JWT (verified against
-      // the installed source) — minted from the .p8 components.
-      clientSecret: generateAppleClientSecret(),
-      // Lets the iOS app's native Sign in with Apple id_token (audience =
-      // bundle id) verify against the same provider.
-      appBundleIdentifier: 'ie.jov.jovie',
-    };
+    try {
+      providers.apple = {
+        clientId: env.AUTH_APPLE_CLIENT_ID,
+        // better-auth@1.6.23 requires a pre-signed ES256 JWT (verified against
+        // the installed source) — minted from the .p8 components.
+        clientSecret: generateAppleClientSecret(),
+        // Lets the iOS app's native Sign in with Apple id_token (audience =
+        // bundle id) verify against the same provider.
+        appBundleIdentifier: 'ie.jov.jovie',
+      };
+    } catch (error) {
+      // Prefer degraded Apple sign-in over failing the entire production build
+      // when preview/Vercel env has a corrupt AUTH_APPLE_PRIVATE_KEY.
+      console.error(
+        '[better-auth] Skipping Apple provider — invalid AUTH_APPLE_PRIVATE_KEY',
+        error
+      );
+    }
   }
   return providers;
 }
