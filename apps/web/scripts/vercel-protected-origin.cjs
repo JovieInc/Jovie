@@ -14,6 +14,7 @@ const {
 
 const BYPASS_HEADER = 'x-vercel-protection-bypass';
 const SET_BYPASS_COOKIE_HEADER = 'x-vercel-set-bypass-cookie';
+const PUBLIC_PROBE_COOKIE_NAMES = new Set(['jv_country', 'jv_cc_required']);
 const BUILD_INFO_PATH = '/api/health/build-info';
 const DEFAULT_PROBE_TIMEOUT_MS = 120_000;
 const DEFAULT_VERCEL_API_PAGES = 5;
@@ -741,11 +742,9 @@ async function bootstrapOriginBoundAccess(
     }
 
     const cookies = parseOriginBoundCookies(bootstrapResponse, targetUrl);
-    const sensitiveValues = maskSensitiveValues(
-      cookies.map(cookie => cookie.value)
-    );
+    maskSensitiveValues(cookies.map(cookie => cookie.value));
     if (onSensitiveValues) {
-      await deadline.run(() => onSensitiveValues(sensitiveValues));
+      await deadline.run(() => onSensitiveValues(cookies));
     }
     await deadline.run(() => discardResponseBody(bootstrapResponse));
     if (onCookies) await deadline.run(() => onCookies(cookies, targetUrl));
@@ -842,11 +841,9 @@ async function bootstrapAliasBoundAccess(
     }
 
     const cookies = parseOriginBoundCookies(bootstrapResponse, targetUrl);
-    const sensitiveValues = maskSensitiveValues(
-      cookies.map(cookie => cookie.value)
-    );
+    maskSensitiveValues(cookies.map(cookie => cookie.value));
     if (onSensitiveValues) {
-      await deadline.run(() => onSensitiveValues(sensitiveValues));
+      await deadline.run(() => onSensitiveValues(cookies));
     }
     await deadline.run(() => discardResponseBody(bootstrapResponse));
     if (onCookies) await deadline.run(() => onCookies(cookies, targetUrl));
@@ -1343,6 +1340,7 @@ module.exports = {
   BUILD_INFO_PATH,
   BYPASS_HEADER,
   DEFAULT_PROBE_TIMEOUT_MS,
+  PUBLIC_PROBE_COOKIE_NAMES,
   PUBLIC_HTML_SURFACES,
   SET_BYPASS_COOKIE_HEADER,
   assertAuthorizedDeploymentOrigin,
