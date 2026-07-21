@@ -18,6 +18,7 @@ export default function AiPage() {
           <p className='text-sm font-medium tracking-tight text-muted-token'>
             Public Brief
           </p>
+          {/* ui-casing-allow: marketing display headline */}
           <h1 className='text-4xl font-semibold tracking-tight sm:text-5xl'>
             The AI operating system behind every Jovie profile
           </h1>
@@ -39,6 +40,7 @@ export default function AiPage() {
 
         <section className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-lg font-semibold'>1. Identify</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Recognize known fans, captured contacts, and anonymous visitors
@@ -46,6 +48,7 @@ export default function AiPage() {
             </p>
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-lg font-semibold'>2. Decide</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Route each visit toward the highest-value next action, whether
@@ -53,6 +56,7 @@ export default function AiPage() {
             </p>
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-lg font-semibold'>3. Measure</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Capture impressions, clicks, and downstream value events so
@@ -60,6 +64,7 @@ export default function AiPage() {
             </p>
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-lg font-semibold'>4. Learn</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Use those outcomes to improve routing, segmentation, and follow-up
@@ -68,8 +73,9 @@ export default function AiPage() {
           </article>
         </section>
 
-        <section className='grid gap-8 rounded-[2rem] border border-subtle bg-panel px-6 py-8 lg:grid-cols-[1.2fr_0.8fr]'>
+        <section className='grid gap-8 rounded-4xl border border-subtle bg-panel px-6 py-8 lg:grid-cols-[1.2fr_0.8fr]'>
           <div className='space-y-4'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-2xl font-semibold tracking-tight'>
               What ships in the launch version
             </h2>
@@ -87,6 +93,7 @@ export default function AiPage() {
             </ul>
           </div>
           <div className='space-y-4'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-2xl font-semibold tracking-tight'>
               Read the public context
             </h2>
