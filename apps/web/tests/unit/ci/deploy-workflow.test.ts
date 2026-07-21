@@ -2358,7 +2358,7 @@ describe('CI bounded evidence parallelism', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const mobile = getJobBlock(workflow, 'ci-mobile-overflow');
 
-    expect(mobile).toContain('max-parallel: 2');
+    expect(mobile).toContain('max-parallel: 3');
     expect(mobile).toContain('width: [320, 390, 430]');
   });
 });
