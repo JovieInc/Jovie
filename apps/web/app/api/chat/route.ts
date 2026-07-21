@@ -1513,7 +1513,7 @@ function createPromoStrategyTool(
 function createShowTopInsightsTool(profileId: string | null) {
   return tool({
     description:
-      'Show the artist their top audience, release, track, and monetization signals as structured insight cards. Use this when they ask what is working, what to focus on, or how their audience and releases are performing.',
+      'Show the artist their top audience, release, track, and monetization signals as structured insight cards. Use ONLY when the turn is specifically about analytics or performance — e.g. "what is working", "how are my numbers", "how is this release/track doing". Do NOT use for unrelated turns: general conversation, onboarding answers, creative or strategy questions that are not about measured performance, or when the user has not asked about their numbers.',
     inputSchema: chatToolSchema({}),
     execute: async () => {
       if (!profileId) {

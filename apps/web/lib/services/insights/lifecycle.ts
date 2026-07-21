@@ -483,11 +483,10 @@ function getInsightSourceKey(dataSnapshot: unknown): string | null {
     return `referrer:${referrer}`;
   }
 
-  const spikeDate = getSnapshotToken(snapshot, 'spikeDate');
-  if (spikeDate) {
-    return `spikeDate:${spikeDate}`;
-  }
-
+  // spikeDate is deliberately NOT a discriminator: it is the measurement
+  // window of the same developing event, not a distinct subject. Keying on
+  // it let every daily snapshot of one spike produce its own card
+  // (JOV-3522: 3x "3 New Subscribers").
   const deviceType = getSnapshotToken(snapshot, 'deviceType');
   if (deviceType) {
     return `deviceType:${deviceType}`;
