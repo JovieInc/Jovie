@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 
 import { gbrainLearn } from '../lib/gbrain';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
-import { notifyOps } from '../lib/ops-notify';
+import { sendOpsAlert } from '../lib/ops-notify';
 
 const JOB = 'gbrain-health-summary';
 const GBRAIN = process.env.HERMES_GBRAIN_BIN ?? 'gbrain';
@@ -340,7 +340,7 @@ export async function runGBrainHealthSummary(options?: {
 
   if (options?.notify !== false) {
     try {
-      await (options?.notifyOps ?? notifyOps)(body);
+      await (options?.notifyOps ?? sendOpsAlert)(body);
     } catch (err) {
       logJobEvent({
         job: JOB,

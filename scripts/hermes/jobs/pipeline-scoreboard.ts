@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import { gbrainLearn } from '../lib/gbrain';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
-import { notifyOps } from '../lib/ops-notify';
+import { sendOpsAlert } from '../lib/ops-notify';
 import {
   buildPipelineScoreboard,
   dailyWindow,
@@ -156,7 +156,7 @@ export async function notifyNewAlarms(
   const keys = alarms.map(alarm => alertKey(alarm.rule, windowSince));
   const fresh = keys.filter(key => !state[key]);
   if (fresh.length === 0) return [];
-  await notifyOps(`Pipeline scoreboard alert\n\n${body}`);
+  await sendOpsAlert(`Pipeline scoreboard alert\n\n${body}`);
   const now = new Date().toISOString();
   for (const key of fresh) state[key] = now;
   writeAlertState(state);
@@ -268,6 +268,6 @@ void main().catch(async err => {
     error,
   });
   console.error(`[${JOB}] fatal:`, err);
-  await notifyOps(`Pipeline scoreboard job failed: ${error}`);
+  await sendOpsAlert(`Pipeline scoreboard job failed: ${error}`);
   process.exit(0);
 });
