@@ -351,7 +351,7 @@ describe('LibrarySurface', () => {
     expect(portraitCard?.className).toContain('aspect-[9/16]');
   });
 
-  it('shows release status on cards/rows and never conflates approval Draft with release state', async () => {
+  it('shows release status on cards/rows and keeps the approval axis out of the filter rail', async () => {
     renderLibraryWithSidebarOverride([
       buildAsset({
         status: 'released',
@@ -366,7 +366,7 @@ describe('LibrarySurface', () => {
       buildAsset({
         id: 'release-3',
         title: 'Third Track',
-        status: 'released',
+        status: 'draft',
         approvalStatus: 'approved',
       }),
     ]);
@@ -384,18 +384,27 @@ describe('LibrarySurface', () => {
       screen.queryByTestId('library-approval-status-release-1')
     ).not.toBeInTheDocument();
 
+    // Approval Status stays hidden until a review workflow exists (JOV-3089):
+    // the rail offers exactly one status vocabulary — Release Status.
     fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
-    fireEvent.click(screen.getByRole('button', { name: /Needs Review/u }));
+    const rail = screen.getByRole('navigation', { name: 'Library Filters' });
+    expect(within(rail).getByText('Release Status')).toBeInTheDocument();
+    expect(within(rail).queryByText('Approval Status')).not.toBeInTheDocument();
+    expect(
+      within(rail).queryByRole('button', { name: /Needs Review/u })
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Draft /u }));
 
     await waitFor(() => {
       expect(
-        screen.getByTestId('library-release-status-release-2')
+        screen.getByTestId('library-release-status-release-3')
       ).toBeInTheDocument();
       expect(
         screen.queryByTestId('library-release-status-release-1')
       ).toBeNull();
       expect(
-        screen.queryByTestId('library-release-status-release-3')
+        screen.queryByTestId('library-release-status-release-2')
       ).toBeNull();
     });
   });
@@ -881,14 +890,14 @@ describe('LibrarySurface', () => {
     expect(
       screen.getByTestId('library-saved-filter-views')
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Missing audio/u }));
+    fireEvent.click(screen.getByRole('button', { name: /Needs Attention/u }));
 
     await waitFor(() => {
       expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
       expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /^All items/u }));
+    fireEvent.click(screen.getByRole('button', { name: /^All Items/u }));
 
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
@@ -923,6 +932,62 @@ describe('LibrarySurface', () => {
 
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+  });
+
+  it('filters library rows by title search', async () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+      }),
+    ]);
+
+    fireEvent.change(screen.getByLabelText('Search library by title'), {
+      target: { value: 'never' },
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('library-release-row-release-2')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('library-release-row-release-1')
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('labels the grid-card provider count badge', () => {
+    renderLibrary([buildAsset({ providerCount: 3 })]);
+    clickGridView();
+
+    expect(screen.getByRole('img', { name: '3 Providers' })).toHaveTextContent(
+      '3'
+    );
+  });
+
+  it('stacks duplicate release versions into one row (JOV-3089)', () => {
+    renderLibrary([
+      buildAsset({
+        id: 'release-1',
+        title: 'All This Noise EP',
+        trackCount: 6,
+      }),
+      buildAsset({
+        id: 'release-2',
+        title: 'All This Noise (Remixed)',
+        trackCount: 0,
+      }),
+    ]);
+
+    // The most complete ingest survives; the near-duplicate stacks behind it.
+    expect(
+      screen.getByTestId('library-release-row-release-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('library-release-row-release-2')
+    ).not.toBeInTheDocument();
   });
 
   it('keeps Library inside the standard app shell without a route sidebar takeover', async () => {

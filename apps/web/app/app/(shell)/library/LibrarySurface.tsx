@@ -56,6 +56,7 @@ import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-sh
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import { toast } from '@/components/feedback';
+import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
   DrawerHeader,
   DrawerSection,
@@ -129,6 +130,7 @@ import {
   type LibraryView,
   type LibraryViewMode,
   libraryAssetMatchesView,
+  stackLibraryReleaseVersions,
 } from './library-data';
 import {
   LIBRARY_GRID_DENSITY_OPTIONS,
@@ -190,7 +192,6 @@ const LibraryPreviewContext = createContext<{
 
 type LibraryFilters = {
   readonly statuses: Set<LibraryReleaseAsset['status']>;
-  readonly approvalStatuses: Set<LibraryApprovalStatus>;
   readonly releaseTypes: Set<LibraryReleaseAsset['releaseType']>;
   readonly assetKinds: Set<LibraryAssetKind>;
   readonly providers: Set<string>;
@@ -268,7 +269,6 @@ const PRESETS: readonly {
 function emptyFilters(): LibraryFilters {
   return {
     statuses: new Set(),
-    approvalStatuses: new Set(),
     releaseTypes: new Set(),
     assetKinds: new Set(),
     providers: new Set(),
@@ -315,12 +315,6 @@ function assetMatchesFilters(
   filters: LibraryFilters
 ): boolean {
   if (filters.statuses.size > 0 && !filters.statuses.has(asset.status)) {
-    return false;
-  }
-  if (
-    filters.approvalStatuses.size > 0 &&
-    !filters.approvalStatuses.has(asset.approvalStatus)
-  ) {
     return false;
   }
   if (
@@ -385,7 +379,6 @@ function assetMatchesPills(
 function hasActiveFilters(filters: LibraryFilters): boolean {
   return (
     filters.statuses.size +
-      filters.approvalStatuses.size +
       filters.releaseTypes.size +
       filters.assetKinds.size +
       filters.providers.size >
@@ -504,25 +497,20 @@ const StatusCell = memo(function StatusCell({
   );
 });
 
-const ApprovalStatusCell = memo(function ApprovalStatusCell({
-  asset,
-}: {
-  readonly asset: LibraryReleaseAsset;
-}) {
+/**
+ * Approval Status stays out of the library rail/columns until a real review
+ * workflow exists (JOV-3089) — one visible status vocabulary: release status.
+ */
+function assetMatchesSearchQuery(
+  asset: LibraryReleaseAsset,
+  normalizedQuery: string
+): boolean {
+  if (!normalizedQuery) return true;
   return (
-    <span
-      role='status'
-      className={cn(
-        'system-b-library-status-pill inline-flex h-6 w-fit items-center border px-2 leading-4',
-        libraryApprovalStatusClasses(asset.approvalStatus)
-      )}
-      data-testid={`library-approval-status-${asset.id}`}
-      aria-label={`Approval Status: ${formatLibraryApprovalStatus(asset.approvalStatus)}`}
-    >
-      {formatLibraryApprovalStatus(asset.approvalStatus)}
-    </span>
+    asset.title.toLowerCase().includes(normalizedQuery) ||
+    asset.artist.toLowerCase().includes(normalizedQuery)
   );
-});
+}
 
 /**
  * Neutral fallback avatar color for provider keys missing from
@@ -672,14 +660,6 @@ const LIBRARY_TABLE_COLUMNS = [
     size: 112,
     minSize: 96,
     meta: { className: 'hidden xl:table-cell px-2' },
-  }),
-  libraryColumnHelper.display({
-    id: 'approval',
-    header: 'Approval',
-    cell: ({ row }) => <ApprovalStatusCell asset={row.original} />,
-    size: 128,
-    minSize: 108,
-    meta: { className: 'hidden md:table-cell px-2' },
   }),
   createLibraryTypeColumn('hidden lg:table-cell px-2', 104, 88),
   libraryColumnHelper.display({
@@ -875,9 +855,6 @@ function LibraryRail({
 }) {
   const releaseTypes = uniqueSorted(assets.map(asset => asset.releaseType));
   const statuses = uniqueSorted(assets.map(asset => asset.status));
-  const approvalStatuses = uniqueSorted(
-    assets.map(asset => asset.approvalStatus)
-  );
   const providerKeys = uniqueSorted(
     assets.flatMap(asset => asset.providers.map(provider => provider.key))
   );
@@ -894,7 +871,6 @@ function LibraryRail({
   const counts = {
     releaseTypes: countBy(assets, asset => [asset.releaseType]),
     statuses: countBy(assets, asset => [asset.status]),
-    approvalStatuses: countBy(assets, asset => [asset.approvalStatus]),
     providers: countBy(
       assets,
       asset => asset.providers.map(provider => provider.key) as string[]
@@ -903,7 +879,6 @@ function LibraryRail({
   };
   const activeFilterCount =
     filters.statuses.size +
-    filters.approvalStatuses.size +
     filters.releaseTypes.size +
     filters.assetKinds.size +
     filters.providers.size;
@@ -946,24 +921,6 @@ function LibraryRail({
             </Button>
           ) : null}
         </div>
-
-        <FilterSection label='Approval Status'>
-          {approvalStatuses.map(status => (
-            <FilterRow
-              key={status}
-              active={filters.approvalStatuses.has(status)}
-              count={counts.approvalStatuses.get(status) ?? 0}
-              label={formatLibraryApprovalStatus(status)}
-              dotClassName={libraryApprovalStatusDotClasses(status)}
-              onClick={() =>
-                onFilters({
-                  ...filters,
-                  approvalStatuses: toggleSet(filters.approvalStatuses, status),
-                })
-              }
-            />
-          ))}
-        </FilterSection>
 
         <FilterSection label='Release Status'>
           {statuses.map(status => (
@@ -1263,6 +1220,8 @@ function LibraryToolbar({
   onView,
   gridDensity,
   onGridDensity,
+  searchQuery,
+  onSearchQuery,
   visibleCount,
   totalCount,
   mobileFiltersOpen,
@@ -1278,6 +1237,8 @@ function LibraryToolbar({
   readonly onView: (view: LibraryViewMode) => void;
   readonly gridDensity: LibraryGridDensity;
   readonly onGridDensity: (density: LibraryGridDensity) => void;
+  readonly searchQuery: string;
+  readonly onSearchQuery: (query: string) => void;
   readonly visibleCount: number;
   readonly totalCount: number;
   readonly mobileFiltersOpen: boolean;
@@ -1301,6 +1262,13 @@ function LibraryToolbar({
       }
       end={
         <>
+          <AppSearchField
+            value={searchQuery}
+            onChange={onSearchQuery}
+            placeholder='Search library'
+            ariaLabel='Search library by title'
+            className='w-36 sm:w-48'
+          />
           <PageToolbarActionButton
             label={
               activeFilterCount > 0
@@ -1419,11 +1387,20 @@ const AssetCard = memo(function AssetCard({
                   {asset.artist}
                 </p>
               </div>
-              <span className='system-b-library-card-count shrink-0 tabular-nums'>
-                {getLibraryItemKind(asset) === 'merch'
-                  ? (asset.salePriceLabel ?? 'Merch')
-                  : formatCompactCount(asset.providerCount)}
-              </span>
+              {getLibraryItemKind(asset) === 'merch' ? (
+                <span className='system-b-library-card-count shrink-0 tabular-nums'>
+                  {asset.salePriceLabel ?? 'Merch'}
+                </span>
+              ) : (
+                <span
+                  className='system-b-library-card-count shrink-0 tabular-nums'
+                  role='img'
+                  aria-label={`${asset.providerCount} Providers`}
+                  title={`${asset.providerCount} Providers`}
+                >
+                  {formatCompactCount(asset.providerCount)}
+                </span>
+              )}
             </div>
             <div className='system-b-library-card-summary mt-2 flex min-w-0 items-center gap-1.5'>
               {getLibraryItemKind(asset) === 'merch' ? (
@@ -2344,6 +2321,7 @@ export function LibrarySurface({
     readPersistedLibrarySavedView()
   );
   const [filters, setFilters] = useState<LibraryFilters>(() => emptyFilters());
+  const [searchQuery, setSearchQuery] = useState('');
   const [sort, setSort] = useState<LibrarySortKey>('releaseDate');
   const { view, setView } = useLibraryViewMode();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -2358,14 +2336,17 @@ export function LibrarySurface({
   const deferredSavedView = useDeferredValue(savedView);
   const deferredPills = useDeferredValue(pills);
   const deferredSort = useDeferredValue(sort);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   useEffect(() => {
     setPreset(parseLibraryViewParam(searchParams.get('view')));
   }, [searchParams]);
 
+  // Version-stack duplicate ingests so each release renders as one row
+  // (JOV-3089); overrides then layer on top of the surviving canonical row.
   const effectiveAssets = useMemo<readonly LibraryReleaseAsset[]>(
     () =>
-      assets.map((asset): LibraryReleaseAsset => {
+      stackLibraryReleaseVersions(assets).map((asset): LibraryReleaseAsset => {
         const previewUrl = audioOverrides[asset.id];
         const approvalStatus =
           approvalStatusOverrides[asset.id] ?? asset.approvalStatus;
@@ -2399,18 +2380,21 @@ export function LibrarySurface({
       PRESETS.find(item => item.id === deferredPreset)?.predicate ??
       (() => true);
     const savedViewPredicate = getLibrarySavedViewPredicate(deferredSavedView);
+    const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
 
     return effectiveAssets
       .filter(presetPredicate)
       .filter(savedViewPredicate)
       .filter(asset => assetMatchesFilters(asset, deferredFilters))
       .filter(asset => assetMatchesPills(asset, deferredPills))
+      .filter(asset => assetMatchesSearchQuery(asset, normalizedQuery))
       .toSorted(compareAssets(deferredSort));
   }, [
     deferredFilters,
     deferredPills,
     deferredPreset,
     deferredSavedView,
+    deferredSearchQuery,
     deferredSort,
     effectiveAssets,
   ]);
@@ -2425,10 +2409,6 @@ export function LibrarySurface({
   );
   const statusOptions = useMemo(
     () => uniqueSorted(effectiveAssets.map(asset => asset.status)),
-    [effectiveAssets]
-  );
-  const approvalOptions = useMemo(
-    () => uniqueSorted(effectiveAssets.map(asset => asset.approvalStatus)),
     [effectiveAssets]
   );
   const hasOptions = useMemo(
@@ -2526,6 +2506,7 @@ export function LibrarySurface({
     handleSavedViewChange('all');
     setFilters(emptyFilters());
     setPills([]);
+    setSearchQuery('');
   }
 
   function openAsset(id: string) {
@@ -2605,7 +2586,6 @@ export function LibrarySurface({
 
   const activeFilterCount =
     filters.statuses.size +
-    filters.approvalStatuses.size +
     filters.releaseTypes.size +
     filters.assetKinds.size +
     filters.providers.size;
@@ -2622,7 +2602,6 @@ export function LibrarySurface({
             titleOptions,
             albumOptions: [],
             statusOptions,
-            approvalOptions,
             hasOptions,
             totalCount: effectiveAssets.length,
             visibleCount: visibleAssets.length,
@@ -2632,16 +2611,9 @@ export function LibrarySurface({
                 : 'Filter Library',
             ariaLabel: 'Filter library assets',
             placeholder: 'Search library',
-            allowedFields: [
-              'artist',
-              'title',
-              'status',
-              'approval',
-              'has',
-            ] as const,
+            allowedFields: ['artist', 'title', 'status', 'has'] as const,
           },
     [
-      approvalOptions,
       artistOptions,
       effectiveAssets.length,
       hasOptions,
@@ -2716,6 +2688,8 @@ export function LibrarySurface({
           onView={setView}
           gridDensity={gridDensity}
           onGridDensity={setGridDensity}
+          searchQuery={searchQuery}
+          onSearchQuery={setSearchQuery}
           visibleCount={visibleAssets.length}
           totalCount={effectiveAssets.length}
           mobileFiltersOpen={mobileFiltersOpen}
