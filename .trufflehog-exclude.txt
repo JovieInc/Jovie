@@ -6,3 +6,7 @@ scripts/security/gitleaks-backup-fixture.txt
 # diff-scanned lines (verified 2026-07-20, runs 29785483353/29784648947).
 # gitleaks (.gitleaks.toml) and GitHub secret scanning still cover this file.
 .github/workflows/sonarcloud.yml
+
+# Test fixtures: postgres://user:pass@… strings for DATABASE_URL zod validation only.
+# Same git-mode exclude pattern as sonarcloud.yml (inline ignore not honored).
+apps/web/tests/lib/database-url-validation.test.ts
