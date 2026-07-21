@@ -91,8 +91,11 @@ const FLOW_TRANSITION = {
   ease: [0.22, 1, 0.36, 1] as const,
 };
 
-const CAPTURE_CONSENT_COPY =
-  'By submitting, you agree to receive updates from this artist and Jovie. Reply STOP to opt out. Message and data rates may apply.';
+const CAPTURE_CONSENT_COPY: Record<'email' | 'sms', string> = {
+  email:
+    'By submitting, you agree to receive email updates from this artist and Jovie. Unsubscribe anytime.',
+  sms: 'By submitting, you agree to receive text updates from this artist and Jovie. Reply STOP to opt out. Message and data rates may apply.',
+};
 
 const PREFERENCE_META: Record<
   Extract<NotificationContentType, 'newMusic' | 'tourDates' | 'merch'>,
@@ -511,8 +514,8 @@ export function ProfileMobileNotificationsFlow({
                   {error}
                 </p>
               ) : null}
-              <p className='text-xs leading-4 text-white/42'>
-                {CAPTURE_CONSENT_COPY}
+              <p className='text-xs leading-4 text-tertiary-token'>
+                {CAPTURE_CONSENT_COPY[isSms ? 'sms' : 'email']}
               </p>
               <div className='flex items-center justify-between gap-3'>
                 <button
