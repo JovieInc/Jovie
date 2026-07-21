@@ -233,7 +233,7 @@ Where a transition would insert or remove content that affects layout height or 
 
 Add or update tests (Playwright layout guards, visual regression snapshots, bounding-box assertions on key containers, CLS metrics, or stability specs) for any non-trivial state changes or surfaces that render conditional UI.
 
-This rule is non-negotiable and applies to **all product work** (including onboarding, chat, dashboards, marketing, and shell surfaces). Violations block design review and PR landing. See also `DESIGN.md` (visual stability section), `docs/TESTING_GUIDELINES.md` (risk-based visual QA), and `AGENTS.md` (verification).
+This rule is non-negotiable and applies to **all product work** (including onboarding, chat, dashboards, marketing, and shell surfaces). Violations block design review and PR landing. See also `DESIGN.md` (visual stability section), `docs/TESTING_GUIDELINES.md` (risk-based visual QA), and `AGENTS.md` (verification). Visual/a11y enforcement gates, Chromatic budget, and baseline-approval rules are canonical in `docs/VISUAL_TESTING_POLICY.md`.
 
 ### Global UI Components Render Once
 

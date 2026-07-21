@@ -38,7 +38,7 @@
     {
       "id": "combined-integration",
       "name": "Combined Integration",
-      "purpose": "Affected unit, one hosted build-plus-layout workspace, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head."
+      "purpose": "Affected unit, one hosted build-plus-layout workspace, path-selected Xcode and UI visual (Storybook, Chromatic, Playwright smoke) gates, and model-free semantic evals for GitHub's exact merge-group head."
     },
     {
       "id": "main-deploy",
@@ -103,6 +103,15 @@
       "remediation": "Repair unsafe or invalid migrations; this remains its own exact required ruleset context on source and combined heads."
     },
     {
+      "id": "visual-approval-guard",
+      "name": "Visual Approval Guard",
+      "tier": "fast-gate",
+      "mergeGate": true,
+      "gateStage": "both",
+      "nextLocalCommand": "node scripts/visual-approval-guard.mjs --pr <pr-number>",
+      "remediation": "A visual baseline surface changed without human approval. Review the baseline diff and apply the `visual-approved` label; the labeled event re-runs the guard and turns this required ruleset context green without a new push."
+    },
+    {
       "id": "ci-unit-tests",
       "name": "Unit Tests",
       "tier": "fast-gate",
@@ -128,6 +137,33 @@
       "gateStage": "merge-group",
       "nextLocalCommand": "pnpm run ios:lint && pnpm run ios:test",
       "remediation": "Repair the path-selected Xcode build or test regression on the exact combined head; source PRs run only the portable iOS fast contract."
+    },
+    {
+      "id": "ci-storybook-visual",
+      "name": "Storybook Visual + A11y (combined)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "pnpm --filter @jovie/web run build-storybook && pnpm --filter @jovie/web run test:a11y",
+      "remediation": "Repair the Storybook bundle or the interaction/axe story regression on the exact combined head; the scheduled visual-a11y.yml lane remains the deep audit owner."
+    },
+    {
+      "id": "ci-chromatic",
+      "name": "Chromatic Visual Regression (combined)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "pnpm --filter @jovie/web exec chromatic --config-file ../../chromatic.config.json",
+      "remediation": "Review and accept the Chromatic visual changes or fix the unintended rendering diff on the exact combined head. Local reproduction needs CHROMATIC_PROJECT_TOKEN; merge_group runs are secret-safe because fork heads never enter the queue."
+    },
+    {
+      "id": "ci-ui-playwright-visual",
+      "name": "UI Playwright Visual Smoke (combined)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "pnpm run build:web && pnpm --filter @jovie/web exec playwright test tests/e2e/a11y.spec.ts --config=playwright.config.ts --project=chromium && pnpm --filter @jovie/web exec playwright test tests/e2e/mobile-overflow.spec.ts --config=playwright.config.smoke.mobile.ts",
+      "remediation": "Repair the secret-free DB-free visual smoke (axe keyboard/focus or mobile document-overflow) against the exact combined-head build; Neon-backed page-level visual evidence stays with the scheduled visual-regression.yml lane."
     },
     {
       "id": "ci-promptfoo-evals",
