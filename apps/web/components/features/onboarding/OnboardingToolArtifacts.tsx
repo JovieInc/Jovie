@@ -24,11 +24,9 @@ import {
   normalizeArtistMetrics,
 } from '@/lib/onboarding/canonical-metrics';
 import {
-  type HandleAvailabilityResult,
   SUGGESTED_AVAILABLE_HANDLE_LABEL,
   toHandleAvailabilityResult,
 } from '@/lib/onboarding/handle-availability';
-import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useHandleAvailabilityQuery } from '@/lib/queries/useHandleAvailabilityQuery';
 import { cn } from '@/lib/utils';
@@ -138,7 +136,6 @@ export function formatGenreLabel(genre: string): string {
     )
     .join(' ');
 }
-
 
 function selectionFromSpotifyResult(
   artist: SpotifyArtistResult
