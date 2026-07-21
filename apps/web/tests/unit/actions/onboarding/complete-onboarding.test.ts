@@ -431,6 +431,20 @@ describe('completeOnboarding', () => {
     expect(mockClaimPrebuiltProfileForUser).not.toHaveBeenCalled();
     expect(mockMarkWaitlistSignedUpInTx).not.toHaveBeenCalled();
     expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
+    // Finalization stays gated for direct_profile claims...
+    expect(mockFinalizePostOnboarding).not.toHaveBeenCalled();
+    // ...but the completion cookie must still be set (JOV-2996) so the
+    // proxy doesn't redirect the completed user back to onboarding.
+    expect(cookieSetMock).toHaveBeenCalledWith(
+      'jovie_onboarding_complete',
+      '1',
+      expect.objectContaining({
+        httpOnly: true,
+        maxAge: 120,
+        path: '/',
+        sameSite: 'lax',
+      })
+    );
   });
 
   it('creates a new user profile, caches completion, and keeps side effects non-blocking', async () => {
