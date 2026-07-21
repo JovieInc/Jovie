@@ -26,8 +26,19 @@ const DEV_TOOLBAR_SUPPRESSED_PATHS = new Set([
   '/demo',
   '/demo/video',
   '/start',
+  '/onboarding',
 ]);
-const DEV_TOOLBAR_SUPPRESSED_PREFIXES = ['/demo/'];
+const DEV_TOOLBAR_SUPPRESSED_PREFIXES = [
+  '/demo/',
+  '/onboarding/',
+  '/app/onboarding',
+];
+
+/** Zero the layout CSS var so customer metrics never include toolbar chrome. */
+export function resetDevToolbarHeight(): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
+}
 
 function hasDevToolbarCookie(): boolean {
   if (typeof document === 'undefined') return false;
@@ -44,13 +55,37 @@ export function isDevToolbarSuppressedPath(pathname: string): boolean {
   );
 }
 
-function isSuppressedClientContext(pathname: string): boolean {
-  return (
-    isDemoRecordingClient() ||
-    isDevChromeDisabledClient() ||
-    document.documentElement.dataset.desktopRuntime === 'electron' ||
-    isDevToolbarSuppressedPath(pathname)
-  );
+/**
+ * Production customer sessions never show the toolbar unless an explicit
+ * `__dev_toolbar=1` cookie opt-in is present (emergency prod debugging).
+ */
+export function shouldRenderDevToolbar({
+  env,
+  disabled = false,
+  pathname,
+  hasCookie = false,
+  isDemoRecording = false,
+  isDevChromeDisabled = false,
+  isElectron = false,
+  nodeEnv = process.env.NODE_ENV,
+}: {
+  readonly env: string;
+  readonly disabled?: boolean;
+  readonly pathname: string;
+  readonly hasCookie?: boolean;
+  readonly isDemoRecording?: boolean;
+  readonly isDevChromeDisabled?: boolean;
+  readonly isElectron?: boolean;
+  readonly nodeEnv?: string | undefined;
+}): boolean {
+  if (disabled) return false;
+  if (isDemoRecording || isDevChromeDisabled || isElectron) return false;
+  if (isDevToolbarSuppressedPath(pathname)) return false;
+
+  const isProduction = nodeEnv === 'production' && env === 'production';
+  if (isProduction) return hasCookie;
+
+  return true;
 }
 
 export function DevToolbarGate({
@@ -66,24 +101,36 @@ export function DevToolbarGate({
     let cancelled = false;
 
     const hideToolbar = () => {
-      document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
+      resetDevToolbarHeight();
       setShouldRender(false);
     };
 
     const syncToolbarVisibility = () => {
       if (cancelled) return;
 
-      if (disabled || isSuppressedClientContext(pathname)) {
+      const nextShouldRender = shouldRenderDevToolbar({
+        env,
+        disabled,
+        pathname,
+        hasCookie: hasDevToolbarCookie(),
+        isDemoRecording: isDemoRecordingClient(),
+        isDevChromeDisabled: isDevChromeDisabledClient(),
+        isElectron:
+          document.documentElement.dataset.desktopRuntime === 'electron',
+      });
+
+      if (!nextShouldRender) {
+        // Always zero height when hidden so layout metrics and sticky docks
+        // never reserve space for admin/persona chrome on customer surfaces.
         hideToolbar();
         return;
       }
 
-      const isProduction =
-        process.env.NODE_ENV === 'production' && env === 'production';
-
-      setShouldRender(!isProduction || hasDevToolbarCookie());
+      setShouldRender(true);
     };
 
+    // Fail closed on first paint: zero height until we confirm render.
+    resetDevToolbarHeight();
     syncToolbarVisibility();
 
     const animationFrame = globalThis.requestAnimationFrame?.(
@@ -112,6 +159,8 @@ export function DevToolbarGate({
       }
       document.removeEventListener('DOMContentLoaded', handleDomReady);
       observer?.disconnect();
+      // Leaving a gated surface must not leave residual height for metrics.
+      resetDevToolbarHeight();
     };
   }, [disabled, env, pathname]);
 

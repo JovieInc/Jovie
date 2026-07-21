@@ -101,6 +101,8 @@ describe('DevToolbar', () => {
       expect(isDevToolbarSuppressedPath('/demo/video')).toBe(true);
       expect(isDevToolbarSuppressedPath('/demo/founder-video')).toBe(true);
       expect(isDevToolbarSuppressedPath('/start')).toBe(true);
+      expect(isDevToolbarSuppressedPath('/onboarding')).toBe(true);
+      expect(isDevToolbarSuppressedPath('/onboarding/checkout')).toBe(true);
       expect(isDevToolbarSuppressedPath('/app/dashboard/releases')).toBe(false);
     });
   });

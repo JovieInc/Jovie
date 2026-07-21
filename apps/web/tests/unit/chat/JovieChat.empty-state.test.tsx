@@ -201,7 +201,7 @@ describe('JovieChat empty state', () => {
     expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
-      'Ask jovie...'
+      'Ask Jovie...'
     );
     expect(getByTestId('chat-input').getAttribute('data-variant')).toBe('hero');
     // ≥3 profile-aware starters (rail pills use aria-label = suggestion label).
@@ -251,8 +251,20 @@ describe('JovieChat empty state', () => {
     expect(
       screen.getByTestId('chat-empty-state-centered-composer')
     ).toBeTruthy();
+    // Docked layout: cards scroll above, composer at bottom of usable area.
+    const region = screen.getByTestId('chat-empty-state-composer-region');
+    expect(region.getAttribute('data-layout')).toBe('docked');
+    expect(screen.getByTestId('chat-empty-state-above-scroll')).toBeTruthy();
+    expect(
+      screen
+        .getByTestId('chat-empty-state-centered-composer')
+        .getAttribute('data-dock')
+    ).toBe('bottom');
     expect(screen.getByTestId('suggested-prompts-rail')).toBeTruthy();
     expect(screen.getAllByTestId('chat-action-card')).toHaveLength(3);
+    // Cards own these intents — rail must not re-advertise conflicting chips.
+    expect(screen.queryByLabelText('Plan A Release')).toBeNull();
+    expect(screen.queryByLabelText("What's Working Right Now?")).toBeNull();
   });
 
   it('hides scaffolding while typing so the composer owns attention', () => {
@@ -353,7 +365,7 @@ describe('JovieChat empty state', () => {
     expect(getAllByTestId('chat-message')).toHaveLength(2);
     expect(
       screen.getByTestId('chat-input').getAttribute('data-placeholder')
-    ).toBe('Ask jovie...');
+    ).toBe('Ask Jovie...');
     expect(screen.getByTestId('chat-input').getAttribute('data-variant')).toBe(
       'compact'
     );

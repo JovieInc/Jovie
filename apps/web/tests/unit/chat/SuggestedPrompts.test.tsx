@@ -16,7 +16,11 @@ describe('SuggestedPrompts', () => {
     expect(generateAlbumArt).toBeTruthy();
     expect(generateAlbumArt).toBeDisabled();
     expect(getByText('Build Artist Profile')).toBeTruthy();
-    expect(getByText("What's Working For Me Right Now?")).toBeTruthy();
+    expect(getByText("What's Working Right Now?")).toBeTruthy();
+    // Full title is always on the pill for truncated overflow discoverability.
+    expect(
+      getByText("What's Working Right Now?").closest('button')
+    ).toHaveAttribute('title', "What's Working Right Now?");
 
     // Old task-list entries should be gone — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();
@@ -39,6 +43,20 @@ describe('SuggestedPrompts', () => {
     expect(row?.className).toContain('snap-x');
     expect(row?.className).not.toContain('flex-wrap');
     expect(row?.className).toContain('whitespace-nowrap');
+  });
+
+  it('hides chips that duplicate empty-state action card labels', () => {
+    const onSelect = vi.fn();
+    const { queryByText, getByText } = fastRender(
+      <SuggestedPrompts
+        onSelect={onSelect}
+        excludeLabels={['Generate Album Art', 'Plan A Release']}
+      />
+    );
+
+    expect(queryByText('Generate Album Art')).toBeNull();
+    expect(queryByText('Plan A Release')).toBeNull();
+    expect(getByText("What's Working Right Now?")).toBeTruthy();
   });
 
   it('uses flat prompt icons without always-on icon backgrounds', () => {

@@ -137,8 +137,10 @@
     transparent
   );
   --system-b-chat-composer-max-width: 45rem;
-  --system-b-chat-composer-thread-scroll-padding: 9rem;
-  --system-b-chat-composer-scroll-fade-height: 7rem;
+  /* Content-safe inset so sticky composer dock never covers last messages/cards.
+     Sized for compact dock (input + padding + safe-area); keep ≥ dock height. */
+  --system-b-chat-composer-thread-scroll-padding: 11rem;
+  --system-b-chat-composer-scroll-fade-height: 8rem;
   --system-b-chat-loading-composer-height: 88px;
   --system-b-duration-fast: var(--ds-motion-subtle-duration);
   --system-b-ease: var(--ds-motion-subtle-easing);
@@ -8764,25 +8766,37 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  /* End padding so the last chip can scroll fully past the edge fade. */
+  scroll-padding-inline: var(--space-3);
   mask-image: linear-gradient(
     to right,
     transparent 0,
-    black 18px,
-    black calc(100% - 18px),
+    black 12px,
+    black calc(100% - 28px),
     transparent 100%
   );
   -webkit-mask-image: linear-gradient(
     to right,
     transparent 0,
-    black 18px,
-    black calc(100% - 18px),
+    black 12px,
+    black calc(100% - 28px),
     transparent 100%
   );
 }
 
 :where(.system-b-chat-prompt-rail-scroll::-webkit-scrollbar) {
-  display: none;
+  height: 3px;
+}
+
+:where(.system-b-chat-prompt-rail-scroll::-webkit-scrollbar-thumb) {
+  background: color-mix(
+    in oklab,
+    var(--color-text-tertiary-token) 40%,
+    transparent
+  );
+  border-radius: var(--radius-full);
 }
 
 :where(.system-b-chat-prompt-rail) {
@@ -8791,6 +8805,8 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   flex-wrap: nowrap;
   align-items: stretch;
   gap: var(--space-1-5);
+  /* Trailing spacer: last chip fully reachable under the edge mask. */
+  padding-inline: 2px calc(var(--space-6) + var(--space-2));
 }
 
 :where(.system-b-chat-prompt-pill) {
@@ -8842,8 +8858,8 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(.system-b-chat-prompt-pill-default) {
-  min-width: 168px;
-  max-width: 228px;
+  min-width: 11.5rem;
+  max-width: 16.5rem;
   padding: var(--space-1-5) var(--space-3);
   font-size: var(--text-xs);
 }

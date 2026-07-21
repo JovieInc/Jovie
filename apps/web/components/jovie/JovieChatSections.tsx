@@ -110,7 +110,7 @@ export function ChatComposerSurface({
 
       <ChatInput
         {...chatInputProps}
-        placeholder='Ask jovie...'
+        placeholder='Ask Jovie...' // ui-casing-allow: brand placeholder
         variant={showThreadView ? 'compact' : 'hero'}
       />
     </div>

@@ -102,7 +102,7 @@ function hasConnectedMusicCatalog(profile: ChatActionProfile): boolean {
 /**
  * First-run / empty-thread scaffolding (JOV-3547). Always returns ≥3
  * profile-aware starter actions so the empty chat never renders a bare
- * "Ask jovie..." box. Setup-gap cards lead when the profile is incomplete.
+ * "Ask Jovie..." box. Setup-gap cards lead when the profile is incomplete.
  */
 export function buildChatActionCards({
   profile,

@@ -128,6 +128,13 @@ export function JovieChat({
     return actionCards.filter(card => !dismissedActionCardIds.has(card.id));
   }, [actionCards, dismissedActionCardIds]);
 
+  // Rail chips that duplicate a visible action card would show conflicting
+  // enabled/disabled states (e.g. Generate Album Art card vs capability-gated chip).
+  const promptRailExcludeLabels = useMemo(
+    () => visibleActionCards.map(card => card.title),
+    [visibleActionCards]
+  );
+
   const handleDismissActionCard = useCallback((cardId: string) => {
     setDismissedActionCardIds(prev => {
       const next = new Set(prev);
@@ -720,7 +727,14 @@ export function JovieChat({
           >
             {!showThreadView ? (
               <div
-                className='flex flex-1 flex-col items-center justify-center'
+                className={cn(
+                  'flex flex-1 flex-col',
+                  // Docked scaffolds (cards/opportunity) fill the viewport so the
+                  // composer can sit at the bottom; welcome state stays centered.
+                  showEmptyActionCards || showEmptyOpportunityCards
+                    ? 'min-h-0'
+                    : 'items-center justify-center'
+                )}
                 data-testid='chat-empty-state-viewport'
               >
                 <ChatEmptyStateComposerRegion
@@ -761,6 +775,7 @@ export function JovieChat({
                         isFirstSession={isFirstSession}
                         layout='rail'
                         dimmed={composerPickerOpen}
+                        excludeLabels={promptRailExcludeLabels}
                       />
                     </div>
                   ) : null}
