@@ -1,9 +1,10 @@
+import { Button } from '@jovie/ui';
+import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { cn } from '@/lib/utils';
 import { SHELL_H2_CLASS, SHELL_LEAD_CLASS } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
-import { ShellCtaButton } from './ShellCtaButton';
 
 interface ArtistProfileFinalCtaProps {
   readonly finalCta: ArtistProfileLandingCopy['finalCta'];
@@ -45,15 +46,11 @@ export function ArtistProfileFinalCta({
         </p>
       ) : null}
       <div className='mt-8'>
-        <ShellCtaButton
-          href={ctaHref}
-          tone='primary'
-          context='on-dark'
-          size='lg'
-          data-testid='final-cta-action'
-        >
-          {finalCta.ctaLabel}
-        </ShellCtaButton>
+        <Button asChild variant='primary' size='lg'>
+          <Link href={ctaHref} data-testid='final-cta-action'>
+            {finalCta.ctaLabel}
+          </Link>
+        </Button>
       </div>
     </ArtistProfileSectionShell>
   );

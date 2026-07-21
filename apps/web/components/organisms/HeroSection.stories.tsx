@@ -1,6 +1,30 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { CTAButton } from '@/components/molecules/CTAButton';
+import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { HeroSection } from './HeroSection';
+
+// Story-local stand-in for the retired molecules/CTAButton: the canonical
+// marketing CTA is the @jovie/ui Button composed with next/link via asChild.
+function StoryCta({
+  href,
+  variant = 'primary',
+  size = 'lg',
+  className,
+  children,
+}: Readonly<{
+  href: string;
+  variant?: 'primary' | 'secondary';
+  size?: 'md' | 'lg';
+  className?: string;
+  children: ReactNode;
+}>) {
+  return (
+    <Button asChild variant={variant} size={size} className={className}>
+      <Link href={href}>{children}</Link>
+    </Button>
+  );
+}
 
 const meta: Meta<typeof HeroSection> = {
   title: 'Organisms/HeroSection',
@@ -34,9 +58,9 @@ export const HomePage: Story = {
         <p className='text-sm text-gray-600 dark:text-white/70'>
           Create your artist page in seconds.
         </p>
-        <CTAButton href='/sign-up' variant='primary' size='lg'>
+        <StoryCta href='/sign-up' variant='primary' size='lg'>
           Sign up to get started
-        </CTAButton>
+        </StoryCta>
       </div>
     ),
     supportingText: 'Go live in 60 seconds • Free forever',
@@ -58,12 +82,12 @@ export const LinkInBioPage: Story = {
     icon: '🚀',
     children: (
       <div className='flex flex-col sm:flex-row gap-6 justify-center items-center'>
-        <CTAButton href='/onboarding' variant='primary' size='lg'>
+        <StoryCta href='/onboarding' variant='primary' size='lg'>
           Create Your Profile
-        </CTAButton>
-        <CTAButton href='/pricing' variant='secondary' size='lg'>
+        </StoryCta>
+        <StoryCta href='/pricing' variant='secondary' size='lg'>
           View Pricing
-        </CTAButton>
+        </StoryCta>
       </div>
     ),
     supportingText: (
@@ -100,9 +124,9 @@ export const Simple: Story = {
     headline: 'Welcome to Jovie',
     subtitle: 'The simplest way to share your music.',
     children: (
-      <CTAButton href='/get-started' variant='primary' size='lg'>
+      <StoryCta href='/get-started' variant='primary' size='lg'>
         Get Started
-      </CTAButton>
+      </StoryCta>
     ),
   },
 };
@@ -113,12 +137,12 @@ export const WithoutHighlight: Story = {
     subtitle: 'Connect with fans and grow your audience.',
     children: (
       <div className='flex flex-col gap-4'>
-        <CTAButton href='/sign-up' variant='primary' size='lg'>
+        <StoryCta href='/sign-up' variant='primary' size='lg'>
           Create Account
-        </CTAButton>
-        <CTAButton href='/demo' variant='outline' size='md'>
+        </StoryCta>
+        <StoryCta href='/demo' variant='secondary' size='md'>
           Watch Demo
-        </CTAButton>
+        </StoryCta>
       </div>
     ),
     trustIndicators: (
@@ -142,9 +166,9 @@ export const MinimalForm: Story = {
           placeholder='Enter your email'
           className='w-full px-4 py-3 border border-gray-300 rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-transparent'
         />
-        <CTAButton href='#' variant='primary' size='lg' className='w-full'>
+        <StoryCta href='#' variant='primary' size='lg' className='w-full'>
           Join Now
-        </CTAButton>
+        </StoryCta>
       </div>
     ),
     supportingText: 'No spam. Opt-out anytime.',
@@ -158,9 +182,9 @@ export const WithoutBackgroundEffects: Story = {
     subtitle: 'No fancy effects, just content.',
     showBackgroundEffects: false,
     children: (
-      <CTAButton href='/clean' variant='primary' size='lg'>
+      <StoryCta href='/clean' variant='primary' size='lg'>
         Keep It Clean
-      </CTAButton>
+      </StoryCta>
     ),
   },
 };
@@ -175,12 +199,12 @@ export const LongHeadline: Story = {
       'Stop losing potential fans to complicated landing pages. Our optimized design gets more clicks, more streams, and more followers.',
     children: (
       <div className='flex flex-col gap-4'>
-        <CTAButton href='/transform' variant='primary' size='lg'>
+        <StoryCta href='/transform' variant='primary' size='lg'>
           Transform My Career
-        </CTAButton>
-        <CTAButton href='/learn-more' variant='outline' size='md'>
+        </StoryCta>
+        <StoryCta href='/learn-more' variant='secondary' size='md'>
           Learn More
-        </CTAButton>
+        </StoryCta>
       </div>
     ),
     supportingText: 'Used by 10,000+ artists worldwide',

@@ -1,8 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
-import { shellCtaClassName } from '@/components/marketing/artist-profile/ShellCtaButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT } from '@/data/homepageFrontDoorCta';
 import { track } from '@/lib/analytics';
@@ -53,17 +53,16 @@ export function HomeHeroCTA() {
           className='w-full min-w-0 bg-transparent font-mono text-sm tracking-tighter text-primary-token placeholder:text-white/36 focus:outline-none'
         />
       </label>
-      <button
+      <Button
         type='submit'
+        variant='primary'
+        size='lg'
         data-testid='homepage-primary-cta'
-        className={shellCtaClassName({
-          tone: 'primary',
-          size: 'md',
-          context: 'on-dark',
-        })}
+        className='shrink-0'
       >
+        {/* ui-casing-allow: marketing hero CTA */}
         Claim your profile
-      </button>
+      </Button>
     </form>
   );
 }

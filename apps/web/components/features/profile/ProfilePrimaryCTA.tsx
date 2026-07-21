@@ -1,8 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { CTAButton } from '@/components/molecules/CTAButton';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
@@ -129,15 +129,11 @@ export function ProfilePrimaryCTA({
   if (nextAction.kind === 'tickets') {
     return (
       <div className='space-y-4'>
-        <CTAButton
-          href={nextAction.url}
-          external
-          variant='primary'
-          size='lg'
-          className='w-full'
-        >
-          Find tickets
-        </CTAButton>
+        <Button asChild variant='primary' size='lg' className='w-full'>
+          <a href={nextAction.url} target='_blank' rel='noopener noreferrer'>
+            Find tickets
+          </a>
+        </Button>
       </div>
     );
   }
@@ -145,15 +141,11 @@ export function ProfilePrimaryCTA({
   if (nextAction.kind === 'shop') {
     return (
       <div className='space-y-4'>
-        <CTAButton
-          href={nextAction.url}
-          external
-          variant='primary'
-          size='lg'
-          className='w-full'
-        >
-          Shop merch
-        </CTAButton>
+        <Button asChild variant='primary' size='lg' className='w-full'>
+          <a href={nextAction.url} target='_blank' rel='noopener noreferrer'>
+            Shop merch
+          </a>
+        </Button>
       </div>
     );
   }
@@ -166,6 +158,7 @@ export function ProfilePrimaryCTA({
           target='_blank'
           rel='noopener noreferrer'
           className={ctaLinkClass}
+          // ui-casing-allow: natural aria-label phrasing
           aria-label='Open in Spotify'
         >
           Open in Spotify
@@ -183,6 +176,7 @@ export function ProfilePrimaryCTA({
             type='button'
             onClick={() => setDrawerOpen(true)}
             className={cn(ctaLinkClass, 'max-w-sm')}
+            // ui-casing-allow: natural aria-label phrasing
             aria-label='Open music streaming links'
           >
             Listen now
@@ -207,6 +201,7 @@ export function ProfilePrimaryCTA({
           href={`/${artist.handle}/listen`}
           prefetch={false}
           className={cn(ctaLinkClass, 'max-w-sm')}
+          // ui-casing-allow: natural aria-label phrasing
           aria-label='Open Listen page with music links'
         >
           Listen now

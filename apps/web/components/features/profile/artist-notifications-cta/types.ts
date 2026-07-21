@@ -58,7 +58,8 @@ export interface ArtistNotificationsCTAProps {
   readonly portalContainer?: HTMLElement | null;
   /**
    * Controls the base rendering style when notifications are disabled or idle.
-   * "link" matches the static profile button, "button" matches CTAButton.
+   * "link" matches the static profile button, "button" matches the canonical
+   * @jovie/ui Button primary CTA.
    */
   readonly variant?: 'link' | 'button';
   /**

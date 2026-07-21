@@ -1,5 +1,6 @@
+import { Button } from '@jovie/ui';
+import Link from 'next/link';
 import { SectionHeading } from '@/components/atoms/SectionHeading';
-import { CTAButton } from '@/components/molecules/CTAButton';
 
 export interface CTASectionProps {
   readonly title: React.ReactNode;
@@ -46,14 +47,14 @@ export function CTASection({
         </div>
 
         <div className='flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:justify-end'>
-          <CTAButton
-            href={buttonHref}
+          <Button
+            asChild
             variant={variant === 'secondary' ? 'secondary' : 'primary'}
-            size={variant === 'secondary' ? 'lg' : 'default'}
+            size={variant === 'secondary' ? 'lg' : 'md'}
             className='w-full md:w-auto'
           >
-            {buttonText}
-          </CTAButton>
+            <Link href={buttonHref}>{buttonText}</Link>
+          </Button>
         </div>
       </div>
     </section>

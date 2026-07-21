@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { VoiceDemoVisual } from '@/components/features/landing/VoiceDemoVisual';
@@ -159,19 +160,14 @@ export default function VoiceLandingPage() {
                 </li>
               </ul>
               <div className='mt-8 flex flex-wrap gap-3'>
-                <Link
-                  href={APP_ROUTES.START}
-                  className='btn-linear-primary'
-                  data-testid='voice-trust-cta'
-                >
-                  Start your first clone
-                </Link>
-                <Link
-                  href={APP_ROUTES.SUPPORT}
-                  className='inline-flex h-10 items-center rounded-full border border-subtle px-4 text-sm font-medium text-secondary-token transition-colors hover:bg-surface-1'
-                >
-                  Talk to the team
-                </Link>
+                <Button asChild variant='primary'>
+                  <Link href={APP_ROUTES.START} data-testid='voice-trust-cta'>
+                    Start your first clone
+                  </Link>
+                </Button>
+                <Button asChild variant='secondary'>
+                  <Link href={APP_ROUTES.SUPPORT}>Talk to the team</Link>
+                </Button>
               </div>
               <p className='mt-4 text-xs text-tertiary-token'>
                 Voice infrastructure shipped in PR 9882 (YouTube to ElevenLabs)
@@ -192,13 +188,11 @@ export default function VoiceLandingPage() {
             <p className='text-secondary-token'>
               The same voice that fans already know, now available on demand.
             </p>
-            <Link
-              href={APP_ROUTES.START}
-              className='btn-linear-primary mt-2'
-              data-testid='voice-final-cta'
-            >
-              Clone my voice now
-            </Link>
+            <Button asChild variant='primary' className='mt-2'>
+              <Link href={APP_ROUTES.START} data-testid='voice-final-cta'>
+                Clone my voice now
+              </Link>
+            </Button>
             <span className='text-xs text-tertiary-token'>
               Free tier. Cancel anytime. No card required.
             </span>

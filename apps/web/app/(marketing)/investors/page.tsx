@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
@@ -29,20 +30,16 @@ export default function InvestorsPage() {
             first profile visit onward.
           </p>
           <div className='flex flex-wrap gap-3'>
-            <Link
-              className='btn-linear-primary'
-              href={APP_ROUTES.SUPPORT}
-              prefetch={false}
-            >
-              Request Access
-            </Link>
-            <Link
-              className='btn-linear-secondary'
-              href={APP_ROUTES.AI}
-              prefetch={false}
-            >
-              Read The AI Brief
-            </Link>
+            <Button asChild variant='primary'>
+              <Link href={APP_ROUTES.SUPPORT} prefetch={false}>
+                Request Access
+              </Link>
+            </Button>
+            <Button asChild variant='secondary'>
+              <Link href={APP_ROUTES.AI} prefetch={false}>
+                Read The AI Brief
+              </Link>
+            </Button>
           </div>
         </section>
 
@@ -94,20 +91,19 @@ export default function InvestorsPage() {
               creator experience without exposing gated investor data.
             </p>
             <div className='flex flex-wrap gap-3'>
-              <Link
-                className='btn-linear-secondary'
-                prefetch={false}
-                href={APP_ROUTES.BLOG_THE_CONTACT_PROBLEM}
-              >
-                Read The Thesis
-              </Link>
-              <Link
-                className='btn-linear-secondary'
-                href={APP_ROUTES.PRICING}
-                prefetch={false}
-              >
-                View Product Pricing
-              </Link>
+              <Button asChild variant='secondary'>
+                <Link
+                  href={APP_ROUTES.BLOG_THE_CONTACT_PROBLEM}
+                  prefetch={false}
+                >
+                  Read The Thesis
+                </Link>
+              </Button>
+              <Button asChild variant='secondary'>
+                <Link href={APP_ROUTES.PRICING} prefetch={false}>
+                  View Product Pricing
+                </Link>
+              </Button>
             </div>
           </div>
         </section>
