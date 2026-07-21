@@ -5,6 +5,10 @@ import { useReducedMotion } from 'motion/react';
 import Script from 'next/script';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { publicEnv } from '@/lib/env-public';
+import {
+  getBrowserTurnstileHostname,
+  resolveTurnstileSiteKey,
+} from '@/lib/turnstile/keys';
 import { cn } from '@/lib/utils';
 import { isOnboardingLocalAutomationBypassRuntime } from './onboardingAutomationBypass';
 
@@ -125,7 +129,12 @@ export function OnboardingTurnstile({
     useState(false);
   const [interactiveChallengeVisible, setInteractiveChallengeVisible] =
     useState(false);
-  const siteKey = publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  // Hostname-aware: preview/localhost get always-pass dummy keys so prod
+  // domain-locked sitekeys cannot cause Cloudflare 110200 on *.vercel.app.
+  const siteKey = resolveTurnstileSiteKey(
+    getBrowserTurnstileHostname(),
+    publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+  );
   const hasStaticBypass =
     process.env.NODE_ENV === 'development' ||
     publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||

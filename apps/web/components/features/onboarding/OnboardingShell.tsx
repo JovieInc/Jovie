@@ -6,6 +6,10 @@ import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { track } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
+import {
+  getBrowserTurnstileHostname,
+  resolveTurnstileSiteKey,
+} from '@/lib/turnstile/keys';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
@@ -115,7 +119,10 @@ export function OnboardingShell({
   const turnstilePanelVisible = isOnboardingTurnstilePanelVisible(
     turnstileState,
     turnstileInstruction,
-    publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+    resolveTurnstileSiteKey(
+      getBrowserTurnstileHostname(),
+      publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+    )
   );
 
   const isTurnstileUnavailable =
