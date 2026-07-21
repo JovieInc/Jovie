@@ -16,6 +16,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ## [Unreleased]
 
 - **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; build-info prefers the stamped release version (and falls back to bundled `version.json`), and both shell/legacy banners omit the version when unavailable.
+- **Chat audio player no longer doubles up (JOV-3511):** the full docked bottom bar and sidebar mini never show at once; the full bar sits flat under the canvas without elevated float chrome; right-rail release sections tighten spacing; audio thumbnails stay compact; icon actions are borderless at rest and circle on hover.
+- **Library Approval Status is first-class again (#10384):** every Library asset surfaces Draft / Needs Review / Approved / Archived as a badge on grid cards, a list column, and filter chips (rail + pill search), with Release Status kept as a separate labeled axis so the two never collapse into one bare “Draft”.
+- **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; it uses the build-time release version from build-info, or omits the version when unavailable.
 - **Entity mention hover cards now use the same rich entity card as the chat rail:** hovering an inline release, artist, track, or event mention opens the canonical compact EntityCard instead of a one-off popover layout.
 - **Chat tool activity is quieter and indented:** agent tool-call rows sit one rhythm step in from assistant prose with secondary color and book weight, so narrative stays primary and consecutive steps form a quiet run.
 - **Artist profiles now adapt to release, touring, and live-support moments:** one music-native link brings listening, tickets, support, fan capture, setup guidance, and product truth into a clearer responsive journey.
@@ -1618,7 +1621,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Changed
 
 - [internal] Migrated release and share feature components to shell-v1 design tokens: replaced semi-transparent surface tokens (`bg-surface-1/30`, `/50`, `/70`, `bg-surface-2/80`) with explicit opacity values, replaced raw duration values (`duration-100`, `duration-150`, `duration-200`) with canonical motion tokens (`duration-fast`, `duration-subtle`, `duration-slow`), replaced `text-green-500` with `text-success-token`, replaced decorative hover scale/translate on smart link play button with color-only feedback, replaced `transition-all` with `transition-[transform,opacity]` on icon crossfade animation.
-
 
 ## [26.4.209] - 2026-05-06
      9|
