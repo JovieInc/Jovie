@@ -201,7 +201,7 @@ export function ProfileLiveCelebration({
           Your Profile Is Live
         </h2>
 
-        <div className='flex items-center gap-2 rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-2.5'>
+        <div className='flex items-center gap-2 rounded-lg border border-subtle bg-(--linear-app-content-surface) px-4 py-2.5'>
           <span className='text-app font-medium text-primary-token'>
             {profileUrl}
           </span>

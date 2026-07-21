@@ -39,13 +39,13 @@ export const PopularityIcon = memo(function PopularityIcon({
 
   // Color mapping for each level
   const colors = {
-    low: 'bg-(--linear-text-tertiary)',
+    low: 'bg-tertiary-token',
     med: 'bg-amber-400 dark:bg-amber-300',
     high: 'bg-emerald-500 dark:bg-emerald-400',
   };
 
   const activeColor = colors[level];
-  const inactiveColor = 'bg-(--linear-border-subtle)';
+  const inactiveColor = 'bg-subtle';
 
   // Number of bars to fill based on level
   const barCounts: Record<'low' | 'med' | 'high', number> = {

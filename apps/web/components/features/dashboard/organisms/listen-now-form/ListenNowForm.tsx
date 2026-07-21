@@ -191,7 +191,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
           Primary Streaming
         </h3>
 
-        <ContentSurfaceCard className='divide-y divide-(--linear-border-subtle) overflow-hidden bg-surface-1 p-0'>
+        <ContentSurfaceCard className='divide-y divide-subtle overflow-hidden bg-surface-1 p-0'>
           {/* Spotify row */}
           <div className='flex items-center gap-3 px-4 py-3'>
             <div
@@ -385,7 +385,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
           </ContentSurfaceCard>
         ) : (
           <div className='space-y-0'>
-            <ContentSurfaceCard className='divide-y divide-(--linear-border-subtle) overflow-hidden p-0'>
+            <ContentSurfaceCard className='divide-y divide-subtle overflow-hidden p-0'>
               {additionalLinks.map((link, index) => {
                 const meta = PLATFORM_METADATA_MAP[link.platform];
                 const dspInfo = connectedDspInfo[link.platform];

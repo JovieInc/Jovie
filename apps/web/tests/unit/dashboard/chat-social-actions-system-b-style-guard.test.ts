@@ -57,8 +57,8 @@ describe('chat social add action System B source contract', () => {
       ).not.toMatch(pattern);
     }
 
-    expect(source).toContain('border-(--linear-app-frame-seam)');
+    expect(source).toContain('border-subtle');
     expect(source).toContain('bg-surface-0');
-    expect(source).toContain('divide-(--linear-border-subtle)');
+    expect(source).toContain('divide-subtle');
   });
 });

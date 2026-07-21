@@ -15,17 +15,17 @@ const INTENT_BADGES: Record<
   high: {
     label: 'High',
     className: 'border-default bg-surface-1 text-secondary-token',
-    dotClassName: 'bg-(--linear-text-secondary)',
+    dotClassName: 'bg-secondary-token',
   },
   medium: {
     label: 'Medium',
     className: 'border-subtle bg-surface-0 text-tertiary-token',
-    dotClassName: 'bg-(--linear-text-tertiary)',
+    dotClassName: 'bg-tertiary-token',
   },
   low: {
     label: 'Low',
     className: 'border-subtle bg-transparent text-tertiary-token',
-    dotClassName: 'bg-(--linear-text-tertiary)/70',
+    dotClassName: 'bg-tertiary-token/70',
   },
 };
 

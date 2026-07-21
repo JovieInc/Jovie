@@ -17,7 +17,7 @@ export function ReleaseTaskEmptyState({
   isLoading,
 }: ReleaseTaskEmptyStateProps) {
   return (
-    <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1'>
+    <div className='rounded-lg border border-subtle bg-surface-1'>
       <EmptyState
         icon={<ListChecks className='h-5 w-5' aria-hidden='true' />}
         heading='Your Release Playbook'

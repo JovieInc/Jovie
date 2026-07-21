@@ -25,7 +25,7 @@ export function ReleaseTaskExplainerPopover({
         <button
           type='button'
           className='flex-shrink-0 rounded p-0.5 text-tertiary-token opacity-60 hover:opacity-100 hover:bg-surface-1 transition-opacity'
-          aria-label='Task info'
+          aria-label='Task Info'
         >
           <Info className='h-3.5 w-3.5' />
         </button>
@@ -34,7 +34,7 @@ export function ReleaseTaskExplainerPopover({
         align='end'
         side='top'
         sideOffset={4}
-        className='w-72 rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 p-3 shadow-lg'
+        className='w-72 rounded-lg border border-subtle bg-surface-1 p-3 shadow-lg'
       >
         <p className='text-2xs leading-relaxed text-secondary-token'>
           {explainerText}

@@ -304,13 +304,13 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             <>
               <DrawerSection title='Role' className='space-y-2' surface='card'>
                 <Label className='text-app text-secondary-token'>
-                  Contact type
+                  Contact Type
                 </Label>
                 <Select value={contact.role} onValueChange={handleRoleChange}>
-                  <SelectTrigger className='h-8 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-app'>
+                  <SelectTrigger className='h-8 rounded-lg border border-subtle bg-surface-0 px-2.5 text-app'>
                     <SelectValue>{roleLabel}</SelectValue>
                   </SelectTrigger>
-                  <SelectContent className='rounded-lg border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'>
+                  <SelectContent className='rounded-lg border-subtle bg-(--linear-app-content-surface) p-1'>
                     {CONTACT_ROLE_OPTIONS.map(option => (
                       <SelectItem
                         key={option.value}
@@ -372,18 +372,18 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                 >
                   <div className='space-y-2'>
                     <Label className='text-app text-secondary-token'>
-                      Default action
+                      Default Action
                     </Label>
                     <Select
                       value={contact.preferredChannel || ''}
                       onValueChange={handlePreferredChannelChange}
                     >
-                      <SelectTrigger className='h-8 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-app'>
+                      <SelectTrigger className='h-8 rounded-lg border border-subtle bg-surface-0 px-2.5 text-app'>
                         <SelectValue placeholder='Select preferred channel'>
                           {getPreferredChannelLabel(contact.preferredChannel)}
                         </SelectValue>
                       </SelectTrigger>
-                      <SelectContent className='rounded-lg border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'>
+                      <SelectContent className='rounded-lg border-subtle bg-(--linear-app-content-surface) p-1'>
                         <SelectItem value='email'>Email</SelectItem>
                         <SelectItem value='phone'>Phone</SelectItem>
                       </SelectContent>
@@ -425,10 +425,10 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                         aria-pressed={isSelected}
                         title={territory}
                         className={cn(
-                          'inline-flex h-6 max-w-full shrink-0 items-center whitespace-nowrap rounded-md border px-2 text-2xs font-caption leading-none transition-[background-color,border-color,color] duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+                          'inline-flex h-6 max-w-full shrink-0 items-center whitespace-nowrap rounded-md border px-2 text-2xs font-caption leading-none transition-[background-color,border-color,color] duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
                           isSelected
                             ? 'border-(--linear-border-focus)/35 bg-surface-1 text-primary-token'
-                            : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+                            : 'border-subtle bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
                         )}
                       >
                         {territory}
@@ -448,7 +448,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 
           {/* Saving indicator */}
           {contact.isSaving && (
-            <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-center text-app text-tertiary-token'>
+            <div className='rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-center text-app text-tertiary-token'>
               Saving...
             </div>
           )}

@@ -23,7 +23,7 @@ export function CategorySection({
       className={cn(
         variant === 'flat'
           ? 'py-2'
-          : 'rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3',
+          : 'rounded-lg border border-subtle bg-(--linear-app-content-surface) p-3',
         className
       )}
     >

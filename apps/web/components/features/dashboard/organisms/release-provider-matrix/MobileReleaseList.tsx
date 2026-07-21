@@ -244,7 +244,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
           lockReason={lockReason}
         />
       }
-      className='border-b border-(--linear-app-frame-seam) last:border-b-0'
+      className='border-b border-subtle last:border-b-0'
       contentClassName='bg-transparent'
     >
       <ShellListRowButton

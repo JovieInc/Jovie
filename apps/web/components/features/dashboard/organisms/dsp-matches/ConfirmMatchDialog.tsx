@@ -87,7 +87,7 @@ export function ConfirmMatchDialog({
   return (
     <Dialog open={open} onClose={onClose} size='md'>
       <DialogTitle className='flex items-center gap-3'>
-        <div className='flex h-8 w-8 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
+        <div className='flex h-8 w-8 items-center justify-center rounded-lg border border-subtle bg-surface-0'>
           <Icon name='Link2' className='h-4 w-4 text-secondary-token' />
         </div>
         <span>Confirm artist match</span>
@@ -115,7 +115,7 @@ export function ConfirmMatchDialog({
                 unoptimized={isExternalDspImage(externalArtistImageUrl)}
               />
             ) : (
-              <div className='flex h-16 w-16 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0'>
+              <div className='flex h-16 w-16 items-center justify-center rounded-lg border border-subtle bg-surface-0'>
                 <DspProviderIcon provider={providerId} size='lg' />
               </div>
             )}
@@ -131,7 +131,7 @@ export function ConfirmMatchDialog({
                     href={externalArtistUrl}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+                    className='flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
                   >
                     <Icon name='ExternalLink' className='h-4 w-4' />
                   </a>
@@ -144,7 +144,7 @@ export function ConfirmMatchDialog({
 
               <div className='mt-2 flex flex-wrap items-center gap-2'>
                 <ConfidenceBadge score={confidenceScore} size='md' showLabel />
-                <span className='rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-3xs font-caption text-secondary-token'>
+                <span className='rounded-md border border-subtle bg-surface-0 px-1.5 py-0.5 text-3xs font-caption text-secondary-token'>
                   {matchingIsrcCount} matching ISRCs
                 </span>
               </div>

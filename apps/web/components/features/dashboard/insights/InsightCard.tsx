@@ -47,7 +47,7 @@ interface InsightCardProps {
 export function InsightCard({ insight }: InsightCardProps) {
   return (
     <article
-      className='border-b border-(--linear-app-frame-seam) px-1 py-3.5 transition-colors duration-subtle last:border-b-0 hover:bg-surface-0/60'
+      className='border-b border-subtle px-1 py-3.5 transition-colors duration-subtle last:border-b-0 hover:bg-surface-0/60'
       aria-label={`${PRIORITY_LABELS[insight.priority]} insight: ${insight.title}`}
     >
       <div className='flex items-start gap-3'>
@@ -63,7 +63,7 @@ export function InsightCard({ insight }: InsightCardProps) {
               size='sm'
               className={`rounded-md px-1.5 py-0.5 text-3xs ${
                 insight.priority === 'low'
-                  ? 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'
+                  ? 'border-subtle bg-surface-0 text-secondary-token'
                   : ''
               }`}
               style={priorityBadgeStyle(insight.priority)}
@@ -82,7 +82,7 @@ export function InsightCard({ insight }: InsightCardProps) {
             </p>
           ) : null}
 
-          <div className='mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-(--linear-app-frame-seam) pt-3'>
+          <div className='mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-subtle pt-3'>
             <div className='flex items-center gap-2'>
               <span className='text-3xs font-caption text-secondary-token capitalize'>
                 {insight.category}

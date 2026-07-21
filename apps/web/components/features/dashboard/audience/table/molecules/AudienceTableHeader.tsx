@@ -174,7 +174,7 @@ export function AudienceTableHeader({
                     </div>
                     <span
                       className={cn(
-                        'inline-flex items-center rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-2xs font-caption text-secondary-token tabular-nums transition-colors duration-subtle whitespace-nowrap',
+                        'inline-flex items-center rounded-md border border-subtle bg-surface-0 px-2 py-0.5 text-2xs font-caption text-secondary-token tabular-nums transition-colors duration-subtle whitespace-nowrap',
                         selectedCount > 0 &&
                           'pointer-events-none opacity-0 -translate-y-0.5'
                       )}

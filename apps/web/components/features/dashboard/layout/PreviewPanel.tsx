@@ -83,12 +83,12 @@ function PreviewPanelEmpty({
 
               <div className='mx-auto w-full max-w-80'>
                 <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
-                  <div className='rounded-3xl border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
+                  <div className='rounded-3xl border border-subtle bg-surface-1 p-2'>
                     <div className='mb-2 flex items-center justify-between px-2.5 pt-1'>
                       <div className='h-2.5 w-16 rounded skeleton' />
                       <div className='h-5 w-20 rounded-lg skeleton' />
                     </div>
-                    <div className='relative aspect-[9/19.5] overflow-hidden rounded-3xl border border-(--linear-app-frame-seam) bg-surface-0'>
+                    <div className='relative aspect-[9/19.5] overflow-hidden rounded-3xl border border-subtle bg-surface-0'>
                       <div className='pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5'>
                         <div className='h-1.5 w-24 rounded-full bg-black/55' />
                       </div>
@@ -367,14 +367,14 @@ export function PreviewPanel() {
                   </p>
                 </div>
                 <div className='flex items-center gap-1.5'>
-                  <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-tight text-secondary-token'>
+                  <div className='rounded-lg border border-subtle bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-tight text-secondary-token'>
                     Mobile
                   </div>
-                  <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-tight text-secondary-token'>
+                  <div className='rounded-lg border border-subtle bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-tight text-secondary-token'>
                     {visibleLinkCount} live
                   </div>
                   {hiddenLinkCount > 0 && (
-                    <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-tight text-secondary-token'>
+                    <div className='rounded-lg border border-subtle bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-tight text-secondary-token'>
                       {hiddenLinkCount} draft{hiddenLinkCount === 1 ? '' : 's'}
                     </div>
                   )}
@@ -383,15 +383,15 @@ export function PreviewPanel() {
 
               <div className='mx-auto w-full max-w-80'>
                 <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
-                  <div className='rounded-3xl border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
+                  <div className='rounded-3xl border border-subtle bg-surface-1 p-2'>
                     <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-3xs font-caption tracking-tight text-secondary-token'>
                       <span>Preview</span>
-                      <span className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-3xs tracking-tight'>
+                      <span className='rounded-lg border border-subtle bg-surface-0 px-2 py-0.5 text-3xs tracking-tight'>
                         {username ? `@${username}` : 'Profile'}
                       </span>
                     </div>
 
-                    <div className='relative aspect-[9/19.5] max-h-185 overflow-hidden rounded-3xl border border-(--linear-app-frame-seam) bg-surface-0'>
+                    <div className='relative aspect-[9/19.5] max-h-185 overflow-hidden rounded-3xl border border-subtle bg-surface-0'>
                       <div className='pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5'>
                         <div className='h-1.5 w-24 rounded-full bg-black/55' />
                       </div>
@@ -483,11 +483,11 @@ export function PreviewPanel() {
                   url={profileUrl}
                   size='md'
                   className='flex-1'
-                  inputClassName='h-8 rounded-lg border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-2xs'
+                  inputClassName='h-8 rounded-lg border-subtle bg-surface-0 px-2.5 py-1.5 text-2xs'
                 />
                 <button
                   type='button'
-                  className='shrink-0 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
+                  className='shrink-0 rounded-md border border-subtle bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
                   onClick={() =>
                     globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
                   }
@@ -512,7 +512,7 @@ export function PreviewPanel() {
                 </p>
               </div>
 
-              <p className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2 text-2xs leading-5 text-secondary-token'>
+              <p className='rounded-lg border border-subtle bg-surface-0 px-2.5 py-2 text-2xs leading-5 text-secondary-token'>
                 {visibleLinkCount} visible link
                 {visibleLinkCount === 1 ? '' : 's'} currently anchor the public
                 profile
@@ -521,7 +521,7 @@ export function PreviewPanel() {
                   : '.'}
               </p>
 
-              <div className='grid grid-cols-3 divide-x divide-(--linear-app-frame-seam)'>
+              <div className='grid grid-cols-3 divide-x divide-subtle'>
                 <div className='space-y-px pr-3'>
                   <p className='text-3xs font-medium leading-[14px] text-tertiary-token'>
                     Visible
@@ -552,7 +552,7 @@ export function PreviewPanel() {
                 {snapshotTags.map(tag => (
                   <span
                     key={tag}
-                    className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-tight text-secondary-token'
+                    className='rounded-lg border border-subtle bg-surface-0 px-2.5 py-1 text-3xs font-caption tracking-tight text-secondary-token'
                   >
                     {tag}
                   </span>

@@ -56,7 +56,7 @@ function MilestoneRow({
           'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
           isComplete
             ? 'border-success/25 bg-success/10 text-success'
-            : 'border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token'
+            : 'border-subtle bg-surface-0 text-tertiary-token'
         )}
       >
         {isComplete ? (
@@ -212,10 +212,10 @@ export const SocialBioNudge = memo(function SocialBioNudge({
   );
 
   return (
-    <div className='rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-4'>
+    <div className='rounded-xl border border-subtle bg-surface-1 p-4'>
       <div className='flex items-start gap-3'>
         <div
-          className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 p-2 text-secondary-token'
+          className='rounded-full border border-subtle bg-surface-0 p-2 text-secondary-token'
           aria-hidden='true'
         >
           <SocialIcon platform='instagram' className='h-4 w-4' />

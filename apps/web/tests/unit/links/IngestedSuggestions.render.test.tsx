@@ -33,7 +33,7 @@ describe('IngestedSuggestions - rendering', () => {
     );
 
     expect(
-      screen.getByLabelText('Ingested link suggestions')
+      screen.getByLabelText('Ingested Link Suggestions')
     ).toBeInTheDocument();
   });
 
@@ -79,7 +79,7 @@ describe('IngestedSuggestions - rendering', () => {
       />
     );
 
-    const container = screen.getByLabelText('Ingested link suggestions');
+    const container = screen.getByLabelText('Ingested Link Suggestions');
     expect(container).toHaveClass('custom-class');
   });
 

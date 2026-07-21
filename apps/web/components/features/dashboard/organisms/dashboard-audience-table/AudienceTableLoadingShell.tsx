@@ -53,7 +53,7 @@ export function AudienceTableLoadingShell() {
       <div className='flex-1 min-h-0 overflow-hidden bg-(--linear-app-content-surface)'>
         <div className='flex h-full min-h-0 flex-col'>
           <div className='flex-1 min-h-0 overflow-hidden sm:hidden'>
-            <div className='divide-y divide-(--linear-border-subtle)'>
+            <div className='divide-y divide-subtle'>
               {AUDIENCE_MOBILE_ROW_KEYS.map(key => (
                 <div key={key} className='flex items-center gap-3 px-4 py-3'>
                   <LoadingSkeleton

@@ -208,7 +208,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
           aria-label='Show Provider Availability Details'
           aria-haspopup='listbox'
           aria-expanded={open}
-          className='inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] px-1.5 py-1 text-xs font-normal tracking-tight text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:border-(--color-accent) focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--color-accent)'
+          className='inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-subtle bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] px-1.5 py-1 text-xs font-normal tracking-tight text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:border-(--color-accent) focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--color-accent)'
         >
           <CompactLinkRail
             items={compactProviders.map(providerKey => ({
@@ -244,9 +244,9 @@ export const AvailabilityCell = memo(function AvailabilityCell({
 
       <PopoverContent
         align='end'
-        className='w-80 rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 p-0 shadow-popover'
+        className='w-80 rounded-xl border border-subtle bg-surface-1 p-0 shadow-popover'
       >
-        <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+        <div className='border-b border-subtle px-3 py-2'>
           <p className='text-xs font-caption tracking-tight text-primary-token'>
             Platform Availability
           </p>
@@ -267,7 +267,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
             return (
               <div
                 key={providerKey}
-                className='flex min-h-9 items-center justify-between border-b border-(--linear-app-frame-seam) px-3 py-1.5 last:border-b-0'
+                className='flex min-h-9 items-center justify-between border-b border-subtle px-3 py-1.5 last:border-b-0'
               >
                 <div className='flex min-w-0 items-center gap-2.5'>
                   {/* Status dot with screen reader text */}
@@ -276,7 +276,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                       className='flex h-2.5 w-2.5 items-center justify-center rounded-full bg-surface-1'
                       aria-hidden='true'
                     >
-                      <span className='h-1 w-1 rounded-full bg-(--linear-text-tertiary)' />
+                      <span className='h-1 w-1 rounded-full bg-tertiary-token' />
                     </span>
                   ) : (
                     <span
@@ -425,7 +425,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         </div>
 
         {validationError && (
-          <div className='min-h-7 border-t border-(--linear-app-frame-seam) px-3 py-1.5'>
+          <div className='min-h-7 border-t border-subtle px-3 py-1.5'>
             <p className='text-2xs text-error'>{validationError}</p>
           </div>
         )}

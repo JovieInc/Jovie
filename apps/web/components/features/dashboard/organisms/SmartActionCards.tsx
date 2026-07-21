@@ -39,7 +39,7 @@ function ActionCard({
       className='group flex items-center justify-between gap-3 p-3.5 transition-[background-color,border-color] duration-subtle hover:bg-surface-0'
     >
       <div className='flex items-center gap-3 min-w-0'>
-        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'>
+        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-0 text-secondary-token'>
           {icon}
         </div>
         <div className='min-w-0'>

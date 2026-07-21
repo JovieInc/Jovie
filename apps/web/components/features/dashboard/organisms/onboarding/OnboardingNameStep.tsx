@@ -55,10 +55,10 @@ export function OnboardingNameStep({
             value={fullName}
             onChange={e => onNameChange(e.target.value)}
             placeholder={namePlaceholder}
-            aria-label='Your full name'
+            aria-label='Your Full Name'
             maxLength={50}
             autoComplete='name'
-            className='w-full rounded-md border border-subtle bg-surface-1 px-3 py-2.5 text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface)'
+            className='w-full rounded-md border border-subtle bg-surface-1 px-3 py-2.5 text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface)'
           />
 
           <Button

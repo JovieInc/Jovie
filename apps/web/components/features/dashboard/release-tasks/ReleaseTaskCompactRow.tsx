@@ -45,7 +45,7 @@ export const ReleaseTaskCompactRow = React.memo(function ReleaseTaskCompactRow({
         type='button'
         onClick={() => onNavigate(task.id)}
         className={cn(
-          'flex-1 text-left text-2xs truncate transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none',
+          'flex-1 text-left text-2xs truncate transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base outline-none',
           isAi ? 'opacity-70' : 'hover:text-accent'
         )}
       >

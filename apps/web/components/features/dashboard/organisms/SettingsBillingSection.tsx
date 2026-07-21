@@ -126,7 +126,7 @@ export function SettingsBillingSection() {
                 className={cn(
                   'rounded-md px-1.5 text-3xs',
                   badgeVariant === 'secondary' &&
-                    'border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token',
+                    'border border-subtle bg-surface-0 text-secondary-token',
                   badgeVariant === 'warning' &&
                     'border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300',
                   badgeVariant === 'success' &&
@@ -155,7 +155,7 @@ export function SettingsBillingSection() {
       </div>
 
       {isStale && billingData?.staleReason ? (
-        <div className='border-t border-(--linear-app-frame-seam) px-4 py-3.5 sm:px-5'>
+        <div className='border-t border-subtle px-4 py-3.5 sm:px-5'>
           <div className='flex items-start gap-2 text-amber-700 dark:text-amber-300'>
             <AlertTriangle className='mt-0.5 h-4 w-4 shrink-0' aria-hidden />
             <p className='text-app leading-[18px]'>{billingData.staleReason}</p>
@@ -164,7 +164,7 @@ export function SettingsBillingSection() {
       ) : null}
 
       {portalMutation.error ? (
-        <div className='border-t border-(--linear-app-frame-seam) px-4 py-3.5 sm:px-5'>
+        <div className='border-t border-subtle px-4 py-3.5 sm:px-5'>
           <p className='text-app leading-[18px] text-destructive'>
             {portalMutation.error instanceof Error
               ? portalMutation.error.message

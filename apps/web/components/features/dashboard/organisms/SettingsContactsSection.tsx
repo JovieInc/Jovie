@@ -66,7 +66,7 @@ export function SettingsContactsSection({
               Failed to load contacts.
             </p>
             <Button variant='ghost' size='sm' onClick={() => refetch()}>
-              Try again
+              Try Again
             </Button>
           </ContentSurfaceCard>
         </div>
@@ -208,7 +208,7 @@ function ContactsListInner({
             className='gap-1.5 text-secondary-token hover:text-primary-token'
           >
             <Plus className='h-4 w-4' aria-hidden />
-            Add contact
+            Add Contact
           </Button>
         }
       >
@@ -278,7 +278,7 @@ const ContactRow = memo(function ContactRow({
       type='button'
       onClick={onClick}
       aria-pressed={isSelected}
-      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-[background-color,border-color,box-shadow] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) ${
+      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-[background-color,border-color,box-shadow] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base ${
         isSelected
           ? 'border-subtle bg-surface-0'
           : 'border-transparent hover:bg-surface-0'

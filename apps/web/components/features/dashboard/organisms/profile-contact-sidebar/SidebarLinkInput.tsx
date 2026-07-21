@@ -178,8 +178,8 @@ export function SidebarLinkInput({
         autoCapitalize='none'
         autoCorrect='off'
         autoComplete='off'
-        className='h-9 rounded-lg border-(--linear-app-frame-seam) bg-surface-0 text-app'
-        aria-label='Add link'
+        className='h-9 rounded-lg border-subtle bg-surface-0 text-app'
+        aria-label='Add Link'
         autoFocus
       />
 
@@ -188,7 +188,7 @@ export function SidebarLinkInput({
           <div
             ref={refs.setFloating}
             style={floatingStyles}
-            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) py-1 shadow-popover'
+            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-subtle bg-(--linear-app-content-surface) py-1 shadow-popover'
             onMouseDown={e => e.preventDefault()}
             aria-hidden='true'
           >
@@ -209,7 +209,7 @@ export function SidebarLinkInput({
         <button
           type='button'
           onClick={handleAdd}
-          className='mt-2 flex w-full items-center gap-2 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-app transition-colors hover:bg-surface-1'
+          className='mt-2 flex w-full items-center gap-2 rounded-md border border-subtle bg-surface-0 px-3 py-2 text-app transition-colors hover:bg-surface-1'
         >
           <SocialIcon
             platform={detectedLink.platform.icon}

@@ -37,7 +37,7 @@ export function AudienceMemberActivityFeed({
   return (
     <div className='relative'>
       <div
-        className='absolute top-2.5 bottom-2.5 left-3 w-px bg-(--linear-border-subtle)'
+        className='absolute top-2.5 bottom-2.5 left-3 w-px bg-subtle'
         aria-hidden='true'
       />
 

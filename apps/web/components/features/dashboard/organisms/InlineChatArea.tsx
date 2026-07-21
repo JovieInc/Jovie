@@ -82,7 +82,7 @@ const InlineChatMessage = memo(function InlineChatMessage({
           <div
             className={cn(
               'max-w-[85%] rounded-xl px-3 py-2',
-              'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
+              'border border-subtle bg-surface-0 text-primary-token'
             )}
           >
             <div className='whitespace-pre-wrap text-app leading-relaxed'>
@@ -275,7 +275,7 @@ export const InlineChatArea = forwardRef<
                 <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
                   <BrandLogo size={14} tone='auto' />
                 </div>
-                <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2'>
+                <div className='rounded-lg border border-subtle bg-surface-0 px-3 py-2'>
                   <Loader2 className='h-4 w-4 animate-spin text-secondary-token' />
                 </div>
               </div>

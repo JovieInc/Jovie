@@ -169,7 +169,7 @@ export function GetStartedChecklistCard({
 
   return (
     <ContentSurfaceCard className='overflow-hidden p-0'>
-      <div className='flex items-center justify-between gap-3 border-b border-(--linear-app-frame-seam) px-3 py-2'>
+      <div className='flex items-center justify-between gap-3 border-b border-subtle px-3 py-2'>
         <div className='flex items-center gap-1.5'>
           <h3 className='text-xs font-caption tracking-tight text-primary-token'>
             Get Started
@@ -192,7 +192,7 @@ export function GetStartedChecklistCard({
           <button
             type='button'
             onClick={handleDismiss}
-            className='rounded-full border border-transparent px-2 py-0.5 text-2xs text-tertiary-token transition-colors hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token'
+            className='rounded-full border border-transparent px-2 py-0.5 text-2xs text-tertiary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-secondary-token'
           >
             Dismiss
           </button>
@@ -250,7 +250,7 @@ export function GetStartedChecklistCard({
             return (
               <li
                 key={item.id}
-                className='flex items-center gap-2 rounded-full border border-transparent px-2.5 py-1.5 hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
+                className='flex items-center gap-2 rounded-full border border-transparent px-2.5 py-1.5 hover:border-subtle hover:bg-surface-0'
               >
                 {checkboxEl}
                 <Link
@@ -269,7 +269,7 @@ export function GetStartedChecklistCard({
               className={`flex items-center gap-2 rounded-full border border-transparent px-2.5 py-1.5 transition-colors ${
                 isDone
                   ? 'bg-surface-0 opacity-50'
-                  : 'hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
+                  : 'hover:border-subtle hover:bg-surface-0'
               }`}
             >
               {checkboxEl}
@@ -281,7 +281,7 @@ export function GetStartedChecklistCard({
                     e.stopPropagation();
                     handleCopyUrl();
                   }}
-                  className='rounded-full border border-transparent px-2 py-0.5 text-3xs text-tertiary-token transition-colors hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-secondary-token'
+                  className='rounded-full border border-transparent px-2 py-0.5 text-3xs text-tertiary-token transition-colors hover:border-subtle hover:bg-surface-1 hover:text-secondary-token'
                 >
                   Copy
                 </button>
