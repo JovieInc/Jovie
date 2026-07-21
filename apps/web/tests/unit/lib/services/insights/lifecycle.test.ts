@@ -86,3 +86,42 @@ describe('insight lifecycle deduplication', () => {
     expect(result).toHaveLength(1);
   });
 });
+
+describe('JOV-3522 Top signals duplicate cards', () => {
+  it('collapses same-fact insights that differ only by spikeDate window', () => {
+    const result = dedupeVisibleInsights([
+      {
+        ...baseInsight,
+        insightType: 'subscriber_growth',
+        category: 'audience',
+        title: '3 New Subscribers',
+        description: 'You gained 3 subscribers.',
+        dataSnapshot: { spikeDate: '2026-06-22' },
+      },
+      {
+        ...baseInsight,
+        insightType: 'subscriber_growth',
+        category: 'audience',
+        title: '3 New Subscribers',
+        description: 'You gained 3 subscribers.',
+        dataSnapshot: { spikeDate: '2026-06-24' },
+      },
+    ]);
+
+    expect(result).toHaveLength(1);
+  });
+
+  it('keeps genuinely distinct subjects of the same category and family', () => {
+    const result = dedupeVisibleInsights([
+      baseInsight,
+      {
+        ...baseInsight,
+        insightType: 'new_market',
+        title: 'Denver is becoming a breakout market',
+        dataSnapshot: { city: 'Denver', country: 'US' },
+      },
+    ]);
+
+    expect(result).toHaveLength(2);
+  });
+});
