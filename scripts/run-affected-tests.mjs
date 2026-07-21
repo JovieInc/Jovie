@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync, spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -378,7 +379,10 @@ function unique(values) {
   return [...new Set(values)];
 }
 
-export function buildAffectedTestPlan(changedFiles) {
+export function buildAffectedTestPlan(
+  changedFiles,
+  { isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)) } = {}
+) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
@@ -555,9 +559,30 @@ export function buildAffectedTestPlan(changedFiles) {
       // Per docs/PR_FLOW.md, Playwright remains in hosted manual/deep lanes.
       !(isExactMobileOverflowNavigationRace && file.endsWith('.spec.ts'))
   );
-  const directTestFiles = new Set(directTests);
+  const directlyRunnableTestFiles = new Set(
+    directTests.filter(
+      file =>
+        isFileAvailable(file) &&
+        !file.startsWith('apps/web/tests/e2e/') &&
+        !file.startsWith('apps/web/tests/performance/')
+    )
+  );
+  const isExactProductionReleaseContract =
+    files.length === 2 &&
+    files.includes('.github/workflows/production-release.yml') &&
+    directlyRunnableTestFiles.has(
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts'
+    );
+  const hasUnsupportedAutomationPeer =
+    files.some(
+      file => file.startsWith('.github/') || file.startsWith('scripts/')
+    ) && !isExactProductionReleaseContract;
   const hasManifestInputBeyondDirectTests = manifest =>
-    files.some(file => manifest.has(file) && !directTestFiles.has(file));
+    files.some(
+      file =>
+        manifest.has(file) &&
+        (hasUnsupportedAutomationPeer || !directlyRunnableTestFiles.has(file))
+    );
   const mandatoryTests = [];
   const hasSeedConfirmationChange = files.some(
     file =>
