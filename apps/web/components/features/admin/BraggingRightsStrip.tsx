@@ -1,6 +1,6 @@
 'use client';
 
-import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Building2, Mail, MousePointerClick, Tag, Users } from 'lucide-react';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -56,13 +56,15 @@ function BadgeRow({
           {overflow.length > 0 && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
+                <Button
                   type='button'
-                  className='inline-flex cursor-default items-center rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium text-tertiary-token'
+                  variant='ghost'
+                  size='sm'
+                  className='inline-flex h-auto cursor-default items-center rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium text-tertiary-token hover:bg-surface-0'
                   aria-label={`${overflow.length} more ${title.toLowerCase()}`}
                 >
-                  +{overflow.length} others
-                </button>
+                  +{overflow.length} Others
+                </Button>
               </TooltipTrigger>
               <TooltipContent
                 side='top'

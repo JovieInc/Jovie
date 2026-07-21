@@ -81,11 +81,12 @@ export function BatchIngestForm({
   return (
     <ContentSurfaceCard className='overflow-hidden'>
       <div className='p-0'>
-        <button
+        <Button
           type='button'
+          variant='ghost'
           aria-expanded={isOpen}
           onClick={() => setIsOpen(open => !open)}
-          className='flex w-full items-center gap-2 border-b border-subtle px-4 py-3 text-left'
+          className='flex h-auto w-full items-center justify-start gap-2 rounded-none border-b border-subtle px-4 py-3 text-left hover:bg-transparent'
         >
           <ChevronRight
             className={cn(
@@ -101,7 +102,7 @@ export function BatchIngestForm({
               {summaryText}
             </span>
           )}
-        </button>
+        </Button>
       </div>
       <AnimatedAccordion isOpen={isOpen}>
         <div className='space-y-2 px-4 py-3'>

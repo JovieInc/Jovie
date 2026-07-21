@@ -44,7 +44,7 @@ describe('PillSearch', () => {
     const input = screen.getByLabelText('Filter tracks');
     const row = input.parentElement;
     const root = row?.parentElement;
-    const closeButton = screen.getByRole('button', { name: 'Close search' });
+    const closeButton = screen.getByRole('button', { name: 'Close Search' });
 
     expect(root?.className).toContain('h-full');
     expect(row?.className).toContain('h-full');

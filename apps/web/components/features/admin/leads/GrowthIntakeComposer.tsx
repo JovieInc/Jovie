@@ -36,6 +36,7 @@ interface ModeCallbacks {
 
 const MODE_OPTIONS = [
   { value: 'single', label: 'Single Profile' },
+  // ui-casing-allow: URLs abbreviation
   { value: 'batch', label: 'Batch URLs' },
   { value: 'queue', label: 'Queue Leads' },
 ] as const;
@@ -115,7 +116,7 @@ function SingleModeForm({
           label: option.label,
         }))}
         size='sm'
-        aria-label='Select single profile network'
+        aria-label='Select Single Profile Network'
       />
       <Input
         type='text'
@@ -144,20 +145,21 @@ function SingleModeForm({
         disabled={ingestProfileMutation.isPending}
         autoComplete='off'
         className='text-xs'
-        aria-label='Single profile input'
+        aria-label='Single Profile Input'
       />
       {network === 'spotify' && results.length > 0 ? (
         <div className='max-h-44 overflow-auto rounded-md border border-subtle bg-background-elevated p-1'>
           {results.map(artist => (
-            <button
+            <Button
               key={artist.id}
               type='button'
-              className='flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent/15'
+              variant='ghost'
+              className='flex h-auto w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent/15'
               onClick={() => setInputValue(artist.url)}
             >
               <span>{artist.name}</span>
               <span className='text-tertiary-token'>Use</span>
-            </button>
+            </Button>
           ))}
         </div>
       ) : (
@@ -222,7 +224,8 @@ function BatchModeForm({
 https://open.spotify.com/artist/...
 https://instagram.com/artist'
         className='text-xs'
-        aria-label='Batch URLs input'
+        // ui-casing-allow: URLs abbreviation
+        aria-label='Batch URLs Input'
       />
       <div className='flex items-center justify-between gap-3 text-2xs text-tertiary-token'>
         <span>
@@ -297,7 +300,8 @@ function QueueModeForm({
 https://open.spotify.com/artist/...
 https://instagram.com/artist'
         className='text-xs'
-        aria-label='Queue URLs input'
+        // ui-casing-allow: URLs abbreviation
+        aria-label='Queue URLs Input'
       />
       <div className='flex items-center justify-between gap-3 text-2xs text-tertiary-token'>
         <span>
@@ -361,7 +365,7 @@ export function GrowthIntakeComposer({
           label: option.label,
         }))}
         size='sm'
-        aria-label='Select intake mode'
+        aria-label='Select Intake Mode'
       />
 
       {banner ? (

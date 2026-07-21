@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+
 import { Search, X } from 'lucide-react';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -419,14 +421,16 @@ export function PillSearch({
           placeholder={pills.length === 0 ? placeholder : 'and…'}
           className='system-b-pill-search-input flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token'
         />
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='sm'
           onClick={onClose}
-          className='system-b-pill-search-close shrink-0'
-          aria-label='Close search'
+          className='system-b-pill-search-close h-auto shrink-0'
+          aria-label='Close Search'
         >
           Esc
-        </button>
+        </Button>
       </div>
 
       {dropdownVisible && (
@@ -439,19 +443,20 @@ export function PillSearch({
           {suggestions.map((sug, i) => {
             const optionId = `${optionIdPrefix}-${i}`;
             return (
-              <button
+              <Button
                 key={`${sug.kind}-${sug.kind === 'value' ? sug.field + sug.value : sug.field}`}
                 id={optionId}
                 role='option'
                 aria-selected={i === highlight}
                 type='button'
+                variant='ghost'
                 onMouseEnter={() => setHighlight(i)}
                 onMouseDown={e => {
                   e.preventDefault();
                   commitSuggestion(sug);
                 }}
                 className={cn(
-                  'system-b-pill-search-option flex w-full items-center gap-2 text-left',
+                  'system-b-pill-search-option flex h-auto w-full items-center justify-start gap-2 rounded-none text-left',
                   i === highlight
                     ? 'system-b-pill-search-option-highlighted text-primary-token'
                     : 'text-secondary-token'
@@ -479,7 +484,7 @@ export function PillSearch({
                 {i === highlight && (
                   <kbd className='system-b-pill-search-kbd shrink-0'>↵</kbd>
                 )}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -506,43 +511,49 @@ function PillChip({
       <span className='system-b-pill-search-chip-field'>
         {FIELD_LABEL[pill.field]}
       </span>
-      <button
+      <Button
         type='button'
+        variant='ghost'
+        size='sm'
         onClick={onToggleOp}
-        className='system-b-pill-search-chip-op'
+        className='system-b-pill-search-chip-op h-auto'
         title='Toggle is / is not'
       >
         {pill.op}
-      </button>
+      </Button>
       <span className='inline-flex min-w-0 items-center gap-0.5 pr-0.5'>
         {pill.values.map((v, i) => (
           <span key={v} className='inline-flex items-center'>
             {i > 0 && <span className='system-b-pill-search-chip-or'>or</span>}
             <span className='system-b-pill-search-chip-value inline-flex min-w-0 items-center'>
               <span className='truncate'>{v}</span>
-              <button
+              <Button
                 type='button'
+                variant='ghost'
+                size='icon'
                 onClick={() => onRemoveValue(v)}
-                className='system-b-pill-search-chip-value-remove'
+                className='system-b-pill-search-chip-value-remove h-auto w-auto'
                 aria-label={`Remove ${v}`}
               >
                 <X
                   aria-hidden='true'
                   className='system-b-pill-search-remove-icon'
                 />
-              </button>
+              </Button>
             </span>
           </span>
         ))}
       </span>
-      <button
+      <Button
         type='button'
+        variant='ghost'
+        size='icon'
         onClick={onRemove}
-        className='system-b-pill-search-chip-remove'
-        aria-label='Remove filter'
+        className='system-b-pill-search-chip-remove h-auto w-auto'
+        aria-label='Remove Filter'
       >
         <X aria-hidden='true' className='system-b-pill-search-remove-icon' />
-      </button>
+      </Button>
     </span>
   );
 }

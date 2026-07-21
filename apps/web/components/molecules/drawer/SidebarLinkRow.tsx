@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -100,45 +101,51 @@ export function SidebarLinkRow({
 
   const swipeActions = (
     <>
-      <button
+      <Button
         type='button'
+        variant='ghost'
+        size='icon'
         onClick={handleCopy}
         disabled={!hasUrl}
         className={cn(
           SWIPE_ACTION_BUTTON_CLASS,
-          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,#3182ce)]'
+          'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,#3182ce)]'
         )}
         aria-label={copied ? 'Copied!' : `Copy ${label} link`}
       >
         <span aria-hidden='true' className='inline-flex'>
           <CopyToggleIcon copied={copied} size='h-4 w-4' />
         </span>
-      </button>
-      <button
+      </Button>
+      <Button
         type='button'
+        variant='ghost'
+        size='icon'
         onClick={handleOpen}
         disabled={!hasUrl}
         className={cn(
           SWIPE_ACTION_BUTTON_CLASS,
-          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] text-primary-token'
+          'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] text-primary-token'
         )}
         aria-label={`Open ${label}`}
       >
         <ExternalLink className='h-4 w-4' aria-hidden='true' />
-      </button>
+      </Button>
       {hasRemove && (
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='icon'
           onClick={onRemove}
           disabled={isRemoving}
           className={cn(
             SWIPE_ACTION_BUTTON_CLASS,
-            'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,#c43d4b)] disabled:opacity-50'
+            'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,#c43d4b)] disabled:opacity-50'
           )}
           aria-label={`Remove ${label}`}
         >
           <Trash2 className='h-4 w-4' aria-hidden='true' />
-        </button>
+        </Button>
       )}
     </>
   );
@@ -184,10 +191,12 @@ export function SidebarLinkRow({
         <div className='max-lg:hidden shrink-0 items-center opacity-0 transition-opacity group-focus:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100 lg:flex'>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
+              <Button
                 type='button'
+                variant='ghost'
+                size='icon'
                 className={cn(
-                  'rounded-md border border-transparent p-1 text-tertiary-token',
+                  'h-auto w-auto rounded-md border border-transparent p-1 text-tertiary-token',
                   'hover:border-subtle hover:bg-surface-0 hover:text-primary-token',
                   'transition-[background-color,border-color,color,box-shadow] duration-subtle focus-visible:outline-none',
                   'focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-ring'
@@ -195,7 +204,7 @@ export function SidebarLinkRow({
                 aria-label={`Actions for ${label}`}
               >
                 <MoreHorizontal className='h-4 w-4' aria-hidden='true' />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end' sideOffset={4}>
               <DropdownMenuItem onClick={handleOpen} disabled={!hasUrl}>
