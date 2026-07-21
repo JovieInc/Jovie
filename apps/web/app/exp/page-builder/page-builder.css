@@ -1,0 +1,44 @@
+/*
+ * Page-builder studio chrome.
+ *
+ * The composed page renders the production marketing header, which is
+ * `position: fixed; top: 0` with an inline `z-index: 100`. The studio
+ * toolbar is also fixed at the top, so without an offset the header paints
+ * over the toolbar and intercepts its clicks. These rules keep the two
+ * stacked exactly like production (header directly above content, content
+ * directly below the toolbar) with zero layout shift between chrome states.
+ */
+.page-builder-root {
+  /* Matches the toolbar's h-14 utility (3.5rem). */
+  --page-builder-toolbar-height: 3.5rem;
+}
+
+/* Push the fixed marketing header below the studio toolbar. The
+   homepage-embedded ("transparent") bar is a plain fixed element, so a
+   direct top override works. */
+.page-builder-stage [data-testid="header-nav"] {
+  top: var(--page-builder-toolbar-height);
+}
+
+/* The marketing-glass ("solid") pill sets `top` from --marketing-glass-top
+   with !important (see organisms/HeaderNav.css), and its flyout menu derives
+   its position from the same variable. Overriding the variable moves both
+   below the toolbar without fighting the !important declaration. */
+.page-builder-stage .marketing-glass-header {
+  --marketing-glass-top: calc(
+    var(--page-builder-toolbar-height) +
+    clamp(0.42rem, 0.8vw, 0.62rem)
+  );
+}
+
+/* The section drawer is modal and must sit above the fixed marketing
+   header (z-index 100). */
+.page-builder-drawer {
+  z-index: 120;
+}
+
+/* On narrow viewports the toolbar scrolls horizontally instead of
+   squishing its controls below their content size. */
+.page-builder-toolbar > * {
+  flex-shrink: 0;
+}

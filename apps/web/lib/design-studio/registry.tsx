@@ -108,7 +108,7 @@ function StudioFrame({
   return (
     <div
       className={cn(
-        'min-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-background text-white dark:text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)]',
+        'min-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-background text-white dark:text-white shadow-2xl',
         className
       )}
     >
@@ -490,7 +490,20 @@ function AudioBarPreview() {
 
 function SectionPreview({ variant }: Readonly<{ variant: SectionVariant }>) {
   return (
-    <div className='max-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-(--linear-app-content-surface)'>
+    /*
+      `transform-gpu` establishes a containing block so fixed-position
+      sections (the marketing header is `position: fixed; z-index: 100`)
+      pin inside the preview card instead of escaping to the viewport and
+      painting over the studio toolbar.
+    */
+    <div
+      className={cn(
+        'max-h-[360px] transform-gpu overflow-hidden rounded-lg border border-white/10 bg-(--linear-app-content-surface)',
+        // Fixed-position headers contribute no height, so reserve room for
+        // the floating glass pill (~54px) to keep the preview card visible.
+        variant.category === 'header' && 'min-h-20'
+      )}
+    >
       {variant.render()}
     </div>
   );
