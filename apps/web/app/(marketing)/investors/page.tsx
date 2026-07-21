@@ -18,6 +18,7 @@ export default function InvestorsPage() {
           <p className='text-sm font-medium tracking-tight text-muted-token'>
             Investor overview
           </p>
+          {/* ui-casing-allow: marketing display headline */}
           <h1 className='text-4xl font-semibold tracking-tight sm:text-5xl'>
             Jovie turns creator traffic into measurable fan value
           </h1>
@@ -47,6 +48,7 @@ export default function InvestorsPage() {
 
         <section className='grid gap-4 md:grid-cols-3'>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-lg font-semibold'>Traffic choke point</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Every marketing push already ends at the profile. Jovie upgrades
@@ -54,6 +56,7 @@ export default function InvestorsPage() {
             </p>
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-lg font-semibold'>Compounding data asset</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Each click and capture event improves the next routing decision,
@@ -61,6 +64,7 @@ export default function InvestorsPage() {
             </p>
           </article>
           <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-lg font-semibold'>Revenue paths</h2>
             <p className='mt-3 text-sm leading-7 text-secondary-token'>
               Launch routes cover subscription growth, listening conversion,
@@ -69,8 +73,9 @@ export default function InvestorsPage() {
           </article>
         </section>
 
-        <section className='grid gap-8 rounded-[2rem] border border-subtle bg-panel px-6 py-8 lg:grid-cols-[0.95fr_1.05fr]'>
+        <section className='grid gap-8 rounded-4xl border border-subtle bg-panel px-6 py-8 lg:grid-cols-[0.95fr_1.05fr]'>
           <div className='space-y-4'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-2xl font-semibold tracking-tight'>Why now</h2>
             <p className='text-sm leading-7 text-secondary-token'>
               Music creation is cheap, distribution is crowded, and static
@@ -79,6 +84,7 @@ export default function InvestorsPage() {
             </p>
           </div>
           <div className='space-y-4'>
+            {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-2xl font-semibold tracking-tight'>
               Public materials
             </h2>

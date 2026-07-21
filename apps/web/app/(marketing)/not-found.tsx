@@ -13,13 +13,13 @@ export default function NotFound() {
   return (
     <MarketingContainer
       width='page'
-      className='flex min-h-[calc(100vh-8rem)] items-center justify-center'
+      className='system-b-marketing-not-found flex items-center justify-center'
     >
       <div className='w-full max-w-md mx-auto text-center px-4 py-16'>
         {/* Error code — oversized, muted */}
         <div className='mb-8 select-none'>
           <span
-            className='block text-[120px] md:text-[160px] font-semibold leading-none tracking-tighter text-primary-token/[0.42]'
+            className='system-b-marketing-not-found-code'
             aria-hidden='true'
           >
             404
@@ -28,6 +28,7 @@ export default function NotFound() {
 
         {/* Content */}
         <div className='-mt-16 relative'>
+          {/* ui-casing-allow: marketing display headline */}
           <h1 className='text-xl font-semibold text-primary-token tracking-tight mb-2'>
             Page not found
           </h1>

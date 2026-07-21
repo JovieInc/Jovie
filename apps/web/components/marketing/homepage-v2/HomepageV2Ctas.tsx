@@ -27,10 +27,7 @@ export function HomepageStoryHeader({
 
   return (
     <div
-      className={cn(
-        centered ? 'mx-auto text-center' : 'max-w-[38rem]',
-        className
-      )}
+      className={cn(centered ? 'mx-auto text-center' : 'max-w-xl', className)}
     >
       <h2
         className={cn('homepage-story-heading', headlineClassName)}

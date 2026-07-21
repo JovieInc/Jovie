@@ -19,10 +19,7 @@ export function DemoVideoPage() {
       className='mx-auto flex w-full max-w-5xl flex-col items-center px-4 py-16 sm:px-6 lg:py-24'
       data-testid='demo-video-page'
     >
-      <h1
-        className='max-w-3xl text-center text-4xl font-bold leading-tight text-white dark:text-white sm:text-5xl'
-        style={{ fontFeatureSettings: 'var(--font-features)' }}
-      >
+      <h1 className='max-w-3xl text-center text-4xl font-bold leading-tight text-primary-token sm:text-5xl'>
         Jovie Turns Artist Signals Into Execution
       </h1>
 
@@ -39,7 +36,7 @@ export function DemoVideoPage() {
       <div className='mt-10 flex flex-wrap items-center justify-center gap-4'>
         <a
           href={downloadHref}
-          className='inline-flex h-12 items-center rounded-full border border-white/20 px-8 text-sm font-semibold text-white dark:text-white transition-colors hover:bg-white/10'
+          className='inline-flex h-12 items-center rounded-full border border-subtle px-8 text-sm font-semibold text-primary-token transition-colors hover:bg-(--color-cell-hover)'
           download='jovie-demo.mp4'
         >
           Download demo
