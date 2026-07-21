@@ -15,6 +15,7 @@ on:
   # Risk-tiered CI: CodeQL runs on the merged code (post-merge on main) + nightly
   # deep scan — NOT on every PR/merge-queue batch. Running 5-language CodeQL on
   # each PR saturated the runner pool and stalled the Graphite queue (2026-06-22).
+  # Hygiene (#10463): keep pull_request off — JS matrix budget is 360 min.
   push:
     branches: ['main']
   schedule:

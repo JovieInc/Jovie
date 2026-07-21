@@ -3,6 +3,8 @@ name: SonarCloud
 # Tech-debt scan — runs NIGHTLY against main, not as a per-PR gate. SonarCloud
 # was pure noise on PRs (advisory failures on mechanical/codemod diffs). Debt it
 # surfaces is paid down by the tech-debt routine + ponytail, not by blocking PRs.
+# Hygiene (#10463): no pull_request trigger (path-filter would still burn runners
+# on large source diffs); nightly + manual only.
 on:
   schedule:
     - cron: '0 7 * * *' # 07:00 UTC nightly (~midnight PT)
