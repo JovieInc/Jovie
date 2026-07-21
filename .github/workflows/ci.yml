@@ -946,6 +946,15 @@ jobs:
             CURRENT_BASE_REF="refs/heads/$PULL_REQUEST_BASE_REF"
           elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
             BASE_SHA="${{ github.event.merge_group.base_sha }}"
+            # The merge-group base is the exact previous queue head; the queue
+            # delta is the only range this event may scan. An empty or
+            # malformed payload must fail closed here — never substitute a
+            # wider base ref (JOV-4333).
+            if [[ ! "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] \
+              || [[ "$BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+              echo "::error title=Secret scan base resolution failed::merge_group event carried no exact base_sha (previous queue head); refusing to scan a widened range."
+              exit 1
+            fi
           else
             BASE_SHA="${{ github.event.before }}"
             if [[ "$BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then

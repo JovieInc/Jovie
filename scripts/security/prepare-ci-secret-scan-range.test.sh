@@ -397,6 +397,31 @@ git -C "$SCENARIO_DIR" cat-file -e "${QUEUE_ONE_SHA}^{commit}" \
   || fail 'first merge-group side is absent'
 git -C "$SCENARIO_DIR" cat-file -e "${QUEUE_TWO_SHA}^{commit}" \
   || fail 'second merge-group side is absent'
+# The merge-group scan base must be exactly the event's base_sha (the previous
+# queue head); the prepared range may never silently widen below it (JOV-4333).
+[[ "$(git -C "$SCENARIO_DIR" rev-parse refs/secret-scan/exact-base)" == "$BASE_SHA" ]] \
+  || fail 'merge-group scan base did not resolve to the exact event base_sha'
+
+# A merge_group event without an exact base_sha (empty, malformed, or zero)
+# must fail closed with an explicit classification. Substituting any other ref
+# would silently widen the scanned range beyond the actual queue delta.
+MERGE_GROUP_FAIL_DIR="$TEST_ROOT/merge-group-fail-closed"
+git init -q "$MERGE_GROUP_FAIL_DIR"
+git -C "$MERGE_GROUP_FAIL_DIR" remote add origin "file://$ORIGIN"
+git -C "$MERGE_GROUP_FAIL_DIR" fetch -q --depth=1 origin "$QUEUE_REF"
+git -C "$MERGE_GROUP_FAIL_DIR" checkout -q --detach FETCH_HEAD
+for bad_base in '' '322d3ba' '0000000000000000000000000000000000000000'; do
+  status=0
+  (
+    cd "$MERGE_GROUP_FAIL_DIR"
+    "$RANGE_SCRIPT" "$bad_base" "$QUEUE_HEAD" "$QUEUE_REF" "$QUEUE_HEAD" ''
+  ) >"$TEST_ROOT/merge-group-fail-closed.output" 2>&1 || status=$?
+  [[ $status -ne 0 ]] \
+    || fail "merge-group event base '$bad_base' must fail closed"
+  grep -q 'base SHA must be an exact 40-character lowercase commit id' \
+    "$TEST_ROOT/merge-group-fail-closed.output" \
+    || fail "merge-group event base '$bad_base' lacks explicit classification"
+done
 
 checkout_range \
   direct-main refs/heads/main "$BASE_SHA" "$DIRECT_HEAD" refs/heads/main "$DIRECT_HEAD" ''
