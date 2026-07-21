@@ -36,10 +36,26 @@ function clampDimension(
   return Math.min(Math.max(Math.round(value), min), max);
 }
 
+function intersectsDisplay(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  display: DisplayBounds
+): boolean {
+  return (
+    x < display.x + display.width &&
+    x + width > display.x &&
+    y < display.y + display.height &&
+    y + height > display.y
+  );
+}
+
 export function sanitizeWindowState(
   raw: unknown,
   displayBounds: DisplayBounds,
-  report?: DesktopSecurityReporter
+  report?: DesktopSecurityReporter,
+  connectedDisplays?: readonly DisplayBounds[]
 ): WindowState {
   if (raw === null || typeof raw !== 'object') {
     return { ...DEFAULT_WINDOW_STATE };
@@ -62,24 +78,46 @@ export function sanitizeWindowState(
     DEFAULT_WINDOW_STATE.height
   );
 
+  const savedX = isFiniteNumber(record.x) ? record.x : undefined;
+  const savedY = isFiniteNumber(record.y) ? record.y : undefined;
+  // A window parked on a secondary display keeps its saved position verbatim —
+  // clamping against only the primary work area would teleport it back on
+  // relaunch. Only when the saved bounds intersect NO connected display (e.g.
+  // a disconnected monitor) do we fall back to clamping into the primary.
+  const keepSavedPosition =
+    savedX !== undefined &&
+    savedY !== undefined &&
+    connectedDisplays !== undefined &&
+    connectedDisplays.some(display =>
+      intersectsDisplay(savedX, savedY, width, height, display)
+    );
+
   let x: number | undefined;
   let y: number | undefined;
   let clamped = false;
 
-  if (isFiniteNumber(record.x)) {
-    const minX = displayBounds.x;
-    const maxX = displayBounds.x + displayBounds.width - width;
-    const nextX = Math.min(Math.max(Math.round(record.x), minX), maxX);
-    x = nextX;
-    clamped ||= nextX !== record.x;
+  if (savedX !== undefined) {
+    if (keepSavedPosition) {
+      x = Math.round(savedX);
+    } else {
+      const minX = displayBounds.x;
+      const maxX = displayBounds.x + displayBounds.width - width;
+      const nextX = Math.min(Math.max(Math.round(savedX), minX), maxX);
+      x = nextX;
+      clamped ||= nextX !== savedX;
+    }
   }
 
-  if (isFiniteNumber(record.y)) {
-    const minY = displayBounds.y;
-    const maxY = displayBounds.y + displayBounds.height - height;
-    const nextY = Math.min(Math.max(Math.round(record.y), minY), maxY);
-    y = nextY;
-    clamped ||= nextY !== record.y;
+  if (savedY !== undefined) {
+    if (keepSavedPosition) {
+      y = Math.round(savedY);
+    } else {
+      const minY = displayBounds.y;
+      const maxY = displayBounds.y + displayBounds.height - height;
+      const nextY = Math.min(Math.max(Math.round(savedY), minY), maxY);
+      y = nextY;
+      clamped ||= nextY !== savedY;
+    }
   }
 
   if (isFiniteNumber(record.width)) {

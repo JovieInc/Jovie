@@ -3,7 +3,7 @@
  * Audit installed Jovie desktop shells under /Applications (macOS).
  *
  * Flags legacy bundle IDs, multiple concurrent processes, and CDP exposure.
- * See apps/desktop/BUILDS.md for the canonical build matrix.
+ * See apps/desktop/SIGNING.md for the canonical build matrix.
  */
 
 import { execFileSync } from 'node:child_process';

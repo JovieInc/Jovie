@@ -54,12 +54,8 @@ win:
 linux:
   target: AppImage
   icon: assets/icon-staging.png
-publish:
-  provider: github
-  owner: JovieInc
-  repo: Jovie
-  # Staging builds publish as prereleases on a separate `staging` channel so
-  # that production auto-updater (which reads latest.yml) never picks up a
-  # staging build. electron-updater will read staging.yml instead.
-  releaseType: prerelease
-  channel: staging
+# Staging builds are distributed as CI artifacts only and do NOT auto-update:
+# CI packages with --publish never, the version has no prerelease component
+# for a provider to match a `staging` channel against, and
+# autoUpdater.allowPrerelease is never set. Keep publish disabled.
+publish: null

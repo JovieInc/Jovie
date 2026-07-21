@@ -11,11 +11,18 @@ const result = spawnSync(
   {
     cwd: repoRoot,
     stdio: 'inherit',
+    // Windows can only resolve pnpm.cmd through the shell.
+    shell: process.platform === 'win32',
   }
 );
 
 if (result.error) {
   throw result.error;
+}
+
+if (result.signal) {
+  // Re-raise so the parent observes the same signal termination.
+  process.kill(process.pid, result.signal);
 }
 
 process.exit(result.status ?? 1);

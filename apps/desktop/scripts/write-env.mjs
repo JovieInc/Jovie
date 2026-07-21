@@ -27,11 +27,20 @@ function resolveAppUrl(env) {
 
   if (env === 'local') {
     const localUrl = process.env.ELECTRON_APP_URL || 'http://localhost:3112';
-    const parsed = new URL(localUrl);
+    let parsed;
+    try {
+      parsed = new URL(localUrl);
+    } catch {
+      throw new Error(
+        'ELECTRON_APP_URL for ELECTRON_ENV=local must be an http loopback URL.'
+      );
+    }
+    // WHATWG URL keeps the brackets on IPv6 hostnames ('[::1]').
+    const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
     const isLoopback =
-      parsed.hostname === 'localhost' ||
-      parsed.hostname === '127.0.0.1' ||
-      parsed.hostname === '::1';
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1';
 
     if (parsed.protocol !== 'http:' || !isLoopback) {
       throw new Error(
