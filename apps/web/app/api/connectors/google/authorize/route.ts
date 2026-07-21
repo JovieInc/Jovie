@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { signGoogleOAuthState } from '@/lib/connectors/google-calendar/oauth-state';
+import { getOAuthScopesForBundle } from '@/lib/connectors/registry';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { env } from '@/lib/env-server';
@@ -66,12 +67,8 @@ export async function GET(request: Request) {
       access_type: 'offline',
       prompt: 'consent',
       state,
-      scope: [
-        'https://www.googleapis.com/auth/calendar.events.readonly',
-        'https://www.googleapis.com/auth/calendar.events',
-        'https://www.googleapis.com/auth/gmail.readonly',
-        'https://www.googleapis.com/auth/userinfo.email',
-      ].join(' '),
+      // Scopes come from CONNECTOR_REGISTRY entries for the Google bundle.
+      scope: getOAuthScopesForBundle('google').join(' '),
     });
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;

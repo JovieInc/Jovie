@@ -726,12 +726,20 @@ export const connectorProviderEnum = pgEnum('connector_provider', [
   'gmail',
 ]);
 
+/** TS union derived from the Postgres `connector_provider` enum (single source of truth). */
+export type ConnectorProviderId =
+  (typeof connectorProviderEnum.enumValues)[number];
+
 export const connectorStatusEnum = pgEnum('connector_status', [
   'connected',
   'needs_reauth',
   'error',
   'disabled',
 ]);
+
+/** TS union derived from the Postgres `connector_status` enum. */
+export type ConnectorDbStatus =
+  (typeof connectorStatusEnum.enumValues)[number];
 
 export const webhookProviderEnum = pgEnum('webhook_provider', [
   'spotify',
