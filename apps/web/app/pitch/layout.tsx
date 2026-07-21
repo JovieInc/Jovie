@@ -8,7 +8,7 @@ export default function PitchLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='dark linear-marketing min-h-svh bg-black dark:bg-black text-primary-token'>
+    <div className='system-b-marketing dark min-h-svh bg-base text-primary-token'>
       {children}
     </div>
   );

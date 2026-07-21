@@ -30,9 +30,6 @@ const SKIP: RegExp[] = [
   /\/node_modules\//,
   /\/\.next\//,
   /\/\.turbo\//,
-  // Self-contained pitch reference stylesheet: defines its own --font-dm-sans and
-  // imports the Google webfont. Tracked for cleanup in the System A teardown phase.
-  /\/public\/pitch\//,
   // Server-side OG-image Satori rendering is a build-time asset, not live page type.
   /opengraph-image\.tsx$/,
   /\/lib\/share\/image-utils\.ts$/,
@@ -130,13 +127,11 @@ describe('singular System B — design-system unification ratchet', () => {
   it('.linear-marketing wrapper is shrink-only (System A is being retired)', () => {
     // Baseline 2026-06-18. This set may only SHRINK. Removing the wrapper from a
     // surface (reskinning it onto System B tokens) must also remove it here.
-    const APPLIERS_ALLOWLIST = new Set<string>([
-      'app/(dynamic)/playlists/layout.tsx',
-      'app/brand/layout.tsx',
-      'app/not-found.tsx',
-      'app/pitch/layout.tsx',
-      'components/features/home/MarketingScrollUnlock.tsx',
-    ]);
+    // 2026-07-21: last holdouts (playlists, brand, not-found, pitch,
+    // MarketingScrollUnlock) reskinned onto System B — the wrapper has no live
+    // appliers left. Keep this set EMPTY; the `.linear-marketing` CSS teardown
+    // in design-system.css is the final System A retirement step (later wave).
+    const APPLIERS_ALLOWLIST = new Set<string>([]);
 
     const files = [
       ...walk(resolve(WEB_ROOT, 'app'), ['.tsx', '.ts']),

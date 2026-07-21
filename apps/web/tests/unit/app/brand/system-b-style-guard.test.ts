@@ -54,6 +54,15 @@ function extractBrandCss(source: string): string {
 }
 
 describe('brand page System B source contract', () => {
+  it('renders /brand on the System B marketing wrapper, not System A', () => {
+    const layout = readFileSync(
+      resolve(process.cwd(), layoutSourcePath),
+      'utf8'
+    );
+    expect(layout).toContain('system-b-marketing dark');
+    expect(layout).not.toContain('linear-marketing');
+  });
+
   it('keeps brand route visuals on named System B primitives', () => {
     const sources = [
       [

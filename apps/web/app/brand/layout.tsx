@@ -11,7 +11,7 @@ export default function BrandLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='linear-marketing dark system-b-brand-layout'>
+    <div className='system-b-marketing dark system-b-brand-layout'>
       <SkipToContent />
       <MarketingHeader
         logoSize='sm'
