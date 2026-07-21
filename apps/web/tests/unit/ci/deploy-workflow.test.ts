@@ -1212,6 +1212,8 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'NEXT_PUBLIC_BETTER_AUTH_URL',
       'BETTER_AUTH_SECRET',
       'BETTER_AUTH_URL',
+      'AUTH_GOOGLE_CLIENT_ID',
+      'AUTH_GOOGLE_CLIENT_SECRET',
       'DATABASE_URL',
       'SESSION_SECRET',
       'AI_GATEWAY_API_KEY',
@@ -1226,6 +1228,30 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       expect(deployStep).toContain(key);
       expect(deployStep).toContain(`--env ${key}`);
       expect(deployStep).not.toContain(`--env ${key}=`);
+    }
+
+    const deployAllowlist = deployStep
+      .split('\n')
+      .find(line => line.includes('--only-secrets='));
+    for (const key of [
+      'AUTH_GOOGLE_CLIENT_ID',
+      'AUTH_GOOGLE_CLIENT_SECRET',
+    ]) {
+      expect(deployAllowlist).toContain(key);
+    }
+
+    const buildStep = getStepBlock(
+      workflow,
+      'Build (preview target for staging verification)'
+    );
+    for (const key of [
+      'AUTH_GOOGLE_CLIENT_ID',
+      'AUTH_GOOGLE_CLIENT_SECRET',
+    ]) {
+      const buildAllowlist = buildStep
+        .split('\n')
+        .find(line => line.includes('--only-secrets='));
+      expect(buildAllowlist).toContain(key);
     }
   });
 
