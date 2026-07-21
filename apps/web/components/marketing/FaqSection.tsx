@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import { ClientFaqAccordion } from './ClientFaqAccordion';
 
 interface FaqItem {
@@ -24,10 +25,16 @@ export function FaqSection({
 }: FaqSectionProps) {
   return (
     <section
-      className={className ?? 'mx-auto max-w-190 px-6 pb-24 sm:px-8 lg:px-10'}
+      className={cn(
+        'faq-section',
+        className ?? 'mx-auto max-w-190 px-6 pb-24 sm:px-8 lg:px-10'
+      )}
     >
       <h2
-        className={headingClassName ?? 'marketing-h2-linear text-primary-token'}
+        className={cn(
+          'faq-section__heading',
+          headingClassName ?? 'marketing-h2-linear text-primary-token'
+        )}
       >
         {heading}
       </h2>

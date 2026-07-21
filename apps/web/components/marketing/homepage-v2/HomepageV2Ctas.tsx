@@ -54,18 +54,24 @@ export function HomepageV2Pricing() {
   return (
     <section
       data-testid='homepage-v2-pricing'
-      className='homepage-story-section'
+      className='homepage-story-section system-b-mounted-home-pricing'
     >
-      <MarketingContainer width='page'>
-        <div className='homepage-pricing-shell'>
+      <MarketingContainer
+        width='page'
+        className='system-b-mounted-home-pricing-container'
+      >
+        <div className='homepage-pricing-shell system-b-mounted-home-pricing-shell'>
           <HomepageStoryHeader
             align='center'
             body='Artist profiles are free forever. Pro adds the release tools when you need them.'
             headline={HOMEPAGE_V2_COPY.pricing.headline}
-            className='homepage-pricing-copy'
+            className='homepage-pricing-copy system-b-mounted-home-pricing-copy'
           />
 
-          <MarketingPricingPlans mode='compact' />
+          <MarketingPricingPlans
+            mode='compact'
+            className='system-b-mounted-home-pricing-plans'
+          />
         </div>
       </MarketingContainer>
     </section>

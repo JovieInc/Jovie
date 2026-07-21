@@ -17,7 +17,7 @@ describe('HomepageClosedLoop', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Every Release Makes The Next Move Clearer.',
+        name: 'Every release makes the next move clearer.',
       })
     ).toBeInTheDocument();
     expect(screen.getByRole('list')).toHaveAttribute(

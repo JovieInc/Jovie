@@ -64,6 +64,31 @@
   --ds-public-content-max: 1298px; /* canonical public/marketing width */
   --ds-prose-max: 680px; /* prose exception */
 
+  /* Marketing display type scale (System B public surfaces). One canonical
+     ramp for hero display, section titles, and ledes so marketing pages share
+     a single visual hierarchy instead of per-section one-off clamps. Satoshi
+     display + Inter body per the approved exception in DESIGN.md. */
+  --ds-marketing-display-size: clamp(4rem, 6.9vw, 6.25rem);
+  --ds-marketing-display-leading: 0.94;
+  --ds-marketing-display-tracking: -0.045em;
+  --ds-marketing-title-size: clamp(
+    var(--text-4xl),
+    4.6vw,
+    calc(var(--text-5xl) + var(--space-4))
+  );
+  --ds-marketing-title-leading: 1.08;
+  --ds-marketing-title-tracking: 0;
+  --ds-marketing-lede-size: clamp(1.25rem, 1.6vw, 1.375rem);
+  --ds-marketing-lede-leading: var(--leading-normal);
+  --ds-marketing-lede-tracking: -0.015em;
+  /* Eyebrow / kicker spec: quiet uppercase-free label above section titles.
+     0 tracking per the System B contract (see trust-strip style guard). */
+  --ds-marketing-eyebrow-size: calc(var(--text-xs) - 1px);
+  --ds-marketing-eyebrow-weight: var(--font-weight-medium);
+  --ds-marketing-eyebrow-leading: var(--leading-tight);
+  --ds-marketing-eyebrow-tracking: 0;
+  --ds-marketing-eyebrow-color: var(--color-text-tertiary-token);
+
   /* Shell V1 semantic aliases — app chrome should prefer these names when
      touching shared shell geometry. They intentionally resolve to the current
      Linear-derived values so this pass changes the token contract, not visuals. */
@@ -3104,68 +3129,173 @@ body:has(.system-b-download-page) .marketing-glass-header__cta:focus-visible {
    SYSTEM B START LOADING PRIMITIVES
    ============================================ */
 
+/* Host matching the SidebarProvider wrapper the resolved /start page renders
+   around AppShellFrame (flex h-svh w-full overflow-x-hidden bg-base). */
 :where(.system-b-start-loading-page) {
+  display: flex;
+  width: 100%;
+  height: 100svh;
+  overflow-x: hidden;
+  background: var(--system-b-bg-page);
+  color: var(--system-b-text-primary);
+  color-scheme: dark;
+}
+
+/* OnboardingShell main wrapper + chat section: fills the shell content panel. */
+:where(.system-b-start-loading-main) {
   position: relative;
   display: flex;
-  height: 100%;
   min-height: 0;
   flex: 1 1 auto;
   flex-direction: column;
   overflow: hidden;
   background: var(--system-b-app-content-surface);
-  color: var(--system-b-text-primary);
-  color-scheme: dark;
 }
 
+/* Chat scroll area (px-4 py-5 sm:px-6 lg:px-8 on the resolved page). */
 :where(.system-b-start-loading-scroll) {
+  position: relative;
   flex: 1 1 auto;
   overflow-y: auto;
-  padding-block: clamp(var(--space-5), 4svh, var(--space-8));
-  padding-inline: clamp(var(--space-4), 4vw, var(--space-8));
+  padding-block: var(--space-5);
+  padding-inline: var(--space-4);
 }
 
-:where(.system-b-start-loading-content) {
+@media (min-width: 640px) {
+  :where(.system-b-start-loading-scroll) {
+    padding-inline: var(--space-6);
+  }
+}
+
+@media (min-width: 1024px) {
+  :where(.system-b-start-loading-scroll) {
+    padding-inline: var(--space-8);
+  }
+}
+
+/* Centering column (max-w-[52rem] justify-center on the resolved page). */
+:where(.system-b-start-loading-column) {
   display: flex;
   width: 100%;
   min-height: 100%;
-  max-width: var(--app-shell-content-max-reading);
+  max-width: 52rem;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
-  gap: var(--space-6);
   margin-inline: auto;
 }
 
-:where(.system-b-start-loading-mark) {
+/* ChatEmptyStateComposerRegion: content shell + centered flex region. */
+:where(.system-b-start-loading-region) {
+  position: relative;
   display: flex;
-  width: var(--space-8);
-  height: var(--space-8);
-  flex-shrink: 0;
+  width: 100%;
+  max-width: var(--system-b-chat-composer-max-width);
+  min-height: 100%;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  opacity: 0.92;
+  margin-inline: auto;
+  padding-block: var(--space-8);
+  padding-inline: var(--space-1);
+}
+
+/* Empty-state intro, anchored to the region midline exactly like the resolved
+   `above` slot (absolute inset-x-0 bottom-1/2 mb-12, max-w-[44rem]). */
+:where(.system-b-start-loading-intro) {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 50%;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  max-width: 44rem;
+  max-height: min(46svh, calc(var(--space-24) * 4));
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-inline: auto;
+  margin-bottom: var(--space-12);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline: var(--space-1);
+  padding-bottom: var(--space-1);
+}
+
+:where(.system-b-start-loading-intro-message) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+:where(.system-b-start-loading-intro-line) {
+  width: 72%;
+  height: var(--space-4);
+}
+
+:where(.system-b-start-loading-intro-line:last-child) {
+  width: 46%;
+}
+
+:where(.system-b-start-loading-intro-pills) {
+  display: flex;
+  gap: var(--space-2);
+  overflow: hidden;
+}
+
+:where(.system-b-start-loading-intro-pill) {
+  height: var(--space-8);
+  flex-shrink: 0;
+  border-radius: var(--system-b-radius-pill);
+}
+
+:where(.system-b-start-loading-intro-pill:nth-child(1)) {
+  width: calc(var(--space-24) + var(--space-20));
+}
+
+:where(.system-b-start-loading-intro-pill:nth-child(2)) {
+  width: calc(var(--space-24) + var(--space-10));
+}
+
+:where(.system-b-start-loading-intro-pill:nth-child(3)) {
+  width: calc(var(--space-24) + var(--space-16));
+}
+
+:where(.system-b-start-loading-intro-pill:nth-child(4)) {
+  width: calc(var(--space-24) + var(--space-20));
+}
+
+:where(.system-b-start-loading-intro-footer) {
+  width: calc(var(--space-24) + var(--space-24));
+  height: var(--space-3);
+  margin-inline: auto;
+}
+
+:where(.system-b-start-loading-composer-anchor) {
+  position: relative;
+  z-index: 1;
+  width: 100%;
 }
 
 :where(.system-b-start-loading-composer-wrap) {
   width: 100%;
-  max-width: var(--app-shell-content-max-form);
+  max-width: var(--system-b-chat-composer-max-width);
+  margin-inline: auto;
 }
 
+/* Resolved composer surface: 1px seam border, 3xl radius, content-surface
+   fill, shared chat loading composer height token (matches ChatInput empty
+   geometry within a couple px). */
 :where(.system-b-start-loading-composer) {
+  height: var(--system-b-chat-loading-composer-height);
   overflow: hidden;
   border: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 84%, transparent);
-  border-radius: var(--system-b-radius-pill);
-  background: color-mix(
-    in oklab,
-    var(--system-b-app-content-surface) 88%,
-    var(--system-b-bg-page) 12%
-  );
+  border-radius: var(--radius-3xl);
+  background: var(--system-b-app-content-surface);
 }
 
 :where(.system-b-start-loading-composer-row) {
   display: flex;
-  min-height: calc(var(--space-10) + var(--space-4));
+  height: 100%;
   align-items: center;
   gap: var(--space-2);
   padding-block: var(--space-2);

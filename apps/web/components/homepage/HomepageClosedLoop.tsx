@@ -38,54 +38,50 @@ export function HomepageClosedLoop({
   return (
     <section
       aria-labelledby='homepage-closed-loop-heading'
-      className={cn(
-        'homepage-closed-loop-section w-full border-t border-subtle py-20 text-primary-token md:py-28',
-        className
-      )}
+      className={cn('homepage-closed-loop-section', className)}
       data-testid='homepage-closed-loop'
     >
-      <div className='homepage-closed-loop-inner mx-auto grid w-full max-w-6xl gap-14 px-6 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] md:items-center md:gap-20 lg:px-10'>
-        <div className='homepage-closed-loop-copy max-w-xl'>
-          <p className='mb-4 text-sm font-medium text-secondary-token'>
-            The Jovie loop
-          </p>
+      <div className='homepage-closed-loop-inner'>
+        <div className='homepage-closed-loop-copy'>
+          <p>The Jovie loop</p>
           <h2
-            className='max-w-lg text-3xl font-semibold tracking-tight text-primary-token text-balance md:text-5xl'
+            className='homepage-closed-loop-headline'
             id='homepage-closed-loop-heading'
           >
-            Every Release Makes The Next Move Clearer.
+            {/* ui-casing-allow: marketing display headline (DESIGN.md Text Casing exception) */}
+            Every release makes the next move clearer.
           </h2>
-          <p className='mt-5 max-w-md text-base leading-7 text-secondary-token md:text-lg'>
+          <p>
             Jovie keeps the signal moving from the work you release to the
             action worth taking next.
           </p>
         </div>
 
-        <div className='homepage-closed-loop-story grid gap-10 md:grid-cols-[minmax(180px,0.7fr)_minmax(0,1fr)] md:items-center md:gap-12'>
+        <div className='homepage-closed-loop-story'>
           <ClosedLoopVisual />
 
           <ol
             aria-label='The Jovie Closed Loop'
-            className='homepage-closed-loop-sequence m-0 grid list-none gap-0 p-0'
+            className='homepage-closed-loop-sequence'
             data-testid='homepage-closed-loop-sequence'
           >
             {CLOSED_LOOP_STEPS.map((step, index) => (
               <li
-                className='homepage-closed-loop-step relative grid grid-cols-[2rem_minmax(0,1fr)] gap-4 pb-7 last:pb-0'
+                className='homepage-closed-loop-step'
                 data-testid='homepage-closed-loop-step'
                 key={step.id}
               >
                 <span
                   aria-hidden='true'
-                  className='homepage-closed-loop-step-marker relative z-10 mt-0.5 grid size-8 place-items-center rounded-full border border-subtle bg-surface-0 text-xs font-medium text-primary-token'
+                  className='homepage-closed-loop-step-marker'
                 >
                   {index + 1}
                 </span>
-                <span className='homepage-closed-loop-step-copy block border-b border-subtle pb-7 last:border-0'>
-                  <span className='block text-base font-medium text-primary-token'>
+                <span className='homepage-closed-loop-step-copy'>
+                  <span className='homepage-closed-loop-step-title'>
                     {step.title}
                   </span>
-                  <span className='mt-1 block text-sm leading-6 text-secondary-token'>
+                  <span className='homepage-closed-loop-step-description'>
                     {step.description}
                   </span>
                 </span>
@@ -102,18 +98,18 @@ function ClosedLoopVisual() {
   return (
     <figure
       aria-hidden='true'
-      className='homepage-closed-loop-visual relative mx-auto aspect-square w-full max-w-64 text-secondary-token'
+      className='homepage-closed-loop-visual'
       data-testid='homepage-closed-loop-visual'
     >
       <svg
-        className='absolute inset-0 size-full'
+        className='homepage-closed-loop-visual-svg'
         fill='none'
         viewBox='0 0 240 240'
         xmlns='http://www.w3.org/2000/svg'
       >
         <title>Five-stage closed loop</title>
         <circle
-          className='text-primary-token'
+          className='homepage-closed-loop-visual-ring'
           cx='120'
           cy='120'
           r='76'
@@ -122,28 +118,35 @@ function ClosedLoopVisual() {
           strokeWidth='1'
         />
         <path
-          className='text-primary-token'
+          className='homepage-closed-loop-visual-arc'
           d='M120 44a76 76 0 0 1 72 52'
           markerEnd='url(#homepage-closed-loop-arrow)'
           stroke='currentColor'
           strokeWidth='1.5'
         />
         <path
-          className='text-secondary-token'
+          className='homepage-closed-loop-visual-arc homepage-closed-loop-visual-arc--muted'
           d='M192 148a76 76 0 0 1-72 48 76 76 0 0 1-72-52'
           markerEnd='url(#homepage-closed-loop-arrow)'
           stroke='currentColor'
           strokeWidth='1.5'
         />
         <path
-          className='text-primary-token'
+          className='homepage-closed-loop-visual-arc'
           d='M48 92a76 76 0 0 1 72-48'
           markerEnd='url(#homepage-closed-loop-arrow)'
           stroke='currentColor'
           strokeWidth='1.5'
         />
+        <g className='homepage-closed-loop-visual-nodes' fill='currentColor'>
+          <circle cx='120' cy='44' r='3' />
+          <circle cx='192.3' cy='96.5' r='3' />
+          <circle cx='164.7' cy='181.5' r='3' />
+          <circle cx='75.3' cy='181.5' r='3' />
+          <circle cx='47.7' cy='96.5' r='3' />
+        </g>
         <circle
-          className='fill-surface-0 text-primary-token'
+          className='homepage-closed-loop-visual-hub'
           cx='120'
           cy='120'
           fill='currentColor'
@@ -152,7 +155,7 @@ function ClosedLoopVisual() {
           strokeWidth='1'
         />
         <path
-          className='text-secondary-token'
+          className='homepage-closed-loop-visual-plus'
           d='M111 120h18M120 111v18'
           stroke='currentColor'
           strokeLinecap='round'
@@ -172,7 +175,7 @@ function ClosedLoopVisual() {
           </marker>
         </defs>
       </svg>
-      <span className='absolute inset-x-0 bottom-4 text-center text-xs font-medium text-secondary-token'>
+      <span className='homepage-closed-loop-visual-caption'>
         Signal, in motion
       </span>
     </figure>

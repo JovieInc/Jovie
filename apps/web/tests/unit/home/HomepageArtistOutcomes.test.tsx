@@ -45,7 +45,7 @@ describe('HomepageArtistOutcomes', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Every Fan Has A Next Move.',
+        name: 'Every fan has a next move.',
       })
     ).toBeInTheDocument();
     expect(

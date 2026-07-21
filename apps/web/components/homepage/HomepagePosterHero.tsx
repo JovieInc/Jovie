@@ -1,6 +1,7 @@
 import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import type { ElementType, ReactNode } from 'react';
+import { HomepageCtaPendingLabel } from './HomepageCtaPendingLabel';
 
 export interface HomepagePosterHeroCta {
   readonly label: ReactNode;
@@ -59,7 +60,9 @@ export function HomepagePosterHero({
               data-testid='homepage-primary-cta'
               data-cta-sign-up={primaryCta.signUp ? 'true' : undefined}
             >
-              {primaryCta.label}
+              <HomepageCtaPendingLabel>
+                {primaryCta.label}
+              </HomepageCtaPendingLabel>
             </LinkComponent>
           </Button>
         </div>

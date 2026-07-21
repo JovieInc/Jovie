@@ -42,7 +42,8 @@ export function HomepageArtistOutcomes({
       <div className='homepage-artist-outcomes__inner'>
         <div className='homepage-artist-outcomes__copy'>
           <h2 id='homepage-artist-outcomes-heading'>
-            Every Fan Has A Next Move.
+            {/* ui-casing-allow: marketing display headline (DESIGN.md Text Casing exception) */}
+            Every fan has a next move.
           </h2>
           <p>Drive streams. Capture fans. Get paid.</p>
         </div>

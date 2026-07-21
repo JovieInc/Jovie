@@ -32,12 +32,20 @@ import { SYSTEM_B_RADIUS_PX } from '@/lib/design/system-b-radius';
 import { cn } from '@/lib/utils';
 
 // ─── Design constants (match in-app composer exactly) ─────────────────────
+// System B flat surfaces only: no gradient sheen, no box-shadow. Alpha comes
+// from color-mix against tokens so the demo tracks the active theme.
 
-const SURFACE_BG =
-  'linear-gradient(180deg, rgba(255,255,255,0.018) 0%, transparent 40%), var(--color-bg-surface-2)';
+const SURFACE_BG = 'var(--system-b-bg-surface-2)';
 
-const SEND_BTN_BG =
-  'linear-gradient(180deg, var(--color-bg-primary) 0%, var(--color-bg-base) 100%)';
+const SURFACE_BORDER =
+  'color-mix(in oklab, var(--system-b-app-frame-seam) 84%, transparent)';
+
+const SEAM_BORDER =
+  'color-mix(in oklab, var(--system-b-app-frame-seam) 78%, transparent)';
+
+const SEND_BTN_BG = 'var(--color-btn-primary-bg)';
+
+const SEND_BTN_FG = 'var(--color-btn-primary-fg)';
 
 // ─── State machine ────────────────────────────────────────────────────────
 
@@ -98,13 +106,13 @@ function SendButton() {
   return (
     <span
       aria-hidden='true'
-      className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_0.5px_rgba(0,0,0,0.14),0_1px_3px_rgba(0,0,0,0.18)]'
-      style={{ background: SEND_BTN_BG }}
+      className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full shadow-none'
+      style={{ background: SEND_BTN_BG, color: SEND_BTN_FG }}
     >
       <Send
         size={13}
         strokeWidth={1.8}
-        className='text-(--color-bg-surface-2) translate-x-[0.5px]'
+        className='translate-x-[0.5px]'
         aria-hidden='true'
       />
     </span>
@@ -124,10 +132,12 @@ function InputRow({
     <div className='flex items-end gap-2 px-4 py-3'>
       <div className='flex min-h-7 flex-1 items-end'>
         <span
-          className='min-h-7 w-full text-sm leading-[1.5] text-white/90 font-[Inter,system-ui,sans-serif] whitespace-pre-wrap break-words'
+          className='min-h-7 w-full text-sm leading-[1.5] text-primary-token/90 font-[Inter,system-ui,sans-serif] whitespace-pre-wrap break-words'
           aria-hidden='true'
         >
-          {value || <span className='text-white/28'>{placeholder}</span>}
+          {value || (
+            <span className='text-primary-token/28'>{placeholder}</span>
+          )}
         </span>
       </div>
       {value ? <SendButton /> : null}
@@ -142,16 +152,18 @@ interface EntityPillProps {
 function EntityPill({ label }: EntityPillProps) {
   return (
     <span
-      className='inline-flex items-center gap-1 rounded px-2 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
+      className='inline-flex items-center gap-1 rounded px-2 py-0.5 shadow-none'
       style={{
-        background: 'rgba(255,255,255,0.055)',
+        background:
+          'color-mix(in oklab, var(--color-text-primary-token) 5.5%, transparent)',
         fontFamily:
           'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
         fontSize: 11,
         fontWeight: 600,
         letterSpacing: '0.04em',
         textTransform: 'uppercase',
-        color: 'rgba(255,255,255,0.6)',
+        color:
+          'color-mix(in oklab, var(--color-text-primary-token) 60%, transparent)',
       }}
     >
       <Music2 size={11} strokeWidth={1.4} aria-hidden='true' />
@@ -168,15 +180,18 @@ const TABS = ['Releases', 'Tour', 'Artists'] as const;
 
 function TabBar({ activeTab }: TabBarProps) {
   return (
-    <div className='flex items-center gap-0 border-b border-white/[0.055] px-3'>
+    <div
+      className='flex items-center gap-0 border-b px-3'
+      style={{ borderColor: SEAM_BORDER }}
+    >
       {TABS.map(tab => (
         <span
           key={tab}
           className={cn(
             'px-2 py-2 text-xs cursor-default select-none',
             tab === activeTab
-              ? 'border-b border-white/60 text-white/90 font-[500] -mb-px'
-              : 'text-white/38'
+              ? 'border-b border-primary-token/60 text-primary-token/90 font-[500] -mb-px'
+              : 'text-primary-token/38'
           )}
           style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
         >
@@ -200,7 +215,7 @@ function ReleaseRow({ label, type, year, artBg, isActive }: ReleaseRowProps) {
     <div
       className={cn(
         'flex items-center gap-3 px-3 py-2 cursor-default',
-        isActive ? 'bg-white/[0.07]' : 'hover:bg-white/[0.035]'
+        isActive ? 'bg-primary-token/[0.07]' : 'hover:bg-primary-token/[0.035]'
       )}
     >
       <div
@@ -210,13 +225,13 @@ function ReleaseRow({ label, type, year, artBg, isActive }: ReleaseRowProps) {
       />
       <div className='min-w-0 flex-1'>
         <p
-          className='truncate text-app text-white/90 leading-tight'
+          className='truncate text-app text-primary-token/90 leading-tight'
           style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
         >
           {label}
         </p>
         <p
-          className='text-2xs text-white/38 leading-tight mt-0.5'
+          className='text-2xs text-primary-token/38 leading-tight mt-0.5'
           style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
         >
           {type} · {year}
@@ -233,19 +248,19 @@ interface StatStripProps {
 function StatStrip({ stats }: StatStripProps) {
   return (
     <p
-      className='text-2xs leading-relaxed text-white/40'
+      className='text-2xs leading-relaxed text-primary-token/40'
       style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
     >
       {stats.map((stat, i) => (
         <span key={stat.key}>
           {i > 0 && (
             <span
-              className='mx-1.5 inline-block h-1 w-1 rounded-full bg-white/20 align-middle'
+              className='mx-1.5 inline-block h-1 w-1 rounded-full bg-primary-token/20 align-middle'
               aria-hidden='true'
             />
           )}
           {stat.solid ? (
-            <span className='rounded px-1.5 py-0.5 text-3xs font-[500] bg-white/10 text-white/70'>
+            <span className='rounded px-1.5 py-0.5 text-3xs font-[500] bg-primary-token/10 text-primary-token/70'>
               {stat.label}
             </span>
           ) : (
@@ -269,13 +284,13 @@ function PreviewPane({ artBg, eyebrow, title, stats }: PreviewPaneProps) {
     <div className='flex flex-1 flex-col justify-center gap-3 px-5 py-5'>
       <div className='flex items-start gap-4'>
         <div
-          className='h-18 w-18 shrink-0 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.4)]'
+          className='h-18 w-18 shrink-0 rounded-lg shadow-none'
           style={{ background: artBg }}
           aria-hidden='true'
         />
         <div className='flex min-w-0 flex-col justify-center gap-1 pt-1'>
           <p
-            className='text-3xs uppercase tracking-[0.08em] text-white/40'
+            className='text-3xs uppercase tracking-[0.08em] text-primary-token/40'
             style={{
               fontFamily:
                 'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
@@ -285,7 +300,7 @@ function PreviewPane({ artBg, eyebrow, title, stats }: PreviewPaneProps) {
             {eyebrow}
           </p>
           <p
-            className='text-mid font-[500] text-white/90 leading-snug'
+            className='text-mid font-[500] text-primary-token/90 leading-snug'
             style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
           >
             {title}
@@ -471,7 +486,11 @@ export function HomeComposerHero() {
             : 'Pause Jovie composer demo'
         }
         aria-pressed={state.isPaused}
-        className='pointer-events-none absolute left-4 top-4 z-[2] flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/70 text-white/70 opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.25)] transition-opacity focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/35'
+        className='pointer-events-none absolute left-4 top-4 z-[2] flex h-8 w-8 items-center justify-center rounded-full border border-primary-token/10 text-primary-token/70 opacity-0 shadow-none transition-opacity focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-token/35'
+        style={{
+          background:
+            'color-mix(in oklab, var(--system-b-cinematic-black) 70%, transparent)',
+        }}
       >
         {state.isPaused ? (
           <Play size={14} strokeWidth={1.8} aria-hidden='true' />
@@ -491,7 +510,8 @@ export function HomeComposerHero() {
               'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
             fontWeight: 600,
             fontSize: 'clamp(180px, 38vw, 360px)',
-            color: 'rgba(255,255,255,0.018)',
+            color:
+              'color-mix(in oklab, var(--color-text-primary-token) 1.8%, transparent)',
             letterSpacing: '-0.08em',
             lineHeight: 0.8,
             transform: 'translateY(-12px)',
@@ -516,13 +536,13 @@ export function HomeComposerHero() {
           transition={prefersReducedMotion ? undefined : TRANSITION_SURFACE}
           style={{
             background: SURFACE_BG,
+            borderColor: SURFACE_BORDER,
             borderRadius: geometry.borderRadius,
             width: 'min(100%, 760px)',
           }}
           className={cn(
             'home-composer-surface',
-            'overflow-hidden border border-white/[0.07]',
-            'shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_0_rgba(0,0,0,0.18),0_8px_24px_-8px_rgba(0,0,0,0.3)]',
+            'overflow-hidden border shadow-none',
             isEntity ? 'flex' : 'flex flex-col'
           )}
         >
@@ -530,7 +550,10 @@ export function HomeComposerHero() {
             // ── Entity state: two-column layout ───────────────────────
             <div className='home-composer-result flex w-full'>
               {/* Left rail: 264px */}
-              <aside className='home-composer-result__rail flex w-66 shrink-0 flex-col border-r border-white/[0.055]'>
+              <aside
+                className='home-composer-result__rail flex w-66 shrink-0 flex-col border-r'
+                style={{ borderColor: SEAM_BORDER }}
+              >
                 <div className='px-3 pt-3 pb-2'>
                   <EntityPill label='Releases' />
                 </div>
@@ -558,7 +581,7 @@ export function HomeComposerHero() {
                   stats={MIDNIGHT_RUN_STATS}
                 />
                 <ActionList />
-                <div className='border-t border-white/[0.055]'>
+                <div className='border-t' style={{ borderColor: SEAM_BORDER }}>
                   <InputRow value={state.typedText} />
                 </div>
               </div>

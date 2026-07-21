@@ -103,21 +103,30 @@ describe('mounted homepage workspace System B source contract', () => {
 
     expect(css).toContain('var(--system-b-bg-page)');
     expect(css).toContain('var(--system-b-app-frame-seam)');
-    expect(css).toContain('var(--system-b-app-content-surface)');
+    expect(css).toContain('var(--system-b-bg-surface-0)');
     expect(css).toContain('var(--color-text-primary-token)');
     expect(css).toContain('var(--color-text-secondary-token)');
     expect(css).not.toContain('var(--color-text-tertiary-token)');
-    expect(css).toContain('var(--radius-3xl)');
+    // Content column: pinned to the shared homepage grid
+    // (--ds-public-content-max inside --homepage-page-gutter gutters).
+    expect(css).toContain('var(--ds-public-content-max)');
+    expect(css).toContain('var(--homepage-page-gutter)');
+    // Section title rides the shared marketing title ramp (fluid, so no
+    // per-breakpoint font-size overrides live in this block).
+    expect(css).toContain('var(--ds-marketing-title-size)');
+    expect(css).toContain('var(--ds-marketing-title-leading)');
+    expect(css).toContain('var(--ds-marketing-title-tracking)');
+    // Numbered callouts use the eyebrow spec for the 01/02/03 numerals.
+    expect(css).toContain('var(--ds-marketing-eyebrow-size)');
+    expect(css).toContain('var(--ds-marketing-eyebrow-weight)');
+    expect(css).toContain('var(--ds-marketing-eyebrow-tracking)');
     expect(css).toContain('var(--radius-xl)');
-    expect(css).toContain('var(--text-5xl)');
-    expect(css).toContain('var(--text-4xl)');
     expect(css).toContain('var(--text-lg)');
     expect(css).toContain('var(--text-sm)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('box-shadow: none;');
     expect(css).toContain('backdrop-filter: none;');
     expect(css).toContain('visibility: hidden;');
-    expect(css).toContain('@media (max-width: 767px)');
     expect(css).toContain('letter-spacing: 0;');
   });
 });

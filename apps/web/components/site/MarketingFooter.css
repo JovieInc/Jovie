@@ -54,6 +54,12 @@
   padding-top: clamp(1.5rem, 2.5vw, 2rem);
 }
 
+/* Minimal variant (pricing/legal): tighter gap between the mark and the
+   baseband. 1.75rem = --space-6 + --space-1 (no --space-7 token exists). */
+.marketing-footer-premium .mf-baseband--minimal {
+  margin-top: calc(var(--space-6) + var(--space-1));
+}
+
 .marketing-footer-premium .mf-legal-link {
   display: inline-flex;
   font-size: 0.75rem;
