@@ -1,4 +1,6 @@
 # Visual regression for public marketing/auth surfaces + admin chrome (JOV-4060/4062).
+# Also covers the previously orphaned visual specs (JOV-4039): auth modal/pages,
+# chat composer, and the public profile surface audit.
 #
 # Scheduled/manual baseline refresh. Source PR visual work is covered by the
 # deterministic queue Build + Layout gate; screenshot comparison stays off the
@@ -150,6 +152,25 @@ jobs:
 
           # Public marketing/auth baselines (JOV-4060)
           node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/visual-regression.spec.ts \
+            --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
+
+          # Auth modal + auth pages (JOV-4039) — anonymous surfaces; missing or
+          # stale baselines self-heal through the same refresh auto-PR below.
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/auth-visual.spec.ts \
+            --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
+
+          # Public profile surfaces (JOV-4039) — capture audit across themes and
+          # breakpoints; ready-selector and layout assertions gate (this spec has
+          # no snapshot compare). Captures stay run-local: the artifact guard
+          # omits images from staged uploads by design.
+          PROFILE_AUDIT_CYCLE=run-${{ github.run_id }} \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/profile-visual-audit.spec.ts \
+            --config=playwright.config.ts --project=chromium --reporter=line
+
+          # Chat composer surface (JOV-4039) — authenticated via the dev
+          # test-auth bypass, the same mechanism the admin lane below uses.
+          E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=creator \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/chat-visual.spec.ts \
             --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
 
           # Admin surfaces (JOV-4062) — the same refresh server heals stale
