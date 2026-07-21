@@ -2,9 +2,8 @@
 
 import { ChevronRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
-import { InsightCategoryIcon } from '@/components/features/dashboard/insights/InsightCategoryIcon';
 import { APP_ROUTES } from '@/constants/routes';
-import { cn } from '@/lib/utils';
+import { dedupeChatInsightCards } from '@/lib/insights/chat-presentation';
 import type { ChatInsightsToolResult } from '../types';
 
 interface ChatAnalyticsCardProps {
@@ -29,7 +28,12 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
     return null;
   }
 
-  const displayedCount = result.insights.length;
+  const insights = dedupeChatInsightCards(result.insights);
+  if (insights.length === 0) {
+    return null;
+  }
+
+  const displayedCount = insights.length;
   const hasMoreSignals = displayedCount < result.totalActive;
 
   return (
@@ -39,16 +43,16 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
       aria-label={result.title}
     >
       <div className='flex items-start justify-between gap-3'>
-        <div className='flex min-w-0 items-start gap-3'>
+        <div className='flex min-w-0 items-start gap-2.5'>
           <div className='flex h-5 w-5 shrink-0 items-center justify-center text-tertiary-token'>
-            <Sparkles className='h-4 w-4' strokeWidth={2.2} />
+            <Sparkles className='h-3.5 w-3.5' strokeWidth={2} />
           </div>
           <div className='min-w-0'>
             <p className='text-sm font-semibold leading-5 text-primary-token'>
               {result.title}
             </p>
             <p
-              className='mt-1 text-xs leading-5 text-tertiary-token'
+              className='mt-0.5 text-xs leading-5 text-tertiary-token'
               data-testid='chat-analytics-signal-count'
             >
               {formatChatActiveSignalsLabel(displayedCount, result.totalActive)}
@@ -67,34 +71,25 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
       </div>
 
       <ul
-        className='mt-3 flex snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-1 [-ms-overflow-style:none] [scrollbar-width:none] md:grid md:grid-cols-3 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden'
+        className='mt-3 flex snap-x snap-mandatory gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-1 [-ms-overflow-style:none] [scrollbar-width:none] md:grid md:grid-cols-3 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden'
         data-testid='chat-analytics-signal-carousel'
         aria-label='Top Signals'
       >
-        {result.insights.map(insight => (
+        {insights.map(insight => (
           <li
             key={insight.id}
-            className={cn(
-              'flex min-h-34 min-w-[min(20rem,84vw)] snap-start flex-col justify-between rounded-lg border border-subtle bg-surface-1 p-4 text-primary-token shadow-card md:min-w-0'
-            )}
+            className='flex min-h-28 min-w-[min(18rem,80vw)] snap-start flex-col rounded-lg border border-subtle bg-surface-1 px-3.5 py-3 text-primary-token md:min-w-0'
             data-testid='chat-analytics-signal-card'
           >
-            <div className='flex items-center gap-2'>
-              <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token'>
-                <InsightCategoryIcon category={insight.category} size='sm' />
-              </span>
-              <span className='text-2xs font-medium capitalize leading-4 text-tertiary-token'>
-                {insight.category.replaceAll('_', ' ')}
-              </span>
-            </div>
-            <div className='mt-4 min-w-0'>
-              <p className='text-pretty text-base font-semibold leading-[1.18] text-primary-token'>
-                {insight.title}
-              </p>
-              <p className='mt-3 line-clamp-2 text-xs leading-5 text-secondary-token'>
-                {insight.actionSuggestion ?? insight.description}
-              </p>
-            </div>
+            <p className='text-2xs font-medium capitalize leading-4 text-tertiary-token'>
+              {insight.category.replaceAll('_', ' ')}
+            </p>
+            <p className='mt-2 text-pretty text-sm font-semibold leading-snug text-primary-token'>
+              {insight.title}
+            </p>
+            <p className='mt-1.5 line-clamp-2 text-xs leading-5 text-secondary-token'>
+              {insight.actionSuggestion ?? insight.description}
+            </p>
           </li>
         ))}
       </ul>

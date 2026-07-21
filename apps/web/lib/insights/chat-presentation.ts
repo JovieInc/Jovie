@@ -1,3 +1,4 @@
+import { normalizeInsightTitleForDedup } from '@/lib/insights/insight-dedup';
 import type {
   InsightCategory,
   InsightResponse,
@@ -49,6 +50,29 @@ export function sortInsightsForChat<T extends InsightResponse>(insights: T[]) {
     if (scoreDelta !== 0) return scoreDelta;
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
+}
+
+/**
+ * Client-side defensive dedupe for chat cards (no dataSnapshot available).
+ * Collapses near-identical titles within the same insight type family so
+ * already-persisted tool results cannot re-show the same signal 3×.
+ */
+export function dedupeChatInsightCards<T extends InsightResponse>(
+  insights: readonly T[]
+): T[] {
+  const seen = new Set<string>();
+  const deduped: T[] = [];
+
+  for (const insight of insights) {
+    const key = `${insight.category}|${insight.insightType}|${normalizeInsightTitleForDedup(insight.title)}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(insight);
+  }
+
+  return deduped;
 }
 
 export function buildInsightPrompt(

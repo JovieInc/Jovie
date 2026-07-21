@@ -85,6 +85,38 @@ describe('insight lifecycle deduplication', () => {
 
     expect(result).toHaveLength(1);
   });
+
+  it('collapses near-identical subscriber signal titles that only differ by growth callouts', () => {
+    const result = dedupeVisibleInsights([
+      {
+        ...baseInsight,
+        insightType: 'subscriber_surge',
+        category: 'growth',
+        dataSnapshot: {},
+        title: '3 New Subscribers in One Month',
+        description: 'Your email list grew by 3 people this month.',
+      },
+      {
+        ...baseInsight,
+        insightType: 'subscriber_surge',
+        category: 'growth',
+        dataSnapshot: null,
+        title: '3 New Subscribers in One Month (300% Growth)',
+        description: 'Subscribers jumped 300% month over month.',
+      },
+      {
+        ...baseInsight,
+        insightType: 'subscriber_surge',
+        category: 'growth',
+        dataSnapshot: {},
+        title: '3 New Subscribers in One Month — 300% Growth',
+        description: 'A strong month for subscriber growth.',
+      },
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.title).toBe('3 New Subscribers in One Month');
+  });
 });
 
 describe('JOV-3522 Top signals duplicate cards', () => {

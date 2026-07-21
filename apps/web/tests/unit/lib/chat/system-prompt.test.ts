@@ -59,6 +59,9 @@ describe('buildSystemPrompt', () => {
     });
 
     expect(prompt).toContain("call the 'showTopInsights' tool first");
+    expect(prompt).toContain(
+      "Do NOT call 'showTopInsights' for distribution deals"
+    );
   });
 
   it('instructs off-topic refusals to pivot into useful music-career actions', () => {

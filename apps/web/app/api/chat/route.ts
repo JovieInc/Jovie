@@ -75,6 +75,7 @@ import {
   resolveRetouchCapability,
 } from '@/lib/chat/retouch-capability';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
+import { isShowTopInsightsTurnRelevant } from '@/lib/chat/show-top-insights-relevance';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import {
   canUsePaidChatTools,
@@ -1510,10 +1511,13 @@ function createPromoStrategyTool(
   });
 }
 
-function createShowTopInsightsTool(profileId: string | null) {
+function createShowTopInsightsTool(
+  profileId: string | null,
+  lastUserText: string
+) {
   return tool({
     description:
-      'Show the artist their top audience, release, track, and monetization signals as structured insight cards. Use ONLY when the turn is specifically about analytics or performance — e.g. "what is working", "how are my numbers", "how is this release/track doing". Do NOT use for unrelated turns: general conversation, onboarding answers, creative or strategy questions that are not about measured performance, or when the user has not asked about their numbers.',
+      "Show the artist's top audience, release, track, and monetization signals as structured insight cards. Call ONLY when the artist is asking about performance, growth, audience, signals, analytics, what is working, or what to focus on next. Do NOT call for distribution deals (e.g. AWAL), legal, bio edits, canvas, album art, merch, billing, or other unrelated topics.",
     inputSchema: chatToolSchema({}),
     execute: async () => {
       if (!profileId) {
@@ -1525,12 +1529,24 @@ function createShowTopInsightsTool(profileId: string | null) {
         };
       }
 
+      if (!isShowTopInsightsTurnRelevant(lastUserText)) {
+        return {
+          success: true,
+          title: 'Top signals',
+          totalActive: 0,
+          insights: [],
+          relevant: false,
+          note: 'Current turn is not about performance signals. Answer without insight cards.',
+        };
+      }
+
       const summary = await getInsightsSummary(profileId);
       return {
         success: true,
         title: 'Top signals',
         totalActive: summary.totalActive,
         insights: summary.insights,
+        relevant: true,
       };
     },
   });
@@ -2021,11 +2037,17 @@ function buildChatTools(
   retouchContext?: {
     readonly sourceImageUrl: string | null;
     readonly conversationId: string | null;
-  }
+  },
+  lastUserText = ''
 ) {
   return {
     ...(insightsEnabled
-      ? { showTopInsights: createShowTopInsightsTool(resolvedProfileId) }
+      ? {
+          showTopInsights: createShowTopInsightsTool(
+            resolvedProfileId,
+            lastUserText
+          ),
+        }
       : {}),
     proposeProfileEdit: createProfileEditTool(artistContext),
     importBioFromUrl: createImportBioFromUrlTool({ userId: clerkUserId }),
@@ -2849,7 +2871,8 @@ export async function POST(req: Request) {
               sourceImageUrl: extractLastUserImageUrl(uiMessages),
               conversationId:
                 reservedTurn?.conversationId ?? resolvedConversationId,
-            }
+            },
+            userText
           ),
         }
       : freeTools;
