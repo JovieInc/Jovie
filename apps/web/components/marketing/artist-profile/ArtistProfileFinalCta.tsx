@@ -21,22 +21,22 @@ export function ArtistProfileFinalCta({
   return (
     <ArtistProfileSectionShell
       className={cn(
-        'relative bg-white/[0.012]',
-        roomy &&
-          'flex min-h-[56svh] items-center sm:min-h-[60svh] lg:min-h-[66svh]'
+        'relative bg-surface-0',
+        roomy && 'system-b-artist-profile-final-cta-roomy'
       )}
       containerClassName={cn(
         'relative text-center',
         roomy && 'flex w-full flex-col items-center justify-center'
       )}
     >
+      {/* ui-casing-allow: marketing display headline */}
       <h2
         data-testid='final-cta-headline'
-        className={cn(SHELL_H2_CLASS, 'mx-auto max-w-[16ch] lg:max-w-[20ch]')}
+        className={cn(SHELL_H2_CLASS, 'mx-auto max-w-sm lg:max-w-md')}
       >
         {finalCta.headline}
       </h2>
-      <p className={cn(SHELL_LEAD_CLASS, 'mx-auto mt-5 max-w-[34rem] sm:mt-6')}>
+      <p className={cn(SHELL_LEAD_CLASS, 'mx-auto mt-5 max-w-lg sm:mt-6')}>
         {finalCta.subhead}
       </p>
       {showSignature ? (

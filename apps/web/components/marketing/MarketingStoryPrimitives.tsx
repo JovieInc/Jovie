@@ -205,7 +205,7 @@ export function ArtistProfileCaptureVisual({
   return (
     <div
       ref={rootRef}
-      className={cn('artist-profile-capture-shell', className)}
+      className={cn('system-b-artist-profile-capture-shell', className)}
     >
       <style>{CAPTURE_ANIMATION_STYLES}</style>
 

@@ -11,14 +11,11 @@ interface ArtistProfileSectionHeaderProps {
   readonly eyebrowClassName?: string;
 }
 
-export const SHELL_H2_CLASS =
-  'text-[clamp(2.25rem,4.8vw,3.5rem)] font-bold leading-[1.02] tracking-[-0.04em] text-primary-token text-balance';
+export const SHELL_H2_CLASS = 'system-b-artist-profile-shell-h2';
 
-export const SHELL_EYEBROW_CLASS =
-  'text-xs font-medium uppercase tracking-[0.06em] text-secondary-token';
+export const SHELL_EYEBROW_CLASS = 'system-b-artist-profile-shell-eyebrow';
 
-export const SHELL_LEAD_CLASS =
-  'text-[clamp(1.0625rem,1.4vw,1.25rem)] leading-[1.45] text-secondary-token text-pretty';
+export const SHELL_LEAD_CLASS = 'system-b-artist-profile-shell-lead';
 
 export function ArtistProfileSectionHeader({
   headline,
@@ -35,7 +32,7 @@ export function ArtistProfileSectionHeader({
   return (
     <div
       className={cn(
-        isCentered ? 'mx-auto max-w-[46rem] text-center' : 'max-w-2xl',
+        isCentered ? 'mx-auto max-w-2xl text-center' : 'max-w-2xl',
         className
       )}
     >
@@ -50,7 +47,7 @@ export function ArtistProfileSectionHeader({
           className={cn(
             SHELL_LEAD_CLASS,
             'mt-5 sm:mt-6',
-            isCentered ? 'mx-auto max-w-[38rem]' : 'max-w-2xl',
+            isCentered ? 'mx-auto max-w-xl' : 'max-w-2xl',
             bodyClassName
           )}
         >
