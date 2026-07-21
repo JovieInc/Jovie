@@ -38,7 +38,8 @@
 #    the audit trail while exact-head CI and native merge_group evidence gate.
 #
 # 4. Simplified status checks: PR Ready + Migration Guard + Fork PR Gate
-#    + PR Size Guard (the full live required set on ruleset 10512119).
+#    + PR Size Guard + Visual Approval Guard (the full live required set on
+#    ruleset 10512119).
 #    Source PR Ready aggregates the deterministic fast lane. The same bare
 #    context on merge_group aggregates deterministic unit, build/layout,
 #    migration, iOS-when-affected, and eval evidence on the combined head.
@@ -131,6 +132,15 @@ rules:
         # the live context is the bare job name with no "CI /" prefix. Approved
         # mechanical codemods opt out with the `big-pr` label.
         - context: 'PR Size Guard'
+
+        # Visual Approval Guard: Bare dual-event context from
+        # .github/workflows/visual-approval-guard.yml (same pattern as PR Size
+        # Guard). Fails any PR or merge-group head whose diff touches visual
+        # baseline surfaces (e2e __snapshots__, contrast/touch-target ratchet
+        # baselines, button-surface-classes-remaining.json) until a human
+        # applies the `visual-approved` label; the labeled event re-runs the
+        # check without a new push.
+        - context: 'Visual Approval Guard'
 
   # Match live ruleset deletion protection. This applies to the main ref only.
   - type: 'deletion'

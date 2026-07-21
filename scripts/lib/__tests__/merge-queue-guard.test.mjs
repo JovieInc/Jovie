@@ -46,6 +46,7 @@ const greenStatuses = [
   { name: 'Migration Guard', conclusion: 'SUCCESS' },
   { name: 'Fork PR Gate', state: 'SUCCESS' },
   { name: 'PR Size Guard', state: 'SUCCESS' },
+  { name: 'Visual Approval Guard', state: 'SUCCESS' },
 ];
 
 function buildUiFastTrackBody({
@@ -365,6 +366,7 @@ describe('aggregate required checks', () => {
       'CI / Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
+      'Visual Approval Guard',
     ]);
     expect(ok.ok).toBe(true);
 
@@ -403,6 +405,7 @@ describe('aggregate required checks', () => {
       'Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
+      'Visual Approval Guard',
     ]);
     expect(normalizeBranchProtectionSource(branchProtectionYaml)).toEqual(
       LIVE_NATIVE_RULESET_FIXTURE
@@ -498,6 +501,7 @@ describe('aggregate required checks', () => {
             { context: 'Migration Guard' },
             { context: 'Fork PR Gate', integration_id: 2934433 },
             { context: 'PR Size Guard' },
+            { context: 'Visual Approval Guard' },
           ],
         },
         { type: 'non_fast_forward' },
@@ -544,6 +548,7 @@ describe('aggregate required checks', () => {
           'Migration Guard',
           'Fork PR Gate',
           'PR Size Guard',
+          'Visual Approval Guard',
         ].map(context => ({ context })),
       },
     };
