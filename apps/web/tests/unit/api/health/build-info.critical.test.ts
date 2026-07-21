@@ -77,4 +77,27 @@ describe('@critical GET /api/health/build-info', () => {
     const body = await response.json();
     expect(body.buildId).toBe('development');
   });
+
+  it('returns the build-time app version instead of the 0.0.0 fallback (JOV-3459)', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '26.6.61');
+
+    const { GET } = await import('@/app/api/health/build-info/route');
+    const response = GET();
+    const body = await response.json();
+
+    expect(body.version).toBe('26.6.61');
+    expect(body.version).not.toBe('0.0.0');
+  });
+
+  it('falls back to 0.0.0 only when no app version is configured', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '');
+
+    const { GET } = await import('@/app/api/health/build-info/route');
+    const response = GET();
+    const body = await response.json();
+
+    expect(body.version).toBe('0.0.0');
+  });
 });
