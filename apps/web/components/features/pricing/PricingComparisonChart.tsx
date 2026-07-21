@@ -201,6 +201,7 @@ export function PricingComparisonChart() {
 
       <div className='system-b-pricing-table-shell' data-variant='desktop'>
         <table className='system-b-pricing-table'>
+          <caption className='sr-only'>Feature comparison by plan</caption>
           <thead>
             <tr className='system-b-pricing-chart-row'>
               <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading' />
@@ -284,6 +285,9 @@ export function PricingComparisonChart() {
 
       <div className='system-b-pricing-table-shell' data-variant='mobile'>
         <table className='system-b-pricing-table'>
+          <caption className='sr-only'>
+            Feature comparison for selected plan
+          </caption>
           <thead>
             <tr className='system-b-pricing-chart-row'>
               <th className='system-b-pricing-chart-cell system-b-pricing-chart-cell--feature-heading' />
