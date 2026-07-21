@@ -331,6 +331,7 @@ jobs:
         with:
           sparse-checkout: |
             scripts/lib/tracker.mjs
+            scripts/lib/agent-branch-pattern.mjs
             scripts/github-query-todo.mjs
           sparse-checkout-cone-mode: false
 
@@ -344,8 +345,17 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
-          OPEN_AGENT_PRS=$(gh api "repos/${{ github.repository }}/pulls?state=open&per_page=100" \
-            | jq '[.[] | select(.head.ref | test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+-"; "i"))] | length')
+          # Shared capacity matcher (#10463) — same as github-ai-dispatcher.yml.
+          REPO="${{ github.repository }}"
+          OPEN_AGENT_PRS=$(
+            gh api --paginate "repos/${REPO}/pulls?state=open&per_page=100" \
+              | jq -s '.' \
+              | node scripts/lib/agent-branch-pattern.mjs --count
+          )
+          if [[ ! "$OPEN_AGENT_PRS" =~ ^[0-9]+$ ]]; then
+            echo "::error::Invalid open agent PR count (${OPEN_AGENT_PRS}); failing closed"
+            exit 1
+          fi
           CAPACITY=$((MAX_OPEN_AGENT_PRS - OPEN_AGENT_PRS))
           if [[ "$CAPACITY" -le 0 ]]; then
             echo "No dispatch capacity: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS agent PRs are open"; exit 0

@@ -54,6 +54,7 @@ jobs:
         with:
           sparse-checkout: |
             scripts/lib/tracker.mjs
+            scripts/lib/agent-branch-pattern.mjs
             scripts/github-query-todo.mjs
           sparse-checkout-cone-mode: false
 
@@ -68,8 +69,22 @@ jobs:
         run: |
           set -euo pipefail
 
-          OPEN_AGENT_PRS=$(gh api "repos/${{ github.repository }}/pulls?state=open&per_page=100" \
-            | jq '[.[] | select(.head.ref | test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+-"; "i"))] | length')
+          # Single source of truth: scripts/lib/agent-branch-pattern.mjs (#10463).
+          # Paginate so dispatcher/orchestrator/auto-pr see the same PR universe.
+          REPO="${{ github.repository }}"
+          if ! OPEN_AGENT_PRS=$(
+            set -o pipefail
+            gh api --paginate "repos/${REPO}/pulls?state=open&per_page=100" \
+              | jq -s '.' \
+              | node scripts/lib/agent-branch-pattern.mjs --count
+          ); then
+            echo "::error::Failed to count open agent PRs; failing closed"
+            exit 1
+          fi
+          if [[ ! "$OPEN_AGENT_PRS" =~ ^[0-9]+$ ]]; then
+            echo "::error::Invalid open agent PR count (${OPEN_AGENT_PRS}); failing closed"
+            exit 1
+          fi
 
           CAPACITY=$((MAX_OPEN_AGENT_PRS - OPEN_AGENT_PRS))
           if [[ "$CAPACITY" -le 0 ]]; then

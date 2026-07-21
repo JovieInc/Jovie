@@ -48,6 +48,21 @@ jobs:
       issue_url: ${{ steps.gather.outputs.issue_url }}
       branch_name: ${{ steps.gather.outputs.branch_name }}
     steps:
+      # Capacity matching needs the shared branch pattern (#10463). Sparse so
+      # non-dispatch label events that still reach this job stay cheap.
+      - name: Checkout capacity helper
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lib/agent-branch-pattern.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
       - name: Gather issue payload
         id: gather
         env:
@@ -165,8 +180,24 @@ jobs:
             exit 0
           fi
 
-          OPEN_AGENT_PRS=$(gh pr list --state open --json headRefName --limit 200 \
-            | jq '[.[] | select(.headRefName | test("^(codex|claude|codegen-bot|linear)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i"))] | length')
+          # Single source of truth: scripts/lib/agent-branch-pattern.mjs (#10463).
+          # Paginate REST so dispatcher/orchestrator/auto-pr see the same universe.
+          # Fail closed on count errors so we never over-dispatch when unknown.
+          if ! OPEN_AGENT_PRS=$(
+            set -o pipefail
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+              | jq -s '.' \
+              | node scripts/lib/agent-branch-pattern.mjs --count
+          ); then
+            echo "::warning::Failed to count open agent PRs; failing closed for #${ISSUE_NUMBER}."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ ! "$OPEN_AGENT_PRS" =~ ^[0-9]+$ ]]; then
+            echo "::warning::Invalid open agent PR count (${OPEN_AGENT_PRS}); failing closed."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS"
           if [[ "$OPEN_AGENT_PRS" -ge "$MAX_OPEN_AGENT_PRS" ]]; then
             echo "::warning::Rate limit reached ($OPEN_AGENT_PRS open agent PRs). Deferring issue #${ISSUE_NUMBER}."
