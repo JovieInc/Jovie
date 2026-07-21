@@ -5,6 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  Input,
 } from '@jovie/ui';
 import {
   type ColumnDef,
@@ -21,6 +22,7 @@ import {
   FileAudio2,
   FileText,
   Filter,
+  FolderOpen,
   Grid3x3,
   ImageIcon,
   LayoutList,
@@ -28,10 +30,13 @@ import {
   Music2,
   Pause,
   PlayCircle,
+  Plus,
   Share2,
   Shirt,
   Table2,
+  Trash2,
   Video,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -117,6 +122,21 @@ import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
+  assetMatchesLibraryCollectionFilters,
+  countLibraryCollectionMatches,
+  createLibraryCollection,
+  deleteLibraryCollection,
+  type LibraryCollection,
+  type LibraryCollectionFilters,
+  libraryCollectionHasActiveFilters,
+  persistActiveLibraryCollectionId,
+  persistLibraryCollections,
+  readPersistedActiveLibraryCollectionId,
+  readPersistedLibraryCollections,
+  summarizeLibraryCollectionFilters,
+  upsertLibraryCollection,
+} from './library-collections';
+import {
   formatLibraryDuration,
   formatLibraryReleaseDate,
   getLibraryAspectRatioClass,
@@ -196,6 +216,8 @@ type LibraryFilters = {
   readonly releaseTypes: Set<LibraryReleaseAsset['releaseType']>;
   readonly assetKinds: Set<LibraryAssetKind>;
   readonly providers: Set<string>;
+  /** Release label + genre tags used as metadata filters for collections. */
+  readonly releaseTags: Set<string>;
 };
 
 type CountMap<T extends string> = ReadonlyMap<T, number>;
@@ -274,6 +296,43 @@ function emptyFilters(): LibraryFilters {
     releaseTypes: new Set(),
     assetKinds: new Set(),
     providers: new Set(),
+    releaseTags: new Set(),
+  };
+}
+
+function releaseTagsForAsset(asset: LibraryReleaseAsset): string[] {
+  const tags: string[] = [];
+  if (asset.label?.trim()) tags.push(asset.label.trim());
+  for (const genre of asset.genres) {
+    if (genre.trim()) tags.push(genre.trim());
+  }
+  return tags;
+}
+
+function libraryFiltersToCollectionFilters(
+  filters: LibraryFilters
+): LibraryCollectionFilters {
+  return {
+    statuses: Array.from(filters.statuses),
+    approvalStatuses: Array.from(filters.approvalStatuses),
+    releaseTypes: Array.from(filters.releaseTypes),
+    assetKinds: Array.from(filters.assetKinds),
+    releaseTags: Array.from(filters.releaseTags),
+  };
+}
+
+function collectionFiltersToLibraryFilters(
+  collectionFilters: LibraryCollectionFilters,
+  previous: LibraryFilters = emptyFilters()
+): LibraryFilters {
+  return {
+    statuses: new Set(collectionFilters.statuses),
+    approvalStatuses: new Set(collectionFilters.approvalStatuses),
+    releaseTypes: new Set(collectionFilters.releaseTypes),
+    assetKinds: new Set(collectionFilters.assetKinds),
+    // Collections intentionally ignore providers (not part of the collection contract).
+    providers: previous.providers,
+    releaseTags: new Set(collectionFilters.releaseTags),
   };
 }
 
@@ -343,6 +402,13 @@ function assetMatchesFilters(
   ) {
     return false;
   }
+  if (filters.releaseTags.size > 0) {
+    const tags = releaseTagsForAsset(asset).map(tag => normalizePillValue(tag));
+    const hasTag = Array.from(filters.releaseTags).some(tag =>
+      tags.includes(normalizePillValue(tag))
+    );
+    if (!hasTag) return false;
+  }
   return true;
 }
 
@@ -391,14 +457,24 @@ function assetMatchesPills(
   });
 }
 
-function hasActiveFilters(filters: LibraryFilters): boolean {
+function countActiveFilters(filters: LibraryFilters): number {
   return (
     filters.statuses.size +
-      filters.approvalStatuses.size +
-      filters.releaseTypes.size +
-      filters.assetKinds.size +
-      filters.providers.size >
-    0
+    filters.approvalStatuses.size +
+    filters.releaseTypes.size +
+    filters.assetKinds.size +
+    filters.providers.size +
+    filters.releaseTags.size
+  );
+}
+
+function hasActiveFilters(filters: LibraryFilters): boolean {
+  return countActiveFilters(filters) > 0;
+}
+
+function hasCollectionSavableFilters(filters: LibraryFilters): boolean {
+  return libraryCollectionHasActiveFilters(
+    libraryFiltersToCollectionFilters(filters)
   );
 }
 
@@ -847,34 +923,55 @@ function LibrarySavedViewRow({
   count,
   active,
   onClick,
+  leadingIcon,
+  trailing,
+  selectTestId,
 }: {
   readonly label: string;
   readonly count: number;
   readonly active: boolean;
   readonly onClick: () => void;
+  readonly leadingIcon?: ReactNode;
+  readonly trailing?: ReactNode;
+  readonly selectTestId?: string;
 }) {
   return (
-    <Button
-      asChild
-      variant={active ? 'secondary' : 'tertiary'}
-      size='sm'
-      static
+    <div
       className={cn(
-        'flex h-7 w-full items-center justify-start gap-2 border px-2 transition-colors duration-fast ease-subtle focus-visible:ring-offset-(--linear-app-content-surface)',
+        'flex h-7 w-full items-center gap-1 border px-1 transition-colors duration-fast ease-subtle',
         active
           ? 'border-default bg-surface-1 text-primary-token'
           : 'border-transparent text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
       )}
     >
-      <button type='button' onClick={onClick} aria-pressed={active}>
-        <span className='min-w-0 flex-1 truncate text-left'>
-          {label || 'Untitled'}
-        </span>
-        <span className='system-b-library-rail-count tabular-nums'>
-          {count}
-        </span>
-      </button>
-    </Button>
+      <Button
+        asChild
+        variant={active ? 'secondary' : 'tertiary'}
+        size='sm'
+        static
+        className='flex h-full min-w-0 flex-1 items-center justify-start gap-2 border-0 bg-transparent px-1 shadow-none hover:bg-transparent'
+      >
+        <button
+          type='button'
+          onClick={onClick}
+          aria-pressed={active}
+          data-testid={selectTestId}
+        >
+          {leadingIcon ? (
+            <span className='grid h-3 w-3 shrink-0 place-items-center text-tertiary-token'>
+              {leadingIcon}
+            </span>
+          ) : null}
+          <span className='min-w-0 flex-1 truncate text-left'>
+            {label || 'Untitled'}
+          </span>
+          <span className='system-b-library-rail-count tabular-nums'>
+            {count}
+          </span>
+        </button>
+      </Button>
+      {trailing}
+    </div>
   );
 }
 
@@ -885,6 +982,11 @@ function LibraryRail({
   filters,
   onFilters,
   onClearFilters,
+  collections,
+  activeCollectionId,
+  onSelectCollection,
+  onCreateCollection,
+  onDeleteCollection,
   className,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
@@ -893,13 +995,19 @@ function LibraryRail({
   readonly filters: LibraryFilters;
   readonly onFilters: (filters: LibraryFilters) => void;
   readonly onClearFilters: () => void;
+  readonly collections: readonly LibraryCollection[];
+  readonly activeCollectionId: string | null;
+  readonly onSelectCollection: (collectionId: string | null) => void;
+  readonly onCreateCollection: (name: string) => boolean;
+  readonly onDeleteCollection: (collectionId: string) => void;
   readonly className?: string;
 }) {
+  const [createOpen, setCreateOpen] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const createNameId = useId();
   const releaseTypes = uniqueSorted(assets.map(asset => asset.releaseType));
   const statuses = uniqueSorted(assets.map(asset => asset.status));
-  const approvalStatuses = uniqueSorted(
-    assets.map(asset => asset.approvalStatus)
-  );
+  const releaseTags = uniqueSorted(assets.flatMap(releaseTagsForAsset));
   const providerKeys = uniqueSorted(
     assets.flatMap(asset => asset.providers.map(provider => provider.key))
   );
@@ -922,13 +1030,17 @@ function LibraryRail({
       asset => asset.providers.map(provider => provider.key) as string[]
     ),
     assetKinds: countBy(assets, asset => asset.assetKinds),
+    releaseTags: countBy(assets, asset => releaseTagsForAsset(asset)),
   };
-  const activeFilterCount =
-    filters.statuses.size +
-    filters.approvalStatuses.size +
-    filters.releaseTypes.size +
-    filters.assetKinds.size +
-    filters.providers.size;
+  const activeFilterCount = countActiveFilters(filters);
+  const canSaveCollection = hasCollectionSavableFilters(filters);
+
+  function handleCreateSubmit() {
+    const created = onCreateCollection(draftName);
+    if (!created) return;
+    setDraftName('');
+    setCreateOpen(false);
+  }
 
   return (
     <nav
@@ -940,15 +1052,159 @@ function LibraryRail({
     >
       <div className='min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <div className='pb-2'>
-          <p className='system-b-library-rail-title pb-1 pt-2'>Smart Filters</p>
+          <div className='flex items-center justify-between gap-2 pb-1 pt-2'>
+            <p className='system-b-library-rail-title'>Collections</p>
+            <Button
+              type='button'
+              variant='tertiary'
+              size='sm'
+              disabled={!canSaveCollection && !createOpen}
+              onClick={() => {
+                if (createOpen) {
+                  setCreateOpen(false);
+                  setDraftName('');
+                  return;
+                }
+                setCreateOpen(true);
+              }}
+              className='h-auto rounded-xs px-1.5 py-0.5 text-tertiary-token hover:bg-surface-1 hover:text-primary-token disabled:opacity-40'
+              aria-expanded={createOpen}
+              data-testid='library-collection-create-toggle'
+            >
+              {createOpen ? (
+                <>
+                  <X className='h-3 w-3' aria-hidden='true' />
+                  Cancel
+                </>
+              ) : (
+                <>
+                  <Plus className='h-3 w-3' aria-hidden='true' />
+                  Save
+                </>
+              )}
+            </Button>
+          </div>
+          {/* Reserved slot sized for the create form so open/close does not reflow Smart Filters. */}
+          <div
+            className='min-h-36 space-y-1.5 pb-1'
+            data-testid='library-collections-create-slot'
+          >
+            {createOpen ? (
+              <form
+                className='space-y-1.5 rounded-xs border border-subtle bg-surface-0 p-2'
+                onSubmit={event => {
+                  event.preventDefault();
+                  handleCreateSubmit();
+                }}
+                data-testid='library-collection-create-form'
+              >
+                <label
+                  htmlFor={createNameId}
+                  className='system-b-library-rail-title block'
+                >
+                  Collection Name
+                </label>
+                <Input
+                  id={createNameId}
+                  value={draftName}
+                  onChange={event => setDraftName(event.target.value)}
+                  placeholder='Name this collection'
+                  autoComplete='off'
+                  className='h-8'
+                  data-testid='library-collection-name-input'
+                />
+                <p className='system-b-library-rail-count truncate text-left'>
+                  {summarizeLibraryCollectionFilters(
+                    libraryFiltersToCollectionFilters(filters)
+                  )}
+                </p>
+                <Button
+                  type='submit'
+                  variant='secondary'
+                  size='sm'
+                  disabled={!draftName.trim() || !canSaveCollection}
+                  className='h-7 w-full'
+                  data-testid='library-collection-create-submit'
+                >
+                  Create Collection
+                </Button>
+              </form>
+            ) : (
+              <p className='system-b-library-rail-count px-1 text-left leading-4'>
+                {canSaveCollection
+                  ? 'Save current filters as a named collection. Files stay put.'
+                  : 'Select filters below, then save a collection.'}
+              </p>
+            )}
+          </div>
+          <div className='space-y-px' data-testid='library-collections'>
+            {collections.length === 0 ? (
+              <p
+                className='system-b-library-rail-count px-1 py-1 text-left'
+                data-testid='library-collections-empty'
+              >
+                No collections yet
+              </p>
+            ) : (
+              collections.map(collection => (
+                <div
+                  key={collection.id}
+                  data-testid={`library-collection-row-${collection.id}`}
+                >
+                  <LibrarySavedViewRow
+                    label={collection.name}
+                    count={countLibraryCollectionMatches(
+                      assets,
+                      collection.filters
+                    )}
+                    active={activeCollectionId === collection.id}
+                    selectTestId={`library-collection-select-${collection.id}`}
+                    leadingIcon={
+                      <FolderOpen className='h-3 w-3' aria-hidden='true' />
+                    }
+                    onClick={() =>
+                      onSelectCollection(
+                        activeCollectionId === collection.id
+                          ? null
+                          : collection.id
+                      )
+                    }
+                    trailing={
+                      <Button
+                        type='button'
+                        variant='tertiary'
+                        size='sm'
+                        className='h-6 w-6 shrink-0 p-0 text-tertiary-token hover:bg-surface-0 hover:text-primary-token'
+                        aria-label={`Delete collection ${collection.name}`}
+                        data-testid={`library-collection-delete-${collection.id}`}
+                        onClick={event => {
+                          event.stopPropagation();
+                          onDeleteCollection(collection.id);
+                        }}
+                      >
+                        <Trash2 className='h-3 w-3' aria-hidden='true' />
+                      </Button>
+                    }
+                  />
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className='border-t border-subtle pb-2 pt-2'>
+          <p className='system-b-library-rail-title pb-1'>Smart Filters</p>
           <div className='space-y-px' data-testid='library-saved-filter-views'>
             {LIBRARY_SAVED_VIEWS.map(view => (
               <LibrarySavedViewRow
                 key={view.id}
                 label={view.label}
                 count={countLibrarySavedViewMatches(assets, view.id)}
-                active={savedView === view.id}
-                onClick={() => onSavedView(view.id)}
+                active={activeCollectionId === null && savedView === view.id}
+                onClick={() => {
+                  onSelectCollection(null);
+                  onSavedView(view.id);
+                }}
               />
             ))}
           </div>
@@ -1040,6 +1296,25 @@ function LibraryRail({
             />
           ))}
         </FilterSection>
+
+        {releaseTags.length > 0 ? (
+          <FilterSection label='Release Tag'>
+            {releaseTags.map(tag => (
+              <FilterRow
+                key={tag}
+                active={filters.releaseTags.has(tag)}
+                count={counts.releaseTags.get(tag) ?? 0}
+                label={tag}
+                onClick={() =>
+                  onFilters({
+                    ...filters,
+                    releaseTags: toggleSet(filters.releaseTags, tag),
+                  })
+                }
+              />
+            ))}
+          </FilterSection>
+        ) : null}
 
         {providerKeys.length > 0 ? (
           <FilterSection label='Providers'>
@@ -2408,7 +2683,29 @@ export function LibrarySurface({
   const [savedView, setSavedView] = useState<LibrarySavedViewId>(() =>
     readPersistedLibrarySavedView()
   );
-  const [filters, setFilters] = useState<LibraryFilters>(() => emptyFilters());
+  const [collections, setCollections] = useState<LibraryCollection[]>(() =>
+    readPersistedLibraryCollections()
+  );
+  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(
+    () => {
+      const persistedId = readPersistedActiveLibraryCollectionId();
+      if (!persistedId) return null;
+      const exists = readPersistedLibraryCollections().some(
+        item => item.id === persistedId
+      );
+      return exists ? persistedId : null;
+    }
+  );
+  const [filters, setFilters] = useState<LibraryFilters>(() => {
+    const activeId = readPersistedActiveLibraryCollectionId();
+    if (!activeId) return emptyFilters();
+    const active = readPersistedLibraryCollections().find(
+      item => item.id === activeId
+    );
+    return active
+      ? collectionFiltersToLibraryFilters(active.filters)
+      : emptyFilters();
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [sort, setSort] = useState<LibrarySortKey>('releaseDate');
   const { view, setView } = useLibraryViewMode();
@@ -2422,6 +2719,7 @@ export function LibrarySurface({
   const deferredFilters = useDeferredValue(filters);
   const deferredPreset = useDeferredValue(preset);
   const deferredSavedView = useDeferredValue(savedView);
+  const deferredActiveCollectionId = useDeferredValue(activeCollectionId);
   const deferredPills = useDeferredValue(pills);
   const deferredSort = useDeferredValue(sort);
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -2463,21 +2761,36 @@ export function LibrarySurface({
     [approvalStatusOverrides, assets, audioOverrides, shareOverrides]
   );
 
+  const activeCollection = useMemo(
+    () =>
+      collections.find(item => item.id === deferredActiveCollectionId) ?? null,
+    [collections, deferredActiveCollectionId]
+  );
+
   const visibleAssets = useMemo(() => {
     const presetPredicate =
       PRESETS.find(item => item.id === deferredPreset)?.predicate ??
       (() => true);
-    const savedViewPredicate = getLibrarySavedViewPredicate(deferredSavedView);
+    // Collections replace smart filters while active (dynamic saved view).
+    const savedViewPredicate = activeCollection
+      ? () => true
+      : getLibrarySavedViewPredicate(deferredSavedView);
+    const collectionPredicate = activeCollection
+      ? (asset: LibraryReleaseAsset) =>
+          assetMatchesLibraryCollectionFilters(asset, activeCollection.filters)
+      : () => true;
     const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
 
     return effectiveAssets
       .filter(presetPredicate)
       .filter(savedViewPredicate)
+      .filter(collectionPredicate)
       .filter(asset => assetMatchesFilters(asset, deferredFilters))
       .filter(asset => assetMatchesPills(asset, deferredPills))
       .filter(asset => assetMatchesSearchQuery(asset, normalizedQuery))
       .toSorted(compareAssets(deferredSort));
   }, [
+    activeCollection,
     deferredFilters,
     deferredPills,
     deferredPreset,
@@ -2598,9 +2911,81 @@ export function LibrarySurface({
     persistLibrarySavedView(next);
   }, []);
 
+  const handleActiveCollectionChange = useCallback(
+    (nextId: string | null) => {
+      setActiveCollectionId(nextId);
+      persistActiveLibraryCollectionId(nextId);
+
+      if (!nextId) {
+        return;
+      }
+
+      const collection = collections.find(item => item.id === nextId);
+      if (!collection) {
+        setActiveCollectionId(null);
+        persistActiveLibraryCollectionId(null);
+        return;
+      }
+
+      // Collections are dynamic views: apply filters, clear smart filter, optional layout.
+      handleSavedViewChange('all');
+      setFilters(collectionFiltersToLibraryFilters(collection.filters));
+      if (collection.viewMode) {
+        setView(collection.viewMode);
+      }
+    },
+    [collections, handleSavedViewChange, setView]
+  );
+
+  const handleFiltersChange = useCallback((next: LibraryFilters) => {
+    setFilters(next);
+    // Manual filter edits leave the collection selection (view becomes ad-hoc).
+    setActiveCollectionId(null);
+    persistActiveLibraryCollectionId(null);
+  }, []);
+
+  const handleCreateCollection = useCallback(
+    (name: string): boolean => {
+      const created = createLibraryCollection({
+        name,
+        filters: libraryFiltersToCollectionFilters(filters),
+        viewMode: view,
+      });
+      if (!created) {
+        toast.error('Add filters before saving a collection');
+        return false;
+      }
+      const next = upsertLibraryCollection(collections, created);
+      setCollections(next);
+      persistLibraryCollections(next);
+      setActiveCollectionId(created.id);
+      persistActiveLibraryCollectionId(created.id);
+      handleSavedViewChange('all');
+      toast.success(`Collection "${created.name}" saved`);
+      return true;
+    },
+    [collections, filters, handleSavedViewChange, view]
+  );
+
+  const handleDeleteCollection = useCallback(
+    (collectionId: string) => {
+      const next = deleteLibraryCollection(collections, collectionId);
+      setCollections(next);
+      persistLibraryCollections(next);
+      if (activeCollectionId === collectionId) {
+        setActiveCollectionId(null);
+        persistActiveLibraryCollectionId(null);
+        setFilters(emptyFilters());
+      }
+    },
+    [activeCollectionId, collections]
+  );
+
   function resetView() {
     handlePresetChange('all');
     handleSavedViewChange('all');
+    setActiveCollectionId(null);
+    persistActiveLibraryCollectionId(null);
     setFilters(emptyFilters());
     setPills([]);
     setSearchQuery('');
@@ -2681,12 +3066,7 @@ export function LibrarySurface({
     []
   );
 
-  const activeFilterCount =
-    filters.statuses.size +
-    filters.approvalStatuses.size +
-    filters.releaseTypes.size +
-    filters.assetKinds.size +
-    filters.providers.size;
+  const activeFilterCount = countActiveFilters(filters);
 
   const headerSearchAdapter = useMemo(
     () =>
@@ -2739,11 +3119,29 @@ export function LibrarySurface({
         savedView={savedView}
         onSavedView={handleSavedViewChange}
         filters={filters}
-        onFilters={setFilters}
-        onClearFilters={() => setFilters(emptyFilters())}
+        onFilters={handleFiltersChange}
+        onClearFilters={() => {
+          handleFiltersChange(emptyFilters());
+        }}
+        collections={collections}
+        activeCollectionId={activeCollectionId}
+        onSelectCollection={handleActiveCollectionChange}
+        onCreateCollection={handleCreateCollection}
+        onDeleteCollection={handleDeleteCollection}
       />
     ),
-    [effectiveAssets, filters, handleSavedViewChange, savedView]
+    [
+      activeCollectionId,
+      collections,
+      effectiveAssets,
+      filters,
+      handleActiveCollectionChange,
+      handleCreateCollection,
+      handleDeleteCollection,
+      handleFiltersChange,
+      handleSavedViewChange,
+      savedView,
+    ]
   );
 
   useRegisterShellSidebarOverride(

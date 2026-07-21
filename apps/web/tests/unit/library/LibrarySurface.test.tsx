@@ -101,6 +101,8 @@ vi.mock('next/navigation', () => ({
 vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),
+    success: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -1197,5 +1199,102 @@ describe('LibrarySurface', () => {
     expect(contract).toHaveAttribute('data-key', 'library');
     expect(contract).toHaveAttribute('data-back-href', APP_ROUTES.CHAT);
     expect(contract).toHaveAttribute('data-back-label', 'Back to App');
+  });
+
+  it('creates a named collection from filters and auto-populates matching assets', async () => {
+    const user = userEvent.setup();
+    renderLibraryWithSidebarOverride([
+      buildAsset({
+        id: 'release-1',
+        title: 'Take Me Over',
+        status: 'draft',
+        label: 'Jovie',
+        genres: [],
+      }),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        status: 'released',
+        label: 'Other Label',
+        genres: [],
+      }),
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+
+    expect(screen.getByTestId('library-collections')).toBeInTheDocument();
+    expect(screen.getByTestId('library-collections-empty')).toBeInTheDocument();
+
+    // Release Status filter (draft) is collection-savable metadata.
+    fireEvent.click(screen.getByRole('button', { name: /^Draft /u }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+      expect(screen.queryByText('Never Say A Word')).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId('library-collection-create-toggle'));
+    expect(
+      screen.getByTestId('library-collection-create-form')
+    ).toBeInTheDocument();
+
+    await user.type(
+      screen.getByTestId('library-collection-name-input'),
+      'Summer Release'
+    );
+    await user.click(screen.getByTestId('library-collection-create-submit'));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('library-collections-empty')
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('Summer Release')).toBeInTheDocument();
+    });
+
+    const collectionsNav = screen.getByTestId('library-collections');
+    const collectionSelect = within(collectionsNav).getByRole('button', {
+      name: /^Summer Release/u,
+    });
+    expect(collectionSelect.getAttribute('data-testid')).toMatch(
+      /^library-collection-select-col_/u
+    );
+
+    // Clear filters then re-select the collection — dynamic view, no file move.
+    fireEvent.click(screen.getByRole('button', { name: /Clear Filters/u }));
+    await waitFor(() => {
+      expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+      expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+    });
+
+    fireEvent.click(collectionSelect);
+    await waitFor(() => {
+      expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+      expect(screen.queryByText('Never Say A Word')).not.toBeInTheDocument();
+    });
+  });
+
+  it('filters by release tag from the library rail without moving files', async () => {
+    renderLibraryWithSidebarOverride([
+      buildAsset({
+        id: 'release-1',
+        title: 'Take Me Over',
+        label: 'Jovie',
+        genres: [],
+      }),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        label: 'Other Label',
+        genres: [],
+      }),
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Jovie/u }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+      expect(screen.queryByText('Never Say A Word')).not.toBeInTheDocument();
+    });
   });
 });
