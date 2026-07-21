@@ -140,9 +140,9 @@ run_trufflehog_pre_commit() {
   fi
 
   echo "Running trufflehog filesystem on ${#staged_files[@]} staged file(s)..."
-  # No $(trufflehog_exclude_args) here: --exclude-globs only exists in
-  # trufflehog's git mode (filesystem mode rejects it), and exclusions are
-  # already applied above via is_trufflehog_excluded when building the list.
+  # --exclude-globs is git-mode-only (verified on 3.95.5 and 3.95.9:
+  # filesystem mode rejects the flag). The staged list above was already
+  # filtered through is_trufflehog_excluded, which honors the same file.
   # shellcheck disable=SC2048,SC2086
   "$TRUFFLEHOG_BIN" filesystem \
     ${staged_files[@]} \
@@ -237,7 +237,6 @@ run_trufflehog_git() {
   # shellcheck disable=SC2046
   "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) \
     >"$log" 2>&1 || status=$?
-  cat "$log"
   if [[ $status -ne 0 ]] && grep -qiE "$CLONE_CORRUPTION_SIGNATURE" "$log"; then
     echo "::error title=Secret scan checkout corruption::TruffleHog could not read the runner's Git object store; repairing the checkout and retrying once." >&2
     repair_partial_clone || {
@@ -247,24 +246,90 @@ run_trufflehog_git() {
       return "$status"
     }
     status=0
+    # The retry's output replaces the corrupted attempt wholesale so range
+    # classification downstream parses exactly one final scan result.
+    : >"$log"
     # shellcheck disable=SC2046
     "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) \
-      || status=$?
+      >"$log" 2>&1 || status=$?
   fi
+  cat "$log"
   rm -f "$log"
   return $status
 }
 
+# trufflehog's git --since-commit is not a rev-list exclusion: it walks
+# `git log --patch --full-history <head> -- . ':(exclude)<glob>'...` and stops
+# at the first walked commit equal to the base (verified against the 3.95.9
+# source and the exact CI binary, JOV-4333). A base commit that only touches
+# excluded paths never appears in that path-limited log, so the walk widens
+# into history below the base and attributes pre-existing main content to this
+# event. Git's own rev-list is the exact range contract: findings outside
+# <base>..HEAD are classified loudly and excluded from this event's verdict;
+# findings inside it fail the scan.
+classify_trufflehog_ci_pr_findings() {
+  local base_commit="$1" scan_log="$2" status="$3"
+  local finding_commits range_file inside outside
+
+  # trufflehog can abort its own scan preparation (for example go-git
+  # merge-base resolution over a shallow-clone boundary) yet still exit 0
+  # with zero findings. That is a scan that never ran; never accept it.
+  if grep -q 'encountered errors during scan' "$scan_log"; then
+    echo "::error title=Secret scan incomplete::trufflehog aborted its git scan before completion; failing closed instead of accepting an empty result." >&2
+    return 1
+  fi
+
+  finding_commits="$(
+    grep -oE '^Commit: [0-9a-f]{40}$' "$scan_log" | awk '{print $2}' | sort -u
+  )"
+  if [[ -z "$finding_commits" ]]; then
+    return "$status"
+  fi
+  if [[ "$status" -ne 0 && "$status" -ne 183 ]]; then
+    return "$status"
+  fi
+
+  range_file="$(mktemp)"
+  # NB: this function runs with set -e suspended (checked `||` call site), so
+  # every fallible command needs an explicit guard.
+  if ! git rev-list "${base_commit}..HEAD" >"$range_file"; then
+    rm -f "$range_file"
+    echo "::error title=Secret scan range check failed::could not compute the exact ${base_commit}..HEAD range for finding classification; failing closed." >&2
+    return 1
+  fi
+  inside="$(grep -xF -f "$range_file" <<<"$finding_commits" || true)"
+  outside="$(grep -vxF -f "$range_file" <<<"$finding_commits" || true)"
+  rm -f "$range_file"
+  if [[ -n "$outside" ]]; then
+    echo "::warning title=Secret scan range widened below exact base::trufflehog walked past the exact scan base and reported pre-existing content in $(wc -l <<<"$outside" | tr -d ' ') out-of-range commit(s): $(paste -sd, - <<<"$outside"). These commits are not in ${base_commit}..HEAD and cannot fail this event; track them on main." >&2
+  fi
+  if [[ -n "$inside" ]]; then
+    return 183
+  fi
+  return 0
+}
+
 run_trufflehog_ci_pr() {
-  local base_commit
+  local base_commit scan_log status classify_status
   base_commit="$(git rev-parse "$BASE_REF")"
 
   echo "Running trufflehog git since ${BASE_REF} (${base_commit})..."
+  scan_log="$(mktemp)"
+  status=0
   run_trufflehog_git \
     --since-commit "$base_commit" \
     --branch HEAD \
     --no-verification \
-    --fail
+    --fail >"$scan_log" 2>&1 || status=$?
+  cat "$scan_log"
+  # The classifier owns the final verdict: trufflehog's raw exit status
+  # reflects findings anywhere its walk reached, not necessarily this event's
+  # exact range.
+  classify_status=0
+  classify_trufflehog_ci_pr_findings "$base_commit" "$scan_log" "$status" \
+    || classify_status=$?
+  rm -f "$scan_log"
+  return "$classify_status"
 }
 
 run_trufflehog_full() {
