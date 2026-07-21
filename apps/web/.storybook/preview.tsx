@@ -6,9 +6,95 @@ import React from 'react';
 import { ToastProvider } from '../components/providers/ToastProvider';
 import '../app/globals.css';
 
+/**
+ * Deterministic Storybook fixtures (Phase 2 visual-testing policy).
+ * Fixed clock, stable IDs, disabled animations, seeded data — prevent
+ * Chromatic false positives that burn the free-tier snapshot budget.
+ * @see https://www.chromatic.com/docs/snapshots/
+ * @see docs/VISUAL_TESTING_POLICY.md
+ */
+const FIXED_NOW = new Date('2026-01-15T12:00:00.000Z');
+const STABLE_ID_PREFIX = 'sb-stable';
+
+function installDeterministicFixtures(): void {
+  if (typeof window === 'undefined') return;
+  if ((window as Window & { __jovieStorybookFixtures?: boolean }).__jovieStorybookFixtures) {
+    return;
+  }
+  (window as Window & { __jovieStorybookFixtures?: boolean }).__jovieStorybookFixtures =
+    true;
+
+  // Fixed clock — Date.now is the primary source of time drift in snapshots.
+  const fixedMs = FIXED_NOW.getTime();
+  Date.now = () => fixedMs;
+
+  // Stable Math.random for seeded-looking data in stories that call it.
+  let seed = 0x5f3759df;
+  Math.random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+
+  // Stable React useId / crypto.randomUUID for deterministic DOM ids.
+  let idSeq = 0;
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    crypto.randomUUID = () => {
+      idSeq += 1;
+      const n = idSeq.toString(16).padStart(12, '0');
+      return `00000000-0000-4000-8000-${n.slice(-12)}`;
+    };
+  }
+
+  // Inject CSS that freezes animation/transition for Chromatic + a11y runs.
+  const style = document.createElement('style');
+  style.setAttribute('data-jovie-storybook-fixtures', 'true');
+  style.textContent = `
+    *, *::before, *::after {
+      animation-duration: 0s !important;
+      animation-delay: 0s !important;
+      transition-duration: 0s !important;
+      transition-delay: 0s !important;
+      caret-color: transparent !important;
+    }
+    .skeleton, [data-shimmer], [class*="animate-"] {
+      animation: none !important;
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Prefer reduced motion so components that branch on it render consistently.
+  try {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      configurable: true,
+      value: (query: string) => {
+        const reduced = query.includes('prefers-reduced-motion');
+        return {
+          matches: reduced,
+          media: query,
+          onchange: null,
+          addListener: () => undefined,
+          removeListener: () => undefined,
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+          dispatchEvent: () => false,
+        } as MediaQueryList;
+      },
+    });
+  } catch {
+    // ignore if already non-configurable
+  }
+
+  // Stable id helper for stories that need an explicit id prop.
+  (window as Window & { __jovieStableId?: (name: string) => string }).__jovieStableId =
+    (name: string) => `${STABLE_ID_PREFIX}-${name}`;
+}
+
 // Intercept /api/* fetches to prevent unhandled rejections from TanStack Query
 // background refetches that 404 in the Storybook test environment.
 if (typeof window !== 'undefined') {
+  installDeterministicFixtures();
+
   const originalFetch = window.fetch;
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const raw =
@@ -34,6 +120,13 @@ if (typeof window !== 'undefined') {
 
 const preview: Preview = {
   parameters: {
+    // Chromatic: pause animations (defense in depth vs CSS above)
+    chromatic: {
+      pauseAnimationAtEnd: true,
+      delay: 0,
+      // One Chrome viewport by free-tier policy unless layout truly changes.
+      modes: undefined,
+    },
     controls: {
       matchers: {
         color: /(background|color)$/i,
@@ -95,11 +188,11 @@ const preview: Preview = {
           <ThemeProvider
             attribute='class'
             defaultTheme='dark'
-            enableSystem
+            enableSystem={false}
             disableTransitionOnChange
-            storageKey='jovie-theme'
+            storageKey='jovie-theme-storybook'
           >
-            <TooltipProvider>
+            <TooltipProvider delayDuration={0} skipDelayDuration={0}>
               <ToastProvider>
                 <Story />
               </ToastProvider>
