@@ -15,6 +15,17 @@ import { formatSchemaEventStartDate } from './event-date';
 /** Max MusicEvent schemas to emit (Google shows ~5 in rich results). */
 export const MAX_EVENT_SCHEMAS = 5;
 
+/** Max linked-entity `mentions` to emit on the profile entity node. */
+export const MAX_ENTITY_MENTIONS = 25;
+
+/** A profile-linked entity (own release or credited artist) for JSON-LD mentions. */
+export interface ProfileEntityMention {
+  readonly kind: 'release' | 'artist';
+  readonly name: string;
+  /** Absolute URL of the entity's Jovie page. */
+  readonly url: string;
+}
+
 const SOCIAL_PLATFORMS = new Set([
   'instagram',
   'twitter',
@@ -111,7 +122,8 @@ function buildArtistEntitySchema(
   profileUrl: string,
   genres: string[] | null,
   uniqueSocialUrls: string[],
-  listenActions: ReturnType<typeof buildListenActions>
+  listenActions: ReturnType<typeof buildListenActions>,
+  entityMentions: readonly ProfileEntityMention[]
 ): Record<string, unknown> {
   return {
     '@type': resolveArtistEntityType(profile.creator_type),
@@ -120,6 +132,13 @@ function buildArtistEntitySchema(
     description: profile.bio || `Music by ${artistName}`,
     url: profileUrl,
     ...(uniqueSocialUrls.length > 0 && { sameAs: uniqueSocialUrls }),
+    ...(entityMentions.length > 0 && {
+      mentions: entityMentions.slice(0, MAX_ENTITY_MENTIONS).map(mention => ({
+        '@type': mention.kind === 'artist' ? 'MusicGroup' : 'MusicRecording',
+        name: mention.name,
+        url: mention.url,
+      })),
+    }),
     genre: genres && genres.length > 0 ? genres : ['Music'],
     ...(profile.avatar_url && {
       image: {
@@ -248,7 +267,8 @@ export function generateProfileStructuredData(
   genres: string[] | null,
   links: LegacySocialLink[],
   tourDates: TourDateViewModel[] = [],
-  identityLinks: EntityIdentityLink[] = []
+  identityLinks: EntityIdentityLink[] = [],
+  entityMentions: readonly ProfileEntityMention[] = []
 ) {
   const artistName = profile.display_name || profile.username;
   const normalizedUsername =
@@ -263,7 +283,8 @@ export function generateProfileStructuredData(
     profileUrl,
     genres,
     uniqueSocialUrls,
-    listenActions
+    listenActions,
+    entityMentions
   );
   const profilePageSchema = buildProfilePageSchema(
     profile,
