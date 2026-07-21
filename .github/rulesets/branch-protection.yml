@@ -146,9 +146,10 @@ rules:
       grouping_strategy: 'ALLGREEN'
       min_entries_to_merge: 1
       max_entries_to_merge: 10
-      # At most two queued PRs may request checks concurrently, using expanded
-      # runner capacity without an unbounded merge-group fan-out.
-      max_entries_to_build: 2
+      # Eight concurrent merge_group builds (~10 peak jobs each) fit under the
+      # ~120 org Actions concurrency ceiling while leaving headroom for source
+      # PR CI and release. Raise toward 10–12 only after measured land waves.
+      max_entries_to_build: 8
       min_entries_to_merge_wait_minutes: 0
       check_response_timeout_minutes: 60
 
