@@ -1,5 +1,10 @@
 import { BASE_URL } from '@/constants/app';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import {
+  getRegistryEntry,
+  isDspPlatform,
+  normalizePlatformKey,
+} from '@/lib/dsp-registry';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -23,9 +28,24 @@ export interface ProfileAeoFaqItem {
   readonly source: ProfileAeoSource;
 }
 
+export interface ProfileAeoFact {
+  readonly label: string;
+  readonly value: string;
+}
+
+export interface ProfileAeoLink {
+  readonly id: string;
+  readonly platform: string;
+  readonly label: string;
+  readonly url: string;
+}
+
 export interface ProfileAeoContent {
   readonly artistName: string;
   readonly profileUrl: string;
+  readonly facts: readonly ProfileAeoFact[];
+  readonly listenLinks: readonly ProfileAeoLink[];
+  readonly followLinks: readonly ProfileAeoLink[];
   readonly description: readonly string[];
   readonly faqs: readonly ProfileAeoFaqItem[];
 }
@@ -205,6 +225,97 @@ function getOrigin(artist: Artist): string | null {
 
 function pluralize(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function sentenceCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function buildFacts(
+  artist: Artist,
+  genres: readonly string[]
+): ProfileAeoFact[] {
+  const facts: ProfileAeoFact[] = [];
+
+  if (genres.length > 0) {
+    facts.push({ label: 'Genre', value: sentenceCase(genres.join(', ')) });
+  }
+
+  if (artist.active_since_year) {
+    facts.push({
+      label: 'Active Since',
+      value: String(artist.active_since_year),
+    });
+  }
+
+  const origin = getOrigin(artist);
+  if (origin) {
+    facts.push({ label: 'Hometown', value: origin });
+  }
+
+  return facts;
+}
+
+function getPlatformLabel(platform: string): string {
+  const key = normalizePlatformKey(platform);
+  return (key ? getRegistryEntry(key)?.name : undefined) ?? platform;
+}
+
+function buildLinkSections(
+  artist: Artist,
+  socialLinks: readonly LegacySocialLink[]
+): {
+  readonly listenLinks: ProfileAeoLink[];
+  readonly followLinks: ProfileAeoLink[];
+} {
+  const listenLinks: ProfileAeoLink[] = [];
+  const followLinks: ProfileAeoLink[] = [];
+  const seenPlatforms = new Set<string>();
+
+  for (const link of socialLinks) {
+    const url = cleanText(link.url);
+    if (!url) continue;
+
+    const key = normalizePlatformKey(link.platform) ?? link.platform;
+    if (seenPlatforms.has(key)) continue;
+    seenPlatforms.add(key);
+
+    const item: ProfileAeoLink = {
+      id: link.id,
+      platform: link.platform,
+      label: getPlatformLabel(link.platform),
+      url,
+    };
+    if (isDspPlatform(link.platform)) {
+      listenLinks.push(item);
+    } else {
+      followLinks.push(item);
+    }
+  }
+
+  // Profile DSP URL columns fill in destinations that have no social link.
+  // YouTube is categorized as social by isDspPlatform, so the column only
+  // joins the listen row when the artist has no YouTube social link.
+  const dspColumnFallbacks = [
+    { platform: 'spotify', url: artist.spotify_url },
+    { platform: 'apple_music', url: artist.apple_music_url },
+    { platform: 'youtube', url: artist.youtube_url },
+  ] as const;
+
+  for (const fallback of dspColumnFallbacks) {
+    const url = cleanText(fallback.url);
+    if (!url || seenPlatforms.has(fallback.platform)) continue;
+    seenPlatforms.add(fallback.platform);
+
+    listenLinks.push({
+      id: `dsp-column-${fallback.platform}`,
+      platform: fallback.platform,
+      label: getPlatformLabel(fallback.platform),
+      url,
+    });
+  }
+
+  return { listenLinks, followLinks };
 }
 
 function buildDescription(params: {
@@ -419,10 +530,14 @@ export function buildProfileAeoContent({
     artistHandle: artist.handle,
     releases,
   });
+  const { listenLinks, followLinks } = buildLinkSections(artist, socialLinks);
 
   return {
     artistName: artist.name,
     profileUrl: absoluteProfileUrl(artist.handle),
+    facts: buildFacts(artist, uniqueGenres),
+    listenLinks,
+    followLinks,
     description: buildDescription({
       artist,
       genres: uniqueGenres,

@@ -1,5 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { ProfileAboutShare } from '@/features/profile/ProfileAboutShare';
 import type { ProfileAeoContent as ProfileAeoContentModel } from '@/lib/profile/aeo-content';
 
 interface ProfileAeoContentProps {
@@ -18,13 +20,90 @@ export function ProfileAeoContent({
       data-testid='profile-aeo-content'
     >
       <div className='profile-aeo-content__inner mx-auto grid max-w-5xl gap-8 border-t pt-8 lg:gap-11 lg:pt-10'>
-        <div className='space-y-3 lg:sticky lg:top-12 lg:self-start'>
-          <h2
-            id='profile-aeo-heading'
-            className='profile-aeo-content__heading text-3xl font-semibold leading-tight tracking-tight text-balance'
-          >
-            About {content.artistName}
-          </h2>
+        <div className='space-y-5 lg:sticky lg:top-12 lg:self-start'>
+          <div className='flex items-start justify-between gap-4'>
+            <h2
+              id='profile-aeo-heading'
+              className='profile-aeo-content__heading text-3xl font-semibold leading-tight tracking-tight text-balance'
+            >
+              About {content.artistName}
+            </h2>
+            <ProfileAboutShare
+              url={content.profileUrl}
+              artistName={content.artistName}
+            />
+          </div>
+
+          {content.facts.length > 0 ? (
+            <dl
+              className='profile-aeo-content__facts flex flex-col gap-3 border-y py-4 sm:flex-row sm:flex-wrap sm:gap-x-10 sm:gap-y-4'
+              data-testid='profile-about-facts'
+            >
+              {content.facts.map(fact => (
+                <div key={fact.label} className='space-y-1'>
+                  <dt className='profile-aeo-content__fact-label text-xs font-medium'>
+                    {fact.label}
+                  </dt>
+                  <dd className='profile-aeo-content__fact-value text-mid font-medium'>
+                    {fact.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+
+          {content.listenLinks.length > 0 ? (
+            <div className='space-y-2' data-testid='profile-about-listen'>
+              <h3 className='profile-aeo-content__link-label text-xs font-medium'>
+                Listen
+              </h3>
+              <ul className='flex flex-wrap items-center gap-x-5 gap-y-2'>
+                {content.listenLinks.map(link => (
+                  <li key={link.id}>
+                    <a
+                      href={link.url}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='profile-aeo-content__link inline-flex min-h-11 items-center gap-2 text-sm font-medium transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--profile-aeo-text)'
+                    >
+                      <SocialIcon
+                        platform={link.platform}
+                        className='h-4 w-4'
+                      />
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {content.followLinks.length > 0 ? (
+            <div className='space-y-2' data-testid='profile-about-follow'>
+              <h3 className='profile-aeo-content__link-label text-xs font-medium'>
+                Follow
+              </h3>
+              <ul className='flex flex-wrap items-center gap-1'>
+                {content.followLinks.map(link => (
+                  <li key={link.id}>
+                    <a
+                      href={link.url}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='profile-aeo-content__link inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--profile-aeo-text)'
+                      aria-label={`Follow ${content.artistName} on ${link.label}`}
+                    >
+                      <SocialIcon
+                        platform={link.platform}
+                        className='h-5 w-5'
+                      />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <div className='profile-aeo-content__body space-y-3 text-mid leading-7 text-pretty'>
             {content.description.map(paragraph => (
               <p key={paragraph}>{paragraph}</p>

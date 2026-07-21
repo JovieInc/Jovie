@@ -179,6 +179,178 @@ describe('Profile AEO content', () => {
     expect(content.faqs[3]?.answer).toContain('$68.00');
   });
 
+  it('builds the facts strip from genres, active year, and hometown', () => {
+    const content = buildContent();
+
+    expect(content.facts).toEqual([
+      { label: 'Genre', value: 'Tech house, electronic, club' },
+      { label: 'Active Since', value: '2018' },
+      { label: 'Hometown', value: 'Austin, TX' },
+    ]);
+  });
+
+  it('falls back to location for the hometown fact only when hometown is missing', () => {
+    const content = buildProfileAeoContent({
+      artist: { ...baseArtist, hometown: null, location: 'Berlin, DE' },
+      now,
+    });
+
+    expect(content.facts).toContainEqual({
+      label: 'Hometown',
+      value: 'Berlin, DE',
+    });
+
+    const withHometown = buildProfileAeoContent({ artist: baseArtist, now });
+    expect(withHometown.facts).toContainEqual({
+      label: 'Hometown',
+      value: 'Austin, TX',
+    });
+  });
+
+  it('omits the facts strip fields that have no data', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        hometown: null,
+        location: null,
+        active_since_year: null,
+        genres: null,
+      },
+      now,
+    });
+
+    expect(content.facts).toEqual([]);
+  });
+
+  it('splits social links into listen (DSP) and follow (non-DSP) rows', () => {
+    const content = buildProfileAeoContent({
+      artist: baseArtist,
+      socialLinks: [
+        ...socialLinks,
+        {
+          id: 'link-2',
+          artist_id: 'artist-1',
+          platform: 'instagram',
+          url: 'https://instagram.com/djtest',
+          clicks: 0,
+          created_at: '2024-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'link-3',
+          artist_id: 'artist-1',
+          platform: 'youtube',
+          url: 'https://youtube.com/@djtest',
+          clicks: 0,
+          created_at: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+      now,
+    });
+
+    expect(content.listenLinks.map(link => link.label)).toEqual([
+      'Spotify',
+      'Apple Music',
+    ]);
+    expect(content.listenLinks[0]?.url).toBe(
+      'https://open.spotify.com/artist/test'
+    );
+    // The apple_music_url profile column fills in the missing DSP link.
+    expect(content.listenLinks[1]?.url).toBe(
+      'https://music.apple.com/artist/test'
+    );
+    // A YouTube social link is categorized as follow, not listen, and
+    // suppresses the youtube_url column fallback.
+    expect(content.followLinks.map(link => link.platform)).toEqual([
+      'instagram',
+      'youtube',
+    ]);
+  });
+
+  it('uses profile DSP URL columns for the listen row when no social links exist', () => {
+    const content = buildProfileAeoContent({
+      artist: baseArtist,
+      socialLinks: [],
+      now,
+    });
+
+    expect(content.listenLinks.map(link => link.platform)).toEqual([
+      'spotify',
+      'apple_music',
+      'youtube',
+    ]);
+    expect(content.followLinks).toEqual([]);
+  });
+
+  it('renders the facts strip, listen, follow, and share controls', () => {
+    const content = buildProfileAeoContent({
+      artist: baseArtist,
+      genres: ['tech house'],
+      socialLinks: [
+        ...socialLinks,
+        {
+          id: 'link-2',
+          artist_id: 'artist-1',
+          platform: 'instagram',
+          url: 'https://instagram.com/djtest',
+          clicks: 0,
+          created_at: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+      now,
+    });
+
+    render(<ProfileAeoContent content={content} />);
+
+    const facts = screen.getByTestId('profile-about-facts');
+    expect(facts).toBeVisible();
+    expect(facts).toHaveTextContent('Genre');
+    expect(facts).toHaveTextContent('Active Since');
+    expect(facts).toHaveTextContent('Hometown');
+
+    const listen = screen.getByTestId('profile-about-listen');
+    expect(listen).toBeVisible();
+    const spotifyLink = screen.getByRole('link', { name: 'Spotify' });
+    expect(spotifyLink).toHaveAttribute(
+      'href',
+      'https://open.spotify.com/artist/test'
+    );
+    expect(spotifyLink).toHaveAttribute('target', '_blank');
+    expect(spotifyLink).toHaveAttribute('rel', 'noopener noreferrer');
+
+    const follow = screen.getByTestId('profile-about-follow');
+    expect(follow).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Follow DJ Test on Instagram' })
+    ).toHaveAttribute('href', 'https://instagram.com/djtest');
+
+    expect(screen.getByTestId('profile-about-share')).toBeVisible();
+  });
+
+  it('hides the facts, listen, and follow sections when there is no data', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        hometown: null,
+        location: null,
+        active_since_year: null,
+        genres: null,
+        spotify_url: undefined,
+        apple_music_url: undefined,
+        youtube_url: undefined,
+      },
+      socialLinks: [],
+      now,
+    });
+
+    render(<ProfileAeoContent content={content} />);
+
+    expect(screen.queryByTestId('profile-about-facts')).toBeNull();
+    expect(screen.queryByTestId('profile-about-listen')).toBeNull();
+    expect(screen.queryByTestId('profile-about-follow')).toBeNull();
+    expect(screen.getByTestId('profile-about-share')).toBeVisible();
+    expect(screen.getByTestId('profile-aeo-content')).toBeVisible();
+  });
+
   it('keeps sparse profiles unique and sourced instead of using duplicate boilerplate', () => {
     const first = buildProfileAeoContent({
       artist: {

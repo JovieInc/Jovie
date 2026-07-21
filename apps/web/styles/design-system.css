@@ -395,6 +395,26 @@
   text-decoration-color: var(--profile-aeo-text);
 }
 
+:where(.profile-aeo-content__facts) {
+  border-color: var(--profile-aeo-border);
+}
+
+:where(.profile-aeo-content__fact-value) {
+  color: var(--profile-aeo-text);
+}
+
+:where(.profile-aeo-content__fact-label),
+:where(.profile-aeo-content__link-label),
+:where(.profile-aeo-content__link),
+:where(.profile-aeo-content__share) {
+  color: var(--profile-aeo-muted);
+}
+
+:where(.profile-aeo-content__link:hover),
+:where(.profile-aeo-content__share:hover) {
+  color: var(--profile-aeo-text);
+}
+
 :where(.profile-aeo-claim-card) {
   --profile-aeo-claim-ink: var(--system-b-cinematic-black);
   background: var(--color-bg-paper);
