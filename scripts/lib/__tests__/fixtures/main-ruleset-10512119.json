@@ -34,7 +34,8 @@
           { "context": "PR Ready" },
           { "context": "Migration Guard" },
           { "context": "Fork PR Gate" },
-          { "context": "PR Size Guard" }
+          { "context": "PR Size Guard" },
+          { "context": "Visual Approval Guard" }
         ],
         "strict_required_status_checks_policy": false
       }
