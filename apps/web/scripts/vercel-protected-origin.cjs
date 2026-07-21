@@ -52,12 +52,26 @@ function stripInlineScripts(html) {
 }
 const PUBLIC_HTML_SURFACES = Object.freeze([
   { label: 'Homepage', path: '/', minimumBytes: 1_000 },
-  { label: 'Public profile', path: '/tim', minimumBytes: 500 },
+  {
+    label: 'Public profile',
+    path: '/tim',
+    minimumBytes: 500,
+    requiredContent: 'data-testid="public-profile-layout-shell"',
+  },
   { label: 'Signup', path: '/signup', minimumBytes: 500 },
   { label: 'Signin', path: '/signin', minimumBytes: 500 },
   { label: 'Start', path: '/start', minimumBytes: 500 },
   { label: 'Pricing', path: '/pricing', minimumBytes: 500 },
 ]);
+
+function projectSemanticHtml(body) {
+  // App Router serializes alternate error/not-found boundaries into hydration
+  // scripts even when the rendered route is healthy. Only inspect content the
+  // document can present; malformed or unclosed inert blocks remain fail-closed.
+  return body
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|style|template)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '');
+}
 
 function parseProbeUrl(rawUrl, label = 'Probe URL') {
   let url;
@@ -956,8 +970,15 @@ async function verifyPublicSurfaceOnce(
   ) {
     throw new Error(`${surface.label} returned an incomplete document.`);
   }
-  if (PUBLIC_ERROR_CONTENT.test(stripInlineScripts(body))) {
+  const semanticHtml = projectSemanticHtml(body);
+  if (PUBLIC_ERROR_CONTENT.test(semanticHtml)) {
     throw new Error(`${surface.label} returned error or not-found content.`);
+  }
+  if (
+    surface.requiredContent &&
+    !semanticHtml.includes(surface.requiredContent)
+  ) {
+    throw new Error(`${surface.label} omitted its semantic sentinel.`);
   }
 }
 

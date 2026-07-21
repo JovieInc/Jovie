@@ -191,6 +191,28 @@ function responseFixture({
   };
 }
 
+function publicSurfaceFetchFixture(html: string) {
+  return vi.fn(async (rawUrl: URL, _options: unknown) => {
+    const url = new URL(rawUrl);
+    const isHealth = url.pathname === '/api/health';
+    return {
+      status: 200,
+      url: url.href,
+      headers: {
+        get: (name: string) =>
+          name.toLowerCase() === 'content-type'
+            ? isHealth
+              ? 'application/json'
+              : 'text/html; charset=utf-8'
+            : null,
+      },
+      text: vi
+        .fn()
+        .mockResolvedValue(isHealth ? JSON.stringify({ status: 'ok' }) : html),
+    };
+  });
+}
+
 function browserFixture({ leakToChild = false } = {}) {
   const setCookie = vi.fn().mockResolvedValue(undefined);
   const newPage = vi.fn(async () => {
@@ -1174,7 +1196,10 @@ describe('origin-bound Vercel protection bypass', () => {
     body,
     error,
   }) => {
-    const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
+    const html =
+      '<html><body><main data-testid="public-profile-layout-shell">' +
+      'healthy'.repeat(200) +
+      '</main></body></html>';
     const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {
       const url = new URL(rawUrl);
       const isFailure = url.pathname === failingPath;
@@ -1208,86 +1233,17 @@ describe('origin-bound Vercel protection bypass', () => {
     ).rejects.toThrow(error);
   });
 
-  it('accepts a healthy profile whose inline flight payload serializes the not-found boundary', async () => {
-    // Next.js embeds the route's not-found template inside the RSC flight
-    // payload of every HEALTHY page render. The error-content scan must not
-    // treat that serialized script text as rendered error content.
-    const healthyProfile =
-      '<html><body><h1>Tim White</h1>' +
+  it.each([
+    ['Next.js hydration script', '<script>Profile not found</script>'],
+    ['style block', '<style>/* Profile not found */</style>'],
+  ])('ignores not-found fallback copy in a closed inert %s', async (_, inert) => {
+    const html =
+      '<html><body><main data-testid="public-profile-layout-shell">' +
       'healthy'.repeat(200) +
-      '<script>self.__next_f.push([1,"{\\"className\\":\\"system-b-public-profile-not-found-title\\",\\"children\\":\\"Profile not found\\"}"])</script>' +
-      '<script type="application/json">{"message":"Something went wrong"}</script>' +
+      '</main>' +
+      inert +
       '</body></html>';
-    const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
-    const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {
-      const url = new URL(rawUrl);
-      const isHealth = url.pathname === '/api/health';
-      const isProfile = url.pathname === '/tim';
-      return {
-        status: 200,
-        url: url.href,
-        headers: {
-          get: (name: string) =>
-            name.toLowerCase() === 'content-type'
-              ? isHealth
-                ? 'application/json'
-                : 'text/html; charset=utf-8'
-              : null,
-        },
-        text: vi
-          .fn()
-          .mockResolvedValue(
-            isHealth
-              ? JSON.stringify({ status: 'ok', database: 'ok' })
-              : isProfile
-                ? healthyProfile
-                : html
-          ),
-      };
-    });
-
-    await verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
-      cookieHeader: '__vercel_live_token=opaque-cookie',
-      fetchImpl,
-      attempts: 1,
-    });
-    expect(
-      fetchImpl.mock.calls.some(([url]) => new URL(url).pathname === '/tim')
-    ).toBe(true);
-  });
-
-  it('still rejects rendered error content outside inline scripts', async () => {
-    const renderedError =
-      '<html><body><script>self.__next_f.push([1,"ok"])</script>' +
-      '<h1>Profile not found</h1>' +
-      'x'.repeat(600) +
-      '</body></html>';
-    const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
-    const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {
-      const url = new URL(rawUrl);
-      const isHealth = url.pathname === '/api/health';
-      return {
-        status: 200,
-        url: url.href,
-        headers: {
-          get: (name: string) =>
-            name.toLowerCase() === 'content-type'
-              ? isHealth
-                ? 'application/json'
-                : 'text/html; charset=utf-8'
-              : null,
-        },
-        text: vi
-          .fn()
-          .mockResolvedValue(
-            isHealth
-              ? JSON.stringify({ status: 'ok', database: 'ok' })
-              : url.pathname === '/tim'
-                ? renderedError
-                : html
-          ),
-      };
-    });
+    const fetchImpl = publicSurfaceFetchFixture(html);
 
     await expect(
       verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
@@ -1295,32 +1251,51 @@ describe('origin-bound Vercel protection bypass', () => {
         fetchImpl,
         attempts: 1,
       })
-    ).rejects.toThrow('Public profile returned error or not-found content.');
+    ).resolves.toBeUndefined();
+  });
+
+  it.each([
+    [
+      'visible error beside an inert fallback',
+      '<main data-testid="public-profile-layout-shell">Profile not found</main><script>Profile not found</script>',
+    ],
+    [
+      'unclosed hydration script',
+      '<main data-testid="public-profile-layout-shell">healthy</main><script>Profile not found',
+    ],
+  ])('fails closed on a $label', async (_label, fragment) => {
+    const html =
+      '<html><body>' + fragment + 'healthy'.repeat(200) + '</body></html>';
+    const fetchImpl = publicSurfaceFetchFixture(html);
+
+    await expect(
+      verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
+        cookieHeader: '__vercel_live_token=opaque-cookie',
+        fetchImpl,
+        attempts: 1,
+      })
+    ).rejects.toThrow('error or not-found content');
+  });
+
+  it('rejects a generic profile 200 without the public-profile sentinel', async () => {
+    const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
+    const fetchImpl = publicSurfaceFetchFixture(html);
+
+    await expect(
+      verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
+        cookieHeader: '__vercel_live_token=opaque-cookie',
+        fetchImpl,
+        attempts: 1,
+      })
+    ).rejects.toThrow('Public profile omitted its semantic sentinel');
   });
 
   it('checks the complete public-surface set with cookie-only exact-route requests', async () => {
-    const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
-    const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {
-      const url = new URL(rawUrl);
-      const isHealth = url.pathname === '/api/health';
-      return {
-        status: 200,
-        url: url.href,
-        headers: {
-          get: (name: string) =>
-            name.toLowerCase() === 'content-type'
-              ? isHealth
-                ? 'application/json'
-                : 'text/html; charset=utf-8'
-              : null,
-        },
-        text: vi
-          .fn()
-          .mockResolvedValue(
-            isHealth ? JSON.stringify({ status: 'ok' }) : html
-          ),
-      };
-    });
+    const html =
+      '<html><body><main data-testid="public-profile-layout-shell">' +
+      'healthy'.repeat(200) +
+      '</main></body></html>';
+    const fetchImpl = publicSurfaceFetchFixture(html);
 
     await verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
       cookieHeader: '__vercel_live_token=opaque-cookie',
