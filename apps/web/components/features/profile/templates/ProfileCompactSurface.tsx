@@ -26,7 +26,6 @@ import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { track } from '@/lib/analytics';
-import { Mark } from '@/lib/brand/primitives';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import {
@@ -288,7 +287,6 @@ export function ProfileCompactSurface({
   dataTestId,
   hideBackButton = false,
   hideMoreMenu = false,
-  hideJovieBranding = false,
   headerSocialLinksOverride,
   renderInteractiveOverlays = true,
   renderSemanticHeading = true,
@@ -428,9 +426,11 @@ export function ProfileCompactSurface({
   const isMenuActive =
     drawerOpen && drawerView === 'menu' && activeVisiblePrimaryTab !== 'tour';
   const topChromeButtonClassName =
-    'h-11! w-11! border-white/14 bg-black/24 text-white dark:text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md hover:bg-black/36';
+    'profile-top-chrome-icon text-white dark:text-white';
+  // 28px visual glyph box with a 44×44 hit area: box-content + p-2 grows the
+  // hit box to 44px while -m-2 cancels the layout footprint (no shift).
   const socialIconClassName =
-    'inline-flex h-7 w-7 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+    'box-content inline-flex h-7 w-7 items-center justify-center p-2 -m-2 text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   // Composition rule: the home hero has one definite token-driven height
   // (h-(--cover-height) = clamp(220px, 34svh, 400px)) on every viewport. It
   // never shrink-wraps — the old short-viewport min-h-0/flex-none band
@@ -616,7 +616,7 @@ export function ProfileCompactSurface({
                 <CircleIconButton
                   onClick={onBack}
                   size='lg'
-                  variant='pearl'
+                  variant='pearlQuiet'
                   className={topChromeButtonClassName}
                   ariaLabel='Back'
                 >
@@ -644,15 +644,14 @@ export function ProfileCompactSurface({
                 <CircleIconButton
                   onClick={onOpenMenu}
                   size='lg'
-                  variant='pearl'
+                  variant='pearlQuiet'
                   className={topChromeButtonClassName}
                   ariaLabel='Menu'
                 >
-                  {hideJovieBranding ? (
-                    <MoreHorizontal className='h-5 w-5' />
-                  ) : (
-                    <Mark size={18} className='h-5 w-5' />
-                  )}
+                  {/* The drawer is an overflow menu (Share / Pay / Contact), so
+                      the trigger wears the overflow ellipsis — never a brand
+                      mark or gear. */}
+                  <MoreHorizontal className='h-5 w-5' />
                 </CircleIconButton>
               )}
             </div>
@@ -678,7 +677,7 @@ export function ProfileCompactSurface({
                     href={profileHref}
                     prefetch={false}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md text-3xl font-semibold leading-none tracking-normal text-(--profile-status-pill-fg) drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
+                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md py-2.5 -my-2.5 text-3xl font-semibold leading-none tracking-normal text-(--profile-status-pill-fg) drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
                   >
                     <span className='min-w-0 max-w-full [overflow-wrap:anywhere]'>
                       {artist.name}
