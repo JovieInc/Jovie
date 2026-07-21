@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { normalizeArtistMetrics } from '@/lib/onboarding/canonical-metrics';
 import {
   evaluateAccessSignal,
   MAX_INTERVIEW_TURNS_BEFORE_FORCE,
@@ -15,6 +16,29 @@ describe('evaluateAccessSignal', () => {
     });
     expect(result.kind).toBe('instant_access');
     expect(result.rationale).toContain('spotify_followers_1500');
+  });
+
+  it('does not treat monthly listeners as Spotify followers for access', () => {
+    const result = evaluateAccessSignal({
+      signal: EMPTY_SIGNAL,
+      spotifyFollowers: null,
+      metrics: normalizeArtistMetrics({
+        monthlyListeners: 500_000,
+      }),
+      turnCount: 1,
+    });
+    expect(result.kind).toBe('needs_more_info');
+  });
+
+  it('prefers metrics.spotifyFollowers over a contradictory bare count', () => {
+    const result = evaluateAccessSignal({
+      signal: EMPTY_SIGNAL,
+      spotifyFollowers: 50,
+      metrics: normalizeArtistMetrics({ spotifyFollowers: 2500 }),
+      turnCount: 1,
+    });
+    expect(result.kind).toBe('instant_access');
+    expect(result.rationale).toContain('spotify_followers_2500');
   });
 
   it('grants instant access at audience band 5k_to_50k', () => {

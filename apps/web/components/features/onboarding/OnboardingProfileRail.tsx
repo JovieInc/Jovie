@@ -2,6 +2,10 @@
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
+import {
+  type CanonicalArtistMetrics,
+  getDisplaySpotifyFollowers,
+} from '@/lib/onboarding/canonical-metrics';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
@@ -16,7 +20,12 @@ export interface OnboardingProfileArtist {
   readonly name: string;
   readonly url: string;
   readonly imageUrl?: string | null;
+  /**
+   * Display follower count — always `metrics.spotifyFollowers` when metrics
+   * are present. Kept as a convenience mirror; never store monthly listeners here.
+   */
   readonly followers?: number | null;
+  readonly metrics?: CanonicalArtistMetrics | null;
   readonly popularity?: number | null;
   readonly genres?: readonly string[];
   readonly dspMatches?: readonly OnboardingDspMatch[];
@@ -165,7 +174,10 @@ function buildPreviewArtist(
   const firstGenre = artist.genres?.[0]
     ? formatGenreLabel(artist.genres[0])
     : null;
-  const followerLabel = formatCompactCount(artist.followers);
+  // Single source: metrics.spotifyFollowers when present, else followers mirror.
+  const followerCount =
+    getDisplaySpotifyFollowers(artist.metrics) ?? artist.followers ?? null;
+  const followerLabel = formatCompactCount(followerCount);
 
   return {
     id: `onboarding-preview-${artist.id}`,

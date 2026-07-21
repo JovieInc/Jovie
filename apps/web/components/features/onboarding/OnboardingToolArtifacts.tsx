@@ -18,6 +18,15 @@ import {
   NONE_OF_THESE_CTA_LABEL,
 } from '@/lib/chat/onboarding-script/widget-events';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
+import {
+  type CanonicalArtistMetrics,
+  getDisplaySpotifyFollowers,
+  normalizeArtistMetrics,
+} from '@/lib/onboarding/canonical-metrics';
+import {
+  SUGGESTED_AVAILABLE_HANDLE_LABEL,
+  toHandleAvailabilityResult,
+} from '@/lib/onboarding/handle-availability';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useHandleAvailabilityQuery } from '@/lib/queries/useHandleAvailabilityQuery';
 import { cn } from '@/lib/utils';
@@ -45,12 +54,14 @@ export interface ArtistPickerOutput {
 export interface ArtistConfirmedOutput {
   readonly action?: 'spotify_artist_confirmed';
   readonly spotifyArtistId?: string;
+  readonly metrics?: CanonicalArtistMetrics | null;
   readonly artist?: {
     readonly id: string;
     readonly name: string;
     readonly url: string;
     readonly imageUrl?: string | null;
     readonly followers?: number | null;
+    readonly metrics?: CanonicalArtistMetrics | null;
     readonly popularity?: number | null;
     readonly genres?: readonly string[];
     readonly dspMatches?: readonly OnboardingDspMatch[];
@@ -73,6 +84,7 @@ export interface OnboardingArtistSelection {
   readonly url: string;
   readonly imageUrl?: string;
   readonly followers?: number;
+  readonly metrics?: CanonicalArtistMetrics;
   readonly popularity?: number;
 }
 
@@ -123,6 +135,24 @@ export function formatGenreLabel(genre: string): string {
         .join('-')
     )
     .join(' ');
+}
+
+function selectionFromSpotifyResult(
+  artist: SpotifyArtistResult
+): OnboardingArtistSelection {
+  const metrics = normalizeArtistMetrics(
+    { followers: artist.followers },
+    { source: 'spotify_search' }
+  );
+  return {
+    id: artist.id,
+    name: artist.name,
+    url: artist.url,
+    imageUrl: artist.imageUrl ?? undefined,
+    followers: getDisplaySpotifyFollowers(metrics) ?? undefined,
+    metrics,
+    popularity: artist.popularity ?? undefined,
+  };
 }
 
 function formatFollowers(count: number | null | undefined): string | null {
@@ -430,7 +460,7 @@ export function OnboardingSpotifyArtistPickerCard({
             selected={selectedId === artist.id}
             onSelect={() => {
               setSelectedId(artist.id);
-              onSelectArtist(artist);
+              onSelectArtist(selectionFromSpotifyResult(artist));
             }}
           />
         ))}
@@ -466,7 +496,11 @@ function ArtistResultRow({
   readonly selected: boolean;
   readonly onSelect: () => void;
 }) {
-  const followers = formatFollowers(artist.followers);
+  const metrics = normalizeArtistMetrics(
+    { followers: artist.followers },
+    { source: 'spotify_search' }
+  );
+  const followers = formatFollowers(getDisplaySpotifyFollowers(metrics));
   const meta = [
     followers,
     artist.popularity ? `Pop ${artist.popularity}` : null,
@@ -561,7 +595,7 @@ export function OnboardingHandleCheckCard({
   const [draftHandle, setDraftHandle] = useState(handle ?? '');
   const [confirmed, setConfirmed] = useState(false);
   const normalizedDraft = draftHandle.replace(/^@/, '').trim().toLowerCase();
-  const availability = useHandleAvailabilityQuery({
+  const availabilityQuery = useHandleAvailabilityQuery({
     handle: normalizedDraft || null,
     enabled: Boolean(normalizedDraft) && !isRunning(state) && !isFailed(state),
   });
@@ -597,9 +631,18 @@ export function OnboardingHandleCheckCard({
     );
   }
 
-  const loading = availability.isLoading || availability.isFetching;
-  const available = availability.data?.available;
-  const error = availability.data?.error;
+  const loading = availabilityQuery.isLoading || availabilityQuery.isFetching;
+  const availability = toHandleAvailabilityResult({
+    handle: normalizedDraft || handle || '',
+    available: loading ? null : (availabilityQuery.data?.available ?? null),
+    error: availabilityQuery.data?.error,
+    checking: loading,
+  });
+  const available =
+    availability.reason === 'checking' || availability.reason === 'unknown'
+      ? undefined
+      : availability.available;
+  const error = availability.error;
   const profilePath = normalizedDraft ? `jov.ie/${normalizedDraft}` : null;
   const canConfirm =
     Boolean(normalizedDraft) &&
@@ -667,7 +710,10 @@ export function OnboardingHandleCheckCard({
           <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
             {error ??
               (available === false
-                ? 'Try a sharper variant.'
+                ? availability.suggestedAlternatives &&
+                  availability.suggestedAlternatives.length > 0
+                  ? `${SUGGESTED_AVAILABLE_HANDLE_LABEL}: @${availability.suggestedAlternatives[0]}`
+                  : 'Try a sharper variant.'
                 : (profilePath ?? 'Edit the handle before it is claimed.'))}
           </p>
           {onConfirmHandle ? (
