@@ -1612,9 +1612,9 @@ describe('unit-test runner capacity', () => {
     expect(unitJob).not.toContain('runs-on: jovie-runner');
     expect(unitJob).not.toContain('ci-unit-runner-route');
     expect(unitJob).not.toContain('vars.CI_UNIT_RUNNER');
-    expect(unitJob).toContain('max-parallel: 5');
+    expect(unitJob).toContain('max-parallel: 120');
     expect(unitJob).toContain(
-      'Hosted capacity runs all five logical shards without consuming Gem'
+      'Do not artificially\n      # serialize unit shards'
     );
     expect(unitJob).toContain('all five named');
     expect(unitJob).toContain('warm-canary receipts');

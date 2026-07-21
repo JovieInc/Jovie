@@ -136,7 +136,7 @@ describe('merge_group workflow contract', () => {
     expect(units).toContain('runs-on: ubuntu-latest');
     expect(units).not.toContain('runs-on: jovie-runner');
     expect(units).not.toContain('vars.CI_UNIT_RUNNER');
-    expect(units).toContain('max-parallel: 5');
+    expect(units).toContain('max-parallel: 120');
     expect(units).toContain('all five named');
   });
 
@@ -272,8 +272,8 @@ describe('merge_group workflow contract', () => {
     expect(buildLayout).toContain('Run deterministic layout behavior guard');
     expect(buildLayout).not.toContain('actions/upload-artifact');
     expect(buildLayout).not.toContain('actions/download-artifact');
-    expect(unitTests).toContain("shard: ['1/5', '2/5', '3/5', '4/5', '5/5']");
-    expect(unitTests).toContain('max-parallel: 5');
+    expect(unitTests).toContain("shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']");
+    expect(unitTests).toContain('max-parallel: 120');
     expect(getJobBlock(CI_WORKFLOW, 'ci-a11y')).not.toContain(
       "github.event_name == 'merge_group'"
     );
