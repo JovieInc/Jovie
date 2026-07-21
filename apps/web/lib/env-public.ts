@@ -9,6 +9,33 @@ function getRuntimeHtmlDatasetValue(
 }
 
 /**
+ * Normalize a public URL env value into an absolute origin URL.
+ *
+ * Off-Vercel builds (e.g. `vercel build` in CI) may expose host-only values
+ * like `staging.jov.ie` — or miss NEXT_PUBLIC_* vars entirely — and a bare
+ * `new URL(raw)` then throws during page-data collection (e.g. /_not-found),
+ * aborting the whole build. This helper never throws: host-only values get an
+ * `https://` prefix and anything unparseable falls back.
+ */
+export function absolutePublicUrl(
+  raw: string | undefined,
+  fallback = 'https://jov.ie'
+): string {
+  const value = raw?.trim();
+  if (!value) {
+    return fallback;
+  }
+  const withProtocol = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value)
+    ? value
+    : `https://${value}`;
+  try {
+    return new URL(withProtocol).origin;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
  * Public environment variables with lazy access.
  *
  * Uses getters to read environment variables at access time rather than
@@ -45,10 +72,10 @@ export const publicEnv = {
   },
   get NEXT_PUBLIC_APP_URL() {
     // Single domain architecture: app routes are at jov.ie/app/*
-    return process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';
+    return absolutePublicUrl(process.env.NEXT_PUBLIC_APP_URL);
   },
   get NEXT_PUBLIC_PROFILE_URL() {
-    return process.env.NEXT_PUBLIC_PROFILE_URL || 'https://jov.ie';
+    return absolutePublicUrl(process.env.NEXT_PUBLIC_PROFILE_URL);
   },
   get NEXT_PUBLIC_PROFILE_HOSTNAME() {
     return process.env.NEXT_PUBLIC_PROFILE_HOSTNAME || 'jov.ie';
