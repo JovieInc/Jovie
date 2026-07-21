@@ -67,7 +67,18 @@ export function generateAppleClientSecret(): string {
     sub: clientId,
   };
   const signingInput = `${base64UrlEncodeJson(header)}.${base64UrlEncodeJson(payload)}`;
-  const key = createPrivateKey(normalizePrivateKeyPem(privateKeyRaw));
+  let key;
+  try {
+    key = createPrivateKey(normalizePrivateKeyPem(privateKeyRaw));
+  } catch (error) {
+    // Bad/truncated PEM in preview env must not crash Next page-data collection
+    // (seen as ERR_OSSL_UNSUPPORTED on /[username]/claim during staging build).
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `AUTH_APPLE_PRIVATE_KEY is not a valid PEM private key (${message}). ` +
+        'Fix the .p8 in Doppler or clear AUTH_APPLE_* to disable Apple sign-in.'
+    );
+  }
   const signature = sign('sha256', Buffer.from(signingInput), {
     key,
     dsaEncoding: 'ieee-p1363',
