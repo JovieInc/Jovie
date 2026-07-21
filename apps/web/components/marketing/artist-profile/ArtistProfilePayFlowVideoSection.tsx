@@ -11,6 +11,7 @@ import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
+import './ArtistProfilePayFlowVideoSection.css';
 
 const POSTER_PATH = getMarketingExportImage(
   'tim-white-profile-pay-mobile'
@@ -68,7 +69,7 @@ export function ArtistProfilePayFlowVideoSection({
       />
       <div className='mt-12 sm:mt-14 lg:mt-16'>
         <ArtistProfilePhoneFrame>
-          <div className='relative h-full w-full bg-black dark:bg-black'>
+          <div className='ap-payflow__frame relative h-full w-full'>
             <video
               ref={videoRef}
               aria-label={copy.ariaLabel}
@@ -84,7 +85,7 @@ export function ArtistProfilePayFlowVideoSection({
               onError={handleError}
             />
             {showPosterOverlay ? (
-              <div className='absolute inset-0 flex items-center justify-center bg-black/40'>
+              <div className='ap-payflow__overlay absolute inset-0 flex items-center justify-center'>
                 <Image
                   alt={copy.posterAlt}
                   src={POSTER_PATH}
@@ -97,7 +98,7 @@ export function ArtistProfilePayFlowVideoSection({
                   <button
                     type='button'
                     onClick={handlePlayClick}
-                    className='relative z-10 inline-flex items-center gap-2 rounded-full bg-white/95 px-5 py-3 text-sm font-medium text-black dark:text-white shadow-lg transition hover:bg-white dark:hover:bg-surface-1'
+                    className='ap-payflow__play relative z-10 inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-medium transition'
                   >
                     <Play
                       aria-hidden='true'
@@ -109,7 +110,7 @@ export function ArtistProfilePayFlowVideoSection({
                 ) : (
                   <div
                     aria-hidden='true'
-                    className='relative z-10 size-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80'
+                    className='ap-payflow__spinner relative z-10 size-8 animate-spin rounded-full border-2'
                   />
                 )}
               </div>

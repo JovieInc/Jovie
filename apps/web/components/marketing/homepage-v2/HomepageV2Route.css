@@ -1,0 +1,196 @@
+/*
+ * Homepage v2 (/new) — System B visual layer.
+ *
+ * TSX in this directory is under a strict System B source guard (no inline
+ * styles, no literals, no arbitrary utilities). Composition effects that the
+ * token utilities cannot express live here, token-derived where possible.
+ */
+
+@keyframes homepage-v2-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+@keyframes homepage-v2-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--drift-rotate, 0deg));
+  }
+  50% {
+    transform: translate3d(0, -6px, 0) rotate(var(--drift-rotate, 0deg));
+  }
+}
+
+/* Hero composition ------------------------------------------------------- */
+
+.homepage-v2-hero__backdrop {
+  background: var(--linear-hero-backdrop);
+}
+
+.homepage-v2-hero__glow {
+  height: 42rem;
+}
+
+.homepage-v2-hero__copy {
+  max-width: 34rem;
+}
+
+.homepage-v2-hero__headline {
+  max-width: 10ch;
+}
+
+.homepage-v2-hero__sub {
+  max-width: 31rem;
+}
+
+.homepage-v2-hero__visual {
+  min-height: 32rem;
+}
+
+@media (min-width: 640px) {
+  .homepage-v2-hero__visual {
+    min-height: 37rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .homepage-v2-hero__visual {
+    min-height: 42rem;
+  }
+}
+
+.homepage-v2-hero__glow-blob {
+  background: radial-gradient(
+    circle at center,
+    color-mix(in oklab, var(--color-accent) 18%, transparent),
+    transparent 68%
+  );
+}
+
+.homepage-v2-hero__phone {
+  width: 14.75rem;
+}
+
+@media (min-width: 640px) {
+  .homepage-v2-hero__phone {
+    width: 16.5rem;
+  }
+}
+
+.homepage-v2-hero__phone-float {
+  filter: drop-shadow(
+    0 38px 120px
+      color-mix(in oklab, var(--system-b-cinematic-black) 58%, transparent)
+  );
+  animation: homepage-v2-float 8s ease-in-out infinite;
+}
+
+.homepage-v2-hero__demo-scale {
+  transform-origin: top left;
+  transform: scale(0.41);
+  width: 244%;
+  min-height: 244%;
+}
+
+@media (min-width: 640px) {
+  .homepage-v2-hero__demo-scale {
+    transform: scale(0.455);
+  }
+}
+
+.homepage-v2-hero__shot {
+  animation: homepage-v2-drift 10s ease-in-out infinite;
+}
+
+.homepage-v2-hero__shot--a {
+  --drift-rotate: -3deg;
+  width: 52%;
+}
+
+.homepage-v2-hero__shot--b {
+  --drift-rotate: 2deg;
+  width: 44%;
+  animation-duration: 11s;
+}
+
+.homepage-v2-hero__shot--c {
+  --drift-rotate: 4deg;
+  width: 45%;
+  animation-duration: 12s;
+}
+
+.homepage-v2-hero__shot-a-frame {
+  border-radius: 1.15rem;
+}
+
+.homepage-v2-hero__card--a {
+  width: 15rem;
+}
+
+.homepage-v2-hero__card--b {
+  width: 15.75rem;
+}
+
+.homepage-v2-hero__card--c {
+  width: 16rem;
+}
+
+/* Spotlight sticky rail --------------------------------------------------- */
+
+.homepage-v2-spotlight__copy {
+  max-width: 23rem;
+}
+
+.homepage-v2-spotlight__heading {
+  max-width: 11ch;
+}
+
+.homepage-v2-capture__body {
+  max-width: 29rem;
+}
+
+.homepage-v2-spotlight-stage {
+  position: relative;
+}
+
+.homepage-v2-spotlight-rail {
+  position: relative;
+}
+
+@media (min-width: 1024px) and (min-height: 821px) {
+  .homepage-v2-spotlight-stage {
+    min-height: clamp(38rem, 62vw, 50rem);
+  }
+
+  .homepage-v2-spotlight-rail {
+    position: sticky;
+    top: clamp(
+      calc(var(--linear-header-height) + 1.25rem),
+      11svh,
+      calc(var(--linear-header-height) + 4rem)
+    );
+  }
+}
+
+/* Social proof ------------------------------------------------------------ */
+
+.homepage-v2-proof__header {
+  max-width: 40rem;
+}
+
+.homepage-v2-proof__scrim {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--system-b-cinematic-black) 5%, transparent),
+    color-mix(in oklab, var(--system-b-cinematic-black) 80%, transparent) 100%
+  );
+}
+
+.homepage-v2-proof__line {
+  line-height: 1.6;
+}

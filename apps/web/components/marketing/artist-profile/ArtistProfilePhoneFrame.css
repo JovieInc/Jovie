@@ -1,0 +1,51 @@
+/* ArtistProfilePhoneFrame — System B tokenized device chrome. Gradient stops
+   map to the dark surface tokens (surface-2 #161a20 / surface-0 #0a0b0e),
+   matching the original rgba(20,21,28) → rgba(10,11,15) stops. */
+
+.ap-phone-frame {
+  border: 1px solid
+    color-mix(in oklab, var(--color-text-primary-token) 12%, transparent);
+  border-radius: 2.4rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-bg-surface-2) 98%, transparent),
+    color-mix(in oklab, var(--color-bg-surface-0) 98%, transparent)
+  );
+  box-shadow:
+    0 34px 100px
+    color-mix(in oklab, var(--system-b-cinematic-black) 48%, transparent),
+    0 14px 36px
+    color-mix(in oklab, var(--system-b-cinematic-black) 28%, transparent);
+}
+
+.ap-phone-frame__screen {
+  border: 1px solid
+    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
+  border-radius: 1.85rem;
+}
+
+.ap-phone-frame__notch {
+  background: color-mix(
+    in oklab,
+    var(--system-b-cinematic-black) 70%,
+    transparent
+  );
+  box-shadow: 0 0 0 1px
+    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
+}
+
+.ap-phone-frame__overlay {
+  background:
+    radial-gradient(
+      circle at top,
+      color-mix(in oklab, var(--color-text-tertiary-token) 14%, transparent),
+      transparent 35%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--color-text-primary-token) 4%, transparent),
+      transparent 22%,
+      transparent 78%,
+      color-mix(in oklab, var(--system-b-cinematic-black) 22%, transparent)
+    );
+}

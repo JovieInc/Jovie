@@ -6,6 +6,7 @@ import type {
 import { ArtistProfileCaptureVisual } from '../MarketingStoryPrimitives';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
+import './ArtistProfileCaptureSection.css';
 
 interface ArtistProfileCaptureSectionProps {
   readonly id?: string;
@@ -26,14 +27,14 @@ export function ArtistProfileCaptureSection({
 }: Readonly<ArtistProfileCaptureSectionProps>) {
   if (!isEditorialCapture(capture)) {
     return (
-      <ArtistProfileSectionShell className='bg-white/[0.012]' id={id}>
+      <ArtistProfileSectionShell className='ap-capture-section--visual' id={id}>
         <div className='mx-auto max-w-280'>
           <ArtistProfileSectionHeader
             align='center'
             headline={capture.headline}
             body={capture.subhead}
-            className='max-w-[46rem]'
-            bodyClassName='mx-auto max-w-[34rem]'
+            className='max-w-184'
+            bodyClassName='mx-auto max-w-136'
           />
 
           <ArtistProfileCaptureVisual capture={capture} className='mt-10' />
