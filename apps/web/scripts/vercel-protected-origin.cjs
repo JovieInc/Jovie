@@ -625,8 +625,7 @@ async function readResponseText(response, deadline) {
   return deadline ? deadline.run(() => response.text()) : response.text();
 }
 
-function validateBuildInfo(payload, expectedCommitSha, expectedEnvironment) {
-  const expectedSha = requireFullCommitSha(expectedCommitSha);
+function validateBuildIdentity(payload, expectedEnvironment) {
   const environment = requireExpectedEnvironment(expectedEnvironment);
   if (
     !payload ||
@@ -641,18 +640,23 @@ function validateBuildInfo(payload, expectedCommitSha, expectedEnvironment) {
       'Exact Vercel deployment bypass verification returned malformed or wrong-environment build identity.'
     );
   }
-  if (!expectedSha.startsWith(payload.commitSha)) {
+  return payload;
+}
+
+function validateBuildInfo(payload, expectedCommitSha, expectedEnvironment) {
+  const expectedSha = requireFullCommitSha(expectedCommitSha);
+  const identity = validateBuildIdentity(payload, expectedEnvironment);
+  if (!expectedSha.startsWith(identity.commitSha)) {
     throw new Error(
       'Exact Vercel deployment bypass verification returned the wrong commit.'
     );
   }
-  return payload;
+  return identity;
 }
 
-async function readVerifiedBuildInfo(
+async function readBuildIdentity(
   response,
   requestedUrl,
-  expectedCommitSha,
   expectedEnvironment,
   deadline
 ) {
@@ -679,10 +683,26 @@ async function readVerifiedBuildInfo(
       'Exact Vercel deployment bypass verification returned invalid JSON.'
     );
   }
-  return validateBuildInfo(payload, expectedCommitSha, expectedEnvironment);
+  return validateBuildIdentity(payload, expectedEnvironment);
 }
 
-async function bootstrapOriginBoundAccess(
+async function readVerifiedBuildInfo(
+  response,
+  requestedUrl,
+  expectedCommitSha,
+  expectedEnvironment,
+  deadline
+) {
+  const identity = await readBuildIdentity(
+    response,
+    requestedUrl,
+    expectedEnvironment,
+    deadline
+  );
+  return validateBuildInfo(identity, expectedCommitSha, expectedEnvironment);
+}
+
+async function bootstrapOriginBoundAccessInternal(
   rawTargetUrl,
   {
     fetchImpl = globalThis.fetch,
@@ -690,11 +710,13 @@ async function bootstrapOriginBoundAccess(
     expectedCommitSha = process.env.EXPECTED_COMMIT_SHA,
     expectedDeploymentOrigin = process.env.EXPECTED_VERCEL_DEPLOYMENT_ORIGIN,
     expectedEnvironment = process.env.EXPECTED_VERCEL_ENVIRONMENT,
+    maskLineWriter,
     timeoutMs = process.env.VERCEL_PROBE_TIMEOUT_MS ?? DEFAULT_PROBE_TIMEOUT_MS,
     deadline: suppliedDeadline,
     onSensitiveValues,
     onCookies,
-  } = {}
+  } = {},
+  discoverCommitSha
 ) {
   const targetUrl = parseProbeUrl(rawTargetUrl, 'Protected deployment target');
   if (
@@ -708,7 +730,9 @@ async function bootstrapOriginBoundAccess(
   }
   requireExpectedDeploymentOrigin(expectedDeploymentOrigin, targetUrl);
   const environment = requireExpectedEnvironment(expectedEnvironment);
-  const expectedSha = requireFullCommitSha(expectedCommitSha);
+  const expectedSha = discoverCommitSha
+    ? undefined
+    : requireFullCommitSha(expectedCommitSha);
   const deadline =
     suppliedDeadline ??
     createAbsoluteDeadline(timeoutMs, 'Protected deployment bootstrap');
@@ -742,7 +766,10 @@ async function bootstrapOriginBoundAccess(
     }
 
     const cookies = parseOriginBoundCookies(bootstrapResponse, targetUrl);
-    maskSensitiveValues(cookies.map(cookie => cookie.value));
+    maskSensitiveValues(
+      cookies.map(cookie => cookie.value),
+      maskLineWriter
+    );
     if (onSensitiveValues) {
       await deadline.run(() => onSensitiveValues(cookies));
     }
@@ -763,18 +790,38 @@ async function bootstrapOriginBoundAccess(
       verification.url,
       verification.options
     );
-    const buildInfo = await readVerifiedBuildInfo(
-      verificationResponse,
-      verification.url,
-      expectedSha,
-      environment,
-      deadline
-    );
+    const buildInfo = expectedSha
+      ? await readVerifiedBuildInfo(
+          verificationResponse,
+          verification.url,
+          expectedSha,
+          environment,
+          deadline
+        )
+      : await readBuildIdentity(
+          verificationResponse,
+          verification.url,
+          environment,
+          deadline
+        );
 
     return { buildInfo, cookieHeader, cookies, targetUrl };
   } finally {
     if (ownsDeadline) deadline.dispose();
   }
+}
+
+async function bootstrapOriginBoundAccess(rawTargetUrl, options) {
+  return bootstrapOriginBoundAccessInternal(rawTargetUrl, options, false);
+}
+
+async function discoverOriginBoundBuildIdentity(rawTargetUrl, options) {
+  const access = await bootstrapOriginBoundAccessInternal(
+    rawTargetUrl,
+    options,
+    true
+  );
+  return access.buildInfo;
 }
 
 async function bootstrapAliasBoundAccess(
@@ -1035,7 +1082,26 @@ function normalizeDeploymentUrl(rawUrl, label = 'Vercel deployment URL') {
 }
 
 function deploymentCommitSha(deployment) {
-  return deployment?.meta?.githubCommitSha ?? deployment?.gitSource?.sha;
+  const presentShas = [
+    deployment?.meta?.githubCommitSha,
+    deployment?.gitSource?.sha,
+  ].filter(value => value !== undefined && value !== null && value !== '');
+  if (presentShas.length === 0) return undefined;
+  if (
+    presentShas.some(
+      value => typeof value !== 'string' || !FULL_COMMIT_SHA.test(value)
+    )
+  ) {
+    throw new Error(
+      'Exact caller deployment returned a malformed commit SHA field.'
+    );
+  }
+  if (new Set(presentShas).size !== 1) {
+    throw new Error(
+      'Exact caller deployment returned conflicting commit SHA fields.'
+    );
+  }
+  return presentShas[0];
 }
 
 function deploymentState(deployment) {
@@ -1067,6 +1133,8 @@ async function resolveAuthorizedVercelDeployment({
   commitSha = process.env.EXPECTED_COMMIT_SHA ?? process.env.COMMIT_SHA,
   candidateUrl = process.env.VERCEL_CANDIDATE_DEPLOYMENT_URL,
   candidateId = process.env.VERCEL_CANDIDATE_DEPLOYMENT_ID,
+  allowMissingCommitSha = process.env.VERCEL_ALLOW_MISSING_COMMIT_SHA ===
+    'true',
   maxPages = process.env.VERCEL_DEPLOYMENT_MAX_PAGES ??
     DEFAULT_VERCEL_API_PAGES,
   timeoutMs = process.env.VERCEL_API_TIMEOUT_MS ?? 30_000,
@@ -1076,9 +1144,17 @@ async function resolveAuthorizedVercelDeployment({
 } = {}) {
   const credential = token?.trim();
   const project = projectId?.trim();
-  const expectedSha = requireFullCommitSha(commitSha);
   const exactCandidateUrl = normalizeDeploymentUrl(candidateUrl);
   const exactCandidateId = candidateId?.trim() || undefined;
+  if (allowMissingCommitSha && (!exactCandidateId || !exactCandidateUrl)) {
+    throw new Error(
+      'Missing commit SHA mode requires an exact deployment URL and ID.'
+    );
+  }
+  const expectedSha =
+    allowMissingCommitSha && !commitSha
+      ? undefined
+      : requireFullCommitSha(commitSha);
   const pages = Number(maxPages);
   const initialDelay = Number(initialWaitMs);
   const pollInterval = Number(pollIntervalMs);
@@ -1258,6 +1334,9 @@ async function resolveAuthorizedVercelDeployment({
             observedSha === null ||
             observedSha === ''
           ) {
+            if (allowMissingCommitSha && state === 'READY') {
+              return { id, url: urlOrigin, commitSha: null };
+            }
             // READY can precede Git metadata propagation. Missing SHA remains
             // transient, but a present malformed or wrong SHA fails below.
             matchingTransient = true;
@@ -1266,7 +1345,7 @@ async function resolveAuthorizedVercelDeployment({
           if (
             typeof observedSha !== 'string' ||
             !FULL_COMMIT_SHA.test(observedSha) ||
-            observedSha !== expectedSha
+            (expectedSha && observedSha !== expectedSha)
           ) {
             throw new Error(
               'Exact caller deployment does not match the full expected commit SHA.'
@@ -1276,7 +1355,9 @@ async function resolveAuthorizedVercelDeployment({
           if (state === 'READY') {
             matchingReady.set(id, { id, url: urlOrigin });
             if (exactCandidateId || exactCandidateUrl) {
-              return { id, url: urlOrigin };
+              return allowMissingCommitSha
+                ? { id, url: urlOrigin, commitSha: observedSha }
+                : { id, url: urlOrigin };
             }
           } else {
             matchingTransient = true;
@@ -1352,6 +1433,7 @@ module.exports = {
   buildOriginBoundProbeRequest,
   cookiesToRequestHeader,
   createAbsoluteDeadline,
+  discoverOriginBoundBuildIdentity,
   isExactVercelDeploymentUrl,
   isTrustedVercelProtectedAliasUrl,
   maskSensitiveValues,
@@ -1365,6 +1447,7 @@ module.exports = {
   safeRouteLabel,
   stripInlineScripts,
   validateBuildInfo,
+  validateBuildIdentity,
   verifyPublicDeploymentSurfaces,
   writeExactHostCookieJar,
 };
@@ -1380,11 +1463,19 @@ if (require.main === module) {
       process.stdout.write(
         `${JSON.stringify(await resolveAuthorizedVercelDeployment())}\n`
       );
+    } else if (command === 'discover-build-identity') {
+      const buildInfo = await discoverOriginBoundBuildIdentity(
+        process.env.VERCEL_PROBE_URL,
+        {
+          maskLineWriter: line => console.error(line),
+        }
+      );
+      process.stdout.write(`${JSON.stringify(buildInfo)}\n`);
     } else if (command === 'bootstrap-cookie-jar') {
       await bootstrapAndVerifyFromEnvironment();
     } else {
       throw new Error(
-        'Usage: vercel-protected-origin.cjs <assert-authorized-origin|assert-origin-bound-redirect|resolve-deployment|bootstrap-cookie-jar>'
+        'Usage: vercel-protected-origin.cjs <assert-authorized-origin|assert-origin-bound-redirect|resolve-deployment|discover-build-identity|bootstrap-cookie-jar>'
       );
     }
   })().catch(error => {

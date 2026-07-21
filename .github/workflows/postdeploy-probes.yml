@@ -197,7 +197,10 @@ jobs:
         id: target
         if: ${{ steps.trigger.outputs.should_probe == 'true' }}
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
           SHOULD_PROBE: ${{ steps.trigger.outputs.should_probe }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -210,7 +213,7 @@ jobs:
             echo "deployment_url_b64="
             echo "commit_sha="
           } >> "$GITHUB_OUTPUT"
-          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+          for key in GH_TOKEN REPOSITORY VERCEL_AUTOMATION_BYPASS_SECRET VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
             if [ -z "${!key:-}" ]; then
               echo "::error::$key is required to resolve the canonical production deployment."
               exit 1
@@ -235,7 +238,6 @@ jobs:
           deployment_url="$(jq -r '.url' <<<"$canonical_json")"
           deployment_state="$(jq -r '.readyState | ascii_upcase' <<<"$canonical_json")"
           deployment_target="$(jq -r '.target | ascii_downcase' <<<"$canonical_json")"
-          commit_sha="$(jq -r '.meta.githubCommitSha // .gitSource.sha // ""' <<<"$canonical_json")"
           if [[ "$deployment_url" != *://* && "$deployment_url" == *.vercel.app ]]; then
             deployment_url="https://${deployment_url}"
           fi
@@ -243,9 +245,8 @@ jobs:
           if [[ "$deployment_id" != dpl_* ]] ||
             [ "$deployment_state" != "READY" ] ||
             [ "$deployment_target" != "production" ] ||
-            [[ ! "$deployment_url" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] ||
-            [[ ! "$commit_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Canonical production is not an exact READY production deployment with a full commit SHA."
+            [[ ! "$deployment_url" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]]; then
+            echo "::error::Canonical production is not an exact READY production deployment."
             exit 1
           fi
 
@@ -254,7 +255,7 @@ jobs:
           exact_json="$(
             VERCEL_CANDIDATE_DEPLOYMENT_URL="$deployment_url" \
             VERCEL_CANDIDATE_DEPLOYMENT_ID="$deployment_id" \
-            EXPECTED_COMMIT_SHA="$commit_sha" \
+            VERCEL_ALLOW_MISSING_COMMIT_SHA=true \
             VERCEL_DEPLOYMENT_MAX_PAGES=5 \
             VERCEL_API_TIMEOUT_MS=120000 \
             VERCEL_DEPLOYMENT_POLL_INTERVAL_MS=3000 \
@@ -264,6 +265,52 @@ jobs:
             echo "::error::Exact landed production deployment identity did not converge."
             exit 1
           }
+          [ "$(jq -r '.url // ""' <<<"$exact_json")" = "$deployment_url" ] || {
+            echo "::error::Exact landed production deployment URL did not converge."
+            exit 1
+          }
+
+          # Vercel source metadata is optional and is absent on some CLI-built
+          # production deployments. Read the deployed build identity from the
+          # exact immutable origin instead, with an origin-bound bypass cookie.
+          build_identity_json="$(
+            VERCEL_PROBE_URL="$deployment_url" \
+            EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url" \
+            EXPECTED_VERCEL_ENVIRONMENT=production \
+            VERCEL_PROBE_TIMEOUT_MS=120000 \
+              node apps/web/scripts/vercel-protected-origin.cjs discover-build-identity
+          )"
+          deployed_sha="$(jq -r '.commitSha // ""' <<<"$build_identity_json")"
+          [[ "$deployed_sha" =~ ^[0-9a-f]{7,40}$ ]] || {
+            echo "::error::Exact production build identity omitted a valid commit SHA."
+            exit 1
+          }
+
+          # Expand the deployed prefix inside this repository, then prove that
+          # exact commit is on main. GitHub rejects ambiguous or foreign SHAs.
+          commit_json="$(gh api "repos/$REPOSITORY/commits/$deployed_sha")"
+          commit_sha="$(jq -r '.sha // ""' <<<"$commit_json")"
+          [[ "$commit_sha" =~ ^[0-9a-f]{40}$ ]] &&
+            [[ "$commit_sha" == "$deployed_sha"* ]] || {
+            echo "::error::Deployed commit identity did not resolve uniquely in this repository."
+            exit 1
+          }
+          comparison_json="$(gh api "repos/$REPOSITORY/compare/$commit_sha...main")"
+          jq -e --arg sha "$commit_sha" '
+            type == "object" and
+            (.status == "ahead" or .status == "identical") and
+            .base_commit.sha == $sha and
+            .merge_base_commit.sha == $sha
+          ' >/dev/null <<<"$comparison_json" || {
+            echo "::error::Canonical production commit is not an ancestor of main."
+            exit 1
+          }
+
+          observed_vercel_sha="$(jq -r '.commitSha // ""' <<<"$exact_json")"
+          if [ -n "$observed_vercel_sha" ] && [ "$observed_vercel_sha" != "$commit_sha" ]; then
+            echo "::error::Vercel list metadata disagrees with the exact origin build identity."
+            exit 1
+          fi
 
           {
             echo "deployment_id=$deployment_id"
