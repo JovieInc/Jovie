@@ -57,8 +57,9 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
 
   // Zero matches is the common resolution for this query, so a skeleton
   // that renders during `isLoading` and then collapses to `null` produces a
-  // visible flash-then-shift for most users (#13821). Stay collapsed while
-  // loading and only occupy space once we know there is something to show.
+  // visible flash-then-shift for most users (JOV-4159 / #13821). Stay
+  // collapsed while loading and only occupy space once we know there is
+  // something to show — empty and loading share the same zero footprint.
   if (isLoading) {
     return null;
   }

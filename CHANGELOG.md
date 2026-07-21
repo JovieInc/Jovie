@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Suggested DSP matches no longer flash a skeleton then collapse (JOV-4159):** when the Music drawer loads with no match suggestions (the common case), the section stays empty instead of flashing skeleton rows and shifting sibling content.
 - **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; build-info prefers the stamped release version (and falls back to bundled `version.json`), and both shell/legacy banners omit the version when unavailable.
 - **Entity mention hover cards now use the same rich entity card as the chat rail:** hovering an inline release, artist, track, or event mention opens the canonical compact EntityCard instead of a one-off popover layout.
 - **Chat tool activity is quieter and indented:** agent tool-call rows sit one rhythm step in from assistant prose with secondary color and book weight, so narrative stays primary and consecutive steps form a quiet run.
