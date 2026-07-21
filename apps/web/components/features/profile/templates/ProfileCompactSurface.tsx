@@ -663,7 +663,7 @@ export function ProfileCompactSurface({
               data-testid='profile-hero-identity-block'
             >
               <div
-                className='min-w-0 px-3 py-2.5 [overflow-wrap:anywhere] [@media(max-height:820px)]:px-2.5 [@media(max-height:820px)]:py-2'
+                className='min-w-0 py-2 [overflow-wrap:anywhere]'
                 data-testid='profile-hero-identity-content'
               >
                 <IdentityHeading
@@ -694,7 +694,7 @@ export function ProfileCompactSurface({
                   </Link>
                 </IdentityHeading>
 
-                <div className='mt-1 flex min-w-0 items-center justify-between gap-2 [@media(max-height:820px)]:mt-0.5'>
+                <div className='mt-2 flex min-w-0 items-center justify-between gap-2 [@media(max-height:820px)]:mt-1'>
                   <p className='flex min-w-0 items-center gap-1.5 text-xs font-medium leading-4 tracking-normal text-white/74 [@media(max-height:820px)]:text-2xs'>
                     <span className='min-w-0 truncate'>{heroSubtitle}</span>
                     {locationLabel ? (
