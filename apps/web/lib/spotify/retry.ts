@@ -12,6 +12,7 @@
 
 import 'server-only';
 import * as Sentry from '@sentry/nextjs';
+import { CircuitOpenError } from './circuit-breaker';
 
 // ============================================================================
 // Types
@@ -141,6 +142,58 @@ function extractRetryAfter(error: unknown): number | undefined {
 }
 
 /**
+ * HTTP statuses that represent an expected transient vendor outage.
+ * Matches the 5xx subset of the default retryable statuses.
+ */
+const TRANSIENT_VENDOR_STATUSES = new Set([500, 502, 503, 504]);
+
+/**
+ * Check whether an error is an expected transient vendor failure:
+ * - Circuit breaker open (fail-fast while the vendor is known to be down)
+ * - Vendor 5xx still failing after retries (SPOTIFY_UNAVAILABLE / 5xx status)
+ * - Rate limit still in effect after retries (429 / rate-limit error codes)
+ *
+ * Classification mirrors circuit-breaker.ts isRateLimitError. These failures
+ * are captured at warning level because the circuit breaker already alerts
+ * once per outage episode; everything else keeps error level.
+ */
+function isExpectedTransientVendorError(error: unknown): boolean {
+  if (error instanceof CircuitOpenError) {
+    return true;
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  // IngestError / SpotifyError with a `code` field
+  if ('code' in error) {
+    const code = (error as Error & { code: string }).code;
+    if (
+      code === 'SPOTIFY_UNAVAILABLE' ||
+      code === 'SPOTIFY_RATE_LIMITED' ||
+      code === 'RATE_LIMITED'
+    ) {
+      return true;
+    }
+  }
+
+  // SpotifyError (dsp-enrichment provider) with a `statusCode` field
+  if ('statusCode' in error) {
+    const status = (error as Error & { statusCode: number }).statusCode;
+    if (status === 429 || TRANSIENT_VENDOR_STATUSES.has(status)) return true;
+  }
+
+  // Generic error with a `status` field
+  if ('status' in error) {
+    const status = (error as Error & { status: number }).status;
+    if (status === 429 || TRANSIENT_VENDOR_STATUSES.has(status)) return true;
+  }
+
+  return false;
+}
+
+/**
  * Execute a function with retry logic.
  *
  * @param fn - The async function to execute
@@ -214,10 +267,14 @@ export async function withRetry<T>(
     }
   }
 
-  // Capture to Sentry when all retries are exhausted
+  // Capture to Sentry when all retries are exhausted.
+  // Expected transient vendor failures (vendor 5xx, rate limit after retry,
+  // breaker-open) are downgraded to warning: the circuit breaker already
+  // alerts once per outage episode, so per-call error captures would drown
+  // real defects. Genuine unexpected failures keep error level.
   if (lastError) {
     Sentry.captureException(lastError, {
-      level: 'error',
+      level: isExpectedTransientVendorError(lastError) ? 'warning' : 'error',
       tags: { component: 'spotify-retry' },
       extra: {
         attempts: actualAttempts,
