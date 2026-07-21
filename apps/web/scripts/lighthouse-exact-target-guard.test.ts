@@ -27,6 +27,7 @@ import {
   validateLighthouseArtifactSeal,
   validateNoSensitiveArtifactValues,
 } from './lighthouse-exact-target-guard';
+import { ZERO_DYNAMIC_SECRET_RECEIPT } from './vercel-protected-origin.cjs';
 
 const BASE_URL = 'https://jovie-5sy8pmjja-jovie.vercel.app';
 const HOME_URL = `${BASE_URL}/`;
@@ -199,9 +200,14 @@ describe('exact production Lighthouse evidence guard', () => {
   });
 
   it.each([
+    '1',
     'sentinel-bypass-secret',
     'sentinel-cookie-value',
   ])('rejects artifacts containing protected probe state without echoing it', sensitiveValue => {
+    const sensitiveValues =
+      sensitiveValue === '1'
+        ? ['1']
+        : ['sentinel-bypass-secret', 'sentinel-cookie-value'];
     expect(() =>
       validateNoSensitiveArtifactValues(
         [
@@ -210,13 +216,13 @@ describe('exact production Lighthouse evidence guard', () => {
             contents: JSON.stringify({ diagnostic: sensitiveValue }),
           },
         ],
-        ['sentinel-bypass-secret', 'sentinel-cookie-value']
+        sensitiveValues
       )
     ).toThrow('protected probe state');
     try {
       validateNoSensitiveArtifactValues(
         [{ name: 'lhr-1.json', contents: sensitiveValue }],
-        [sensitiveValue]
+        sensitiveValues
       );
     } catch (error) {
       expect(String(error)).not.toContain(sensitiveValue);
@@ -271,6 +277,22 @@ describe('exact production Lighthouse evidence guard', () => {
       expect(() => readSensitiveValues(symlinkReceipt, reports)).toThrow(
         'mode-0600 regular file'
       );
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('accepts only the explicit zero dynamic-secret receipt', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-zero-receipt-'));
+    const receipt = join(root, 'sensitive-values');
+    try {
+      writeFileSync(receipt, `${ZERO_DYNAMIC_SECRET_RECEIPT}\n`, {
+        mode: 0o600,
+      });
+      expect(readSensitiveValues(receipt)).toEqual([]);
+
+      writeFileSync(receipt, '');
+      expect(() => readSensitiveValues(receipt)).toThrow('receipt is empty');
     } finally {
       rmSync(root, { force: true, recursive: true });
     }

@@ -1,6 +1,7 @@
 import {
   chmodSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -19,6 +20,7 @@ const {
   buildOriginBoundCookieRequest,
   buildOriginBoundProbeRequest,
   maskSensitiveValues,
+  ZERO_DYNAMIC_SECRET_RECEIPT,
   parseExactHostCookieJar,
   readExactHostCookieJar,
   resolveAuthorizedVercelDeployment,
@@ -98,6 +100,7 @@ const {
 const {
   primeLighthouseVercelAliasBypass,
   primeLighthouseVercelBypass,
+  recordSensitiveValues,
   sensitiveCookieValues,
   validateBuildInfo,
   validateCookieOriginBoundaryHeaders,
@@ -157,6 +160,10 @@ const {
   readonly sensitiveCookieValues: (
     cookies: readonly { readonly name: string; readonly value: string }[]
   ) => readonly string[];
+  readonly recordSensitiveValues: (
+    path: string,
+    values: readonly string[]
+  ) => void;
 };
 
 const DEPLOYMENT_URL = 'https://jovie-5sy8pmjja-jovie.vercel.app/';
@@ -240,14 +247,33 @@ function browserFixture({ leakToChild = false } = {}) {
 }
 
 describe('origin-bound Vercel protection bypass', () => {
-  it('records only non-public probe cookie values', () => {
+  it('records an explicit zero-state receipt for public-only probe cookies', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-zero-receipt-'));
+    const receiptPath = join(directory, 'sensitive-values');
+    try {
+      recordSensitiveValues(
+        receiptPath,
+        sensitiveCookieValues([
+          { name: 'jv_country', value: 'US' },
+          { name: 'jv_cc_required', value: '1' },
+        ])
+      );
+      expect(readFileSync(receiptPath, 'utf8')).toBe(
+        `${ZERO_DYNAMIC_SECRET_RECEIPT}\n`
+      );
+    } finally {
+      rmSync(directory, { force: true, recursive: true });
+    }
+  });
+
+  it('keeps an unknown short dynamic cookie value in the sensitive receipt', () => {
     expect(
       sensitiveCookieValues([
         { name: 'jv_country', value: 'US' },
         { name: 'jv_cc_required', value: '1' },
-        { name: '__vercel_live_token', value: 'opaque-cookie' },
+        { name: '__unknown_dynamic_cookie', value: '1' },
       ])
-    ).toEqual(['opaque-cookie']);
+    ).toEqual(['1']);
   });
 
   it('never attaches the bypass credential to canonical production', () => {
