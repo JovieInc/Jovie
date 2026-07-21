@@ -469,7 +469,7 @@ export function EntityCard({
               ) : (
                 <span
                   className={cn(
-                    'inline-flex h-9 w-full shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle group-hover:border-(--linear-btn-primary-hover) group-hover:bg-btn-primary-hover'
+                    'inline-flex h-9 w-full shrink-0 items-center justify-center rounded-full bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle group-hover:bg-btn-primary-hover'
                   )}
                 >
                   {model.cta.label}
