@@ -1,5 +1,6 @@
 'use client';
 
+import type { AudioPlaybackStatus } from '@jovie/audio-contracts';
 import { Check, Copy, ExternalLink, Pause, Play, VolumeX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SeekBar } from '@/components/atoms/SeekBar';
@@ -109,7 +110,7 @@ function getPreviewSourceLabel(
 
 function getPlaybackAnnouncement(params: {
   title: string | null | undefined;
-  playbackStatus: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+  playbackStatus: AudioPlaybackStatus;
   isActiveTrack: boolean;
   isPlaying: boolean;
 }): string {
@@ -117,12 +118,28 @@ function getPlaybackAnnouncement(params: {
     return 'Preview unavailable.';
   }
 
+  if (params.playbackStatus === 'stalled') {
+    return 'Preview stalled. Trying to recover.';
+  }
+
   if (!params.title || !params.isActiveTrack) {
     return '';
   }
 
   if (params.isPlaying) {
+    if (params.playbackStatus === 'buffering') {
+      return `Buffering ${params.title}.`;
+    }
+
+    if (params.playbackStatus === 'seeking') {
+      return `Seeking ${params.title}.`;
+    }
+
     return `Now playing ${params.title}.`;
+  }
+
+  if (params.playbackStatus === 'interrupted') {
+    return `Paused ${params.title} for another audio action.`;
   }
 
   if (params.playbackStatus === 'paused') {

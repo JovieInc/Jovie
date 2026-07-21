@@ -1,6 +1,16 @@
 'use client';
 
+import {
+  type AudioPlaybackEvent,
+  type AudioPlaybackStatus,
+  getNextAudioPlaybackStatus,
+} from '@jovie/audio-contracts';
 import { useCallback, useEffect, useState } from 'react';
+import {
+  type InteractionLatencyMarkHandle,
+  markInteractionStart,
+  measureInteractionPoint,
+} from '@/lib/monitoring/interaction-latency';
 
 export interface AudioTrackSource {
   readonly id: string;
@@ -20,10 +30,10 @@ export interface ToggleTrackOptions {
   readonly queue?: readonly AudioTrackSource[];
 }
 
-interface PlaybackState {
+export interface PlaybackState {
   readonly activeTrackId: string | null;
   readonly isPlaying: boolean;
-  readonly playbackStatus: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+  readonly playbackStatus: AudioPlaybackStatus;
   readonly lastErrorReason:
     | 'play_rejected'
     | 'media_error'
@@ -55,18 +65,43 @@ let _queueIndex = -1;
 let _interruptionDepth = 0;
 let _wasPlayingBeforeInterruption = false;
 let _mediaSessionBound = false;
+let _playLatencyMark: InteractionLatencyMarkHandle | null = null;
+let _seekLatencyMark: InteractionLatencyMarkHandle | null = null;
+let _bufferingLatencyMark: InteractionLatencyMarkHandle | null = null;
 /** ~4 Hz progress notify for cross-surface scrub without rAF thrash. */
 const PROGRESS_NOTIFY_MS = 250;
+
+function createAudioElement(): HTMLAudioElement {
+  const audio = new Audio();
+  audio.preload = 'metadata';
+  bindAudioEvents(audio);
+  return audio;
+}
 
 /** Lazily create the Audio element — safe to call during SSR (returns null server-side). */
 function getAudio(): HTMLAudioElement | null {
   if (typeof Audio === 'undefined') return null;
   if (!_audio) {
-    _audio = new Audio();
-    _audio.preload = 'metadata';
-    bindAudioEvents(_audio);
+    _audio = createAudioElement();
   }
   return _audio;
+}
+
+function replaceAudioElement(): HTMLAudioElement | null {
+  if (typeof Audio === 'undefined') return null;
+  _seekLatencyMark = finishLatencyMark(_seekLatencyMark, 'superseded');
+  _bufferingLatencyMark = finishLatencyMark(
+    _bufferingLatencyMark,
+    'superseded'
+  );
+  const previousAudio = _audio;
+  const nextAudio = createAudioElement();
+  _audio = nextAudio;
+  if (previousAudio) {
+    previousAudio.pause();
+    previousAudio.src = '';
+  }
+  return nextAudio;
 }
 
 function isPlayableTrack(track: AudioTrackSource): boolean {
@@ -150,10 +185,64 @@ function setState(partial: Partial<PlaybackState>): void {
     prev.releaseTitle !== state.releaseTitle ||
     prev.artworkUrl !== state.artworkUrl ||
     prev.isPlaying !== state.isPlaying ||
+    prev.currentTime !== state.currentTime ||
     prev.duration !== state.duration
   ) {
     syncMediaSession();
   }
+}
+
+function getTransitionStatus(
+  event: AudioPlaybackEvent,
+  audio: HTMLAudioElement | null
+): AudioPlaybackStatus {
+  return getNextAudioPlaybackStatus({
+    current: state.playbackStatus,
+    event,
+    hasActiveTrack: state.activeTrackId !== null,
+    isPaused: audio?.paused ?? true,
+  });
+}
+
+function finishLatencyMark(
+  mark: InteractionLatencyMarkHandle | null,
+  point: string
+): null {
+  const measureName = measureInteractionPoint(mark, point);
+  if (
+    mark &&
+    typeof performance !== 'undefined' &&
+    typeof performance.clearMarks === 'function'
+  ) {
+    performance.clearMarks(mark.startMark);
+    performance.clearMarks(`${mark.id}:${point}`);
+  }
+  if (
+    measureName &&
+    typeof performance !== 'undefined' &&
+    typeof performance.clearMeasures === 'function'
+  ) {
+    performance.clearMeasures(measureName);
+  }
+  return null;
+}
+
+function startLatencyMark(
+  name: string,
+  previousMark: InteractionLatencyMarkHandle | null
+): InteractionLatencyMarkHandle | null {
+  finishLatencyMark(previousMark, 'superseded');
+  return markInteractionStart(name);
+}
+
+function isCurrentPlaybackRequest(
+  audio: HTMLAudioElement,
+  token: number,
+  trackId: string
+): boolean {
+  return (
+    _audio === audio && _playToken === token && state.activeTrackId === trackId
+  );
 }
 
 function getMediaSession(): MediaSession | null {
@@ -171,11 +260,17 @@ function bindMediaSessionHandlers(): void {
     session.setActionHandler('play', () => {
       const audio = getAudio();
       if (!audio || !state.activeTrackId) return;
+      const trackId = state.activeTrackId;
+      const token = ++_playToken;
+      _playLatencyMark = startLatencyMark('audio-play', _playLatencyMark);
       void audio.play().catch(() => {
-        handlePlaybackFailure(audio, 'play_rejected');
+        if (isCurrentPlaybackRequest(audio, token, trackId)) {
+          handlePlaybackFailure(audio, 'play_rejected');
+        }
       });
     });
     session.setActionHandler('pause', () => {
+      _playToken += 1;
       getAudio()?.pause();
     });
     session.setActionHandler('previoustrack', () => {
@@ -207,6 +302,11 @@ function syncMediaSession(): void {
   if (!state.activeTrackId) {
     session.metadata = null;
     session.playbackState = 'none';
+    try {
+      session.setPositionState?.();
+    } catch {
+      // Some partial Media Session implementations reject clearing state.
+    }
     return;
   }
 
@@ -236,6 +336,8 @@ function syncMediaSession(): void {
         position: Math.min(state.currentTime, state.duration),
         playbackRate: 1,
       });
+    } else if (typeof session.setPositionState === 'function') {
+      session.setPositionState();
     }
   } catch {
     // setPositionState throws when position > duration during short previews.
@@ -246,6 +348,7 @@ function seekToTime(time: number): void {
   const audio = getAudio();
   if (!audio || !Number.isFinite(time)) return;
   if (!Number.isFinite(audio.duration) || audio.duration === 0) return;
+  _seekLatencyMark = startLatencyMark('audio-seek', _seekLatencyMark);
   audio.currentTime = Math.max(0, Math.min(time, audio.duration));
 }
 
@@ -259,10 +362,19 @@ function handlePlaybackFailure(
   audio: HTMLAudioElement | null,
   reason: PlaybackState['lastErrorReason']
 ): void {
+  _playToken += 1;
+  if (_audio === audio) {
+    _audio = null;
+  }
   if (audio) {
     audio.pause();
     audio.src = '';
   }
+  _activeTrackIsrc = null;
+  _hasRetriedRefresh = false;
+  _playLatencyMark = finishLatencyMark(_playLatencyMark, 'failed');
+  _seekLatencyMark = finishLatencyMark(_seekLatencyMark, 'failed');
+  _bufferingLatencyMark = finishLatencyMark(_bufferingLatencyMark, 'failed');
   clearPlaybackQueue();
   setState({
     activeTrackId: null,
@@ -282,7 +394,10 @@ function handlePlaybackFailure(
 }
 
 async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
-  const audio = getAudio();
+  const audio =
+    state.activeTrackId && state.activeTrackId !== track.id
+      ? replaceAudioElement()
+      : getAudio();
   if (!audio) return;
 
   if (!track.audioUrl) {
@@ -295,6 +410,7 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
   _hasRetriedRefresh = false;
   audio.pause();
   audio.src = track.audioUrl;
+  _playLatencyMark = startLatencyMark('audio-play', _playLatencyMark);
   setState({
     activeTrackId: track.id,
     isPlaying: false,
@@ -313,13 +429,13 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
   try {
     await audio.play();
   } catch (error) {
-    if (_playToken === token) {
+    if (isCurrentPlaybackRequest(audio, token, track.id)) {
       handlePlaybackFailure(audio, 'play_rejected');
     }
     throw error;
   }
 
-  if (_playToken !== token) {
+  if (!isCurrentPlaybackRequest(audio, token, track.id)) {
     return;
   }
 }
@@ -338,11 +454,21 @@ function bindAudioEvents(el: HTMLAudioElement): void {
   // swallowed by the throttle when initialized to 0, dropping the first
   // progress update (surfaced as a shard-order-dependent unit test flake).
   let lastNotifiedAt = -Infinity;
-  el.addEventListener('timeupdate', () => {
+  const bindCurrentAudioEvent = (
+    event: keyof HTMLMediaElementEventMap,
+    handler: () => void
+  ) => {
+    el.addEventListener(event, () => {
+      if (_audio !== el) return;
+      handler();
+    });
+  };
+
+  bindCurrentAudioEvent('timeupdate', () => {
     // ~4 Hz keeps cross-surface scrub bars smooth without rAF thrash.
     const now =
       typeof performance !== 'undefined' ? performance.now() : Date.now();
-    if (now - lastNotifiedAt < PROGRESS_NOTIFY_MS) return;
+    if (lastNotifiedAt > 0 && now - lastNotifiedAt < PROGRESS_NOTIFY_MS) return;
     lastNotifiedAt = now;
     setState({
       currentTime: el.currentTime,
@@ -350,20 +476,55 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     });
   });
 
-  el.addEventListener('play', () =>
+  bindCurrentAudioEvent('play', () => {
+    if (_interruptionDepth > 0) return;
     setState({
       isPlaying: true,
-      playbackStatus: 'playing',
+      playbackStatus: getTransitionStatus('play', el),
       lastErrorReason: null,
-    })
-  );
-  el.addEventListener('pause', () =>
+    });
+  });
+  bindCurrentAudioEvent('playing', () => {
+    if (_interruptionDepth > 0) return;
+    _playLatencyMark = finishLatencyMark(_playLatencyMark, 'audible');
+    _bufferingLatencyMark = finishLatencyMark(
+      _bufferingLatencyMark,
+      'recovered'
+    );
+    setState({
+      isPlaying: true,
+      playbackStatus: getTransitionStatus('playing', el),
+      lastErrorReason: null,
+    });
+  });
+  bindCurrentAudioEvent('pause', () =>
     setState({
       isPlaying: false,
-      playbackStatus: state.activeTrackId ? 'paused' : 'idle',
+      playbackStatus: getTransitionStatus('pause', el),
     })
   );
-  el.addEventListener('ended', () => {
+  bindCurrentAudioEvent('waiting', () => {
+    if (_interruptionDepth > 0) return;
+    _bufferingLatencyMark ??= markInteractionStart('audio-buffering');
+    setState({ playbackStatus: getTransitionStatus('waiting', el) });
+  });
+  bindCurrentAudioEvent('canplay', () => {
+    if (_interruptionDepth > 0) return;
+    _bufferingLatencyMark = finishLatencyMark(
+      _bufferingLatencyMark,
+      'recovered'
+    );
+    setState({ playbackStatus: getTransitionStatus('canplay', el) });
+  });
+  bindCurrentAudioEvent('stalled', () => {
+    if (_interruptionDepth > 0) return;
+    _bufferingLatencyMark ??= markInteractionStart('audio-buffering');
+    _bufferingLatencyMark = finishLatencyMark(_bufferingLatencyMark, 'stalled');
+    _bufferingLatencyMark = markInteractionStart('audio-buffering');
+    setState({ playbackStatus: getTransitionStatus('stalled', el) });
+  });
+  bindCurrentAudioEvent('ended', () => {
+    if (_interruptionDepth > 0) return;
     const nextIndex = _queueIndex + 1;
     const nextTrack = getQueueTrackAt(nextIndex);
     if (nextTrack) {
@@ -373,24 +534,32 @@ function bindAudioEvents(el: HTMLAudioElement): void {
 
     setState({
       isPlaying: false,
-      playbackStatus: 'paused',
+      playbackStatus: getTransitionStatus('ended', el),
       currentTime: 0,
       ...getQueueSnapshot(),
     });
   });
-  el.addEventListener('loadedmetadata', () => {
+  bindCurrentAudioEvent('loadedmetadata', () => {
     setState({
       duration: Number.isFinite(el.duration) ? el.duration : 0,
     });
   });
-  el.addEventListener('seeked', () => {
+  bindCurrentAudioEvent('seeking', () => {
+    if (_interruptionDepth > 0) return;
+    _seekLatencyMark ??= markInteractionStart('audio-seek');
+    setState({ playbackStatus: getTransitionStatus('seeking', el) });
+  });
+  bindCurrentAudioEvent('seeked', () => {
+    if (_interruptionDepth > 0) return;
     lastNotifiedAt = -Infinity; // invalidate throttle so next timeupdate fires
+    _seekLatencyMark = finishLatencyMark(_seekLatencyMark, 'settled');
     setState({
+      playbackStatus: getTransitionStatus('seeked', el),
       currentTime: el.currentTime,
       duration: Number.isFinite(el.duration) ? el.duration : 0,
     });
   });
-  el.addEventListener('error', () => {
+  bindCurrentAudioEvent('error', () => {
     // Guard: only handle errors when a track is actively loaded.
     // The audio element can fire stale error events (e.g., after tab
     // backgrounding/resuming) even when src is already cleared.
@@ -418,12 +587,30 @@ function bindAudioEvents(el: HTMLAudioElement): void {
             // Guard: only act if the same track is still active.
             // If the user switched tracks while the fetch was in-flight,
             // the new track owns the audio element. Do nothing.
-            if (state.activeTrackId !== trackIdAtError) return;
+            if (_audio !== el || state.activeTrackId !== trackIdAtError) return;
 
             if (data?.previewUrl) {
-              el.src = data.previewUrl;
-              el.play().catch(() => {
+              const refreshedAudio = replaceAudioElement();
+              if (!refreshedAudio) {
                 handlePlaybackFailure(el, 'media_error');
+                return;
+              }
+              refreshedAudio.src = data.previewUrl;
+              const token = ++_playToken;
+              _playLatencyMark = startLatencyMark(
+                'audio-play',
+                _playLatencyMark
+              );
+              refreshedAudio.play().catch(() => {
+                if (
+                  isCurrentPlaybackRequest(
+                    refreshedAudio,
+                    token,
+                    trackIdAtError
+                  )
+                ) {
+                  handlePlaybackFailure(refreshedAudio, 'media_error');
+                }
               });
             } else {
               handlePlaybackFailure(el, 'media_error');
@@ -432,7 +619,7 @@ function bindAudioEvents(el: HTMLAudioElement): void {
         )
         .catch(() => {
           // Only fail if the errored track is still active
-          if (state.activeTrackId === trackIdAtError) {
+          if (_audio === el && state.activeTrackId === trackIdAtError) {
             handlePlaybackFailure(el, 'media_error');
           }
         });
@@ -452,7 +639,13 @@ export function pausePlaybackForInterruption(): void {
     );
   }
   _interruptionDepth += 1;
+  if (state.activeTrackId) {
+    setState({
+      playbackStatus: getTransitionStatus('interruption_start', audio),
+    });
+  }
   if (audio && !audio.paused) {
+    _playToken += 1;
     audio.pause();
   }
 }
@@ -467,12 +660,24 @@ export function resumePlaybackAfterInterruption(
 
   const shouldResume = Boolean(options.resume) && _wasPlayingBeforeInterruption;
   _wasPlayingBeforeInterruption = false;
-  if (!shouldResume) return;
-
   const audio = getAudio();
+  if (!shouldResume) {
+    if (state.activeTrackId) {
+      setState({
+        playbackStatus: getTransitionStatus('interruption_end', audio),
+      });
+    }
+    return;
+  }
+
   if (!audio || !state.activeTrackId) return;
+  const trackId = state.activeTrackId;
+  const token = ++_playToken;
+  _playLatencyMark = startLatencyMark('audio-play', _playLatencyMark);
   void audio.play().catch(() => {
-    handlePlaybackFailure(audio, 'play_rejected');
+    if (isCurrentPlaybackRequest(audio, token, trackId)) {
+      handlePlaybackFailure(audio, 'play_rejected');
+    }
   });
 }
 
@@ -502,13 +707,18 @@ export function useTrackAudioPlayer() {
       // Same track — toggle pause/resume
       if (state.activeTrackId === track.id) {
         if (audio.paused) {
+          const token = ++_playToken;
+          _playLatencyMark = startLatencyMark('audio-play', _playLatencyMark);
           try {
             await audio.play();
           } catch (error) {
-            handlePlaybackFailure(audio, 'play_rejected');
+            if (isCurrentPlaybackRequest(audio, token, track.id)) {
+              handlePlaybackFailure(audio, 'play_rejected');
+            }
             throw error;
           }
         } else {
+          _playToken += 1;
           audio.pause();
         }
         return;
@@ -546,14 +756,20 @@ export function useTrackAudioPlayer() {
     _wasPlayingBeforeInterruption = false;
     const audio = getAudio();
     if (audio) {
+      _audio = null;
       audio.pause();
       audio.src = '';
     }
+    _activeTrackIsrc = null;
+    _hasRetriedRefresh = false;
     clearPlaybackQueue();
+    _playLatencyMark = finishLatencyMark(_playLatencyMark, 'stopped');
+    _seekLatencyMark = finishLatencyMark(_seekLatencyMark, 'stopped');
+    _bufferingLatencyMark = finishLatencyMark(_bufferingLatencyMark, 'stopped');
     setState({
       activeTrackId: null,
       isPlaying: false,
-      playbackStatus: 'idle',
+      playbackStatus: getTransitionStatus('stop', audio),
       lastErrorReason: null,
       currentTime: 0,
       duration: 0,

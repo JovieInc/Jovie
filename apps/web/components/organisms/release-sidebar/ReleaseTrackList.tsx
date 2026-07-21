@@ -1,5 +1,6 @@
 'use client';
 
+import type { AudioPlaybackStatus } from '@jovie/audio-contracts';
 import { ChevronRight, Pause, Play } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { toast } from '@/components/feedback';
@@ -231,7 +232,7 @@ function TrackListRow({
   readonly playbackState: {
     activeTrackId: string | null;
     isPlaying: boolean;
-    playbackStatus?: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+    playbackStatus?: AudioPlaybackStatus;
   };
   readonly playbackQueue: readonly TrackControlSource[];
   readonly onToggleTrack: (

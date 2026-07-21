@@ -3,16 +3,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Map of event name -> listener callbacks registered on the mock Audio element
 let audioEventListeners: Record<string, Array<() => void>>;
-let mockAudio: {
+interface MockAudioElement {
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
   addEventListener: ReturnType<typeof vi.fn>;
+  listeners: Record<string, Array<() => void>>;
   paused: boolean;
   src: string;
   preload: string;
   currentTime: number;
   duration: number;
-};
+  error?: { code: number };
+}
+let mockAudio: MockAudioElement;
+let audioInstances: MockAudioElement[];
 let nextPlayMock: ReturnType<typeof vi.fn> | null = null;
 
 function createMockAudio() {
@@ -31,13 +35,15 @@ function createMockAudio() {
     preload: '',
     currentTime: 0,
     duration: 0,
+    listeners: audioEventListeners,
   };
+  audioInstances.push(mockAudio);
   nextPlayMock = null;
   return mockAudio;
 }
 
-function fireAudioEvent(event: string) {
-  const handlers = audioEventListeners[event];
+function fireAudioEvent(event: string, audio = mockAudio) {
+  const handlers = audio.listeners[event];
   if (handlers) {
     for (const handler of handlers) {
       handler();
@@ -65,6 +71,11 @@ describe('useTrackAudioPlayer', () => {
   beforeEach(() => {
     vi.resetModules();
     nextPlayMock = null;
+    audioInstances = [];
+    Object.defineProperty(navigator, 'mediaSession', {
+      configurable: true,
+      value: undefined,
+    });
   });
 
   it('plays a new track and sets metadata', async () => {
@@ -188,6 +199,7 @@ describe('useTrackAudioPlayer', () => {
   });
 
   it('sets isPlaying to false and resets currentTime on ended event', async () => {
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1);
     const useTrackAudioPlayer = await importFresh();
     const { result } = renderHook(() => useTrackAudioPlayer());
 
@@ -223,6 +235,161 @@ describe('useTrackAudioPlayer', () => {
     expect(result.current.playbackState.currentTime).toBe(0);
     // activeTrackId should remain (track didn't error, it just finished)
     expect(result.current.playbackState.activeTrackId).toBe('track-1');
+    expect(result.current.playbackState.playbackStatus).toBe('ended');
+    nowSpy.mockRestore();
+  });
+
+  it('exposes buffering, stalled, seeking, and recovery transitions', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('play');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('loading');
+
+    act(() => fireAudioEvent('playing'));
+    expect(result.current.playbackState.playbackStatus).toBe('playing');
+
+    act(() => fireAudioEvent('waiting'));
+    expect(result.current.playbackState.playbackStatus).toBe('buffering');
+
+    act(() => fireAudioEvent('stalled'));
+    expect(result.current.playbackState.playbackStatus).toBe('stalled');
+
+    act(() => fireAudioEvent('canplay'));
+    expect(result.current.playbackState.playbackStatus).toBe('playing');
+
+    act(() => {
+      mockAudio.duration = 180;
+      result.current.seek(42);
+      fireAudioEvent('seeking');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('seeking');
+
+    act(() => {
+      mockAudio.currentTime = 42;
+      fireAudioEvent('seeked');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('playing');
+    expect(result.current.playbackState.currentTime).toBe(42);
+  });
+
+  it('measures play-to-audible, buffering recovery, and seek settlement', async () => {
+    const markSpy = vi.spyOn(performance, 'mark');
+    const measureSpy = vi.spyOn(performance, 'measure');
+    const clearMarksSpy = vi.spyOn(performance, 'clearMarks');
+    const clearMeasuresSpy = vi.spyOn(performance, 'clearMeasures');
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('playing');
+      fireAudioEvent('waiting');
+      fireAudioEvent('playing');
+      mockAudio.duration = 180;
+      result.current.seek(30);
+      fireAudioEvent('seeking');
+      fireAudioEvent('seeked');
+    });
+
+    expect(markSpy).toHaveBeenCalledWith(expect.stringContaining('audio-play'));
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-play:event-to-audible',
+      expect.any(String),
+      expect.any(String)
+    );
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-buffering:event-to-recovered',
+      expect.any(String),
+      expect.any(String)
+    );
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-seek:event-to-settled',
+      expect.any(String),
+      expect.any(String)
+    );
+    expect(clearMarksSpy).toHaveBeenCalled();
+    expect(clearMeasuresSpy).toHaveBeenCalledWith(
+      'audio-seek:event-to-settled'
+    );
+    markSpy.mockRestore();
+    measureSpy.mockRestore();
+    clearMarksSpy.mockRestore();
+    clearMeasuresSpy.mockRestore();
+  });
+
+  it('updates Media Session position when throttled progress is published', async () => {
+    const setPositionState = vi.fn();
+    Object.defineProperty(navigator, 'mediaSession', {
+      configurable: true,
+      value: {
+        metadata: null,
+        playbackState: 'none',
+        setActionHandler: vi.fn(),
+        setPositionState,
+      },
+    });
+    vi.stubGlobal(
+      'MediaMetadata',
+      vi.fn(function MediaMetadata() {
+        return {};
+      })
+    );
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1);
+
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+
+    act(() => {
+      mockAudio.duration = 180;
+      mockAudio.currentTime = 12;
+      fireAudioEvent('loadedmetadata');
+      fireAudioEvent('timeupdate');
+    });
+
+    expect(setPositionState).toHaveBeenLastCalledWith({
+      duration: 180,
+      position: 12,
+      playbackRate: 1,
+    });
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-2',
+        title: 'Next Song',
+        audioUrl: 'https://cdn.example.com/next.mp3',
+      });
+    });
+    expect(setPositionState).toHaveBeenLastCalledWith();
+
+    act(() => result.current.stop());
+    expect(setPositionState).toHaveBeenLastCalledWith();
+    nowSpy.mockRestore();
   });
 
   it('stores queue metadata and advances to the next queued track on ended', async () => {
@@ -352,6 +519,7 @@ describe('useTrackAudioPlayer', () => {
     act(() => {
       engine.pausePlaybackForInterruption();
     });
+    expect(result.current.playbackState.playbackStatus).toBe('interrupted');
     expect(mockAudio.pause).toHaveBeenCalled();
     act(() => {
       mockAudio.paused = true;
@@ -363,6 +531,41 @@ describe('useTrackAudioPlayer', () => {
     });
     expect(mockAudio.play).toHaveBeenCalledTimes(1);
     expect(result.current.playbackState.isPlaying).toBe(false);
+    expect(result.current.playbackState.playbackStatus).toBe('paused');
+  });
+
+  it('keeps interruption ownership through queued media events', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const engine = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('playing');
+      engine.pausePlaybackForInterruption();
+      mockAudio.paused = true;
+      fireAudioEvent('pause');
+      fireAudioEvent('playing');
+      fireAudioEvent('waiting');
+      fireAudioEvent('stalled');
+      fireAudioEvent('canplay');
+      fireAudioEvent('seeking');
+      fireAudioEvent('seeked');
+      fireAudioEvent('ended');
+    });
+
+    expect(result.current.playbackState.playbackStatus).toBe('interrupted');
+    expect(result.current.playbackState.isPlaying).toBe(false);
+    expect(result.current.playbackState.activeTrackId).toBe('track-1');
   });
 
   it('switches source onto a single active track', async () => {
@@ -386,27 +589,309 @@ describe('useTrackAudioPlayer', () => {
 
     expect(result.current.playbackState.activeTrackId).toBe('track-2');
     expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
-    expect(mockAudio.pause.mock.calls.length).toBeGreaterThanOrEqual(1);
+    expect(audioInstances).toHaveLength(2);
+    expect(audioInstances[0]?.pause).toHaveBeenCalled();
+  });
+
+  it('ignores late media events from a replaced source element', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'First',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+      });
+    });
+    const firstAudio = mockAudio;
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-2',
+        title: 'Second',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+      });
+    });
+
+    act(() => {
+      fireAudioEvent('playing', firstAudio);
+      fireAudioEvent('waiting', firstAudio);
+      fireAudioEvent('ended', firstAudio);
+      fireAudioEvent('error', firstAudio);
+    });
+
+    expect(result.current.playbackState.activeTrackId).toBe('track-2');
+    expect(result.current.playbackState.playbackStatus).toBe('loading');
+    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
+  });
+
+  it('does not reuse a stopped source for the next track', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'First',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+      });
+    });
+    const stoppedAudio = mockAudio;
+    act(() => result.current.stop());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-2',
+        title: 'Second',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+      });
+    });
+    act(() => {
+      fireAudioEvent('playing', stoppedAudio);
+      fireAudioEvent('error', stoppedAudio);
+      fireAudioEvent('ended', stoppedAudio);
+    });
+
+    expect(audioInstances).toHaveLength(2);
+    expect(result.current.playbackState.activeTrackId).toBe('track-2');
+    expect(result.current.playbackState.playbackStatus).toBe('loading');
+    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
+  });
+
+  it('does not reuse a failed source for the next track', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'First',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+      });
+    });
+    const failedAudio = mockAudio;
+    failedAudio.error = { code: 3 };
+    act(() => fireAudioEvent('error', failedAudio));
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-2',
+        title: 'Second',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+      });
+    });
+    act(() => {
+      fireAudioEvent('playing', failedAudio);
+      fireAudioEvent('error', failedAudio);
+      fireAudioEvent('ended', failedAudio);
+    });
+
+    expect(audioInstances).toHaveLength(2);
+    expect(result.current.playbackState.activeTrackId).toBe('track-2');
+    expect(result.current.playbackState.playbackStatus).toBe('loading');
+    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
+  });
+
+  it('isolates refreshed preview playback from events on the expired source', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        previewUrl: 'https://cdn.example.com/refreshed.mp3',
+        source: 'deezer',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const useTrackAudioPlayer = await importFresh();
+      const { result } = renderHook(() => useTrackAudioPlayer());
+
+      await act(async () => {
+        await result.current.toggleTrack({
+          id: 'track-1',
+          title: 'Refresh Me',
+          audioUrl: 'https://cdn.example.com/expired.mp3',
+          isrc: 'USRC17607839',
+        });
+      });
+      const expiredAudio = mockAudio;
+      expiredAudio.error = { code: 2 };
+
+      await act(async () => {
+        fireAudioEvent('error', expiredAudio);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/preview-url/refresh?isrc=USRC17607839'
+      );
+      expect(audioInstances).toHaveLength(2);
+      expect(mockAudio.src).toBe('https://cdn.example.com/refreshed.mp3');
+
+      act(() => {
+        fireAudioEvent('playing', expiredAudio);
+        fireAudioEvent('waiting', expiredAudio);
+        fireAudioEvent('ended', expiredAudio);
+      });
+      expect(result.current.playbackState.activeTrackId).toBe('track-1');
+      expect(result.current.playbackState.playbackStatus).toBe('loading');
+
+      act(() => fireAudioEvent('playing'));
+      expect(result.current.playbackState.playbackStatus).toBe('playing');
+    } finally {
+      vi.stubGlobal('fetch', originalFetch);
+    }
+  });
+
+  it('settles in-flight seek and buffering marks when replacing a source', async () => {
+    const measureSpy = vi.spyOn(performance, 'measure');
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'First',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('playing');
+      fireAudioEvent('waiting');
+      mockAudio.duration = 180;
+      result.current.seek(42);
+      fireAudioEvent('seeking');
+    });
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-2',
+        title: 'Second',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+      });
+    });
+
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-buffering:event-to-superseded',
+      expect.any(String),
+      expect.any(String)
+    );
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-seek:event-to-superseded',
+      expect.any(String),
+      expect.any(String)
+    );
+    measureSpy.mockRestore();
+  });
+
+  it('ignores a late same-track resume rejection after switching tracks', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'First',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+      });
+    });
+    mockAudio.paused = true;
+    let rejectResume: ((error: Error) => void) | undefined;
+    mockAudio.play.mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectResume = reject;
+        })
+    );
+
+    let resumePromise: Promise<void> | undefined;
+    await act(async () => {
+      resumePromise = result.current.toggleTrack({
+        id: 'track-1',
+        title: 'First',
+      });
+      await result.current.toggleTrack({
+        id: 'track-2',
+        title: 'Second',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+      });
+      rejectResume?.(new Error('Late rejection'));
+      await expect(resumePromise).rejects.toThrow('Late rejection');
+    });
+
+    expect(result.current.playbackState.activeTrackId).toBe('track-2');
+    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
+  });
+
+  it('ignores a late Media Session play rejection after switching tracks', async () => {
+    const actionHandlers: Record<string, (() => void) | null> = {};
+    Object.defineProperty(navigator, 'mediaSession', {
+      configurable: true,
+      value: {
+        metadata: null,
+        playbackState: 'none',
+        setActionHandler: vi.fn(
+          (action: string, handler: (() => void) | null) => {
+            actionHandlers[action] = handler;
+          }
+        ),
+        setPositionState: vi.fn(),
+      },
+    });
+    vi.stubGlobal(
+      'MediaMetadata',
+      vi.fn(function MediaMetadata() {
+        return {};
+      })
+    );
+
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'First',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+      });
+    });
+
+    let rejectMediaSessionPlay: ((error: Error) => void) | undefined;
+    mockAudio.play.mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectMediaSessionPlay = reject;
+        })
+    );
+    actionHandlers.play?.();
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-2',
+        title: 'Second',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+      });
+      rejectMediaSessionPlay?.(new Error('Late Media Session rejection'));
+      await Promise.resolve();
+    });
+
+    expect(result.current.playbackState.activeTrackId).toBe('track-2');
+    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
   });
 
   it('keeps the latest track active when an earlier play() resolves late', async () => {
     let resolveFirstPlay: (() => void) | undefined;
     let resolveSecondPlay: (() => void) | undefined;
 
-    nextPlayMock = vi
-      .fn()
-      .mockImplementationOnce(
-        () =>
-          new Promise<void>(resolve => {
-            resolveFirstPlay = resolve;
-          })
-      )
-      .mockImplementationOnce(
-        () =>
-          new Promise<void>(resolve => {
-            resolveSecondPlay = resolve;
-          })
-      );
+    nextPlayMock = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>(resolve => {
+          resolveFirstPlay = resolve;
+        })
+    );
 
     const useTrackAudioPlayer = await importFresh();
     const { result } = renderHook(() => useTrackAudioPlayer());
@@ -420,6 +905,12 @@ describe('useTrackAudioPlayer', () => {
         title: 'First Song',
         audioUrl: 'https://cdn.example.com/first.mp3',
       });
+      nextPlayMock = vi.fn().mockImplementation(
+        () =>
+          new Promise<void>(resolve => {
+            resolveSecondPlay = resolve;
+          })
+      );
       secondToggle = result.current.toggleTrack({
         id: 'track-2',
         title: 'Second Song',
@@ -432,7 +923,7 @@ describe('useTrackAudioPlayer', () => {
       await firstToggle;
     });
 
-    expect(mockAudio.pause).toHaveBeenCalledTimes(2);
+    expect(audioInstances).toHaveLength(2);
     expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
     expect(result.current.playbackState.activeTrackId).toBe('track-2');
     expect(result.current.playbackState.trackTitle).toBe('Second Song');
