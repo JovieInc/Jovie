@@ -15,6 +15,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Suggested DSP matches no longer flash a skeleton then collapse (JOV-4159):** when the Music drawer loads with no match suggestions (the common case), the section stays empty instead of flashing skeleton rows and shifting sibling content.
+
 - **Library Approval Status is first-class again (#10384):** every Library asset surfaces Draft / Needs Review / Approved / Archived as a badge on grid cards, a list column, and filter chips (rail + pill search), with Release Status kept as a separate labeled axis so the two never collapse into one bare “Draft”.
 - **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; it uses the build-time release version from build-info, or omits the version when unavailable.
 - **Entity mention hover cards now use the same rich entity card as the chat rail:** hovering an inline release, artist, track, or event mention opens the canonical compact EntityCard instead of a one-off popover layout.
