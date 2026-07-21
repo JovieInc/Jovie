@@ -831,7 +831,9 @@ export function ProfileMobileNotificationsFlow({
 
   const contentBody = (
     <>
-      <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.055),transparent_42%)]' />
+      {presentation === 'inline' ? null : (
+        <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.055),transparent_42%)]' />
+      )}
 
       <div
         className={cn(
@@ -925,8 +927,10 @@ export function ProfileMobileNotificationsFlow({
         </div>
       </div>
     ) : (
+      // Inline: transparent so the sheet sits on the page's own surface with
+      // no rounded seam against a mismatched background token.
       <div
-        className='relative flex h-full min-h-full flex-1 flex-col rounded-(--profile-card-radius) bg-[color:var(--profile-stage-bg)] dark:text-white'
+        className='relative flex h-full min-h-full flex-1 flex-col dark:text-white'
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}
