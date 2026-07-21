@@ -9,6 +9,8 @@ import {
   getLibraryAssetAspectRatio,
   getLibraryDrawerHeroClass,
   LIBRARY_GRID_DENSITY_LAYOUT,
+  normalizeLibraryVersionTitle,
+  stackLibraryReleaseVersions,
 } from '@/app/app/(shell)/library/library-data';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
@@ -303,5 +305,64 @@ describe('library data', () => {
     expect(LIBRARY_GRID_DENSITY_LAYOUT.spacious).toContain(
       'sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3'
     );
+  });
+});
+
+describe('library version stacking (JOV-3089)', () => {
+  it('normalizes version variant titles to one key', () => {
+    expect(normalizeLibraryVersionTitle('All This Noise EP')).toBe(
+      'all this noise'
+    );
+    expect(normalizeLibraryVersionTitle('All This Noise (Remixed)')).toBe(
+      'all this noise'
+    );
+    expect(normalizeLibraryVersionTitle('All This Noise [Deluxe]')).toBe(
+      'all this noise'
+    );
+    expect(normalizeLibraryVersionTitle('All This Noise - Remastered')).toBe(
+      'all this noise'
+    );
+    expect(normalizeLibraryVersionTitle('  All   This   Noise  ')).toBe(
+      'all this noise'
+    );
+    // Distinct titles stay distinct.
+    expect(normalizeLibraryVersionTitle('All This Noise')).not.toBe(
+      normalizeLibraryVersionTitle('Some Other Song')
+    );
+  });
+
+  it('stacks near-duplicate ingests and keeps the most complete row', () => {
+    const assets = buildLibraryReleaseAssets([
+      buildRelease({
+        id: 'sparse',
+        title: 'All This Noise EP',
+        totalTracks: 0,
+        releaseDate: '2026-01-01T00:00:00.000Z',
+      }),
+      buildRelease({
+        id: 'full',
+        title: 'All This Noise (Remixed)',
+        totalTracks: 6,
+        releaseDate: '2026-02-01T00:00:00.000Z',
+      }),
+      buildRelease({
+        id: 'other',
+        title: 'Different Song',
+        totalTracks: 1,
+      }),
+    ]);
+
+    const stacked = stackLibraryReleaseVersions(assets);
+
+    expect(stacked.map(asset => asset.id)).toEqual(['full', 'other']);
+  });
+
+  it('keeps same-title releases by different artists unstacked', () => {
+    const assets = buildLibraryReleaseAssets([
+      buildRelease({ id: 'a', title: 'Intro', artistNames: ['Artist A'] }),
+      buildRelease({ id: 'b', title: 'Intro', artistNames: ['Artist B'] }),
+    ]);
+
+    expect(stackLibraryReleaseVersions(assets)).toHaveLength(2);
   });
 });
