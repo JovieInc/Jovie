@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **App shell loading skeleton** matches `DESIGN_V1` so flag-on users no longer flash the legacy sidebar/header on first `/app` paint.
 
+- [internal] **Post-deploy probes now identify CLI-built production deployments (JOV-4366):** exact immutable build identity replaces optional Vercel source metadata while preserving project, deployment, origin, environment, and main-ancestry proofs.
 - **[internal] Staging Better Auth Google OAuth credentials now reach the Vercel build and runtime deploy (#14659):** the release workflow allowlists and forwards both Google client keys, failing closed when either is absent.
 
 ## [26.7.0] - 2026-07-21

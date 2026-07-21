@@ -863,6 +863,28 @@ describe('deploy workflow Vercel env resolution', () => {
     );
   });
 
+  it('serializes only the aliased staging OAuth proof', () => {
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const oauthStep = getStepBlock(
+      getJobBlock(workflow, 'alias-staging'),
+      'Verify aliased staging OAuth redirect URIs'
+    );
+
+    expect(oauthStep).toContain(
+      'until PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \\\n'
+    );
+    expect(oauthStep).toContain(
+      'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run --'
+    );
+    expect(oauthStep).toContain(
+      'pnpm exec playwright test tests/e2e/oauth-providers.spec.ts'
+    );
+    expect(oauthStep).toContain('--project=chromium --reporter=line');
+    expect(oauthStep).toContain('max_attempts=3');
+    expect(oauthStep).toContain('sleep "$sleep_seconds"');
+    expect(workflow).not.toMatch(/^\s+PLAYWRIGHT_WORKERS:/m);
+  });
+
   it('cross-proves one-shot CI evidence under one dedicated FIFO production lease', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
@@ -1214,6 +1236,10 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'BETTER_AUTH_URL',
       'AUTH_GOOGLE_CLIENT_ID',
       'AUTH_GOOGLE_CLIENT_SECRET',
+      'AUTH_APPLE_CLIENT_ID',
+      'AUTH_APPLE_TEAM_ID',
+      'AUTH_APPLE_KEY_ID',
+      'AUTH_APPLE_PRIVATE_KEY',
       'DATABASE_URL',
       'SESSION_SECRET',
       'AI_GATEWAY_API_KEY',
@@ -1233,7 +1259,14 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     const deployAllowlist = deployStep
       .split('\n')
       .find(line => line.includes('--only-secrets='));
-    for (const key of ['AUTH_GOOGLE_CLIENT_ID', 'AUTH_GOOGLE_CLIENT_SECRET']) {
+    for (const key of [
+      'AUTH_GOOGLE_CLIENT_ID',
+      'AUTH_GOOGLE_CLIENT_SECRET',
+      'AUTH_APPLE_CLIENT_ID',
+      'AUTH_APPLE_TEAM_ID',
+      'AUTH_APPLE_KEY_ID',
+      'AUTH_APPLE_PRIVATE_KEY',
+    ]) {
       expect(deployAllowlist).toContain(key);
     }
 
@@ -1241,7 +1274,14 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       workflow,
       'Build (preview target for staging verification)'
     );
-    for (const key of ['AUTH_GOOGLE_CLIENT_ID', 'AUTH_GOOGLE_CLIENT_SECRET']) {
+    for (const key of [
+      'AUTH_GOOGLE_CLIENT_ID',
+      'AUTH_GOOGLE_CLIENT_SECRET',
+      'AUTH_APPLE_CLIENT_ID',
+      'AUTH_APPLE_TEAM_ID',
+      'AUTH_APPLE_KEY_ID',
+      'AUTH_APPLE_PRIVATE_KEY',
+    ]) {
       const buildAllowlist = buildStep
         .split('\n')
         .find(line => line.includes('--only-secrets='));

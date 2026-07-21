@@ -54,6 +54,15 @@ export function isStampAllowedBranch(branch) {
   if (STAMP_ALLOWED_BRANCHES.has(normalized)) {
     return true;
   }
+  // Merge-queue synthetic heads (gh-readonly-queue/<base>/pr-<n>-<sha>) carry
+  // the combined main+PR tree with no source-branch context. The pull_request
+  // lane already enforces the guard on the source branch, so a queued PR's
+  // fan-out writes were validated before enrollment — do not re-classify the
+  // queue branch as a feature branch (GH-14658: version-stamp PRs could never
+  // pass the merge queue).
+  if (normalized.startsWith('gh-readonly-queue/')) {
+    return true;
+  }
   // Integration / train branches roll up already-stamped commits.
   return /^(integration|train|release|hotfix)\//.test(normalized);
 }

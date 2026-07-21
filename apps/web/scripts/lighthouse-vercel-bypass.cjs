@@ -18,15 +18,17 @@ const {
   isTrustedVercelProtectedAliasUrl,
   maskSensitiveValues,
   parseProbeUrl,
+  PUBLIC_PROBE_COOKIE_NAMES,
   readVerifiedBuildInfo,
   safeRouteLabel,
   validateBuildInfo,
+  ZERO_DYNAMIC_SECRET_RECEIPT,
 } = require('./vercel-protected-origin.cjs');
 
 const COOKIE_SCOPE_PROBE_PATH = '/__jovie_cookie_scope_probe__';
 
 function recordSensitiveValues(path, values) {
-  const safeValues = maskSensitiveValues(values);
+  const safeValues = values.length === 0 ? [] : maskSensitiveValues(values);
   if (!path) return;
   let expectedIdentity;
   let flags = constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW;
@@ -53,10 +55,20 @@ function recordSensitiveValues(path, values) {
       );
     }
     fchmodSync(descriptor, 0o600);
-    writeSync(descriptor, `${safeValues.join('\n')}\n`, null, 'utf8');
+    const receipt =
+      safeValues.length === 0
+        ? ZERO_DYNAMIC_SECRET_RECEIPT
+        : safeValues.join('\n');
+    writeSync(descriptor, `${receipt}\n`, null, 'utf8');
   } finally {
     closeSync(descriptor);
   }
+}
+
+function sensitiveCookieValues(cookies) {
+  return cookies
+    .filter(cookie => !PUBLIC_PROBE_COOKIE_NAMES.has(cookie.name))
+    .map(cookie => cookie.value);
 }
 
 function parseRequestCookieHeader(header) {
@@ -181,8 +193,11 @@ async function primeLighthouseVercelAliasBypass(
     expectedCommitSha,
     expectedAliasOrigin,
     expectedEnvironment,
-    onSensitiveValues: values =>
-      recordSensitiveValuesImpl(sensitiveValuesPath, values),
+    onSensitiveValues: cookies =>
+      recordSensitiveValuesImpl(
+        sensitiveValuesPath,
+        sensitiveCookieValues(cookies)
+      ),
     onCookies: async (cookies, verifiedTargetUrl) => {
       await browser.defaultBrowserContext().setCookie(...cookies);
       await assertBrowserCookieOriginBoundaryImpl(
@@ -225,8 +240,11 @@ async function primeLighthouseVercelBypass(
     expectedCommitSha,
     expectedDeploymentOrigin,
     expectedEnvironment,
-    onSensitiveValues: values =>
-      recordSensitiveValuesImpl(sensitiveValuesPath, values),
+    onSensitiveValues: cookies =>
+      recordSensitiveValuesImpl(
+        sensitiveValuesPath,
+        sensitiveCookieValues(cookies)
+      ),
     onCookies: async (cookies, verifiedTargetUrl) => {
       await browser.defaultBrowserContext().setCookie(...cookies);
       await assertBrowserCookieOriginBoundaryImpl(
@@ -250,6 +268,7 @@ module.exports.assertBrowserCookieOriginBoundary =
   assertBrowserCookieOriginBoundary;
 module.exports.readVerifiedBuildInfo = readVerifiedBuildInfo;
 module.exports.recordSensitiveValues = recordSensitiveValues;
+module.exports.sensitiveCookieValues = sensitiveCookieValues;
 module.exports.validateCookieOriginBoundaryHeaders =
   validateCookieOriginBoundaryHeaders;
 module.exports.validateBuildInfo = validateBuildInfo;
