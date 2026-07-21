@@ -6,14 +6,18 @@ import { buildOnboardingPromptSecuritySection } from '@/lib/chat/prompt-disclosu
  * list necessarily contains banned words, so tests lint these examples,
  * not the raw prompt. Keep every entry lint-clean.
  */
+/** Shared opener / waitlist receipts — imported by the script bank to avoid copy drift. */
+export const ONBOARDING_OPENER_PRIMARY =
+  "Hey — I'm Jovie. I'll remember this chat if you sign up. What are you working on?";
+export const ONBOARDING_WAITLIST_RECEIPT =
+  "On the early list. We'll email when a spot opens — return here or /start to resume.";
+
 export const ONBOARDING_CALIBRATION_EXAMPLES = {
-  opener:
-    "Hey — I'm Jovie. I'll remember this chat if you sign up. What are you working on?",
+  opener: ONBOARDING_OPENER_PRIMARY,
   afterSpotifyPick:
     'Pulled up this artist. 47k Spotify followers (source: enrichment), last release about 2 weeks ago. The gap is the bio-link layer downstream of the DSP, not the songs. What is making you fix this now?',
   softCommit: 'Want me to set this up?',
-  waitlist:
-    "On the early list. We'll email when a spot opens — return here or /start to resume.",
+  waitlist: ONBOARDING_WAITLIST_RECEIPT,
   checkoutCloser:
     'Pro is $39/mo; free tier exists if you want to start there. How does that sound?',
 } as const;

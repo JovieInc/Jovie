@@ -18,6 +18,11 @@
  * - Followers: "Spotify followers (source: enrichment)" — no Jovie audience claims
  */
 
+import {
+  ONBOARDING_OPENER_PRIMARY,
+  ONBOARDING_WAITLIST_RECEIPT,
+} from '@/lib/chat/prompts/onboarding';
+
 export type ScriptStepId =
   | 'greet'
   | 'get_artist'
@@ -42,15 +47,11 @@ function line(stepId: ScriptStepId, variant: string, text: string): ScriptLine {
 }
 
 export const SCRIPT_LINES: readonly ScriptLine[] = [
-  line(
-    'greet',
-    'v3',
-    "Hey — I'm Jovie. I'll remember this chat if you sign up. What are you working on?"
-  ),
+  line('greet', 'v3', ONBOARDING_OPENER_PRIMARY),
   line(
     'greet',
     'v4',
-    "Hey, I'm Jovie. I'll remember this chat if you sign up. What are you working on right now?"
+    "I'm Jovie. Sign up and this chat sticks with you. What's the work right now?"
   ),
 
   line(
@@ -61,7 +62,7 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   line(
     'get_artist',
     'v4',
-    'Find the Spotify artist first — everything downstream needs real data. Pick below.'
+    'Search Spotify for the act — pick a row so enrichment can attach.'
   ),
 
   // Before ownership verified: "this artist", not "you". Followers cite enrichment source.
@@ -73,7 +74,7 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   line(
     'confirm_artist',
     'v4',
-    '{name} locked as the match. {followers} Spotify followers (source: enrichment). Next: claim a handle.'
+    '{name} is the match. Enrichment shows {followers} Spotify followers. Claim a handle next.'
   ),
 
   line(
@@ -100,11 +101,7 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
     'You clear the bar. Checkout is about a minute — free tier is available if you want to start there.'
   ),
 
-  line(
-    'waitlist',
-    'v3',
-    "On the early list. We'll email when a spot opens; return to this chat or /start to resume."
-  ),
+  line('waitlist', 'v3', ONBOARDING_WAITLIST_RECEIPT),
 
   line(
     'done',

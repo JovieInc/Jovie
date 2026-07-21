@@ -80,6 +80,11 @@ const OUTCOME_COPY: Record<
   },
 };
 
+const PRIMARY_CTA_CLASS =
+  'inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-app font-semibold text-black transition-colors hover:bg-white/90 focus-ring-themed dark:bg-white dark:text-black';
+const SECONDARY_BTN_CLASS =
+  'inline-flex h-10 items-center justify-center gap-2 rounded-full border border-white/[0.12] px-4 text-app font-semibold text-white/86 transition-colors hover:bg-white/[0.04] focus-ring-themed';
+
 function NextSteps({ email }: { readonly email?: string | null }) {
   const emailLine = email?.trim()
     ? `Watch ${email.trim()} for the access email.`
@@ -106,6 +111,23 @@ function NextSteps({ email }: { readonly email?: string | null }) {
   );
 }
 
+function PrimaryCtaLink({
+  href,
+  label,
+  testId,
+}: {
+  readonly href: string;
+  readonly label: string;
+  readonly testId?: string;
+}) {
+  return (
+    <Link href={href} className={PRIMARY_CTA_CLASS} data-testid={testId}>
+      {label}
+      <ArrowRight className='h-3.5 w-3.5' aria-hidden />
+    </Link>
+  );
+}
+
 export function WaitlistOutcomeView({
   outcome,
   onRetry,
@@ -116,6 +138,9 @@ export function WaitlistOutcomeView({
   const canRetry =
     (outcome === 'save_failed' || outcome === 'rate_limited') && onRetry;
   const { signOut } = useAuthSafe();
+  const primaryHref = copy.actionHref;
+  const primaryLabel = copy.actionLabel;
+  const showResumeCta = Boolean(copy.showNextSteps && !primaryHref);
 
   return (
     <section className='w-full rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-primary-token shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
@@ -131,42 +156,34 @@ export function WaitlistOutcomeView({
       {copy.showNextSteps ? <NextSteps email={email} /> : null}
 
       <div className='mt-6 flex flex-col gap-2 sm:flex-row'>
-        {copy.actionHref && copy.actionLabel ? (
-          <Link
-            href={copy.actionHref}
-            className='inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-app font-semibold text-black transition-colors hover:bg-white/90 focus-ring-themed dark:bg-white dark:text-black'
-          >
-            {copy.actionLabel}
-            <ArrowRight className='h-3.5 w-3.5' aria-hidden />
-          </Link>
+        {primaryHref && primaryLabel ? (
+          <PrimaryCtaLink href={primaryHref} label={primaryLabel} />
         ) : null}
-        {copy.showNextSteps && !copy.actionHref ? (
-          <Link
+        {showResumeCta ? (
+          <PrimaryCtaLink
             href={APP_ROUTES.START}
-            className='inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-app font-semibold text-black transition-colors hover:bg-white/90 focus-ring-themed dark:bg-white dark:text-black'
-            data-testid='waitlist-resume-start'
-          >
-            Resume at Start
-            <ArrowRight className='h-3.5 w-3.5' aria-hidden />
-          </Link>
+            label='Resume At Start'
+            testId='waitlist-resume-start'
+          />
         ) : null}
         {canRetry ? (
           <button
             type='button'
             onClick={onRetry}
-            className='inline-flex h-10 items-center justify-center gap-2 rounded-full border border-white/[0.12] px-4 text-app font-semibold text-white/86 transition-colors hover:bg-white/[0.04] focus-ring-themed'
+            className={SECONDARY_BTN_CLASS}
           >
             Try Again
           </button>
         ) : null}
-        {copy.actionHref || copy.showNextSteps ? null : (
+        {primaryHref || copy.showNextSteps ? null : (
           <button
             type='button'
             onClick={() => {
               void signOut({ redirectUrl: APP_ROUTES.HOME });
             }}
             className={cn(
-              'inline-flex h-10 items-center justify-center rounded-full border border-white/[0.12] px-4 text-app font-semibold text-white/74 transition-colors hover:bg-white/[0.04] hover:text-white focus-ring-themed',
+              SECONDARY_BTN_CLASS,
+              'text-white/74 hover:text-white',
               canRetry && 'sm:ml-auto'
             )}
           >
