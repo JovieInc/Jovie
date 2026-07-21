@@ -11,7 +11,17 @@
  *
  * Editing rule: changing a line's text requires a NEW variant key. PR2 keys
  * conversion stats to `key`; silently re-texting a key corrupts attribution.
+ *
+ * Copy contract (audit):
+ * - 1–2 sentences + action per turn
+ * - Before ownership verified: "this artist", never "you"
+ * - Followers: "Spotify followers (source: enrichment)" — no Jovie audience claims
  */
+
+import {
+  ONBOARDING_OPENER_PRIMARY,
+  ONBOARDING_WAITLIST_RECEIPT,
+} from '@/lib/chat/prompts/onboarding';
 
 export type ScriptStepId =
   | 'greet'
@@ -37,79 +47,72 @@ function line(stepId: ScriptStepId, variant: string, text: string): ScriptLine {
 }
 
 export const SCRIPT_LINES: readonly ScriptLine[] = [
+  line('greet', 'v3', ONBOARDING_OPENER_PRIMARY),
   line(
     'greet',
-    'v1',
-    "Hey — I'm Jovie. Early access is limited right now, so some artists land on the waitlist. I'll remember this chat so we can pick up where we left off if you sign up. What are you working on?"
-  ),
-  line(
-    'greet',
-    'v2',
-    "Hey, I'm Jovie. I run the release side so you can stay on the music. Early access is limited — some artists waitlist first. I'll remember this chat if you sign up. What are you working on right now?"
+    'v4',
+    "I'm Jovie. Sign up and this chat sticks with you. What's the work right now?"
   ),
 
   line(
     'get_artist',
-    'v1',
-    "Let's skip the small talk — pull up your Spotify so I'm working with real numbers, not vibes. Pick your artist below."
+    'v3',
+    'First, pull up the Spotify artist so we use real numbers. Pick below.'
   ),
   line(
     'get_artist',
-    'v2',
-    'First move: find you on Spotify. Everything downstream gets sharper once I can see the real numbers. Pick your artist below.'
+    'v4',
+    'Search Spotify for the act — pick a row so enrichment can attach.'
   ),
 
+  // Before ownership verified: "this artist", not "you". Followers cite enrichment source.
   line(
     'confirm_artist',
-    'v1',
-    "Pulled you up. {followers} Spotify followers — that's a real audience, and the question now is whether your release setup respects it. Next: lock your handle before someone else grabs it."
+    'v3',
+    'Pulled up this artist. {followers} Spotify followers (source: enrichment). Next: lock a handle for this profile.'
   ),
   line(
     'confirm_artist',
-    'v2',
-    "{name}, locked in. {followers} followers on Spotify. Most artists at your size are still running a bare link page — that's the gap we close. Next: your handle."
+    'v4',
+    '{name} is the match. Enrichment shows {followers} Spotify followers. Claim a handle next.'
   ),
 
   line(
     'confirm_artist_no_data',
-    'v1',
-    "Locked in. Spotify is being slow with the numbers, but we don't need them to keep moving. Next: lock your handle before someone else grabs it."
+    'v3',
+    'Locked the match. Spotify enrichment is slow — we can keep moving without the counts. Next: lock a handle.'
   ),
 
   line(
     'handle',
-    'v1',
-    'Claiming @{handle} for you — checking it now. This is the link everything else hangs off, so we get it right first.'
+    'v3',
+    'Checking @{handle} now. This is the public link for the profile.'
   ),
 
   line(
     'ask_audience',
-    'v1',
-    'One thing before I route you: roughly how big is your audience right now? Under 500, a few thousand, more? Real answer beats a flattering one.'
+    'v3',
+    'One thing before routing: roughly how big is the audience? Under 500, a few thousand, more?'
   ),
 
   line(
     'instant_access',
-    'v1',
-    'You clear the bar. Checkout takes about a minute, and the free tier exists if you want to start there — the numbers will make the case either way.'
+    'v3',
+    'You clear the bar. Checkout is about a minute — free tier is available if you want to start there.'
   ),
 
-  line(
-    'waitlist',
-    'v1',
-    'Putting you on the early list. We pick this up exactly where we left off — nothing gets lost. Share an email at sign-in if you want a heads-up when access opens.'
-  ),
+  line('waitlist', 'v3', ONBOARDING_WAITLIST_RECEIPT),
 
   line(
     'done',
-    'v1',
-    "You're set from my side. The card above is your next move — take it when you're ready."
+    'v3',
+    'Next step is the card above — take it when ready. Nothing else needed from this chat.'
   ),
 
   line(
     'stream_error',
-    'v1',
-    'Lost my thread mid-sentence. Say that again and I pick it right up.'
+    'v3',
+    'Lost the thread mid-sentence. Say that again and we pick it up.'
   ),
 ] as const;
 
@@ -182,10 +185,10 @@ export function renderLine(
   slots: { name?: string | null; followers?: number | null; handle?: string }
 ): string {
   return scriptLine.text
-    .replaceAll('{name}', slots.name ?? 'Artist')
+    .replaceAll('{name}', slots.name ?? 'This artist')
     .replaceAll(
       '{followers}',
-      slots.followers != null ? formatFollowers(slots.followers) : 'your'
+      slots.followers != null ? formatFollowers(slots.followers) : 'unknown'
     )
-    .replaceAll('{handle}', slots.handle ?? 'your-handle');
+    .replaceAll('{handle}', slots.handle ?? 'handle');
 }

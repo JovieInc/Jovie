@@ -10,6 +10,10 @@ describe('lintVoice', () => {
   it.each([
     ['banned-phrase', "Excited to share what we've built!"],
     ['banned-phrase', "Here's the thing about release plans."],
+    ['banned-phrase', "Fire. That's the play for this release."],
+    ['banned-phrase', 'Catch you on the flip side after checkout.'],
+    ['banned-phrase', 'The room is totally dark without a link page.'],
+    ['banned-phrase', 'That path probably goes nowhere useful.'],
     ['corporate-verb', 'Leverage your robust fanbase.'],
     ['hedging', 'Maybe you could perhaps try a link page.'],
     ['apology', 'Sorry, something went wrong on our end.'],
@@ -18,6 +22,11 @@ describe('lintVoice', () => {
     ['multi-exclamation', 'Let’s go!!'],
     ['cheerleading', "That's amazing, superstar."],
     ['vague-quantifier', 'You have a lot of followers.'],
+    ['premature-ownership', 'Your live profile is ready to share.'],
+    [
+      'unsupported-audience-claim',
+      'Jovie will notify all your Spotify followers tonight.',
+    ],
   ])('flags %s', (rule, text) => {
     const result = lintVoice(text);
     expect(result.ok).toBe(false);

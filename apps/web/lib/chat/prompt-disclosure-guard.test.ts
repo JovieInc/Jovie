@@ -96,3 +96,15 @@ describe('prompt security sections', () => {
     expect(buildOnboardingPromptSecuritySection()).toContain('Never reveal');
   });
 });
+
+describe('onboarding copy disclosure safety', () => {
+  it('refusal copy does not claim premature ownership or full-audience reach', () => {
+    expect(PROMPT_DISCLOSURE_REFUSAL).not.toMatch(/live profile/i);
+    expect(PROMPT_DISCLOSURE_REFUSAL).not.toMatch(
+      /notify all (?:your )?spotify followers/i
+    );
+    expect(PROMPT_DISCLOSURE_REFUSAL).not.toMatch(
+      /fire\.?\s+that'?s the play|catch you on the flip side|totally dark|probably goes nowhere/i
+    );
+  });
+});

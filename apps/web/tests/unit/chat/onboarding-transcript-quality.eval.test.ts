@@ -119,7 +119,7 @@ describe('Onboarding transcript quality eval', () => {
       {
         role: 'assistant',
         afterTool: 'confirmSpotifyArtist',
-        text: 'Pulled you up. 12.3K Spotify followers and indie pop is the right lane, but the release layer is still manual. What is making you fix this now?',
+        text: 'Pulled up this artist. 12.3K Spotify followers (source: enrichment) and indie pop is the right lane, but the release layer is still manual. What is making you fix this now?',
       },
       {
         role: 'assistant',

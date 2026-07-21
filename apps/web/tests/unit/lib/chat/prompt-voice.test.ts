@@ -30,6 +30,28 @@ describe('onboarding prompt voice (JOV-3806)', () => {
     expect(ONBOARDING_SYSTEM_PROMPT).toMatch(/warm to musicians/i);
     expect(ONBOARDING_SYSTEM_PROMPT).toMatch(/ruthless to bad systems/i);
   });
+
+  it('bans sloppy closers and unsupported audience claims', () => {
+    expect(ONBOARDING_SYSTEM_PROMPT).toMatch(/Fire\. That's the play/i);
+    expect(ONBOARDING_SYSTEM_PROMPT).toMatch(/Catch you on the flip side/i);
+    expect(ONBOARDING_SYSTEM_PROMPT).toMatch(/totally dark/i);
+    expect(ONBOARDING_SYSTEM_PROMPT).toMatch(/probably goes nowhere useful/i);
+    expect(ONBOARDING_SYSTEM_PROMPT).toMatch(/this artist/i);
+    expect(ONBOARDING_SYSTEM_PROMPT).toMatch(/source: enrichment/i);
+    expect(ONBOARDING_SYSTEM_PROMPT).toMatch(/Never claim Jovie notifies/i);
+  });
+
+  it('keeps post-Spotify calibration non-ownership and source-cited', () => {
+    expect(ONBOARDING_CALIBRATION_EXAMPLES.afterSpotifyPick).toMatch(
+      /this artist/i
+    );
+    expect(ONBOARDING_CALIBRATION_EXAMPLES.afterSpotifyPick).toMatch(
+      /source: enrichment/i
+    );
+    expect(ONBOARDING_CALIBRATION_EXAMPLES.afterSpotifyPick).not.toMatch(
+      /Pulled you up/i
+    );
+  });
 });
 
 describe('authenticated chat prompt voice', () => {

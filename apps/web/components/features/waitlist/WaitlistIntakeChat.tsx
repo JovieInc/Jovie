@@ -308,7 +308,7 @@ export function WaitlistIntakeChat({
       <WaitlistSuccessView
         outcome={outcome}
         onRetry={() => setOutcome(null)}
-        confirmedEmail={userEmail}
+        email={userEmail}
       />
     );
   }
