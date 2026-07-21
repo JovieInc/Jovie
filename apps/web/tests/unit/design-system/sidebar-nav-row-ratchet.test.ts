@@ -32,6 +32,8 @@ const SCAN_DIRS = ['components', 'app'].map(directory =>
 );
 const BASELINE_PATH = join(__dirname, 'sidebar-nav-row.baseline.json');
 
+const CANONICAL_HELPER_IMPORT = /getSidebarNavRowClassName/;
+
 // Distinct hand-rolled settings/sidebar nav row signature from JOV-3584.
 const HAND_ROLLED_SETTINGS_NAV_ROW =
   /['"`]flex min-h-7 items-center rounded-full px-2\.5 py-1/g;
@@ -43,7 +45,6 @@ const HAND_ROLLED_SHELL_NAV_ROW =
 const SOURCE_EXT = /\.(tsx|ts)$/;
 
 const ALLOWLIST = new Set([
-  'components/shell/SidebarNavItem.tsx',
   'components/organisms/sidebar/menu.tsx',
   'components/organisms/sidebar/group.tsx',
   'components/molecules/tab-bar/TabBar.tsx',
@@ -84,6 +85,7 @@ function countHandRolledNavRows(): number {
     if (ALLOWLIST.has(relativePath)) continue;
 
     const content = readFileSync(file, 'utf8');
+    if (CANONICAL_HELPER_IMPORT.test(content)) continue;
 
     const settingsMatches = content.match(HAND_ROLLED_SETTINGS_NAV_ROW);
     const shellMatches = content.match(HAND_ROLLED_SHELL_NAV_ROW);

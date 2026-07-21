@@ -55,7 +55,7 @@ function mapContact(
 async function assertProfileOwnership(
   tx: DbOrTransaction,
   profileId: string,
-  userId: string
+  clerkUserId: string
 ): Promise<{ id: string; username: string; usernameNormalized: string }> {
   const [profile] = await tx
     .select({
@@ -65,7 +65,9 @@ async function assertProfileOwnership(
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(and(eq(creatorProfiles.id, profileId), eq(users.id, userId)))
+    .where(
+      and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
+    )
     .limit(1);
 
   if (!profile) {
@@ -85,8 +87,8 @@ async function fetchContactsCore(
   userId: string
 ): Promise<DashboardContact[]> {
   return withDbSessionTx(
-    async (tx, sessionUserId) => {
-      await assertProfileOwnership(tx, profileId, sessionUserId);
+    async (tx, clerkUserId) => {
+      await assertProfileOwnership(tx, profileId, clerkUserId);
 
       const rows = await tx
         .select()

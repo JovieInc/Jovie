@@ -161,6 +161,7 @@ export function OnboardingShell({
   return (
     <SidebarProvider defaultOpen={false}>
       <AppShellFrame
+        variant='shellChatV1'
         sidebar={null}
         containerClassName='[color-scheme:dark]'
         contentClassName='overflow-hidden!'

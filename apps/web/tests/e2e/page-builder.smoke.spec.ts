@@ -1,9 +1,11 @@
 /**
- * E2E smoke: /exp/page-builder fails closed for unauthenticated visitors.
+ * E2E smoke: /exp/page-builder renders the composed landing page and the
+ * DESIGN_V1-flagged studio modes.
  *
- * The shared /exp layout performs the role check before rendering prototype
- * children. Production retains its proxy defence-in-depth; development and
- * preview exercise the layout gate directly.
+ * /exp/* is production-blocked (lib/security/production-blocked-routes.ts),
+ * so this spec only runs against dev/preview targets and skips on
+ * production. DESIGN_V1 is forced on via the override cookie + localStorage,
+ * the same mechanism as shell-chat-v1-flag-off.spec.ts.
  *
  * Run:
  *   doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web exec playwright test tests/e2e/page-builder.smoke.spec.ts --project=chromium
@@ -12,71 +14,58 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
+import {
+  APP_FLAG_OVERRIDES_COOKIE,
+  FF_OVERRIDES_KEY,
+} from '@/lib/flags/overrides';
 import { isProductionTarget } from '../helpers/auth';
-import { setTestAuthBypassSession } from '../helpers/clerk-auth';
-import { hasAdminCredentials, signInAsAdmin } from './utils/admin-test-utils';
-import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test.beforeEach(() => {
+test.beforeEach(async ({ page }) => {
   if (isProductionTarget()) {
-    test.skip(true, '/exp/* retains a production proxy defence-in-depth');
+    test.skip(true, '/exp/* routes are blocked on production targets');
   }
-});
 
-test('page builder returns not-found without exposing prototype data', async ({
-  page,
-}) => {
-  await page.goto('/exp/page-builder', {
-    waitUntil: 'domcontentloaded',
+  const overrides = JSON.stringify({
+    [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
   });
 
-  // Streamed App Router notFound() responses can retain HTTP 200. Prove the
-  // fail-closed gate by its sentinel, original path, and absent prototype data.
-  expect(new URL(page.url()).pathname).toBe('/exp/page-builder');
-  await expect(page.getByTestId('not-found')).toBeVisible();
-  await expect(
-    page.locator('[data-body-section="marketing-hero"]')
-  ).toHaveCount(0);
-  await expect(page.getByTestId('design-studio-sections')).toHaveCount(0);
-});
-
-test('page builder returns not-found for authenticated non-admins', async ({
-  page,
-}) => {
-  test.skip(
-    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-    'Non-admin auth fixture not available'
+  await page.addInitScript(
+    ({ cookieName, key, value }) => {
+      localStorage.setItem(key, value);
+      document.cookie = `${cookieName}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
+    },
+    {
+      cookieName: APP_FLAG_OVERRIDES_COOKIE,
+      key: FF_OVERRIDES_KEY,
+      value: overrides,
+    }
   );
-
-  await setTestAuthBypassSession(page, 'creator-ready');
-  await page.goto('/exp/page-builder', {
-    waitUntil: 'domcontentloaded',
-  });
-
-  expect(new URL(page.url()).pathname).toBe('/exp/page-builder');
-  await expect(page.getByTestId('not-found')).toBeVisible();
-  await expect(
-    page.locator('[data-body-section="marketing-hero"]')
-  ).toHaveCount(0);
-  await expect(page.getByTestId('design-studio-sections')).toHaveCount(0);
 });
 
-test('page builder renders preview content for authenticated admins', async ({
+test('page builder composes the default landing page from registry sections', async ({
   page,
 }) => {
-  test.setTimeout(180_000);
-  test.skip(!hasAdminCredentials(), 'Admin auth not available');
+  await page.goto('/exp/page-builder', { waitUntil: 'domcontentloaded' });
 
-  await signInAsAdmin(page);
-  const response = await page.goto('/exp/page-builder', {
-    waitUntil: 'domcontentloaded',
-  });
-  await page.waitForTimeout(SMOKE_TIMEOUTS.HYDRATION_SETTLE);
-
-  expect(response?.ok()).toBe(true);
   await expect(
     page.locator('[data-body-section="marketing-hero"]')
   ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.locator('[data-body-section="faq-section-default"]')
+  ).toBeVisible();
+});
+
+test('sections mode renders the design studio workspace when DESIGN_V1 is on', async ({
+  page,
+}) => {
+  await page.goto('/exp/page-builder?mode=sections', {
+    waitUntil: 'domcontentloaded',
+  });
+
+  await expect(page.getByTestId('design-studio-sections')).toBeVisible({
+    timeout: 30_000,
+  });
 });

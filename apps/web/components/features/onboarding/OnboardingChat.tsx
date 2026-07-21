@@ -1036,6 +1036,7 @@ export function OnboardingChat({
     onRemoveLastChip: chipTray.removeLast,
     onAddSkill: chipTray.addSkill,
     onAddEntity: chipTray.addEntity,
+    shellChatV1: true,
     statusBanner: composerStatusBanner,
   } as const;
   const onboardingComposerSurface = (

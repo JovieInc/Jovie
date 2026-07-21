@@ -1,7 +1,6 @@
 'use client';
 
 import { ShieldCheck } from 'lucide-react';
-import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { useOptimisticToggle } from '@/features/dashboard/hooks/useOptimisticToggle';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
@@ -9,10 +8,7 @@ import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggle
 import { useNotificationSettingsMutation } from '@/lib/queries';
 
 export function SettingsAudienceSection() {
-  const { selectedProfile } = useDashboardData();
-  const selectedProfileId = selectedProfile?.id;
-  const { updateNotificationsAsync } =
-    useNotificationSettingsMutation(selectedProfileId);
+  const { updateNotificationsAsync } = useNotificationSettingsMutation();
 
   const {
     checked: doubleOptIn,
@@ -21,12 +17,8 @@ export function SettingsAudienceSection() {
     saveStatus,
   } = useOptimisticToggle({
     initialValue: true,
-    mutateAsync: async (enabled: boolean) => {
-      if (!selectedProfileId) {
-        throw new Error('Cannot update settings without a selected profile');
-      }
-      await updateNotificationsAsync({ require_double_opt_in: enabled });
-    },
+    mutateAsync: (enabled: boolean) =>
+      updateNotificationsAsync({ require_double_opt_in: enabled }),
     errorMessage: 'Failed to update email verification setting.',
   });
 
@@ -43,7 +35,7 @@ export function SettingsAudienceSection() {
           description='New fans confirm their email before they start receiving updates, which keeps your list cleaner and protects deliverability.'
           checked={doubleOptIn}
           onCheckedChange={handleToggle}
-          disabled={isPending || !selectedProfileId}
+          disabled={isPending}
           ariaLabel='Toggle email verification requirement'
         />
       </div>

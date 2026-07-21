@@ -1,78 +1,49 @@
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTES } from '@/constants/routes';
 import {
+  artistProfileNavItem,
+  filterProfilesWorkspaceNavigation,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
+  newThreadNavItem,
   primaryNavigation,
+  settingsNavItem,
+  touringNavItem,
 } from './config';
 
-const CANONICAL_SIX = [
-  ['inbox', 'Inbox', APP_ROUTES.DASHBOARD],
-  ['chat', 'Chat', APP_ROUTES.CHAT],
-  ['library', 'Library', APP_ROUTES.LIBRARY],
-  ['contacts', 'Contacts', APP_ROUTES.CONTACTS],
-  ['calendar', 'Calendar', APP_ROUTES.CALENDAR],
-  ['tasks', 'Tasks', APP_ROUTES.TASKS],
-] as const;
+// Canonical nav items that mobile is allowed to reference. Anything mobile
+// renders must come from this set (or the shared exports above) so desktop
+// and mobile can never drift — see JOV-12644.
+const CANONICAL_ITEM_IDS = new Set([
+  ...primaryNavigation.map(item => item.id),
+  artistProfileNavItem.id,
+  touringNavItem.id,
+  settingsNavItem.id,
+]);
 
-function toContract(items: readonly (typeof primaryNavigation)[number][]) {
-  return items.map(item => [item.id, item.name, item.href]);
-}
-
-describe('canonical customer shell navigation', () => {
-  it('keeps the founder-approved six destinations in exact order', () => {
-    expect(toContract(primaryNavigation)).toEqual(CANONICAL_SIX);
-  });
-
-  it('detects missing and reordered canonical destinations', () => {
-    expect(toContract(primaryNavigation.slice(0, -1))).not.toEqual(
-      CANONICAL_SIX
-    );
-    expect(toContract([...primaryNavigation].reverse())).not.toEqual(
-      CANONICAL_SIX
-    );
-  });
-
-  it('derives mobile primary + More destinations from the same object identities', () => {
-    expect(mobilePrimaryNavigation).toEqual(primaryNavigation.slice(0, 3));
-    expect(mobileExpandedNavigation).toEqual(primaryNavigation.slice(3));
-    expect([...mobilePrimaryNavigation, ...mobileExpandedNavigation]).toEqual(
-      primaryNavigation
-    );
-
-    for (const [index, item] of [
+describe('mobile nav derivation', () => {
+  it('never defines a mobile-only NavItem — every id traces back to a canonical item', () => {
+    for (const item of [
       ...mobilePrimaryNavigation,
       ...mobileExpandedNavigation,
-    ].entries()) {
-      expect(item).toBe(primaryNavigation[index]);
+    ]) {
+      expect(CANONICAL_ITEM_IDS.has(item.id)).toBe(true);
     }
   });
 
-  it('excludes retired primary destinations while preserving route constants', () => {
-    const ids = primaryNavigation.map(item => item.id);
-    const labels = primaryNavigation.map(item => item.name);
+  it('uses the shared chat entry point instead of a redefined "home" item', () => {
+    expect(mobilePrimaryNavigation[0]).toBe(newThreadNavItem);
+  });
 
-    expect(ids).not.toEqual(
-      expect.arrayContaining([
-        'search',
-        'touring',
-        'audience',
-        'profiles',
-        'releases',
-      ])
-    );
-    expect(labels).not.toEqual(
-      expect.arrayContaining([
-        'Search',
-        'Touring',
-        'Audience',
-        'Profiles',
-        'Releases',
-      ])
-    );
-    expect(APP_ROUTES.TOUR_DATES).toBe('/app/tour-dates');
-    expect(APP_ROUTES.AUDIENCE).toBe('/app/audience');
-    expect(APP_ROUTES.PROFILES).toBe('/app/profiles');
-    expect(APP_ROUTES.RELEASES).toBe('/app/releases');
+  it('omits the Profiles destination while its rollout flag is disabled', () => {
+    expect(
+      filterProfilesWorkspaceNavigation(mobileExpandedNavigation, false).some(
+        item => item.id === artistProfileNavItem.id
+      )
+    ).toBe(false);
+    expect(
+      filterProfilesWorkspaceNavigation(mobileExpandedNavigation, true).some(
+        item => item.id === artistProfileNavItem.id
+      )
+    ).toBe(true);
   });
 });

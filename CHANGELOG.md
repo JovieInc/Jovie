@@ -6,17 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
-- [internal] **Merge-group visual CI harness repair:** the filtered web workspace can resolve the repository Chromatic config again, DB-free mobile overflow excludes only explicitly database-backed redirects, and a forward-only Storybook audit now requires five clean runs before newly opened UI PRs can be gated.
-- [internal] **Bounded `ci-fast` lane groups (JOV-4477):** independent typecheck and remaining fast-gate checks now run in two hosted groups while preserving the single required `ci-fast` result and complete lane diagnostics.
-- **Unified app shell migration:** the authenticated app now uses one canonical customer/OV navigation model, header search, route-shaped loading states, chat home, Library filters, release/tour-date/profile rails, audio controls, and privacy-safe navigation telemetry. Better Auth production-artifact tests, route-specific readiness contracts, optimistic profile edit concurrency, and a 21-route performance matrix cover the migration end to end.
-- [internal] **Next.js security update (JOV-2569):** upgraded every application to Next.js 16.2.11, patching middleware authorization bypass, SSRF, Server Action disclosure and denial-of-service, cache-confusion, and image-optimization vulnerabilities.
-- [internal] **JavaScript, Ruby, and Python dependency audits now report zero known findings (JOV-2569):** patched Better Auth OAuth audience binding, Sharp/libvips image processing, Vitest browser file access, request parsing, archive handling, HTTP client, and Pytest vulnerabilities; CI Python tooling installs from a fully hashed lockfile, and automated lint repair bootstraps pnpm through Corepack.
-- [internal] **Repository security hygiene (JOV-2569):** workflow test tooling and the autofix package manager are version-pinned, reusable lint runs with an explicit read-only token, and generated Python bytecode is ignored instead of committed.
 - [internal] **App shell loading skeleton** matches `DESIGN_V1` so flag-on users no longer flash the legacy sidebar/header on first `/app` paint.
 
 - [internal] **Post-deploy probes now identify CLI-built production deployments (JOV-4366):** exact immutable build identity replaces optional Vercel source metadata while preserving project, deployment, origin, environment, and main-ancestry proofs.
-- **[internal] Audio playback has one canonical transition contract (JOV-3689):** loading, audible playback, buffering, seeking, stalls, interruptions, completion, and errors are defined in a typed, mutation-tested state machine for playback surfaces to adopt.
-- **[internal] Canonical audio contract foundation (JOV-3685):** one typed package now defines Jovie's MP3, WAV, FLAC, AIFF, AAC, and M4A format registry, MIME aliases, extensions, upload policies, and branded time/BPM units with mutation-tested invariants.
 - **[internal] Staging Better Auth Google OAuth credentials now reach the Vercel build and runtime deploy (#14659):** the release workflow allowlists and forwards both Google client keys, failing closed when either is absent.
 
 ## [26.7.0] - 2026-07-21

@@ -105,36 +105,10 @@ function resolveLocalBetterAuthUrl(): URL | undefined {
     return undefined;
   }
 
-  // A malformed BETTER_AUTH_URL must degrade to the non-local path, never
-  // abort the build while prerendering (page-data collection runs this
-  // module's import graph).
-  let configuredUrl: URL;
-  try {
-    configuredUrl = new URL(env.BETTER_AUTH_URL);
-  } catch {
-    return undefined;
-  }
+  const configuredUrl = new URL(env.BETTER_AUTH_URL);
   return LOOPBACK_HOSTNAMES.has(configuredUrl.hostname)
     ? configuredUrl
     : undefined;
-}
-
-/**
- * Local dev / E2E servers can run on a non-default port (e.g. PORT=3200 for
- * parallel QA runs) while Doppler's BETTER_AUTH_URL stays pinned to 3100.
- * Trust the loopback host for the port this process actually serves so the
- * session lookup's host check doesn't 500 public routes. Loopback-only and
- * never applied to Vercel preview/production deployments.
- */
-function resolveServingPortHost(): string | undefined {
-  if (env.VERCEL_ENV === 'preview' || env.VERCEL_ENV === 'production') {
-    return undefined;
-  }
-  const port = process.env.PORT?.trim();
-  if (!port || !/^\d{2,5}$/.test(port)) {
-    return undefined;
-  }
-  return `localhost:${port}`;
 }
 
 function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
@@ -149,7 +123,6 @@ function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
           'staging.jov.ie',
           'localhost:3100',
           localBetterAuthUrl?.host,
-          resolveServingPortHost(),
           env.VERCEL_URL,
           env.VERCEL_BRANCH_URL,
         ].filter((host): host is string => Boolean(host))

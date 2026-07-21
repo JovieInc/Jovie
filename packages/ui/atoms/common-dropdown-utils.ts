@@ -6,7 +6,6 @@ import type {
 } from './common-dropdown-types';
 import {
   isActionItem,
-  isActionRow,
   isCheckboxItem,
   isCustomItem,
   isLabel,
@@ -18,14 +17,6 @@ import {
 function getItemLabelText(item: CommonDropdownItem): string {
   if (isActionItem(item) || isCheckboxItem(item)) {
     return [item.label, item.description].filter(Boolean).join(' ');
-  }
-
-  if (isActionRow(item)) {
-    return item.items
-      .map(action =>
-        [action.label, action.description].filter(Boolean).join(' ')
-      )
-      .join(' ');
   }
 
   if (isSubmenu(item)) {
@@ -134,16 +125,6 @@ export function filterItems(
   const filtered = items.flatMap((item): CommonDropdownItem[] => {
     if (isSeparator(item) || isLabel(item) || isCustomItem(item)) {
       return [item];
-    }
-
-    if (isActionRow(item)) {
-      const matchingItems = item.items.filter(action =>
-        itemMatches(action, trimmedQuery, filterItem)
-      );
-
-      return matchingItems.length > 0
-        ? [{ ...item, items: matchingItems }]
-        : [];
     }
 
     if (isRadioGroup(item)) {

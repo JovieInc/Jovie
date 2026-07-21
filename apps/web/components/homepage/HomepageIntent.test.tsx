@@ -49,14 +49,10 @@ describe('HomepageIntent', () => {
     render(<HomepageIntent />);
     expect(
       screen.getByRole('heading', {
-        name: 'Jovie helps you move your music forward.',
+        name: 'Jovie runs your music career.',
       })
     ).toBeTruthy();
-    expect(
-      screen.getByText(
-        'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.'
-      )
-    ).toBeTruthy();
+    expect(screen.getByText('You make the music.')).toBeTruthy();
     expect(getInput()).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Plan a release' })).toBeTruthy();
     expect(

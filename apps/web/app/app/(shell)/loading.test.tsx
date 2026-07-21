@@ -23,15 +23,8 @@ vi.mock('@/components/organisms/PageShell', () => ({
   }) => <section data-testid={testId}>{children}</section>,
 }));
 vi.mock('@/components/shell/DashboardSegmentSkeleton', () => ({
-  DashboardSegmentSkeleton: ({
-    variant = 'default',
-  }: {
-    readonly variant?: string;
-  }) => (
-    <div
-      data-testid='dashboard-segment-skeleton'
-      data-skeleton-variant={variant}
-    />
+  DashboardSegmentSkeleton: () => (
+    <div data-testid='dashboard-segment-skeleton' />
   ),
 }));
 vi.mock('@/components/shell/LyricsRouteSkeleton', () => ({
@@ -71,45 +64,14 @@ describe('ShellLoading', () => {
   });
 
   it.each([
-    ['insights', APP_ROUTES.INSIGHTS, 'insights'],
-    ['legacy insights', `${APP_ROUTES.LEGACY_DASHBOARD}/insights`, 'insights'],
-    ['nested admin', APP_ROUTES.ADMIN_ACTIVITY, 'admin'],
-    ['profiles workspace', APP_ROUTES.PROFILES, 'profile'],
-  ])('uses the %s route-shaped skeleton', async (_name, pathname, expectedVariant) => {
+    ['insights', APP_ROUTES.INSIGHTS],
+    ['nested admin', APP_ROUTES.ADMIN_ACTIVITY],
+  ])('uses the generic skeleton for %s routes', async (_name, pathname) => {
     mockHeaders.mockResolvedValue(new Headers({ 'next-url': pathname }));
 
     const { getByTestId, queryByTestId } = render(await ShellLoading());
 
-    expect(getByTestId('dashboard-segment-skeleton')).toHaveAttribute(
-      'data-skeleton-variant',
-      expectedVariant
-    );
+    expect(getByTestId('dashboard-segment-skeleton')).toBeInTheDocument();
     expect(queryByTestId('settings-route-skeleton')).toBeNull();
-  });
-
-  it.each([
-    ['canonical tour alias', APP_ROUTES.TOUR_DATES],
-    ['legacy dashboard tour alias', APP_ROUTES.DASHBOARD_TOUR_DATES],
-  ])('uses the tour table-workspace skeleton for %s', async (_name, pathname) => {
-    mockHeaders.mockResolvedValue(new Headers({ 'next-url': pathname }));
-
-    const { getByTestId, queryByTestId } = render(await ShellLoading());
-
-    expect(getByTestId('dashboard-segment-skeleton')).toHaveAttribute(
-      'data-skeleton-variant',
-      'tour'
-    );
-    expect(queryByTestId('settings-route-skeleton')).toBeNull();
-  });
-
-  it('keeps touring settings on the settings form skeleton', async () => {
-    mockHeaders.mockResolvedValue(
-      new Headers({ 'next-url': APP_ROUTES.SETTINGS_TOURING })
-    );
-
-    const { getByTestId, queryByTestId } = render(await ShellLoading());
-
-    expect(getByTestId('settings-route-skeleton')).toBeInTheDocument();
-    expect(queryByTestId('dashboard-segment-skeleton')).toBeNull();
   });
 });

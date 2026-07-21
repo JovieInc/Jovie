@@ -1,7 +1,7 @@
 import type { MouseEvent } from 'react';
 
 /** The entity kinds a card can represent across profile + chat + dashboard. */
-export type EntityKind = 'merch' | 'music' | 'video' | 'show' | 'ai' | 'alerts';
+export type EntityKind = 'merch' | 'music' | 'video' | 'show' | 'ai';
 
 /** Carbon accent palette name (maps to `--color-accent-<name>`). */
 export type EntityAccent =

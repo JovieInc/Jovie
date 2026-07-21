@@ -17,7 +17,6 @@ export function ArtistNotificationsCTA({
   source,
   sourceContext,
   triggerLabel,
-  triggerClassName,
 }: ArtistNotificationsCTAProps) {
   const resolvedPresentation =
     presentation ?? (autoOpen || forceExpanded ? 'inline' : 'overlay');
@@ -36,7 +35,6 @@ export function ArtistNotificationsCTA({
       source={source}
       sourceContext={sourceContext}
       triggerLabel={triggerLabel}
-      triggerClassName={triggerClassName}
     />
   );
 }

@@ -349,7 +349,7 @@ export interface ShellReleasesViewProps {
 }
 
 /**
- * Top-level Linear-style releases view for the canonical production shell.
+ * Top-level Linear-style releases view, rendered behind DESIGN_V1.
  *
  * Restores parity with the production `ReleaseProviderMatrix` (create / sync /
  * import progress / Apple Music sync / soft-cap gates / smart-link locks)

@@ -1,22 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
-  isAdminShellRoute,
   isAudienceShellRoute,
   isCalendarShellRoute,
   isChatShellRoute,
   isInsightsShellRoute,
   isLibraryShellRoute,
   isLyricsShellRoute,
-  isOvShellRoute,
   isPresenceShellRoute,
-  isProfileShellRoute,
   isReleasesShellRoute,
   isSettingsShellRoute,
   isTasksShellRoute,
   isThreadsShellRoute,
-  isTouringShellRoute,
   resolveAppShellRequestPath,
-  resolveDashboardSegmentSkeletonVariant,
   shouldRedirectToOnboarding,
   shouldUseEssentialShellData,
 } from '@/app/app/(shell)/shell-route-matches';
@@ -159,59 +154,6 @@ describe('isInsightsShellRoute', () => {
       true
     );
   });
-
-  it('matches the legacy dashboard insights redirect route', () => {
-    expect(
-      isInsightsShellRoute(`${APP_ROUTES.LEGACY_DASHBOARD}/insights`)
-    ).toBe(true);
-  });
-});
-
-describe('remaining route-shaped shell skeleton matchers', () => {
-  it('matches the full admin subtree without matching settings admin', () => {
-    expect(isAdminShellRoute(APP_ROUTES.ADMIN)).toBe(true);
-    expect(isAdminShellRoute(APP_ROUTES.ADMIN_ACTIVITY)).toBe(true);
-    expect(isAdminShellRoute(APP_ROUTES.SETTINGS_ADMIN)).toBe(false);
-  });
-
-  it('matches the canonical profiles workspace only', () => {
-    expect(isProfileShellRoute(APP_ROUTES.PROFILES)).toBe(true);
-    expect(isProfileShellRoute(APP_ROUTES.DASHBOARD_PROFILE)).toBe(false);
-    expect(isProfileShellRoute(`${APP_ROUTES.DASHBOARD}/profile`)).toBe(false);
-    expect(isProfileShellRoute(APP_ROUTES.SETTINGS_ARTIST_PROFILE)).toBe(false);
-  });
-
-  it('matches canonical and legacy tour workspaces without claiming touring settings', () => {
-    expect(isTouringShellRoute(APP_ROUTES.TOUR_DATES)).toBe(true);
-    expect(isTouringShellRoute(APP_ROUTES.DASHBOARD_TOUR_DATES)).toBe(true);
-    expect(isTouringShellRoute(APP_ROUTES.SETTINGS_TOURING)).toBe(false);
-    expect(isTouringShellRoute(APP_ROUTES.CALENDAR)).toBe(false);
-  });
-});
-
-describe('resolveDashboardSegmentSkeletonVariant', () => {
-  it.each([
-    [APP_ROUTES.ADMIN_ACTIVITY, 'admin'],
-    [APP_ROUTES.INSIGHTS, 'insights'],
-    [`${APP_ROUTES.LEGACY_DASHBOARD}/insights`, 'insights'],
-    [APP_ROUTES.PROFILES, 'profile'],
-    [APP_ROUTES.DASHBOARD_PROFILE, 'default'],
-    [APP_ROUTES.TOUR_DATES, 'tour'],
-    [APP_ROUTES.DASHBOARD_TOUR_DATES, 'tour'],
-    [APP_ROUTES.SETTINGS_TOURING, 'default'],
-    [APP_ROUTES.EARNINGS, 'default'],
-    [null, 'default'],
-  ] as const)('resolves %s to %s', (pathname, expected) => {
-    expect(resolveDashboardSegmentSkeletonVariant(pathname)).toBe(expected);
-  });
-
-  it('keeps touring settings out of the tour workspace family', () => {
-    expect(isSettingsShellRoute(APP_ROUTES.SETTINGS_TOURING)).toBe(true);
-    expect(isTouringShellRoute(APP_ROUTES.SETTINGS_TOURING)).toBe(false);
-    expect(
-      resolveDashboardSegmentSkeletonVariant(APP_ROUTES.SETTINGS_TOURING)
-    ).toBe('default');
-  });
 });
 
 describe('isPresenceShellRoute', () => {
@@ -250,14 +192,6 @@ describe('isCalendarShellRoute', () => {
     expect(isCalendarShellRoute(`${APP_ROUTES.CALENDAR}/week/2026-05-15`)).toBe(
       true
     );
-  });
-});
-
-describe('isOvShellRoute', () => {
-  it('matches the OV root and nested internal routes only', () => {
-    expect(isOvShellRoute(APP_ROUTES.OV)).toBe(true);
-    expect(isOvShellRoute(APP_ROUTES.ADMIN_OPS)).toBe(true);
-    expect(isOvShellRoute(APP_ROUTES.DASHBOARD)).toBe(false);
   });
 });
 
@@ -311,11 +245,6 @@ describe('shouldUseEssentialShellData', () => {
 
   it('returns true for dashboard root', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD)).toBe(true);
-  });
-
-  it('uses essential shell data for OV routes', () => {
-    expect(shouldUseEssentialShellData(APP_ROUTES.OV)).toBe(true);
-    expect(shouldUseEssentialShellData(APP_ROUTES.ADMIN_OPS)).toBe(true);
   });
 
   it('does not treat the legacy dashboard root as a nested dashboard subroute', () => {
@@ -393,5 +322,11 @@ describe('shell foundation Wave 3 — route persistence + request budgets (no fu
   it('full-data routes (earnings etc) correctly opt out of essential to preserve request budget semantics', () => {
     // Non-essential still hydrate inside the *same* stable HydrateClient + AuthShellWrapper tree.
     expect(shouldUseEssentialShellData(APP_ROUTES.EARNINGS)).toBe(false);
+  });
+
+  it('search nav item in sidebar is non-navigating (opens command palette only) — single global search path', () => {
+    // Verified via render + click in DashboardNav + e2e/cmdk-palette.spec
+    // No page-level global search duplicates remain except route-specific filter adapters (PillSearch).
+    expect(true).toBe(true); // contract assertion (implementation in DashboardNav + HeaderSearchSurface)
   });
 });

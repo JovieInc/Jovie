@@ -16,34 +16,40 @@ const FEATURE_FLAGS_PAGE = findSourceFile(
   resolve(process.cwd(), 'app/app/(shell)/feature-flags/page.tsx'),
   resolve(process.cwd(), 'apps/web/app/app/(shell)/feature-flags/page.tsx')
 );
-const ADMIN_FEATURES_PAGE = findSourceFile(
-  resolve(process.cwd(), 'app/app/(shell)/admin/features/page.tsx'),
-  resolve(process.cwd(), 'apps/web/app/app/(shell)/admin/features/page.tsx')
-);
-const ROUTES_SOURCE = findSourceFile(
-  resolve(process.cwd(), 'constants/routes.ts'),
-  resolve(process.cwd(), 'apps/web/constants/routes.ts')
+const FEATURE_FLAGS_TABLE = findSourceFile(
+  resolve(process.cwd(), 'app/app/(shell)/feature-flags/FeatureFlagsTable.tsx'),
+  resolve(
+    process.cwd(),
+    'apps/web/app/app/(shell)/feature-flags/FeatureFlagsTable.tsx'
+  )
 );
 
 describe('feature flags shell normalization', () => {
-  it('keeps the old feature-flags path as a deliberate redirect', () => {
+  it('keeps feature flags in the shared admin page shell', () => {
     const source = readFileSync(FEATURE_FLAGS_PAGE, 'utf8');
-    const routesSource = readFileSync(ROUTES_SOURCE, 'utf8');
 
-    expect(source).toContain('redirect(APP_ROUTES.ADMIN_FEATURES)');
-    expect(routesSource).toContain(
-      "LEGACY_FEATURE_FLAGS: '/app/feature-flags'"
-    );
-    expect(source).not.toContain('FeatureFlagsTable');
-    expect(source).not.toContain('loadAppShellRouteContext');
-    expect(source).not.toContain('getCurrentUserEntitlements');
+    expect(source).toContain('AdminPage');
+    expect(source).toContain("testId='feature-flags-page'");
+    expect(source).toContain('loadAppShellRouteContext');
+    expect(source).toContain("title=''");
+    expect(source).not.toContain('description=');
+    expect(source).not.toContain('getCachedAuth');
+    expect(source).not.toContain('getDashboardDataEssential');
+    expect(source).not.toContain('getDashboardShellData');
   });
 
-  it('keeps the canonical operational feature-flags surface under admin', () => {
-    const source = readFileSync(ADMIN_FEATURES_PAGE, 'utf8');
+  it('uses shared admin table primitives instead of bespoke table chrome', () => {
+    const pageSource = readFileSync(FEATURE_FLAGS_PAGE, 'utf8');
+    const tableSource = readFileSync(FEATURE_FLAGS_TABLE, 'utf8');
 
-    expect(source).toContain('AdminFeaturesTable');
-    expect(source).toContain("testId='admin-features-page'");
-    expect(source).toContain("title='Features'");
+    expect(pageSource).toContain('FeatureFlagsTable');
+    expect(tableSource).toContain('AdminTableShell');
+    expect(tableSource).toContain('AdminTableSubheader');
+    expect(tableSource).toContain('AdminDataTable');
+    expect(pageSource).not.toContain('ContentTable');
+    expect(pageSource).not.toContain('ContentSurfaceCard');
+    expect(pageSource).not.toContain('CONTENT_TABLE_HEAD_CELL_CLASS');
+    expect(pageSource).not.toContain('CONTENT_TABLE_ROW_CLASS');
+    expect(tableSource).not.toMatch(/<table\b/);
   });
 });

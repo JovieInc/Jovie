@@ -247,6 +247,50 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     const lower = mainText.toLowerCase();
     expect(lower).not.toContain('application error');
     expect(lower).not.toContain('something went wrong');
+  });
+
+  test('dashboard tab navigation works', async ({ page }, testInfo) => {
+    const credentials = getProdCredentials();
+    const expectedOrigin = exactOriginForTest(testInfo);
+
+    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+      waitUntil: 'domcontentloaded',
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    const profileUrl = assertExactNavigationUrl(
+      page.url(),
+      expectedOrigin,
+      'Dashboard profile navigation'
+    );
+
+    if (
+      profileUrl.pathname.startsWith(APP_ROUTES.SIGNIN) ||
+      profileUrl.pathname.startsWith('/sign-in')
+    ) {
+      const result = await signInViaRenderedFlow(
+        page,
+        credentials,
+        expectedOrigin
+      );
+
+      if (result === 'verification-required') {
+        throw new Error(
+          'Better Auth rendered email-code verification without a configured OTP source'
+        );
+      }
+      if (result === 'signin-form-unavailable') {
+        throw new Error('Sign-in form not available for tab navigation test');
+      }
+
+      expect(result).toBe('authenticated');
+    }
+
+    await waitForHydration(page);
+    assertExactNavigationUrl(
+      page.url(),
+      expectedOrigin,
+      'Hydrated dashboard profile navigation'
+    );
 
     const tabs = [APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES];
 

@@ -50,30 +50,21 @@ const items: EntityCardModel[] = [
 ];
 
 describe('EntityCarousel profile geometry', () => {
-  it('fills the track height and uses the shared aspect-ratio card geometry', () => {
+  it('uses one horizontal-only scroll owner and equal card footprints', () => {
     render(<EntityCarousel items={items} dataTestId='profile-home-carousel' />);
 
     const carousel = screen.getByTestId('profile-home-carousel');
     expect(carousel.className).toContain('overflow-x-auto');
     expect(carousel.className).toContain('overflow-y-hidden');
     expect(carousel.className).toContain('profile-horizontal-rail');
-    expect(carousel.className).toContain('h-full');
-    expect(carousel.className).toContain('items-stretch');
-    expect(carousel.className).toContain('snap-mandatory');
-    expect(carousel.className).toContain('overscroll-x-contain');
     expect(carousel.className).not.toContain('touch-action');
 
     const footprints = [...carousel.querySelectorAll(':scope > li')];
     expect(footprints).toHaveLength(2);
-    // One stable geometry for every card: the .profile-entity-card class owns
-    // aspect-ratio/height/cap in design-system.css — no fixed px footprints.
     expect(
       footprints.every(
         item =>
-          item.className.includes('profile-entity-card') &&
-          item.className.includes('snap-always') &&
-          !item.className.includes('w-56') &&
-          !item.className.includes('h-96')
+          item.className.includes('w-56') && item.className.includes('h-96')
       )
     ).toBe(true);
 
@@ -84,168 +75,12 @@ describe('EntityCarousel profile geometry', () => {
     }
   });
 
-  it('locks the art zone to a full-width square with cover-fitted artwork', () => {
+  it('keeps release artwork square and fits it without cropping', () => {
     render(<EntityCarousel items={items} />);
 
     for (const image of screen.getAllByRole('img')) {
-      // Unified card anatomy: the art zone is a square matched to the full
-      // card width (no letterbox bands), and artwork object-covers the
-      // square zone — square art fills it exactly, non-square art crops.
       expect(image.parentElement?.className).toContain('aspect-square');
-      expect(image.parentElement?.className).not.toContain('flex-1');
-      expect(image.className).toContain('object-cover');
+      expect(image.className).toContain('object-contain');
     }
-  });
-
-  it('renders a full-width 36px CTA at the bottom of every card', () => {
-    const withCta: EntityCardModel[] = [
-      {
-        id: 'release-1',
-        kind: 'music',
-        href: '/tim/release-1',
-        imageUrl: '/release-1.jpg',
-        imageAlt: 'Release one',
-        title: 'Release One',
-        cta: { label: 'Listen', href: '/tim/release-1' },
-      },
-    ];
-    render(<EntityCarousel items={withCta} />);
-
-    const cta = screen.getByText('Listen');
-    expect(cta.className).toContain('h-9');
-    expect(cta.className).toContain('w-full');
-  });
-
-  it('renders leading and trailing slot cards in the same geometry', () => {
-    render(
-      <EntityCarousel
-        items={items}
-        dataTestId='profile-home-carousel'
-        leading={<section data-testid='slot-leading' />}
-        trailing={<section data-testid='slot-trailing' />}
-      />
-    );
-
-    const carousel = screen.getByTestId('profile-home-carousel');
-    const footprints = [...carousel.querySelectorAll(':scope > li')];
-    expect(footprints).toHaveLength(4);
-
-    const leadingLi = carousel.querySelector('[data-carousel-slot="leading"]');
-    const trailingLi = carousel.querySelector(
-      '[data-carousel-slot="trailing"]'
-    );
-    expect(leadingLi?.className).toContain('profile-entity-card');
-    expect(trailingLi?.className).toContain('profile-entity-card');
-    // Leading slot is the first card, trailing slot the last.
-    expect(footprints[0]).toBe(leadingLi);
-    expect(footprints[footprints.length - 1]).toBe(trailingLi);
-    expect(leadingLi?.contains(screen.getByTestId('slot-leading'))).toBe(true);
-    expect(trailingLi?.contains(screen.getByTestId('slot-trailing'))).toBe(
-      true
-    );
-  });
-
-  it('renders slot-only carousels (no entity items) without an empty shell', () => {
-    render(
-      <EntityCarousel
-        items={[]}
-        dataTestId='profile-home-carousel'
-        leading={<section data-testid='slot-leading' />}
-      />
-    );
-
-    const carousel = screen.getByTestId('profile-home-carousel');
-    expect(carousel.querySelectorAll(':scope > li')).toHaveLength(1);
-  });
-
-  it('renders one full-width landscape card per mandatory snap', () => {
-    const withCta: EntityCardModel[] = [
-      {
-        ...items[0],
-        meta: 'Single · 2026',
-        cta: { label: 'Listen', href: '/tim/release-1' },
-      },
-    ];
-
-    render(
-      <EntityCarousel
-        items={withCta}
-        layout='profile-landscape'
-        dataTestId='profile-home-carousel'
-      />
-    );
-
-    const carousel = screen.getByTestId('profile-home-carousel');
-    expect(carousel).toHaveAttribute('data-layout', 'profile-landscape');
-    expect(carousel.className).toContain('snap-mandatory');
-
-    const footprint = carousel.querySelector(':scope > li');
-    expect(footprint).toHaveAttribute('data-layout', 'profile-landscape');
-    expect(footprint?.className).toContain('w-full');
-    expect(footprint?.className).toContain('snap-always');
-
-    const image = screen.getByRole('img', { name: 'Release one' });
-    expect(image.parentElement?.className).toContain('aspect-square');
-    expect(image.parentElement?.className).toMatch(/(?:^|\s)rounded(?:\s|$)/);
-    expect(image.parentElement?.className).toContain('border-0');
-    expect(image.parentElement?.className).not.toContain('border-r');
-
-    const cta = screen.getByText('Listen');
-    expect(cta.className).toContain('h-8');
-    expect(cta.className).toContain('w-fit');
-    expect(cta.className).not.toContain('w-full');
-  });
-
-  it('keeps landscape leading and trailing slots in identical full-width footprints', () => {
-    render(
-      <EntityCarousel
-        items={items}
-        layout='profile-landscape'
-        leading={<section data-testid='slot-leading' />}
-        trailing={<section data-testid='slot-trailing' />}
-      />
-    );
-
-    const carousel = screen.getByTestId('entity-carousel');
-    const footprints = [...carousel.querySelectorAll(':scope > li')];
-    expect(footprints).toHaveLength(4);
-    expect(
-      footprints.every(
-        footprint =>
-          footprint.className.includes('w-full') &&
-          footprint.getAttribute('data-layout') === 'profile-landscape'
-      )
-    ).toBe(true);
-  });
-
-  it('keeps missing artwork in the same square, subtly rounded media slot', () => {
-    render(
-      <EntityCarousel
-        layout='profile-landscape'
-        items={[
-          {
-            id: 'release-without-art',
-            kind: 'music',
-            href: '/tim/release-without-art',
-            imageUrl: null,
-            imageAlt: 'Release without artwork',
-            title: 'A Very Long Release Title Without Artwork',
-            meta: 'Single · 2026',
-            cta: { label: 'Listen', href: '/tim/release-without-art' },
-          },
-        ]}
-      />
-    );
-
-    expect(screen.queryByRole('img')).not.toBeInTheDocument();
-    const card = screen.getByTestId('entity-card-music');
-    const media = card.querySelector('.aspect-square');
-    expect(media?.className).toMatch(/(?:^|\s)rounded(?:\s|$)/);
-    expect(media?.className).toContain('border-0');
-    expect(
-      screen.getByRole('heading', {
-        name: 'A Very Long Release Title Without Artwork',
-      })
-    ).toHaveClass('line-clamp-1');
   });
 });

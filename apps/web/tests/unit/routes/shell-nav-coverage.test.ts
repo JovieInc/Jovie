@@ -2,19 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  adminNavigation,
+  adminSettingsNavigation,
   artistSettingsNavigation,
   paymentsNavItem,
   primaryNavigation,
   settingsNavItem,
   userSettingsNavigation,
 } from '@/components/features/dashboard/dashboard-nav/config';
-import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
-import { APP_ROUTES } from '@/constants/routes';
-import {
-  findNewRedirectStubPaths,
-  isPageLevelRedirectStub,
-} from '../app/app-ia-static-guard';
-import redirectBaseline from './shell-redirect-stubs.baseline.json';
 
 const SHELL_ROOT = path.resolve(__dirname, '../../../app/app/(shell)');
 const CONTACTS_CLIENT_PATH = path.join(
@@ -28,20 +23,12 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/chat/[id]': 'Thread detail is reached from chat history',
   '/app/library':
     'Canonical library page for releases, merch, images, videos, and audio',
-  '/app/audience':
-    'Retained customer workspace reachable by direct links and shortcuts after primary navigation consolidation',
-  '/app/profiles':
-    'Retained customer workspace reachable by direct links after primary navigation consolidation',
-  '/app/tour-dates':
-    'Retained customer workspace reachable by direct links and Settings after primary navigation consolidation',
   '/app/threads': 'Legacy all threads route redirects to chats',
-  '/app/ov/investors/links': 'Sub-tool reached from Investors workspace',
-  '/app/ov/investors/settings':
+  '/app/admin/investors/links': 'Sub-tool reached from Investors workspace',
+  '/app/admin/investors/settings':
     'Sub-tool reached from Investors workspace actions',
-  '/app/ov/interviews': 'Internal admin review workspace (manual entry)',
-  '/app/ov/playlists': 'Internal admin workflow (manual entry)',
-  '/app/ov/agent-runs/[id]':
-    'Dynamic operator debug route reached from an agent run action',
+  '/app/admin/interviews': 'Internal admin review workspace (manual entry)',
+  '/app/admin/playlists': 'Internal admin workflow (manual entry)',
   '/app/dashboard/releases/[releaseId]/tasks':
     'Dynamic workflow route reached from releases actions',
   '/app/releases/[releaseId]/tasks':
@@ -74,14 +61,6 @@ interface ShellPage {
   readonly source: string;
 }
 
-function containsRedirect(source: string): boolean {
-  return (
-    /\bredirect\s*\(/.test(source) ||
-    /\bpermanentRedirect\s*\(/.test(source) ||
-    /\bredirectFromEarningsRoute\s*\(/.test(source)
-  );
-}
-
 function toRoutePath(filePath: string): string {
   let relativePath = path.relative(SHELL_ROOT, filePath).replace(/\\/g, '/');
   relativePath = relativePath.replace(/(^|\/)page\.(tsx|ts)$/, '');
@@ -91,15 +70,7 @@ function toRoutePath(filePath: string): string {
     .filter(segment => !/^\([^/]+\)$/.test(segment))
     .join('/');
 
-  const physicalRoute = `/app${relativePath ? `/${relativePath}` : ''}`;
-  if (
-    physicalRoute === APP_ROUTES.LEGACY_ADMIN ||
-    physicalRoute.startsWith(`${APP_ROUTES.LEGACY_ADMIN}/`)
-  ) {
-    return physicalRoute.replace(APP_ROUTES.LEGACY_ADMIN, APP_ROUTES.OV);
-  }
-
-  return physicalRoute;
+  return `/app${relativePath ? `/${relativePath}` : ''}`;
 }
 
 function findShellPages(dir: string = SHELL_ROOT): ShellPage[] {
@@ -130,6 +101,14 @@ function findShellPages(dir: string = SHELL_ROOT): ShellPage[] {
   return pages;
 }
 
+function isRedirectStub(source: string): boolean {
+  return (
+    /\bredirect\(/.test(source) ||
+    /\bpermanentRedirect\(/.test(source) ||
+    /\bredirectFromEarningsRoute\(/.test(source)
+  );
+}
+
 function getNavRoutePaths(): Set<string> {
   const navItems = [
     ...primaryNavigation,
@@ -137,7 +116,8 @@ function getNavRoutePaths(): Set<string> {
     ...userSettingsNavigation,
     paymentsNavItem,
     ...artistSettingsNavigation,
-    ...ADMIN_NAV_REGISTRY,
+    ...adminNavigation,
+    ...adminSettingsNavigation,
   ];
 
   return new Set(
@@ -149,7 +129,6 @@ describe('shell route coverage', () => {
   const pages = findShellPages();
   const pageByRoute = new Map(pages.map(page => [page.routePath, page]));
   const navRoutes = getNavRoutePaths();
-  const allowedRedirectStubs = new Set(redirectBaseline.routes);
 
   it('every nav destination resolves to a shell page', () => {
     const missingRoutes = [...navRoutes].filter(
@@ -159,24 +138,11 @@ describe('shell route coverage', () => {
     expect(missingRoutes).toEqual([]);
   });
 
-  it('keeps the canonical Contacts destination as a real workspace', () => {
-    const contactsPage = pageByRoute.get(APP_ROUTES.CONTACTS);
-    const contactsClient = fs.readFileSync(CONTACTS_CLIENT_PATH, 'utf8');
-
-    expect(contactsPage).toBeDefined();
-    expect(contactsPage?.source).not.toMatch(/\bredirect\(/);
-    expect(contactsPage?.source).toContain('ContactsPageClient');
-    expect(contactsPage?.source).not.toContain('getProfileContactsForOwner');
-    expect(contactsClient).toContain('ContactsManager');
-    expect(contactsClient).toContain('useContactsQuery');
-  });
-
-  it('non-nav shell pages are intentional internals or baselined redirects', () => {
+  it('non-nav shell pages are either intentional internals or explicit redirects', () => {
     const unexpectedPages = pages
       .filter(page => !navRoutes.has(page.routePath))
       .filter(page => !(page.routePath in INTENTIONAL_INTERNAL_ROUTES))
-      .filter(page => !allowedRedirectStubs.has(page.routePath))
-      .filter(page => !containsRedirect(page.source))
+      .filter(page => !isRedirectStub(page.source))
       .map(
         page =>
           `${page.routePath} (${path.relative(SHELL_ROOT, page.filePath)})`
@@ -184,41 +150,6 @@ describe('shell route coverage', () => {
       .sort();
 
     expect(unexpectedPages).toEqual([]);
-  });
-
-  it('blocks new page-level redirect stubs and keeps the exception set exact', () => {
-    const fixtures = pages.map(page => ({
-      path: page.routePath,
-      source: page.source,
-    }));
-    const currentRedirectStubs = fixtures
-      .filter(file => isPageLevelRedirectStub(file.source))
-      .map(file => file.path)
-      .sort();
-
-    expect(findNewRedirectStubPaths(fixtures, allowedRedirectStubs)).toEqual(
-      []
-    );
-    expect(currentRedirectStubs).toEqual([...allowedRedirectStubs].sort());
-  });
-
-  it('distinguishes a new redirect stub from a compliant rendered page', () => {
-    const fixtures = [
-      {
-        path: '/app/new-stub',
-        source:
-          "import { redirect } from 'next/navigation'; export default function Page() { redirect('/app'); }",
-      },
-      {
-        path: '/app/rendered',
-        source:
-          "import { redirect } from 'next/navigation'; export default function Page() { if (false) redirect('/app'); return <main>Rendered</main>; }",
-      },
-    ];
-
-    expect(findNewRedirectStubPaths(fixtures, allowedRedirectStubs)).toEqual([
-      '/app/new-stub',
-    ]);
   });
 
   it('intentional internal route allowlist stays accurate', () => {

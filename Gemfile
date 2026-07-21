@@ -1,6 +1,5 @@
 source "https://rubygems.org"
 
-ruby ">= 3.1"
+ruby ">= 2.6.10"
 
 gem "fastlane", "~> 2.226"
-gem "excon", ">= 1.5.0"

@@ -5,16 +5,5 @@
     "emptyState": 9,
     "shell": 21
   },
-  "allowedEmptyStatePaths": [
-    "components/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState.tsx",
-    "components/features/dashboard/organisms/tour-dates/TourDatesEmptyState.tsx",
-    "components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx",
-    "components/features/opportunity-inbox/OpportunityInboxEmptyState.tsx",
-    "components/molecules/DropdownEmptyState.tsx",
-    "components/molecules/EmptyState.tsx",
-    "components/molecules/drawer/DrawerEmptyState.tsx",
-    "components/organisms/EmptyState.tsx",
-    "components/organisms/table/atoms/TableEmptyState.tsx"
-  ],
   "note": "Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands. emptyState 14→9 on 2026-07-09 (GH-12638): wave-1 EmptyState consolidation deleted DspPresenceEmptyState, DspMatchEmptyState, InsightEmptyState, DemoEmptyState, StarterEmptyState; ReleaseTaskEmptyState + TableEmptyState now compose the molecule."
 }

@@ -5,8 +5,6 @@
  * (OpenAI Realtime, Deepgram, Whisper) by implementing the same interface.
  */
 
-import { recordUxLatency } from '@/lib/monitoring/interaction-latency';
-
 export type TranscriberErrorCode =
   | 'not-allowed'
   | 'service-not-allowed'
@@ -108,15 +106,9 @@ export function createWebSpeechTranscriber(
   const isSupported = isWebSpeechTranscriptionSupported(browserWindow);
 
   let recognition: SpeechRecognitionInstance | null = null;
-  let recognitionStartedAt: number | null = null;
-  let firstTranscriptRecorded = false;
-
-  const nowMs = () => globalThis.performance?.now?.() ?? Date.now();
 
   const disposeRecognition = () => {
     recognition = null;
-    recognitionStartedAt = null;
-    firstTranscriptRecorded = false;
   };
 
   const getRecognition = (): SpeechRecognitionInstance | null => {
@@ -136,17 +128,6 @@ export function createWebSpeechTranscriber(
       let transcript = '';
       for (const result of Array.from(event.results)) {
         transcript += result[0]?.transcript ?? '';
-      }
-      if (
-        transcript.length > 0 &&
-        recognitionStartedAt !== null &&
-        !firstTranscriptRecorded
-      ) {
-        firstTranscriptRecorded = true;
-        recordUxLatency(
-          'speech_to_text',
-          Math.max(0, nowMs() - recognitionStartedAt)
-        );
       }
       callbacks.onTranscript(transcript);
     };
@@ -171,12 +152,9 @@ export function createWebSpeechTranscriber(
       const activeRecognition = getRecognition();
       if (!activeRecognition) return;
       try {
-        recognitionStartedAt = nowMs();
-        firstTranscriptRecorded = false;
         activeRecognition.start();
       } catch {
         // Chrome throws InvalidStateError when start() races — safe to ignore.
-        recognitionStartedAt = null;
       }
     },
     stop() {

@@ -1,5 +1,4 @@
 import {
-  Bell,
   Bot,
   type LucideIcon,
   Music2,
@@ -55,13 +54,6 @@ export const KIND_PRESETS: Record<EntityKind, KindPreset> = {
     fallbackVariant: 'generic',
     ctaLabel: 'View Details',
   },
-  alerts: {
-    eyebrow: 'Alerts',
-    icon: Bell,
-    accent: 'purple',
-    fallbackVariant: 'generic',
-    ctaLabel: 'Get Updates',
-  },
 };
 
 /** CSS custom-property reference for a Carbon accent. */
@@ -76,11 +68,11 @@ export function entityCardArtStyle(accent: EntityAccent): CSSProperties {
   };
 }
 
-/** Color for a status dot, sourced from semantic status tokens. */
+/** Color for a status dot, sourced from design tokens. */
 export function statusDotVar(tone: EntityStatusTone | undefined): string {
   switch (tone) {
     case 'live':
-      return 'var(--color-success)';
+      return 'var(--color-accent-green)';
     case 'scheduled':
       return 'var(--color-accent-orange)';
     case 'draft':

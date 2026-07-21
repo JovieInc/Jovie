@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { APP_ROUTES } from '@/constants/routes';
 
 const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 const mockGetWaitlistSettings = vi.hoisted(() => vi.fn());
@@ -74,7 +73,7 @@ describe('Admin waitlist settings API', () => {
       expect.any(Error),
       expect.objectContaining({
         action: 'load_waitlist_settings',
-        route: APP_ROUTES.ADMIN_WAITLIST_SETTINGS,
+        route: '/app/admin/waitlist/settings',
         adminEmail: 'unknown',
       })
     );
@@ -140,7 +139,7 @@ describe('Admin waitlist settings API', () => {
       expect.any(Error),
       expect.objectContaining({
         action: 'update_waitlist_settings',
-        route: APP_ROUTES.ADMIN_WAITLIST_SETTINGS,
+        route: '/app/admin/waitlist/settings',
         adminEmail: 'unknown',
       })
     );

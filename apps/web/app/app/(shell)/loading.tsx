@@ -19,9 +19,7 @@ import {
   isReleasesShellRoute,
   isSettingsShellRoute,
   isTasksShellRoute,
-  isTouringShellRoute,
   resolveAppShellRequestPath,
-  resolveDashboardSegmentSkeletonVariant,
 } from './shell-route-matches';
 
 function SettingsShellLoading() {
@@ -80,15 +78,6 @@ export default async function ShellLoading() {
     return <TasksRouteSkeleton />;
   }
 
-  if (isTouringShellRoute(pathname)) {
-    return (
-      <DashboardSegmentSkeleton
-        rowKeyPrefix='shell-loading-row'
-        variant='tour'
-      />
-    );
-  }
-
   if (isSettingsShellRoute(pathname)) {
     return <SettingsShellLoading />;
   }
@@ -105,10 +94,5 @@ export default async function ShellLoading() {
     return <CalendarRouteSkeleton />;
   }
 
-  return (
-    <DashboardSegmentSkeleton
-      rowKeyPrefix='shell-loading-row'
-      variant={resolveDashboardSegmentSkeletonVariant(pathname)}
-    />
-  );
+  return <DashboardSegmentSkeleton rowKeyPrefix='shell-loading-row' />;
 }

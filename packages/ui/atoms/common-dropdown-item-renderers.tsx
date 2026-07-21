@@ -24,7 +24,6 @@ import type {
 } from './common-dropdown-renderer';
 import type {
   CommonDropdownActionItem,
-  CommonDropdownActionRow,
   CommonDropdownCheckboxItem,
   CommonDropdownItem,
   CommonDropdownRadioGroup,
@@ -164,7 +163,6 @@ export function renderActionItem(
   return (
     <MenuItem
       key={item.id}
-      aria-label={item.content ? item.label : undefined}
       data-menu-row=''
       data-menu-variant={isDestructive ? 'danger' : undefined}
       data-selected={isSelected ? 'true' : undefined}
@@ -185,58 +183,36 @@ export function renderActionItem(
         item.className
       )}
     >
-      {item.content ?? (
-        <>
-          <span className={MENU_LEADING_SLOT_BASE}>
-            {item.loading ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin motion-reduce:animate-none' />
-            ) : (
-              renderIcon(item.icon, 'h-4 w-4')
-            )}
+      <span className={MENU_LEADING_SLOT_BASE}>
+        {item.loading ? (
+          <Loader2 className='h-3.5 w-3.5 animate-spin motion-reduce:animate-none' />
+        ) : (
+          renderIcon(item.icon, 'h-4 w-4')
+        )}
+      </span>
+      <StructuredMenuLabel label={item.label} description={item.description} />
+      <span className={MENU_TRAILING_SLOT_BASE}>
+        {item.trailing}
+        {renderBadge(item.badge)}
+        {item.subText ? (
+          <span className='text-[11px] text-(--linear-text-tertiary)'>
+            {item.subText}
           </span>
-          <StructuredMenuLabel
-            label={item.label}
-            description={item.description}
-          />
-          <span className={MENU_TRAILING_SLOT_BASE}>
-            {item.trailing}
-            {renderBadge(item.badge)}
-            {item.subText ? (
-              <span className='text-[11px] text-(--linear-text-tertiary)'>
-                {item.subText}
-              </span>
-            ) : null}
-            {item.shortcut ? (
-              <span className={MENU_SHORTCUT_BASE}>{item.shortcut}</span>
-            ) : null}
-            {renderIcon(item.iconAfter, 'h-4 w-4')}
-            {isSelected &&
-            !item.trailing &&
-            !item.badge &&
-            !item.subText &&
-            !item.shortcut &&
-            !item.iconAfter ? (
-              <Check className='h-4 w-4' />
-            ) : null}
-          </span>
-        </>
-      )}
+        ) : null}
+        {item.shortcut ? (
+          <span className={MENU_SHORTCUT_BASE}>{item.shortcut}</span>
+        ) : null}
+        {renderIcon(item.iconAfter, 'h-4 w-4')}
+        {isSelected &&
+        !item.trailing &&
+        !item.badge &&
+        !item.subText &&
+        !item.shortcut &&
+        !item.iconAfter ? (
+          <Check className='h-4 w-4' />
+        ) : null}
+      </span>
     </MenuItem>
-  );
-}
-
-export function renderActionRow(
-  item: CommonDropdownActionRow,
-  context: MenuRenderContext
-): React.ReactNode {
-  return (
-    <div
-      key={item.id}
-      data-menu-action-row={item.id}
-      className={cn(item.className)}
-    >
-      {item.items.map(action => renderActionItem(action, context))}
-    </div>
   );
 }
 

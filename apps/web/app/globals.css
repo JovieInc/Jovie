@@ -110,11 +110,11 @@ html[data-desktop-runtime="electron"]
   -webkit-app-region: no-drag;
 }
 
-/* Titlebar rail alignment for the canonical app shell — the app-shell-body has
+/* Titlebar rail alignment for shellChatV1 — the app-shell-body has
    p-[--linear-app-shell-gap] on all sides, so the sidebar column starts at
    gap offset from the left edge. Mirror that offset in the titlebar so the
    sidebar-cell left edge aligns with the sidebar rail. */
-html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
+html[data-desktop-runtime="electron"] [data-shell-design="shellChatV1"]
   [data-electron-titlebar="true"] {
   padding-left: var(--linear-app-shell-gap);
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
@@ -1145,8 +1145,7 @@ body {
     display: grid;
     gap: 0.7rem;
     margin: 1.35rem 0 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-    padding: 1.1rem 0 0;
+    padding: 0;
     list-style: none;
   }
   .marketing-pricing-plan-card__features li {

@@ -22,6 +22,7 @@ export default async function LyricsPage({ params }: Props) {
   const routeContext = await loadAppShellRouteContext({
     route: `/app/lyrics/${trackId}`,
     authFailure: 'notFound',
+    requiredFlag: 'DESIGN_V1',
     dashboardErrorLogMessage: 'Dashboard data load failed on lyrics page',
     dashboardErrorMessage: 'Failed to load lyrics. Please refresh the page.',
   });

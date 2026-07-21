@@ -48,10 +48,14 @@ historical console cleanup.
   SDK.
 - If `STATSIG_SERVER_SECRET` is not configured, the product flags remain on by
   default. Experiments still degrade gracefully to their local variants.
-- The authenticated app shell is a canonical production path, not a rollout
-  gate. Shell, navigation, rail, loading, and audio variants must not be added
-  to this registry.
+- `DESIGN_V1` and its aliases (`SHELL_CHAT_V1`, `DESIGN_V1_RELEASES`,
+  `DESIGN_V1_TASKS`, `DESIGN_V1_CHAT_ENTITIES`, `DESIGN_V1_LYRICS`,
+  `DESIGN_V1_LIBRARY`, `DESIGN_V1_AUTH`, and `DESIGN_V1_ONBOARDING`) are
+  permanent local-default app flags, not Statsig-backed rollout gates. The
+  legacy `design_v1` and per-surface key constants remain compatibility names
+  only; changing those keys in Statsig does not affect the current runtime.
 - Security-sensitive authorization must still rely on server-side entitlement checks; gates are rollout controls, not permission boundaries.
+- The Design V1 rollout contract, valid flag combinations, and rollback paths live in `docs/DESIGN_V1_ROLLOUT_MATRIX.md`.
 
 ## Maintenance Checklist
 

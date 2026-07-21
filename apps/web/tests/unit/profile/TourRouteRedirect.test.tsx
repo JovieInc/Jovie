@@ -1,72 +1,43 @@
-import { describe, expect, it } from 'vitest';
-import {
-  getProfileModeRedirectHref,
-  getRouteRedirectSearchParams,
-  profileModeRedirectResponse,
-} from '../../../app/[username]/_lib/mode-route-redirect';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { redirectToProfileMode } from '../../../app/[username]/_lib/mode-route-redirect';
+
+const { redirectMock } = vi.hoisted(() => ({
+  redirectMock: vi.fn(),
+}));
+
+vi.mock('next/navigation', () => ({
+  redirect: redirectMock,
+}));
 
 describe('profile mode route redirects', () => {
-  it('redirects to the canonical tour mode URL with a hard 307', async () => {
-    const response = profileModeRedirectResponse(
-      'http://localhost:3000/testartist/tour',
-      'testartist',
-      undefined,
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('redirects to the canonical tour mode URL', async () => {
+    await redirectToProfileMode(
+      Promise.resolve({ username: 'testartist' }),
       'tour'
     );
 
-    expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost:3000/testartist?mode=tour'
-    );
+    expect(redirectMock).toHaveBeenCalledWith('/testartist?mode=tour');
   });
 
-  it('redirects to the canonical pay mode URL without server search params', () => {
-    const response = profileModeRedirectResponse(
-      'http://localhost:3000/testartist/tip',
-      'testartist',
-      undefined,
+  it('redirects to the canonical pay mode URL without server search params', async () => {
+    await redirectToProfileMode(
+      Promise.resolve({ username: 'testartist' }),
       'pay'
     );
 
-    expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost:3000/testartist?mode=pay'
-    );
+    expect(redirectMock).toHaveBeenCalledWith('/testartist?mode=pay');
   });
 
-  it('redirects to the canonical releases mode URL', () => {
-    const response = profileModeRedirectResponse(
-      'http://localhost:3000/testartist/releases',
-      'testartist',
-      undefined,
+  it('redirects to the canonical releases mode URL', async () => {
+    await redirectToProfileMode(
+      Promise.resolve({ username: 'testartist' }),
       'releases'
     );
 
-    expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost:3000/testartist?mode=releases'
-    );
-  });
-
-  it('preserves the source query param in the redirect target', () => {
-    const searchParams = getRouteRedirectSearchParams(
-      new URLSearchParams('source=qr')
-    );
-    const href = getProfileModeRedirectHref('testartist', searchParams, 'pay');
-
-    expect(href).toBe('/testartist?mode=pay&source=qr');
-  });
-
-  it('keeps all source values; the href builder picks the first non-empty one', () => {
-    const multi = getRouteRedirectSearchParams(
-      new URLSearchParams('source=qr&source=ig')
-    );
-    expect(multi).toEqual({ source: ['qr', 'ig'] });
-    expect(getProfileModeRedirectHref('testartist', multi, 'pay')).toBe(
-      '/testartist?mode=pay&source=qr'
-    );
-    expect(
-      getRouteRedirectSearchParams(new URLSearchParams('utm_source=x'))
-    ).toBeUndefined();
+    expect(redirectMock).toHaveBeenCalledWith('/testartist?mode=releases');
   });
 });

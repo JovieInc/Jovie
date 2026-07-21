@@ -30,7 +30,20 @@ describe('AppShellRightRail', () => {
     expect(rail).toContainElement(screen.getByTestId('fixture-panel'));
   });
 
-  it('applies the canonical rail radius treatment', () => {
+  it('applies shellChatV1 radius treatment when opted in', () => {
+    render(
+      <AppShellRightRail variant='shellChatV1'>
+        <div>Panel</div>
+      </AppShellRightRail>
+    );
+
+    const rail = screen.getByTestId('app-shell-right-rail');
+
+    expect(rail).toHaveAttribute('data-shell-design', 'shellChatV1');
+    expect(rail).toHaveClass('lg:rounded-(--linear-app-shell-radius)');
+  });
+
+  it('defaults to legacy variant without shell radius chrome', () => {
     render(
       <AppShellRightRail>
         <div>Panel</div>
@@ -39,7 +52,8 @@ describe('AppShellRightRail', () => {
 
     const rail = screen.getByTestId('app-shell-right-rail');
 
-    expect(rail).toHaveClass('lg:rounded-(--linear-app-shell-radius)');
+    expect(rail).toHaveAttribute('data-shell-design', 'legacy');
+    expect(rail).not.toHaveClass('lg:rounded-(--linear-app-shell-radius)');
   });
 
   it('merges custom className without replacing base sticky layout', () => {

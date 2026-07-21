@@ -44,8 +44,8 @@ If a variant is imported by a component that is itself dormant or feature-flagge
 
 ## Preview surfaces
 
-- **`/exp/page-builder`** — admin-only surface for composing multiple sections into a full page. Toolbar lets you swap header, hero, body sections, footer CTA, and footer. Used to spot-check landing-page compositions before committing.
-- **`/exp/component-checker`** — admin-only surface for rendering one variant full-bleed. Arrow keys move within a category; ⌘+arrow jumps categories. Shows status, description, and component path. Use this to scan for consolidation opportunities and confirm orphaned status.
+- **`/exp/page-builder`** — compose multiple sections into a full page. Toolbar lets you swap header, hero, body sections, footer CTA, and footer. Used to spot-check landing-page compositions before committing.
+- **`/exp/component-checker`** — render one variant full-bleed. Arrow keys move within a category; ⌘+arrow jumps categories. Shows status, description, and component path. Use this to scan for consolidation opportunities and confirm orphaned status.
 
 ## Add a new variant
 

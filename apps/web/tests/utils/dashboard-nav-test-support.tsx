@@ -26,8 +26,6 @@ export const mockClearPendingShell = vi.fn();
 export const mockRouterPush = vi.fn();
 export const mockOpenPreviewPanel = vi.fn();
 export const mockTogglePreviewPanel = vi.fn();
-export const mockStartNavigationTelemetry = vi.fn();
-export const mockTrackNavigationImpressions = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
@@ -87,15 +85,6 @@ vi.mock('@/components/organisms/PendingShellContext', () => ({
 
 vi.mock('@/lib/hooks/useNotifications', () => ({
   useNotifications: () => ({ success: vi.fn(), error: vi.fn() }),
-}));
-
-vi.mock('@/lib/tracking/navigation-telemetry', () => ({
-  navigationInputMethodFromClick: (detail: number) =>
-    detail === 0 ? 'keyboard' : 'pointer',
-  startNavigationTelemetry: (...args: unknown[]) =>
-    mockStartNavigationTelemetry(...args),
-  trackNavigationImpressions: (...args: unknown[]) =>
-    mockTrackNavigationImpressions(...args),
 }));
 
 vi.mock('@/hooks/useClipboard', () => ({
@@ -190,8 +179,6 @@ export function resetDashboardNavTestMocks() {
   mockRouterPush.mockReset();
   mockOpenPreviewPanel.mockReset();
   mockTogglePreviewPanel.mockReset();
-  mockStartNavigationTelemetry.mockReset();
-  mockTrackNavigationImpressions.mockReset();
 }
 
 export function renderDashboardNav({

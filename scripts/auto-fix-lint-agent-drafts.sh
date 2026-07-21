@@ -172,8 +172,7 @@ while IFS= read -r pr; do
 
   # Setup pnpm and install
   if ! command -v pnpm >/dev/null 2>&1; then
-    corepack enable >/dev/null 2>&1
-    corepack prepare pnpm@9.15.4 --activate >/dev/null 2>&1
+    npm install -g pnpm@latest >/dev/null 2>&1
   fi
 
   if ! pnpm install --frozen-lockfile >/dev/null 2>&1; then

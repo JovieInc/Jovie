@@ -2,7 +2,6 @@
 
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
-import { invalidateHandleCache } from '@/lib/onboarding/handle-availability-cache';
 import { invalidateProfileEdgeCache } from '@/lib/services/profile/queries';
 import {
   CACHE_TAGS,
@@ -58,19 +57,9 @@ export async function invalidateUsernameChange(
   newUsernameNormalized: string,
   oldUsernameNormalized: string | null | undefined
 ): Promise<void> {
-  await Promise.all([
-    invalidateProfileCache(newUsernameNormalized, oldUsernameNormalized),
-    invalidateHandleCache(newUsernameNormalized),
-    oldUsernameNormalized && oldUsernameNormalized !== newUsernameNormalized
-      ? invalidateHandleCache(oldUsernameNormalized)
-      : Promise.resolve(),
-  ]);
+  await invalidateProfileCache(newUsernameNormalized, oldUsernameNormalized);
 
   // Also invalidate homepage in case featured creators are affected
-  await invalidateHomepageCache();
-}
-
-export async function invalidateHomepageCache(): Promise<void> {
   revalidatePath('/');
 }
 

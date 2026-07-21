@@ -4,7 +4,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { APP_ROUTES } from '@/constants/routes';
-import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { InvestorSettingsForm } from './InvestorSettingsForm';
 
 export const metadata: Metadata = {
@@ -15,9 +14,7 @@ export const metadata: Metadata = {
  * Admin investor portal settings page.
  * Toggle progress bar, set raise target, configure URLs, etc.
  */
-export default async function InvestorSettingsPage() {
-  await requireCurrentAdminPageAccess();
-
+export default function InvestorSettingsPage() {
   return (
     <AdminPage
       title='Investor Settings'

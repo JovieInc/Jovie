@@ -11,9 +11,7 @@ export {
 export { generateMusicStructuredData } from './music';
 export {
   generateProfileStructuredData,
-  MAX_ENTITY_MENTIONS,
   MAX_EVENT_SCHEMAS,
-  type ProfileEntityMention,
 } from './profile';
 export {
   validateMerchRichResults,

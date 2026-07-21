@@ -1,13 +1,7 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-
-// Isolate from the real ~/.hermes before any path is computed: shipper-state.ts
-// reads the machine-local pause sentinel ($HOME/.hermes/shipping-paused) and
-// these tests write fixture state — neither may touch the real home dir.
-// os.homedir() honors $HOME on POSIX, and the lib computes its paths at import.
-process.env.HOME = mkdtempSync(join(tmpdir(), 'hud-shipper-test-home-'));
 
 const hermesDir = join(homedir(), '.hermes');
 const stateDir = join(hermesDir, 'state');
@@ -26,7 +20,7 @@ describe('getHudShipperStatus', () => {
     mkdirSync(logsDir, { recursive: true });
   });
 
-  it('reports idle from hermetic state without the operator pause sentinel', async () => {
+  it('parses in-flight jobs and recent shipper events', async () => {
     writeJsonl(jobsLogPath, [
       {
         job: 'codex-issue-shipper',

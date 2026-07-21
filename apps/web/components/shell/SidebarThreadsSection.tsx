@@ -11,7 +11,6 @@ import {
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import React, { useMemo } from 'react';
-import { NavBadge } from '@/components/atoms/NavBadge';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
 import { cn } from '@/lib/utils';
@@ -334,11 +333,10 @@ export function SidebarThreadsSection({
           Chats
         </span>
         {unreadCount > 0 && (
-          <NavBadge
-            variant='count'
-            count={unreadCount}
-            aria-label={`${unreadCount} unread ${unreadCount === 1 ? 'chat' : 'chats'}`}
-          />
+          <span className='inline-flex items-center gap-1 text-2xs font-medium text-quaternary-token'>
+            <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/85' />
+            {unreadCount}
+          </span>
         )}
       </div>
 

@@ -3,8 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const webRoot = path.resolve(__dirname, '../../..');
-const meetJoviePath = 'components/homepage/HomepageMeetJovie.tsx';
-const carouselPath = 'components/homepage/MeetJovieCarousel.tsx';
+const artistOutcomesPath = 'components/homepage/HomepageArtistOutcomes.tsx';
 const outcomeCardsPath = 'components/homepage/HomepageOutcomeCards.tsx';
 const cssPath = 'app/(home)/home.css';
 
@@ -29,50 +28,34 @@ const forbiddenCssPatterns = [
   /(?:background|color|border(?:-[^:]+)?|text-decoration-color):[^;]*(?<!-)\b(?:white|black)\b/,
 ] as const;
 
-function extractCssBlock(source: string, name: string): string {
-  const start = source.indexOf(`${name} START`);
-  const end = source.indexOf(`${name} END`, start);
+function extractArtistOutcomesCss(source: string): string {
+  const start = source.indexOf('HOMEPAGE ARTIST OUTCOMES SYSTEM B START');
+  const end = source.indexOf('HOMEPAGE ARTIST OUTCOMES SYSTEM B END', start);
 
-  expect(start, `${name} CSS block exists`).toBeGreaterThanOrEqual(0);
-  expect(end, `${name} CSS block is bounded`).toBeGreaterThan(start);
+  expect(start, 'artist outcomes CSS block exists').toBeGreaterThanOrEqual(0);
+  expect(end, 'artist outcomes CSS block is bounded').toBeGreaterThan(start);
 
   return source.slice(start, end);
 }
 
-describe('mounted homepage Meet Jovie System B source contract', () => {
-  it('keeps the Meet Jovie section markup on named System B primitives', () => {
-    const source = readFileSync(path.join(webRoot, meetJoviePath), 'utf8');
+describe('mounted homepage artist outcomes System B source contract', () => {
+  it('keeps mounted artist outcomes markup on named System B primitives', () => {
+    const source = readFileSync(path.join(webRoot, artistOutcomesPath), 'utf8');
 
     for (const pattern of forbiddenSourcePatterns) {
-      expect(source, `${meetJoviePath} leaked ${pattern}`).not.toMatch(pattern);
+      expect(source, `${artistOutcomesPath} leaked ${pattern}`).not.toMatch(
+        pattern
+      );
     }
 
     for (const className of [
-      'homepage-meet-jovie',
-      'homepage-meet-jovie__inner',
-      'homepage-meet-jovie__eyebrow',
-      'homepage-meet-jovie__heading',
-      'homepage-meet-jovie__intro',
-    ]) {
-      expect(source).toContain(className);
-    }
-  });
-
-  it('keeps the carousel markup on named System B primitives', () => {
-    const source = readFileSync(path.join(webRoot, carouselPath), 'utf8');
-
-    for (const pattern of forbiddenSourcePatterns) {
-      expect(source, `${carouselPath} leaked ${pattern}`).not.toMatch(pattern);
-    }
-
-    for (const className of [
-      'homepage-artist-profiles__row',
-      'homepage-artist-profiles__track',
-      'homepage-artist-profiles__card',
+      'homepage-artist-outcomes',
+      'homepage-artist-outcomes__inner',
+      'homepage-artist-outcomes__copy',
+      'homepage-artist-outcomes__list',
       'homepage-artist-outcome',
       'homepage-artist-outcome__copy',
       'homepage-artist-outcome__media',
-      'homepage-artist-outcome__device',
     ]) {
       expect(source).toContain(className);
     }
@@ -111,10 +94,9 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     }
   });
 
-  it('keeps Meet Jovie CSS tokenized and locked to the shared column', () => {
-    const css = extractCssBlock(
-      readFileSync(path.join(webRoot, cssPath), 'utf8'),
-      'HOMEPAGE MEET JOVIE SYSTEM B'
+  it('keeps artist outcomes CSS tokenized and locked to the shared grid', () => {
+    const css = extractArtistOutcomesCss(
+      readFileSync(path.join(webRoot, cssPath), 'utf8')
     );
 
     for (const pattern of forbiddenCssPatterns) {
@@ -122,32 +104,18 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     }
 
     expect(css).toContain('var(--system-b-bg-page)');
+    expect(css).toContain('var(--system-b-app-frame-seam)');
     expect(css).toContain('var(--color-text-primary-token)');
     expect(css).toContain('var(--color-text-tertiary-token)');
     expect(css).toContain('var(--ds-public-content-max)');
-    expect(css).toContain('var(--homepage-page-gutter)');
-    expect(css).toContain('var(--homepage-section-title-size)');
+    expect(css).toContain('var(--homepage-grid-gutter)');
+    expect(css).toContain('var(--homepage-chapter-rule)');
+    expect(css).toContain('var(--homepage-chapter-space)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('var(--font-sans)');
-    expect(css).toContain('font-size: var(--homepage-section-copy-size)');
-    expect(css).toContain('text-wrap: pretty');
-  });
-
-  it('keeps outcome card CSS tokenized', () => {
-    const css = extractCssBlock(
-      readFileSync(path.join(webRoot, cssPath), 'utf8'),
-      'HOMEPAGE ARTIST OUTCOMES SYSTEM B'
-    );
-
-    for (const pattern of forbiddenCssPatterns) {
-      expect(css, `${cssPath} leaked ${pattern}`).not.toMatch(pattern);
-    }
-
-    expect(css).toContain('var(--system-b-app-frame-seam)');
-    expect(css).toContain('var(--color-text-primary-token)');
-    expect(css).toContain('var(--system-b-primary-bg)');
-    expect(css).toContain('var(--space-');
-    expect(css).toContain('var(--radius-2xl)');
+    expect(css).toContain('var(--radius-lg)');
+    expect(css).toContain('grid-column: 1 / -1;');
+    expect(css).toContain('grid-template-columns: repeat(12, minmax(0, 1fr));');
     expect(css).toContain('@media (max-width: 767px)');
   });
 });

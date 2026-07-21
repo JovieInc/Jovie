@@ -1,9 +1,13 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
+export type AppShellRightRailVariant = 'legacy' | 'shellChatV1';
+
 export interface AppShellRightRailProps {
   /** Right-rail content — typically a RightDrawer or EntitySidebarShell tree. */
   readonly children: ReactNode;
+  /** Shell design variant — mirrors AppShellFrame so rail chrome stays in sync. */
+  readonly variant?: AppShellRightRailVariant;
   readonly className?: string;
 }
 
@@ -17,17 +21,21 @@ export interface AppShellRightRailProps {
  * drag the context panel along with them.
  *
  * Usage (normally composed by AppShellFrame):
- *   <AppShellRightRail>
+ *   <AppShellRightRail variant="shellChatV1">
  *     <EntitySidebarShell ...>{content}</EntitySidebarShell>
  *   </AppShellRightRail>
  */
 export function AppShellRightRail({
   children,
+  variant = 'legacy',
   className,
 }: AppShellRightRailProps) {
+  const isShellChatV1 = variant === 'shellChatV1';
+
   return (
     <aside
       data-testid='app-shell-right-rail'
+      data-shell-design={variant}
       aria-label='Context Panel'
       className={cn(
         // Mobile drawers are fixed descendants of this stacking context, so the
@@ -39,7 +47,7 @@ export function AppShellRightRail({
         // Mirror the left sidebar mount language so inner drawer width changes
         // reclaim canvas space with the same cinematic timing.
         'transition-[width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none',
-        'lg:rounded-(--linear-app-shell-radius)',
+        isShellChatV1 && 'lg:rounded-(--linear-app-shell-radius)',
         className
       )}
     >

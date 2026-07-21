@@ -96,3 +96,91 @@ export function HomepageClosedLoop({
     </section>
   );
 }
+
+function ClosedLoopVisual() {
+  return (
+    <figure
+      aria-hidden='true'
+      className='homepage-closed-loop-visual'
+      data-testid='homepage-closed-loop-visual'
+    >
+      <svg
+        className='homepage-closed-loop-visual-svg'
+        fill='none'
+        viewBox='0 0 240 240'
+        xmlns='http://www.w3.org/2000/svg'
+      >
+        <title>Five-stage closed loop</title>
+        <circle
+          className='homepage-closed-loop-visual-ring'
+          cx='120'
+          cy='120'
+          r='76'
+          stroke='currentColor'
+          strokeDasharray='2 8'
+          strokeWidth='1'
+        />
+        <path
+          className='homepage-closed-loop-visual-arc'
+          d='M120 44a76 76 0 0 1 72 52'
+          markerEnd='url(#homepage-closed-loop-arrow)'
+          stroke='currentColor'
+          strokeWidth='1.5'
+        />
+        <path
+          className='homepage-closed-loop-visual-arc homepage-closed-loop-visual-arc--muted'
+          d='M192 148a76 76 0 0 1-72 48 76 76 0 0 1-72-52'
+          markerEnd='url(#homepage-closed-loop-arrow)'
+          stroke='currentColor'
+          strokeWidth='1.5'
+        />
+        <path
+          className='homepage-closed-loop-visual-arc'
+          d='M48 92a76 76 0 0 1 72-48'
+          markerEnd='url(#homepage-closed-loop-arrow)'
+          stroke='currentColor'
+          strokeWidth='1.5'
+        />
+        <g className='homepage-closed-loop-visual-nodes' fill='currentColor'>
+          <circle cx='120' cy='44' r='3' />
+          <circle cx='192.3' cy='96.5' r='3' />
+          <circle cx='164.7' cy='181.5' r='3' />
+          <circle cx='75.3' cy='181.5' r='3' />
+          <circle cx='47.7' cy='96.5' r='3' />
+        </g>
+        <circle
+          className='homepage-closed-loop-visual-hub'
+          cx='120'
+          cy='120'
+          fill='currentColor'
+          r='30'
+          stroke='currentColor'
+          strokeWidth='1'
+        />
+        <path
+          className='homepage-closed-loop-visual-plus'
+          d='M111 120h18M120 111v18'
+          stroke='currentColor'
+          strokeLinecap='round'
+          strokeWidth='1.5'
+        />
+        <defs>
+          <marker
+            id='homepage-closed-loop-arrow'
+            markerHeight='5'
+            markerWidth='5'
+            orient='auto-start-reverse'
+            refX='4'
+            refY='2.5'
+            viewBox='0 0 5 5'
+          >
+            <path d='M0 0L5 2.5L0 5' fill='currentColor' />
+          </marker>
+        </defs>
+      </svg>
+      <span className='homepage-closed-loop-visual-caption'>
+        Signal, in motion
+      </span>
+    </figure>
+  );
+}

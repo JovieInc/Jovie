@@ -28,7 +28,6 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const { mutate: updateProfile, isPending: loading } = useProfileMutation({
-    profileId: artist.id,
     silent: true, // We handle our own success/error UI
     onSuccess: data => {
       const updatedArtist = convertCreatorProfileToArtist(

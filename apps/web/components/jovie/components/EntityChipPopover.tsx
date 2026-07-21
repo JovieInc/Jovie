@@ -21,6 +21,7 @@ import {
 } from '@/components/organisms/entity-card';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
+import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import { ENTITY_KIND_ACCENT_VAR } from './entity-accent';
 
@@ -68,15 +69,11 @@ export function EntityChipPopover({
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   const entityPanel = useOptionalChatEntityPanel();
   const previewPanel = useOptionalPreviewPanelState();
-  const entityPanelKind =
-    kind === 'release'
-      ? ('release' as const)
-      : kind === 'event'
-        ? ('tour-date' as const)
-        : null;
-  const canOpenEntityPanel = entityPanelKind !== null && entityPanel !== null;
+  const canOpenEntityPanel =
+    designV1ChatEntitiesEnabled && kind === 'release' && entityPanel !== null;
   const canOpenProfilePreview =
     kind === 'artist' &&
     previewPanel !== null &&
@@ -144,16 +141,16 @@ export function EntityChipPopover({
   );
 
   const handleOpenEntityPanel = useCallback(() => {
-    if (!entityPanel || !entityPanelKind) return;
+    if (!entityPanel) return;
     entityPanel.open({
-      kind: entityPanelKind,
+      kind: 'release',
       id,
       label,
       source: 'manual',
       focusKey,
     });
     setOpen(false);
-  }, [entityPanel, entityPanelKind, id, label, focusKey]);
+  }, [entityPanel, id, label, focusKey]);
 
   const handleOpenProfilePreview = useCallback(() => {
     if (!previewPanel) return;

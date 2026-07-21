@@ -11,11 +11,10 @@ import {
 } from '@/constants/admin-navigation';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
-import type { AppShellMode, AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
 export interface AuthRouteConfig {
-  section: AppShellSection;
+  section: 'admin' | 'dashboard' | 'library' | 'settings';
   breadcrumbs: DashboardBreadcrumbItem[];
   showMobileTabs: boolean;
   isTableRoute: boolean;
@@ -52,17 +51,16 @@ export function getDemoBreadcrumbSegment(pathname: string): string {
  *
  * Separates routing concerns from layout component.
  */
-export function useAuthRouteConfig(
-  mode: AppShellMode = 'customer'
-): AuthRouteConfig {
+export function useAuthRouteConfig(): AuthRouteConfig {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isDemoRoute = isDemoRoutePath(pathname);
 
   // Detect section based on pathname
-  const section = useMemo<AppShellSection>(() => {
-    if (mode === 'ov') return 'ov';
-    if (pathname.startsWith(APP_ROUTES.LEGACY_ADMIN)) return 'admin';
+  const section = useMemo<
+    'admin' | 'dashboard' | 'library' | 'settings'
+  >(() => {
+    if (pathname.startsWith(APP_ROUTES.ADMIN)) return 'admin';
     if (pathname.startsWith(APP_ROUTES.SETTINGS)) return 'settings';
     if (
       pathname === APP_ROUTES.LIBRARY ||
@@ -71,7 +69,7 @@ export function useAuthRouteConfig(
       return 'library';
     }
     return 'dashboard';
-  }, [mode, pathname]);
+  }, [pathname]);
 
   // Generate breadcrumbs from pathname
   const breadcrumbs = useMemo<DashboardBreadcrumbItem[]>(() => {
@@ -94,12 +92,7 @@ export function useAuthRouteConfig(
     const UUID_REGEX =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let lastPart = parts[parts.length - 1];
-    if (
-      pathname === APP_ROUTES.LIBRARY &&
-      searchParams.get('view') === 'releases'
-    ) {
-      lastPart = 'releases';
-    } else if (isChatThreadPath(parts)) {
+    if (isChatThreadPath(parts)) {
       lastPart = 'chat';
     } else if (UUID_REGEX.test(lastPart) && parts.length >= 2) {
       lastPart = parts[parts.length - 2];
@@ -144,8 +137,9 @@ export function useAuthRouteConfig(
     ];
   }, [isDemoRoute, pathname, searchParams]);
 
-  // Customer navigation never leaks into the dedicated OV shell.
-  const showMobileTabs = mode === 'customer';
+  // Show mobile bottom tabs on all authenticated sections so users always
+  // have persistent navigation on mobile (dashboard, settings, and admin).
+  const showMobileTabs = true;
 
   // Table routes that need different overflow behavior.
   // Memoized so downstream consumers don't re-render when navigating
@@ -161,8 +155,7 @@ export function useAuthRouteConfig(
       pathname.includes('/campaigns') ||
       pathname.includes('/people') ||
       pathname.includes('/growth') ||
-      pathname.includes('/releases') ||
-      pathname === APP_ROUTES.TOUR_DATES,
+      pathname.includes('/releases'),
     [isDemoRoute, pathname]
   );
 

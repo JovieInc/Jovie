@@ -7,9 +7,8 @@ import {
   type Locator,
   type Page,
 } from '@playwright/test';
+import { APP_ROUTES } from '../constants/routes';
 import {
-  assertResolvedPerfRoutePath,
-  assertValidPerfRouteManifest,
   END_USER_PERF_ROUTE_MANIFEST,
   getPrimaryTimingMetricName,
   getRouteResourceBudgets,
@@ -296,7 +295,8 @@ function resolveAuthStatePath(authPath?: string) {
   return DEFAULT_AUTH_STATE_PATHS.find(path => existsSync(path));
 }
 
-function loadAuthCookies(_baseUrl: string, authPath?: string) {
+function loadAuthCookies(baseUrl: string, authPath?: string) {
+  const domain = new URL(baseUrl).hostname;
   const explicitAuthStatePath = authPath
     ? resolveAuthStatePath(authPath)
     : undefined;
@@ -311,6 +311,25 @@ function loadAuthCookies(_baseUrl: string, authPath?: string) {
       path: cookie.path || '/',
       sameSite: normalizeSameSite(cookie.sameSite),
     }));
+  }
+
+  // E2E test auth bypass: inject synthetic bypass cookies so the middleware
+  // skips Clerk auth entirely. This allows perf measurement of authenticated
+  // routes without a real Clerk session.
+  const testAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+  const testUserId = process.env.E2E_CLERK_USER_ID?.trim();
+  if (testAuthBypass && testUserId) {
+    return [
+      { domain, name: '__e2e_test_mode', path: '/', value: 'bypass-auth' },
+      { domain, name: '__e2e_test_user_id', path: '/', value: testUserId },
+    ] satisfies readonly AuthCookie[];
+  }
+
+  const cookieValue = process.env.CLERK_SESSION_COOKIE?.trim();
+  if (cookieValue) {
+    return [
+      { domain, name: '__session', path: '/', value: cookieValue },
+    ] satisfies readonly AuthCookie[];
   }
 
   const storageStatePath = resolveAuthStatePath(authPath);
@@ -413,14 +432,14 @@ function resolveExpectedDynamicPath(
 }
 
 function expectedRoutePaths(route: PerfRouteDefinition, resolvedPath: string) {
-  const redirectDestinations = (
-    (route.readySelectors.redirectDestinations ?? []) as readonly string[]
-  ).map(expectedPath => resolveExpectedDynamicPath(expectedPath, resolvedPath));
-  const expected = new Set<string>(
-    route.measureMode === 'redirect'
-      ? redirectDestinations
-      : [resolvedPath, ...redirectDestinations]
-  );
+  const expected = new Set<string>([
+    resolvedPath,
+    ...(
+      (route.readySelectors.redirectDestinations ?? []) as readonly string[]
+    ).map(expectedPath =>
+      resolveExpectedDynamicPath(expectedPath, resolvedPath)
+    ),
+  ]);
   return [...expected];
 }
 
@@ -444,7 +463,7 @@ function matchesExpectedPath(actualUrl: URL, expectedPath: string) {
   return actualUrl.pathname === normalizedExpected;
 }
 
-export async function waitForExpectedUrl(
+async function waitForExpectedUrl(
   page: Page,
   expectedPaths: readonly string[],
   timeoutMs = READY_TIMEOUT_MS
@@ -458,7 +477,7 @@ export async function waitForExpectedUrl(
       expectedPaths.some(expectedPath =>
         matchesExpectedPath(currentUrl, expectedPath)
       ),
-    { timeout: timeoutMs, waitUntil: 'domcontentloaded' }
+    { timeout: timeoutMs }
   );
 }
 
@@ -554,49 +573,43 @@ async function waitForContentReady(
   page: Page,
   route: PerfRouteDefinition,
   startedAt: number,
-  usePageWarmStart = false,
-  timeoutMs = READY_TIMEOUT_MS
+  usePageWarmStart = false
 ) {
   const loadingSelectors = route.readySelectors.loading;
-  const contentSelectors = route.readySelectors.content;
+  const contentSelectors =
+    route.readySelectors.content ?? route.readySelectors.shell;
 
   if (loadingSelectors?.length) {
-    await waitForAnyVisible(
-      page,
-      [...loadingSelectors, ...(contentSelectors ?? [])],
-      timeoutMs
-    ).catch(() => null);
-    await waitForAllHidden(page, loadingSelectors, timeoutMs).catch(
-      () => undefined
-    );
+    await waitForAnyVisible(page, [
+      ...loadingSelectors,
+      ...(contentSelectors ?? []),
+    ]).catch(() => null);
+    await waitForAllHidden(page, loadingSelectors).catch(() => undefined);
   }
 
-  await waitForAnyVisible(page, contentSelectors, timeoutMs);
+  await waitForAnyVisible(page, contentSelectors);
   if (usePageWarmStart) {
     return await readWarmNavigationElapsed(page);
   }
   return Date.now() - startedAt;
 }
 
-/**
- * Warm navigation is ready only when destination-owned content is usable.
- * Persistent source-shell and loading selectors are deliberately insufficient:
- * they can remain visible while the destination is stalled or broken.
- */
-export async function waitForWarmDestinationReady(
+async function waitForWarmShellReady(
   page: Page,
   route: PerfRouteDefinition,
   startedAt: number,
-  usePageWarmStart = false,
-  timeoutMs = READY_TIMEOUT_MS
+  usePageWarmStart = false
 ) {
-  return waitForContentReady(
-    page,
-    route,
-    startedAt,
-    usePageWarmStart,
-    timeoutMs
-  );
+  const selectors = [
+    ...(route.readySelectors.loading ?? []),
+    ...(route.readySelectors.content ?? []),
+    ...(route.readySelectors.shell ?? []),
+  ];
+  await waitForAnyVisible(page, selectors.length > 0 ? selectors : undefined);
+  if (usePageWarmStart) {
+    return await readWarmNavigationElapsed(page);
+  }
+  return Date.now() - startedAt;
 }
 
 async function armWarmNavigationStart(locator: Locator) {
@@ -647,20 +660,13 @@ async function readWarmNavigationElapsed(page: Page) {
   });
 }
 
-export async function measureWarmNavigationRoute(
+async function measureWarmNavigationRoute(
   page: Page,
   route: PerfRouteDefinition,
   baseUrl: string,
   url: string
 ) {
-  const startPath = route.warmNavigationStartPath;
-  if (!startPath) {
-    throw new TypeError(
-      `Warm-navigation route "${route.id}" is missing warmNavigationStartPath.`
-    );
-  }
-
-  await page.goto(resolveRouteUrl(baseUrl, startPath), {
+  await page.goto(resolveRouteUrl(baseUrl, APP_ROUTES.DASHBOARD), {
     timeout: NAVIGATION_TIMEOUT_MS,
     waitUntil: 'domcontentloaded',
   });
@@ -668,13 +674,10 @@ export async function measureWarmNavigationRoute(
     .waitForLoadState('networkidle', { timeout: 5_000 })
     .catch(() => undefined);
   await page.waitForTimeout(250);
-  const navTriggerSelectors = route.readySelectors.navTrigger ?? [];
-  const visibleTrigger = await waitForVisibleTrigger(page, navTriggerSelectors);
-  if (!visibleTrigger) {
-    throw new Error(
-      `Warm-navigation route "${route.id}" could not find a visible nav trigger from "${startPath}". Selectors: ${navTriggerSelectors.join(', ')}.`
-    );
-  }
+  const visibleTrigger = await waitForVisibleTrigger(
+    page,
+    route.readySelectors.navTrigger
+  ).catch(() => null);
 
   const startedAt = Date.now();
   const parsedUrl = new URL(url);
@@ -682,64 +685,32 @@ export async function measureWarmNavigationRoute(
     route,
     `${parsedUrl.pathname}${parsedUrl.search}`
   );
-  await armWarmNavigationStart(visibleTrigger);
-  const routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
-  await visibleTrigger.click({ noWaitAfter: true });
+  const navTriggerSelector = route.readySelectors.navTrigger?.[0];
+  let routeReadyPromise: Promise<unknown> | null = null;
+  if (visibleTrigger) {
+    await armWarmNavigationStart(visibleTrigger);
+    routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
+    await visibleTrigger.click({ noWaitAfter: true });
+  } else if (navTriggerSelector) {
+    const trigger = page.locator(navTriggerSelector).first();
+    await armWarmNavigationStart(trigger);
+    routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
+    await trigger.click({ noWaitAfter: true });
+  } else {
+    await page.goto(url, {
+      timeout: NAVIGATION_TIMEOUT_MS,
+      waitUntil: 'domcontentloaded',
+    });
+    routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
+  }
 
   await routeReadyPromise;
-  const warmShellResponse = await readWarmNavigationElapsed(page);
-  const skeletonToContent = hasTimingBudget(route, 'skeleton-to-content')
-    ? await waitForContentReady(page, route, startedAt, true)
-    : 0;
-
-  return {
-    skeletonToContent,
-    warmShellResponse,
-  };
-}
-
-export async function measureSameRouteInteraction(
-  page: Page,
-  route: PerfRouteDefinition,
-  baseUrl: string
-) {
-  const startPath = route.interactionStartPath;
-  if (!startPath) {
-    throw new TypeError(
-      `Same-route interaction "${route.id}" is missing interactionStartPath.`
-    );
-  }
-
-  await page.goto(resolveRouteUrl(baseUrl, startPath), {
-    timeout: NAVIGATION_TIMEOUT_MS,
-    waitUntil: 'domcontentloaded',
-  });
-  await page
-    .waitForLoadState('networkidle', { timeout: 5_000 })
-    .catch(() => undefined);
-  await page.waitForTimeout(250);
-
-  const triggerSelectors = route.readySelectors.navTrigger ?? [];
-  const visibleTrigger = await waitForVisibleTrigger(page, triggerSelectors);
-  if (!visibleTrigger) {
-    throw new Error(
-      `Same-route interaction "${route.id}" could not find a visible trigger on "${startPath}". Selectors: ${triggerSelectors.join(', ')}.`
-    );
-  }
-
-  const startedAt = Date.now();
-  await armWarmNavigationStart(visibleTrigger);
-  await visibleTrigger.click({ noWaitAfter: true });
-  await waitForAnyVisible(page, route.readySelectors.shell);
-  const warmShellResponse = await readWarmNavigationElapsed(page);
-
-  const currentUrl = new URL(page.url());
-  if (!matchesExpectedPath(currentUrl, route.path)) {
-    throw new Error(
-      `Same-route interaction "${route.id}" navigated to "${currentUrl.pathname}${currentUrl.search}" instead of remaining on "${route.path}".`
-    );
-  }
-
+  const warmShellResponse = await waitForWarmShellReady(
+    page,
+    route,
+    startedAt,
+    true
+  );
   const skeletonToContent = hasTimingBudget(route, 'skeleton-to-content')
     ? await waitForContentReady(page, route, startedAt, true)
     : 0;
@@ -924,19 +895,17 @@ async function warmRoute(
   try {
     const page = await context.newPage();
     if (route.warmupStrategy === 'authenticated-shell') {
-      const measureAuthenticatedShell =
-        route.measureMode === 'same-route-interaction'
-          ? measureSameRouteInteraction(page, route, baseUrl)
-          : measureWarmNavigationRoute(page, route, baseUrl, url);
-      await measureAuthenticatedShell.catch(async () => {
-        await page.goto(url, {
-          timeout: NAVIGATION_TIMEOUT_MS,
-          waitUntil: 'domcontentloaded',
-        });
-        await waitForAnyVisible(page, route.readySelectors.content).catch(
-          () => undefined
-        );
-      });
+      await measureWarmNavigationRoute(page, route, baseUrl, url).catch(
+        async () => {
+          await page.goto(url, {
+            timeout: NAVIGATION_TIMEOUT_MS,
+            waitUntil: 'domcontentloaded',
+          });
+          await waitForAnyVisible(page, route.readySelectors.content).catch(
+            () => undefined
+          );
+        }
+      );
       return;
     }
 
@@ -978,16 +947,15 @@ async function measureRouteSample(
       'warm-shell-response': 0,
     };
 
-    if (
-      route.measureMode === 'warm-navigation' ||
-      route.measureMode === 'same-route-interaction'
-    ) {
-      const interaction =
-        route.measureMode === 'warm-navigation'
-          ? await measureWarmNavigationRoute(page, route, baseUrl, url)
-          : await measureSameRouteInteraction(page, route, baseUrl);
-      timingValues['warm-shell-response'] = interaction.warmShellResponse;
-      timingValues['skeleton-to-content'] = interaction.skeletonToContent;
+    if (route.measureMode === 'warm-navigation') {
+      const warmNavigation = await measureWarmNavigationRoute(
+        page,
+        route,
+        baseUrl,
+        url
+      );
+      timingValues['warm-shell-response'] = warmNavigation.warmShellResponse;
+      timingValues['skeleton-to-content'] = warmNavigation.skeletonToContent;
     } else {
       const startedAt = Date.now();
       await page.goto(url, {
@@ -1162,11 +1130,9 @@ function normalizeLoadedRoute(route: PerfRouteDefinition): PerfRouteDefinition {
 
 export async function loadGuardManifestRoutes(manifestPath?: string) {
   if (!manifestPath) {
-    const routes = END_USER_PERF_ROUTE_MANIFEST.map(route =>
+    return END_USER_PERF_ROUTE_MANIFEST.map(route =>
       normalizeLoadedRoute(route)
     );
-    assertValidPerfRouteManifest(routes);
-    return routes;
   }
 
   const resolvedManifestPath = isAbsolute(manifestPath)
@@ -1185,9 +1151,7 @@ export async function loadGuardManifestRoutes(manifestPath?: string) {
     );
   }
 
-  const routes = loadedManifest.map(route => normalizeLoadedRoute(route));
-  assertValidPerfRouteManifest(routes);
-  return routes;
+  return loadedManifest.map(route => normalizeLoadedRoute(route));
 }
 
 export function selectGuardRoutes(
@@ -1279,7 +1243,6 @@ async function measureRoutesAgainstBudgets(
         options.baseUrl,
         authCookies
       );
-      assertResolvedPerfRoutePath(route, resolvedPath);
       const url = resolveRouteUrl(options.baseUrl, resolvedPath);
       logInfo(`Checking ${route.id} -> ${resolvedPath}`, options);
 

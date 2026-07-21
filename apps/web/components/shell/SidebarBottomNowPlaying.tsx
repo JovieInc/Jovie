@@ -1,10 +1,9 @@
 'use client';
 
-import { Pause, Play, X } from 'lucide-react';
+import { Pause, Play } from 'lucide-react';
 import Image from 'next/image';
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { IconBtn } from './IconBtn';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
 
 /**
@@ -32,13 +31,11 @@ export const SidebarBottomNowPlaying = React.memo(
     track,
     isPlaying,
     onPlay,
-    onDismiss,
     className,
   }: {
     readonly track: NowPlayingTrack;
     readonly isPlaying: boolean;
     readonly onPlay: () => void;
-    readonly onDismiss?: () => void;
     readonly className?: string;
   }) {
     const trackTitle = track.trackTitle ?? '';
@@ -93,17 +90,6 @@ export const SidebarBottomNowPlaying = React.memo(
             />
           )}
         </button>
-        {onDismiss ? (
-          <IconBtn
-            label='Dismiss Player'
-            onClick={onDismiss}
-            tooltipSide='top'
-            tone='ghost'
-            className='shrink-0'
-          >
-            <X aria-hidden='true' className='size-3.5' strokeWidth={2.25} />
-          </IconBtn>
-        ) : null}
       </div>
     );
   }

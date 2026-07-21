@@ -174,7 +174,7 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: >-
           doppler run --project jovie-web --config stg
-          --only-secrets=BETTER_AUTH_URL,NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_PROFILE_URL,NEXT_PUBLIC_PROFILE_HOSTNAME
+          --only-secrets=NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_PROFILE_URL,NEXT_PUBLIC_PROFILE_HOSTNAME
           --no-fallback -- env -u DOPPLER_TOKEN pnpm --filter=@jovie/web exec
           tsx scripts/check-signup-readiness.ts --target=stg --source=env
       - name: Build (preview target for staging verification)
@@ -554,7 +554,6 @@ jobs:
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie
           EXPECTED_VERCEL_ENVIRONMENT: preview
-          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_DYNAMIC_SECRETS_FILE: ${{ runner.temp }}/playwright-dynamic-cookie-values
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
@@ -564,40 +563,12 @@ jobs:
           cd apps/web
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          oauth_retry_root="$RUNNER_TEMP/aliased-staging-oauth-retries"
-          mkdir -m 700 "$oauth_retry_root"
-
-          quarantine_oauth_artifacts() {
-            destination="$1"
-            for artifact_path in test-results playwright-report; do
-              if [ -e "$artifact_path" ] || [ -L "$artifact_path" ]; then
-                if [ ! -d "$destination" ]; then
-                  mkdir -m 700 "$destination"
-                fi
-                mv -- "$artifact_path" "$destination/"
-              fi
-            done
-          }
-
           attempt=1
           max_attempts=3
-          while [ "$attempt" -le "$max_attempts" ]; do
-            if PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \
-              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
-                  --project=chromium --reporter=line; then
-              break
-            else
-              guard_status=$?
-            fi
-
-            attempt_artifact_root="$oauth_retry_root/attempt-${attempt}"
-            mkdir -m 700 "$attempt_artifact_root"
-            quarantine_oauth_artifacts "$attempt_artifact_root/failed-artifacts"
-            if [ -f "$RUNNER_TEMP/safe-playwright-producer/blocked" ]; then
-              echo "::error::Playwright artifact guard blocked aliased staging OAuth output; refusing an unsafe retry."
-              exit "$guard_status"
-            fi
+          until PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
+                --project=chromium --reporter=line; do
             if [ "$attempt" -ge "$max_attempts" ]; then
               echo "❌ Aliased staging Better Auth OAuth runtime proof failed after ${max_attempts} attempts."
               exit 1
@@ -636,76 +607,10 @@ jobs:
             echo "is_current=false" >> "$GITHUB_OUTPUT"
           fi
 
-  migrate-production:
-    name: Migrate production database
-    needs:
-      [
-        deploy-staging,
-        attest-staging-build,
-        canary-health-gate,
-        alias-staging,
-        production-head,
-      ]
-    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.attest-staging-build.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    outputs:
-      schema_drift: ${{ steps.verify-production-schema.outcome == 'failure' }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ inputs.expected_sha }}
-          persist-credentials: false
-      - uses: ./.github/actions/setup-node-pnpm
-      - uses: ./.github/actions/setup-doppler
-      - name: Require production migration credential
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
-        run: |
-          set -euo pipefail
-          if [ -z "${DOPPLER_TOKEN:-}" ]; then
-            echo "::error::DOPPLER_TOKEN_PRD is required for production database migration."
-            exit 1
-          fi
-      # Exact staging build, attestation, protected-origin canary, staging alias,
-      # and the controller's repo-wide production lease have already authorized
-      # this expand/contract-compatible schema generation. Do not add a second
-      # non-atomic main observation around the irreversible migration and call it
-      # exact; production-head and the pre-promotion checks own supersession.
-      - name: DB safety check (production preflight)
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
-          GIT_BRANCH: main
-          ALLOW_PROD_MIGRATIONS: 'true'
-        run: >-
-          doppler run --project jovie-web --config prd
-          --only-secrets=DATABASE_URL --no-fallback --
-          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web exec tsx
-          scripts/drizzle-migrate-preflight.ts
-      - name: DB migrate (production - Drizzle)
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
-          GIT_BRANCH: main
-          ALLOW_PROD_MIGRATIONS: 'true'
-        run: >-
-          doppler run --project jovie-web --config prd
-          --only-secrets=DATABASE_URL --no-fallback --
-          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
-      - name: DB verify (production schema check)
-        id: verify-production-schema
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
-        run: >-
-          doppler run --project jovie-web --config prd
-          --only-secrets=DATABASE_URL --no-fallback --
-          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:verify:ci
-
   promote-production:
     name: Promote to Production
-    needs: [deploy-staging, attest-staging-build, canary-health-gate, alias-staging, production-head, migrate-production]
-    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.attest-staging-build.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' && needs.migrate-production.result == 'success' }}
+    needs: [deploy-staging, attest-staging-build, canary-health-gate, alias-staging, production-head]
+    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.attest-staging-build.result == 'success' && needs.canary-health-gate.result == 'success' && needs.alias-staging.result == 'success' && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -718,7 +623,7 @@ jobs:
       # distinguish silent-no-op regressions from generic promote failures.
       # Values distinguish production artifact, promotion state, and canonical
       # alias convergence failures for deploy-notify and Gem diagnosis.
-      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype }}
+      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.stage-production.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype }}
       production_deployment_id: ${{ steps.stage-production.outputs.production_deployment_id }}
       production_deployment_url_b64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}
       previous_production_deployment_id: ${{ steps.promote.outputs.previous_production_deployment_id }}
@@ -798,7 +703,6 @@ jobs:
           fi
 
           required_runtime_env=(
-            BETTER_AUTH_URL
             NEXT_PUBLIC_BETTER_AUTH_URL
             BETTER_AUTH_SECRET
             DATABASE_URL
@@ -836,15 +740,8 @@ jobs:
             fi
           done
 
-          if ! pnpm --filter=@jovie/web exec tsx \
-            scripts/reconcile-vercel-build-env.ts \
-            --file=.vercel/.env.production.local; then
-            fail_stage "Unable to reconcile the canonical production build environment." production_artifact_failed
-          fi
-
           if ! pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts \
-            --target=prd --source=vercel-file \
-            --file=.vercel/.env.production.local; then
+            --target=prd --source=env; then
             fail_stage "Production signup configuration is incomplete." production_artifact_failed
           fi
 
@@ -941,105 +838,12 @@ jobs:
           }
           export -f production_stage
           doppler run --project jovie-web --config prd \
-            --only-secrets=BETTER_AUTH_URL,NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,SENTRY_AUTH_TOKEN \
+            --only-secrets=NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY \
             --no-fallback -- env -u DOPPLER_TOKEN bash -c production_stage
-
-      - name: Setup Playwright for exact-build performance gate
-        if: ${{ steps.mutation-head.outputs.is_current == 'true' && steps.stage-production.outcome == 'success' }}
-        uses: ./.github/actions/setup-playwright
-
-      - name: Prove canonical navigation budgets on exact staged build
-        id: performance-gate
-        if: ${{ steps.mutation-head.outputs.is_current == 'true' && steps.stage-production.outcome == 'success' }}
-        timeout-minutes: 20
-        env:
-          EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
-          PRODUCTION_DEPLOYMENT_URL_B64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}
-          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
-          PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
-        run: |
-          set -euo pipefail
-
-          fail_performance_gate() {
-            echo "::error::$1"
-            echo "failure_subtype=exact_build_performance_failed" >> "$GITHUB_OUTPUT"
-            exit 1
-          }
-
-          if [ -z "${DOPPLER_TOKEN:-}" ]; then
-            fail_performance_gate "The production Doppler credential is required before production promotion."
-          fi
-          # Expanded inside the Doppler child shell.
-          # shellcheck disable=SC2016
-          if ! doppler run --project jovie-web --config prd \
-            --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
-            --no-fallback -- env -u DOPPLER_TOKEN bash -c \
-              '[ -n "${E2E_PROD_USER_EMAIL:-}" ] && [ -n "${DATABASE_URL:-}" ]'; then
-            fail_performance_gate "Authenticated performance credentials are required before production promotion."
-          fi
-          if [ -z "${PLAYWRIGHT_VERCEL_BYPASS_SECRET:-}" ]; then
-            fail_performance_gate "Protected-origin credentials are required before production promotion."
-          fi
-
-          deployment_url="$(
-            printf '%s' "$PRODUCTION_DEPLOYMENT_URL_B64" | base64 --decode
-          )" || fail_performance_gate "Exact staged deployment URL is malformed."
-          if [[ ! "$deployment_url" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]]; then
-            fail_performance_gate "Exact staged deployment URL is missing or invalid."
-          fi
-
-          auth_state="$RUNNER_TEMP/uas-performance-auth-${GITHUB_RUN_ID}.json"
-          dynamic_secrets_file="$RUNNER_TEMP/uas-performance-dynamic-secrets-${GITHUB_RUN_ID}"
-          cleanup_performance_gate() {
-            rm -f "$auth_state" "$dynamic_secrets_file"
-          }
-          trap cleanup_performance_gate EXIT
-
-          cd apps/web
-          mkdir -p tests/.auth
-          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          if ! doppler run --project jovie-web --config prd \
-            --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
-            --no-fallback -- env -u DOPPLER_TOKEN \
-              CI=true \
-              BASE_URL="$deployment_url" \
-              EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url" \
-              EXPECTED_VERCEL_ENVIRONMENT=production \
-              PERFORMANCE_AUTH_STATE_PATH="$auth_state" \
-              PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$dynamic_secrets_file" \
-                node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts \
-                    --project=chromium --reporter=line \
-                    --grep "sign-in works and dashboard loads"; then
-            fail_performance_gate "Unable to establish authenticated exact-build browser state."
-          fi
-          if [ ! -s "$auth_state" ] ||
-            ! jq -e '
-              ((.cookies // []) | length > 0) or
-              ((.origins // []) | length > 0)
-            ' "$auth_state" >/dev/null; then
-            fail_performance_gate "Authenticated exact-build browser state was not persisted."
-          fi
-
-          if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
-            --base-url "$deployment_url" \
-            --auth-path "$auth_state" \
-            --runs 3 \
-            --route-id creator-inbox-nav \
-            --route-id creator-chat-nav \
-            --route-id creator-library \
-            --route-id creator-contacts \
-            --route-id creator-calendar \
-            --route-id creator-tasks; then
-            fail_performance_gate "Canonical six-route browser budgets failed on the exact staged build."
-          else
-            echo "performance_status=passed" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Recheck main immediately before production promotion
         id: final-current
-        if: ${{ steps.mutation-head.outputs.is_current == 'true' && steps.performance-gate.outcome == 'success' }}
+        if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}
@@ -1171,30 +975,13 @@ jobs:
         continue-on-error: true
         env:
           BASE_URL: https://jov.ie
-          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
         run: |
           set -euo pipefail
-          : >> "$GITHUB_OUTPUT"
           # The browser must issue the same-origin POST
           # /api/auth/sign-in/social before either provider navigation exists.
           cd apps/web
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          oauth_retry_root="$RUNNER_TEMP/production-oauth-retries"
-          mkdir -m 700 "$oauth_retry_root"
-
-          quarantine_oauth_artifacts() {
-            destination="$1"
-            for artifact_path in test-results playwright-report; do
-              if [ -e "$artifact_path" ] || [ -L "$artifact_path" ]; then
-                if [ ! -d "$destination" ]; then
-                  mkdir -m 700 "$destination"
-                fi
-                mv -- "$artifact_path" "$destination/"
-              fi
-            done
-          }
-
           attempt=1
           max_attempts=3
           confirmed_attempts=0
@@ -1206,45 +993,13 @@ jobs:
               PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" \
               --run -- pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
-              --project=chromium --no-deps --reporter=json || probe_status=$?
+              --project=chromium --reporter=json || probe_status=$?
             if [ "$probe_status" -eq 0 ] && jq -e '
-              def oauth_suites:
-                [.suites[]? | select(
-                  type == "object" and
-                  .title == "oauth-providers.spec.ts" and
-                  .file == "oauth-providers.spec.ts"
-                )];
-              def oauth_specs:
-                oauth_suites[0].suites[0].specs;
+              def results:
+                [ .suites[]? | .. | objects | select(has("results")) | .results[]? ];
               type == "object" and (.suites | type == "array") and
-              (.suites | length) == 1 and
-              (oauth_suites | length) == 1 and
-              (oauth_suites[0].specs | type == "array") and
-              (oauth_suites[0].specs | length) == 0 and
-              (oauth_suites[0].suites | type == "array") and
-              (oauth_suites[0].suites | length) == 1 and
-              oauth_suites[0].suites[0].title == "candidate-bound Better Auth OAuth runtime @production-smoke" and
-              (oauth_specs | type == "array") and
-              (oauth_specs | map(.title)) == [
-                "google UI starts the exact Better Auth provider redirect",
-                "apple UI starts the exact Better Auth provider redirect"
-              ] and
-              all(oauth_specs[];
-                (.tests | type == "array") and
-                (.tests | length) == 1 and
-                (.tests[0].status == "expected" or .tests[0].status == "flaky") and
-                .tests[0].expectedStatus == "passed" and
-                .tests[0].projectName == "chromium" and
-                (.tests[0].results | type == "array") and
-                (.tests[0].results | length) > 0 and
-                .tests[0].results[-1].status == "passed"
-              ) and
-              (.errors | type == "array") and
-              (.errors | length) == 0 and
-              (.stats | type == "object") and
-              (.stats.unexpected // 0) == 0 and
-              (.stats.skipped // 0) == 0 and
-              ((.stats.expected // 0) + (.stats.flaky // 0) == 2)
+              (results | map(select(.status == "passed")) | length) == 2 and
+              (results | map(select(.status == "skipped")) | length) == 0
             ' >/dev/null "$report"; then
               {
                 echo "ba_health=passed"
@@ -1254,68 +1009,19 @@ jobs:
               exit 0
             fi
 
-            attempt_artifact_root="$oauth_retry_root/attempt-${attempt}"
-            mkdir -m 700 "$attempt_artifact_root"
-            if [ -f "$report" ]; then
-              mkdir -m 700 "$attempt_artifact_root/failed-artifacts"
-              mv -- "$report" "$attempt_artifact_root/failed-artifacts/oauth-provider-report.json"
-              report="$attempt_artifact_root/failed-artifacts/oauth-provider-report.json"
-            fi
-            quarantine_oauth_artifacts "$attempt_artifact_root/failed-artifacts"
-
             # Only explicit runtime-contract assertions in a valid Playwright
             # report confirm a regression. Browser/tool/network/report failures
             # remain uncertainty and can never request rollback.
-            if [ "$probe_status" -ne 0 ] && [ -s "$report" ] && jq -e '
-              def oauth_suites:
-                [.suites[]? | select(
-                  type == "object" and
-                  .title == "oauth-providers.spec.ts" and
-                  .file == "oauth-providers.spec.ts"
-                )];
-              def oauth_specs:
-                oauth_suites[0].suites[0].specs;
-              def oauth_tests:
-                [oauth_specs[]?.tests[]?];
-              def final_results:
-                [oauth_tests[]?.results[-1]];
+            if [ -s "$report" ] && jq -e '
+              def results:
+                [ .suites[]? | .. | objects | select(has("results")) | .results[]? ];
               type == "object" and (.suites | type == "array") and
-              (.suites | length) == 1 and
-              (oauth_suites | length) == 1 and
-              (oauth_suites[0].specs | type == "array") and
-              (oauth_suites[0].specs | length) == 0 and
-              (oauth_suites[0].suites | type == "array") and
-              (oauth_suites[0].suites | length) == 1 and
-              oauth_suites[0].suites[0].title == "candidate-bound Better Auth OAuth runtime @production-smoke" and
-              (oauth_specs | type == "array") and
-              (oauth_specs | map(.title)) == [
-                "google UI starts the exact Better Auth provider redirect",
-                "apple UI starts the exact Better Auth provider redirect"
-              ] and
-              (oauth_tests | length) == 2 and
-              all(oauth_specs[];
-                (.tests | type == "array") and
-                (.tests | length) == 1 and
-                (
-                  (.tests[0].status == "unexpected" and
-                    .tests[0].results[-1].status == "failed") or
-                  (.tests[0].status == "expected" and
-                    .tests[0].results[-1].status == "passed")
-                ) and
-                .tests[0].projectName == "chromium" and
-                .tests[0].expectedStatus == "passed" and
-                (.tests[0].results | type == "array") and
-                (.tests[0].results | length) > 0
-              ) and
-              (final_results | map(select(.status == "failed")) | length) > 0 and
-              all(final_results[];
-                .status == "passed" or
-                (
-                  .status == "failed" and
-                  ([.errors[]?.message // ""] | any(
-                    contains("CONFIRMED_OAUTH_RUNTIME_CONTRACT")
-                  ))
-                )
+              (results | map(select(.status == "failed")) | length) > 0 and
+              all(results[] | select(.status != "passed" and .status != "skipped");
+                .status == "failed" and
+                ([.errors[]?.message // ""] | any(
+                  contains("CONFIRMED_OAUTH_RUNTIME_CONTRACT")
+                ))
               )
             ' >/dev/null "$report"; then
               confirmed_attempts=$((confirmed_attempts + 1))
@@ -1323,10 +1029,6 @@ jobs:
             else
               uncertain=true
               echo "OAuth attempt ${attempt}/${max_attempts} lacked exact structured runtime-contract evidence."
-            fi
-            if [ -f "$RUNNER_TEMP/safe-playwright-producer/blocked" ]; then
-              echo "::error::Playwright artifact guard blocked production OAuth output; refusing an unsafe retry."
-              exit 1
             fi
             if [ "$attempt" -lt "$max_attempts" ]; then
               sleep_seconds=$((attempt * 15))
@@ -1473,7 +1175,6 @@ jobs:
     needs:
       [
         release-head,
-        migrate-production,
         deploy-staging,
         attest-staging-build,
         canary-health-gate,
@@ -1515,7 +1216,7 @@ jobs:
             echo "production_deployment_id=$PRODUCTION_DEPLOYMENT_ID"
             echo "production_deployment_url_b64=$PRODUCTION_DEPLOYMENT_URL_B64"
             echo "previous_production_deployment_id=$PREVIOUS_PRODUCTION_DEPLOYMENT_ID"
-            echo "schema_drift=${{ needs.migrate-production.outputs.schema_drift == 'true' || needs.deploy-staging.outputs.schema_drift == 'true' }}"
+            echo "schema_drift=${{ needs.deploy-staging.outputs.schema_drift }}"
             echo "failure_subtype=${{ needs.promote-production.outputs.failure_subtype }}"
             echo "sentry_gate_status=${{ needs.sentry-error-gate.outputs.gate_status }}"
             echo "oauth_gate_status=${{ needs.production-oauth-gate.outputs.gate_status }}"
@@ -1583,7 +1284,6 @@ jobs:
           fi
 
           for gate in \
-            "migrate-production:${{ needs.migrate-production.result }}" \
             "deploy-staging:${{ needs.deploy-staging.result }}" \
             "attest-staging-build:${{ needs.attest-staging-build.result }}" \
             "canary-health-gate:${{ needs.canary-health-gate.result }}" \

@@ -20,11 +20,7 @@ export {
   processTrackArtistCredits,
 } from './artist-import';
 // Search operations
-export {
-  getCreditedArtistsWithProfiles,
-  getFrequentCollaborators,
-  searchArtists,
-} from './artist-search';
+export { getFrequentCollaborators, searchArtists } from './artist-search';
 // Recording-artist operations
 export {
   deleteRecordingArtists,
@@ -50,6 +46,5 @@ export {
 export type {
   ArtistWithRole,
   CollaboratorInfo,
-  CreditedArtistWithProfile,
   FindOrCreateArtistInput,
 } from './types';

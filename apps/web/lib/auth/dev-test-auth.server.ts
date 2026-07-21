@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { makeSignature } from 'better-auth/crypto';
 import { eq, or } from 'drizzle-orm';
 import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
@@ -561,6 +560,10 @@ async function ensureDevTestAuthActorForBetterAuthUser(
     );
   }
 
+  // Mint a real Better Auth session — this is the primary path now (not
+  // best-effort). The session cookie is set by the dev bypass route's
+  // `buildDevTestAuthCookieDescriptors`; the BA session row means any
+  // direct `auth.api.getSession` call site sees a real session.
   await mintBetterAuthSessionForDevTestActor({
     dbUserId,
     betterAuthUserId,
@@ -634,43 +637,6 @@ async function mintBetterAuthSessionForDevTestActor(params: {
 
   const ctx = await auth.$context;
   await ctx.internalAdapter.createSession(betterAuthUserId, false);
-}
-
-export async function buildBetterAuthSessionCookieDescriptor(
-  actor: DevTestAuthActor,
-  secure: boolean
-) {
-  const ctx = await auth.$context;
-  const session = await ctx.internalAdapter.createSession(
-    actor.clerkUserId,
-    false
-  );
-  if (!session?.token) {
-    throw new Error(
-      'Better Auth performance session creation returned no token'
-    );
-  }
-
-  const signature = await makeSignature(session.token, ctx.secret);
-  const attributes = ctx.authCookies.sessionToken.attributes;
-  const configuredSameSite =
-    typeof attributes.sameSite === 'string'
-      ? attributes.sameSite.toLowerCase()
-      : 'lax';
-  const sameSite: 'lax' | 'strict' | 'none' =
-    configuredSameSite === 'strict' || configuredSameSite === 'none'
-      ? configuredSameSite
-      : 'lax';
-
-  return {
-    name: ctx.authCookies.sessionToken.name,
-    value: `${session.token}.${signature}`,
-    httpOnly: attributes.httpOnly ?? true,
-    maxAge: ctx.sessionConfig.expiresIn,
-    path: attributes.path ?? '/',
-    sameSite,
-    secure: secure || (attributes.secure ?? false),
-  };
 }
 
 export function buildDevTestAuthCookieDescriptors(

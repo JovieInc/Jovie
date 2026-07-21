@@ -15,6 +15,7 @@ import {
   buildLyricsRoute,
   resolveLyricsReturnRoute,
 } from '@/constants/routes';
+import { useAppFlag } from '@/lib/flags/client';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
@@ -23,6 +24,12 @@ import {
   resetAudioChromeSnapshot,
   setAudioChromeSnapshot,
 } from './audio-chrome-state';
+
+export type PersistentAudioBarVariant = 'legacy' | 'shellChatV1';
+
+interface PersistentAudioBarProps {
+  readonly variant?: PersistentAudioBarVariant;
+}
 
 const SHELL_AUDIO_BAR_TRANSITION =
   'max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)';
@@ -39,10 +46,13 @@ function isLyricsRoutePath(pathname: string | null): boolean {
   );
 }
 
-export function PersistentAudioBar() {
+export function PersistentAudioBar({
+  variant = 'legacy',
+}: Readonly<PersistentAudioBarProps>) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const designV1LyricsEnabled = useAppFlag('DESIGN_V1');
   const {
     playbackState,
     toggleTrack,
@@ -159,10 +169,12 @@ export function PersistentAudioBar() {
   ]);
 
   const activeTrackId = playbackState.activeTrackId;
-  const compactPlayerVisible = Boolean(activeTrackId) && barCollapsed;
+  const isShellAudioBar = variant === 'shellChatV1';
+  const compactPlayerVisible =
+    isShellAudioBar && Boolean(activeTrackId) && barCollapsed;
 
   useEffect(() => {
-    if (!activeTrackId) return;
+    if (variant !== 'shellChatV1' || !activeTrackId) return;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented || isFormElement(event.target)) return;
@@ -189,7 +201,12 @@ export function PersistentAudioBar() {
         return;
       }
 
-      if (key === 'l' && plainKey && playbackState.hasLyrics) {
+      if (
+        key === 'l' &&
+        plainKey &&
+        designV1LyricsEnabled &&
+        playbackState.hasLyrics
+      ) {
         event.preventDefault();
         handleOpenLyrics();
         return;
@@ -216,15 +233,17 @@ export function PersistentAudioBar() {
     return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, [
     activeTrackId,
+    designV1LyricsEnabled,
     handleCloseLyrics,
     handleOpenLyrics,
     handleToggle,
     pathname,
     playbackState.hasLyrics,
+    variant,
   ]);
 
   useEffect(() => {
-    if (!activeTrackId) {
+    if (!isShellAudioBar || !activeTrackId) {
       resetAudioChromeSnapshot();
       return;
     }
@@ -234,7 +253,7 @@ export function PersistentAudioBar() {
       compactPlayerVisible,
       fullPlayerVisible: !compactPlayerVisible,
     });
-  }, [activeTrackId, compactPlayerVisible]);
+  }, [activeTrackId, compactPlayerVisible, isShellAudioBar]);
 
   useEffect(() => {
     return resetAudioChromeSnapshot;
@@ -265,7 +284,7 @@ export function PersistentAudioBar() {
     playButtonIcon = <Pause className='h-3 w-3' />;
   }
 
-  const mobileBar = (className?: string) => (
+  const legacyBar = (className?: string) => (
     <section
       aria-label='Audio Player'
       className={cn(
@@ -357,11 +376,15 @@ export function PersistentAudioBar() {
     </section>
   );
 
+  if (variant === 'legacy') {
+    return legacyBar();
+  }
+
   const shellTrack: AudioBarTrack = {
     id: activeTrackId,
     title: playbackState.trackTitle ?? '',
     artist: playbackState.artistName ?? '',
-    hasLyrics: playbackState.hasLyrics,
+    hasLyrics: designV1LyricsEnabled && playbackState.hasLyrics,
   };
   const lyricsPath = buildLyricsRoute(activeTrackId);
   const nowPlayingTrack = {
@@ -420,7 +443,6 @@ export function PersistentAudioBar() {
                 : undefined
             }
             onCollapse={() => setBarCollapsed(true)}
-            onDismiss={stop}
             currentTime={playbackState.currentTime}
             duration={playbackState.duration}
             onSeek={seek}
@@ -428,7 +450,9 @@ export function PersistentAudioBar() {
             onToggleWaveform={() => setWaveformOn(current => !current)}
             lyricsActive={pathname === lyricsPath}
             onOpenLyrics={
-              playbackState.hasLyrics ? handleOpenLyrics : undefined
+              designV1LyricsEnabled && playbackState.hasLyrics
+                ? handleOpenLyrics
+                : undefined
             }
             track={shellTrack}
             className='min-w-0 px-0 py-0'
@@ -454,7 +478,7 @@ export function PersistentAudioBar() {
           transition: SHELL_AUDIO_BAR_TRANSITION,
         }}
       />
-      {mobileBar('lg:hidden')}
+      {legacyBar('lg:hidden')}
     </>
   );
 }

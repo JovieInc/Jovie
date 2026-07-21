@@ -37,32 +37,6 @@ export function prefetchForRoute(
         staleTime,
       });
       break;
-    case 'contacts':
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.contacts.list(profileId),
-        queryFn: ({ signal }) =>
-          fetchWithTimeout<DashboardContact[]>(
-            `/api/dashboard/contacts?profileId=${encodeURIComponent(profileId)}`,
-            { signal }
-          ),
-        staleTime,
-      });
-      break;
-    case 'calendar':
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.events.list(profileId),
-        queryFn: async () => {
-          const dates = await loadTourDates(profileId);
-          return dates.map(tourDateToEventRecord);
-        },
-        staleTime,
-      });
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.releases.matrix(profileId),
-        queryFn: () => loadReleaseMatrix(profileId),
-        staleTime,
-      });
-      break;
     case 'audience':
       // Audience uses cursor-based pagination — prefetch the first page
       queryClient.prefetchQuery({

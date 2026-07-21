@@ -11,7 +11,6 @@ import { resolveAppShellRouteFlagNames } from '@/lib/flags/route-snapshots';
 import { getAppFlagsSnapshot } from '@/lib/flags/server';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
-import type { AppShellMode } from '@/types/app-shell';
 import { DashboardLoadTracker } from './DashboardLoadTracker';
 import {
   getDashboardData,
@@ -42,12 +41,10 @@ import {
 export async function DashboardShellContent({
   userId,
   pathname,
-  mode,
   children,
 }: {
   readonly userId: string;
   readonly pathname: string | null;
-  readonly mode: AppShellMode;
   readonly children: React.ReactNode;
 }) {
   // Keep the shell fast on route-owned workspaces. Routes that fetch their own
@@ -95,7 +92,6 @@ export async function DashboardShellContent({
         <DashboardLoadTracker pathname={pathname} userId={userId} />
         <ProfileCompletionRedirect />
         <AuthShellWrapper
-          mode={mode}
           persistSidebarCollapsed={setSidebarCollapsed}
           sidebarDefaultOpen={sidebarDefaultOpen}
           previewPanelDefaultOpen={!useEssentialShell}

@@ -128,7 +128,7 @@ export async function copyAvatarToBlob(
     }
 
     const sharp = (await import('sharp')).default;
-    const baseImage = sharp(buffer, { failOn: 'none' })
+    const baseImage = sharp(buffer, { failOnError: false })
       .rotate()
       .withMetadata({ orientation: undefined });
 

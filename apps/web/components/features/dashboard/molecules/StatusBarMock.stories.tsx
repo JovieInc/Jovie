@@ -20,6 +20,6 @@ export const Default: Story = {};
 
 export const DarkSurface: Story = {
   args: {
-    className: 'bg-base text-primary-token border border-black/6',
+    className: 'bg-black text-white',
   },
 };

@@ -7,6 +7,7 @@
  * dashboard settings like sidebar collapse state.
  */
 
+import { eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidateTag,
@@ -37,8 +38,17 @@ export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
       throw new Error('Unauthorized');
     }
 
-    await withDbSession(async appUserId => {
-      // Upsert into user_settings — appUserId is already users.id (UUID)
+    await withDbSession(async clerkUserId => {
+      // Get DB user id
+      const [user] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, clerkUserId))
+        .limit(1);
+
+      if (!user?.id) throw new TypeError('User not found');
+
+      // Upsert into user_settings
       await db
         .insert(userSettings)
         .values({

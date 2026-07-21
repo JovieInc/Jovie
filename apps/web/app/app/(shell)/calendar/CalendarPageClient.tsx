@@ -24,7 +24,6 @@ import {
   rejectEvents,
   undoRejectEvent,
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
-import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -205,16 +204,10 @@ export function CalendarPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
   const queryClient = useQueryClient();
-  const {
-    data: releases,
-    isError: releasesError,
-    isLoading: isLoadingReleases,
-  } = useReleasesQuery(profileId);
-  const {
-    data: events,
-    isError: eventsError,
-    isLoading: isLoadingEvents,
-  } = useEventsQuery(profileId);
+  const { data: releases, isLoading: isLoadingReleases } =
+    useReleasesQuery(profileId);
+  const { data: events, isLoading: isLoadingEvents } =
+    useEventsQuery(profileId);
 
   const releasesByDay = useMemo<Map<string, ReleaseDot[]>>(() => {
     const map = new Map<string, ReleaseDot[]>();
@@ -422,7 +415,6 @@ export function CalendarPageClient() {
 
   return (
     <PageShell
-      data-testid='calendar-workspace'
       toolbar={
         <PageToolbar
           start={
@@ -461,10 +453,6 @@ export function CalendarPageClient() {
         />
       }
     >
-      <NavigationDestinationReady
-        destination='calendar'
-        ready={!isLoading && !releasesError && !eventsError}
-      />
       <PageContent>
         <div className='flex h-full min-h-0 flex-col gap-4'>
           <div className='flex flex-wrap items-center justify-between gap-2'>

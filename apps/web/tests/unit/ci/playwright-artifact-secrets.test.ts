@@ -86,7 +86,7 @@ const producerCounts: Record<string, number> = {
   'nightly-tests.yml': 4,
   'postdeploy-probes.yml': 1,
   'production-controller.yml': 1,
-  'production-release.yml': 3,
+  'production-release.yml': 2,
   'screenshots.yml': 1,
   'synthetic-monitoring.yml': 6,
   'visual-regression.yml': 5,
@@ -1176,10 +1176,6 @@ ${fixtureCheckout}
       'utf8'
     );
     const aliasJob = jobBlock(productionRelease, 'alias-staging');
-    const productionOauthJob = jobBlock(
-      productionRelease,
-      'production-oauth-gate'
-    );
     const oauthProbe = stepBlock(
       aliasJob,
       'Verify aliased staging OAuth redirect URIs'
@@ -1219,13 +1215,6 @@ ${fixtureCheckout}
     expect(oauthProbe).toContain(
       'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
     );
-    expect(oauthProbe).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
-    expect(productionOauthJob).toContain(
-      "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
-    );
-    expect(
-      productionRelease.match(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/g)
-    ).toHaveLength(3);
     const action = readFileSync(
       join(githubRoot, 'actions/upload-safe-playwright-artifact/action.yml'),
       'utf8'

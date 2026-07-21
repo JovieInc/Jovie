@@ -15,7 +15,7 @@ async function processArtworkInputBuffer(
   inputBuffer: Buffer
 ): Promise<Record<string, Buffer>> {
   const sharp = await getSharp();
-  const baseImage = sharp(inputBuffer, { failOn: 'none' })
+  const baseImage = sharp(inputBuffer, { failOnError: false })
     .rotate()
     .withMetadata({ orientation: undefined });
 

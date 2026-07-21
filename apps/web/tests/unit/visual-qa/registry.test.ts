@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
 import {
   getVisualQaSurface,
   listVisualQaSurfaces,
@@ -13,9 +14,11 @@ describe('visual-qa registry', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('keeps every baseline independent from retired shell overrides', () => {
+  it('pins design-v1 overrides on every surface baseline', () => {
     for (const surface of VISUAL_QA_SURFACES) {
-      expect(surface.baseline.flagOverrides).toBeUndefined();
+      expect(
+        surface.baseline.flagOverrides?.[APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]
+      ).toBe(true);
       expect(surface.baseline.route.startsWith('/')).toBe(true);
       expect(surface.baseline.waitFor.length).toBeGreaterThan(0);
       expect(surface.themes).toEqual(['dark', 'light']);
@@ -39,7 +42,9 @@ describe('visual-qa registry', () => {
     );
     expect(afterConfig.route).toBe(surface!.baseline.route);
     expect(afterConfig.colorScheme).toBe('light');
-    expect(afterConfig.flagOverrides).toEqual({});
+    expect(afterConfig.flagOverrides?.[APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]).toBe(
+      true
+    );
   });
 
   it('filters requested themes by surface support', () => {
