@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import {
   AlertCircle,
   AtSign,
@@ -11,6 +12,11 @@ import {
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import {
+  ATTACH_ACCOUNT_CTA_LABEL,
+  CONFIRM_HANDLE_CTA_LABEL,
+  NONE_OF_THESE_CTA_LABEL,
+} from '@/lib/chat/onboarding-script/widget-events';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
 import {
   type CanonicalArtistMetrics,
@@ -65,17 +71,13 @@ export interface ArtistConfirmedOutput {
 }
 
 export interface HandleCheckOutput {
-  readonly action?: 'check_handle';
+  readonly action?: 'check_handle' | 'handle_confirmed';
   readonly handle?: string;
-  readonly availability?: HandleAvailabilityResult;
 }
 
 export interface SocialLinkOutput {
-  readonly action?: 'propose_social_link';
+  readonly action?: 'propose_social_link' | 'social_attached';
   readonly url?: string | null;
-  readonly parseOk?: boolean;
-  readonly reason?: string;
-  readonly platform?: string;
 }
 
 export interface OnboardingArtistSelection {
@@ -135,6 +137,25 @@ export function formatGenreLabel(genre: string): string {
         .join('-')
     )
     .join(' ');
+}
+
+
+function selectionFromSpotifyResult(
+  artist: SpotifyArtistResult
+): OnboardingArtistSelection {
+  const metrics = normalizeArtistMetrics(
+    { followers: artist.followers },
+    { source: 'spotify_search' }
+  );
+  return {
+    id: artist.id,
+    name: artist.name,
+    url: artist.url,
+    imageUrl: artist.imageUrl ?? undefined,
+    followers: getDisplaySpotifyFollowers(metrics) ?? undefined,
+    metrics,
+    popularity: artist.popularity ?? undefined,
+  };
 }
 
 function formatFollowers(count: number | null | undefined): string | null {
@@ -296,11 +317,13 @@ export function OnboardingSpotifyArtistPickerCard({
   inputQuery,
   disabled = false,
   onSelectArtist,
+  onNoneOfThese,
 }: ToolArtifactProps & {
   readonly output?: ArtistPickerOutput | null;
   readonly inputQuery?: string | null;
   readonly disabled?: boolean;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
+  readonly onNoneOfThese?: () => void;
 }) {
   const initialQuery = output?.query ?? inputQuery ?? '';
   const [query, setQuery] = useState(initialQuery);
@@ -311,6 +334,13 @@ export function OnboardingSpotifyArtistPickerCard({
     minQueryLength: 1,
   });
   const { search, searchImmediate, clear } = artistSearch;
+
+  // Keep the field prefilled when the tool re-opens with a new query from chat.
+  useEffect(() => {
+    if (initialQuery && !query) {
+      setQuery(initialQuery);
+    }
+  }, [initialQuery, query]);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -437,6 +467,22 @@ export function OnboardingSpotifyArtistPickerCard({
             }}
           />
         ))}
+
+        {!isSearching && results.length > 0 && onNoneOfThese ? (
+          <Button
+            type='button'
+            variant='ghost'
+            onClick={() => {
+              if (disabled) return;
+              onNoneOfThese();
+            }}
+            disabled={disabled || selectedId !== null}
+            className='flex h-auto w-full items-center justify-center rounded-lg px-2.5 py-2 text-xs font-medium text-secondary-token hover:bg-white/[0.045] hover:text-primary-token'
+            data-testid='onboarding-artist-none-of-these'
+          >
+            {NONE_OF_THESE_CTA_LABEL}
+          </Button>
+        ) : null}
       </div>
     </div>
   );
@@ -453,7 +499,6 @@ function ArtistResultRow({
   readonly selected: boolean;
   readonly onSelect: () => void;
 }) {
-  // Canonical metrics so search rows cannot mix monthly listeners into followers.
   const metrics = normalizeArtistMetrics(
     { followers: artist.followers },
     { source: 'spotify_search' }
@@ -539,14 +584,19 @@ export function OnboardingArtistConfirmedCard({
 
 export function OnboardingHandleCheckCard({
   onHandleCandidateChange,
+  onConfirmHandle,
   state,
   output,
+  disabled = false,
 }: ToolArtifactProps & {
   readonly onHandleCandidateChange?: (handle: string | null) => void;
+  readonly onConfirmHandle?: (handle: string) => void;
   readonly output?: HandleCheckOutput | null;
+  readonly disabled?: boolean;
 }) {
   const handle = output?.handle?.replace(/^@/, '').toLowerCase() ?? null;
   const [draftHandle, setDraftHandle] = useState(handle ?? '');
+  const [confirmed, setConfirmed] = useState(false);
   const normalizedDraft = draftHandle.replace(/^@/, '').trim().toLowerCase();
   const availabilityQuery = useHandleAvailabilityQuery({
     handle: normalizedDraft || null,
@@ -585,52 +635,44 @@ export function OnboardingHandleCheckCard({
   }
 
   const loading = availabilityQuery.isLoading || availabilityQuery.isFetching;
-  // Single contract projection — never available+taken for the same handle.
   const availability = toHandleAvailabilityResult({
-    handle: normalizedDraft || handle,
+    handle: normalizedDraft || handle || '',
     available: loading ? null : (availabilityQuery.data?.available ?? null),
     error: availabilityQuery.data?.error,
     checking: loading,
-    suggestedAlternatives: output?.availability?.suggestedAlternatives,
   });
   const available =
-    availability.available && availability.reason === 'available';
-  const profilePath = availability.handle
-    ? `jov.ie/${availability.handle}`
-    : null;
+    availability.reason === 'checking' || availability.reason === 'unknown'
+      ? undefined
+      : availability.available;
+  const error = availability.error;
+  const profilePath = normalizedDraft ? `jov.ie/${normalizedDraft}` : null;
+  const canConfirm =
+    Boolean(normalizedDraft) &&
+    available === true &&
+    !loading &&
+    !disabled &&
+    !confirmed;
 
   return (
     <div
       className={cn(
         'w-full max-w-110 px-1 py-2 text-primary-token',
-        !available &&
-          availability.reason !== 'checking' &&
-          availability.reason !== 'unknown' &&
-          'text-error'
+        available === false && 'text-error'
       )}
       data-testid='onboarding-handle-check'
-      data-availability-reason={availability.reason}
-      role={
-        !available &&
-        availability.reason !== 'checking' &&
-        availability.reason !== 'unknown'
-          ? 'alert'
-          : 'status'
-      }
+      role={available === false ? 'alert' : 'status'}
     >
       <div className='flex items-start gap-3'>
         <span
           className={cn(
             'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-secondary-token',
             available && 'text-green-500',
-            !available &&
-              availability.reason !== 'checking' &&
-              availability.reason !== 'unknown' &&
-              'text-red-400'
+            available === false && 'text-red-400'
           )}
           aria-hidden
         >
-          {loading || availability.reason === 'checking' ? (
+          {loading ? (
             <Loader2 className='h-3.5 w-3.5 animate-spin motion-reduce:animate-none' />
           ) : available ? (
             <Check className='h-3.5 w-3.5' />
@@ -641,11 +683,10 @@ export function OnboardingHandleCheckCard({
         <div className='min-w-0 flex-1'>
           <div className='flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-sm leading-5 tracking-[-0.01em]'>
             <strong className='font-semibold text-primary-token'>
-              @{availability.handle || handle}
+              @{normalizedDraft || handle}
             </strong>
             <span className='text-secondary-token'>
-              {availability.reason === 'checking' ||
-              availability.reason === 'unknown'
+              {loading || available === undefined
                 ? 'is being checked'
                 : available
                   ? 'is available'
@@ -656,49 +697,47 @@ export function OnboardingHandleCheckCard({
             <span className='text-app text-tertiary-token' aria-hidden>
               @
             </span>
-            <span className='sr-only'>Edit proposed handle</span>
+            <span className='sr-only'>Edit Proposed Handle</span>
             <input
-              aria-label='Edit proposed handle'
+              aria-label='Edit Proposed Handle'
               value={draftHandle}
               onChange={event => setDraftHandle(event.target.value)}
               className='min-w-0 flex-1 bg-transparent px-0.5 text-app leading-5 text-primary-token placeholder:text-quaternary-token focus:outline-none'
-              placeholder='handle'
+              placeholder='Handle'
               inputMode='text'
               autoCapitalize='none'
               spellCheck={false}
+              disabled={disabled || confirmed}
             />
           </label>
           <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
-            {availability.error ??
-              (available
-                ? (profilePath ?? 'Edit the handle before it is claimed.')
-                : availability.reason === 'checking' ||
-                    availability.reason === 'unknown'
-                  ? (profilePath ?? 'Checking availability…')
-                  : 'Try a sharper variant.')}
+            {error ??
+              (available === false
+                ? availability.suggestedAlternatives &&
+                  availability.suggestedAlternatives.length > 0
+                  ? `${SUGGESTED_AVAILABLE_HANDLE_LABEL}: @${availability.suggestedAlternatives[0]}`
+                  : 'Try a sharper variant.'
+                : (profilePath ?? 'Edit the handle before it is claimed.'))}
           </p>
-          {!available &&
-          availability.suggestedAlternatives &&
-          availability.suggestedAlternatives.length > 0 ? (
-            <ul
-              className='mt-2 space-y-1'
-              data-testid='onboarding-handle-suggestions'
+          {onConfirmHandle ? (
+            <Button
+              type='button'
+              data-testid='onboarding-confirm-handle'
+              disabled={!canConfirm}
+              onClick={() => {
+                if (!canConfirm || !normalizedDraft) return;
+                setConfirmed(true);
+                onConfirmHandle(normalizedDraft);
+              }}
+              className={cn(
+                'mt-3 h-9 rounded-full px-3.5 text-app font-semibold',
+                canConfirm
+                  ? 'bg-white text-black hover:bg-white/90 dark:bg-white dark:text-black'
+                  : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
+              )}
             >
-              {availability.suggestedAlternatives.map(suggestion => (
-                <li key={suggestion} className='text-xs leading-5'>
-                  <span className='text-secondary-token'>
-                    {SUGGESTED_AVAILABLE_HANDLE_LABEL}:{' '}
-                  </span>
-                  <button
-                    type='button'
-                    className='font-medium text-primary-token underline-offset-2 hover:underline focus-visible:outline-none'
-                    onClick={() => setDraftHandle(suggestion)}
-                  >
-                    @{suggestion}
-                  </button>
-                </li>
-              ))}
-            </ul>
+              {confirmed ? 'Handle Confirmed' : CONFIRM_HANDLE_CTA_LABEL}
+            </Button>
           ) : null}
         </div>
       </div>
@@ -709,9 +748,21 @@ export function OnboardingHandleCheckCard({
 export function OnboardingSocialLinkCard({
   state,
   output,
+  onAttachAccount,
+  disabled = false,
 }: ToolArtifactProps & {
   readonly output?: SocialLinkOutput | null;
+  readonly onAttachAccount?: (url: string) => void;
+  readonly disabled?: boolean;
 }) {
+  const initialUrl = output?.url ?? '';
+  const [draftUrl, setDraftUrl] = useState(initialUrl);
+  const [attached, setAttached] = useState(false);
+
+  useEffect(() => {
+    if (initialUrl) setDraftUrl(initialUrl);
+  }, [initialUrl]);
+
   if (isFailed(state)) {
     return (
       <StatusShell
@@ -734,31 +785,72 @@ export function OnboardingSocialLinkCard({
     );
   }
 
-  // Reject incomplete parses (bare instagram.com, missing account path).
-  const rawUrl = output?.url ?? null;
-  const parseOk = output?.parseOk !== false;
-  const parsed = rawUrl && parseOk ? parseSocialLinkInput(rawUrl) : null;
-
-  if (!rawUrl || !parseOk || !parsed || !parsed.ok) {
-    return (
-      <StatusShell
-        icon={<AlertCircle className='h-3.5 w-3.5' />}
-        title='Link needs a full profile URL'
-        body='Use a full URL with your account path — for example https://instagram.com/yourhandle.'
-        tone='error'
-      />
-    );
-  }
-
-  const host = hostnameFor(parsed.url);
+  const trimmed = draftUrl.trim();
+  const host = hostnameFor(trimmed || undefined);
+  const canAttach =
+    Boolean(trimmed) &&
+    Boolean(host) &&
+    !disabled &&
+    !attached &&
+    Boolean(onAttachAccount);
 
   return (
-    <StatusShell
-      icon={<Link2 className='h-3.5 w-3.5' />}
-      title='Link ready to attach'
-      body={host ?? parsed.url}
-      tone='success'
-    />
+    <div
+      className='w-full max-w-110 px-1 py-2 text-primary-token'
+      data-testid='onboarding-social-link'
+      role='status'
+    >
+      <div className='flex items-start gap-3'>
+        <span
+          className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-secondary-token'
+          aria-hidden
+        >
+          <Link2 className='h-3.5 w-3.5' />
+        </span>
+        <div className='min-w-0 flex-1'>
+          <p className='text-sm font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
+            {host ? 'Link ready to attach' : 'Attach a public social account'}
+          </p>
+          <label className='mt-2 flex h-9 items-center rounded-lg border border-subtle bg-surface-0 px-2.5 focus-within:border-white/[0.16] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.035)]'>
+            <span className='sr-only'>Social Profile URL</span>
+            <input
+              aria-label='Social Profile URL'
+              value={draftUrl}
+              onChange={event => setDraftUrl(event.target.value)}
+              className='min-w-0 flex-1 bg-transparent text-app leading-5 text-primary-token placeholder:text-quaternary-token focus:outline-none'
+              placeholder='https://instagram.com/yourname'
+              inputMode='url'
+              autoCapitalize='none'
+              spellCheck={false}
+              disabled={disabled || attached}
+            />
+          </label>
+          <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
+            {host ?? 'Paste the full URL fans already use.'}
+          </p>
+          {onAttachAccount ? (
+            <Button
+              type='button'
+              data-testid='onboarding-attach-account'
+              disabled={!canAttach}
+              onClick={() => {
+                if (!canAttach || !trimmed) return;
+                setAttached(true);
+                onAttachAccount(trimmed);
+              }}
+              className={cn(
+                'mt-3 h-9 rounded-full px-3.5 text-app font-semibold',
+                canAttach
+                  ? 'bg-white text-black hover:bg-white/90 dark:bg-white dark:text-black'
+                  : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
+              )}
+            >
+              {attached ? 'Account Attached' : ATTACH_ACCOUNT_CTA_LABEL}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -768,26 +860,4 @@ export function useArtistSelectionMessage() {
       `I picked ${artist.name} on Spotify. Let's build my artist profile from that match.`,
     []
   );
-}
-
-/**
- * Normalize a search-result artist into the onboarding selection shape with
- * canonical metrics so downstream rail/chat use the same follower field.
- */
-export function selectionFromSpotifyResult(
-  artist: SpotifyArtistResult
-): OnboardingArtistSelection {
-  const metrics = normalizeArtistMetrics(
-    { followers: artist.followers },
-    { source: 'spotify_search' }
-  );
-  return {
-    id: artist.id,
-    name: artist.name,
-    url: artist.url,
-    imageUrl: artist.imageUrl,
-    followers: getDisplaySpotifyFollowers(metrics) ?? undefined,
-    metrics,
-    popularity: artist.popularity,
-  };
 }

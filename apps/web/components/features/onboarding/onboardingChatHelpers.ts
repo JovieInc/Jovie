@@ -3,14 +3,6 @@
 
 import { type UIMessage } from 'ai';
 import type { MessagePart } from '@/components/jovie/types';
-import {
-  type CanonicalArtistMetrics,
-  getDisplaySpotifyFollowers,
-  normalizeArtistMetrics,
-  pickPreferredArtistMetrics,
-} from '@/lib/onboarding/canonical-metrics';
-import { normalizeHandleCandidate } from '@/lib/onboarding/handle-availability';
-import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import { type CheckoutCardPayload } from './ChatProposeCheckoutCard';
 import { type NextStepCardPayload } from './ChatProposeNextStepCard';
 import type {
@@ -153,63 +145,16 @@ export function getOnboardingErrorMessage(message: string): string {
   return message;
 }
 
-function metricsFromSelection(
-  artist: OnboardingArtistSelection
-): CanonicalArtistMetrics {
-  return normalizeArtistMetrics(
-    {
-      followers: artist.followers,
-      spotifyFollowers: artist.metrics?.spotifyFollowers,
-      monthlyListeners: artist.metrics?.monthlyListeners,
-    },
-    { source: artist.metrics?.source ?? 'spotify_search' }
-  );
-}
-
-function metricsFromConfirmed(
-  output: ArtistConfirmedOutput
-): CanonicalArtistMetrics | null {
-  const artist = output.artist;
-  if (!artist && !output.metrics) return null;
-
-  const fromTopLevel = output.metrics
-    ? normalizeArtistMetrics(output.metrics, {
-        source: output.metrics.source ?? 'tool_output',
-      })
-    : null;
-  const fromArtist = artist
-    ? normalizeArtistMetrics(
-        {
-          followers: artist.followers,
-          spotifyFollowers: artist.metrics?.spotifyFollowers,
-          monthlyListeners: artist.metrics?.monthlyListeners,
-        },
-        { source: artist.metrics?.source ?? 'tool_output' }
-      )
-    : null;
-
-  return (
-    pickPreferredArtistMetrics(fromTopLevel, fromArtist) ??
-    normalizeArtistMetrics(
-      { followers: artist?.followers },
-      { source: 'tool_output' }
-    )
-  );
-}
-
 export function artistFromSelection(
   artist: OnboardingArtistSelection | null
 ): OnboardingProfileArtist | null {
   if (!artist) return null;
-  const metrics = metricsFromSelection(artist);
-  const followers = getDisplaySpotifyFollowers(metrics);
   return {
     id: artist.id,
     name: artist.name,
     url: artist.url,
     imageUrl: artist.imageUrl ?? null,
-    followers,
-    metrics,
+    followers: artist.followers ?? null,
     popularity: artist.popularity ?? null,
     genres: [],
     dspMatches: [
@@ -228,15 +173,12 @@ export function artistFromConfirmedOutput(
 ): OnboardingProfileArtist | null {
   const artist = output.artist;
   if (!artist) return null;
-  const metrics = metricsFromConfirmed(output);
-  const followers = getDisplaySpotifyFollowers(metrics);
   return {
     id: artist.id,
     name: artist.name,
     url: artist.url,
     imageUrl: artist.imageUrl ?? null,
-    followers,
-    metrics: metrics ?? undefined,
+    followers: artist.followers ?? null,
     popularity: artist.popularity ?? null,
     genres: artist.genres ?? [],
     dspMatches: [
@@ -252,7 +194,7 @@ export function artistFromConfirmedOutput(
 }
 
 export function cleanHandle(handle: string | undefined): string | null {
-  const cleaned = normalizeHandleCandidate(handle);
+  const cleaned = handle?.replace(/^@/, '').trim().toLowerCase();
   return cleaned || null;
 }
 
@@ -269,7 +211,6 @@ export function deriveProfileBuilderState({
   let artistConfirmed = false;
   let handle: string | null = null;
   const socialLinks: string[] = [];
-  const seenSocial = new Set<string>();
 
   for (const message of messages) {
     for (const part of getToolParts(message)) {
@@ -277,22 +218,7 @@ export function deriveProfileBuilderState({
 
       if (isArtistConfirmedOutput(output)) {
         const confirmedArtist = artistFromConfirmedOutput(output);
-        if (confirmedArtist && artist?.metrics) {
-          // Prefer confirmed metrics over search so rail + chat agree.
-          const preferred = pickPreferredArtistMetrics(
-            confirmedArtist.metrics,
-            artist.metrics
-          );
-          artist = {
-            ...confirmedArtist,
-            metrics: preferred ?? confirmedArtist.metrics,
-            followers: getDisplaySpotifyFollowers(
-              preferred ?? confirmedArtist.metrics
-            ),
-          };
-        } else {
-          artist = confirmedArtist ?? artist;
-        }
+        artist = confirmedArtist ?? artist;
         artistConfirmed =
           Boolean(confirmedArtist) || Boolean(output.spotifyArtistId);
       }
@@ -302,13 +228,7 @@ export function deriveProfileBuilderState({
       }
 
       if (isSocialLinkOutput(output) && output.url) {
-        // Only attach complete social URLs (never bare instagram.com).
-        if (output.parseOk === false) continue;
-        const parsed = parseSocialLinkInput(output.url);
-        if (!parsed.ok) continue;
-        if (seenSocial.has(parsed.url)) continue;
-        seenSocial.add(parsed.url);
-        socialLinks.push(parsed.url);
+        socialLinks.push(output.url);
       }
     }
   }
