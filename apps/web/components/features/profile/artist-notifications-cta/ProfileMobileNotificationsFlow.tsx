@@ -91,8 +91,11 @@ const FLOW_TRANSITION = {
   ease: [0.22, 1, 0.36, 1] as const,
 };
 
-const CAPTURE_CONSENT_COPY =
-  'By submitting, you agree to receive updates from this artist and Jovie. Reply STOP to opt out. Message and data rates may apply.';
+const CAPTURE_CONSENT_COPY: Record<'email' | 'sms', string> = {
+  email:
+    'By submitting, you agree to receive email updates from this artist and Jovie. Unsubscribe anytime.',
+  sms: 'By submitting, you agree to receive text updates from this artist and Jovie. Reply STOP to opt out. Message and data rates may apply.',
+};
 
 const PREFERENCE_META: Record<
   Extract<NotificationContentType, 'newMusic' | 'tourDates' | 'merch'>,
@@ -511,8 +514,8 @@ export function ProfileMobileNotificationsFlow({
                   {error}
                 </p>
               ) : null}
-              <p className='text-xs leading-4 text-white/42'>
-                {CAPTURE_CONSENT_COPY}
+              <p className='text-xs leading-4 text-tertiary-token'>
+                {CAPTURE_CONSENT_COPY[isSms ? 'sms' : 'email']}
               </p>
               <div className='flex items-center justify-between gap-3'>
                 <button
@@ -831,7 +834,9 @@ export function ProfileMobileNotificationsFlow({
 
   const contentBody = (
     <>
-      <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.055),transparent_42%)]' />
+      {presentation === 'inline' ? null : (
+        <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.055),transparent_42%)]' />
+      )}
 
       <div
         className={cn(
@@ -925,8 +930,10 @@ export function ProfileMobileNotificationsFlow({
         </div>
       </div>
     ) : (
+      // Inline: transparent so the sheet sits on the page's own surface with
+      // no rounded seam against a mismatched background token.
       <div
-        className='relative flex h-full min-h-full flex-1 flex-col rounded-(--profile-card-radius) bg-[color:var(--profile-stage-bg)] dark:text-white'
+        className='relative flex h-full min-h-full flex-1 flex-col dark:text-white'
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}

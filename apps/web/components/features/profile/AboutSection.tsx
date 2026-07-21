@@ -2,14 +2,21 @@
 
 import { Calendar, Download, Home, MapPin } from 'lucide-react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import type { Artist } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
+import { EntityMentionText } from './EntityMentionText';
 
 interface AboutSectionProps {
   readonly artist: Artist;
   readonly genres?: string[] | null;
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
+  /**
+   * Optional entity-linked segments for `artist.tagline` (computed
+   * server-side). Falls back to plain text when omitted.
+   */
+  readonly bioSegments?: readonly EntityMentionSegment[];
 }
 
 function sanitizeFilename(value: string): string {
@@ -59,6 +66,7 @@ export function AboutSection({
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
+  bioSegments,
 }: AboutSectionProps) {
   const hasBio = Boolean(artist.tagline);
   const hasLocation = Boolean(artist.location);
@@ -89,7 +97,11 @@ export function AboutSection({
 
       {hasBio && (
         <p className='text-sm font-book leading-relaxed text-white/70 whitespace-pre-line'>
-          {artist.tagline}
+          {bioSegments ? (
+            <EntityMentionText segments={bioSegments} />
+          ) : (
+            artist.tagline
+          )}
         </p>
       )}
 
