@@ -52,7 +52,7 @@
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);
   --avatar-size: clamp(88px, 22vw, 144px);
-  --cover-height: clamp(300px, min(94vw, 46svh), 430px);
+  --cover-height: clamp(220px, 34svh, 400px);
   --content-max: 720px;
   --profile-bottom-nav-height: calc(
     3.125rem +
@@ -205,7 +205,7 @@
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);
   --avatar-size: clamp(88px, 22vw, 144px);
-  --cover-height: clamp(300px, min(94vw, 46svh), 430px);
+  --cover-height: clamp(220px, 34svh, 400px);
   --content-max: 720px;
 }
 
@@ -328,6 +328,101 @@
   );
 }
 
+/* Single hero legibility gradient, limited to the bottom ~55% of the cover so
+   the artist photo stays clearly visible in the upper zone. Replaces the old
+   stacked full-height scrims (profile-cover-home-gradient +
+   profile-cover-home-fade) that darkened the whole photo. */
+:where(.profile-cover-home-gradient) {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 55%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(3, 4, 6, 0.42) 52%,
+    rgba(5, 6, 8, 0.9) 86%,
+    var(--profile-stage-bg) 100%
+  );
+}
+
+/* Profile home carousel card geometry: one 3:4 shape that fills the remaining
+   viewport height. Width derives from height via aspect-ratio; the max-height
+   cap keeps width at or under ~78vw (width = 0.75 × height). Cards center
+   vertically when the track is taller than the capped card height. */
+:where(.profile-entity-card) {
+  aspect-ratio: 3 / 4;
+  height: 100%;
+  max-height: 104vw;
+  align-self: center;
+  /* Size container so card content can respond to the card's own height. */
+  container-type: size;
+  transition:
+    transform var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
+    opacity var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
+}
+
+/* Unified card anatomy: the art zone is a full-width square, so the text
+   zone + CTA share (card height − card width). Progressive disclosure keeps
+   every line whole instead of clipping mid-line: the meta line hides below
+   the height where it fits (~448px), and the eyebrow hides below the height
+   where it fits next to the title (~360px) — title and CTA always fit. */
+@container (max-height: 447px) {
+  :where(.profile-entity-card) .entity-card-meta {
+    display: none;
+  }
+}
+
+@container (max-height: 359px) {
+  :where(.profile-entity-card) .entity-card-eyebrow {
+    display: none;
+  }
+}
+
+/* Scroll-driven edge treatment (transform/opacity only; applied via
+   IntersectionObserver and skipped entirely under reduced motion). */
+:where(.profile-entity-card[data-edge="true"]) {
+  transform: scale(0.96);
+  opacity: 0.75;
+}
+
+/* Chromeless top-chrome icon buttons (back / overflow menu): glyph-only by
+   default, with a legibility drop-shadow so the glyph reads over hero media on
+   touch devices that never hover. The pearl circle reveals on hover /
+   focus-visible only. Unlayered on purpose so it beats the layered variant
+   utilities on the same element. */
+.profile-top-chrome-icon {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--profile-status-pill-fg);
+}
+
+.profile-top-chrome-icon > svg {
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.72))
+    drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
+}
+
+@media (hover: hover) {
+  .profile-top-chrome-icon:hover {
+    border-color: var(--profile-pearl-border);
+    background: var(--profile-pearl-bg);
+    box-shadow: var(--profile-pearl-shadow);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+}
+
+.profile-top-chrome-icon:focus-visible {
+  border-color: var(--profile-pearl-border);
+  background: var(--profile-pearl-bg);
+  box-shadow: var(--profile-pearl-shadow);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
 :where(.profile-horizontal-rail) {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -377,6 +472,26 @@
 :where(.profile-aeo-content__source:hover) {
   color: var(--profile-aeo-text);
   text-decoration-color: var(--profile-aeo-text);
+}
+
+:where(.profile-aeo-content__facts) {
+  border-color: var(--profile-aeo-border);
+}
+
+:where(.profile-aeo-content__fact-value) {
+  color: var(--profile-aeo-text);
+}
+
+:where(.profile-aeo-content__fact-label),
+:where(.profile-aeo-content__link-label),
+:where(.profile-aeo-content__link),
+:where(.profile-aeo-content__share) {
+  color: var(--profile-aeo-muted);
+}
+
+:where(.profile-aeo-content__link:hover),
+:where(.profile-aeo-content__share:hover) {
+  color: var(--profile-aeo-text);
 }
 
 :where(.profile-aeo-claim-card) {
@@ -441,16 +556,10 @@
   }
 }
 
-/* Compact mobile home hero: reserve room for the showcase release card below.
-   On short viewports (≤820px tall) cap the cover at 190px so the bento card
-   stays above the fold (profile-mobile-viewport-stability). Media crops via
-   object-cover; content below the hero scrolls. */
-[data-testid="profile-compact-surface"][data-mode="profile"] {
-  @media (max-height: 820px) {
-    --cover-height: 190px;
-  }
-}
-
+/* Compact mobile home hero: one definite token-driven height on every
+   viewport (--cover-height, clamp(220px, 34svh, 400px)). The hero never
+   shrink-wraps; media crops via object-cover and the carousel below owns the
+   remaining viewport height. */
 /* Query-mode profile URLs are served from the ISR home shell, then hydrate into
    the requested mode from window.location. Match the mode header on first paint
    so hydration does not move the compact profile frame. */
@@ -480,9 +589,6 @@ html[data-profile-initial-mode]
   .profile-cover-home-gradient,
 html[data-profile-initial-mode]
   [data-testid="profile-compact-surface"][data-mode="profile"]
-  .profile-cover-home-fade,
-html[data-profile-initial-mode]
-  [data-testid="profile-compact-surface"][data-mode="profile"]
   [data-testid="profile-hero-identity-block"] {
   display: none !important;
 }
@@ -495,7 +601,10 @@ html[data-profile-initial-mode]
 
 @media (min-width: 768px) {
   .public-profile-compact-shell {
-    --cover-height: 340px;
+    /* Proportional hero: on short desktop windows the shell shrinks below
+       740px and a fixed 340px hero would crush the carousel to a sliver.
+       Share the shell height instead (45%, floored at 200px). */
+    --cover-height: clamp(200px, 45%, 340px);
     height: min(740px, calc(100dvh - (var(--page-pad) * 2)));
   }
 }
@@ -4954,6 +5063,31 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     var(--jovie-entity-accent) 82%,
     var(--color-text-primary-token) 18%
   );
+}
+
+/* Inline entity links in public profile bio/AEO copy. The entity-kind accent
+   is provided via the `--jovie-entity-accent` custom property on the link. */
+.profile-entity-mention {
+  color: var(--jovie-entity-accent);
+  text-decoration-color: color-mix(
+    in srgb,
+    var(--jovie-entity-accent) 45%,
+    transparent
+  );
+  transition:
+    color var(--system-b-duration-fast) var(--system-b-ease),
+    text-decoration-color var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+.profile-entity-mention:hover,
+.profile-entity-mention:focus-visible {
+  text-decoration-color: var(--jovie-entity-accent);
+}
+
+.profile-entity-mention:focus-visible {
+  outline: 2px solid var(--jovie-entity-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .system-b-assistant-skill-mention {
