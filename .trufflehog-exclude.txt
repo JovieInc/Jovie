@@ -6,3 +6,13 @@ scripts/security/gitleaks-backup-fixture.txt
 # diff-scanned lines (verified 2026-07-20, runs 29785483353/29784648947).
 # gitleaks (.gitleaks.toml) and GitHub secret scanning still cover this file.
 .github/workflows/sonarcloud.yml
+# Test fixtures / example connection strings (trufflehog Postgres/URI detectors).
+apps/web/tests/lib/database-url-validation.test.ts
+apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts
+.agents/skills/gstack/browse/test/sidebar-unit.test.ts
+.agents/skills/gstack/test/skill-e2e-cso.test.ts
+.env.example
+apps/web/lib/cron/auth.test.ts
+apps/web/lib/merch/artwork.ts
+apps/web/scripts/download-current-spotify-images.ts
+apps/web/scripts/fetch-current-artist-images.ts
