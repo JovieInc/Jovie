@@ -12,7 +12,7 @@ vi.mock('@/features/home/HomepageLabelLogoMark', () => ({
   ),
 }));
 
-vi.mock('@/features/home/MarketingSurfaceCard', () => ({
+vi.mock('@/components/marketing/MarketingSurfaceCard', () => ({
   MarketingSurfaceCard: () => (
     <div data-testid='operating-system-task-surface'>tasks</div>
   ),

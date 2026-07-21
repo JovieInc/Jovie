@@ -33,7 +33,7 @@ Jovie historically used two related but distinct design systems based on surface
 | Public profiles | System B (public variant) | Expressive but product-native | `[username]/*` |
 | Legal / informational | System A (calmer variant) | Clean, readable | `(dynamic)/legal/*` |
 
-**Decision tree:** Selling/explaining (blog, pricing, legal) → System A. Everything else (homepage, auth, app, profiles) → System B.
+**Decision tree:** Everything → System B. Marketing/selling surfaces (blog, pricing, legal) use the editorial marketing language on System B tokens — System A is retired (founder-directed 2026-06-18, see banner above).
 
 Migration status: homepage migrated 2026-04-22; pricing, download, launch, artist-notifications, and pay since. **Full System A retirement is now in progress (founder-directed 2026-06-18), superseding the earlier 3-month deferral.** Remaining holdouts being reskinned onto System B tokens: `(marketing)/{about, ai, artist-profile, artist-profiles, blog, changelog, compare/[slug], alternatives/[slug], support, investors, voice, new}` and `(dynamic)/legal/*`. Each surface ships with its own `*-system-b-style-guard` test, and a global ratchet keeps the holdout list shrink-only.
 
@@ -363,7 +363,7 @@ These colors differentiate features in bento grids and semantic indicators. They
 **Usage rules:**
 - Apply accent color to feature card **title text only** via `text-[color:var(--accent-*)]`
 - Never use accent colors on CTAs, brand identity, icon backgrounds, or decorative elements
-- Feature accents are defined in `design-system.css` (lines 136-151 light, 362-377 dark, 816-823 aliases)
+- Feature accents are defined in `design-system.css` (lines 572-588 light, 840-856 dark, 1395-1401 aliases)
 
 ### Gray Scale (Radix-style)
 
@@ -852,7 +852,7 @@ The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical examp
 | 2026-03-23 | Stay on OKLCH color space | Linear uses LCH for rendering but OKLCH-like generation; OKLCH is more modern and positions us for theme generation |
 | 2026-03-23 | Theme base hue: 282 | Match Linear's March 2026 refresh (shifted from 272) |
 | 2026-03-23 | Font weight book: 450 | Linear's default UI weight (was incorrectly set to 400) |
-| 2026-03-23 | Two accent colors: #7170ff (app) + #5E6AD2 (marketing CTA) | Linear uses different accent colors for app vs marketing surfaces |
+| 2026-03-23 | Two accent colors: #7170ff (app) + #5E6AD2 (marketing CTA) | Linear uses different accent colors for app vs marketing surfaces. **Superseded 2026-04-11** by the neutral-CTA rule ("No brand color (Apple approach)"): CTAs are white-on-black; accent colors are supporting cast for feature differentiation only. |
 | 2026-03-23 | Marketing always dark | Linear's marketing pages are dark-only; System A follows this |
 | 2026-03-25 | Remove `color-mix()` from content surfaces | Flat `var(--linear-app-content-surface)` renders more cleanly and avoids compositing artifacts |
 | 2026-03-25 | Right panel inside `<main>` content card | Matches Linear's unified card layout — sidebar and panel share one card with a thin left-border divider |

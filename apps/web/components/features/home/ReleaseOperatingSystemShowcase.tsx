@@ -1,11 +1,11 @@
 import { Radar } from 'lucide-react';
+import { MarketingSurfaceCard } from '@/components/marketing/MarketingSurfaceCard';
 import { AiDemo } from '@/features/home/AiDemo';
 import { HomepageLabelLogoMark } from '@/features/home/HomepageLabelLogoMark';
 import {
   HOME_OPERATING_MONITORING_SIGNALS,
   HOME_RELEASE_AI_CONTEXT,
 } from '@/features/home/home-surface-seed';
-import { MarketingSurfaceCard } from '@/features/home/MarketingSurfaceCard';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 const RELEASE_TASKS_IMAGE = getMarketingExportImage('release-tasks-desktop');

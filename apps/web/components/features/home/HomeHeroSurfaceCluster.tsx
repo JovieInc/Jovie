@@ -1,7 +1,7 @@
 import { CheckCircle2, Circle } from 'lucide-react';
+import { MarketingSurfaceCard } from '@/components/marketing/MarketingSurfaceCard';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { HOME_HERO_TASKS } from './home-surface-seed';
-import { MarketingSurfaceCard } from './MarketingSurfaceCard';
 
 const HERO_PROFILE_IMAGE = getMarketingExportImage(
   'tim-white-profile-listen-mobile'
