@@ -74,6 +74,7 @@ Known gaps (recorded, not Phase 1 work):
 
 - `packages/ui` has ~37 atom components but only 11 story files.
 - The `apps/web/.storybook/main.ts` stories glob (`../components/**/*.stories.*`) does not pick up `packages/ui` stories.
+- Two app-level composite tables — `Dashboard/Organisms/DashboardAudienceTable` and `Admin/Tables/CreatorProfiles` (virtualization stories) — are temporarily excluded from Chromatic capture (`chromatic: { disableSnapshot: true }`) because capture fails in Chromatic's sandboxed environment on unsettled table data fetching; re-enable once Phase 2 deterministic fixtures land (JOV-4359).
 
 Direction is a ratchet: coverage percentage only goes up. New components never ship below the bar; existing gaps burn down in Phase 2.
 
