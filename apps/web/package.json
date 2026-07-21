@@ -208,6 +208,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@jovie/audio-contracts": "workspace:*",
     "@floating-ui/react": "^0.27.19",
     "@headlessui/react": "^2.2.10",
     "@jovie/auth-routing": "workspace:*",
