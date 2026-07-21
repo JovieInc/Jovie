@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Press kit share drops support multi-asset sets:** from Library, artists can curate multiple releases into one branded drop link, with explicit Include comment and Allow downloads toggles, layouts, passphrase, and expiry (GitHub #10388).
 - **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; it uses the build-time release version from build-info, or omits the version when unavailable.
 - **Entity mention hover cards now use the same rich entity card as the chat rail:** hovering an inline release, artist, track, or event mention opens the canonical compact EntityCard instead of a one-off popover layout.
 - **Chat tool activity is quieter and indented:** agent tool-call rows sit one rhythm step in from assistant prose with secondary color and book weight, so narrative stays primary and consecutive steps form a quiet run.
