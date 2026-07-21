@@ -314,7 +314,7 @@ test.describe('canonical /start onboarding chat', () => {
       )
     ).toBeVisible();
     await expect(page.locator(CHAT_PANEL)).toBeVisible();
-    await expect(page.getByTestId('chat-empty-state-logo')).toBeVisible();
+    // The resolved empty state renders the intro + centered composer (no logo).
     await expect(
       page.getByTestId('chat-empty-state-centered-composer')
     ).toBeVisible();
@@ -372,7 +372,10 @@ test.describe('canonical /start onboarding chat', () => {
     await page.setViewportSize({ width: 615, height: 407 });
     await page.goto('/start', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
-    await expect(page.getByTestId('chat-empty-state-logo')).toBeVisible();
+    // The resolved empty state renders the intro + centered composer (no logo).
+    await expect(
+      page.getByTestId('chat-empty-state-centered-composer')
+    ).toBeVisible();
 
     const textarea = page.locator(COMPOSER_TEXTAREA);
     await textarea.fill('/feed');
