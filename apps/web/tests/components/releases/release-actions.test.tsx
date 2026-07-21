@@ -87,7 +87,7 @@ describe('buildReleaseActions', () => {
 
     expect(items[0]).toMatchObject({
       id: 'edit',
-      label: 'Edit Release Links',
+      label: 'Edit release links',
     });
     expect(items[1]).toEqual({ type: 'separator' });
     expect(separators).toHaveLength(1);
