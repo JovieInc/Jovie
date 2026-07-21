@@ -15,8 +15,14 @@
 
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import {
+  buildAuthorityPageDraft,
+  isAuthorityPagePlatform,
+  type ClaimedGraphContext,
+} from '@/lib/authority';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
+import { AUTHORITY_CREATE_PAGE_KIND } from '@/lib/connectors/playbooks/authority-page-gap-detector';
 import {
   enqueueApprovedActionWorkflow,
   recoverOrphanedApprovedAction,
@@ -33,6 +39,72 @@ type BookingPayload = {
   endsAt?: string;
   timeZone?: string;
 };
+
+type AuthorityCreatePagePayload = {
+  platform?: unknown;
+  artistName?: unknown;
+  graphContext?: ClaimedGraphContext;
+  humanGateRequired?: unknown;
+};
+
+function isCalendarActionKind(kind: string | null | undefined): boolean {
+  if (typeof kind !== 'string' || kind.length === 0) return false;
+  return kind === 'calendar.create_event' || kind.startsWith('calendar.');
+}
+
+/**
+ * Authority create-page approvals draft (never publish). Wikipedia stays
+ * human-gated; Fandom/Genius drafts are agent-assisted copy for the artist.
+ */
+async function completeAuthorityCreatePageApproval(input: {
+  readonly approvalId: string;
+  readonly userId: string;
+  readonly payload: unknown;
+}): Promise<{
+  readonly draft: ReturnType<typeof buildAuthorityPageDraft>;
+  readonly humanGateRequired: boolean;
+}> {
+  const raw = (input.payload ?? {}) as AuthorityCreatePagePayload;
+  const platform = isAuthorityPagePlatform(raw.platform)
+    ? raw.platform
+    : 'fandom';
+  const artistName =
+    typeof raw.artistName === 'string' && raw.artistName.trim().length > 0
+      ? raw.artistName.trim()
+      : typeof raw.graphContext?.artistName === 'string'
+        ? raw.graphContext.artistName.trim()
+        : 'Artist';
+
+  const graphContext: ClaimedGraphContext = {
+    ...(raw.graphContext ?? {}),
+    artistName,
+  };
+
+  const draft = buildAuthorityPageDraft(platform, graphContext);
+
+  await db
+    .update(suggestedActions)
+    .set({
+      status: 'executed',
+      executedAt: new Date(),
+      executionResult: {
+        kind: AUTHORITY_CREATE_PAGE_KIND,
+        draft,
+        published: false,
+        humanGateRequired: draft.humanGateRequired,
+        createUrl: draft.createUrl,
+      },
+    })
+    .where(
+      and(
+        eq(suggestedActions.id, input.approvalId),
+        eq(suggestedActions.userId, input.userId),
+        eq(suggestedActions.status, 'approved')
+      )
+    );
+
+  return { draft, humanGateRequired: draft.humanGateRequired };
+}
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -98,19 +170,62 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
-    // Include event payload so the cron executor can call Google Calendar
-    // without a second DB round-trip to reload the suggested_action row.
+    const kind = updated[0].kind;
     const eventPayload = updated[0].payload as BookingPayload | null;
 
-    const enqueueResult = await enqueueApprovedActionWorkflow({
-      userId,
-      approvalId: id,
-      eventPayload,
-    });
+    // Authority page drafts: generate stub + mark executed (never auto-publish).
+    if (kind === AUTHORITY_CREATE_PAGE_KIND) {
+      const { draft, humanGateRequired } =
+        await completeAuthorityCreatePageApproval({
+          approvalId: id,
+          userId,
+          payload: updated[0].payload,
+        });
 
-    logger.info('[approve] suggested_action approved, workflow_run queued', {
+      logger.info('[approve] authority.create_page drafted', {
+        approvalId: id,
+        userId,
+        platform: draft.platform,
+        humanGateRequired,
+      });
+
+      void recordInboxDecision({
+        suggestedActionId: id,
+        userId,
+        verdict: 'approved',
+        cardKind: kind,
+        surface: 'opportunity-inbox',
+      });
+
+      return NextResponse.json(
+        {
+          ok: true,
+          approvalId: id,
+          kind,
+          draft,
+          published: false,
+          humanGateRequired,
+          createUrl: draft.createUrl,
+        },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Calendar (and future executor-backed) kinds enqueue workflow_runs.
+    // Non-calendar kinds must not be pushed into the calendar executor.
+    let enqueueResult: 'enqueued' | 'already-queued' | 'skipped' = 'skipped';
+    if (isCalendarActionKind(kind)) {
+      enqueueResult = await enqueueApprovedActionWorkflow({
+        userId,
+        approvalId: id,
+        eventPayload,
+      });
+    }
+
+    logger.info('[approve] suggested_action approved', {
       approvalId: id,
       userId,
+      kind,
       enqueueResult,
     });
 
@@ -119,12 +234,12 @@ export async function POST(_request: Request, { params }: RouteParams) {
       suggestedActionId: id,
       userId,
       verdict: 'approved',
-      cardKind: updated[0]?.kind ?? null,
+      cardKind: kind,
       surface: 'opportunity-inbox',
     });
 
     return NextResponse.json(
-      { ok: true, approvalId: id },
+      { ok: true, approvalId: id, kind, enqueueResult },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (err) {

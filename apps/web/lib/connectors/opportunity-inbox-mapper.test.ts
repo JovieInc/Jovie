@@ -42,6 +42,31 @@ describe('mapSuggestedActionToInboxCard', () => {
     expect(card.typeLabel).toBe('New Song');
   });
 
+  it('maps authority.create_page with draft CTA and profile-match type', () => {
+    const card = mapSuggestedActionToInboxCard({
+      id: 'action-authority-1',
+      kind: 'authority.create_page',
+      payload: {
+        title: 'Create Fandom (EDM Wiki) page for Tim White',
+        primaryActionLabel: 'Draft page',
+      },
+      rationale:
+        'Peers mention you on Fandom without a link because no artist page exists yet. Example: unlinked mention on Cosmic Gate.',
+      createdAt: new Date('2026-07-21T10:00:00.000Z'),
+    });
+
+    expect(card).toMatchObject({
+      id: 'action-authority-1',
+      signalType: 'new_profile_match',
+      typeLabel: 'Profile Match',
+      title: 'Create Fandom (EDM Wiki) page for Tim White',
+      primaryActionLabel: 'Draft page',
+      status: 'pending',
+      category: 'suggestion',
+    });
+    expect(card.why).toContain('Cosmic Gate');
+  });
+
   it('falls back when payload title and rationale are missing', () => {
     const card = mapSuggestedActionToInboxCard({
       id: 'action-2',

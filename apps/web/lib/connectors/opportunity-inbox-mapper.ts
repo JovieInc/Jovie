@@ -28,15 +28,27 @@ interface SuggestedActionRow {
 
 const PRIMARY_ACTION_LABEL_BY_KIND: Readonly<Record<string, string>> = {
   'calendar.create_event': 'Add to calendar',
+  'authority.create_page': 'Draft page',
 };
+
+function primaryActionLabelFromPayload(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const label = (payload as { primaryActionLabel?: unknown }).primaryActionLabel;
+  return typeof label === 'string' && label.trim().length > 0
+    ? label.trim()
+    : null;
+}
 
 function primaryActionLabelFor(
   kind: string,
-  category: OpportunityInboxCardCategory
+  category: OpportunityInboxCardCategory,
+  payload?: unknown
 ): string {
   if (category === 'tour_date') {
     return 'Confirm date';
   }
+  const fromPayload = primaryActionLabelFromPayload(payload);
+  if (fromPayload) return fromPayload;
   return PRIMARY_ACTION_LABEL_BY_KIND[kind] ?? 'Approve';
 }
 
@@ -97,7 +109,8 @@ export function mapSuggestedActionToInboxCard(
     title: titleFromPayload(row.payload, category),
     why: whyFromRow(row, category),
     primaryActionLabel:
-      report?.nextStep?.label ?? primaryActionLabelFor(row.kind, category),
+      report?.nextStep?.label ??
+      primaryActionLabelFor(row.kind, category, row.payload),
     status: 'pending',
     category,
     ...(report ? { report } : {}),
