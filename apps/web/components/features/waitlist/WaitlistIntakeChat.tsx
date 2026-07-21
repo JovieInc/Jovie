@@ -4,6 +4,7 @@ import { ArrowRight, Loader2, SendHorizontal } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { getPlanIntent } from '@/lib/auth/plan-intent';
+import { isMeaningfulIntakeAnswer } from '@/lib/chat/onboarding-script/widget-events';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
 import type { WaitlistDisplayOutcome } from './WaitlistOutcomeView';
@@ -128,7 +129,7 @@ export function WaitlistIntakeChat({
       {
         id: 'intro-1',
         role: 'jovie' as const,
-        text: "Hey. I'm Jovie. I will save your release context first, then show the access result.",
+        text: "Hey. I'm Jovie. Early access is limited right now, so some artists land on the waitlist. I will save your release context first, then show the access result.",
       },
       {
         id: 'intro-2',
@@ -242,6 +243,27 @@ export function WaitlistIntakeChat({
       return;
     }
 
+    // Incomplete acks ("k", "ok") must not advance required intake steps
+    // or complete waitlist/reservation.
+    if (
+      !skipped &&
+      !step.optional &&
+      !isMeaningfulIntakeAnswer(trimmed) &&
+      step.id !== 'primarySocialUrl' &&
+      step.id !== 'spotifyUrl'
+    ) {
+      setError('Add a real answer to continue — short acks do not count.');
+      return;
+    }
+
+    if (step.id === 'handle' && !skipped) {
+      const handle = normalizeHandle(trimmed);
+      if (handle.length < 2 || !isMeaningfulIntakeAnswer(handle)) {
+        setError('Enter a real handle (at least 2 characters).');
+        return;
+      }
+    }
+
     if (
       !skipped &&
       (step.id === 'primarySocialUrl' || step.id === 'spotifyUrl') &&
@@ -283,7 +305,11 @@ export function WaitlistIntakeChat({
 
   if (outcome) {
     return (
-      <WaitlistSuccessView outcome={outcome} onRetry={() => setOutcome(null)} />
+      <WaitlistSuccessView
+        outcome={outcome}
+        onRetry={() => setOutcome(null)}
+        confirmedEmail={userEmail}
+      />
     );
   }
 
@@ -311,8 +337,8 @@ export function WaitlistIntakeChat({
                 Request Access
               </h1>
               <p className='mt-1 text-app leading-5 text-white/52'>
-                Answer a few launch questions. We save only the fields needed to
-                decide access.
+                Early access is limited. Answer a few launch questions — we save
+                only the fields needed to decide access or waitlist placement.
               </p>
             </div>
 

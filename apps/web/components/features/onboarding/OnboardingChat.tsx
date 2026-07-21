@@ -27,6 +27,10 @@ import {
   getPreferredErrorMessage,
 } from '@/components/jovie/utils';
 import { track } from '@/lib/analytics';
+import {
+  ONBOARDING_WIDGET_EVENTS,
+  widgetEventDisplayText,
+} from '@/lib/chat/onboarding-script/widget-events';
 import { useAppFlag } from '@/lib/flags/client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { cn } from '@/lib/utils';
@@ -106,6 +110,9 @@ type OnboardingToolRendererArgs = {
   readonly key: string;
   readonly isBusy: boolean;
   readonly onHandleCandidateChange: (handle: string | null) => void;
+  readonly onConfirmHandle: (handle: string) => void;
+  readonly onAttachAccount: (url: string) => void;
+  readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 };
@@ -119,6 +126,7 @@ const renderSearchSpotifyArtist: OnboardingToolRenderer = ({
   key,
   isBusy,
   onSelectArtist,
+  onNoneOfTheseArtists,
   selectedArtistId,
 }) => {
   if (selectedArtistId) return null;
@@ -136,6 +144,7 @@ const renderSearchSpotifyArtist: OnboardingToolRenderer = ({
       inputQuery={getInputQuery(part)}
       disabled={isBusy}
       onSelectArtist={onSelectArtist}
+      onNoneOfThese={onNoneOfTheseArtists}
     />
   );
 };
@@ -157,8 +166,10 @@ const renderConfirmSpotifyArtist: OnboardingToolRenderer = ({ part, key }) => {
 
 const renderCheckHandle: OnboardingToolRenderer = ({
   onHandleCandidateChange,
+  onConfirmHandle,
   part,
   key,
+  isBusy,
 }) => {
   const output = part.output;
   if (!(isHandleCheckOutput(output) || output === undefined)) {
@@ -171,11 +182,18 @@ const renderCheckHandle: OnboardingToolRenderer = ({
       state={part.state}
       output={isHandleCheckOutput(output) ? output : null}
       onHandleCandidateChange={onHandleCandidateChange}
+      onConfirmHandle={onConfirmHandle}
+      disabled={isBusy}
     />
   );
 };
 
-const renderProposeSocialLink: OnboardingToolRenderer = ({ part, key }) => {
+const renderProposeSocialLink: OnboardingToolRenderer = ({
+  part,
+  key,
+  isBusy,
+  onAttachAccount,
+}) => {
   const output = part.output;
   if (!(isSocialLinkOutput(output) || output === undefined)) {
     return null;
@@ -186,6 +204,8 @@ const renderProposeSocialLink: OnboardingToolRenderer = ({ part, key }) => {
       key={key}
       state={part.state}
       output={isSocialLinkOutput(output) ? output : null}
+      onAttachAccount={onAttachAccount}
+      disabled={isBusy}
     />
   );
 };
@@ -231,6 +251,9 @@ function renderOnboardingTools({
   hasMessageText,
   isBusy,
   onHandleCandidateChange,
+  onConfirmHandle,
+  onAttachAccount,
+  onNoneOfTheseArtists,
   onSelectArtist,
   selectedArtistId,
 }: {
@@ -239,6 +262,9 @@ function renderOnboardingTools({
   readonly hasMessageText: boolean;
   readonly isBusy: boolean;
   readonly onHandleCandidateChange: (handle: string | null) => void;
+  readonly onConfirmHandle: (handle: string) => void;
+  readonly onAttachAccount: (url: string) => void;
+  readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 }) {
@@ -264,6 +290,9 @@ function renderOnboardingTools({
         key,
         isBusy,
         onHandleCandidateChange,
+        onConfirmHandle,
+        onAttachAccount,
+        onNoneOfTheseArtists,
         onSelectArtist,
         selectedArtistId,
       });
@@ -299,6 +328,9 @@ function OnboardingMessageList({
   isStreaming,
   lastAssistantMessageId,
   onHandleCandidateChange,
+  onConfirmHandle,
+  onAttachAccount,
+  onNoneOfTheseArtists,
   isBusy,
   onSelectArtist,
   selectedArtistId,
@@ -307,6 +339,9 @@ function OnboardingMessageList({
   readonly isStreaming: boolean;
   readonly lastAssistantMessageId: string | null;
   readonly onHandleCandidateChange: (handle: string | null) => void;
+  readonly onConfirmHandle: (handle: string) => void;
+  readonly onAttachAccount: (url: string) => void;
+  readonly onNoneOfTheseArtists: () => void;
   readonly isBusy: boolean;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
@@ -344,6 +379,9 @@ function OnboardingMessageList({
                   hasMessageText: Boolean(text),
                   isBusy,
                   onHandleCandidateChange,
+                  onConfirmHandle,
+                  onAttachAccount,
+                  onNoneOfTheseArtists,
                   onSelectArtist,
                   selectedArtistId,
                 })
@@ -482,6 +520,9 @@ interface OnboardingMessageRegionProps {
   readonly lastAssistantMessageId: string | null;
   readonly onboardingComposerSurface: ReactNode;
   readonly onHandleCandidateChange: (handle: string | null) => void;
+  readonly onConfirmHandle: (handle: string) => void;
+  readonly onAttachAccount: (url: string) => void;
+  readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly onSelectStarterSuggestion: (prompt: string) => void;
   readonly profileBuilderState: OnboardingProfileBuilderState;
@@ -499,6 +540,9 @@ function OnboardingMessageRegion({
   lastAssistantMessageId,
   onboardingComposerSurface,
   onHandleCandidateChange,
+  onConfirmHandle,
+  onAttachAccount,
+  onNoneOfTheseArtists,
   onSelectArtist,
   onSelectStarterSuggestion,
   profileBuilderState,
@@ -514,6 +558,9 @@ function OnboardingMessageRegion({
           lastAssistantMessageId={lastAssistantMessageId}
           isBusy={isBusy}
           onHandleCandidateChange={onHandleCandidateChange}
+          onConfirmHandle={onConfirmHandle}
+          onAttachAccount={onAttachAccount}
+          onNoneOfTheseArtists={onNoneOfTheseArtists}
           onSelectArtist={onSelectArtist}
           selectedArtistId={profileBuilderState.artist?.id ?? null}
         />
@@ -550,6 +597,9 @@ function OnboardingMessageRegion({
         lastAssistantMessageId={lastAssistantMessageId}
         isBusy={isBusy}
         onHandleCandidateChange={onHandleCandidateChange}
+        onConfirmHandle={onConfirmHandle}
+        onAttachAccount={onAttachAccount}
+        onNoneOfTheseArtists={onNoneOfTheseArtists}
         onSelectArtist={onSelectArtist}
         selectedArtistId={profileBuilderState.artist?.id ?? null}
       />
@@ -773,6 +823,36 @@ export function OnboardingChat({
     [formatArtistSelectionMessage, submitText]
   );
 
+  const handleConfirmHandle = useCallback(
+    (handle: string) => {
+      const payload = {
+        onboardingEvent: ONBOARDING_WIDGET_EVENTS.HANDLE_CONFIRMED,
+        handle,
+      } as const;
+      submitText(widgetEventDisplayText(payload), payload);
+    },
+    [submitText]
+  );
+
+  const handleAttachAccount = useCallback(
+    (url: string) => {
+      const payload = {
+        onboardingEvent: ONBOARDING_WIDGET_EVENTS.SOCIAL_ATTACHED,
+        url,
+      } as const;
+      submitText(widgetEventDisplayText(payload), payload);
+    },
+    [submitText]
+  );
+
+  const handleNoneOfTheseArtists = useCallback(() => {
+    const payload = {
+      onboardingEvent: ONBOARDING_WIDGET_EVENTS.ARTIST_NONE_OF_THESE,
+    } as const;
+    setSelectedArtist(null);
+    submitText(widgetEventDisplayText(payload), payload);
+  }, [submitText]);
+
   const profileBuilderState = useMemo(
     () => deriveProfileBuilderState({ handleDraft, messages, selectedArtist }),
     [handleDraft, messages, selectedArtist]
@@ -995,6 +1075,9 @@ export function OnboardingChat({
             lastAssistantMessageId={lastAssistantMessageId}
             onboardingComposerSurface={onboardingComposerSurface}
             onHandleCandidateChange={setHandleDraft}
+            onConfirmHandle={handleConfirmHandle}
+            onAttachAccount={handleAttachAccount}
+            onNoneOfTheseArtists={handleNoneOfTheseArtists}
             onSelectArtist={handleArtistSelect}
             onSelectStarterSuggestion={submitText}
             profileBuilderState={profileBuilderState}

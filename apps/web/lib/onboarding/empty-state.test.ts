@@ -5,8 +5,9 @@ import {
 } from './empty-state';
 
 describe('onboarding empty state copy', () => {
-  it('includes memory disclosure and one intake question', () => {
+  it('includes memory disclosure, early-access disclosure, and one intake question', () => {
     expect(ONBOARDING_WELCOME_MESSAGE).toMatch(/remember/i);
+    expect(ONBOARDING_WELCOME_MESSAGE).toMatch(/early access|waitlist/i);
     expect(ONBOARDING_WELCOME_MESSAGE).toMatch(/what are you working on/i);
     expect((ONBOARDING_WELCOME_MESSAGE.match(/\?/g) ?? []).length).toBe(1);
   });

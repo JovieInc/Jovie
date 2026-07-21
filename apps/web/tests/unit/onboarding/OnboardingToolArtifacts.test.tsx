@@ -247,26 +247,46 @@ describe('onboarding tool artifacts', () => {
 
     expect(screen.getByText('@testartist')).toBeDefined();
     expect(screen.getByText('is available')).toBeDefined();
-    expect(screen.getByLabelText('Edit proposed handle')).toHaveValue(
+    expect(screen.getByLabelText('Edit Proposed Handle')).toHaveValue(
       'testartist'
     );
     expect(screen.getByText('jov.ie/testartist')).toBeDefined();
     expect(screen.queryByText('checkHandle')).toBeNull();
 
-    fireEvent.change(screen.getByLabelText('Edit proposed handle'), {
+    fireEvent.change(screen.getByLabelText('Edit Proposed Handle'), {
       target: { value: 'test' },
     });
 
     expect(onHandleCandidateChange).toHaveBeenLastCalledWith('test');
 
-    fireEvent.change(screen.getByLabelText('Edit proposed handle'), {
+    fireEvent.change(screen.getByLabelText('Edit Proposed Handle'), {
       target: { value: '' },
     });
 
     expect(onHandleCandidateChange).toHaveBeenLastCalledWith('');
   });
 
-  it('renders proposed social links as reviewable artifacts', () => {
+  it('emits Confirm Handle widget event when the CTA is pressed', () => {
+    mocks.handleAvailability.data = { available: true };
+    const onConfirmHandle = vi.fn();
+
+    fastRender(
+      <OnboardingHandleCheckCard
+        state='output-available'
+        output={{ action: 'check_handle', handle: 'testartist' }}
+        onConfirmHandle={onConfirmHandle}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Handle' }));
+    expect(onConfirmHandle).toHaveBeenCalledWith('testartist');
+    expect(
+      screen.getByRole('button', { name: 'Handle Confirmed' })
+    ).toBeDefined();
+  });
+
+  it('renders proposed social links with Attach Account CTA', () => {
+    const onAttachAccount = vi.fn();
     fastRender(
       <OnboardingSocialLinkCard
         state='output-available'
@@ -274,11 +294,42 @@ describe('onboarding tool artifacts', () => {
           action: 'propose_social_link',
           url: 'https://instagram.com/testartist',
         }}
+        onAttachAccount={onAttachAccount}
       />
     );
 
     expect(screen.getByText('Link ready to attach')).toBeDefined();
-    expect(screen.getByText('instagram.com')).toBeDefined();
+    expect(
+      screen.getByDisplayValue('https://instagram.com/testartist')
+    ).toBeDefined();
     expect(screen.queryByText('proposeSocialLink')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Attach Account' }));
+    expect(onAttachAccount).toHaveBeenCalledWith(
+      'https://instagram.com/testartist'
+    );
+  });
+
+  it('offers None of These when artist results are present', () => {
+    mocks.artistSearch.results = [
+      {
+        id: 'artist-1',
+        name: 'Test Artist',
+        url: 'https://open.spotify.com/artist/artist-1',
+        followers: 12_300,
+        popularity: 48,
+      },
+    ];
+    const onNoneOfThese = vi.fn();
+    fastRender(
+      <OnboardingSpotifyArtistPickerCard
+        state='output-available'
+        output={{ action: 'open_artist_picker', query: 'Test Artist' }}
+        onSelectArtist={vi.fn()}
+        onNoneOfThese={onNoneOfThese}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'None of These' }));
+    expect(onNoneOfThese).toHaveBeenCalled();
   });
 });

@@ -74,11 +74,14 @@ export function ChatProposeNextStepCard({
   }
 
   if (kind === 'waitlist') {
+    // Never promise email delivery until the visitor has a confirmed email
+    // (sign-in/sign-up). Success language is the list confirmation only.
+    const waitlistBody = isSignedIn
+      ? `You're on the list. We'll email you when you're up. We can pick up right here.`
+      : `You're on the list. We pick up right here — nothing gets lost. Add an email at sign-in if you want a heads-up when access opens.`;
     return (
       <div className='px-1 py-1'>
-        <p className='text-mid leading-7 text-primary-token'>
-          {`You're on the list. I'll email you when you're up. We can pick up right here.`}
-        </p>
+        <p className='text-mid leading-7 text-primary-token'>{waitlistBody}</p>
       </div>
     );
   }
