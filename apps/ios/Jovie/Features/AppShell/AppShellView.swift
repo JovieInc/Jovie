@@ -258,10 +258,14 @@ struct AppShellView<
               onCancel: {
                 isShowingTalkOverlay = false
               },
-              onSend: { transcript in
+              onInsertDraft: { transcript in
+                // Voice memo → editable action draft (not auto-send). User
+                // reviews/edits in composer, then sends when ready (#10380).
+                let handoff = VoiceMemoActionDraft.shellHandoff(fromTranscript: transcript)
                 isShowingTalkOverlay = false
                 selectTab(.chat)
-                onAutoSendMessage(transcript)
+                chatDraft = handoff.chatDraft
+                // handoff.autoSendMessage is always nil — intentional.
               }
             )
             .transition(.opacity)

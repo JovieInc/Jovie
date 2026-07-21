@@ -47,9 +47,9 @@
     <true/>
   </dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Jovie uses the microphone only while you hold the talk button.</string>
+  <string>Jovie uses the microphone while you talk so it can capture voice memos as action drafts.</string>
   <key>NSSpeechRecognitionUsageDescription</key>
-  <string>Jovie turns your voice into text so it can send your request.</string>
+  <string>Jovie transcribes your voice on-device when available (Apple Speech may use a network path only if on-device is unavailable) so you can edit an action draft before sending. Jovie does not store the recording.</string>
   <key>UIAppFonts</key>
   <array>
     <string>Inter-Variable.ttf</string>

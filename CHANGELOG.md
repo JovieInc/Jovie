@@ -15,6 +15,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Added
+
+- **iOS voice memo → action draft**: Talk overlay uses on-device Speech when available, reviews an editable transcript, and inserts it into the chat composer draft (no auto-send).
+
+
 - **Library Approval Status is first-class again (#10384):** every Library asset surfaces Draft / Needs Review / Approved / Archived as a badge on grid cards, a list column, and filter chips (rail + pill search), with Release Status kept as a separate labeled axis so the two never collapse into one bare “Draft”.
 - **Press kit share drops support multi-asset sets:** from Library, artists can curate multiple releases into one branded drop link, with explicit Include comment and Allow downloads toggles, layouts, passphrase, and expiry (GitHub #10388).
 - **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; it uses the build-time release version from build-info, or omits the version when unavailable.
