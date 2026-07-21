@@ -4,9 +4,9 @@
  * Baseline: Linear.app March 2026 refresh, evolved with Jovie's identity.
  * Aesthetic: Apple meets Rekordbox. Dark-first, restrained, product-as-hero.
  *
- * Two systems:
- *   System A (marketing) — Satoshi + DM Sans, dark only, no brand color.
- *   System B (app/product) — Inter, light + dark.
+ * One system, two languages (System B canonical, System A retired 2026-06-18):
+ *   Body + UI — Inter (DM Sans retired 2026-06-18).
+ *   Display/hero — Satoshi (approved display exception).
  */
 
 /* -------------------------------------------------------------------------
@@ -15,7 +15,7 @@
  * They are not redistributed here — we substitute the nearest Google Fonts
  * equivalent. Swap @font-face to the self-hosted files when shipping prod.
  * ------------------------------------------------------------------------- */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=DM+Sans:wght@400..700&family=Source+Serif+4:wght@300..700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Source+Serif+4:wght@300..700&display=swap");
 /* Satoshi is not on Google Fonts. We substitute Manrope (nearest geometric
  * sans w/ weight 800 variant). FLAG: swap for self-hosted Satoshi for prod. */
 @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap");
@@ -23,14 +23,13 @@
 :root {
   /* ——— Font stacks ——— */
   --font-satoshi: "Manrope", "Satoshi Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-dm-sans: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-inter: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: "Source Serif 4", Georgia, serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   /* Marketing scoped */
   --marketing-font-display: var(--font-satoshi);
-  --marketing-font-body: var(--font-dm-sans);
+  --marketing-font-body: var(--font-inter);
 
   /* ——— Font weights (Linear-derived) ——— */
   --fw-normal: 400;

@@ -20,6 +20,13 @@ const rawVisualUtilityPattern =
 const negativeTrackingPattern = /\btracking-(?:tight|tighter)\b/;
 
 describe('root not-found System B source tokens', () => {
+  it('renders the root not-found on the System B marketing wrapper, not System A', async () => {
+    const source = await readFile(sourcePath, 'utf8');
+
+    expect(source).toContain('system-b-marketing dark');
+    expect(source).not.toContain('linear-marketing');
+  });
+
   it('keeps the route free of route-local visual token drift', async () => {
     const source = await readFile(sourcePath, 'utf8');
 

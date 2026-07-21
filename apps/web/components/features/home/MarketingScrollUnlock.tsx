@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 
 /**
  * JS fallback that ensures marketing pages can scroll even if
- * the CSS `:has(.linear-marketing)` override doesn't apply
+ * the CSS `:has(.system-b-marketing)` override doesn't apply
  * (older browsers, hydration timing, etc.).
  */
 export function MarketingScrollUnlock() {

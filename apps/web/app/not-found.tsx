@@ -5,7 +5,7 @@ import { NotFoundPageContent } from '@/components/site/NotFoundPageContent';
 
 export default function NotFound() {
   return (
-    <div className='system-b-root-not-found-page dark linear-marketing min-h-screen'>
+    <div className='system-b-root-not-found-page system-b-marketing dark min-h-screen'>
       <MarketingHeader logoSize='xs' variant='minimal' />
 
       <main
