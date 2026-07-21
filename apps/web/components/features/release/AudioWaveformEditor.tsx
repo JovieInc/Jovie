@@ -1,7 +1,9 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Loader2, Pause, Play } from 'lucide-react';
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
@@ -20,17 +22,40 @@ import {
   type AudioSnippet,
   createDefaultSnippet,
   formatSnippetRange,
+  MIN_SNIPPET_DURATION_MS,
   normalizeSnippet,
 } from '@/lib/audio/snippet';
 import { formatTime } from '@/lib/format-time';
+import {
+  type InteractionLatencyMarkHandle,
+  markInteractionStart,
+  measureInteractionPoint,
+} from '@/lib/monitoring/interaction-latency';
 import { cn } from '@/lib/utils';
 
 type TrimHandle = 'start' | 'end';
 
 const WAVEFORM_WIDTH = 1000;
 const WAVEFORM_HEIGHT = 56;
+const TRIM_KEY_STEP_MS = 1_000;
+
+function finishLatencyMark(
+  mark: InteractionLatencyMarkHandle | null,
+  point: string
+): null {
+  const measureName = measureInteractionPoint(mark, point);
+  if (mark && typeof performance !== 'undefined') {
+    performance.clearMarks?.(mark.startMark);
+    performance.clearMarks?.(`${mark.id}:${point}`);
+  }
+  if (measureName && typeof performance !== 'undefined') {
+    performance.clearMeasures?.(measureName);
+  }
+  return null;
+}
 
 function peaksToPath(peaks: readonly number[]): string {
+  if (peaks.length === 0) return '';
   const stride = WAVEFORM_WIDTH / peaks.length;
   const centerY = WAVEFORM_HEIGHT / 2;
   const amplitude = WAVEFORM_HEIGHT / 2 - 2;
@@ -81,8 +106,14 @@ export function AudioWaveformEditor({
   const uid = useId().replace(/:/g, '-');
   const waveformRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const snippetRef = useRef<AudioSnippet | null>(initialSnippet ?? null);
+  const initialSnippetRef = useRef<AudioSnippet | null>(initialSnippet ?? null);
+  const durationMsRef = useRef<number | null>(durationMs ?? null);
   const dragRef = useRef<TrimHandle | null>(null);
   const holdsGlobalFocusRef = useRef(false);
+  const playGenerationRef = useRef(0);
+  const playLatencyMarkRef = useRef<InteractionLatencyMarkHandle | null>(null);
+  const seekLatencyMarkRef = useRef<InteractionLatencyMarkHandle | null>(null);
   const { playbackState: globalPlayback } = useTrackAudioPlayer();
 
   const [peaks, setPeaks] = useState<readonly number[]>([]);
@@ -95,6 +126,7 @@ export function AudioWaveformEditor({
     initialSnippet ?? null
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   const activeDurationMs = resolvedDurationMs > 0 ? resolvedDurationMs : 0;
   const waveformPath = useMemo(() => peaksToPath(peaks), [peaks]);
@@ -105,10 +137,27 @@ export function AudioWaveformEditor({
   const snippetEndPercent = snippet
     ? percentFromMs(snippet.endMs, activeDurationMs)
     : 100;
+  snippetRef.current = snippet;
+  initialSnippetRef.current = initialSnippet ?? null;
+  durationMsRef.current = durationMs ?? null;
 
   useEffect(() => {
     setSnippet(initialSnippet ?? null);
   }, [initialSnippet]);
+
+  useEffect(() => {
+    setPeaks([]);
+    setResolvedDurationMs(durationMsRef.current ?? 0);
+    setCurrentTimeMs(0);
+    setIsPlaying(false);
+    setSnippet(initialSnippetRef.current);
+  }, [audioUrl]);
+
+  useEffect(() => {
+    if (durationMs !== null && durationMs !== undefined && durationMs > 0) {
+      setResolvedDurationMs(durationMs);
+    }
+  }, [durationMs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,10 +168,11 @@ export function AudioWaveformEditor({
       .then(result => {
         if (cancelled) return;
         setPeaks(result.peaks);
-        setResolvedDurationMs(durationMs ?? result.durationMs);
+        const resolvedDuration = durationMsRef.current ?? result.durationMs;
+        setResolvedDurationMs(resolvedDuration);
         setSnippet(current => {
           if (current) return current;
-          return createDefaultSnippet(durationMs ?? result.durationMs);
+          return createDefaultSnippet(resolvedDuration);
         });
       })
       .catch(error => {
@@ -140,7 +190,7 @@ export function AudioWaveformEditor({
     return () => {
       cancelled = true;
     };
-  }, [audioUrl, durationMs]);
+  }, [audioUrl, loadAttempt]);
 
   useEffect(() => {
     const audio = new Audio(audioUrl);
@@ -152,50 +202,98 @@ export function AudioWaveformEditor({
       holdsGlobalFocusRef.current = false;
       resumePlaybackAfterInterruption();
     };
+    const isCurrentSource = () => audioRef.current === audio;
 
     const handleTimeUpdate = () => {
+      if (!isCurrentSource()) return;
       setCurrentTimeMs(Math.round(audio.currentTime * 1000));
-      if (!snippet) return;
-      if (audio.currentTime * 1000 >= snippet.endMs) {
+      const activeSnippet = snippetRef.current;
+      if (!activeSnippet) return;
+      if (audio.currentTime * 1000 >= activeSnippet.endMs) {
         audio.pause();
-        audio.currentTime = snippet.startMs / 1000;
+        audio.currentTime = activeSnippet.startMs / 1000;
         setIsPlaying(false);
         releaseGlobalFocus();
       }
     };
     const handleEnded = () => {
+      if (!isCurrentSource()) return;
       setIsPlaying(false);
       releaseGlobalFocus();
     };
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlaying = () => {
+      if (!isCurrentSource()) return;
+      playLatencyMarkRef.current = finishLatencyMark(
+        playLatencyMarkRef.current,
+        'audible'
+      );
+      setIsPlaying(true);
+    };
+    const handlePause = () => {
+      if (!isCurrentSource()) return;
+      setIsPlaying(false);
+    };
+    const handleSeeking = () => {
+      if (!isCurrentSource()) return;
+      seekLatencyMarkRef.current ??= markInteractionStart('audio-snippet-seek');
+    };
+    const handleSeeked = () => {
+      if (!isCurrentSource()) return;
+      seekLatencyMarkRef.current = finishLatencyMark(
+        seekLatencyMarkRef.current,
+        'settled'
+      );
+      setCurrentTimeMs(Math.round(audio.currentTime * 1000));
+    };
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('playing', handlePlaying);
     audio.addEventListener('pause', handlePause);
+    audio.addEventListener('seeking', handleSeeking);
+    audio.addEventListener('seeked', handleSeeked);
 
     return () => {
+      playGenerationRef.current += 1;
       try {
-        audio.pause();
+        if (!audio.paused) audio.pause();
       } catch {
         // jsdom throws Not implemented for HTMLMediaElement.pause
       }
       audio.src = '';
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('playing', handlePlaying);
       audio.removeEventListener('pause', handlePause);
-      audioRef.current = null;
+      audio.removeEventListener('seeking', handleSeeking);
+      audio.removeEventListener('seeked', handleSeeked);
+      if (audioRef.current === audio) audioRef.current = null;
+      playLatencyMarkRef.current = finishLatencyMark(
+        playLatencyMarkRef.current,
+        'unmounted'
+      );
+      seekLatencyMarkRef.current = finishLatencyMark(
+        seekLatencyMarkRef.current,
+        'unmounted'
+      );
       releaseGlobalFocus();
     };
-  }, [audioUrl, snippet]);
+  }, [audioUrl]);
 
   useEffect(() => {
     if (!globalPlayback.isPlaying) return;
     const audio = audioRef.current;
-    if (!audio || audio.paused) return;
-    audio.pause();
+    if (!audio) return;
+    playGenerationRef.current += 1;
+    playLatencyMarkRef.current = finishLatencyMark(
+      playLatencyMarkRef.current,
+      'interrupted'
+    );
+    seekLatencyMarkRef.current = finishLatencyMark(
+      seekLatencyMarkRef.current,
+      'interrupted'
+    );
+    if (!audio.paused) audio.pause();
     setIsPlaying(false);
     if (holdsGlobalFocusRef.current) {
       holdsGlobalFocusRef.current = false;
@@ -208,6 +306,11 @@ export function AudioWaveformEditor({
       const audio = audioRef.current;
       if (!audio || activeDurationMs <= 0) return;
       const clamped = Math.max(0, Math.min(nextMs, activeDurationMs));
+      seekLatencyMarkRef.current = finishLatencyMark(
+        seekLatencyMarkRef.current,
+        'superseded'
+      );
+      seekLatencyMarkRef.current = markInteractionStart('audio-snippet-seek');
       audio.currentTime = clamped / 1000;
       setCurrentTimeMs(clamped);
     },
@@ -219,6 +322,11 @@ export function AudioWaveformEditor({
     if (!audio) return;
 
     if (isPlaying) {
+      playGenerationRef.current += 1;
+      playLatencyMarkRef.current = finishLatencyMark(
+        playLatencyMarkRef.current,
+        'paused'
+      );
       audio.pause();
       if (holdsGlobalFocusRef.current) {
         holdsGlobalFocusRef.current = false;
@@ -241,9 +349,31 @@ export function AudioWaveformEditor({
       holdsGlobalFocusRef.current = true;
     }
 
+    playLatencyMarkRef.current = finishLatencyMark(
+      playLatencyMarkRef.current,
+      'superseded'
+    );
+    playLatencyMarkRef.current = markInteractionStart('audio-snippet-play');
+    const generation = ++playGenerationRef.current;
     try {
       await audio.play();
+      if (
+        audioRef.current === audio &&
+        playGenerationRef.current === generation
+      ) {
+        setIsPlaying(true);
+      }
     } catch {
+      if (
+        audioRef.current !== audio ||
+        playGenerationRef.current !== generation
+      ) {
+        return;
+      }
+      playLatencyMarkRef.current = finishLatencyMark(
+        playLatencyMarkRef.current,
+        'failed'
+      );
       setIsPlaying(false);
       if (holdsGlobalFocusRef.current) {
         holdsGlobalFocusRef.current = false;
@@ -265,15 +395,6 @@ export function AudioWaveformEditor({
       if (normalized) setSnippet(normalized);
     },
     [activeDurationMs, snippet]
-  );
-
-  const handleWaveformPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (disabled || activeDurationMs <= 0) return;
-      const rect = event.currentTarget.getBoundingClientRect();
-      seekTo(msFromClientX(event.clientX, rect, activeDurationMs));
-    },
-    [activeDurationMs, disabled, seekTo]
   );
 
   const handleHandlePointerDown = useCallback(
@@ -305,6 +426,37 @@ export function AudioWaveformEditor({
     dragRef.current = null;
   }, []);
 
+  const handleHandleKeyDown = useCallback(
+    (handle: TrimHandle) => (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+      if (disabled || !snippet || activeDurationMs <= 0) return;
+
+      const currentValue = handle === 'start' ? snippet.startMs : snippet.endMs;
+      let nextValue: number | null = null;
+      switch (event.key) {
+        case 'ArrowLeft':
+        case 'ArrowDown':
+          nextValue = currentValue - TRIM_KEY_STEP_MS;
+          break;
+        case 'ArrowRight':
+        case 'ArrowUp':
+          nextValue = currentValue + TRIM_KEY_STEP_MS;
+          break;
+        case 'Home':
+          nextValue = 0;
+          break;
+        case 'End':
+          nextValue = activeDurationMs;
+          break;
+        default:
+          return;
+      }
+
+      event.preventDefault();
+      updateSnippetHandle(handle, nextValue);
+    },
+    [activeDurationMs, disabled, snippet, updateSnippetHandle]
+  );
+
   const handleSaveSnippet = useCallback(async () => {
     if (!snippet || !onSaveSnippet) return;
     const normalized = normalizeSnippet(snippet, activeDurationMs);
@@ -319,37 +471,28 @@ export function AudioWaveformEditor({
     }
   }, [activeDurationMs, onSaveSnippet, snippet]);
 
-  if (loadError) {
-    return (
-      <p className='text-xs text-error' data-testid='audio-waveform-error'>
-        {loadError}
-      </p>
-    );
-  }
-
   return (
     <div className='space-y-3' data-testid='audio-waveform-editor'>
       <div className='flex items-center justify-between gap-2'>
-        <button
-          type='button'
+        <Button
+          variant='secondary'
+          size='icon'
           onClick={() => {
             handleTogglePlayback().catch(() => {});
           }}
-          disabled={disabled || isLoading || activeDurationMs <= 0}
+          disabled={
+            disabled || isLoading || Boolean(loadError) || activeDurationMs <= 0
+          }
           aria-label={
             isPlaying ? 'Pause waveform preview' : 'Play waveform preview'
           }
-          className={cn(
-            'inline-flex h-8 w-8 items-center justify-center rounded-md border border-subtle bg-surface-1 text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-2',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
-          )}
         >
           {isPlaying ? (
             <Pause className='h-3.5 w-3.5' strokeWidth={2.5} />
           ) : (
             <Play className='h-3.5 w-3.5 translate-x-px' strokeWidth={2.5} />
           )}
-        </button>
+        </Button>
         <div className='min-w-0 text-right text-2xs text-tertiary-token tabular-nums'>
           <span>{formatTime(currentTimeMs / 1000)}</span>
           <span className='mx-1 text-quaternary-token'>/</span>
@@ -360,10 +503,9 @@ export function AudioWaveformEditor({
       <div
         ref={waveformRef}
         className={cn(
-          'relative h-14 overflow-hidden rounded-lg border border-subtle bg-surface-0',
+          'relative h-14 overflow-hidden rounded-lg border border-subtle bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/55 focus-within:ring-offset-2 focus-within:ring-offset-(--linear-app-content-surface)',
           disabled ? 'pointer-events-none opacity-60' : 'cursor-pointer'
         )}
-        onPointerDown={handleWaveformPointerDown}
         data-testid='audio-waveform-surface'
       >
         {isLoading ? (
@@ -372,6 +514,20 @@ export function AudioWaveformEditor({
               className='h-4 w-4 animate-spin text-tertiary-token motion-reduce:animate-none'
               aria-hidden='true'
             />
+          </div>
+        ) : loadError ? (
+          <div
+            className='flex h-full items-center justify-center gap-2 px-3 text-2xs text-secondary-token'
+            data-testid='audio-waveform-error'
+          >
+            <span>Waveform unavailable.</span>
+            <Button
+              variant='tertiary'
+              size='sm'
+              onClick={() => setLoadAttempt(attempt => attempt + 1)}
+            >
+              Retry
+            </Button>
           </div>
         ) : (
           <>
@@ -382,17 +538,6 @@ export function AudioWaveformEditor({
               aria-hidden='true'
             >
               <defs>
-                <linearGradient
-                  id={`wave-fill-${uid}`}
-                  x1='0%'
-                  y1='0%'
-                  x2='100%'
-                  y2='0%'
-                >
-                  <stop offset='0%' stopColor='rgb(168 85 247 / 0.85)' />
-                  <stop offset='55%' stopColor='rgb(236 72 153 / 0.85)' />
-                  <stop offset='100%' stopColor='rgb(59 130 246 / 0.85)' />
-                </linearGradient>
                 <clipPath id={`wave-played-${uid}`}>
                   <rect
                     x='0'
@@ -402,18 +547,35 @@ export function AudioWaveformEditor({
                   />
                 </clipPath>
               </defs>
-              <path d={waveformPath} fill='rgb(148 163 184 / 0.28)' />
               <path
                 d={waveformPath}
-                fill={`url(#wave-fill-${uid})`}
+                className='fill-current text-quaternary-token opacity-30'
+              />
+              <path
+                d={waveformPath}
+                fill='var(--color-accent)'
+                fillOpacity='0.8'
                 clipPath={`url(#wave-played-${uid})`}
               />
             </svg>
 
+            <input
+              type='range'
+              min={0}
+              max={activeDurationMs}
+              step={100}
+              value={Math.min(currentTimeMs, activeDurationMs)}
+              onChange={event => seekTo(Number(event.currentTarget.value))}
+              disabled={disabled || activeDurationMs <= 0}
+              aria-label='Waveform Position'
+              aria-valuetext={formatTime(currentTimeMs / 1000)}
+              className='absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default'
+            />
+
             {snippet ? (
               <>
                 <div
-                  className='pointer-events-none absolute inset-y-0 bg-cyan-400/10'
+                  className='pointer-events-none absolute inset-y-0 bg-accent/10'
                   style={{
                     left: `${snippetStartPercent}%`,
                     right: `${100 - snippetEndPercent}%`,
@@ -421,22 +583,48 @@ export function AudioWaveformEditor({
                 />
                 <button
                   type='button'
-                  aria-label='Adjust snippet start'
+                  role='slider'
+                  aria-label='Adjust Snippet Start'
+                  aria-valuemin={0}
+                  aria-valuemax={Math.max(
+                    0,
+                    snippet.endMs - MIN_SNIPPET_DURATION_MS
+                  )}
+                  aria-valuenow={snippet.startMs}
+                  aria-valuetext={formatTime(snippet.startMs / 1000)}
                   onPointerDown={handleHandlePointerDown('start')}
                   onPointerMove={handleHandlePointerMove}
                   onPointerUp={handleHandlePointerUp}
-                  className='absolute top-1 bottom-1 z-10 w-2 -translate-x-1/2 rounded-full border border-cyan-300/80 bg-cyan-400 shadow-[0_0_0_1px_rgba(15,23,42,0.35)]'
+                  onPointerCancel={handleHandlePointerUp}
+                  onKeyDown={handleHandleKeyDown('start')}
+                  disabled={disabled || activeDurationMs <= 0}
+                  className='focus-ring-themed absolute inset-y-0 z-10 w-11 -translate-x-1/2 rounded-md'
                   style={{ left: `${snippetStartPercent}%` }}
-                />
+                >
+                  <span className='pointer-events-none absolute top-1 bottom-1 left-1/2 w-1.5 -translate-x-1/2 rounded-full border border-accent/70 bg-accent shadow-sm' />
+                </button>
                 <button
                   type='button'
-                  aria-label='Adjust snippet end'
+                  role='slider'
+                  aria-label='Adjust Snippet End'
+                  aria-valuemin={Math.min(
+                    activeDurationMs,
+                    snippet.startMs + MIN_SNIPPET_DURATION_MS
+                  )}
+                  aria-valuemax={activeDurationMs}
+                  aria-valuenow={snippet.endMs}
+                  aria-valuetext={formatTime(snippet.endMs / 1000)}
                   onPointerDown={handleHandlePointerDown('end')}
                   onPointerMove={handleHandlePointerMove}
                   onPointerUp={handleHandlePointerUp}
-                  className='absolute top-1 bottom-1 z-10 w-2 -translate-x-1/2 rounded-full border border-cyan-300/80 bg-cyan-400 shadow-[0_0_0_1px_rgba(15,23,42,0.35)]'
+                  onPointerCancel={handleHandlePointerUp}
+                  onKeyDown={handleHandleKeyDown('end')}
+                  disabled={disabled || activeDurationMs <= 0}
+                  className='focus-ring-themed absolute inset-y-0 z-10 w-11 -translate-x-1/2 rounded-md'
                   style={{ left: `${snippetEndPercent}%` }}
-                />
+                >
+                  <span className='pointer-events-none absolute top-1 bottom-1 left-1/2 w-1.5 -translate-x-1/2 rounded-full border border-accent/70 bg-accent shadow-sm' />
+                </button>
               </>
             ) : null}
 
@@ -448,26 +636,30 @@ export function AudioWaveformEditor({
         )}
       </div>
 
-      {snippet ? (
-        <div className='flex items-center justify-between gap-2'>
-          <p className='text-2xs text-secondary-token'>
-            Snippet: {formatSnippetRange(snippet.startMs, snippet.endMs)}
-          </p>
-          {onSaveSnippet ? (
-            <button
-              type='button'
-              onClick={() => {
-                handleSaveSnippet().catch(() => {});
-              }}
-              disabled={disabled || isSaving}
-              className='inline-flex h-7 items-center rounded-md border border-subtle bg-surface-1 px-2.5 text-2xs font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-2 disabled:opacity-60'
-              data-testid='audio-snippet-save'
-            >
-              {isSaving ? 'Saving…' : 'Save snippet'}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+      <div className='flex min-h-9 items-center justify-between gap-2'>
+        {snippet && !isLoading && !loadError ? (
+          <>
+            <p className='text-2xs text-secondary-token'>
+              Snippet: {formatSnippetRange(snippet.startMs, snippet.endMs)}
+            </p>
+            {onSaveSnippet ? (
+              <Button
+                variant='secondary'
+                size='sm'
+                onClick={() => {
+                  handleSaveSnippet().catch(() => {});
+                }}
+                disabled={disabled || isSaving}
+                data-testid='audio-snippet-save'
+              >
+                {isSaving ? 'Saving…' : 'Save Snippet'}
+              </Button>
+            ) : null}
+          </>
+        ) : (
+          <span aria-hidden='true' />
+        )}
+      </div>
     </div>
   );
 }
