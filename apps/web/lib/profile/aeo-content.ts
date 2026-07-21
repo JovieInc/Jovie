@@ -6,6 +6,11 @@ import {
   normalizePlatformKey,
 } from '@/lib/dsp-registry';
 import type { PublicMerchCard } from '@/lib/merch/types';
+import {
+  type EntityMentionContext,
+  type EntityMentionSegment,
+  linkEntityMentions,
+} from '@/lib/profile/entity-mentions';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
@@ -46,7 +51,13 @@ export interface ProfileAeoContent {
   readonly facts: readonly ProfileAeoFact[];
   readonly listenLinks: readonly ProfileAeoLink[];
   readonly followLinks: readonly ProfileAeoLink[];
+  /** Plain-text paragraphs — used by meta descriptions, JSON-LD, and tests. */
   readonly description: readonly string[];
+  /**
+   * `description` split into entity-linked segments (parallel array). Render
+   * this in the UI; keep `description` for plain-text consumers.
+   */
+  readonly descriptionSegments: readonly (readonly EntityMentionSegment[])[];
   readonly faqs: readonly ProfileAeoFaqItem[];
 }
 
@@ -58,6 +69,12 @@ export interface BuildProfileAeoContentInput {
   readonly tourDates?: readonly TourDateViewModel[];
   readonly merchCards?: readonly PublicMerchCard[];
   readonly socialLinks?: readonly LegacySocialLink[];
+  /**
+   * Linkable entities for this profile (own releases with slugs, credited
+   * artists resolved to Jovie handles). When omitted, descriptions render
+   * as plain text segments.
+   */
+  readonly entityMentions?: EntityMentionContext;
   readonly now?: Date;
 }
 
@@ -524,6 +541,7 @@ export function buildProfileAeoContent({
   tourDates = [],
   merchCards = [],
   socialLinks = [],
+  entityMentions,
   now = new Date(),
 }: BuildProfileAeoContentInput): ProfileAeoContent {
   const uniqueGenres = getUniqueGenres(artist, genres);
@@ -534,22 +552,30 @@ export function buildProfileAeoContent({
   });
   const { listenLinks, followLinks } = buildLinkSections(artist, socialLinks);
 
+  const description = buildDescription({
+    artist,
+    genres: uniqueGenres,
+    latestRelease,
+    releases,
+    tourDates,
+    merchCards,
+    collaborators,
+    now,
+  });
+  const mentionContext: EntityMentionContext = entityMentions ?? {
+    ownHandle: artist.handle,
+  };
+
   return {
     artistName: artist.name,
     profileUrl: absoluteProfileUrl(artist.handle),
     facts: buildFacts(artist, uniqueGenres),
     listenLinks,
     followLinks,
-    description: buildDescription({
-      artist,
-      genres: uniqueGenres,
-      latestRelease,
-      releases,
-      tourDates,
-      merchCards,
-      collaborators,
-      now,
-    }),
+    description,
+    descriptionSegments: description.map(paragraph =>
+      linkEntityMentions(paragraph, mentionContext)
+    ),
     faqs: [
       buildOriginFaq(artist),
       buildLatestReleaseFaq({ artist, latestRelease, releases, socialLinks }),

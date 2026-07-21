@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileAboutShare } from '@/features/profile/ProfileAboutShare';
 import type { ProfileAeoContent as ProfileAeoContentModel } from '@/lib/profile/aeo-content';
+import { EntityMentionText } from './EntityMentionText';
 
 interface ProfileAeoContentProps {
   readonly content: ProfileAeoContentModel;
@@ -105,8 +106,10 @@ export function ProfileAeoContent({
           ) : null}
 
           <div className='profile-aeo-content__body space-y-3 text-mid leading-7 text-pretty'>
-            {content.description.map(paragraph => (
-              <p key={paragraph}>{paragraph}</p>
+            {content.descriptionSegments.map((segments, index) => (
+              <p key={content.description[index] ?? index}>
+                <EntityMentionText segments={segments} />
+              </p>
             ))}
           </div>
         </div>
