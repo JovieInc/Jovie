@@ -55,6 +55,14 @@ describe('github-transition-issue import contract (JOV-4331)', () => {
     expect(src).toContain(".replace(/^#/, '')");
     expect(src).toContain('Number.parseInt');
   });
+
+  // #14553 / JOV-4332: transitionIssue takes `note`, not `comment`.
+  it('passes note (not comment) to transitionIssue so status notes are posted', () => {
+    const src = read('scripts/github-transition-issue.mjs');
+    // Single-level object literal only (avoids matching the file's explanatory comment).
+    expect(src).toMatch(/transitionIssue\(\s*\{[^}]*\bnote\b/);
+    expect(src).not.toMatch(/transitionIssue\(\s*\{[^}]*\bcomment\b/);
+  });
 });
 
 describe('scripts typecheck baseline no longer pins the fixed TS2305s', () => {
@@ -73,6 +81,14 @@ describe('scripts typecheck baseline no longer pins the fixed TS2305s', () => {
     ).toBeUndefined();
     expect(
       files['scripts/github-transition-issue.mjs']?.TS2305
+    ).toBeUndefined();
+  });
+
+  // #14553: TS2353 for the comment/note param mismatch is fixed; entry leaves baseline.
+  it('drops the repaired TS2353 entry for github-transition-issue.mjs', () => {
+    const baseline = JSON.parse(read('scripts/typecheck-baseline.json'));
+    expect(
+      baseline.files['scripts/github-transition-issue.mjs']?.TS2353
     ).toBeUndefined();
   });
 });
