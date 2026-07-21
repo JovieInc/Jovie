@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+
 import { Clock3, ExternalLink } from 'lucide-react';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { cn } from '@/lib/utils';
@@ -134,14 +136,15 @@ export function WorkflowRunRow({
 
   return (
     <div className={containerClassName}>
-      <button
+      <Button
         type='button'
+        variant='ghost'
         onClick={() => onSelect(artifact)}
-        className='grid gap-2 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
+        className='grid h-auto w-full gap-2 rounded-none text-left hover:bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
         aria-pressed={isSelected}
       >
         {mainContent}
-      </button>
+      </Button>
       {hasActions ? (
         <div className='flex items-center gap-1 border-t border-subtle pt-2'>
           <RowActionLink href={artifact.pullRequestUrl} label='Open PR' />
