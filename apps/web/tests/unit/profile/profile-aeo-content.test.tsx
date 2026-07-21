@@ -243,14 +243,6 @@ describe('Profile AEO content', () => {
           clicks: 0,
           created_at: '2024-01-01T00:00:00.000Z',
         },
-        {
-          id: 'link-4',
-          artist_id: 'artist-1',
-          platform: 'venmo',
-          url: 'https://venmo.com/djtest',
-          clicks: 0,
-          created_at: '2024-01-01T00:00:00.000Z',
-        },
       ],
       now,
     });
@@ -271,13 +263,6 @@ describe('Profile AEO content', () => {
     expect(content.followLinks.map(link => link.platform)).toEqual([
       'instagram',
       'youtube',
-      'venmo',
-    ]);
-    // Registry names win; unknown platforms fall back to sentence case.
-    expect(content.followLinks.map(link => link.label)).toEqual([
-      'Instagram',
-      'YouTube',
-      'Venmo',
     ]);
   });
 

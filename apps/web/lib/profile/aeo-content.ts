@@ -51,7 +51,6 @@ export interface ProfileAeoContent {
   readonly facts: readonly ProfileAeoFact[];
   readonly listenLinks: readonly ProfileAeoLink[];
   readonly followLinks: readonly ProfileAeoLink[];
-  /** Plain-text paragraphs — used by meta descriptions, JSON-LD, and tests. */
   readonly description: readonly string[];
   /**
    * `description` split into entity-linked segments (parallel array). Render
@@ -275,9 +274,7 @@ function buildFacts(
 
 function getPlatformLabel(platform: string): string {
   const key = normalizePlatformKey(platform);
-  return (
-    (key ? getRegistryEntry(key)?.name : undefined) ?? sentenceCase(platform)
-  );
+  return (key ? getRegistryEntry(key)?.name : undefined) ?? platform;
 }
 
 function buildLinkSections(
@@ -552,30 +549,22 @@ export function buildProfileAeoContent({
   });
   const { listenLinks, followLinks } = buildLinkSections(artist, socialLinks);
 
-  const description = buildDescription({
-    artist,
-    genres: uniqueGenres,
-    latestRelease,
-    releases,
-    tourDates,
-    merchCards,
-    collaborators,
-    now,
-  });
-  const mentionContext: EntityMentionContext = entityMentions ?? {
-    ownHandle: artist.handle,
-  };
-
   return {
     artistName: artist.name,
     profileUrl: absoluteProfileUrl(artist.handle),
     facts: buildFacts(artist, uniqueGenres),
     listenLinks,
     followLinks,
-    description,
-    descriptionSegments: description.map(paragraph =>
-      linkEntityMentions(paragraph, mentionContext)
-    ),
+    description: buildDescription({
+      artist,
+      genres: uniqueGenres,
+      latestRelease,
+      releases,
+      tourDates,
+      merchCards,
+      collaborators,
+      now,
+    }),
     faqs: [
       buildOriginFaq(artist),
       buildLatestReleaseFaq({ artist, latestRelease, releases, socialLinks }),
