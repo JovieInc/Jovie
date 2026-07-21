@@ -113,7 +113,7 @@ describe('ChatMessage analytics cards', () => {
     expect(carousel.className).toContain('md:grid-cols-3');
     const signalCard = screen.getByTestId('chat-analytics-signal-card');
     expect(signalCard).toBeTruthy();
-    expect(signalCard.className).toContain('min-w-[min(20rem,84vw)]');
+    expect(signalCard.className).toContain('min-w-[min(18rem,80vw)]');
     expect(screen.getByText('Top signals')).toBeTruthy();
     expect(screen.getByTestId('chat-analytics-signal-count')).toHaveTextContent(
       'Showing 1 of 2 active signals'
@@ -129,6 +129,8 @@ describe('ChatMessage analytics cards', () => {
       screen.getByText('Send your next release update to that segment.')
     ).toBeTruthy();
     expect(screen.queryByText('high')).toBeNull();
+    // Quiet category label only — no colored chip chrome.
+    expect(screen.getByText('growth')).toBeTruthy();
   });
 
   it('renders a compact error row for unknown failed tools', () => {

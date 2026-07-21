@@ -10,6 +10,7 @@ import {
 import { db } from '@/lib/db';
 import { aiInsights, insightGenerationRuns } from '@/lib/db/schema/insights';
 import { sortInsightsForChat } from '@/lib/insights/chat-presentation';
+import { normalizeInsightTitleForDedup } from '@/lib/insights/insight-dedup';
 import { toISOStringSafe } from '@/lib/utils/date';
 import type {
   GeneratedInsight,
@@ -431,12 +432,15 @@ function formatInsightResponse(
 }
 
 function buildInsightDedupKey(insight: InsightDedupCandidate): string {
+  const family = getInsightDedupFamily(insight.insightType);
   const sourceKey = getInsightSourceKey(insight.dataSnapshot);
   if (sourceKey) {
-    return `${insight.category}|${getInsightDedupFamily(insight.insightType)}|${sourceKey}`;
+    return `${insight.category}|${family}|${sourceKey}`;
   }
 
-  return `${insight.category}|${insight.insightType}|${normalizeInsightCopy(insight.title)}|${normalizeInsightCopy(insight.description)}`;
+  // Near-duplicate fallback: same signal family + title fingerprint so LLM
+  // variants ("3 New Subscribers…" vs "… (300% Growth)") collapse to one card.
+  return `${insight.category}|${family}|title:${normalizeInsightTitleForDedup(insight.title)}`;
 }
 
 function getPriorityRank(priority: InsightPriority): number {
@@ -532,8 +536,4 @@ function normalizeSnapshotToken(value: unknown): string | null {
 
   const normalized = String(value).trim().toLowerCase();
   return normalized ? normalized : null;
-}
-
-function normalizeInsightCopy(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
