@@ -64,6 +64,31 @@
   --ds-public-content-max: 1298px; /* canonical public/marketing width */
   --ds-prose-max: 680px; /* prose exception */
 
+  /* Marketing display type scale (System B public surfaces). One canonical
+     ramp for hero display, section titles, and ledes so marketing pages share
+     a single visual hierarchy instead of per-section one-off clamps. Satoshi
+     display + Inter body per the approved exception in DESIGN.md. */
+  --ds-marketing-display-size: clamp(4rem, 6.9vw, 6.25rem);
+  --ds-marketing-display-leading: 0.94;
+  --ds-marketing-display-tracking: -0.045em;
+  --ds-marketing-title-size: clamp(
+    var(--text-4xl),
+    4.6vw,
+    calc(var(--text-5xl) + var(--space-4))
+  );
+  --ds-marketing-title-leading: 1.08;
+  --ds-marketing-title-tracking: 0;
+  --ds-marketing-lede-size: clamp(1.25rem, 1.6vw, 1.375rem);
+  --ds-marketing-lede-leading: var(--leading-normal);
+  --ds-marketing-lede-tracking: -0.015em;
+  /* Eyebrow / kicker spec: quiet uppercase-free label above section titles.
+     0 tracking per the System B contract (see trust-strip style guard). */
+  --ds-marketing-eyebrow-size: calc(var(--text-xs) - 1px);
+  --ds-marketing-eyebrow-weight: var(--font-weight-medium);
+  --ds-marketing-eyebrow-leading: var(--leading-tight);
+  --ds-marketing-eyebrow-tracking: 0;
+  --ds-marketing-eyebrow-color: var(--color-text-tertiary-token);
+
   /* Shell V1 semantic aliases — app chrome should prefer these names when
      touching shared shell geometry. They intentionally resolve to the current
      Linear-derived values so this pass changes the token contract, not visuals. */

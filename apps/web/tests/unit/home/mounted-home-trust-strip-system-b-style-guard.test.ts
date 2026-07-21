@@ -63,9 +63,21 @@ describe('mounted homepage trust strip System B source contract', () => {
     expect(css).toContain('var(--system-b-bg-page)');
     expect(css).toContain('var(--color-text-primary-token)');
     expect(css).toContain('var(--color-text-tertiary-token)');
+    // Content column: the strip locks onto the shared homepage grid
+    // (--ds-public-content-max inside --homepage-page-gutter gutters), not
+    // the legacy 90rem --homepage-section-max.
+    expect(css).toContain('var(--ds-public-content-max)');
+    expect(css).not.toContain('var(--homepage-section-max)');
     expect(css).toContain('var(--homepage-page-gutter)');
-    expect(css).toContain('var(--homepage-section-max)');
-    expect(css).toContain('var(--text-xs)');
+    // Label rides the shared marketing eyebrow tokens (quiet label rhythm).
+    expect(css).toContain('font-size: var(--ds-marketing-eyebrow-size);');
+    expect(css).toContain('font-weight: var(--ds-marketing-eyebrow-weight);');
+    expect(css).toContain('line-height: var(--ds-marketing-eyebrow-leading);');
+    expect(css).toContain(
+      'letter-spacing: var(--ds-marketing-eyebrow-tracking);'
+    );
+    // Section rhythm: padding derives from the shared chapter space token.
+    expect(css).toContain('var(--homepage-chapter-space)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('filter: grayscale(1);');
     expect(css).toContain(
@@ -75,9 +87,8 @@ describe('mounted homepage trust strip System B source contract', () => {
     );
     expect(css).toContain('padding-inline: 0;');
     expect(css).toContain('@media (max-width: 767px)');
-    expect(css).toContain('letter-spacing: 0;');
     expect(css).toMatch(
-      /\.system-b-mounted-home-trust-strip \.system-b-mounted-home-trust-strip-label\s*\{[^}]*color: var\(--color-text-tertiary-token\)/
+      /\.system-b-mounted-home-trust-strip \.system-b-mounted-home-trust-strip-label\s*\{[^}]*color: var\(--ds-marketing-eyebrow-color\)/
     );
     expect(css).not.toMatch(
       /\.system-b-mounted-home-trust-strip \.system-b-mounted-home-trust-strip-label\s*\{[^}]*color: var\(--color-text-quaternary-token\)/

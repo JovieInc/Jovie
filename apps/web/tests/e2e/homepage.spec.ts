@@ -272,7 +272,7 @@ test.describe('Homepage', () => {
     }
     await expect(
       page.getByRole('heading', {
-        name: 'Your always-on AI artist manager.',
+        name: 'Release day is not the finish line.',
       })
     ).toBeVisible();
     await expect(page.getByTestId('homepage-ai-composer-demo')).toBeVisible();
@@ -321,7 +321,7 @@ test.describe('Homepage', () => {
       0
     );
     await expect(
-      outcomes.getByRole('heading', { name: 'Every Fan Has A Next Move.' })
+      outcomes.getByRole('heading', { name: 'Every fan has a next move.' })
     ).toBeVisible();
     for (const outcome of ['Drive Streams', 'Capture Fans', 'Get Paid']) {
       await expect(
@@ -362,7 +362,7 @@ test.describe('Homepage', () => {
     await expect(page.getByText('2.9x')).toHaveCount(0);
     await expect(
       closedLoop.getByRole('heading', {
-        name: 'Every Release Makes The Next Move Clearer.',
+        name: 'Every release makes the next move clearer.',
       })
     ).toBeVisible();
     await expect(

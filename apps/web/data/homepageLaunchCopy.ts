@@ -71,9 +71,9 @@ export const HOMEPAGE_LAUNCH_COPY = {
   productStatement: {
     eyebrow: '',
     lead: '',
-    body: 'Your always-on AI artist manager.',
+    body: 'Release day is not the finish line.',
     description:
-      'Jovie finds the next opportunity across every release, fan signal, and playlist move.',
+      'It is the start of the job. You worked too hard on the song to stop there.',
     cards: [
       {
         number: '',
@@ -94,7 +94,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
   },
   aiComposer: {
     headline: 'Ask once. Surface the next opportunity.',
-    body: 'Jovie turns a release into the capture, presave, or pitch your team can ship.',
+    body: 'Drafts and plans built from your catalog, not a blank prompt.',
   },
   intentBand: {
     eyebrow: 'Ask Jovie',
@@ -197,6 +197,11 @@ export const HOMEPAGE_LAUNCH_COPY = {
       question: 'What does Jovie actually do?',
       answer:
         'Connect your music. Jovie watches your catalog, fans, and stream movement, then surfaces specific opportunities. A release worth a presave. A playlist that fits your sound. A fan moment to capture.',
+    },
+    {
+      question: 'Is Jovie a distributor?',
+      answer:
+        'No. Your distributor gets the song onto Spotify and Apple Music. Jovie runs the work that starts after it goes live.',
     },
     {
       question: 'Where does my catalog data come from?',

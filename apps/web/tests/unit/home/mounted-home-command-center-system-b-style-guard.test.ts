@@ -86,5 +86,10 @@ describe('mounted homepage command center System B source contract', () => {
     expect(css).toContain('var(--color-text-primary-token)');
     expect(css).toContain('var(--radius-xl)');
     expect(css).toContain('display: none;');
+    // Content column: the command center inherits its width from the
+    // poster hero media slot (--ds-public-content-max grid column), so the
+    // block itself must not define a competing column width.
+    expect(css).not.toMatch(/max-width\s*:/);
+    expect(css).not.toContain('var(--homepage-section-max)');
   });
 });

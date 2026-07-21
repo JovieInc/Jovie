@@ -46,7 +46,10 @@ describe('mounted homepage footer CTA System B source contract', () => {
       /--homepage-footer-cta-(top|bottom)|\\.home-viewport \\.marketing-footer-premium > div|homepage-final-cta-rays/
     );
     expect(css).toMatch(
-      /(?=.*var\(--system-b-bg-page\))(?=.*var\(--color-text-primary-token\))(?=.*var\(--color-text-tertiary-token\))(?=.*var\(--system-b-app-frame-seam\))(?=.*var\(--homepage-page-gutter\))(?=.*var\(--homepage-section-max\))(?=.*var\(--text-4xl\))(?=.*var\(--text-xs\))(?=.*var\(--space-)(?=.*\.home-viewport \.system-b-mounted-home-footer)(?=.*@media \(max-width: 767px\))(?=.*letter-spacing: 0;)/s
+      /(?=.*var\(--system-b-bg-page\))(?=.*var\(--color-text-primary-token\))(?=.*var\(--color-text-tertiary-token\))(?=.*var\(--system-b-app-frame-seam\))(?=.*var\(--homepage-page-gutter\))(?=.*var\(--ds-public-content-max\))(?=.*var\(--text-4xl\))(?=.*var\(--text-xs\))(?=.*var\(--space-)(?=.*\.home-viewport \.system-b-mounted-home-footer)(?=.*@media \(max-width: 767px\))(?=.*letter-spacing: 0;)/s
     );
+    // Content column: footer locks onto the shared homepage grid
+    // (--ds-public-content-max), not the legacy 90rem --homepage-section-max.
+    expect(css).not.toContain('var(--homepage-section-max)');
   });
 });

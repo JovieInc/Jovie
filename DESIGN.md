@@ -778,6 +778,7 @@ The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical examp
 | Context | Convention | Example |
 |---------|------------|---------|
 | Headings (H1-H4) | Title Case | "Grow Your Audience" |
+| Marketing display headlines | Sentence case | "Jovie runs your music career." |
 | Button labels | Title Case | "Copy Profile Link" |
 | Nav / tab labels | Title Case | "Dashboard", "Identified" |
 | Column headers | Title Case | "Last Action" |
@@ -791,6 +792,13 @@ The `/start` onboarding composer fix (JOV-2496 follow-up) is the canonical examp
 - Never ALL CAPS except abbreviations (LTV, SMS, UTM)
 - Never lowercase first word of a visible label or heading
 - Dynamic strings forming readable phrases must start with a capital letter
+
+**Marketing display exception (founder-directed 2026-07-21):** large Satoshi
+display headlines on marketing/public surfaces (homepage hero and section
+titles) use sentence case — it reads more editorial and premium at display
+sizes. App/UI headings (H1-H4 inside the product) stay Title Case. In JSX,
+mark intentional marketing sentence-case headlines with
+`{/* ui-casing-allow: marketing display headline */}`.
 
 **Utility:** Use `capitalizeFirst()` from `apps/web/lib/utils/string-utils.ts` for dynamic data.
 
