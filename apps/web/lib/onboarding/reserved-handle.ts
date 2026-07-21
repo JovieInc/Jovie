@@ -3,6 +3,7 @@ import 'server-only';
 import { inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { assertAuthenticatedOnboardingUser } from '@/lib/onboarding/ownership-gate';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 const MAX_SUFFIX_ATTEMPTS = 30;
@@ -51,7 +52,18 @@ async function findTakenHandles(candidates: string[]): Promise<Set<string>> {
   return new Set(rows.map(r => r.normalized));
 }
 
-export async function reserveOnboardingHandle(name: string): Promise<string> {
+/**
+ * Pick an available onboarding handle candidate.
+ *
+ * Auth is required: callers that surface "locked in / reserved" success must
+ * only reach this after ownership verification. Fail closed for anonymous.
+ */
+export async function reserveOnboardingHandle(
+  name: string,
+  userId: string
+): Promise<string> {
+  assertAuthenticatedOnboardingUser(userId);
+
   const bases = buildHandleCandidates(name);
 
   // Build all candidates up front, then check availability in a single query

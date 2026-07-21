@@ -120,11 +120,25 @@ const HANDLE_UNIQUE_VIOLATION = new Error(
   'duplicate key value violates unique constraint "creator_profiles_username_normalized_unique"'
 );
 
+function setupConversationSelect(
+  conversation: { id: string; userId: string | null } | null
+) {
+  const limit = vi.fn().mockResolvedValue(conversation ? [conversation] : []);
+  const where = vi.fn().mockReturnValue({ limit });
+  const from = vi.fn().mockReturnValue({ where });
+  mockDbSelect.mockReturnValueOnce({ from });
+}
+
 function setupMessageSelect() {
   const orderBy = vi.fn().mockResolvedValue([{ toolCalls: [] }]);
   const where = vi.fn().mockReturnValue({ orderBy });
   const from = vi.fn().mockReturnValue({ where });
   mockDbSelect.mockReturnValueOnce({ from });
+}
+
+function setupOwnedConversationAndMessages(userId = 'user_1') {
+  setupConversationSelect({ id: 'conv_1', userId });
+  setupMessageSelect();
 }
 
 function setupExistingProfileSelect(profile: Record<string, unknown> | null) {
@@ -209,6 +223,41 @@ describe('materializeClaimedOnboardingProfile', () => {
     mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
   });
 
+  it('fails closed with UNAUTHORIZED when userId is empty (no profile created)', async () => {
+    await expect(
+      materializeClaimedOnboardingProfile({
+        userId: '',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+      })
+    ).rejects.toMatchObject({
+      errorCode: 'UNAUTHORIZED',
+      status: 401,
+    });
+
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+
+  it('blocks non-owners when the conversation belongs to another user', async () => {
+    setupConversationSelect({ id: 'conv_1', userId: 'other_user' });
+
+    await expect(
+      materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+      })
+    ).rejects.toMatchObject({
+      errorCode: 'FORBIDDEN',
+      status: 403,
+    });
+
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockReserveOnboardingHandle).not.toHaveBeenCalled();
+  });
+
   it('skips when chat state has no materializable profile data', async () => {
     mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
       artist: null,
@@ -216,7 +265,7 @@ describe('materializeClaimedOnboardingProfile', () => {
       socialLinks: [],
       interviewSignals: [],
     });
-    setupMessageSelect();
+    setupOwnedConversationAndMessages();
 
     await expect(
       materializeClaimedOnboardingProfile({
@@ -231,12 +280,13 @@ describe('materializeClaimedOnboardingProfile', () => {
       status: 'skipped',
     });
 
-    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    // conversation + messages
+    expect(mockDbSelect).toHaveBeenCalledTimes(2);
     expect(mockDbInsert).not.toHaveBeenCalled();
   });
 
   it('creates a profile using the proposed handle without a pre-insert availability check', async () => {
-    setupMessageSelect();
+    setupOwnedConversationAndMessages();
     setupExistingProfileSelect(null);
     queueProfileInsert({ id: 'profile_new' });
     queuePostPersistWrites();
@@ -280,7 +330,7 @@ describe('materializeClaimedOnboardingProfile', () => {
       services: {},
     });
 
-    setupMessageSelect();
+    setupOwnedConversationAndMessages();
     setupExistingProfileSelect(null);
     const [profileInsertValues] = queueProfileInsert({ id: 'profile_new' });
     queuePostPersistWrites();
@@ -318,7 +368,7 @@ describe('materializeClaimedOnboardingProfile', () => {
   });
 
   it('retries with a reserved handle when INSERT hits a username unique violation', async () => {
-    setupMessageSelect();
+    setupOwnedConversationAndMessages();
     setupExistingProfileSelect(null);
     queueProfileInsert([
       { error: HANDLE_UNIQUE_VIOLATION },
@@ -340,7 +390,10 @@ describe('materializeClaimedOnboardingProfile', () => {
     });
 
     expect(mockReserveOnboardingHandle).toHaveBeenCalledTimes(1);
-    expect(mockReserveOnboardingHandle).toHaveBeenCalledWith('coolartist');
+    expect(mockReserveOnboardingHandle).toHaveBeenCalledWith(
+      'coolartist',
+      'user_1'
+    );
   });
 
   it('reserves a fallback handle when the proposed handle is invalid', async () => {
@@ -360,7 +413,7 @@ describe('materializeClaimedOnboardingProfile', () => {
     });
     mockReserveOnboardingHandle.mockResolvedValue('theweeknd');
 
-    setupMessageSelect();
+    setupOwnedConversationAndMessages();
     setupExistingProfileSelect(null);
     queueProfileInsert({ id: 'profile_reserved' });
     queuePostPersistWrites();
@@ -378,11 +431,14 @@ describe('materializeClaimedOnboardingProfile', () => {
       status: 'created',
     });
 
-    expect(mockReserveOnboardingHandle).toHaveBeenCalledWith('The Weeknd');
+    expect(mockReserveOnboardingHandle).toHaveBeenCalledWith(
+      'The Weeknd',
+      'user_1'
+    );
   });
 
   it('updates an existing profile and retries on handle conflict', async () => {
-    setupMessageSelect();
+    setupOwnedConversationAndMessages();
     setupExistingProfileSelect({
       id: 'profile_existing',
       userId: 'user_1',
