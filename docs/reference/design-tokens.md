@@ -102,4 +102,4 @@ Three consumption patterns:
 
 - Never hardcode theme colors, focus rings, or motion values — ESLint rules (`no-hardcoded-theme-colors`, `no-raw-focus-ring`, `no-raw-motion-values`) guard this.
 - Add new core tokens to `design-system.css`, not `globals.css` or `theme.css`.
-- Prefer the semantic alias for the surface you're on (`--system-b-*` for public app pages, `--app-shell-*` for app chrome, `--linear-*` for marketing) over reaching into primitives.
+- Prefer the semantic alias for the surface you're on (`--system-b-*` for public app pages, `--app-shell-*` for app chrome) over reaching into primitives. Marketing surfaces use System B tokens too — System A is retired (founder-directed 2026-06-18); the remaining `--linear-*` / `.linear-marketing` appliers are a shrink-only ratchet list (`apps/web/tests/unit/design-system/singular-system-b-ratchet.test.ts`), so never add new ones.

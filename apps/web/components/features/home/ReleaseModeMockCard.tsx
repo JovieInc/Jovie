@@ -1,7 +1,7 @@
+import { MarketingSurfaceCard } from '@/components/marketing/MarketingSurfaceCard';
 import { cn } from '@/lib/utils';
 import { HomepageLabelLogoMark } from './HomepageLabelLogoMark';
 import type { HomepageReleaseMock } from './home-surface-seed';
-import { MarketingSurfaceCard } from './MarketingSurfaceCard';
 
 interface ReleaseModeMockCardProps {
   readonly release: HomepageReleaseMock;
