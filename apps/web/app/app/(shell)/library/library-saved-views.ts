@@ -4,9 +4,7 @@ export type LibrarySavedViewId =
   | 'all'
   | 'scheduled'
   | 'drafts'
-  | 'missing-audio'
-  | 'missing-artwork'
-  | 'no-providers'
+  | 'needs-attention'
   | 'recent'
   | 'live-merch';
 
@@ -22,7 +20,7 @@ export const LIBRARY_SAVED_VIEW_STORAGE_KEY = 'jovie:library:saved-view';
 export const LIBRARY_SAVED_VIEWS: readonly LibrarySavedView[] = [
   {
     id: 'all',
-    label: 'All items',
+    label: 'All Items',
     description: 'Full catalog',
     predicate: () => true,
   },
@@ -39,34 +37,23 @@ export const LIBRARY_SAVED_VIEWS: readonly LibrarySavedView[] = [
     predicate: asset => asset.status === 'draft',
   },
   {
-    id: 'missing-audio',
-    label: 'Missing audio',
-    description: 'Releases without a preview',
+    id: 'needs-attention',
+    label: 'Needs Attention',
+    description: 'Items missing audio, artwork, or DSP links',
     predicate: asset =>
-      getLibraryItemKind(asset) === 'release' && !asset.previewUrl,
-  },
-  {
-    id: 'missing-artwork',
-    label: 'Missing artwork',
-    description: 'Items without cover art',
-    predicate: asset => !asset.hasArtwork,
-  },
-  {
-    id: 'no-providers',
-    label: 'No providers',
-    description: 'Releases without DSP links',
-    predicate: asset =>
-      getLibraryItemKind(asset) === 'release' && asset.providerCount === 0,
+      !asset.hasArtwork ||
+      (getLibraryItemKind(asset) === 'release' &&
+        (!asset.previewUrl || asset.providerCount === 0)),
   },
   {
     id: 'recent',
-    label: 'Updated this week',
+    label: 'Updated This Week',
     description: 'Touched in the last 7 days',
     predicate: asset => isWithinDays(asset.updatedAt ?? asset.releaseDate, 7),
   },
   {
     id: 'live-merch',
-    label: 'Live merch',
+    label: 'Live Merch',
     description: 'Merch cards currently for sale',
     predicate: asset =>
       getLibraryItemKind(asset) === 'merch' && asset.status === 'released',

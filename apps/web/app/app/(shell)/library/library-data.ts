@@ -339,3 +339,88 @@ export function formatLibraryDuration(value: number | null): string {
 
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
+
+// Version suffixes that mark the same release re-ingested under a variant
+// title — "All This Noise (Remixed)", "All This Noise EP", "Song - Deluxe".
+const LIBRARY_VERSION_TAG_PATTERN = /\s*[[(][^\])]*[\])]\s*/g;
+const LIBRARY_VERSION_SUFFIX_PATTERN =
+  /[\s–—-]+(ep|single|album|lp|deluxe|remix|remixed|remaster|remastered|edit|version|acoustic|live)$/i;
+
+/**
+ * Normalize a release title so version variants of one release share a key.
+ * Bracketed tags ("(Remixed)") and trailing format/version words ("EP",
+ * "- Deluxe") are stripped; case and whitespace are collapsed.
+ */
+export function normalizeLibraryVersionTitle(title: string): string {
+  let normalized = title
+    .toLowerCase()
+    .replace(LIBRARY_VERSION_TAG_PATTERN, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  for (
+    let stripped = normalized
+      .replace(LIBRARY_VERSION_SUFFIX_PATTERN, '')
+      .trim();
+    stripped.length > 0 && stripped !== normalized;
+    stripped = normalized.replace(LIBRARY_VERSION_SUFFIX_PATTERN, '').trim()
+  ) {
+    normalized = stripped;
+  }
+
+  return normalized || title.trim().toLowerCase();
+}
+
+function libraryVersionGroupKey(asset: LibraryReleaseAsset): string {
+  return `${asset.artist.trim().toLowerCase()}::${normalizeLibraryVersionTitle(asset.title)}`;
+}
+
+function libraryReleaseDateTime(asset: LibraryReleaseAsset): number {
+  if (!asset.releaseDate) return 0;
+  const time = new Date(asset.releaseDate).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+/**
+ * The canonical row for a version group is the most complete ingest: most
+ * tracks, then most provider links, then the newest release date.
+ */
+function isMoreCanonicalVersion(
+  candidate: LibraryReleaseAsset,
+  current: LibraryReleaseAsset
+): boolean {
+  if (candidate.trackCount !== current.trackCount) {
+    return candidate.trackCount > current.trackCount;
+  }
+  if (candidate.providerCount !== current.providerCount) {
+    return candidate.providerCount > current.providerCount;
+  }
+  return libraryReleaseDateTime(candidate) > libraryReleaseDateTime(current);
+}
+
+/**
+ * Version-stack duplicate ingests of the same release into one row (JOV-3089).
+ * Release-kind assets grouped by artist + normalized title collapse to their
+ * most complete row; merch and other item kinds pass through untouched, and
+ * the surviving row keeps its original list position.
+ */
+export function stackLibraryReleaseVersions(
+  assets: readonly LibraryReleaseAsset[]
+): LibraryReleaseAsset[] {
+  const canonicalByKey = new Map<string, LibraryReleaseAsset>();
+
+  for (const asset of assets) {
+    if (getLibraryItemKind(asset) !== 'release') continue;
+    const key = libraryVersionGroupKey(asset);
+    const current = canonicalByKey.get(key);
+    if (!current || isMoreCanonicalVersion(asset, current)) {
+      canonicalByKey.set(key, asset);
+    }
+  }
+
+  return assets.filter(
+    asset =>
+      getLibraryItemKind(asset) !== 'release' ||
+      canonicalByKey.get(libraryVersionGroupKey(asset))?.id === asset.id
+  );
+}
