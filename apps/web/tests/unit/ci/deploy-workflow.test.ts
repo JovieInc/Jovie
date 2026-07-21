@@ -1233,10 +1233,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     const deployAllowlist = deployStep
       .split('\n')
       .find(line => line.includes('--only-secrets='));
-    for (const key of [
-      'AUTH_GOOGLE_CLIENT_ID',
-      'AUTH_GOOGLE_CLIENT_SECRET',
-    ]) {
+    for (const key of ['AUTH_GOOGLE_CLIENT_ID', 'AUTH_GOOGLE_CLIENT_SECRET']) {
       expect(deployAllowlist).toContain(key);
     }
 
@@ -1244,10 +1241,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       workflow,
       'Build (preview target for staging verification)'
     );
-    for (const key of [
-      'AUTH_GOOGLE_CLIENT_ID',
-      'AUTH_GOOGLE_CLIENT_SECRET',
-    ]) {
+    for (const key of ['AUTH_GOOGLE_CLIENT_ID', 'AUTH_GOOGLE_CLIENT_SECRET']) {
       const buildAllowlist = buildStep
         .split('\n')
         .find(line => line.includes('--only-secrets='));
