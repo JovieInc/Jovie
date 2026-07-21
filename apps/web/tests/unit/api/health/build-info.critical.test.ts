@@ -90,7 +90,7 @@ describe('@critical GET /api/health/build-info', () => {
     expect(body.version).not.toBe('0.0.0');
   });
 
-  it('falls back to 0.0.0 only when no app version is configured', async () => {
+  it('falls back to bundled version.json when env version is empty (JOV-3459)', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '');
 
@@ -98,6 +98,19 @@ describe('@critical GET /api/health/build-info', () => {
     const response = GET();
     const body = await response.json();
 
-    expect(body.version).toBe('0.0.0');
+    expect(body.version).not.toBe('0.0.0');
+    expect(body.version).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it('falls back to bundled version.json when env version is the placeholder', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '0.0.0');
+
+    const { GET } = await import('@/app/api/health/build-info/route');
+    const response = GET();
+    const body = await response.json();
+
+    expect(body.version).not.toBe('0.0.0');
+    expect(body.version).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });

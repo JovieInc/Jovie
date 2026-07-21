@@ -26,6 +26,7 @@ import {
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
+import { getVersionUpdateTitle } from '@/components/shell/getVersionUpdateTitle';
 import { InstallBanner } from '@/components/shell/InstallBanner';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
@@ -62,18 +63,6 @@ export interface UnifiedSidebarProps {
 
 const VERSION_DISMISSAL_KEY = 'jovie-version-update-dismissed';
 const VERSION_NOTIFICATION_DELAY_MS = 10_000;
-
-/**
- * Title for the update banner. Omits the version parenthetical when the
- * incoming version is missing or the unresolved '0.0.0' placeholder so the
- * banner never advertises a bogus release (JOV-3459).
- */
-export function getVersionUpdateTitle(info: VersionMismatchInfo): string {
-  const version = info.newVersion?.trim();
-  return version && version !== '0.0.0'
-    ? `New Version Available (v${version})`
-    : 'New Version Available';
-}
 
 /** Render a group of nav items */
 function SettingsNavGroup({
@@ -364,7 +353,7 @@ function ShellSidebarInstallBanner() {
     return null;
   }
 
-  const title = getVersionUpdateTitle(versionUpdate);
+  const title = getVersionUpdateTitle(versionUpdate.newVersion);
 
   return (
     <InstallBanner
