@@ -1,6 +1,7 @@
 import {
   chmodSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -98,6 +99,7 @@ const {
 const {
   primeLighthouseVercelAliasBypass,
   primeLighthouseVercelBypass,
+  recordSensitiveValues,
   validateBuildInfo,
   validateCookieOriginBoundaryHeaders,
 } = require('./lighthouse-vercel-bypass.cjs') as {
@@ -143,6 +145,10 @@ const {
       ) => void;
     }
   ) => Promise<void>;
+  readonly recordSensitiveValues: (
+    path: string | undefined,
+    values: readonly string[]
+  ) => void;
   readonly validateCookieOriginBoundaryHeaders: (
     exactHostHeader: string,
     childHostHeader: string,
@@ -615,6 +621,26 @@ describe('origin-bound Vercel protection bypass', () => {
       secure: true,
       httpOnly: true,
     });
+  });
+
+  it('records only scan-worthy bootstrap cookie values', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-sensitive-values-'));
+    const receipt = join(directory, 'receipt');
+    try {
+      recordSensitiveValues(receipt, [
+        '0',
+        'Phoenix',
+        'AZ',
+        'opaque-cookie-value',
+      ]);
+
+      expect(readFileSync(receipt, 'utf8')).toBe(
+        'Phoenix\nopaque-cookie-value\n'
+      );
+      expect(() => recordSensitiveValues(receipt, ['0', 'AZ'])).toThrow();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('fails closed if browser request headers expose the cookie to a child subdomain', async () => {

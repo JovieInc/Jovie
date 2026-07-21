@@ -26,7 +26,9 @@ const {
 const COOKIE_SCOPE_PROBE_PATH = '/__jovie_cookie_scope_probe__';
 
 function recordSensitiveValues(path, values) {
-  const safeValues = maskSensitiveValues(values);
+  const safeValues = maskSensitiveValues(
+    values.filter(value => value.length >= 4)
+  );
   if (!path) return;
   let expectedIdentity;
   let flags = constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW;
