@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { formatLocationString } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
 import { ArtistNotificationsCTA } from './artist-notifications-cta/ArtistNotificationsCTA';
+import { subscriptionPrimaryActionClassName } from './artist-notifications-cta/shared';
 import type { NotificationSourceContext } from './artist-notifications-cta/types';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
 
@@ -189,7 +190,7 @@ function TourDatesContent({
         <Button
           type='button'
           variant='primary'
-          className='h-11 w-full rounded-full'
+          className='h-9 w-full rounded-full'
           disabled
         >
           Event Alerts
@@ -202,6 +203,8 @@ function TourDatesContent({
           source={emptyStateSourceContext.ctaLocation}
           sourceContext={emptyStateSourceContext}
           triggerLabel='Event Alerts'
+          // Unified 36px CTA scale — matches the Listen CTA on home cards.
+          triggerClassName={`${subscriptionPrimaryActionClassName} h-9! w-full justify-center gap-2 px-4 text-xs`}
           presentation='overlay'
         />
       );
@@ -244,7 +247,7 @@ function TourDatesContent({
     <div data-testid='tour-drawer-list'>
       {groups.map(group => (
         <section key={group.label} className='pb-4'>
-          <div className='px-4 pb-2 pt-3 text-2xs font-bold uppercase tracking-[0.16em] text-white/32'>
+          <div className='px-4 pb-2 pt-3 text-2xs font-semibold text-tertiary-token'>
             {group.label}
           </div>
           <div className='border-y border-white/[0.075]'>

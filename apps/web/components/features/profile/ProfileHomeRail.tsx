@@ -380,7 +380,6 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
             assignment={profilePacAssignment}
             isSubscribed={isSubscribed}
             renderMode={renderMode}
-            artPriority={pacArtPriority}
           />
         }
         trailing={alertsCard}

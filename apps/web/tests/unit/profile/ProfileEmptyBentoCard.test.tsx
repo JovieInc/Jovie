@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
 
 describe('ProfileEmptyBentoCard', () => {
-  it('renders a prominent events bento with full-color gradient background', () => {
+  it('renders a prominent events bento with the standard surface-1 card treatment', () => {
     render(
       <ProfileEmptyBentoCard
         accent='events'
@@ -18,7 +18,7 @@ describe('ProfileEmptyBentoCard', () => {
     );
 
     const card = screen.getByTestId('profile-events-empty-card');
-    expect(card.style.background).toContain('var(--color-accent-blue)');
+    expect(card.style.background).toContain('var(--color-bg-surface-1)');
     expect(screen.getByText('No Events')).toBeVisible();
     expect(
       screen.getByText('Get alerted when shows are announced.')

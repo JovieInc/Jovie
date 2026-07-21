@@ -772,7 +772,6 @@ export function ProfilePacCard({
             src={artImageUrl}
             alt={artImageAlt}
             fill
-            priority={artPriority}
             sizes='(max-width: 767px) 70vw, 300px'
             className='object-cover'
             fallbackVariant='release'
@@ -790,7 +789,7 @@ export function ProfilePacCard({
             below never moves and never clips (zero-CLS contract). */}
         <div className='flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden'>
           <div className='flex items-center justify-between gap-2'>
-            <p className='entity-card-eyebrow truncate text-3xs font-semibold uppercase leading-none tracking-wide text-tertiary-token'>
+            <p className='entity-card-eyebrow truncate text-3xs font-semibold leading-none text-tertiary-token'>
               {contextLabel}
             </p>
             {contextAside}

@@ -359,6 +359,43 @@
   opacity: 0.75;
 }
 
+/* Chromeless top-chrome icon buttons (back / overflow menu): glyph-only by
+   default, with a legibility drop-shadow so the glyph reads over hero media on
+   touch devices that never hover. The pearl circle reveals on hover /
+   focus-visible only. Unlayered on purpose so it beats the layered variant
+   utilities on the same element. */
+.profile-top-chrome-icon {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--profile-status-pill-fg);
+}
+
+.profile-top-chrome-icon > svg {
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.72))
+    drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
+}
+
+@media (hover: hover) {
+  .profile-top-chrome-icon:hover {
+    border-color: var(--profile-pearl-border);
+    background: var(--profile-pearl-bg);
+    box-shadow: var(--profile-pearl-shadow);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+}
+
+.profile-top-chrome-icon:focus-visible {
+  border-color: var(--profile-pearl-border);
+  background: var(--profile-pearl-bg);
+  box-shadow: var(--profile-pearl-shadow);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
 :where(.profile-horizontal-rail) {
   -ms-overflow-style: none;
   scrollbar-width: none;
