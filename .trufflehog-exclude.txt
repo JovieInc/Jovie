@@ -6,3 +6,10 @@ scripts/security/gitleaks-backup-fixture.txt
 # diff-scanned lines (verified 2026-07-20, runs 29785483353/29784648947).
 # gitleaks (.gitleaks.toml) and GitHub secret scanning still cover this file.
 .github/workflows/sonarcloud.yml
+
+# cron/auth.test.ts: fake postgres://user:pass@example DB URLs in timing-safe
+# comparison fixtures (trustedWithVercelUrlOnly et al.) — URI/Postgres detector
+# bait, unverified non-credentials. Phantom-content scans via stale queue refs
+# hit this file (JOV-4333 root fix in flight; this is the parallel mitigation
+# matching .github/workflows/sonarcloud.yml). gitleaks still covers it.
+apps/web/lib/cron/auth.test.ts
