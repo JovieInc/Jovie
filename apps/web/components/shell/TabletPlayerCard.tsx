@@ -106,7 +106,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
             <button
               type='button'
               onClick={onPrevious}
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
+              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
               aria-label='Previous'
             >
               <SkipBack
@@ -118,7 +118,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
             <button
               type='button'
               onClick={onPlay}
-              className='h-9 w-9 rounded-full grid place-items-center border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
+              className='h-9 w-9 rounded-full grid place-items-center border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
@@ -138,7 +138,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
             <button
               type='button'
               onClick={onNext}
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
+              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
               aria-label='Next'
             >
               <SkipForward

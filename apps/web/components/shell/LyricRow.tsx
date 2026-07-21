@@ -76,7 +76,7 @@ export const LyricRow = React.memo(function LyricRow({
           data-focused={isFocused && !isActive ? '' : undefined}
           className={cn(
             'group/lyric block w-full text-center cursor-pointer select-none bg-transparent border-0 p-0',
-            'transition-[color,opacity,transform] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+            'transition-[color,opacity,transform] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
             isActive
               ? 'text-primary-token text-3xl leading-[1.25] font-display opacity-100'
               : 'text-tertiary-token text-xl leading-[1.35] font-display opacity-60 hover:opacity-90 hover:text-secondary-token'
@@ -111,7 +111,7 @@ export const LyricRow = React.memo(function LyricRow({
         type='button'
         onClick={onStamp}
         className={cn(
-          'shrink-0 h-6 px-1.5 rounded text-3xs tabular-nums font-caption transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+          'shrink-0 h-6 px-1.5 rounded text-3xs tabular-nums font-caption transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
           isActive
             ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
             : 'text-tertiary-token bg-surface-1 border border-(--linear-app-shell-border) hover:text-primary-token hover:border-cyan-500/40'

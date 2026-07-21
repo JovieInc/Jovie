@@ -274,7 +274,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             onClick={e => onThreadContextMenu(e, thread)}
             aria-label={`Chat Actions for ${thread.title}`}
             className={cn(
-              'absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+              'absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
               'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
             )}
           >

@@ -71,7 +71,7 @@ export function JovieOverlay({
               <Mic className='h-3.5 w-3.5' strokeWidth={2.5} />
               <span
                 aria-hidden='true'
-                className='absolute inset-0 rounded-full ring-2 ring-(--linear-border-focus)/35 anim-calm-halo'
+                className='absolute inset-0 rounded-full ring-2 ring-ring/35 anim-calm-halo'
               />
             </span>
             <div className='flex-1 min-w-0'>

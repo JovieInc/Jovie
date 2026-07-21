@@ -134,7 +134,7 @@ export function InlineEditRow({
           aria-label={`Edit ${label}`}
           className={cn(
             valueClass,
-            'bg-transparent outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/24 rounded-sm'
+            'bg-transparent outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/24 rounded-sm'
           )}
         />
       </div>
@@ -178,7 +178,7 @@ export function InlineEditRow({
             enterEdit();
           }}
           aria-label={`Edit ${label}`}
-          className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-opacity duration-subtle ease-subtle'
+          className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-opacity duration-subtle ease-subtle'
         >
           <Pencil className='h-3 w-3' strokeWidth={2.25} />
         </button>

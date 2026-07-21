@@ -84,7 +84,7 @@ describe('ThreadView shell contract', () => {
       'utf8'
     );
 
-    expect(source).toContain('px-(--linear-app-header-padding-x)');
+    expect(source).toContain('px-app-header');
     expect(source).toContain('max-w-[44rem]');
     expect(source).toContain('env(safe-area-inset-bottom)');
     expect(source).toContain('shadow-popover');

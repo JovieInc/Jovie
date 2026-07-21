@@ -131,7 +131,7 @@ export function ScrubGradient({
       <span className={cn(TIME_LABEL, 'text-right')}>
         {formatTime(safeCurrent)}
       </span>
-      <div className='relative flex-1 min-w-15 h-8 rounded-sm focus-within:ring-1 focus-within:ring-(--linear-border-focus)'>
+      <div className='relative flex-1 min-w-15 h-8 rounded-sm focus-within:ring-1 focus-within:ring-ring'>
         <svg
           viewBox={`0 0 ${SCRUB_W} ${SCRUB_H}`}
           className='w-full h-full overflow-visible'

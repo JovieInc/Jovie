@@ -78,7 +78,7 @@ export const SidebarBottomNowPlaying = React.memo(
           type='button'
           onClick={onPlay}
           aria-label={isPlaying ? 'Pause' : 'Play'}
-          className='shrink-0 h-7 w-7 rounded-full grid place-items-center text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
+          className='shrink-0 h-7 w-7 rounded-full grid place-items-center text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
         >
           {isPlaying ? (
             <Pause className='h-3 w-3' strokeWidth={2.5} fill='currentColor' />
