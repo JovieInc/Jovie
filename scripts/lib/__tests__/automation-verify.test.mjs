@@ -277,6 +277,28 @@ const NEON_ATTEMPT_ARTIFACT_MANIFEST = [
 ];
 
 describe('automation-verify affected scope', () => {
+  it('keeps a production workflow contract-only diff on focused coverage', () => {
+    const plan = buildAffectedTestPlan([
+      '.github/workflows/production-release.yml',
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+    ]);
+  });
+
+  it('fails closed when the production workflow contract includes unknown source', () => {
+    expect(
+      buildAffectedTestPlan([
+        '.github/workflows/production-release.yml',
+        'apps/web/lib/unknown-production-release.ts',
+        'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('keeps runner I/O admission on focused controller regressions', () => {
     const plan = buildAffectedTestPlan(RUNNER_IO_PRESSURE_MANIFEST);
 
@@ -1124,8 +1146,21 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('runs a directly changed profiler test without requiring its repair manifest', () => {
+    const plan = buildAffectedTestPlan([
+      'apps/web/scripts/test-performance-profiler.test.ts',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/scripts/test-performance-profiler.test.ts',
+    ]);
+  });
+
   it.each(
-    PERFORMANCE_PROFILER_REPAIR_ANCHORS
+    PERFORMANCE_PROFILER_REPAIR_ANCHORS.filter(
+      input => input !== 'apps/web/scripts/test-performance-profiler.test.ts'
+    )
   )('fails closed when the profiler repair input %s is standalone', input => {
     expect(buildAffectedTestPlan([input]).mode).toBe('full');
   });

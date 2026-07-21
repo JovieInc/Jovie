@@ -446,9 +446,6 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactNeonAttemptArtifactRepair =
     neonAttemptArtifactInputCount === NEON_ATTEMPT_ARTIFACT_MANIFEST.size &&
     files.length === NEON_ATTEMPT_ARTIFACT_MANIFEST.size;
-  const performanceProfilerRepairInputCount = files.filter(file =>
-    PERFORMANCE_PROFILER_REPAIR_ANCHORS.has(file)
-  ).length;
   const isExactPerformanceProfilerRepairPrimary =
     files.length === PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.size &&
     files.every(file => PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST.has(file));
@@ -461,9 +458,6 @@ export function buildAffectedTestPlan(changedFiles) {
   const isExactScannerLoadRepairWithSelector =
     files.length === SCANNER_LOAD_REPAIR_MANIFEST.size &&
     files.every(file => SCANNER_LOAD_REPAIR_MANIFEST.has(file));
-  const scannerLoadRepairInputCount = files.filter(file =>
-    SCANNER_LOAD_REPAIR_MANIFEST.has(file)
-  ).length;
   const isExactPerformanceProfilerRepairWithSelector =
     isExactPerformanceProfilerRepairWithSelectorLegacy ||
     isExactScannerLoadRepairWithSelector;
@@ -561,6 +555,9 @@ export function buildAffectedTestPlan(changedFiles) {
       // Per docs/PR_FLOW.md, Playwright remains in hosted manual/deep lanes.
       !(isExactMobileOverflowNavigationRace && file.endsWith('.spec.ts'))
   );
+  const directTestFiles = new Set(directTests);
+  const hasManifestInputBeyondDirectTests = manifest =>
+    files.some(file => manifest.has(file) && !directTestFiles.has(file));
   const mandatoryTests = [];
   const hasSeedConfirmationChange = files.some(
     file =>
@@ -790,9 +787,10 @@ export function buildAffectedTestPlan(changedFiles) {
   const hasUnknownPrerequisiteTrainPeer =
     hasPrerequisiteTrainCorners && !isExactPrerequisiteTrain;
   const hasIncompleteVercelCongestionControl =
-    vercelCongestionControlInputCount > 0 && !isExactVercelCongestionControl;
+    hasManifestInputBeyondDirectTests(VERCEL_CONGESTION_CONTROL_MANIFEST) &&
+    !isExactVercelCongestionControl;
   const hasIncompleteAffectedTestSelector =
-    affectedTestSelectorInputCount > 0 &&
+    hasManifestInputBeyondDirectTests(AFFECTED_TEST_SELECTOR_MANIFEST) &&
     !isExactAffectedTestSelector &&
     !isExactAuthenticatedA11yRepair &&
     !isExactGoldenPathSmokeContractRepair &&
@@ -807,11 +805,11 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactLayoutGuardContract &&
     !isExactPrSizeGuardWithSelector;
   const hasIncompletePrSizeGuard =
-    prSizeGuardInputCount > 0 &&
+    hasManifestInputBeyondDirectTests(PR_SIZE_GUARD_MANIFEST) &&
     !isExactPrSizeGuard &&
     !isExactPrSizeGuardWithSelector;
   const hasIncompletePerformanceProfilerRepair =
-    performanceProfilerRepairInputCount > 0 &&
+    hasManifestInputBeyondDirectTests(PERFORMANCE_PROFILER_REPAIR_ANCHORS) &&
     !isExactPerformanceProfilerRepair &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactNeonAttemptArtifactRepair &&
@@ -821,7 +819,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract;
   const hasIncompleteScannerLoadRepair =
-    scannerLoadRepairInputCount > 0 &&
+    hasManifestInputBeyondDirectTests(SCANNER_LOAD_REPAIR_MANIFEST) &&
     !isExactScannerLoadRepairPrimary &&
     !isExactScannerLoadRepairWithSelector &&
     !isExactAffectedTestSelector &&
@@ -839,7 +837,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactLayoutGuardContract &&
     !isExactPrSizeGuardWithSelector;
   const hasIncompleteGtmqSourceGateReaper =
-    gtmqSourceGateReaperInputCount > 0 &&
+    hasManifestInputBeyondDirectTests(GTMQ_SOURCE_GATE_REAPER_MANIFEST) &&
     !isExactGtmqSourceGateReaper &&
     !isExactAuthenticatedA11yRepair &&
     !isExactGoldenPathSmokeContractRepair &&
@@ -855,7 +853,9 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactLayoutGuardContract &&
     !isExactPrSizeGuardWithSelector;
   const hasIncompleteMobileOverflowNavigationRace =
-    mobileOverflowNavigationRaceInputCount > 0 &&
+    hasManifestInputBeyondDirectTests(
+      MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST
+    ) &&
     !isExactMobileOverflowNavigationRace &&
     !isExactAuthenticatedA11yRepair &&
     !isExactAffectedTestSelector &&
@@ -870,7 +870,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactLayoutGuardContract &&
     !isExactPrSizeGuardWithSelector;
   const hasIncompleteRunnerIoPressure =
-    runnerIoPressureInputCount > 0 &&
+    hasManifestInputBeyondDirectTests(RUNNER_IO_PRESSURE_MANIFEST) &&
     !isExactRunnerIoPressure &&
     !isExactAuthenticatedA11yRepair &&
     !isExactGoldenPathSmokeContractRepair &&
@@ -885,7 +885,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactLayoutGuardContract &&
     !isExactPrSizeGuardWithSelector;
   const hasIncompleteRunnerPrerequisiteContract =
-    runnerPrerequisiteContractInputCount > 0 &&
+    hasManifestInputBeyondDirectTests(RUNNER_PREREQUISITE_CONTRACT_MANIFEST) &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactAuthenticatedA11yRepair &&
     !isExactAffectedTestSelector &&
@@ -901,7 +901,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactRunnerIoPressure &&
     !isExactPrSizeGuardWithSelector;
   const hasIncompleteLayoutGuardContract =
-    layoutGuardContractInputCount > 0 &&
+    hasManifestInputBeyondDirectTests(LAYOUT_GUARD_CONTRACT_MANIFEST) &&
     !isExactLayoutGuardContract &&
     !isExactAuthenticatedA11yRepair &&
     !isExactPrerequisiteTrain &&
@@ -917,7 +917,7 @@ export function buildAffectedTestPlan(changedFiles) {
     !isExactRunnerIoPressure &&
     !isExactPrSizeGuardWithSelector;
   const hasIncompleteNeonAttemptArtifactRepair =
-    neonAttemptArtifactInputCount > 0 &&
+    hasManifestInputBeyondDirectTests(NEON_ATTEMPT_ARTIFACT_MANIFEST) &&
     !isExactNeonAttemptArtifactRepair &&
     !isExactAuthenticatedA11yRepair &&
     !isExactPrerequisiteTrain &&
