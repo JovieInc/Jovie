@@ -15,10 +15,12 @@ export type WaitlistDisplayOutcome =
 interface WaitlistOutcomeViewProps {
   readonly outcome: WaitlistDisplayOutcome;
   readonly onRetry?: () => void;
+  /** Confirmed email already collected — required before email promises. */
+  readonly confirmedEmail?: string | null;
 }
 
-const OUTCOME_COPY: Record<
-  WaitlistOutcomeViewProps['outcome'],
+function buildOutcomeCopy(hasConfirmedEmail: boolean): Record<
+  WaitlistDisplayOutcome,
   {
     readonly title: string;
     readonly body: string;
@@ -26,58 +28,72 @@ const OUTCOME_COPY: Record<
     readonly actionLabel?: string;
     readonly actionHref?: string;
   }
-> = {
-  accepted: {
-    title: 'You Have Access',
-    body: 'We saved your release context. Continue setup to finish your profile and open Jovie.',
-    icon: CheckCircle2,
-    actionLabel: 'Continue Setup',
-    actionHref: APP_ROUTES.START,
-  },
-  already_accepted: {
-    title: 'You Have Access',
-    body: 'Your request has already been approved. Continue setup to finish your profile.',
-    icon: CheckCircle2,
-    actionLabel: 'Continue Setup',
-    actionHref: APP_ROUTES.START,
-  },
-  waitlisted_gate_on: {
-    title: 'Request Saved',
-    body: 'We saved your release context and profile details. Jovie is in a private rollout, and we will email you when access opens.',
-    icon: Clock3,
-  },
-  waitlisted_capacity_full: {
-    title: "Today's Access Is Full",
-    body: "Your request is complete and saved. Today's access slots are full, so you are on the waitlist.",
-    icon: Clock3,
-  },
-  already_waitlisted: {
-    title: 'Request Already Received',
-    body: 'Your request is already saved. We will keep your latest answers attached to your access request.',
-    icon: Clock3,
-  },
-  pending: {
-    title: "You're on the list",
-    body: "We'll email you when your account is ready.",
-    icon: Clock3,
-  },
-  save_failed: {
-    title: "We Couldn't Save This",
-    body: 'Your answers are still on this device. Try again so we can save the required fields before reviewing access.',
-    icon: RotateCcw,
-  },
-  rate_limited: {
-    title: 'Too Many Attempts',
-    body: 'Please wait a moment before trying again. Your answers are still on this device.',
-    icon: Clock3,
-  },
-};
+> {
+  const emailWhenReady = hasConfirmedEmail
+    ? ' We will email you when access opens.'
+    : ' Add an email on your account if you want a heads-up when access opens.';
+
+  return {
+    accepted: {
+      title: 'You Have Access',
+      body: 'We saved your release context. Continue setup to finish your profile and open Jovie.',
+      icon: CheckCircle2,
+      actionLabel: 'Continue Setup',
+      actionHref: APP_ROUTES.START,
+    },
+    already_accepted: {
+      title: 'You Have Access',
+      body: 'Your request has already been approved. Continue setup to finish your profile.',
+      icon: CheckCircle2,
+      actionLabel: 'Continue Setup',
+      actionHref: APP_ROUTES.START,
+    },
+    waitlisted_gate_on: {
+      title: 'Request Saved',
+      body: `We saved your release context and profile details. Jovie is in a private rollout.${emailWhenReady}`,
+      icon: Clock3,
+    },
+    waitlisted_capacity_full: {
+      title: "Today's Access Is Full",
+      body: `Your request is complete and saved. Today's access slots are full, so you are on the waitlist.${
+        hasConfirmedEmail ? emailWhenReady : ''
+      }`,
+      icon: Clock3,
+    },
+    already_waitlisted: {
+      title: 'Request Already Received',
+      body: 'Your request is already saved. We will keep your latest answers attached to your access request.',
+      icon: Clock3,
+    },
+    pending: {
+      title: "You're on the list",
+      body: hasConfirmedEmail
+        ? "We'll email you when your account is ready."
+        : 'Your request is saved. Add an email on your account if you want a heads-up when access opens.',
+      icon: Clock3,
+    },
+    save_failed: {
+      title: "We Couldn't Save This",
+      body: 'Your answers are still on this device. Try again so we can save the required fields before reviewing access.',
+      icon: RotateCcw,
+    },
+    rate_limited: {
+      title: 'Too Many Attempts',
+      body: 'Please wait a moment before trying again. Your answers are still on this device.',
+      icon: Clock3,
+    },
+  };
+}
 
 export function WaitlistOutcomeView({
   outcome,
   onRetry,
+  confirmedEmail = null,
 }: Readonly<WaitlistOutcomeViewProps>) {
-  const copy = OUTCOME_COPY[outcome];
+  const hasConfirmedEmail = Boolean(
+    confirmedEmail && confirmedEmail.includes('@')
+  );
+  const copy = buildOutcomeCopy(hasConfirmedEmail)[outcome];
   const Icon = copy.icon;
   const canRetry =
     (outcome === 'save_failed' || outcome === 'rate_limited') && onRetry;

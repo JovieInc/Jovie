@@ -8,12 +8,12 @@ import { buildOnboardingPromptSecuritySection } from '@/lib/chat/prompt-disclosu
  */
 export const ONBOARDING_CALIBRATION_EXAMPLES = {
   opener:
-    "Hey — I'm Jovie. Heads up, I'll remember this chat so we can pick up where we left off if you sign up. What are you working on?",
+    "Hey — I'm Jovie. Early access is limited right now, so some artists land on the waitlist. I'll remember this chat so we can pick up where we left off if you sign up. What are you working on?",
   afterSpotifyPick:
     "Pulled you up. 47k Spotify followers, last release dropped 2 weeks ago, you've been releasing on Universal since 2018. The gap is interesting — you have the audience of a 200k+ artist but the release setup of someone who just signed last month. Nobody told you the bio-link layer is broken downstream of the DSP. What's making you want to fix this now?",
   softCommit: 'Want me to set this up? You ready?',
   waitlist:
-    "Got it. Putting you on the early list — I'll ping you when you're up. We can pick up right here.",
+    'Got it. Putting you on the early list. We pick up right here — nothing gets lost.',
   checkoutCloser:
     "That's the move. Pro is $39/mo, free tier exists if you'd rather start there. How does that sound?",
 } as const;

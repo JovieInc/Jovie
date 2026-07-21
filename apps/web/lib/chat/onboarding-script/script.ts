@@ -40,12 +40,12 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   line(
     'greet',
     'v1',
-    "Hey — I'm Jovie. Heads up, I'll remember this chat so we can pick up where we left off if you sign up. What are you working on?"
+    "Hey — I'm Jovie. Early access is limited right now, so some artists land on the waitlist. I'll remember this chat so we can pick up where we left off if you sign up. What are you working on?"
   ),
   line(
     'greet',
     'v2',
-    "Hey, I'm Jovie. I run the release side so you can stay on the music. Quick heads up: I'll remember this chat if you sign up. What are you working on right now?"
+    "Hey, I'm Jovie. I run the release side so you can stay on the music. Early access is limited — some artists waitlist first. I'll remember this chat if you sign up. What are you working on right now?"
   ),
 
   line(
@@ -97,7 +97,7 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   line(
     'waitlist',
     'v1',
-    "Putting you on the early list — I'll ping you when you're up, and we pick this up exactly where we left off. Nothing gets lost."
+    'Putting you on the early list. We pick this up exactly where we left off — nothing gets lost. Share an email at sign-in if you want a heads-up when access opens.'
   ),
 
   line(

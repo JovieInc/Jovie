@@ -9,11 +9,13 @@ import {
 interface WaitlistSuccessViewProps {
   readonly outcome?: WaitlistDisplayOutcome;
   readonly onRetry?: () => void;
+  readonly confirmedEmail?: string | null;
 }
 
 export function WaitlistSuccessView({
   outcome = 'pending',
   onRetry,
+  confirmedEmail = null,
 }: Readonly<WaitlistSuccessViewProps>) {
   return (
     <AuthLayout
@@ -21,7 +23,11 @@ export function WaitlistSuccessView({
       showFormTitle={false}
       showFooterPrompt={false}
     >
-      <WaitlistOutcomeView outcome={outcome} onRetry={onRetry} />
+      <WaitlistOutcomeView
+        outcome={outcome}
+        onRetry={onRetry}
+        confirmedEmail={confirmedEmail}
+      />
     </AuthLayout>
   );
 }

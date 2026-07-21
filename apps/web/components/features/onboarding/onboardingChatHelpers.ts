@@ -109,13 +109,15 @@ export function isArtistConfirmedOutput(
 export function isHandleCheckOutput(
   output: unknown
 ): output is HandleCheckOutput {
-  return asRecord(output)?.action === 'check_handle';
+  const action = asRecord(output)?.action;
+  return action === 'check_handle' || action === 'handle_confirmed';
 }
 
 export function isSocialLinkOutput(
   output: unknown
 ): output is SocialLinkOutput {
-  return asRecord(output)?.action === 'propose_social_link';
+  const action = asRecord(output)?.action;
+  return action === 'propose_social_link' || action === 'social_attached';
 }
 
 export function getInputQuery(part: ToolPart): string | null {

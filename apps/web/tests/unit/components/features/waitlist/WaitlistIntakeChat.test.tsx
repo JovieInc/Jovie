@@ -33,6 +33,20 @@ describe('WaitlistIntakeChat', () => {
     fetchMock.mockReset();
   });
 
+  it('does not advance required steps on incomplete ack answers', async () => {
+    render(<WaitlistIntakeChat userEmail='artist@example.com' />);
+
+    const input = screen.getByRole('textbox');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'k');
+    await userEvent.click(screen.getByRole('button', { name: /send answer/i }));
+
+    expect(
+      screen.getByText(/real answer|short acks|real handle/i)
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('surfaces rate-limited intake responses from non-OK submissions', async () => {
     fetchMock.mockResolvedValue(
       new Response(

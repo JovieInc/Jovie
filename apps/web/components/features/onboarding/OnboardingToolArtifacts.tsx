@@ -11,6 +11,11 @@ import {
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import {
+  ATTACH_ACCOUNT_CTA_LABEL,
+  CONFIRM_HANDLE_CTA_LABEL,
+  NONE_OF_THESE_CTA_LABEL,
+} from '@/lib/chat/onboarding-script/widget-events';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useHandleAvailabilityQuery } from '@/lib/queries/useHandleAvailabilityQuery';
@@ -52,13 +57,13 @@ export interface ArtistConfirmedOutput {
 }
 
 export interface HandleCheckOutput {
-  readonly action?: 'check_handle';
+  readonly action?: 'check_handle' | 'handle_confirmed';
   readonly handle?: string;
 }
 
 export interface SocialLinkOutput {
-  readonly action?: 'propose_social_link';
-  readonly url?: string;
+  readonly action?: 'propose_social_link' | 'social_attached';
+  readonly url?: string | null;
 }
 
 export interface OnboardingArtistSelection {
@@ -278,11 +283,13 @@ export function OnboardingSpotifyArtistPickerCard({
   inputQuery,
   disabled = false,
   onSelectArtist,
+  onNoneOfThese,
 }: ToolArtifactProps & {
   readonly output?: ArtistPickerOutput | null;
   readonly inputQuery?: string | null;
   readonly disabled?: boolean;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
+  readonly onNoneOfThese?: () => void;
 }) {
   const initialQuery = output?.query ?? inputQuery ?? '';
   const [query, setQuery] = useState(initialQuery);
@@ -293,6 +300,13 @@ export function OnboardingSpotifyArtistPickerCard({
     minQueryLength: 1,
   });
   const { search, searchImmediate, clear } = artistSearch;
+
+  // Keep the field prefilled when the tool re-opens with a new query from chat.
+  useEffect(() => {
+    if (initialQuery && !query) {
+      setQuery(initialQuery);
+    }
+  }, [initialQuery, query]);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -419,6 +433,21 @@ export function OnboardingSpotifyArtistPickerCard({
             }}
           />
         ))}
+
+        {!isSearching && results.length > 0 && onNoneOfThese ? (
+          <button
+            type='button'
+            onClick={() => {
+              if (disabled) return;
+              onNoneOfThese();
+            }}
+            disabled={disabled || selectedId !== null}
+            className='flex w-full items-center justify-center rounded-lg px-2.5 py-2 text-xs font-medium text-secondary-token transition-colors duration-fast hover:bg-white/[0.045] hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
+            data-testid='onboarding-artist-none-of-these'
+          >
+            {NONE_OF_THESE_CTA_LABEL}
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -516,14 +545,19 @@ export function OnboardingArtistConfirmedCard({
 
 export function OnboardingHandleCheckCard({
   onHandleCandidateChange,
+  onConfirmHandle,
   state,
   output,
+  disabled = false,
 }: ToolArtifactProps & {
   readonly onHandleCandidateChange?: (handle: string | null) => void;
+  readonly onConfirmHandle?: (handle: string) => void;
   readonly output?: HandleCheckOutput | null;
+  readonly disabled?: boolean;
 }) {
   const handle = output?.handle?.replace(/^@/, '').toLowerCase() ?? null;
   const [draftHandle, setDraftHandle] = useState(handle ?? '');
+  const [confirmed, setConfirmed] = useState(false);
   const normalizedDraft = draftHandle.replace(/^@/, '').trim().toLowerCase();
   const availability = useHandleAvailabilityQuery({
     handle: normalizedDraft || null,
@@ -565,6 +599,12 @@ export function OnboardingHandleCheckCard({
   const available = availability.data?.available;
   const error = availability.data?.error;
   const profilePath = normalizedDraft ? `jov.ie/${normalizedDraft}` : null;
+  const canConfirm =
+    Boolean(normalizedDraft) &&
+    available === true &&
+    !loading &&
+    !disabled &&
+    !confirmed;
 
   return (
     <div
@@ -609,16 +649,17 @@ export function OnboardingHandleCheckCard({
             <span className='text-app text-tertiary-token' aria-hidden>
               @
             </span>
-            <span className='sr-only'>Edit proposed handle</span>
+            <span className='sr-only'>Edit Proposed Handle</span>
             <input
-              aria-label='Edit proposed handle'
+              aria-label='Edit Proposed Handle'
               value={draftHandle}
               onChange={event => setDraftHandle(event.target.value)}
               className='min-w-0 flex-1 bg-transparent px-0.5 text-app leading-5 text-primary-token placeholder:text-quaternary-token focus:outline-none'
-              placeholder='handle'
+              placeholder='Handle'
               inputMode='text'
               autoCapitalize='none'
               spellCheck={false}
+              disabled={disabled || confirmed}
             />
           </label>
           <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
@@ -627,6 +668,26 @@ export function OnboardingHandleCheckCard({
                 ? 'Try a sharper variant.'
                 : (profilePath ?? 'Edit the handle before it is claimed.'))}
           </p>
+          {onConfirmHandle ? (
+            <button
+              type='button'
+              data-testid='onboarding-confirm-handle'
+              disabled={!canConfirm}
+              onClick={() => {
+                if (!canConfirm || !normalizedDraft) return;
+                setConfirmed(true);
+                onConfirmHandle(normalizedDraft);
+              }}
+              className={cn(
+                'mt-3 inline-flex h-9 items-center justify-center rounded-full px-3.5 text-app font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20',
+                canConfirm
+                  ? 'bg-white text-black hover:bg-white/90 dark:bg-white dark:text-black'
+                  : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
+              )}
+            >
+              {confirmed ? 'Handle Confirmed' : CONFIRM_HANDLE_CTA_LABEL}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>
@@ -636,9 +697,21 @@ export function OnboardingHandleCheckCard({
 export function OnboardingSocialLinkCard({
   state,
   output,
+  onAttachAccount,
+  disabled = false,
 }: ToolArtifactProps & {
   readonly output?: SocialLinkOutput | null;
+  readonly onAttachAccount?: (url: string) => void;
+  readonly disabled?: boolean;
 }) {
+  const initialUrl = output?.url ?? '';
+  const [draftUrl, setDraftUrl] = useState(initialUrl);
+  const [attached, setAttached] = useState(false);
+
+  useEffect(() => {
+    if (initialUrl) setDraftUrl(initialUrl);
+  }, [initialUrl]);
+
   if (isFailed(state)) {
     return (
       <StatusShell
@@ -650,7 +723,7 @@ export function OnboardingSocialLinkCard({
     );
   }
 
-  if (isRunning(state) || !output?.url) {
+  if (isRunning(state) && !output) {
     return (
       <StatusShell
         icon={
@@ -661,15 +734,72 @@ export function OnboardingSocialLinkCard({
     );
   }
 
-  const host = hostnameFor(output.url);
+  const trimmed = draftUrl.trim();
+  const host = hostnameFor(trimmed || undefined);
+  const canAttach =
+    Boolean(trimmed) &&
+    Boolean(host) &&
+    !disabled &&
+    !attached &&
+    Boolean(onAttachAccount);
 
   return (
-    <StatusShell
-      icon={<Link2 className='h-3.5 w-3.5' />}
-      title='Link ready to attach'
-      body={host ?? output.url}
-      tone='success'
-    />
+    <div
+      className='w-full max-w-110 px-1 py-2 text-primary-token'
+      data-testid='onboarding-social-link'
+      role='status'
+    >
+      <div className='flex items-start gap-3'>
+        <span
+          className='mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-secondary-token'
+          aria-hidden
+        >
+          <Link2 className='h-3.5 w-3.5' />
+        </span>
+        <div className='min-w-0 flex-1'>
+          <p className='text-sm font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
+            {host ? 'Link ready to attach' : 'Attach a public social account'}
+          </p>
+          <label className='mt-2 flex h-9 items-center rounded-lg border border-subtle bg-surface-0 px-2.5 focus-within:border-white/[0.16] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.035)]'>
+            <span className='sr-only'>Social Profile URL</span>
+            <input
+              aria-label='Social Profile URL'
+              value={draftUrl}
+              onChange={event => setDraftUrl(event.target.value)}
+              className='min-w-0 flex-1 bg-transparent text-app leading-5 text-primary-token placeholder:text-quaternary-token focus:outline-none'
+              placeholder='https://instagram.com/yourname'
+              inputMode='url'
+              autoCapitalize='none'
+              spellCheck={false}
+              disabled={disabled || attached}
+            />
+          </label>
+          <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
+            {host ?? 'Paste the full URL fans already use.'}
+          </p>
+          {onAttachAccount ? (
+            <button
+              type='button'
+              data-testid='onboarding-attach-account'
+              disabled={!canAttach}
+              onClick={() => {
+                if (!canAttach || !trimmed) return;
+                setAttached(true);
+                onAttachAccount(trimmed);
+              }}
+              className={cn(
+                'mt-3 inline-flex h-9 items-center justify-center rounded-full px-3.5 text-app font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20',
+                canAttach
+                  ? 'bg-white text-black hover:bg-white/90 dark:bg-white dark:text-black'
+                  : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
+              )}
+            >
+              {attached ? 'Account Attached' : ATTACH_ACCOUNT_CTA_LABEL}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 

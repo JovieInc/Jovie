@@ -6,7 +6,7 @@ import type { ChatSuggestion } from '@/components/jovie/types';
  * model stay aligned on memory disclosure + one intake question.
  */
 export const ONBOARDING_WELCOME_MESSAGE =
-  "Hey — I'm Jovie. Heads up, I'll remember this chat so we can pick up where we left off if you sign up. What are you working on?";
+  "Hey — I'm Jovie. Early access is limited right now, so some artists land on the waitlist. I'll remember this chat so we can pick up where we left off if you sign up. What are you working on?";
 
 /** Starter pills for the anonymous /start empty state. */
 export const ONBOARDING_STARTER_SUGGESTIONS: readonly ChatSuggestion[] = [
