@@ -8,4 +8,9 @@ set -e  # Required: ensures pre-push-gate.sh failure actually blocks pushes
 # AUTOMATION_VERIFY_MAX_WORKERS overrides.
 export AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-1}"
 
+# NOTE: git holds the ssh receive-pack connection open across this hook.
+# GitHub kills it after ~10 idle minutes, and a long gate then surfaces as
+# `git push` dying with SIGPIPE (exit 141) right after the last check —
+# scripts/setup.sh sets core.sshCommand keepalives to prevent that.
+
 bash scripts/hooks/pre-push-gate.sh affected

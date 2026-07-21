@@ -161,4 +161,17 @@ describe('pre-push gate Node and fanout wiring (JOV-4329)', () => {
       '--max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}"'
     );
   });
+
+  it('wires ssh keepalives into setup so long gates do not SIGPIPE git push', () => {
+    // git push holds the ssh receive-pack connection open across the hook;
+    // GitHub closes idle connections (~10 min) and git then dies with exit
+    // 141 right after a long gate. setup.sh must set core.sshCommand
+    // keepalives, and the hook must document why they matter.
+    const setupSh = readFileSync(resolve(repoRoot, 'scripts/setup.sh'), 'utf8');
+    expect(setupSh).toContain(
+      'ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=10'
+    );
+    expect(setupSh).toContain('config core.sshCommand');
+    expect(huskyPrePush).toContain('SIGPIPE');
+  });
 });
