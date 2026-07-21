@@ -16,6 +16,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ## [Unreleased]
 - [internal] **App shell loading skeleton** matches `DESIGN_V1` so flag-on users no longer flash the legacy sidebar/header on first `/app` paint.
 
+- [internal] **Post-deploy probes now identify CLI-built production deployments (JOV-4366):** exact immutable build identity replaces optional Vercel source metadata while preserving project, deployment, origin, environment, and main-ancestry proofs.
 - **[internal] Staging Better Auth Google OAuth credentials now reach the Vercel build and runtime deploy (#14659):** the release workflow allowlists and forwards both Google client keys, failing closed when either is absent.
 - **Suggested DSP matches no longer flash a skeleton then collapse (JOV-4159):** when the Music drawer loads with no match suggestions (the common case), the section stays empty instead of flashing skeleton rows and shifting sibling content.
 - **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; build-info prefers the stamped release version (and falls back to bundled `version.json`), and both shell/legacy banners omit the version when unavailable.

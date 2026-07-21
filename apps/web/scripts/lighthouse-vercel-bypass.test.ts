@@ -17,6 +17,7 @@ const {
   assertAuthorizedDeploymentOrigin,
   assertOriginBoundRedirect,
   bootstrapOriginBoundAccess,
+  discoverOriginBoundBuildIdentity,
   buildOriginBoundCookieRequest,
   buildOriginBoundProbeRequest,
   maskSensitiveValues,
@@ -40,12 +41,27 @@ const {
     options: {
       readonly fetchImpl: ReturnType<typeof vi.fn>;
       readonly bypassSecret: string;
-      readonly expectedCommitSha: string;
+      readonly expectedCommitSha?: string;
       readonly expectedDeploymentOrigin: string;
       readonly expectedEnvironment: 'preview' | 'production';
+      readonly maskLineWriter?: (line: string) => void;
       readonly timeoutMs?: number;
     }
   ) => Promise<unknown>;
+  readonly discoverOriginBoundBuildIdentity: (
+    url: string,
+    options: {
+      readonly fetchImpl: ReturnType<typeof vi.fn>;
+      readonly bypassSecret: string;
+      readonly expectedDeploymentOrigin: string;
+      readonly expectedEnvironment: 'preview' | 'production';
+      readonly maskLineWriter?: (line: string) => void;
+    }
+  ) => Promise<{
+    readonly buildId: string;
+    readonly commitSha: string;
+    readonly environment: 'preview' | 'production';
+  }>;
   readonly buildOriginBoundCookieRequest: (
     url: string,
     options: { readonly cookieHeader: string }
@@ -83,11 +99,16 @@ const {
     readonly token: string;
     readonly orgId: string;
     readonly projectId: string;
-    readonly commitSha: string;
+    readonly commitSha?: string;
     readonly candidateUrl?: string;
     readonly candidateId?: string;
+    readonly allowMissingCommitSha?: boolean;
     readonly maxPages?: number;
-  }) => Promise<{ readonly id: string; readonly url: string }>;
+  }) => Promise<{
+    readonly id: string;
+    readonly url: string;
+    readonly commitSha?: string | null;
+  }>;
   readonly verifyPublicDeploymentSurfaces: (
     url: string,
     options: {
@@ -786,6 +807,84 @@ describe('origin-bound Vercel protection bypass', () => {
     ).toThrow('must be explicitly set');
   });
 
+  it('discovers a short commit only from an exact origin-bound production identity', async () => {
+    vi.stubEnv('GITHUB_ACTIONS', 'true');
+    const maskLineWriter = vi.fn();
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        responseFixture({
+          status: 307,
+          location: BUILD_INFO_URL,
+          setCookies: [
+            '__vercel_live_token=opaque-cookie; Path=/; Secure; HttpOnly',
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        responseFixture({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            buildId: 'production-build',
+            commitSha: EXPECTED_SHA.slice(0, 7),
+            environment: 'production',
+          }),
+        })
+      );
+
+    await expect(
+      discoverOriginBoundBuildIdentity(DEPLOYMENT_URL, {
+        fetchImpl,
+        bypassSecret: 'sentinel-secret',
+        expectedDeploymentOrigin: DEPLOYMENT_URL,
+        expectedEnvironment: 'production',
+        maskLineWriter,
+      })
+    ).resolves.toMatchObject({
+      buildId: 'production-build',
+      commitSha: EXPECTED_SHA.slice(0, 7),
+      environment: 'production',
+    });
+    expect(maskLineWriter).toHaveBeenCalledWith('::add-mask::opaque-cookie');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    vi.unstubAllEnvs();
+  });
+
+  it('rejects malformed or wrong-environment build identity during discovery', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        responseFixture({
+          status: 307,
+          location: BUILD_INFO_URL,
+          setCookies: [
+            '__vercel_live_token=opaque-cookie; Path=/; Secure; HttpOnly',
+          ],
+        })
+      )
+      .mockResolvedValueOnce(
+        responseFixture({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            buildId: 'preview-build',
+            commitSha: 'not-a-sha',
+            environment: 'preview',
+          }),
+        })
+      );
+
+    await expect(
+      discoverOriginBoundBuildIdentity(DEPLOYMENT_URL, {
+        fetchImpl,
+        bypassSecret: 'sentinel-secret',
+        expectedDeploymentOrigin: DEPLOYMENT_URL,
+        expectedEnvironment: 'production',
+      })
+    ).rejects.toThrow('wrong-environment build identity');
+  });
+
   it('uses one aborting absolute deadline for a stalled protected bootstrap', async () => {
     vi.useFakeTimers();
     try {
@@ -1048,6 +1147,158 @@ describe('origin-bound Vercel protection bypass', () => {
       })
     ).resolves.toEqual({ id: 'dpl_exact', url: DEPLOYMENT_URL.slice(0, -1) });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts absent Vercel SHA only for an exact READY deployment identity', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      status: 200,
+      text: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          deployments: [
+            {
+              uid: 'dpl_exact',
+              url: DEPLOYMENT_URL,
+              projectId: 'prj_jovie',
+              readyState: 'READY',
+              meta: {},
+            },
+          ],
+          pagination: { next: null },
+        })
+      ),
+    });
+
+    await expect(
+      resolveAuthorizedVercelDeployment({
+        fetchImpl,
+        token: 'sentinel-vercel-token',
+        orgId: 'team_jovie',
+        projectId: 'prj_jovie',
+        candidateUrl: DEPLOYMENT_URL,
+        candidateId: 'dpl_exact',
+        allowMissingCommitSha: true,
+      })
+    ).resolves.toEqual({
+      id: 'dpl_exact',
+      url: DEPLOYMENT_URL.slice(0, -1),
+      commitSha: null,
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('rejects missing-SHA mode without both exact deployment coordinates', async () => {
+    await expect(
+      resolveAuthorizedVercelDeployment({
+        fetchImpl: vi.fn(),
+        token: 'sentinel-vercel-token',
+        orgId: 'team_jovie',
+        projectId: 'prj_jovie',
+        candidateUrl: DEPLOYMENT_URL,
+        allowMissingCommitSha: true,
+      })
+    ).rejects.toThrow('requires an exact deployment URL and ID');
+  });
+
+  it('still rejects malformed or conflicting present SHA in missing-SHA mode', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      status: 200,
+      text: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          deployments: [
+            {
+              uid: 'dpl_exact',
+              url: DEPLOYMENT_URL,
+              projectId: 'prj_jovie',
+              readyState: 'READY',
+              meta: { githubCommitSha: 'short-sha' },
+            },
+          ],
+          pagination: { next: null },
+        })
+      ),
+    });
+
+    await expect(
+      resolveAuthorizedVercelDeployment({
+        fetchImpl,
+        token: 'sentinel-vercel-token',
+        orgId: 'team_jovie',
+        projectId: 'prj_jovie',
+        candidateUrl: DEPLOYMENT_URL,
+        candidateId: 'dpl_exact',
+        allowMissingCommitSha: true,
+      })
+    ).rejects.toThrow('malformed commit SHA field');
+  });
+
+  it('rejects contradictory Vercel commit identity fields', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      status: 200,
+      text: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          deployments: [
+            {
+              uid: 'dpl_exact',
+              url: DEPLOYMENT_URL,
+              projectId: 'prj_jovie',
+              readyState: 'READY',
+              meta: { githubCommitSha: EXPECTED_SHA },
+              gitSource: { sha: 'b'.repeat(40) },
+            },
+          ],
+          pagination: { next: null },
+        })
+      ),
+    });
+
+    await expect(
+      resolveAuthorizedVercelDeployment({
+        fetchImpl,
+        token: 'sentinel-vercel-token',
+        orgId: 'team_jovie',
+        projectId: 'prj_jovie',
+        candidateUrl: DEPLOYMENT_URL,
+        candidateId: 'dpl_exact',
+        allowMissingCommitSha: true,
+      })
+    ).rejects.toThrow('conflicting commit SHA fields');
+  });
+
+  it('uses a valid Git-source SHA when metadata contains an empty SHA', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      status: 200,
+      text: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          deployments: [
+            {
+              uid: 'dpl_exact',
+              url: DEPLOYMENT_URL,
+              projectId: 'prj_jovie',
+              readyState: 'READY',
+              meta: { githubCommitSha: '' },
+              gitSource: { sha: EXPECTED_SHA },
+            },
+          ],
+          pagination: { next: null },
+        })
+      ),
+    });
+
+    await expect(
+      resolveAuthorizedVercelDeployment({
+        fetchImpl,
+        token: 'sentinel-vercel-token',
+        orgId: 'team_jovie',
+        projectId: 'prj_jovie',
+        candidateUrl: DEPLOYMENT_URL,
+        candidateId: 'dpl_exact',
+        allowMissingCommitSha: true,
+      })
+    ).resolves.toEqual({
+      id: 'dpl_exact',
+      url: DEPLOYMENT_URL.slice(0, -1),
+      commitSha: EXPECTED_SHA,
+    });
   });
 
   it('retries bounded transport failures and transient Vercel 5xx responses', async () => {
