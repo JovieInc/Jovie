@@ -187,17 +187,43 @@ export function collapseNewestCheckAttempts(checks) {
       collapsed.push(candidates[0]);
       continue;
     }
+    // Non-terminal-only groups (all skipped/neutral, or all successful, or all
+    // pending) never block enrollment. Ambiguity only matters when terminal
+    // outcomes disagree or a terminal red cannot be ordered against success.
+    const allSkipped = candidates.every(isSkippedCheck);
+    if (allSkipped) {
+      collapsed.push(candidates[0]);
+      continue;
+    }
+    const allSuccessful = candidates.every(isSuccessfulCheck);
+    if (allSuccessful) {
+      collapsed.push(candidates[0]);
+      continue;
+    }
+    const allPending = candidates.every(isPendingCheck);
+    if (allPending) {
+      collapsed.push(candidates[0]);
+      continue;
+    }
+
     const ranked = candidates.map(check => ({
       check,
       startedAt: attemptTimestamp(check, 'startedAt'),
       completedAt: attemptTimestamp(check, 'completedAt'),
       observedAt: null,
     }));
-    if (
-      ranked.some(
-        attempt => attempt.startedAt === null || attempt.completedAt === null
-      )
-    ) {
+    const missingTimestamps = ranked.some(
+      attempt => attempt.startedAt === null || attempt.completedAt === null
+    );
+    if (missingTimestamps) {
+      // Prefer a unique successful attempt over fail-closed noise when clocks
+      // are missing; only fail closed if terminal red is also present.
+      const successes = candidates.filter(isSuccessfulCheck);
+      const failures = candidates.filter(isTerminalFailure);
+      if (successes.length >= 1 && failures.length === 0) {
+        collapsed.push(successes[0]);
+        continue;
+      }
       ambiguousNames.push(name);
       continue;
     }
@@ -215,7 +241,29 @@ export function collapseNewestCheckAttempts(checks) {
       ranked[0].startedAt === ranked[1].startedAt &&
       ranked[0].completedAt === ranked[1].completedAt
     ) {
-      ambiguousNames.push(name);
+      const top = ranked
+        .filter(
+          attempt =>
+            attempt.observedAt === ranked[0].observedAt &&
+            attempt.startedAt === ranked[0].startedAt &&
+            attempt.completedAt === ranked[0].completedAt
+        )
+        .map(attempt => attempt.check);
+      const topSuccess = top.filter(isSuccessfulCheck);
+      const topFailure = top.filter(isTerminalFailure);
+      if (topFailure.length > 0 && topSuccess.length > 0) {
+        ambiguousNames.push(name);
+        continue;
+      }
+      if (topFailure.length > 0) {
+        collapsed.push(topFailure[0]);
+        continue;
+      }
+      if (topSuccess.length > 0) {
+        collapsed.push(topSuccess[0]);
+        continue;
+      }
+      collapsed.push(top[0]);
       continue;
     }
     collapsed.push(ranked[0].check);

@@ -159,6 +159,51 @@ describe('pr-check-failures', () => {
     ).toEqual(['Brand Scrub', 'Future Safety Gate']);
   });
 
+  it('duplicate SKIPPED checks with equal timestamps do not block enrollment', () => {
+    const required = [
+      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+    ];
+    const skippedDupes = [
+      {
+        bucket: 'skipping',
+        state: 'SKIPPED',
+        name: 'Fork PR Gate Dependabot Controller',
+        startedAt: '2026-07-21T02:12:55Z',
+        completedAt: '2026-07-21T02:12:54Z',
+      },
+      {
+        bucket: 'skipping',
+        state: 'SKIPPED',
+        name: 'Fork PR Gate Dependabot Controller',
+        startedAt: '2026-07-21T02:12:55Z',
+        completedAt: '2026-07-21T02:12:54Z',
+      },
+      {
+        bucket: 'skipping',
+        state: 'SKIPPED',
+        name: "github.event_name == 'merge_group' && 'Fork PR Gate' || 'Fork PR Gate (merge-group inactive)'",
+        startedAt: '2026-07-21T02:12:55Z',
+        completedAt: '2026-07-21T02:12:54Z',
+      },
+      {
+        bucket: 'skipping',
+        state: 'SKIPPED',
+        name: "github.event_name == 'merge_group' && 'Fork PR Gate' || 'Fork PR Gate (merge-group inactive)'",
+        startedAt: '2026-07-21T02:12:55Z',
+        completedAt: '2026-07-21T02:12:54Z',
+      },
+    ];
+    expect(classifyQueueCheckBlockers([...required, ...skippedDupes])).toEqual(
+      []
+    );
+    expect(collapseNewestCheckAttempts(skippedDupes).ambiguousNames).toEqual(
+      []
+    );
+  });
+
   it('uses only the uniquely newest same-name check attempt', () => {
     const required = [
       { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
