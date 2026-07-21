@@ -1,6 +1,7 @@
 import 'server-only';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { resolveTurnstileSecretKey } from '@/lib/turnstile/keys';
 
 /**
  * Cloudflare Turnstile siteverify helper (JOV-2132).
@@ -11,6 +12,11 @@ import { captureError } from '@/lib/error-tracking';
  * skip verification (the session cookie carries the trust forward).
  *
  * Docs: https://developers.cloudflare.com/turnstile/get-started/server-side-validation/
+ *
+ * Hostname-aware secret selection (preview/localhost → dummy secret) must
+ * match client sitekey resolution in `lib/turnstile/keys.ts` so Vercel
+ * preview hosts do not fail with domain error 110200 while still keeping
+ * real keys on jov.ie / staging.jov.ie.
  */
 
 const VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
@@ -34,10 +40,8 @@ interface SiteverifyResponse {
   readonly cdata?: string;
 }
 
-function getSecretKey(): string | null {
-  const key = env.TURNSTILE_SECRET_KEY;
-  if (!key) return null;
-  return key;
+function getSecretKey(hostname?: string | null): string | null {
+  return resolveTurnstileSecretKey(hostname, env.TURNSTILE_SECRET_KEY);
 }
 
 type AttemptOutcome =
@@ -99,17 +103,20 @@ async function attemptVerify(
  *
  * @param token The token submitted by the client.
  * @param remoteIp The visitor's IP address (optional but recommended).
+ * @param hostname Request hostname — used to pair preview hosts with the
+ *   always-pass dummy secret (must match client sitekey selection).
  * @returns `{ success: true }` on valid token; `{ success: false, errorCodes, reason }` otherwise.
  */
 export async function verifyTurnstileToken(
   token: string | undefined | null,
-  remoteIp?: string | null
+  remoteIp?: string | null,
+  hostname?: string | null
 ): Promise<TurnstileVerifyResult> {
   if (!token || token.length === 0) {
     return { success: false, reason: 'missing_token' };
   }
 
-  const secretKey = getSecretKey();
+  const secretKey = getSecretKey(hostname);
   if (!secretKey) {
     return { success: false, reason: 'turnstile_not_configured' };
   }
@@ -144,11 +151,15 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * True when Turnstile is enabled in the current environment. The chat route
- * uses this to skip the gate cleanly when the secret isn't configured (e.g.
- * branch deploys without the env wired up yet).
+ * uses this to fail closed when the secret isn't configured (e.g. branch
+ * deploys without the env wired up yet).
+ *
+ * Configuration is based on the raw env secret existing — hostname only
+ * selects which secret value is used at verify time, not whether the gate
+ * is active.
  */
 export function isTurnstileConfigured(): boolean {
-  return getSecretKey() !== null;
+  return getSecretKey(null) !== null;
 }
 
 /**

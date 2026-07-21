@@ -290,7 +290,11 @@ export async function tryHandleAnonymousOnboardingChat(
     }
 
     if (!shouldBypassTurnstile) {
-      const verify = await verifyTurnstileToken(parsed.data.turnstileToken, ip);
+      const verify = await verifyTurnstileToken(
+        parsed.data.turnstileToken,
+        ip,
+        extractRequestHostname(req)
+      );
       if (!verify.success) {
         return NextResponse.json(
           {
