@@ -398,6 +398,11 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
   const envGeneratedPath = join(desktopRoot, 'src/env.generated.ts');
   const originalEnvGenerated = await readFile(envGeneratedPath, 'utf8');
 
+  // Ambient ELECTRON_APP_URL from the developer's shell would override the
+  // per-environment defaults under test, so strip it from the copied env.
+  const baseEnv = { ...process.env };
+  delete baseEnv.ELECTRON_APP_URL;
+
   try {
     const { stdout: localStdout } = await execFileAsync(
       process.execPath,
@@ -405,7 +410,7 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
       {
         cwd: desktopRoot,
         env: {
-          ...process.env,
+          ...baseEnv,
           ELECTRON_ENV: 'local',
         },
       }
@@ -441,7 +446,7 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
       {
         cwd: desktopRoot,
         env: {
-          ...process.env,
+          ...baseEnv,
           ELECTRON_ENV: 'production',
         },
       }
@@ -456,7 +461,7 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
       {
         cwd: desktopRoot,
         env: {
-          ...process.env,
+          ...baseEnv,
           ELECTRON_ENV: 'staging',
         },
       }
@@ -532,6 +537,71 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
     smokeSource,
     /redirectUrl\.startsWith\(NATIVE_AUTH_CALLBACK_PREFIX\)/
   );
+});
+
+test('desktop main-window hub regression contracts (desktop QA)', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+
+  // Fix: the auth handoff's deny-all permission handlers on the shared default
+  // session are reverted for the main window when the handoff closes.
+  assert.match(mainSource, /function registerMainWindowPermissionHandlers\(/);
+  assert.match(
+    mainSource,
+    /authHandoffWindow\.on\('closed'[\s\S]*?registerMainWindowPermissionHandlers\(mainWindow\.webContents\.session\)/
+  );
+
+  // Fix: the crash-reload budget resets only on a confirmed app-booted ping,
+  // never on did-finish-load (crash-after-load must reach the failure page).
+  assert.match(
+    mainSource,
+    /const markRendererBooted = \(\): void => \{[\s\S]*?rendererCrashReloadCount = 0;/
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /'did-finish-load'[\s\S]{0,160}?rendererCrashReloadCount = 0/
+  );
+
+  // Fix: the boot watchdog arms only for the app origin.
+  assert.match(mainSource, /shouldArmRendererBootWatchdog\(url, APP_ORIGIN\)/);
+
+  // Fix: window state persists normal bounds and never minimized garbage.
+  assert.match(mainSource, /if \(win\.isMinimized\(\)\) return;/);
+  assert.match(mainSource, /const bounds = win\.getNormalBounds\(\);/);
+
+  // Fix: preferences only ever target the main window; no-op mid-handoff.
+  assert.match(
+    mainSource,
+    /function openPreferences\(\): void \{[\s\S]{0,400}?if \(isAuthHandoffOpen\(\)\) return;/
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /function openPreferences[\s\S]*?BrowserWindow\.getFocusedWindow\(\)/
+  );
+
+  // Fix: cold-start auth completion keeps client/state params so replay works.
+  assert.match(mainSource, /function buildAuthCompletionUrl\(/);
+  assert.match(mainSource, /buildAuthCompletionUrl\(pendingAuthCompletion\)/);
+
+  // Fix: a forged flow-mismatch deep link keeps the in-flight login; only
+  // success and pkce-expired clear the pending flow.
+  assert.match(
+    mainSource,
+    /if \(binding\.reason === 'pkce-expired'\) \{\s*\/\/[^\n]*\n\s*pendingDesktopAuthPkce = null;/
+  );
+
+  // Fix: a no-pending-flow deep link surfaces a visible sign-in retry.
+  assert.match(mainSource, /function surfaceNoPendingAuthFlow\(\): void/);
+  assert.match(mainSource, /surfaceNoPendingAuthFlow\(\);/);
+
+  // Fix: local builds use the staging icon shipped by electron-builder.local.yml.
+  assert.match(
+    mainSource,
+    /APP_ENV === 'production' \? 'icon\.png' : 'icon-staging\.png'/
+  );
+
+  // Fix: doc references must point at files that exist.
+  assert.doesNotMatch(mainSource, /BUILDS\.md/);
+  assert.match(mainSource, /apps\/desktop\/SIGNING\.md/);
 });
 
 test('hosted web app has an early Electron runtime marker before first paint', async () => {

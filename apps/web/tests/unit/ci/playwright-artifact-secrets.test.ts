@@ -2054,6 +2054,26 @@ ${fixtureCheckout}
     ).toBe(true);
   });
 
+  it('fails closed when an unknown dynamic cookie value is shorter than four characters', () => {
+    const workspace = fixture();
+    const runner = fixture();
+    const receipt = join(runner, 'dynamic-cookie-values');
+    const child = `const f=require('node:fs');f.writeFileSync(process.env.PLAYWRIGHT_DYNAMIC_SECRETS_FILE,'xyz\\n',{mode:0o600});f.mkdirSync('out',{recursive:true});f.writeFileSync('out/report.json','{}')`;
+
+    const result = runChild(workspace, runner, child, {
+      PLAYWRIGHT_DYNAMIC_SECRETS_FILE: receipt,
+    });
+
+    expect(result.status).toBe(1);
+    expect(existsSync(receipt)).toBe(false);
+    expect(`${result.stdout}\\n${result.stderr}`).toContain(
+      'categories=inspection-error:1'
+    );
+    expect(
+      existsSync(join(runner, 'safe-playwright-producer', 'blocked'))
+    ).toBe(true);
+  });
+
   it('rejects a dynamic cookie receipt that is not mode 0600', () => {
     const workspace = fixture();
     const runner = fixture();

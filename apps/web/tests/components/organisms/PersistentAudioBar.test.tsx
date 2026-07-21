@@ -474,7 +474,7 @@ describe('PersistentAudioBar', () => {
     expect(screen.queryByRole('button', { name: 'Lyrics' })).toBeNull();
   });
 
-  it('shows the compact shell V1 now-playing row after minimizing', async () => {
+  it('hides the full docked player after minimizing (mini lives in the sidebar)', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool' });
 
@@ -482,12 +482,21 @@ describe('PersistentAudioBar', () => {
 
     await user.click(getExpandedShellMinimizeButton());
 
-    await user.click(screen.getByRole('button', { name: 'Pause' }));
-
-    expect(toggleTrack).toHaveBeenCalledWith({
-      id: 'track-1',
-      title: 'Midnight Drive',
-    });
+    expect(screen.getByTestId('audio-surface-expanded-shell')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    // Compact bottom shell is intentionally empty — sidebar bridge owns mini.
+    expect(screen.getByTestId('audio-surface-compact-shell')).toHaveAttribute(
+      'aria-hidden',
+      'false'
+    );
+    expect(
+      within(screen.getByTestId('audio-surface-compact-shell')).queryByRole(
+        'button',
+        { name: 'Pause' }
+      )
+    ).toBeNull();
   });
 
   it('swaps shell audio surfaces when the player is minimized', async () => {
@@ -506,6 +515,16 @@ describe('PersistentAudioBar', () => {
 
     expect(expandedSurface).toHaveAttribute('aria-hidden', 'true');
     expect(compactSurface).toHaveAttribute('aria-hidden', 'false');
+  });
+
+  it('docks the expanded shell without elevated card shadow chrome', () => {
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
+    expect(expandedSurface.className).toContain('border-t');
+    expect(expandedSurface.className).not.toMatch(/shadow-\[/);
   });
 
   it('publishes compact shell V1 chrome state while minimized and clears on unmount', async () => {
@@ -566,7 +585,11 @@ describe('PersistentAudioBar', () => {
     );
 
     fireEvent.keyDown(globalThis, { key: '`' });
-    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    // Minimize collapses the full docked bar; mini chrome lives in the sidebar.
+    expect(screen.getByTestId('audio-surface-expanded-shell')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
   });
 
   it('closes the lyrics route with Escape when an active track is present', () => {

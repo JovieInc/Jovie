@@ -5,9 +5,11 @@ import {
   mkdtempSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -401,13 +403,14 @@ describe('exact production Lighthouse evidence guard', () => {
       const spawnImpl = ((_command, _args, options) => {
         const isolatedDirectory = join(options.cwd as string, '.lighthouseci');
         const isolatedArtifact = join(isolatedDirectory, 'lhr-1.json');
-        chmodSync(isolatedArtifact, 0o600);
-        writeFileSync(
-          isolatedArtifact,
-          JSON.stringify(reportFixture(PROFILE_URL))
-        );
-        writeFileSync(isolatedArtifact, originalContents);
-        chmodSync(isolatedArtifact, 0o400);
+        // Replace the sealed file via a new inode even when bytes are restored.
+        // In-place rewrite+chmod can leave mtime/ctime unchanged on some hosts
+        // (ext4 coarse timestamps / container FS), which would hide the race.
+        const tmpArtifact = join(isolatedDirectory, 'lhr-1.json.tmp');
+        writeFileSync(tmpArtifact, JSON.stringify(reportFixture(PROFILE_URL)));
+        writeFileSync(tmpArtifact, originalContents, { mode: 0o400 });
+        unlinkSync(isolatedArtifact);
+        renameSync(tmpArtifact, isolatedArtifact);
         writeFileSync(
           join(isolatedDirectory, 'links.json'),
           JSON.stringify({
@@ -446,10 +449,13 @@ describe('exact production Lighthouse evidence guard', () => {
       const spawnImpl = ((_command, _args, options) => {
         const uploadRoot = options.cwd as string;
         const isolatedConfig = join(uploadRoot, 'lighthouserc.json');
-        chmodSync(isolatedConfig, 0o600);
-        writeFileSync(isolatedConfig, '{}');
-        writeFileSync(isolatedConfig, originalConfig);
-        chmodSync(isolatedConfig, 0o400);
+        // Same-content restore via a new inode — stable on hosts where
+        // in-place rewrite does not advance ctime/mtime.
+        const tmpConfig = join(uploadRoot, 'lighthouserc.json.tmp');
+        writeFileSync(tmpConfig, '{}');
+        writeFileSync(tmpConfig, originalConfig, { mode: 0o400 });
+        unlinkSync(isolatedConfig);
+        renameSync(tmpConfig, isolatedConfig);
         writeFileSync(
           join(uploadRoot, '.lighthouseci', 'links.json'),
           JSON.stringify({

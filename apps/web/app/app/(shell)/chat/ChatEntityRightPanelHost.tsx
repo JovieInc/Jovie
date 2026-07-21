@@ -546,8 +546,9 @@ function ChatEntityPanelSection({
 }>) {
   return (
     <section className='system-b-chat-entity-panel-section'>
+      {/* Flat surface — parent rail already provides card elevation (JOV-3511). */}
       <DrawerSurfaceCard
-        variant='card'
+        variant='flat'
         className='system-b-chat-entity-panel-card'
       >
         <div className='system-b-chat-entity-section-heading'>
@@ -660,7 +661,7 @@ function ChatReleaseEntityPanel({
           </div>
         ) : release ? (
           <div className='min-h-0 flex-1 overflow-y-auto'>
-            <div className='px-4 py-4'>
+            <div className='px-3 py-3'>
               <div className='system-b-chat-release-summary'>
                 <div
                   className='system-b-chat-release-artwork'
@@ -672,11 +673,11 @@ function ChatReleaseEntityPanel({
                       alt=''
                       fill
                       className='object-cover'
-                      sizes='64px'
+                      sizes='40px'
                     />
                   ) : (
                     <div className='flex h-full w-full items-center justify-center text-tertiary-token'>
-                      <Disc3 className='h-5 w-5' />
+                      <Disc3 className='h-4 w-4' />
                     </div>
                   )}
                 </div>
@@ -704,7 +705,7 @@ function ChatReleaseEntityPanel({
             </div>
 
             {release ? (
-              <div className='flex flex-wrap gap-1.5 px-4 pb-4'>
+              <div className='flex flex-wrap gap-1 px-3 pb-3'>
                 <button
                   type='button'
                   onClick={() =>

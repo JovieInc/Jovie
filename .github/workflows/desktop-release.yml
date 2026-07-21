@@ -18,7 +18,7 @@ run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }
 #   gracefully and produces an unsigned DMG. Auto-update will not work for
 #   unsigned builds; that's by design — they're for sanity checks only.
 # - See apps/desktop/SIGNING.md for one-time setup.
-# - Canonical prod/staging/local shell matrix: apps/desktop/BUILDS.md (GH-12900).
+# - Canonical prod/staging/local shell matrix: apps/desktop/SIGNING.md (GH-12900).
 
 on:
   workflow_run:
@@ -929,12 +929,13 @@ jobs:
             echo "::error::VERSION is not a valid desktop semver."
             exit 1
           }
+          # publish is null in electron-builder.staging.yml (staging ships as CI
+          # artifacts only, no auto-update), so no staging-mac.yml is produced.
           staging_files=(
             "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg"
             "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg.blockmap"
             "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip"
             "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip.blockmap"
-            "apps/desktop/dist/staging-mac.yml"
           )
           for staging_file in "${staging_files[@]}"; do
             [ -f "$staging_file" ] || {
@@ -953,7 +954,6 @@ jobs:
             apps/desktop/dist/Jovie-Staging-*-universal.dmg.blockmap
             apps/desktop/dist/Jovie-Staging-*-universal.zip
             apps/desktop/dist/Jovie-Staging-*-universal.zip.blockmap
-            apps/desktop/dist/staging-mac.yml
           if-no-files-found: error
           compression-level: 0
           retention-days: 7

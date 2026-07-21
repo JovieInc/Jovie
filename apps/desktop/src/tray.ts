@@ -65,12 +65,13 @@ function buildCirclePng(size: number, withDot: boolean): Buffer {
     }
   }
 
-  const ihdr = Buffer.allocUnsafe(13);
+  // Buffer.alloc (zero-filled): bytes 10-12 must be 0
+  // (compression=0, filter=0, interlace=0)
+  const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(size, 0); // width
   ihdr.writeUInt32BE(size, 4); // height
   ihdr[8] = 8; // bit depth
   ihdr[9] = 6; // color type: RGBA
-  // bytes 10-12 remain 0 (compression=0, filter=0, interlace=0)
 
   const PNG_SIG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
   return Buffer.concat([

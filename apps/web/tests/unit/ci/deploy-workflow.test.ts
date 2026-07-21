@@ -1212,6 +1212,12 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'NEXT_PUBLIC_BETTER_AUTH_URL',
       'BETTER_AUTH_SECRET',
       'BETTER_AUTH_URL',
+      'AUTH_GOOGLE_CLIENT_ID',
+      'AUTH_GOOGLE_CLIENT_SECRET',
+      'AUTH_APPLE_CLIENT_ID',
+      'AUTH_APPLE_TEAM_ID',
+      'AUTH_APPLE_KEY_ID',
+      'AUTH_APPLE_PRIVATE_KEY',
       'DATABASE_URL',
       'SESSION_SECRET',
       'AI_GATEWAY_API_KEY',
@@ -1226,6 +1232,38 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       expect(deployStep).toContain(key);
       expect(deployStep).toContain(`--env ${key}`);
       expect(deployStep).not.toContain(`--env ${key}=`);
+    }
+
+    const deployAllowlist = deployStep
+      .split('\n')
+      .find(line => line.includes('--only-secrets='));
+    for (const key of [
+      'AUTH_GOOGLE_CLIENT_ID',
+      'AUTH_GOOGLE_CLIENT_SECRET',
+      'AUTH_APPLE_CLIENT_ID',
+      'AUTH_APPLE_TEAM_ID',
+      'AUTH_APPLE_KEY_ID',
+      'AUTH_APPLE_PRIVATE_KEY',
+    ]) {
+      expect(deployAllowlist).toContain(key);
+    }
+
+    const buildStep = getStepBlock(
+      workflow,
+      'Build (preview target for staging verification)'
+    );
+    for (const key of [
+      'AUTH_GOOGLE_CLIENT_ID',
+      'AUTH_GOOGLE_CLIENT_SECRET',
+      'AUTH_APPLE_CLIENT_ID',
+      'AUTH_APPLE_TEAM_ID',
+      'AUTH_APPLE_KEY_ID',
+      'AUTH_APPLE_PRIVATE_KEY',
+    ]) {
+      const buildAllowlist = buildStep
+        .split('\n')
+        .find(line => line.includes('--only-secrets='));
+      expect(buildAllowlist).toContain(key);
     }
   });
 
@@ -1612,9 +1650,9 @@ describe('unit-test runner capacity', () => {
     expect(unitJob).not.toContain('runs-on: jovie-runner');
     expect(unitJob).not.toContain('ci-unit-runner-route');
     expect(unitJob).not.toContain('vars.CI_UNIT_RUNNER');
-    expect(unitJob).toContain('max-parallel: 5');
+    expect(unitJob).toContain('max-parallel: 120');
     expect(unitJob).toContain(
-      'Hosted capacity runs all five logical shards without consuming Gem'
+      'Do not artificially\n      # serialize unit shards'
     );
     expect(unitJob).toContain('all five named');
     expect(unitJob).toContain('warm-canary receipts');

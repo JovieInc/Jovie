@@ -1,8 +1,12 @@
 import type { Session } from 'electron';
 import type { DesktopSecurityReporter } from './desktop-security-reporting';
 
+const ENFORCING_CSP_HEADER_NAME = 'content-security-policy';
+
+// Both header names must be deleted before injecting the fallback (browsers
+// intersect multiple CSP headers), but only the enforcing header is evaluated.
 const CSP_HEADER_NAMES = [
-  'content-security-policy',
+  ENFORCING_CSP_HEADER_NAME,
   'content-security-policy-report-only',
 ] as const;
 
@@ -52,15 +56,22 @@ function hasMinimumShellCspPolicy(policy: string): boolean {
 export function evaluateTrustedOriginCspHeaders(input: {
   readonly responseHeaders: Record<string, string | string[] | undefined>;
 }): 'present' | 'missing' | 'weakened' {
-  const policies = CSP_HEADER_NAMES.map(name =>
-    getHeaderValue(input.responseHeaders, name)
-  ).filter((value): value is string => value !== null);
+  // Only the enforcing header counts. A `content-security-policy-report-only`
+  // header is advisory: it must neither satisfy the minimum check (a response
+  // with ONLY report-only runs with zero enforced CSP — exactly the misconfig
+  // this watchdog exists to catch) nor fail it (a divergent report-only policy
+  // alongside a strong enforcing policy must not nuke the enforcing header and
+  // trigger fallback injection).
+  const policy = getHeaderValue(
+    input.responseHeaders,
+    ENFORCING_CSP_HEADER_NAME
+  );
 
-  if (policies.length === 0) {
+  if (policy === null) {
     return 'missing';
   }
 
-  if (policies.every(policy => hasMinimumShellCspPolicy(policy))) {
+  if (hasMinimumShellCspPolicy(policy)) {
     return 'present';
   }
 
@@ -87,6 +98,18 @@ export function installDesktopCspWatchdog(input: {
     }
 
     if (responseUrl.origin !== input.appOrigin) {
+      callback({ cancel: false });
+      return;
+    }
+
+    // Redirects (3xx) and error responses carry no CSP header and no body to
+    // protect; evaluating them floods telemetry with false 'missing' positives
+    // and injects a pointless fallback onto a bodiless response.
+    if (
+      typeof details.statusCode !== 'number' ||
+      details.statusCode < 200 ||
+      details.statusCode >= 300
+    ) {
       callback({ cancel: false });
       return;
     }

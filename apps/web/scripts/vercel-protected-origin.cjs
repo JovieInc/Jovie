@@ -14,6 +14,7 @@ const {
 
 const BYPASS_HEADER = 'x-vercel-protection-bypass';
 const SET_BYPASS_COOKIE_HEADER = 'x-vercel-set-bypass-cookie';
+const PUBLIC_PROBE_COOKIE_NAMES = new Set(['jv_country', 'jv_cc_required']);
 const BUILD_INFO_PATH = '/api/health/build-info';
 const DEFAULT_PROBE_TIMEOUT_MS = 120_000;
 const DEFAULT_VERCEL_API_PAGES = 5;
@@ -40,6 +41,16 @@ const TRANSIENT_VERCEL_API_STATUSES = new Set([
 ]);
 const PUBLIC_ERROR_CONTENT =
   /application error|internal server error|something went wrong|error occurred|this page could not be found|page could not be found|profile not found|temporarily unavailable|auth unavailable|turnstile is not configured/i;
+// Next.js serializes error/not-found boundary templates into the RSC flight
+// payload (<script>self.__next_f.push(...)</script>) of every healthy page, so
+// error phrases like "Profile not found" legitimately appear inside inline
+// scripts without ever rendering. Strip script blocks before the error-content
+// scan; a genuinely rendered error page carries the phrase in visible markup.
+const INLINE_SCRIPT_BLOCK = /<script\b[^>]*>[\s\S]*?<\/script\s*>/gi;
+
+function stripInlineScripts(html) {
+  return html.replace(INLINE_SCRIPT_BLOCK, '');
+}
 const PUBLIC_HTML_SURFACES = Object.freeze([
   { label: 'Homepage', path: '/', minimumBytes: 1_000 },
   { label: 'Public profile', path: '/tim', minimumBytes: 500 },
@@ -731,11 +742,9 @@ async function bootstrapOriginBoundAccess(
     }
 
     const cookies = parseOriginBoundCookies(bootstrapResponse, targetUrl);
-    const sensitiveValues = maskSensitiveValues(
-      cookies.map(cookie => cookie.value)
-    );
+    maskSensitiveValues(cookies.map(cookie => cookie.value));
     if (onSensitiveValues) {
-      await deadline.run(() => onSensitiveValues(sensitiveValues));
+      await deadline.run(() => onSensitiveValues(cookies));
     }
     await deadline.run(() => discardResponseBody(bootstrapResponse));
     if (onCookies) await deadline.run(() => onCookies(cookies, targetUrl));
@@ -832,11 +841,9 @@ async function bootstrapAliasBoundAccess(
     }
 
     const cookies = parseOriginBoundCookies(bootstrapResponse, targetUrl);
-    const sensitiveValues = maskSensitiveValues(
-      cookies.map(cookie => cookie.value)
-    );
+    maskSensitiveValues(cookies.map(cookie => cookie.value));
     if (onSensitiveValues) {
-      await deadline.run(() => onSensitiveValues(sensitiveValues));
+      await deadline.run(() => onSensitiveValues(cookies));
     }
     await deadline.run(() => discardResponseBody(bootstrapResponse));
     if (onCookies) await deadline.run(() => onCookies(cookies, targetUrl));
@@ -946,7 +953,7 @@ async function verifyPublicSurfaceOnce(
   ) {
     throw new Error(`${surface.label} returned an incomplete document.`);
   }
-  if (PUBLIC_ERROR_CONTENT.test(body)) {
+  if (PUBLIC_ERROR_CONTENT.test(stripInlineScripts(body))) {
     throw new Error(`${surface.label} returned error or not-found content.`);
   }
 }
@@ -1333,6 +1340,7 @@ module.exports = {
   BUILD_INFO_PATH,
   BYPASS_HEADER,
   DEFAULT_PROBE_TIMEOUT_MS,
+  PUBLIC_PROBE_COOKIE_NAMES,
   PUBLIC_HTML_SURFACES,
   SET_BYPASS_COOKIE_HEADER,
   assertAuthorizedDeploymentOrigin,
@@ -1355,6 +1363,7 @@ module.exports = {
   requireExpectedEnvironment,
   resolveAuthorizedVercelDeployment,
   safeRouteLabel,
+  stripInlineScripts,
   validateBuildInfo,
   verifyPublicDeploymentSurfaces,
   writeExactHostCookieJar,

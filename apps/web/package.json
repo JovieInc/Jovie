@@ -320,7 +320,7 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/parser": "^8.64.0",
     "@vitejs/plugin-react": "^5.2.0",
-    "@vitest/browser": "4.1.8",
+    "@vitest/browser": "4.1.10",
     "@vitest/browser-playwright": "4.1.8",
     "@vitest/coverage-v8": "4.1.8",
     "autoprefixer": "^10.4.27",

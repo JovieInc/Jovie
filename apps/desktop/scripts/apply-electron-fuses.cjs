@@ -58,16 +58,13 @@ async function updateMacInfoPlist(context) {
     'Set :NSAppTransportSecurity:NSAllowsArbitraryLoads false',
     infoPlistPath,
   ]);
-  await execFileAsync('/usr/libexec/PlistBuddy', [
-    '-c',
-    'Set :NSAppTransportSecurity:NSAllowsLocalNetworking false',
-    infoPlistPath,
-  ]);
-  await execFileAsync('/usr/libexec/PlistBuddy', [
-    '-c',
-    'Delete :NSAppTransportSecurity:NSExceptionDomains',
-    infoPlistPath,
-  ]).catch(() => undefined);
+  // Do NOT touch NSAllowsLocalNetworking or NSExceptionDomains here.
+  // electron-builder injects localhost ATS allowances into Info.plist for
+  // non-MAS builds because electron-updater's MacUpdater serves the
+  // downloaded update to Squirrel.Mac over a loopback HTTP server
+  // (http://127.0.0.1:<port>), and Squirrel's NSURLSession download is
+  // subject to ATS. Hardening those keys away makes the install handoff
+  // fail with ATS error -1022 — they are load-bearing for auto-update.
 }
 
 module.exports = async function applyElectronFuses(context) {

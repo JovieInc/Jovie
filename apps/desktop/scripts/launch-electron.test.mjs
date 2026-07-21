@@ -26,3 +26,14 @@ test('desktop dev script routes through launch-electron', async () => {
     /"dev": "tsc && node scripts\/launch-electron\.mjs"/
   );
 });
+
+test('launch-electron strips a leading -- separator from extra args', async () => {
+  const source = await readFile(
+    join(desktopRoot, 'scripts/launch-electron.mjs'),
+    'utf8'
+  );
+
+  assert.match(source, /process\.argv\.slice\(2\)/);
+  assert.match(source, /rawArgs\[0\] === '--'/);
+  assert.match(source, /rawArgs\.slice\(1\)/);
+});

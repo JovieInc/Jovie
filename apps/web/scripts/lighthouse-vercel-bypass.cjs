@@ -18,6 +18,7 @@ const {
   isTrustedVercelProtectedAliasUrl,
   maskSensitiveValues,
   parseProbeUrl,
+  PUBLIC_PROBE_COOKIE_NAMES,
   readVerifiedBuildInfo,
   safeRouteLabel,
   validateBuildInfo,
@@ -57,6 +58,12 @@ function recordSensitiveValues(path, values) {
   } finally {
     closeSync(descriptor);
   }
+}
+
+function sensitiveCookieValues(cookies) {
+  return cookies
+    .filter(cookie => !PUBLIC_PROBE_COOKIE_NAMES.has(cookie.name))
+    .map(cookie => cookie.value);
 }
 
 function parseRequestCookieHeader(header) {
@@ -181,8 +188,11 @@ async function primeLighthouseVercelAliasBypass(
     expectedCommitSha,
     expectedAliasOrigin,
     expectedEnvironment,
-    onSensitiveValues: values =>
-      recordSensitiveValuesImpl(sensitiveValuesPath, values),
+    onSensitiveValues: cookies =>
+      recordSensitiveValuesImpl(
+        sensitiveValuesPath,
+        sensitiveCookieValues(cookies)
+      ),
     onCookies: async (cookies, verifiedTargetUrl) => {
       await browser.defaultBrowserContext().setCookie(...cookies);
       await assertBrowserCookieOriginBoundaryImpl(
@@ -225,8 +235,11 @@ async function primeLighthouseVercelBypass(
     expectedCommitSha,
     expectedDeploymentOrigin,
     expectedEnvironment,
-    onSensitiveValues: values =>
-      recordSensitiveValuesImpl(sensitiveValuesPath, values),
+    onSensitiveValues: cookies =>
+      recordSensitiveValuesImpl(
+        sensitiveValuesPath,
+        sensitiveCookieValues(cookies)
+      ),
     onCookies: async (cookies, verifiedTargetUrl) => {
       await browser.defaultBrowserContext().setCookie(...cookies);
       await assertBrowserCookieOriginBoundaryImpl(
@@ -250,6 +263,7 @@ module.exports.assertBrowserCookieOriginBoundary =
   assertBrowserCookieOriginBoundary;
 module.exports.readVerifiedBuildInfo = readVerifiedBuildInfo;
 module.exports.recordSensitiveValues = recordSensitiveValues;
+module.exports.sensitiveCookieValues = sensitiveCookieValues;
 module.exports.validateCookieOriginBoundaryHeaders =
   validateCookieOriginBoundaryHeaders;
 module.exports.validateBuildInfo = validateBuildInfo;
