@@ -81,6 +81,53 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const PRODUCTION_OAUTH_REPAIR_CORE = [
+  '.github/workflows/production-release.yml',
+  'apps/web/scripts/lighthouse-vercel-bypass.test.ts',
+  'apps/web/scripts/vercel-protected-origin.cjs',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts',
+];
+const PRODUCTION_OAUTH_REPAIR_TESTS = [
+  'apps/web/scripts/lighthouse-vercel-bypass.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts',
+];
+const PRODUCTION_OAUTH_REPAIR_WITH_SELECTOR = [
+  ...PRODUCTION_OAUTH_REPAIR_CORE,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
+const PRODUCTION_OAUTH_WEB_COMMAND = [
+  'pnpm',
+  [
+    '--filter',
+    '@jovie/web',
+    'exec',
+    'vitest',
+    'run',
+    'scripts/lighthouse-vercel-bypass.test.ts',
+    'tests/unit/ci/deploy-workflow.test.ts',
+    'tests/unit/ci/playwright-artifact-secrets.test.ts',
+    '--passWithNoTests',
+    '--maxWorkers',
+    '2',
+  ],
+];
+const SELECTOR_REGRESSION_COMMAND = [
+  'pnpm',
+  [
+    'exec',
+    'vitest',
+    '--root',
+    'scripts',
+    '--config',
+    'vitest.config.mts',
+    'run',
+    'lib/__tests__/automation-verify.test.mjs',
+    '--maxWorkers',
+    '2',
+  ],
+];
 const PR_SIZE_GUARD_MANIFEST = [
   '.github/workflows/pr-size-guard.yml',
   'scripts/lib/pr-size-guard-policy.mjs',
@@ -277,38 +324,93 @@ const NEON_ATTEMPT_ARTIFACT_MANIFEST = [
 ];
 
 describe('automation-verify affected scope', () => {
-  it('keeps a production workflow contract-only diff on focused coverage', () => {
-    const plan = buildAffectedTestPlan([
-      '.github/workflows/production-release.yml',
-      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-    ]);
+  it('keeps the exact production OAuth repair on focused web contracts', () => {
+    const plan = buildAffectedTestPlan(PRODUCTION_OAUTH_REPAIR_CORE);
 
     expect(plan.mode).toBe('selected');
-    expect(plan.selectedTests).toEqual([
-      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+    expect(plan.selectedTests).toEqual(PRODUCTION_OAUTH_REPAIR_TESTS);
+    expect(plan.scriptVitestTests).toEqual([]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      PRODUCTION_OAUTH_WEB_COMMAND,
     ]);
   });
 
-  it('fails closed when the production workflow contract includes unknown source', () => {
+  it('keeps the self-modifying production OAuth repair on focused contracts', () => {
+    const plan = buildAffectedTestPlan(PRODUCTION_OAUTH_REPAIR_WITH_SELECTOR);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual(PRODUCTION_OAUTH_REPAIR_TESTS);
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+    expect(buildSelectedTestCommands(plan, '2')).toEqual([
+      SELECTOR_REGRESSION_COMMAND,
+      PRODUCTION_OAUTH_WEB_COMMAND,
+    ]);
+  });
+
+  it.each(
+    PRODUCTION_OAUTH_REPAIR_CORE
+  )('fails closed when the production OAuth repair is missing core input %s', missingInput => {
+    expect(
+      buildAffectedTestPlan(
+        PRODUCTION_OAUTH_REPAIR_CORE.filter(file => file !== missingInput)
+      ).mode
+    ).toBe('full');
+    expect(
+      buildAffectedTestPlan(
+        PRODUCTION_OAUTH_REPAIR_WITH_SELECTOR.filter(
+          file => file !== missingInput
+        )
+      ).mode
+    ).toBe('full');
+  });
+
+  it.each(
+    AFFECTED_TEST_SELECTOR_MANIFEST
+  )('fails closed when the production OAuth repair includes only selector input %s', selectorInput => {
+    expect(
+      buildAffectedTestPlan([...PRODUCTION_OAUTH_REPAIR_CORE, selectorInput])
+        .mode
+    ).toBe('full');
+  });
+
+  it.each([
+    'apps/web/lib/unknown-production-release.ts',
+    '.github/workflows/unknown-production-release.yml',
+    'scripts/unknown-production-release.mjs',
+  ])('fails closed when the production OAuth repair includes unknown peer %s', unknownPeer => {
+    for (const manifest of [
+      PRODUCTION_OAUTH_REPAIR_CORE,
+      PRODUCTION_OAUTH_REPAIR_WITH_SELECTOR,
+    ]) {
+      expect(buildAffectedTestPlan([...manifest, unknownPeer]).mode).toBe(
+        'full'
+      );
+    }
+  });
+
+  it('fails closed for the legacy partial production workflow pair', () => {
     expect(
       buildAffectedTestPlan([
         '.github/workflows/production-release.yml',
-        'apps/web/lib/unknown-production-release.ts',
         'apps/web/tests/unit/ci/deploy-workflow.test.ts',
       ]).mode
     ).toBe('full');
   });
 
-  it.each([
-    '.github/workflows/unknown-production-release.yml',
-    'scripts/unknown-production-release.mjs',
-  ])('fails closed when the production workflow contract includes unknown automation %s', unknownAutomation => {
+  it.each(
+    PRODUCTION_OAUTH_REPAIR_CORE
+  )('fails closed when production OAuth repair input %s was deleted', deletedInput => {
     expect(
-      buildAffectedTestPlan([
-        '.github/workflows/production-release.yml',
-        'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-        unknownAutomation,
-      ]).mode
+      buildAffectedTestPlan(PRODUCTION_OAUTH_REPAIR_CORE, {
+        isFileAvailable: file => file !== deletedInput,
+      }).mode
+    ).toBe('full');
+    expect(
+      buildAffectedTestPlan(PRODUCTION_OAUTH_REPAIR_WITH_SELECTOR, {
+        isFileAvailable: file => file !== deletedInput,
+      }).mode
     ).toBe('full');
   });
 

@@ -101,6 +101,18 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const PRODUCTION_OAUTH_REPAIR_CORE = new Set([
+  '.github/workflows/production-release.yml',
+  'apps/web/scripts/lighthouse-vercel-bypass.test.ts',
+  'apps/web/scripts/vercel-protected-origin.cjs',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts',
+]);
+const PRODUCTION_OAUTH_REPAIR_TESTS = [
+  'apps/web/scripts/lighthouse-vercel-bypass.test.ts',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts',
+];
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/app/(shell)/chat/loading.tsx',
   'apps/web/app/exp/shell-v1/page.tsx',
@@ -409,6 +421,27 @@ export function buildAffectedTestPlan(
   const isExactAffectedTestSelector =
     affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
     files.length === AFFECTED_TEST_SELECTOR_MANIFEST.size;
+  const productionOauthRepairInputCount = files.filter(file =>
+    PRODUCTION_OAUTH_REPAIR_CORE.has(file)
+  ).length;
+  const hasAvailableProductionOauthRepairInputs = [
+    ...PRODUCTION_OAUTH_REPAIR_CORE,
+    ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  ].every(file => !files.includes(file) || isFileAvailable(file));
+  const isExactProductionOauthRepairCore =
+    productionOauthRepairInputCount === PRODUCTION_OAUTH_REPAIR_CORE.size &&
+    files.length === PRODUCTION_OAUTH_REPAIR_CORE.size &&
+    hasAvailableProductionOauthRepairInputs;
+  const isExactProductionOauthRepairWithSelector =
+    productionOauthRepairInputCount === PRODUCTION_OAUTH_REPAIR_CORE.size &&
+    affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size &&
+    files.length ===
+      PRODUCTION_OAUTH_REPAIR_CORE.size +
+        AFFECTED_TEST_SELECTOR_MANIFEST.size &&
+    hasAvailableProductionOauthRepairInputs;
+  const isExactProductionOauthRepair =
+    isExactProductionOauthRepairCore ||
+    isExactProductionOauthRepairWithSelector;
   const authenticatedA11yRepairInputCount = files.filter(file =>
     AUTHENTICATED_A11Y_REPAIR_CORE.has(file)
   ).length;
@@ -567,21 +600,20 @@ export function buildAffectedTestPlan(
         !file.startsWith('apps/web/tests/performance/')
     )
   );
-  const isExactProductionReleaseContract =
-    files.length === 2 &&
-    files.includes('.github/workflows/production-release.yml') &&
-    directlyRunnableTestFiles.has(
-      'apps/web/tests/unit/ci/deploy-workflow.test.ts'
-    );
   const hasUnsupportedAutomationPeer =
     files.some(
       file => file.startsWith('.github/') || file.startsWith('scripts/')
-    ) && !isExactProductionReleaseContract;
+    ) && !isExactProductionOauthRepair;
   const hasManifestInputBeyondDirectTests = manifest =>
     files.some(
       file =>
         manifest.has(file) &&
-        (hasUnsupportedAutomationPeer || !directlyRunnableTestFiles.has(file))
+        (hasUnsupportedAutomationPeer ||
+          (!directlyRunnableTestFiles.has(file) &&
+            !(
+              isExactProductionOauthRepairWithSelector &&
+              AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+            )))
     );
   const mandatoryTests = [];
   const hasSeedConfirmationChange = files.some(
@@ -657,6 +689,9 @@ export function buildAffectedTestPlan(
   if (isExactNeonAttemptArtifactRepair) {
     mandatoryTests.push(...NEON_ATTEMPT_ARTIFACT_TESTS);
   }
+  if (isExactProductionOauthRepair) {
+    mandatoryTests.push(...PRODUCTION_OAUTH_REPAIR_TESTS);
+  }
   if (
     isExactPerformanceProfilerRepairPrimary ||
     isExactPerformanceProfilerRepairWithSelectorLegacy
@@ -694,6 +729,7 @@ export function buildAffectedTestPlan(
       ? SCANNER_LOAD_REPAIR_SCRIPT_TESTS
       : []),
     ...(isExactAffectedTestSelector ||
+    isExactProductionOauthRepairWithSelector ||
     (isExactAuthenticatedA11yRepair && affectedTestSelectorInputCount > 0) ||
     isExactPrSizeGuardWithSelector ||
     isExactGoldenPathSmokeContractRepair ||
@@ -738,6 +774,8 @@ export function buildAffectedTestPlan(
     if (file.startsWith('apps/web/tests/eval/promptfoo/')) return true;
     if (isInvestorNoteIngestionInput(file)) return true;
     if (isCiCancellationHealerInput(file)) return true;
+    if (isExactProductionOauthRepair && PRODUCTION_OAUTH_REPAIR_CORE.has(file))
+      return true;
     if (
       isExactAuthenticatedA11yRepair &&
       AUTHENTICATED_A11Y_REPAIR_CORE.has(file)
@@ -990,6 +1028,7 @@ export function buildAffectedTestPlan(
             isExactPrerequisiteTrain ||
             isExactVercelCongestionControl ||
             isExactAffectedTestSelector ||
+            isExactProductionOauthRepair ||
             isExactAuthenticatedA11yRepair ||
             isExactPrSizeGuard ||
             isExactPrSizeGuardWithSelector ||
