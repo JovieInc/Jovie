@@ -436,7 +436,7 @@ describe('ShellReleasesView', () => {
       })
     );
     fireEvent.click(
-      screen.getAllByRole('button', { name: 'Edit release links' })[0]
+      screen.getAllByRole('button', { name: 'Edit Release Links' })[0]
     );
 
     expect(await screen.findByTestId('release-sidebar')).toHaveTextContent(
