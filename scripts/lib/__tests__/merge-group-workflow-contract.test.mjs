@@ -663,6 +663,7 @@ describe('merge_group workflow contract', () => {
       'ci.yml',
       'fork-pr-gate.yml',
       'pr-size-guard.yml',
+      'visual-approval-guard.yml',
     ]);
     expect(getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate')).not.toContain(
       'secrets.'
