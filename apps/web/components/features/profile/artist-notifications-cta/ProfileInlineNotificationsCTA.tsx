@@ -61,6 +61,8 @@ export interface ProfileInlineNotificationsCTAProps {
   readonly source?: NotificationSource;
   readonly sourceContext?: NotificationSourceContext;
   readonly triggerLabel?: string;
+  /** Optional trigger className override (e.g. the 36px empty-state CTA). */
+  readonly triggerClassName?: string;
   readonly experimentVariant?: ProfileAlertOptInVariant;
 }
 
@@ -173,6 +175,7 @@ export function ProfileInlineNotificationsCTA({
   source,
   sourceContext,
   triggerLabel: triggerLabelProp,
+  triggerClassName: triggerClassNameProp,
   experimentVariant,
 }: ProfileInlineNotificationsCTAProps) {
   const { contentPreferences, artistEmail, subscriptionDetails } =
@@ -834,7 +837,7 @@ export function ProfileInlineNotificationsCTA({
   const triggerLabel = isSubscribed
     ? 'Manage alerts'
     : (triggerLabelProp ?? 'Get alerts');
-  const triggerClassName = getTriggerClassName(variant);
+  const triggerClassName = triggerClassNameProp ?? getTriggerClassName(variant);
   const trigger =
     isInline || hideTrigger ? null : (
       <button

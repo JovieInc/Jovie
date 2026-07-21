@@ -18,9 +18,10 @@ const ACCENT_GRADIENTS: Record<ProfileEmptyBentoAccent, CSSProperties> = {
     background:
       'radial-gradient(120% 100% at 50% -8%, color-mix(in oklab, var(--color-accent-pink) 78%, white) 0%, color-mix(in oklab, var(--color-accent-pink) 44%, #2a1028) 44%, color-mix(in oklab, var(--color-accent-pink) 20%, #0a0814) 100%)',
   },
+  // Events: standard surface-1 card treatment (no off-token accent gradient).
   events: {
     background:
-      'radial-gradient(120% 100% at 50% -8%, color-mix(in oklab, var(--color-accent-blue) 78%, white) 0%, color-mix(in oklab, var(--color-accent-blue) 44%, #102040) 44%, color-mix(in oklab, var(--color-accent-blue) 20%, #0a0814) 100%)',
+      'linear-gradient(155deg, var(--color-bg-surface-2), var(--color-bg-surface-1))',
   },
 };
 
