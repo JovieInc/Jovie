@@ -9,7 +9,11 @@ export const dynamic = 'force-dynamic';
 let _cachedBuildId: string | undefined;
 
 export function GET() {
-  const version = env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0';
+  // Read directly from process.env (not the dynamic `env` proxy) so Next.js
+  // inlines the build-time value from version.json (next.config.js `env`
+  // block) into this bundle. Dynamic access via the proxy is not inlined and
+  // resolves to undefined at runtime, surfacing as "v0.0.0" (JOV-3459).
+  const version = process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0';
   const environment = env.VERCEL_ENV;
   const isDevelopment = env.NODE_ENV !== 'production';
   const buildSha = env.NEXT_PUBLIC_BUILD_SHA?.trim().slice(0, 7);
