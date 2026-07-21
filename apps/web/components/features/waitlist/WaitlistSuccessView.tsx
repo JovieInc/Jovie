@@ -9,13 +9,14 @@ import {
 interface WaitlistSuccessViewProps {
   readonly outcome?: WaitlistDisplayOutcome;
   readonly onRetry?: () => void;
-  readonly confirmedEmail?: string | null;
+  /** Optional contact email shown in the completion receipt. */
+  readonly email?: string | null;
 }
 
 export function WaitlistSuccessView({
   outcome = 'pending',
   onRetry,
-  confirmedEmail = null,
+  email,
 }: Readonly<WaitlistSuccessViewProps>) {
   return (
     <AuthLayout
@@ -23,11 +24,7 @@ export function WaitlistSuccessView({
       showFormTitle={false}
       showFooterPrompt={false}
     >
-      <WaitlistOutcomeView
-        outcome={outcome}
-        onRetry={onRetry}
-        confirmedEmail={confirmedEmail}
-      />
+      <WaitlistOutcomeView outcome={outcome} onRetry={onRetry} email={email} />
     </AuthLayout>
   );
 }

@@ -33,7 +33,7 @@ const VOICE_RULES: readonly VoiceRule[] = [
   {
     name: 'banned-phrase',
     pattern:
-      /\b(excited to share|thrilled to announce|let that sink in|here's the truth|at the end of the day|here's the thing|let me tell you|i've been thinking about|game.changer|unlock your potential)\b/i,
+      /\b(excited to share|thrilled to announce|let that sink in|here's the truth|at the end of the day|here's the thing|let me tell you|i've been thinking about|game.changer|unlock your potential|fire\.?\s+that'?s the play|catch you on the flip side|totally dark|probably goes nowhere(?:\s+useful)?)\b/i,
   },
   {
     name: 'corporate-verb',
@@ -68,6 +68,18 @@ const VOICE_RULES: readonly VoiceRule[] = [
   {
     name: 'vague-quantifier',
     pattern: /\b(a lot of|tons of|countless|so many)\b/i,
+  },
+  {
+    // Premature ownership / success before claim+verify.
+    name: 'premature-ownership',
+    pattern:
+      /\b(your live profile|profile is live|you're all set as the owner|claimed your profile)\b/i,
+  },
+  {
+    // Unsupported "we notify your whole Spotify audience" style claims.
+    name: 'unsupported-audience-claim',
+    pattern:
+      /\b(notify (?:all(?: your)?|your entire|the whole) (?:spotify )?followers|reach (?:all(?: your)?|your entire) (?:spotify )?followers|tells? (?:all )?your fans without you doing anything)\b/i,
   },
 ];
 

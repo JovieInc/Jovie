@@ -851,10 +851,14 @@ export function OnboardingSocialLinkCard({
   );
 }
 
+/**
+ * Compact confirmation text for an artist pick.
+ * Prefer a short system-style label over a fake conversational user bubble.
+ * Spotify id travels in message metadata; this string is display-only.
+ */
 export function useArtistSelectionMessage() {
   return useMemo(
-    () => (artist: OnboardingArtistSelection) =>
-      `I picked ${artist.name} on Spotify. Let's build my artist profile from that match.`,
+    () => (artist: OnboardingArtistSelection) => `Selected: ${artist.name}`,
     []
   );
 }

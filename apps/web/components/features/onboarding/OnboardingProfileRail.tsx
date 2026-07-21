@@ -181,13 +181,14 @@ function buildPreviewArtist(
 
   return {
     id: `onboarding-preview-${artist.id}`,
+    // Preview-only — not a real owner. Manage / claim chrome must stay off.
     owner_user_id: 'onboarding-preview',
     handle: handle ?? 'your-handle',
     spotify_id: artist.id,
     name: artist.name,
     image_url: artist.imageUrl ?? undefined,
     tagline: followerLabel
-      ? `${followerLabel} Spotify followers`
+      ? `${followerLabel} Spotify followers (source: enrichment)`
       : (firstGenre ?? undefined),
     theme: undefined,
     settings: undefined,
@@ -206,7 +207,8 @@ function buildPreviewArtist(
     genres: artist.genres ? [...artist.genres] : null,
     career_highlights: null,
     target_playlists: null,
-    published: true,
+    // Not claimed/verified — keep published false so preview never reads as live.
+    published: false,
     is_verified: false,
     is_featured: false,
     marketing_opt_out: false,
@@ -337,6 +339,8 @@ export function OnboardingProfileRail({
           socialLinks={previewLinks}
           genres={previewArtist.genres}
           profileHref={profileHref}
+          // Never show Live — ownership is unverified during onboarding.
+          showLiveBadge={false}
           dataTestId='onboarding-profile-bento'
           phonePreviewTestId='onboarding-phone-preview'
           surfaceTestId='onboarding-profile-compact-surface'
@@ -354,6 +358,15 @@ export function OnboardingProfileRail({
           phoneFrameClassName={
             isInline ? 'h-105 w-50 sm:h-120 sm:w-57' : 'h-148 w-71'
           }
+          topRight={
+            <span
+              className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/50 px-2.5 text-3xs font-semibold uppercase tracking-wider text-white backdrop-blur-md dark:text-white'
+              data-testid='onboarding-profile-preview-badge'
+            >
+              Preview
+            </span>
+          }
+          caption='Preview — not claimed yet'
           overlay={<DspMatchStrip matches={dspMatches} />}
         />
       </div>

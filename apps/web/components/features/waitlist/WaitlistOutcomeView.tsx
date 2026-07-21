@@ -15,85 +15,103 @@ export type WaitlistDisplayOutcome =
 interface WaitlistOutcomeViewProps {
   readonly outcome: WaitlistDisplayOutcome;
   readonly onRetry?: () => void;
-  /** Confirmed email already collected — required before email promises. */
-  readonly confirmedEmail?: string | null;
+  /** Known contact email for the receipt (optional). */
+  readonly email?: string | null;
 }
 
-function buildOutcomeCopy(hasConfirmedEmail: boolean): Record<
-  WaitlistDisplayOutcome,
+const OUTCOME_COPY: Record<
+  WaitlistOutcomeViewProps['outcome'],
   {
     readonly title: string;
     readonly body: string;
     readonly icon: typeof CheckCircle2;
     readonly actionLabel?: string;
     readonly actionHref?: string;
+    readonly showNextSteps?: boolean;
   }
-> {
-  const emailWhenReady = hasConfirmedEmail
-    ? ' We will email you when access opens.'
-    : ' Add an email on your account if you want a heads-up when access opens.';
+> = {
+  accepted: {
+    title: 'You Have Access',
+    body: 'We saved your release context. Continue setup to finish your profile and open Jovie.',
+    icon: CheckCircle2,
+    actionLabel: 'Continue Setup',
+    actionHref: APP_ROUTES.START,
+  },
+  already_accepted: {
+    title: 'You Have Access',
+    body: 'Your request has already been approved. Continue setup to finish your profile.',
+    icon: CheckCircle2,
+    actionLabel: 'Continue Setup',
+    actionHref: APP_ROUTES.START,
+  },
+  waitlisted_gate_on: {
+    title: 'Request Saved',
+    body: 'Jovie is in a private rollout. We saved your release context and will email you when access opens — usually within a few days of capacity.',
+    icon: Clock3,
+    showNextSteps: true,
+  },
+  waitlisted_capacity_full: {
+    title: "Today's Access Is Full",
+    body: "Your request is saved. Today's slots are full, so you are on the waitlist. We email when a spot opens.",
+    icon: Clock3,
+    showNextSteps: true,
+  },
+  already_waitlisted: {
+    title: 'Request Already Received',
+    body: 'Your request is already saved with your latest answers. Watch for an email when access opens.',
+    icon: Clock3,
+    showNextSteps: true,
+  },
+  pending: {
+    title: "You're on the list",
+    body: "Request saved. We'll email you when a spot opens — typically within a few days of capacity.",
+    icon: Clock3,
+    showNextSteps: true,
+  },
+  save_failed: {
+    title: "We Couldn't Save This",
+    body: 'Your answers are still on this device. Try again so we can save the required fields before reviewing access.',
+    icon: RotateCcw,
+  },
+  rate_limited: {
+    title: 'Too Many Attempts',
+    body: 'Please wait a moment before trying again. Your answers are still on this device.',
+    icon: Clock3,
+  },
+};
 
-  return {
-    accepted: {
-      title: 'You Have Access',
-      body: 'We saved your release context. Continue setup to finish your profile and open Jovie.',
-      icon: CheckCircle2,
-      actionLabel: 'Continue Setup',
-      actionHref: APP_ROUTES.START,
-    },
-    already_accepted: {
-      title: 'You Have Access',
-      body: 'Your request has already been approved. Continue setup to finish your profile.',
-      icon: CheckCircle2,
-      actionLabel: 'Continue Setup',
-      actionHref: APP_ROUTES.START,
-    },
-    waitlisted_gate_on: {
-      title: 'Request Saved',
-      body: `We saved your release context and profile details. Jovie is in a private rollout.${emailWhenReady}`,
-      icon: Clock3,
-    },
-    waitlisted_capacity_full: {
-      title: "Today's Access Is Full",
-      body: `Your request is complete and saved. Today's access slots are full, so you are on the waitlist.${
-        hasConfirmedEmail ? emailWhenReady : ''
-      }`,
-      icon: Clock3,
-    },
-    already_waitlisted: {
-      title: 'Request Already Received',
-      body: 'Your request is already saved. We will keep your latest answers attached to your access request.',
-      icon: Clock3,
-    },
-    pending: {
-      title: "You're on the list",
-      body: hasConfirmedEmail
-        ? "We'll email you when your account is ready."
-        : 'Your request is saved. Add an email on your account if you want a heads-up when access opens.',
-      icon: Clock3,
-    },
-    save_failed: {
-      title: "We Couldn't Save This",
-      body: 'Your answers are still on this device. Try again so we can save the required fields before reviewing access.',
-      icon: RotateCcw,
-    },
-    rate_limited: {
-      title: 'Too Many Attempts',
-      body: 'Please wait a moment before trying again. Your answers are still on this device.',
-      icon: Clock3,
-    },
-  };
+function NextSteps({ email }: { readonly email?: string | null }) {
+  const emailLine = email?.trim()
+    ? `Watch ${email.trim()} for the access email.`
+    : 'Watch the email you used on this request.';
+
+  return (
+    <ol
+      className='mt-4 list-decimal space-y-1.5 pl-5 text-sm leading-6 text-white/62'
+      data-testid='waitlist-next-steps'
+    >
+      <li>{emailLine}</li>
+      <li>Expected timing: a few days once capacity opens — not instant.</li>
+      <li>
+        Resume anytime at{' '}
+        <Link
+          href={APP_ROUTES.START}
+          className='font-medium text-white/86 underline-offset-2 hover:underline'
+        >
+          /start
+        </Link>{' '}
+        or the waitlist page; your context stays attached to this request.
+      </li>
+    </ol>
+  );
 }
 
 export function WaitlistOutcomeView({
   outcome,
   onRetry,
-  confirmedEmail = null,
+  email,
 }: Readonly<WaitlistOutcomeViewProps>) {
-  const hasConfirmedEmail = Boolean(
-    confirmedEmail && confirmedEmail.includes('@')
-  );
-  const copy = buildOutcomeCopy(hasConfirmedEmail)[outcome];
+  const copy = OUTCOME_COPY[outcome];
   const Icon = copy.icon;
   const canRetry =
     (outcome === 'save_failed' || outcome === 'rate_limited') && onRetry;
@@ -110,6 +128,7 @@ export function WaitlistOutcomeView({
         </h1>
       </div>
       <p className='text-sm leading-6 text-white/62'>{copy.body}</p>
+      {copy.showNextSteps ? <NextSteps email={email} /> : null}
 
       <div className='mt-6 flex flex-col gap-2 sm:flex-row'>
         {copy.actionHref && copy.actionLabel ? (
@@ -118,6 +137,16 @@ export function WaitlistOutcomeView({
             className='inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-app font-semibold text-black transition-colors hover:bg-white/90 focus-ring-themed dark:bg-white dark:text-black'
           >
             {copy.actionLabel}
+            <ArrowRight className='h-3.5 w-3.5' aria-hidden />
+          </Link>
+        ) : null}
+        {copy.showNextSteps && !copy.actionHref ? (
+          <Link
+            href={APP_ROUTES.START}
+            className='inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-app font-semibold text-black transition-colors hover:bg-white/90 focus-ring-themed dark:bg-white dark:text-black'
+            data-testid='waitlist-resume-start'
+          >
+            Resume at Start
             <ArrowRight className='h-3.5 w-3.5' aria-hidden />
           </Link>
         ) : null}
@@ -130,7 +159,7 @@ export function WaitlistOutcomeView({
             Try Again
           </button>
         ) : null}
-        {copy.actionHref ? null : (
+        {copy.actionHref || copy.showNextSteps ? null : (
           <button
             type='button'
             onClick={() => {
