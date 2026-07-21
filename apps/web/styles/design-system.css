@@ -328,9 +328,28 @@
   height: 100%;
   max-height: 104vw;
   align-self: center;
+  /* Size container so card content can respond to the card's own height. */
+  container-type: size;
   transition:
     transform var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
     opacity var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
+}
+
+/* Unified card anatomy: the art zone is a full-width square, so the text
+   zone + CTA share (card height − card width). Progressive disclosure keeps
+   every line whole instead of clipping mid-line: the meta line hides below
+   the height where it fits (~448px), and the eyebrow hides below the height
+   where it fits next to the title (~360px) — title and CTA always fit. */
+@container (max-height: 447px) {
+  :where(.profile-entity-card) .entity-card-meta {
+    display: none;
+  }
+}
+
+@container (max-height: 359px) {
+  :where(.profile-entity-card) .entity-card-eyebrow {
+    display: none;
+  }
 }
 
 /* Scroll-driven edge treatment (transform/opacity only; applied via
@@ -389,6 +408,26 @@
 :where(.profile-aeo-content__source:hover) {
   color: var(--profile-aeo-text);
   text-decoration-color: var(--profile-aeo-text);
+}
+
+:where(.profile-aeo-content__facts) {
+  border-color: var(--profile-aeo-border);
+}
+
+:where(.profile-aeo-content__fact-value) {
+  color: var(--profile-aeo-text);
+}
+
+:where(.profile-aeo-content__fact-label),
+:where(.profile-aeo-content__link-label),
+:where(.profile-aeo-content__link),
+:where(.profile-aeo-content__share) {
+  color: var(--profile-aeo-muted);
+}
+
+:where(.profile-aeo-content__link:hover),
+:where(.profile-aeo-content__share:hover) {
+  color: var(--profile-aeo-text);
 }
 
 :where(.profile-aeo-claim-card) {
@@ -4849,6 +4888,31 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     var(--jovie-entity-accent) 82%,
     var(--color-text-primary-token) 18%
   );
+}
+
+/* Inline entity links in public profile bio/AEO copy. The entity-kind accent
+   is provided via the `--jovie-entity-accent` custom property on the link. */
+.profile-entity-mention {
+  color: var(--jovie-entity-accent);
+  text-decoration-color: color-mix(
+    in srgb,
+    var(--jovie-entity-accent) 45%,
+    transparent
+  );
+  transition:
+    color var(--system-b-duration-fast) var(--system-b-ease),
+    text-decoration-color var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+.profile-entity-mention:hover,
+.profile-entity-mention:focus-visible {
+  text-decoration-color: var(--jovie-entity-accent);
+}
+
+.profile-entity-mention:focus-visible {
+  outline: 2px solid var(--jovie-entity-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .system-b-assistant-skill-mention {

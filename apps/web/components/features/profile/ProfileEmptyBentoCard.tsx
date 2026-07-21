@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { CSSProperties, MouseEvent, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-export type ProfileEmptyBentoAccent = 'alerts' | 'music' | 'events';
+export type ProfileEmptyBentoAccent = 'music' | 'events';
 
 export type ProfileEmptyBentoLayout = 'prominent' | 'compact' | 'inline';
 
@@ -14,10 +14,6 @@ export type ProfileEmptyBentoLayout = 'prominent' | 'compact' | 'inline';
  * Inline styles (not arbitrary Tailwind) to avoid the arbitrary-value ratchet.
  */
 const ACCENT_GRADIENTS: Record<ProfileEmptyBentoAccent, CSSProperties> = {
-  alerts: {
-    background:
-      'radial-gradient(120% 100% at 50% -8%, color-mix(in oklab, var(--color-accent-purple) 82%, white) 0%, color-mix(in oklab, var(--color-accent-purple) 48%, #1a1030) 44%, color-mix(in oklab, var(--color-accent-purple) 22%, #0a0814) 100%)',
-  },
   music: {
     background:
       'radial-gradient(120% 100% at 50% -8%, color-mix(in oklab, var(--color-accent-pink) 78%, white) 0%, color-mix(in oklab, var(--color-accent-pink) 44%, #2a1028) 44%, color-mix(in oklab, var(--color-accent-pink) 20%, #0a0814) 100%)',

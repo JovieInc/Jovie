@@ -1,8 +1,8 @@
 'use client';
 
-import { Bell } from 'lucide-react';
 import { type MouseEvent, memo, useMemo } from 'react';
 import {
+  EntityCard,
   type EntityCardModel,
   merchToEntityCard,
   releaseToEntityCard,
@@ -10,7 +10,6 @@ import {
 } from '@/components/organisms/entity-card';
 import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
-import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import {
   startOfProfileSurfaceLocalDay as startOfLocalDay,
@@ -82,18 +81,6 @@ function getUpcomingTourDates(
     );
 }
 
-function HomeAlertsSwitch() {
-  return (
-    <span
-      className='relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-white/18 bg-white/18 p-1 shadow-sm transition-colors duration-subtle group-hover:bg-white/24'
-      aria-hidden='true'
-      data-testid='profile-home-alerts-switch'
-    >
-      <span className='block h-6 w-6 rounded-full bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)] dark:bg-white' />
-    </span>
-  );
-}
-
 function HomeAlertsCard({
   artist,
   onAlertsClick,
@@ -105,11 +92,8 @@ function HomeAlertsCard({
   renderMode: ProfileRenderMode;
   sourceContext: NotificationSourceContext;
 }>) {
-  const title = 'Alerts';
-  const description = `${artist.name}: music, shows, merch.`;
   const isInteractive = renderMode === 'interactive';
   const subscribeHref = `/${artist.handle}?mode=subscribe`;
-  const ariaLabel = `Turn on alerts for ${artist.name}`;
   const handleClick = isInteractive
     ? (event: MouseEvent<HTMLElement>) => {
         if (!onAlertsClick) {
@@ -120,21 +104,33 @@ function HomeAlertsCard({
       }
     : undefined;
 
+  // The alerts card is a standard unified-anatomy card — icon art zone,
+  // context eyebrow, "Alerts" title, one-line body, full-width CTA — the
+  // same design as every other card in the home carousel.
+  const model: EntityCardModel = {
+    id: `alerts-${artist.id}`,
+    kind: 'alerts',
+    href: isInteractive ? subscribeHref : null,
+    imageUrl: null,
+    imageAlt: `Alerts for ${artist.name}`,
+    eyebrow: artist.name,
+    title: 'Alerts',
+    meta: 'Music, shows, merch — first.',
+    cta: {
+      label: 'Get Updates',
+      href: isInteractive ? subscribeHref : null,
+    },
+  };
+
   return (
-    <ProfileEmptyBentoCard
-      accent='alerts'
-      icon={Bell}
-      title={title}
-      body={description}
-      // Carousel card geometry: the prominent column layout fills the fixed
-      // 3:4 card box; the inline strip layout is gone with the stacked rail.
-      layout='prominent'
-      className='h-full'
-      trailing={<HomeAlertsSwitch />}
-      href={isInteractive ? subscribeHref : undefined}
-      onClick={handleClick}
-      ariaLabel={ariaLabel}
+    <EntityCard
+      model={model}
+      treatment='detailed'
+      surface='pearl'
+      anatomy='unified'
+      className='h-full w-full overflow-hidden'
       dataTestId='profile-home-alerts-fallback-card'
+      onClick={handleClick}
     />
   );
 }
@@ -287,6 +283,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
           city: show.city,
           startDate: show.startDate,
           ticketUrl: show.ticketUrl,
+          ticketStatus: show.ticketStatus,
         })
       );
     }

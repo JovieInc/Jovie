@@ -148,7 +148,7 @@ describe('ProfileHomeRail', () => {
     expect(screen.getAllByText('Never Say A Word')).toHaveLength(1);
   });
 
-  it('renders a prominent gradient alerts card when the home rail is empty', () => {
+  it('renders the alerts card as a standard unified-anatomy card (no gradient)', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
@@ -163,8 +163,14 @@ describe('ProfileHomeRail', () => {
     );
 
     const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
-    expect(alertsCard.style.background).toContain('var(--color-accent-purple)');
-    expect(alertsCard.className).toContain('min-h-44');
+    // Standard card: pearl surface, no accent gradient, unified anatomy
+    // (square icon art zone + full-width "Get Updates" CTA).
+    expect(alertsCard.style.background).toBe('');
+    expect(alertsCard.className).toContain('bg-(--profile-pearl-bg)');
+    expect(alertsCard).toHaveTextContent('Alerts');
+    const cta = screen.getByText('Get Updates');
+    expect(cta.className).toContain('h-9');
+    expect(cta.className).toContain('w-full');
   });
 
   it('keeps the carousel shell with PAC and alerts cards even when the catalog is empty', () => {
@@ -182,12 +188,12 @@ describe('ProfileHomeRail', () => {
     );
 
     const carousel = screen.getByTestId('profile-home-carousel');
-    expect(
-      screen.getByTestId('profile-home-alerts-fallback-card')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId('profile-home-alerts-switch')
-    ).toBeInTheDocument();
+    const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
+    expect(alertsCard).toBeInTheDocument();
+    // The alerts card shares the unified entity-card anatomy (full-bleed
+    // square art zone, full-width CTA).
+    expect(alertsCard.className).toContain('p-0');
+    expect(screen.getByText('Get Updates')).toBeInTheDocument();
     // No entity items → the carousel still hosts the slot cards.
     expect(carousel.querySelectorAll(':scope > li').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('entity-card-music')).not.toBeInTheDocument();

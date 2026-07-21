@@ -165,12 +165,12 @@ export function EntityCarousel({
             <EntityCard
               model={model}
               treatment='detailed'
-              // The hero keeps image priority; carousel art stays lazy so the
-              // LCP image never competes with the cover photo. artFit='fill'
-              // lets the art zone flex inside the height-locked card so the
-              // CTA footer never clips.
+              // Unified profile-card anatomy: full-bleed square art, text
+              // zone, and a full-width CTA — the same design as the featured
+              // PAC card. The hero keeps image priority; carousel art stays
+              // lazy so the LCP image never competes with the cover photo.
               surface={surface}
-              artFit='fill'
+              anatomy='unified'
               className='h-full w-full overflow-hidden'
               onClick={
                 onCardClick ? () => onCardClick(index, model) : undefined
