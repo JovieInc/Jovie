@@ -147,7 +147,6 @@ auto-update they can apply with one click.
 
 ## Related files
 
-- `apps/desktop/BUILDS.md` — canonical production/staging/local shell matrix
 - `apps/desktop/electron-builder.yml` — production signing config
 - `apps/desktop/electron-builder.staging.yml` — staging signing config
 - `apps/desktop/build/entitlements.mac.plist` — hardened-runtime entitlements

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -89,7 +90,25 @@ export async function generateDmgBackground({
   return outputPath;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Resolve symlinks on the invocation path so running through a symlink
+// (e.g. a bin/ alias) still counts as a direct run instead of a silent no-op.
+function isDirectRun() {
+  const invokedPath = process.argv[1];
+  if (!invokedPath) {
+    return false;
+  }
+  const candidates = [invokedPath];
+  try {
+    candidates.push(realpathSync(invokedPath));
+  } catch {
+    // Keep the raw path; an unresolvable symlink simply won't match.
+  }
+  return candidates.some(
+    candidate => pathToFileURL(candidate).href === import.meta.url
+  );
+}
+
+if (isDirectRun()) {
   const outputPath = await generateDmgBackground();
   console.log(`DMG background written: ${outputPath}`);
 }

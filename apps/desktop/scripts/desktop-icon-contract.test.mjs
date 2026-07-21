@@ -98,6 +98,17 @@ async function assertIcnsFile(filePath) {
   assert.ok(buffer.length > 0);
 }
 
+async function icnsFilesMissing() {
+  for (const filePath of [productionIcnsPath, stagingIcnsPath]) {
+    try {
+      await access(filePath);
+    } catch {
+      return true;
+    }
+  }
+  return false;
+}
+
 test('desktop sources the canonical opaque Jovie app icon profile', async () => {
   const sourceMetadata = await pngMetadata(canonicalIconPath);
 
@@ -124,9 +135,15 @@ test('packaged production and staging icons use the rounded desktop profile', as
   await assertRoundedTransparentPng(productionPngPath, ICON_SIZE);
   await assertRoundedTransparentPng(stagingPngPath, ICON_SIZE);
 
-  // .icns files are macOS-specific; skip this assertion on other platforms
+  // .icns files are macOS-specific; skip this assertion on other platforms.
+  // They are also gitignored build artifacts of prepare:assets (macOS-only
+  // iconutil), so skip when they have not been generated yet.
   if (!isMacOS) {
     console.log('Skipping .icns file assertions on non-macOS platform');
+  } else if (await icnsFilesMissing()) {
+    console.log(
+      'Skipping .icns file assertions: assets/*.icns not generated (run pnpm run prepare:assets)'
+    );
   } else {
     await assertIcnsFile(productionIcnsPath);
     await assertIcnsFile(stagingIcnsPath);

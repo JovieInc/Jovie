@@ -9,6 +9,7 @@ import {
   Menu,
   type MenuItemConstructorOptions,
   screen,
+  type Session,
   shell,
 } from 'electron';
 import {
@@ -69,12 +70,14 @@ const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS.backgroundColor;
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
 // A crashed/killed renderer is reloaded up to this many times before the shell
 // gives up and shows the visible load-failure page (Retry) instead of leaving
-// the window black. Reset to 0 on every successful load so only crash *loops*
-// hit the cap.
+// the window black. Reset to 0 only after a confirmed app-booted ping so a
+// renderer that crashes deterministically after load still hits the cap.
 const MAX_RENDERER_CRASH_RELOADS = 2;
 const HUD_BUILD_INFO_POLL_INTERVAL_MS = 60 * 1000;
+// electron-builder.local.yml and electron-builder.staging.yml both package the
+// staging icon assets; only the production config ships icon.png.
 const APP_ICON_FILENAME =
-  APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
+  APP_ENV === 'production' ? 'icon.png' : 'icon-staging.png';
 const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
 const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop/${app.getVersion()}`;
 const JOVIE_MARK_SVG_PATH =
@@ -535,18 +538,30 @@ function getAppIconPath(): string | undefined {
 
 function loadWindowState(): WindowState {
   const displayBounds = screen.getPrimaryDisplay().workArea;
+  const connectedDisplays = screen
+    .getAllDisplays()
+    .map(display => display.workArea);
 
   try {
     const raw = fs.readFileSync(WINDOW_STATE_FILE, 'utf8');
     const parsed: unknown = JSON.parse(raw);
-    return sanitizeWindowState(parsed, displayBounds, reportDesktopSecurityEvent);
+    return sanitizeWindowState(
+      parsed,
+      displayBounds,
+      reportDesktopSecurityEvent,
+      connectedDisplays
+    );
   } catch {
     return sanitizeWindowState(undefined, displayBounds);
   }
 }
 
 function saveWindowState(win: BrowserWindow): void {
-  const bounds = win.getBounds();
+  // A minimized window reports garbage bounds (x: -32000 on Windows); keep the
+  // last good state instead. getNormalBounds() returns the pre-maximize /
+  // pre-fullscreen bounds so those transient states are never persisted.
+  if (win.isMinimized()) return;
+  const bounds = win.getNormalBounds();
   const state: WindowState = {
     x: bounds.x,
     y: bounds.y,
@@ -605,20 +620,62 @@ function restoreMainWindowAfterAuthHandoff(): void {
   }
 }
 
+// The main window grants trusted audio (mic/dictation) permissions on the
+// shared default session. The auth handoff window overrides those handlers
+// with deny-all for its lifetime, so they must be re-registered when the
+// handoff closes — otherwise mic/dictation stays denied until app restart.
+function registerMainWindowPermissionHandlers(session: Session): void {
+  session.setPermissionRequestHandler(
+    (webContents, permission, callback, details) => {
+      const requestingOrigin =
+        typeof details.requestingUrl === 'string'
+          ? details.requestingUrl
+          : undefined;
+      callback(
+        shouldGrantTrustedAudioPermission({
+          permission,
+          details,
+          webContents,
+          requestingOrigin,
+          parseUrl,
+          appOrigin: APP_ORIGIN,
+        })
+      );
+    }
+  );
+
+  session.setPermissionCheckHandler(
+    (webContents, permission, requestingOrigin, details) =>
+      shouldGrantTrustedAudioPermissionCheck({
+        permission,
+        details,
+        webContents,
+        requestingOrigin,
+        parseUrl,
+        appOrigin: APP_ORIGIN,
+      })
+  );
+}
+
+function buildAuthCompletionUrl(completion: DesktopAuthCompletion): string {
+  const targetUrl = new URL(DESKTOP_AUTH_NATIVE_COMPLETE_PATH, APP_URL);
+  targetUrl.searchParams.set('client', 'electron');
+  targetUrl.searchParams.set('state', completion.state);
+  return targetUrl.toString();
+}
+
 function loadAuthCompletion(completion: DesktopAuthCompletion): void {
   pendingAuthCompletion = completion;
   recentAuthCompletion = null;
 
-  const targetUrl = new URL(DESKTOP_AUTH_NATIVE_COMPLETE_PATH, APP_URL);
-  targetUrl.searchParams.set('client', 'electron');
-  targetUrl.searchParams.set('state', completion.state);
+  const targetUrl = buildAuthCompletionUrl(completion);
   const win =
     mainWindow && !mainWindow.isDestroyed()
       ? mainWindow
-      : createWindow(targetUrl.toString());
+      : createWindow(targetUrl);
 
-  if (win.webContents.getURL() !== targetUrl.toString()) {
-    void win.loadURL(targetUrl.toString());
+  if (win.webContents.getURL() !== targetUrl) {
+    void win.loadURL(targetUrl);
   }
 
   if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
@@ -629,6 +686,19 @@ function loadAuthCompletion(completion: DesktopAuthCompletion): void {
   showWindow(win);
 }
 
+// A jovie://auth/complete deep link can reach a process with no in-flight
+// PKCE flow to bind to (e.g. macOS open-url cold launch). Dropping it silently
+// strands the user — signed in on the web, nothing visible in the app. Surface
+// a fresh sign-in handoff so they can retry. PKCE state is intentionally NOT
+// persisted across launches; the new flow starts over.
+function surfaceNoPendingAuthFlow(): void {
+  if (!app.isReady()) return;
+  const win =
+    mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
+  showWindow(win);
+  showDesktopAuthHandoff(buildCentralDesktopAuthUrl('sign_in', '/app'));
+}
+
 function handleAuthCompletion(
   completion: NonNullable<ReturnType<typeof parseDesktopAuthReturnDeepLink>>
 ): void {
@@ -636,12 +706,21 @@ function handleAuthCompletion(
     pendingDesktopAuthPkce,
     completion
   );
-  pendingDesktopAuthPkce = null;
 
   if (!binding.ok) {
     reportDesktopAuthBindingFailure(reportDesktopSecurityEvent, binding);
+    if (binding.reason === 'pkce-expired') {
+      // The pending flow is dead either way — drop it.
+      pendingDesktopAuthPkce = null;
+    } else if (binding.reason === 'no-pending-flow') {
+      surfaceNoPendingAuthFlow();
+    }
+    // 'flow-mismatch' (a forged-but-well-formed deep link) must NOT clear the
+    // legitimate in-flight login — leave pendingDesktopAuthPkce untouched.
     return;
   }
+
+  pendingDesktopAuthPkce = null;
 
   const nativeCompletion: DesktopAuthCompletion = {
     code: completion.code,
@@ -750,6 +829,11 @@ function showDesktopAuthHandoff(authUrl: string): void {
   authHandoffWindow.on('closed', () => {
     authHandoffWindow = null;
     restoreMainWindowAfterAuthHandoff();
+    // The handoff installed deny-all permission handlers on the shared default
+    // session; restore the main window's trusted-audio policy.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      registerMainWindowPermissionHandlers(mainWindow.webContents.session);
+    }
   });
 
   authHandoffWindow.webContents.session.setPermissionRequestHandler(
@@ -1064,6 +1148,11 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   const markRendererBooted = (): void => {
     rendererBooted = true;
+    // Only a confirmed app-booted ping proves the renderer is healthy, so only
+    // now does the crash-reload budget reset. Resetting on did-finish-load let
+    // a renderer that crashes deterministically AFTER load (e.g. OOM during
+    // hydration) loop reloads forever without ever reaching the failure page.
+    rendererCrashReloadCount = 0;
     clearBootWatchdog();
   };
 
@@ -1072,7 +1161,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     rendererBooted = false;
     if (win.isDestroyed()) return;
     const url = win.webContents.getURL();
-    if (!shouldArmRendererBootWatchdog(url)) return;
+    if (!shouldArmRendererBootWatchdog(url, APP_ORIGIN)) return;
 
     bootWatchdogTimer = setTimeout(() => {
       bootWatchdogTimer = null;
@@ -1107,7 +1196,6 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   win.webContents.on('did-finish-load', () => {
-    rendererCrashReloadCount = 0;
     armBootWatchdog();
   });
   win.webContents.on('render-process-gone', (_event, details) => {
@@ -1140,36 +1228,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     showDesktopLoadFailure(win);
   });
 
-  win.webContents.session.setPermissionRequestHandler(
-    (webContents, permission, callback, details) => {
-      const requestingOrigin =
-        typeof details.requestingUrl === 'string'
-          ? details.requestingUrl
-          : undefined;
-      callback(
-        shouldGrantTrustedAudioPermission({
-          permission,
-          details,
-          webContents,
-          requestingOrigin,
-          parseUrl,
-          appOrigin: APP_ORIGIN,
-        })
-      );
-    }
-  );
-
-  win.webContents.session.setPermissionCheckHandler(
-    (webContents, permission, requestingOrigin, details) =>
-      shouldGrantTrustedAudioPermissionCheck({
-        permission,
-        details,
-        webContents,
-        requestingOrigin,
-        parseUrl,
-        appOrigin: APP_ORIGIN,
-      })
-  );
+  registerMainWindowPermissionHandlers(win.webContents.session);
 
   // Navigation guard: app-host routes stay in-window; auth routes get the
   // dedicated handoff; all other safe URLs open in the system browser.
@@ -1270,17 +1329,18 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 }
 
 function openPreferences(): void {
-  const win =
-    mainWindow && !mainWindow.isDestroyed()
-      ? mainWindow
-      : BrowserWindow.getFocusedWindow();
-  if (!win) {
+  // Mid-handoff the focused window is the small, non-resizable auth window and
+  // the main window is intentionally hidden — loading settings into either
+  // would clobber the sign-in flow, so no-op until the handoff closes.
+  if (isAuthHandoffOpen()) return;
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
     createWindow(SETTINGS_URL);
     return;
   }
 
-  void win.loadURL(SETTINGS_URL);
-  showWindow(win);
+  void mainWindow.loadURL(SETTINGS_URL);
+  showWindow(mainWindow);
 }
 
 function refreshApplicationMenu(): void {
@@ -1303,8 +1363,9 @@ function checkForUpdatesFromMenu(): void {
 }
 
 function shouldScheduleDesktopAutoUpdate(): boolean {
-  // Local dev shells never auto-update. Production and staging each publish to
-  // their own electron-updater channel; see apps/desktop/BUILDS.md.
+  // Local dev shells never auto-update. Production publishes to the
+  // electron-updater channel; staging ships as CI artifacts and its update
+  // check is a no-op (publish: null). See apps/desktop/SIGNING.md.
   if (APP_ENV === 'local' || process.platform === 'linux') {
     return false;
   }
@@ -1679,7 +1740,7 @@ app.whenReady().then(() => {
 
   createWindow(
     pendingAuthCompletion
-      ? new URL(DESKTOP_AUTH_NATIVE_COMPLETE_PATH, APP_URL).toString()
+      ? buildAuthCompletionUrl(pendingAuthCompletion)
       : pendingLegacyAuthReturnRoute
         ? new URL(pendingLegacyAuthReturnRoute, APP_URL).toString()
       : APP_ENTRY_URL

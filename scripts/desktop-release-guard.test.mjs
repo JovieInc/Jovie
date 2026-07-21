@@ -314,9 +314,11 @@ test('desktop staging is a bounded artifact and production is separately proven'
   assertPatterns(stagingUpload, [
     /if: env\.ENVIRONMENT == 'staging'/,
     /desktop-staging-/,
-    /staging-mac\.yml/,
     /retention-days: 7/,
   ]);
+  // publish is null in electron-builder.staging.yml, so staging produces no
+  // auto-update metadata (staging-mac.yml) and must not try to upload it.
+  assert.doesNotMatch(stagingUpload, /staging-mac\.yml/);
   assert.doesNotMatch(stagingUpload, /desktop-production-published|GH_TOKEN/);
   assert.ok(
     publish.indexOf('commits/main') <
