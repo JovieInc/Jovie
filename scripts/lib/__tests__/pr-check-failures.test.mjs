@@ -159,7 +159,6 @@ describe('pr-check-failures', () => {
     ).toEqual(['Brand Scrub', 'Future Safety Gate']);
   });
 
-
   it('duplicate SKIPPED checks with equal timestamps do not block enrollment', () => {
     const required = [
       { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
@@ -197,10 +196,12 @@ describe('pr-check-failures', () => {
         completedAt: '2026-07-21T02:12:54Z',
       },
     ];
-    expect(classifyQueueCheckBlockers([...required, ...skippedDupes])).toEqual([]);
-    expect(
-      collapseNewestCheckAttempts(skippedDupes).ambiguousNames
-    ).toEqual([]);
+    expect(classifyQueueCheckBlockers([...required, ...skippedDupes])).toEqual(
+      []
+    );
+    expect(collapseNewestCheckAttempts(skippedDupes).ambiguousNames).toEqual(
+      []
+    );
   });
 
   it('uses only the uniquely newest same-name check attempt', () => {
