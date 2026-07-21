@@ -140,12 +140,14 @@ run_trufflehog_pre_commit() {
   fi
 
   echo "Running trufflehog filesystem on ${#staged_files[@]} staged file(s)..."
+  # No $(trufflehog_exclude_args) here: --exclude-globs only exists in
+  # trufflehog's git mode (filesystem mode rejects it), and exclusions are
+  # already applied above via is_trufflehog_excluded when building the list.
   # shellcheck disable=SC2048,SC2086
   "$TRUFFLEHOG_BIN" filesystem \
     ${staged_files[@]} \
     --no-verification \
-    --fail \
-    $(trufflehog_exclude_args)
+    --fail
 }
 
 # trufflehog `git file://…` internally clones the local repo. On persistent

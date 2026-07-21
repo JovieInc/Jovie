@@ -610,6 +610,40 @@ else
   info "Skipping Clerk ID sync (Doppler not configured)"
 fi
 
+# ─── Git ssh keepalive (pre-push gate) ───────────────────────────────────────
+# git push holds the ssh receive-pack connection open across the pre-push
+# hook. GitHub closes idle connections (~10 min); when the gate runs longer,
+# the connection dies and git exits with SIGPIPE (141) right after the gate.
+# Protocol-level keepalives keep the connection alive during long gates.
+echo ""
+echo "── Git ssh keepalive ───────────────────────────────────────────────"
+SSH_KEEPALIVE_CMD="ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=10"
+CURRENT_SSH_COMMAND="$(git -C "$REPO_ROOT" config --get core.sshCommand || true)"
+if [[ -z "$CURRENT_SSH_COMMAND" ]]; then
+  git -C "$REPO_ROOT" config core.sshCommand "$SSH_KEEPALIVE_CMD"
+  success "core.sshCommand set (keeps pushes alive across the pre-push gate)"
+elif [[ "$CURRENT_SSH_COMMAND" == "$SSH_KEEPALIVE_CMD" ]]; then
+  success "core.sshCommand keepalive already configured"
+else
+  info "core.sshCommand already set ($CURRENT_SSH_COMMAND) — leaving as-is"
+fi
+
+# ─── 9. Migration drift check ────────────────────────────────────────────────
+# `pnpm db:migrate` trusts the drizzle.__drizzle_migrations ledger and reports
+# "up to date" even when migrations never ran (dev DB drift, 2026-07). Catch
+# that at setup time by comparing the ledger against the drizzle journal.
+echo ""
+echo "── Migration drift check ─────────────────────────────────────────────"
+if command -v doppler &>/dev/null && "${DOPPLER_LOCAL_RUN[@]}" echo "ok" &>/dev/null 2>&1; then
+  if (cd "$REPO_ROOT/apps/web" && "${DOPPLER_LOCAL_RUN[@]}" pnpm tsx scripts/verify-db-migrations.ts); then
+    success "Database migrations match the drizzle journal"
+  else
+    warn "Migration drift detected — run \`pnpm --filter @jovie/web run db:verify\` for the repair steps"
+  fi
+else
+  info "Skipping migration drift check (Doppler not configured)"
+fi
+
 # ─── Final status ────────────────────────────────────────────────────────────
 echo ""
 echo "────────────────────────────────────────────────────────────────────────"

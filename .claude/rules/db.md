@@ -10,6 +10,8 @@ Single driver policy, immutable migrations, transaction discipline.
 
 The `file-protection-check.sh` hook blocks edits to existing migration files.
 
+`pnpm db:migrate` trusts the `drizzle.__drizzle_migrations` ledger and can report "up to date" on a drifted database; run `pnpm --filter @jovie/web run db:verify` (also wired into `scripts/setup.sh`) to compare the ledger against the journal and get repair steps.
+
 For migration creation/run details: `docs/DB_MIGRATIONS.md`.
 
 ## Database Access (Single Driver Policy)

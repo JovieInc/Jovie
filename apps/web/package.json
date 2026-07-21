@@ -146,6 +146,7 @@
     "audit:icons": "node scripts/audit-icons.js",
     "danger": "danger ci --fail-on-errors --verbose",
     "db:migrate": "doppler run -- tsx scripts/drizzle-migrate.ts",
+    "db:verify": "doppler run -- tsx scripts/verify-db-migrations.ts",
     "db:seed": "doppler run -- tsx scripts/drizzle-seed.ts",
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "doppler run -- tsx scripts/drizzle-migrate.ts",
