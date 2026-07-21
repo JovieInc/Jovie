@@ -98,6 +98,7 @@ const {
 const {
   primeLighthouseVercelAliasBypass,
   primeLighthouseVercelBypass,
+  sensitiveCookieValues,
   validateBuildInfo,
   validateCookieOriginBoundaryHeaders,
 } = require('./lighthouse-vercel-bypass.cjs') as {
@@ -153,6 +154,9 @@ const {
     expectedSha: string,
     expectedEnvironment: 'preview' | 'production'
   ) => unknown;
+  readonly sensitiveCookieValues: (
+    cookies: readonly { readonly name: string; readonly value: string }[]
+  ) => readonly string[];
 };
 
 const DEPLOYMENT_URL = 'https://jovie-5sy8pmjja-jovie.vercel.app/';
@@ -236,6 +240,16 @@ function browserFixture({ leakToChild = false } = {}) {
 }
 
 describe('origin-bound Vercel protection bypass', () => {
+  it('records only non-public probe cookie values', () => {
+    expect(
+      sensitiveCookieValues([
+        { name: 'jv_country', value: 'US' },
+        { name: 'jv_cc_required', value: '1' },
+        { name: '__vercel_live_token', value: 'opaque-cookie' },
+      ])
+    ).toEqual(['opaque-cookie']);
+  });
+
   it('never attaches the bypass credential to canonical production', () => {
     const request = buildOriginBoundProbeRequest('https://jov.ie/robots.txt', {
       bypassSecret: 'sentinel-secret',
