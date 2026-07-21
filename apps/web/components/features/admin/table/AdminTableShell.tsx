@@ -127,7 +127,7 @@ export function AdminTableShell({
           <div
             ref={toolbarRef}
             className={cn(
-              'sticky top-0 z-30 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)/96 backdrop-blur-md supports-backdrop-filter:bg-(--linear-app-content-surface)/88',
+              'sticky top-0 z-30 border-b border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)/96 backdrop-blur-md supports-backdrop-filter:bg-(--app-shell-content-surface)/88',
               headerElevated && 'dark:shadow-inset-highlight'
             )}
           >
@@ -139,9 +139,7 @@ export function AdminTableShell({
       </div>
 
       {footer ? (
-        <div className='border-t border-(--linear-app-frame-seam)'>
-          {footer}
-        </div>
+        <div className='border-t border-(--app-shell-frame-seam)'>{footer}</div>
       ) : null}
     </div>
   );

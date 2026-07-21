@@ -382,7 +382,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
               getItemId={entry => entry.id}
               onItemMove={handleItemMove}
               cardHeight={200}
-              className='bg-(--linear-app-content-surface)'
+              className='bg-(--app-shell-content-surface)'
               emptyState={
                 <div className='text-center text-secondary-token'>
                   <p className='text-sm font-medium text-primary-token'>
@@ -409,7 +409,7 @@ function WaitlistIntegrityStatus({
   const hasIssues = integrity.totalIssues > 0;
 
   return (
-    <div className='flex min-h-9 items-center gap-2 border-t border-(--linear-app-frame-seam) px-4 py-2 text-2xs'>
+    <div className='flex min-h-9 items-center gap-2 border-t border-(--app-shell-frame-seam) px-4 py-2 text-2xs'>
       {hasIssues ? (
         <AlertTriangle className='h-3.5 w-3.5 shrink-0 text-amber-500' />
       ) : (
