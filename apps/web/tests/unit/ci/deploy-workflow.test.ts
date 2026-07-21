@@ -1214,6 +1214,10 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'BETTER_AUTH_URL',
       'AUTH_GOOGLE_CLIENT_ID',
       'AUTH_GOOGLE_CLIENT_SECRET',
+      'AUTH_APPLE_CLIENT_ID',
+      'AUTH_APPLE_TEAM_ID',
+      'AUTH_APPLE_KEY_ID',
+      'AUTH_APPLE_PRIVATE_KEY',
       'DATABASE_URL',
       'SESSION_SECRET',
       'AI_GATEWAY_API_KEY',
@@ -1233,7 +1237,14 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     const deployAllowlist = deployStep
       .split('\n')
       .find(line => line.includes('--only-secrets='));
-    for (const key of ['AUTH_GOOGLE_CLIENT_ID', 'AUTH_GOOGLE_CLIENT_SECRET']) {
+    for (const key of [
+      'AUTH_GOOGLE_CLIENT_ID',
+      'AUTH_GOOGLE_CLIENT_SECRET',
+      'AUTH_APPLE_CLIENT_ID',
+      'AUTH_APPLE_TEAM_ID',
+      'AUTH_APPLE_KEY_ID',
+      'AUTH_APPLE_PRIVATE_KEY',
+    ]) {
       expect(deployAllowlist).toContain(key);
     }
 
@@ -1241,7 +1252,14 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       workflow,
       'Build (preview target for staging verification)'
     );
-    for (const key of ['AUTH_GOOGLE_CLIENT_ID', 'AUTH_GOOGLE_CLIENT_SECRET']) {
+    for (const key of [
+      'AUTH_GOOGLE_CLIENT_ID',
+      'AUTH_GOOGLE_CLIENT_SECRET',
+      'AUTH_APPLE_CLIENT_ID',
+      'AUTH_APPLE_TEAM_ID',
+      'AUTH_APPLE_KEY_ID',
+      'AUTH_APPLE_PRIVATE_KEY',
+    ]) {
       const buildAllowlist = buildStep
         .split('\n')
         .find(line => line.includes('--only-secrets='));
