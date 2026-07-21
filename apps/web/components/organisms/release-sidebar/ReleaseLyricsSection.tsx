@@ -231,7 +231,7 @@ export function ReleaseLyricsSection({
           }}
           rows={draftLyrics ? 10 : 4}
           disabled={!isEditable || isSaving}
-          className='min-h-35 resize-y border-(--linear-app-frame-seam) bg-surface-0 text-xs'
+          className='min-h-35 resize-y border-(--app-shell-frame-seam) bg-surface-0 text-xs'
         />
         {/* Auto-save status indicator */}
         <div className='min-h-6'>
@@ -239,7 +239,7 @@ export function ReleaseLyricsSection({
         </div>
       </div>
 
-      <div className='flex flex-wrap items-center gap-2 border-t border-(--linear-app-frame-seam) px-3 py-2.5'>
+      <div className='flex flex-wrap items-center gap-2 border-t border-(--app-shell-frame-seam) px-3 py-2.5'>
         <DrawerButton
           type='button'
           disabled={isActionsDisabled || isCopying}
@@ -255,7 +255,7 @@ export function ReleaseLyricsSection({
         </DrawerButton>
 
         {showFormatOptions && (
-          <div className='inline-flex items-center rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'>
+          <div className='inline-flex items-center rounded-full border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'>
             <DrawerButton
               type='button'
               disabled={isActionsDisabled || isFormatting}

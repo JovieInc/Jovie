@@ -57,7 +57,7 @@ export const Sidebar = React.forwardRef<
             className='w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden'
             style={
               {
-                '--sidebar-width': 'var(--linear-app-sidebar-width)',
+                '--sidebar-width': 'var(--app-shell-sidebar-width)',
               } as React.CSSProperties
             }
             side={side}
@@ -108,7 +108,7 @@ export const Sidebar = React.forwardRef<
           >
             <div
               data-sidebar='sidebar'
-              className='pointer-events-auto flex h-full w-full flex-col overflow-clip bg-sidebar transition-[background-color] duration-normal ease-interactive lg:rounded-(--linear-app-shell-radius) lg:shadow-(--linear-app-sidebar-shadow) group-data-[variant=floating]:rounded-sidebar-floating group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
+              className='pointer-events-auto flex h-full w-full flex-col overflow-clip bg-sidebar transition-[background-color] duration-normal ease-interactive lg:rounded-(--app-shell-radius) lg:shadow-(--linear-app-sidebar-shadow) group-data-[variant=floating]:rounded-sidebar-floating group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
             >
               {children}
             </div>

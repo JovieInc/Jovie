@@ -27,7 +27,7 @@ export function SidebarCollapseButton({
         className={cn(
           // System B icon chrome: borderless circle, transparent idle, soft hover fill.
           // Matches ArtistProfileRailToggle — founder directive JOV-3959.
-          'inline-flex h-7 w-7 items-center justify-center rounded-full border-0 bg-transparent text-secondary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+          'inline-flex h-7 w-7 items-center justify-center rounded-full border-0 bg-transparent text-secondary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
           className
         )}
       >

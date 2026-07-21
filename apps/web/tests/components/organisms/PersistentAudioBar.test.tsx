@@ -622,7 +622,7 @@ describe('PersistentAudioBar', () => {
     render(<PersistentAudioBar variant='shellChatV1' />);
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
-    const reservedHeight = 'var(--linear-app-audio-bar-max-height)';
+    const reservedHeight = 'var(--app-shell-audio-bar-max-height)';
 
     // Height is reserved from the very first frame (only transform/opacity
     // animate), so surrounding content never reflows.

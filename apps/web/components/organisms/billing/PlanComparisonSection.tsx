@@ -192,7 +192,7 @@ export function PlanComparisonSection({
                   })}
                 </div>
 
-                <div className='my-5 h-px bg-(--linear-app-frame-seam)' />
+                <div className='my-5 h-px bg-(--app-shell-frame-seam)' />
                 <ul className='flex-1 space-y-3'>
                   {planData.features.map(feature => (
                     <li

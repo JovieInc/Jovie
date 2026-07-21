@@ -89,7 +89,7 @@ function TableFilterSection<T extends string>({
     <div className='flex max-h-80 min-h-55 min-w-65 flex-col overflow-hidden'>
       <div
         data-menu-header
-        className='border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)]'
+        className='border-b border-[color-mix(in_oklab,var(--app-shell-frame-seam)_44%,transparent)]'
       >
         <div className={cn(TOOLBAR_MENU_HEADER_CLASS, 'border-b-0 pb-1.25')}>
           <span className='truncate text-2xs font-[600] text-secondary-token'>
@@ -171,7 +171,7 @@ function TableFilterSubmenu<T extends string>({
           label={category.label}
           trailingVisual={
             category.selectedIds.length > 0 ? (
-              <span className='inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_30%,transparent)] px-1 text-3xs tabular-nums text-tertiary-token'>
+              <span className='inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-[color-mix(in_oklab,var(--app-shell-frame-seam)_44%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_30%,transparent)] px-1 text-3xs tabular-nums text-tertiary-token'>
                 {category.selectedIds.length}
               </span>
             ) : null

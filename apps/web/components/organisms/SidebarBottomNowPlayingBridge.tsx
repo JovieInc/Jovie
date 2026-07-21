@@ -45,7 +45,7 @@ export function SidebarBottomNowPlayingBridge() {
       aria-hidden={compactPlayerOwnsTrack}
       inert={compactPlayerOwnsTrack ? true : undefined}
       className={cn(
-        'h-(--linear-app-audio-compact-height) overflow-hidden px-2 pb-2 pt-1 transition-[opacity,transform] duration-cinematic ease-cinematic',
+        'h-(--app-shell-audio-compact-height) overflow-hidden px-2 pb-2 pt-1 transition-[opacity,transform] duration-cinematic ease-cinematic',
         compactPlayerOwnsTrack ? 'pointer-events-none opacity-0' : 'opacity-100'
       )}
     >
@@ -57,7 +57,7 @@ export function SidebarBottomNowPlayingBridge() {
         }}
         isPlaying={playbackState.isPlaying}
         onPlay={handlePlay}
-        className='border border-(--linear-app-shell-border)/75 bg-(--linear-app-content-surface) shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform,border-color,background-color] duration-cinematic ease-cinematic'
+        className='border border-(--app-shell-border)/75 bg-(--app-shell-content-surface) shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform,border-color,background-color] duration-cinematic ease-cinematic'
       />
     </div>
   );

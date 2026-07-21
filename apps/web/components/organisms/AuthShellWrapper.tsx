@@ -249,7 +249,7 @@ function AuthShellWrapperInner({
         className='absolute inset-0 z-10 hidden items-start justify-center bg-page/96 px-4 py-6 sm:px-6'
         data-testid='releases-shell-ready'
       >
-        <div className='w-full max-w-3xl rounded-2xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-4 py-4 shadow-[0_16px_40px_rgba(0,0,0,0.16)] sm:px-5'>
+        <div className='w-full max-w-3xl rounded-2xl border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--app-shell-content-surface)_96%,var(--linear-bg-surface-0))] px-4 py-4 shadow-[0_16px_40px_rgba(0,0,0,0.16)] sm:px-5'>
           <div className='flex items-center justify-between gap-4'>
             <div>
               <p className='text-sm font-semibold tracking-tighter text-primary-token'>
@@ -261,7 +261,7 @@ function AuthShellWrapperInner({
             </div>
             <div
               aria-hidden='true'
-              className='h-2.5 w-24 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_78%,transparent)]'
+              className='h-2.5 w-24 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--app-shell-frame-seam)_78%,transparent)]'
             >
               <div className='h-full w-1/2 animate-pulse rounded-full bg-primary-token/65' />
             </div>

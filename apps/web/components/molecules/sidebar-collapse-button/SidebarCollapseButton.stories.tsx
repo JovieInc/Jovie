@@ -37,7 +37,7 @@ export const OnContentSurface: Story = {
   decorators: [
     Story => (
       <SidebarProvider>
-        <div className='flex items-center gap-3 bg-(--linear-app-content-surface) p-4'>
+        <div className='flex items-center gap-3 bg-(--app-shell-content-surface) p-4'>
           <Story />
         </div>
       </SidebarProvider>

@@ -30,14 +30,14 @@ function DefaultSidebarSkeleton({
       // without a width/header reflow.
       className={cn(
         'max-lg:hidden bg-sidebar lg:flex lg:shrink-0 lg:flex-col',
-        isShellChatV1 ? 'lg:w-(--linear-app-sidebar-width)' : 'lg:w-58'
+        isShellChatV1 ? 'lg:w-(--app-shell-sidebar-width)' : 'lg:w-58'
       )}
     >
       <div
         className={cn(
           'flex items-center gap-2 px-2.5',
           isShellChatV1
-            ? 'h-(--linear-app-header-height-compact) py-0.5'
+            ? 'h-(--app-shell-header-height-compact) py-0.5'
             : 'h-9 pt-2'
         )}
       >
@@ -137,7 +137,7 @@ export function AppShellSkeleton({
           className={cn(
             'flex shrink-0 items-center gap-2',
             isShellChatV1
-              ? 'h-(--linear-app-header-height-compact) bg-(--linear-app-content-surface) px-2.5'
+              ? 'h-(--app-shell-header-height-compact) bg-(--app-shell-content-surface) px-2.5'
               : 'h-12 border-b border-subtle px-4'
           )}
         >

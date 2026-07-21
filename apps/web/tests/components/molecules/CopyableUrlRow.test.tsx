@@ -24,7 +24,7 @@ describe('CopyableUrlRow', () => {
     const row = screen.getByTestId('flat-row');
 
     expect(row.className).toContain('border-transparent');
-    expect(row.className).not.toContain('border-(--linear-app-frame-seam)');
+    expect(row.className).not.toContain('border-(--app-shell-frame-seam)');
   });
 
   it('keeps the boxed surface bordered', () => {
@@ -37,7 +37,7 @@ describe('CopyableUrlRow', () => {
     );
 
     expect(screen.getByTestId('boxed-row').className).toContain(
-      'border-(--linear-app-frame-seam)'
+      'border-(--app-shell-frame-seam)'
     );
   });
 

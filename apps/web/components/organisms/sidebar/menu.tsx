@@ -47,7 +47,7 @@ const sidebarMenuButtonVariants = cva(
     // Hover state — Linear: rgba(255,255,255,0.02) bg
     'hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] hover:text-sidebar-item-foreground',
     // Active state — filled background only, no border/inset ring
-    'data-[active=true]:bg-[color-mix(in_oklab,var(--color-sidebar-accent-active)_88%,var(--linear-app-content-surface))] data-[active=true]:text-sidebar-item-foreground',
+    'data-[active=true]:bg-[color-mix(in_oklab,var(--color-sidebar-accent-active)_88%,var(--app-shell-content-surface))] data-[active=true]:text-sidebar-item-foreground',
     // Focus state - subtle bg plus tokenized keyboard ring
     'focus-visible:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/35',
     // Disabled state

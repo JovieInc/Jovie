@@ -25,7 +25,7 @@ const PANEL_MAX_WIDTH_CLASSNAME = {
 } as const;
 
 const PANEL_OUTER_INSET_CLASSNAME = 'px-2.5 py-2.5 sm:px-3 sm:py-3';
-const PANEL_TABLE_SURFACE_CLASSNAME = 'p-0 bg-(--linear-app-content-surface)';
+const PANEL_TABLE_SURFACE_CLASSNAME = 'p-0 bg-(--app-shell-content-surface)';
 
 const PANEL_CONTENT_PADDING_CLASSNAME = {
   none: '',
@@ -80,7 +80,7 @@ export function AppShellContentPanel({
             'flex min-h-0 min-w-0 flex-1 flex-col',
             frame === 'content-container' &&
               (isTableSurface
-                ? 'overflow-hidden bg-(--linear-app-content-surface)'
+                ? 'overflow-hidden bg-(--app-shell-content-surface)'
                 : cn(LINEAR_SURFACE.contentContainer, 'overflow-hidden'))
           )}
         >

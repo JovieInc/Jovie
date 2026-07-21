@@ -55,7 +55,7 @@ export function TableHeaderCell({
         // Base styles
         'border-b border-subtle px-3 py-1 align-middle text-2xs font-caption text-secondary-token',
         // Sticky positioning
-        sticky && 'sticky z-20 bg-(--linear-app-content-surface)',
+        sticky && 'sticky z-20 bg-(--app-shell-content-surface)',
         // Alignment
         alignmentClasses[align],
         // Width

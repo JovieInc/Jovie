@@ -101,7 +101,7 @@ export function CopyableUrlRow({
       className={cn(
         'flex items-center transition-[background-color,border-color] duration-subtle',
         surface === 'boxed'
-          ? 'border border-(--linear-app-frame-seam) bg-surface-0 hover:bg-surface-1'
+          ? 'border border-(--app-shell-frame-seam) bg-surface-0 hover:bg-surface-1'
           : 'border border-transparent bg-transparent hover:bg-surface-1/80',
         styles.container,
         className

@@ -356,7 +356,7 @@ export function ReleaseDspLinks({
               className='h-8 rounded-md border-subtle bg-surface-0 text-xs'
             />
           </DrawerFormGridRow>
-          <div className='flex justify-end gap-2 border-t border-(--linear-app-frame-seam) pt-2'>
+          <div className='flex justify-end gap-2 border-t border-(--app-shell-frame-seam) pt-2'>
             <DrawerButton
               type='button'
               onClick={() => {

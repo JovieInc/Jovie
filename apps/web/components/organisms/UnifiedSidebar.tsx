@@ -404,7 +404,7 @@ export function UnifiedSidebar({
       collapsible='offcanvas'
       className={cn(
         'bg-base',
-        '[--sidebar-width:var(--linear-app-sidebar-width)]',
+        '[--sidebar-width:var(--app-shell-sidebar-width)]',
         'transition-[width,transform] duration-cinematic ease-cinematic',
         // OV brand skin: class-based token override, same mechanism as `.dark`
         // (see design-system.css → OV MODE). Zero layout impact.
@@ -415,7 +415,7 @@ export function UnifiedSidebar({
         data-electron-drag-region='true'
         className={cn(
           'relative justify-center gap-0 px-2.5',
-          'h-(--linear-app-header-height-compact) py-0.5'
+          'h-(--app-shell-header-height-compact) py-0.5'
         )}
       >
         <SidebarHeaderNav

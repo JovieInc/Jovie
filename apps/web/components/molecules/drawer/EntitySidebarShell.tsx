@@ -241,7 +241,7 @@ export function EntitySidebarShell({
                   {!isMinimalHeader && tabs ? (
                     <div
                       className={cn(
-                        'overflow-visible border-t border-(--linear-app-frame-seam) px-3 py-2.5 [&>*]:w-full',
+                        'overflow-visible border-t border-(--app-shell-frame-seam) px-3 py-2.5 [&>*]:w-full',
                         tabsContainerClassName
                       )}
                     >
@@ -253,7 +253,7 @@ export function EntitySidebarShell({
                     <div
                       className={cn(
                         showMinimalHeaderBar &&
-                          'border-t border-(--linear-app-frame-seam)',
+                          'border-t border-(--app-shell-frame-seam)',
                         'overflow-visible px-3 py-2.5 [&>*]:w-full',
                         tabsContainerClassName
                       )}

@@ -131,7 +131,7 @@ export function RightDrawer({
           'fixed inset-0 z-50 flex flex-col',
           'overflow-hidden',
           'outline-none focus:outline-none focus-visible:ring-0',
-          'border-l border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
+          'border-l border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',
           'shadow-(--linear-app-drawer-shadow)',
           'pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-cinematic ease-cinematic',
