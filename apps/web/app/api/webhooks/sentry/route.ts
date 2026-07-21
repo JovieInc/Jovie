@@ -175,7 +175,8 @@ export async function POST(request: NextRequest) {
       : '';
 
     // Fire GitHub repository_dispatch
-    const owner = env.VERCEL_GIT_REPO_OWNER || 'TheBlackFuture';
+    // Canonical product repo. Never fall back to a legacy org/name — silent misfires.
+    const owner = env.VERCEL_GIT_REPO_OWNER || 'JovieInc';
     const repo = env.VERCEL_GIT_REPO_SLUG || 'Jovie';
 
     const dispatchResponse = await serverFetch(
