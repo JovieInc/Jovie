@@ -189,6 +189,13 @@ const config: StorybookConfig = {
           find: 'next/server',
           replacement: require.resolve('./next-server-mock.js'),
         },
+        {
+          // next/constants (pulled in by @sentry/nextjs' isBuild util)
+          // evaluates `process?.features?.typescript` at module top level,
+          // which crashes plain-browser story extraction (Chromatic).
+          find: 'next/constants',
+          replacement: require.resolve('./next-constants-mock.js'),
+        },
         // Mock Next.js navigation for Storybook
         {
           find: 'next/navigation',
