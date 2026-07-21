@@ -445,6 +445,41 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
+  // Regression: JOV-3377 — with overflow-y-auto, overflow-x computes to auto
+  // (CSS Overflow 3), so the home scroll region clips at its own padding box.
+  // Without the --page-pad bleed, that clip lands --page-pad inside the shell
+  // and hard-clips the catalog carousel's trailing card instead of letting it
+  // peek to the surface edge.
+  it('bleeds the home content scroll region to the shell edge so the catalog carousel is not clipped', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const scrollRegion = screen.getByTestId('profile-content-scroll');
+    expect(scrollRegion.className).toContain('-mx-(--page-pad)');
+    expect(scrollRegion.className).toContain('px-(--page-pad)');
+    expect(scrollRegion.className).toContain('overflow-y-auto');
+  });
+
+  it('does not bleed the content scroll region outside home mode', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const scrollRegion = screen.getByTestId('profile-content-scroll');
+    expect(scrollRegion.className).not.toContain('-mx-(--page-pad)');
+  });
+
   it('can hide the menu trigger for clean marketing screenshots', async () => {
     render(
       <ProfileCompactTemplate

@@ -777,6 +777,15 @@ export function ProfileCompactSurface({
           <div
             className={cn(
               'profile-content-scroll-region overflow-y-auto overscroll-contain',
+              // Home mode: bleed the scroll region to the shell edge. With
+              // overflow-y-auto, overflow-x computes to auto (CSS Overflow 3),
+              // so this region clips at its own padding box — which sits
+              // --page-pad inside the shell because the parent column pads it.
+              // That hard-clips the catalog carousel's trailing card instead
+              // of letting it peek to the surface edge. Cancelling the parent
+              // padding here (and re-insetting with px) moves the clip to the
+              // shell edge, where profile-compact-surface already clips.
+              isHomeMode && '-mx-(--page-pad) px-(--page-pad)',
               homeContentScrollClassName,
               showBottomNav ? CONTENT_SAFE_AREA_BOTTOM_PADDING : 'pb-0',
               !isHomeMode &&
