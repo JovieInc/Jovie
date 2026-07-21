@@ -30,7 +30,7 @@ export const ArtworkPlayOverlay = React.memo(function ArtworkPlayOverlay({
       type='button'
       onClick={onPlay}
       className={cn(
-        'absolute inset-0 grid place-items-center bg-black/50 text-white dark:text-white transition-opacity duration-subtle ease-subtle hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none',
+        'absolute inset-0 grid place-items-center bg-black/50 text-white dark:text-white transition-opacity duration-subtle ease-subtle hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none',
         visible ? 'opacity-100' : 'opacity-0',
         className
       )}

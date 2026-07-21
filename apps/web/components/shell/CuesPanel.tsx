@@ -41,7 +41,7 @@ const CueRow = memo(function CueRow({
       type='button'
       onClick={() => onSeek?.(c.at)}
       disabled={disabled}
-      className='group/cue w-full flex items-center gap-2 h-8 px-2 rounded-md text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle'
+      className='group/cue w-full flex items-center gap-2 h-8 px-2 rounded-md text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle'
     >
       <span className='relative w-9 shrink-0'>
         <span

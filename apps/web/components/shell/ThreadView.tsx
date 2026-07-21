@@ -95,7 +95,7 @@ export function ThreadView({
         onScroll={checkAtBottom}
         className='absolute inset-0 overflow-y-auto'
       >
-        <div className='mx-auto w-full max-w-[44rem] px-(--linear-app-header-padding-x) pb-(--system-b-chat-composer-thread-scroll-padding) pt-5 sm:pt-6'>
+        <div className='mx-auto w-full max-w-[44rem] px-app-header pb-(--system-b-chat-composer-thread-scroll-padding) pt-5 sm:pt-6'>
           <header>
             <h1 className='text-2xl font-semibold leading-tight text-primary-token'>
               {thread.title}
@@ -120,14 +120,14 @@ export function ThreadView({
       />
       <div className='absolute inset-x-0 bottom-0'>
         {/* system-b-allow: safe-area inset requires calc(); no spacing token covers env() (JOV-3532) */}
-        <div className='relative mx-auto w-full max-w-[44rem] px-(--linear-app-header-padding-x) pb-[calc(1rem+env(safe-area-inset-bottom))]'>
+        <div className='relative mx-auto w-full max-w-[44rem] px-app-header pb-[calc(1rem+env(safe-area-inset-bottom))]'>
           {!atBottom && (
             <button
               type='button'
               onClick={scrollToBottom}
               aria-label='Scroll To Bottom'
               className={cn(
-                'absolute left-1/2 -top-10 z-10 grid h-8 w-8 -translate-x-1/2 place-items-center rounded-full border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) text-secondary-token shadow-popover transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
+                'absolute left-1/2 -top-10 z-10 grid h-8 w-8 -translate-x-1/2 place-items-center rounded-full border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) text-secondary-token shadow-popover transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55'
               )}
             >
               <ArrowDown className='h-3.5 w-3.5' strokeWidth={2.25} />

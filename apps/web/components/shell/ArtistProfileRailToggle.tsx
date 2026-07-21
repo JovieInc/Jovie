@@ -62,7 +62,7 @@ export function ArtistProfileRailToggle() {
           'text-xs font-semibold text-secondary-token',
           'transition-[background,color,opacity] duration-subtle ease-subtle',
           'hover:bg-surface-0 hover:text-primary-token',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
           isOpen && 'bg-surface-0 text-primary-token'
         )}
       >

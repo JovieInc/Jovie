@@ -77,7 +77,7 @@ export function SuggestionCard({
             <button
               type='button'
               onClick={onDismiss}
-              className='inline-flex items-center h-7 px-3 rounded-full text-2xs text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle'
+              className='inline-flex items-center h-7 px-3 rounded-full text-2xs text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle'
             >
               {dismissLabel}
             </button>
@@ -86,7 +86,7 @@ export function SuggestionCard({
             type='button'
             onClick={onAct}
             disabled={!onAct}
-            className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-white hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:cursor-not-allowed disabled:opacity-60 shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-[filter,box-shadow,opacity] duration-subtle ease-out'
+            className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-white hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:cursor-not-allowed disabled:opacity-60 shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-[filter,box-shadow,opacity] duration-subtle ease-out'
           >
             {actionLabel}
             <ArrowRight className='h-3 w-3' strokeWidth={2.5} />

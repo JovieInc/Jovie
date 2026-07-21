@@ -69,7 +69,7 @@ export function getSidebarNavRowClassName({
   const nonCollapsedSize = tight ? 'h-6 px-2.5' : 'h-7 px-2.5';
 
   return cn(
-    'relative grid items-center rounded-full w-full transition-[background-color,box-shadow,color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+    'relative grid items-center rounded-full w-full transition-[background-color,box-shadow,color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
     'font-normal',
     'before:pointer-events-none before:absolute before:inset-y-1.5 before:left-6 before:w-px before:bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_32%,transparent)]',
     'after:pointer-events-none after:absolute after:inset-y-1.5 after:left-10 after:w-px after:bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_32%,transparent)]',
