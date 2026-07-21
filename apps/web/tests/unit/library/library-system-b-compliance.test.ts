@@ -72,14 +72,32 @@ describe('library right-rail System B structural compliance', () => {
     expect(surface).toContain('TOOLBAR_MENU_CONTENT_CLASS');
   });
 
-  it('surfaces Release Status on cards/hero and Approval Status once in Details (JOV-3333)', () => {
-    // Grid card badge must use release status classes, not approval.
+  it('surfaces Release + Approval on cards and Approval editor once in Details (#10384 / JOV-3333)', () => {
+    // Grid cards carry both axes with explicit aria labels.
     expect(surface).toContain('library-release-status-');
+    expect(surface).toContain('library-approval-status-');
     expect(surface).toContain('Release Status: ${formatLibraryStatus');
+    expect(surface).toContain('Approval Status: ${formatLibraryApprovalStatus');
+    // List view exposes a dedicated Approval column.
+    expect(surface).toContain("header: 'Approval'");
+    expect(surface).toContain('ApprovalStatusCell');
+    // Filter rail + pill search expose approval as a filter axis.
+    expect(surface).toContain("label='Approval Status'");
+    expect(surface).toContain("case 'approval':");
+    expect(surface).toMatch(/allowedFields:\s*\[[^\]]*['"]approval['"]/s);
+    // Dual-axis list columns share the same md breakpoint (no lone Draft).
+    expect(surface).toContain("id: 'status',\n    header: 'Release',");
+    expect(surface).toContain("id: 'approval',\n    header: 'Approval',");
+    const statusColumnMatch = surface.match(
+      /id: 'status',\s*header: 'Release',[\s\S]*?meta: \{ className: '([^']+)' \}/
+    );
+    const approvalColumnMatch = surface.match(
+      /id: 'approval',\s*header: 'Approval',[\s\S]*?meta: \{ className: '([^']+)' \}/
+    );
+    expect(statusColumnMatch?.[1]).toBe('hidden md:table-cell px-2');
+    expect(approvalColumnMatch?.[1]).toBe(statusColumnMatch?.[1]);
     // Drawer hero must not render a second approval pill next to release.
-    // Approval lives only in ApprovalStatusEditor under Details.
+    // Editable approval lives only in ApprovalStatusEditor under Details.
     expect(surface).toContain('ApprovalStatusEditor');
-    // Card status data-testid is release, not approval.
-    expect(surface).toContain('library-release-status-${asset.id}');
   });
 });
