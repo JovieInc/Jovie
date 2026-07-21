@@ -78,6 +78,19 @@ describe('pricing page System B source contract', () => {
     }
   });
 
+  it('labels both comparison tables with a visually hidden caption', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), comparisonChartPath),
+      'utf8'
+    );
+
+    // WCAG SC 1.3.1: desktop and mobile tables need a programmatic name.
+    const captions = source.match(/<caption className='sr-only'>/g) ?? [];
+    expect(captions).toHaveLength(2);
+    expect(source).toContain('Feature comparison by plan');
+    expect(source).toContain('Feature comparison for selected plan');
+  });
+
   it('keeps exactly one page-level primary action on pricing', () => {
     const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
 
