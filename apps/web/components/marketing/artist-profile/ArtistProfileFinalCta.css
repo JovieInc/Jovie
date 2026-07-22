@@ -1,0 +1,43 @@
+/*
+ * Artist-profile final CTA (System B).
+ *
+ * Surface tint, roomy viewport-height variant, and ch/rem measure limits
+ * that Tailwind utilities cannot express. Everything else stays on token
+ * utilities and the shared SHELL_* type classes in the TSX.
+ *
+ * Scoped to the `ap-final-cta` prefix.
+ */
+
+.ap-final-cta {
+  background-color: color-mix(in oklab, #fff 1.2%, transparent);
+}
+
+.ap-final-cta--roomy {
+  min-height: 56svh;
+}
+
+@media (min-width: 40rem) {
+  .ap-final-cta--roomy {
+    min-height: 60svh;
+  }
+}
+
+@media (min-width: 64rem) {
+  .ap-final-cta--roomy {
+    min-height: 66svh;
+  }
+}
+
+.ap-final-cta__headline {
+  max-width: 16ch;
+}
+
+@media (min-width: 64rem) {
+  .ap-final-cta__headline {
+    max-width: 20ch;
+  }
+}
+
+.ap-final-cta__lead {
+  max-width: 34rem;
+}

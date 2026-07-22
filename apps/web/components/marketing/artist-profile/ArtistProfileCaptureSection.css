@@ -1,0 +1,9 @@
+/* ArtistProfileCaptureSection — System B tokenized section wash. */
+
+.ap-capture-section--visual {
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 1.2%,
+    transparent
+  );
+}

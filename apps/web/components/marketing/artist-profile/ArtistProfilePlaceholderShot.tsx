@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import './ArtistProfilePlaceholderShot.css';
 
 export type ArtistProfilePlaceholderVariant =
   | 'upcoming-release'
@@ -23,7 +24,7 @@ function Block({
 }: Readonly<{
   readonly className: string;
 }>) {
-  return <div className={cn('rounded-full bg-white/8', className)} />;
+  return <div className={cn('ap-placeholder-block rounded-full', className)} />;
 }
 
 function Panel({
@@ -31,14 +32,7 @@ function Panel({
 }: Readonly<{
   readonly className: string;
 }>) {
-  return (
-    <div
-      className={cn(
-        'rounded-[1.1rem] border border-white/8 bg-white/[0.035]',
-        className
-      )}
-    />
-  );
+  return <div className={cn('ap-placeholder-panel', className)} />;
 }
 
 export function ArtistProfilePlaceholderShot({
@@ -48,10 +42,10 @@ export function ArtistProfilePlaceholderShot({
   if (variant === 'upcoming-release') {
     return (
       <div className={cn('flex h-full flex-col px-5 pb-5 pt-14', className)}>
-        <Panel className='h-40 bg-white/[0.05]' />
+        <Panel className='ap-placeholder-panel--soft h-40' />
         <Block className='mt-5 h-4 w-32' />
-        <Block className='mt-2 h-3 w-44 bg-white/6' />
-        <Panel className='mt-5 h-14 border-white/10 bg-white/[0.06]' />
+        <Block className='ap-placeholder-block--dim mt-2 h-3 w-44' />
+        <Panel className='ap-placeholder-panel--raised mt-5 h-14' />
         <div className='mt-4 grid grid-cols-3 gap-3'>
           <Panel className='h-16' />
           <Panel className='h-16' />
@@ -64,10 +58,10 @@ export function ArtistProfilePlaceholderShot({
   if (variant === 'release-day') {
     return (
       <div className={cn('flex h-full flex-col px-5 pb-5 pt-14', className)}>
-        <Panel className='h-36 bg-white/[0.05]' />
+        <Panel className='ap-placeholder-panel--soft h-36' />
         <Block className='mt-5 h-4 w-30' />
         <div className='mt-5 space-y-3'>
-          <Panel className='h-11 border-white/10 bg-white/[0.08]' />
+          <Panel className='ap-placeholder-panel--bold h-11' />
           <Panel className='h-11' />
           <Panel className='h-11' />
           <Panel className='h-11' />
@@ -79,7 +73,7 @@ export function ArtistProfilePlaceholderShot({
   if (variant === 'touring') {
     return (
       <div className={cn('flex h-full flex-col px-5 pb-5 pt-14', className)}>
-        <Panel className='h-16 border-white/10 bg-white/[0.08]' />
+        <Panel className='ap-placeholder-panel--bold h-16' />
         <div className='mt-4 space-y-3'>
           <Panel className='h-16' />
           <Panel className='h-16' />
@@ -93,11 +87,11 @@ export function ArtistProfilePlaceholderShot({
   if (variant === 'live-support') {
     return (
       <div className={cn('flex h-full flex-col px-5 pb-5 pt-14', className)}>
-        <div className='mx-auto grid h-40 w-40 place-items-center rounded-[1.8rem] border border-white/10 bg-white/[0.045]'>
-          <div className='h-24 w-24 rounded-xl bg-white/8' />
+        <div className='ap-placeholder-tile mx-auto grid h-40 w-40 place-items-center'>
+          <div className='ap-placeholder-block h-24 w-24 rounded-xl' />
         </div>
         <div className='mt-6 grid grid-cols-3 gap-3'>
-          <Panel className='h-14 border-white/10 bg-white/[0.08]' />
+          <Panel className='ap-placeholder-panel--bold h-14' />
           <Panel className='h-14' />
           <Panel className='h-14' />
         </div>
@@ -109,7 +103,7 @@ export function ArtistProfilePlaceholderShot({
   if (variant === 'capture') {
     return (
       <div className={cn('grid h-full gap-3 p-5', className)}>
-        <Panel className='h-18 border-white/10 bg-white/[0.07]' />
+        <Panel className='ap-placeholder-panel--strong h-18' />
         <Panel className='h-24' />
         <Panel className='h-24' />
         <Panel className='h-16' />
@@ -120,7 +114,7 @@ export function ArtistProfilePlaceholderShot({
   if (variant === 'opinionated') {
     return (
       <div className={cn('grid h-full gap-3 p-5', className)}>
-        <Panel className='h-28 border-white/10 bg-white/[0.06]' />
+        <Panel className='ap-placeholder-panel--raised h-28' />
         <div className='grid gap-3 sm:grid-cols-3'>
           <Panel className='h-20' />
           <Panel className='h-20' />
@@ -132,7 +126,7 @@ export function ArtistProfilePlaceholderShot({
 
   return (
     <div className={cn('grid h-full gap-3 p-4', className)}>
-      <Panel className='h-24 border-white/10 bg-white/[0.06]' />
+      <Panel className='ap-placeholder-panel--raised h-24' />
       <Panel className='h-12' />
       <Panel className='h-12' />
     </div>

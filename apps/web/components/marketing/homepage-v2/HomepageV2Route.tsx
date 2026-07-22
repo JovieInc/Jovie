@@ -1,7 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
 import { DemoPublicProfileSurface } from '@/components/features/demo/DemoPublicProfileSurface';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
@@ -30,6 +29,8 @@ import {
 } from '@/data/homepageV2Copy';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+
+import './HomepageV2Route.css';
 
 export { HomepageV2FinalCta, HomepageV2Pricing } from './HomepageV2Ctas';
 
@@ -74,35 +75,24 @@ function HomepageV2Hero() {
       className='relative overflow-hidden pb-16 pt-23 sm:pb-20 md:pt-25 lg:pb-24'
       aria-labelledby='homepage-v2-hero-heading'
     >
-      <style>{`
-        @keyframes homepage-v2-float {
-          0%, 100% { transform: translate3d(0, 0, 0); }
-          50% { transform: translate3d(0, -10px, 0); }
-        }
-
-        @keyframes homepage-v2-drift {
-          0%, 100% { transform: translate3d(0, 0, 0) rotate(var(--drift-rotate, 0deg)); }
-          50% { transform: translate3d(0, -6px, 0) rotate(var(--drift-rotate, 0deg)); }
-        }
-      `}</style>
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute inset-0'
-        style={{ background: 'var(--linear-hero-backdrop)' }}
+        className='homepage-v2-hero__backdrop pointer-events-none absolute inset-0'
       />
-      <div className='hero-glow pointer-events-none absolute inset-x-0 top-0 h-[42rem]' />
+      <div className='hero-glow homepage-v2-hero__glow pointer-events-none absolute inset-x-0 top-0' />
 
       <MarketingContainer width='landing' className='relative'>
         <div className='grid gap-14 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:items-center'>
-          <div className='max-w-[34rem]'>
+          <div className='homepage-v2-hero__copy'>
+            {/* ui-casing-allow: marketing display headline */}
             <h1
               id='homepage-v2-hero-heading'
               data-testid='homepage-v2-hero'
-              className='marketing-h1-linear max-w-[10ch] text-primary-token'
+              className='homepage-v2-hero__headline text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'
             >
               {HOMEPAGE_V2_COPY.hero.headline}
             </h1>
-            <p className='marketing-lead-linear mt-5 max-w-[31rem] text-secondary-token'>
+            <p className='homepage-v2-hero__sub mt-5 text-lg leading-relaxed text-secondary-token'>
               {HOMEPAGE_V2_COPY.hero.subhead}
             </p>
 
@@ -122,37 +112,22 @@ function HomepageV2Hero() {
               </Link>
             </div>
 
-            <p className='mt-5 text-app font-medium tracking-[-0.01em] text-tertiary-token'>
+            <p className='mt-5 text-app font-medium text-tertiary-token'>
               {HOMEPAGE_V2_COPY.hero.microproof}
             </p>
           </div>
 
-          <div className='relative min-h-[32rem] sm:min-h-[37rem] lg:min-h-[42rem]'>
+          <div className='homepage-v2-hero__visual relative'>
             <div
               aria-hidden='true'
-              className='pointer-events-none absolute inset-x-16 top-16 h-48 blur-3xl'
-              style={{
-                background:
-                  'radial-gradient(circle at center, rgba(132,146,255,0.18), transparent 68%)',
-              }}
+              className='homepage-v2-hero__glow-blob pointer-events-none absolute inset-x-16 top-16 h-48 blur-3xl'
             />
 
-            <div className='absolute left-1/2 top-1/2 z-20 w-[14.75rem] -translate-x-1/2 -translate-y-1/2 sm:w-[16.5rem]'>
-              <div
-                className='drop-shadow-[0_38px_120px_rgba(0,0,0,0.58)]'
-                style={{
-                  animation: 'homepage-v2-float 8s ease-in-out infinite',
-                }}
-              >
+            <div className='homepage-v2-hero__phone absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2'>
+              <div className='homepage-v2-hero__phone-float'>
                 <ArtistProfilePhoneFrame>
                   <div className='relative h-full w-full overflow-hidden bg-(--color-bg-base)'>
-                    <div
-                      className='pointer-events-none absolute left-0 top-0 origin-top-left scale-[0.41] sm:scale-[0.455]'
-                      style={{
-                        width: '244%',
-                        minHeight: '244%',
-                      }}
-                    >
+                    <div className='homepage-v2-hero__demo-scale pointer-events-none absolute left-0 top-0'>
                       <DemoPublicProfileSurface />
                     </div>
                   </div>
@@ -160,33 +135,17 @@ function HomepageV2Hero() {
               </div>
             </div>
 
-            <div
-              className='absolute left-0 top-0 z-10 w-[52%]'
-              style={
-                {
-                  '--drift-rotate': '-3deg',
-                  animation: 'homepage-v2-drift 10s ease-in-out infinite',
-                } as CSSProperties
-              }
-            >
+            <div className='homepage-v2-hero__shot homepage-v2-hero__shot--a absolute left-0 top-0 z-10'>
               <MarketingScreenshot
                 scenarioId='dashboard-releases-sidebar-desktop'
                 altOverride='Release page workspace with launch routing and destination controls'
                 title='Release surfaces'
                 chrome='minimal'
-                className='rounded-[1.15rem]'
+                className='homepage-v2-hero__shot-a-frame'
               />
             </div>
 
-            <div
-              className='absolute bottom-[9%] left-[4%] z-10 w-[44%]'
-              style={
-                {
-                  '--drift-rotate': '2deg',
-                  animation: 'homepage-v2-drift 11s ease-in-out infinite',
-                } as CSSProperties
-              }
-            >
+            <div className='homepage-v2-hero__shot homepage-v2-hero__shot--b absolute bottom-[9%] left-[4%] z-10'>
               <MarketingScreenshot
                 scenarioId='artist-spec-geo-insights-desktop'
                 altOverride='Audience insights showing top cities and engagement signals'
@@ -196,15 +155,7 @@ function HomepageV2Hero() {
               />
             </div>
 
-            <div
-              className='absolute right-0 top-[8%] z-10 w-[45%]'
-              style={
-                {
-                  '--drift-rotate': '4deg',
-                  animation: 'homepage-v2-drift 12s ease-in-out infinite',
-                } as CSSProperties
-              }
-            >
+            <div className='homepage-v2-hero__shot homepage-v2-hero__shot--c absolute right-0 top-[8%] z-10'>
               <MarketingScreenshot
                 scenarioId='artist-spec-tracked-links-desktop'
                 altOverride='Tracked link share menu with campaign routing controls'
@@ -214,13 +165,13 @@ function HomepageV2Hero() {
               />
             </div>
 
-            <div className='absolute left-[2%] top-[8%] z-30 hidden w-[15rem] lg:block'>
+            <div className='homepage-v2-hero__card--a absolute left-[2%] top-[8%] z-30 hidden lg:block'>
               <ArtistNotificationFloatingCardView card={floatingCards[0]} />
             </div>
-            <div className='absolute right-[4%] top-[12%] z-30 hidden w-[15.75rem] lg:block'>
+            <div className='homepage-v2-hero__card--b absolute right-[4%] top-[12%] z-30 hidden lg:block'>
               <ArtistNotificationFloatingCardView card={floatingCards[1]} />
             </div>
-            <div className='absolute right-[9%] top-[44%] z-30 hidden w-[16rem] lg:block'>
+            <div className='homepage-v2-hero__card--c absolute right-[9%] top-[44%] z-30 hidden lg:block'>
               <ArtistNotificationFloatingCardView card={floatingCards[2]} />
             </div>
           </div>
@@ -259,7 +210,7 @@ export function HomepageV2SystemOverview() {
               {!card.href && card.status ? (
                 <p
                   data-testid='homepage-v2-release-pages-preview'
-                  className='mt-5 inline-flex rounded-full border border-white/[0.08] px-3 py-1.5 text-xs font-medium text-white/46'
+                  className='mt-5 inline-flex rounded-full border border-subtle px-3 py-1.5 text-xs font-medium text-tertiary-token'
                 >
                   {card.status}
                 </p>
@@ -278,35 +229,11 @@ export function HomepageV2Spotlight() {
       data-testid='homepage-v2-spotlight'
       className='homepage-story-section relative overflow-hidden'
     >
-      <style>{`
-        .homepage-v2-spotlight-stage {
-          position: relative;
-        }
-
-        .homepage-v2-spotlight-rail {
-          position: relative;
-        }
-
-        @media (min-width: 1024px) and (min-height: 821px) {
-          .homepage-v2-spotlight-stage {
-            min-height: clamp(38rem, 62vw, 50rem);
-          }
-
-          .homepage-v2-spotlight-rail {
-            position: sticky;
-            top: clamp(
-              calc(var(--linear-header-height) + 1.25rem),
-              11svh,
-              calc(var(--linear-header-height) + 4rem)
-            );
-          }
-        }
-      `}</style>
       <MarketingContainer width='page'>
         <div className='mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(16rem,0.36fr)_minmax(0,0.64fr)] lg:items-center xl:gap-16'>
-          <div className='max-w-[23rem] lg:self-center'>
-            <div className='max-w-[23rem]'>
-              <h2 className='homepage-story-heading max-w-[11ch]'>
+          <div className='homepage-v2-spotlight__copy lg:self-center'>
+            <div className='homepage-v2-spotlight__copy'>
+              <h2 className='homepage-story-heading homepage-v2-spotlight__heading'>
                 <span className='block'>One Link.</span>
                 <span className='block whitespace-nowrap'>Always In Sync.</span>
               </h2>
@@ -345,7 +272,7 @@ export function HomepageV2CaptureReactivate() {
           body={HOMEPAGE_V2_COPY.captureReactivation.body}
           className='max-w-2xl'
           headlineClassName='whitespace-pre-line'
-          bodyClassName='mx-auto max-w-[29rem]'
+          bodyClassName='homepage-v2-capture__body mx-auto'
         />
 
         <div className='homepage-split-surface mt-10 grid gap-0 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]'>
@@ -403,7 +330,7 @@ function HomepageV2SocialProof() {
           align='center'
           headline={HOMEPAGE_V2_COPY.socialProof.headline}
           body={HOMEPAGE_V2_COPY.socialProof.body}
-          className='max-w-[40rem]'
+          className='homepage-v2-proof__header'
           bodyClassName='mx-auto max-w-md'
         />
 
@@ -411,7 +338,7 @@ function HomepageV2SocialProof() {
           {ARTIST_PROFILE_SOCIAL_PROOF.profileCards.map(card => (
             <article
               key={card.id}
-              className='overflow-hidden rounded-2xl bg-white/[0.03]'
+              className='overflow-hidden rounded-2xl bg-surface-1'
             >
               <div className='relative aspect-[4/3]'>
                 <Image
@@ -421,15 +348,15 @@ function HomepageV2SocialProof() {
                   sizes='(max-width: 1024px) 100vw, 360px'
                   className='object-cover'
                 />
-                <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(8,9,12,0.05),rgba(8,9,12,0.8)_100%)]' />
+                <div className='homepage-v2-proof__scrim absolute inset-0' />
                 <div className='absolute inset-x-0 bottom-0 z-10 p-5'>
-                  <p className='font-mono text-xs tracking-[-0.02em] text-white/68'>
+                  <p className='font-mono text-xs text-tertiary-token'>
                     jov.ie/{card.handle}
                   </p>
-                  <p className='mt-2 text-xl font-medium tracking-[-0.02em] text-white dark:text-white'>
+                  <p className='mt-2 text-xl font-medium tracking-tight text-primary-token'>
                     {card.name}
                   </p>
-                  <p className='mt-2 text-app leading-[1.6] text-white/72'>
+                  <p className='homepage-v2-proof__line mt-2 text-app text-secondary-token'>
                     {card.supportingLine}
                   </p>
                 </div>

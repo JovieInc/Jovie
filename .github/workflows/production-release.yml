@@ -554,6 +554,7 @@ jobs:
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie
           EXPECTED_VERCEL_ENVIRONMENT: preview
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_DYNAMIC_SECRETS_FILE: ${{ runner.temp }}/playwright-dynamic-cookie-values
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
@@ -563,12 +564,40 @@ jobs:
           cd apps/web
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          oauth_retry_root="$RUNNER_TEMP/aliased-staging-oauth-retries"
+          mkdir -m 700 "$oauth_retry_root"
+
+          quarantine_oauth_artifacts() {
+            destination="$1"
+            for artifact_path in test-results playwright-report; do
+              if [ -e "$artifact_path" ] || [ -L "$artifact_path" ]; then
+                if [ ! -d "$destination" ]; then
+                  mkdir -m 700 "$destination"
+                fi
+                mv -- "$artifact_path" "$destination/"
+              fi
+            done
+          }
+
           attempt=1
           max_attempts=3
-          until PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-              pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
-                --project=chromium --reporter=line; do
+          while [ "$attempt" -le "$max_attempts" ]; do
+            if PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
+                  --project=chromium --reporter=line; then
+              break
+            else
+              guard_status=$?
+            fi
+
+            attempt_artifact_root="$oauth_retry_root/attempt-${attempt}"
+            mkdir -m 700 "$attempt_artifact_root"
+            quarantine_oauth_artifacts "$attempt_artifact_root/failed-artifacts"
+            if [ -f "$RUNNER_TEMP/safe-playwright-producer/blocked" ]; then
+              echo "::error::Playwright artifact guard blocked aliased staging OAuth output; refusing an unsafe retry."
+              exit "$guard_status"
+            fi
             if [ "$attempt" -ge "$max_attempts" ]; then
               echo "❌ Aliased staging Better Auth OAuth runtime proof failed after ${max_attempts} attempts."
               exit 1

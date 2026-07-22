@@ -154,6 +154,21 @@ function getShellRunBlocks(workflow: string): string[] {
   return blocks;
 }
 
+function getStepRunScript(step: string): string {
+  const lines = step.split('\n');
+  const run = lines.findIndex(line => /^\s+run:\s*\|\s*$/.test(line));
+
+  expect(run, 'Missing multiline run script').toBeGreaterThanOrEqual(0);
+
+  const body = lines.slice(run + 1);
+  const indentation = Math.min(
+    ...body.filter(line => line.trim()).map(line => line.search(/\S/))
+  );
+  return body
+    .map(line => (line.trim() ? line.slice(indentation) : ''))
+    .join('\n');
+}
+
 describe('source PR path-output reachability contract', () => {
   it('runs fast required gates for workflow-only changes without source unit or build work', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -871,11 +886,15 @@ describe('deploy workflow Vercel env resolution', () => {
     );
 
     expect(oauthStep).toContain(
-      'until PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \\\n'
+      'if PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \\\n'
     );
     expect(oauthStep).toContain(
       'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run --'
     );
+    expect(oauthStep).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(
+      workflow.match(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/g)
+    ).toHaveLength(1);
     expect(oauthStep).toContain(
       'pnpm exec playwright test tests/e2e/oauth-providers.spec.ts'
     );
@@ -1912,9 +1931,208 @@ describe('canary health gate workflow', () => {
     );
     expect(oauthStep).toContain('PLAYWRIGHT_VERCEL_BYPASS_SECRET:');
     expect(oauthStep).toContain('oauth-providers.spec.ts');
+    expect(oauthStep).toContain(
+      'oauth_retry_root="$RUNNER_TEMP/aliased-staging-oauth-retries"'
+    );
+    expect(oauthStep).toContain(
+      'PLAYWRIGHT_DYNAMIC_SECRETS_FILE: ${{ runner.temp }}/playwright-dynamic-cookie-values'
+    );
+    expect(oauthStep).toContain(
+      'attempt_artifact_root="$oauth_retry_root/attempt-${attempt}"'
+    );
+    expect(oauthStep).toContain(
+      'quarantine_oauth_artifacts "$attempt_artifact_root/failed-artifacts"'
+    );
+    expect(oauthStep).toContain(
+      'for artifact_path in test-results playwright-report'
+    );
+    expect(oauthStep).toContain('mv -- "$artifact_path" "$destination/"');
+    expect(oauthStep).toContain(
+      'if [ -f "$RUNNER_TEMP/safe-playwright-producer/blocked" ]'
+    );
+    expect(oauthStep).toContain('refusing an unsafe retry');
+    expect(oauthStep).not.toContain('attempt_runner_temp=');
+    expect(oauthStep).not.toContain('preexisting-artifacts');
+    expect(oauthStep).not.toContain('RUNNER_TEMP="$attempt_runner_temp"');
+    expect(oauthStep).not.toContain('rm -rf test-results');
+    expect(oauthStep.indexOf('guard-playwright-artifacts.mjs')).toBeLessThan(
+      oauthStep.indexOf('failed-artifacts')
+    );
+    expect(oauthStep.indexOf('failed-artifacts')).toBeLessThan(
+      oauthStep.indexOf('safe-playwright-producer/blocked')
+    );
+    expect(oauthStep.indexOf('safe-playwright-producer/blocked')).toBeLessThan(
+      oauthStep.indexOf('if [ "$attempt" -ge "$max_attempts" ]')
+    );
     expect(aliasJob.indexOf('- name: Alias verified deployment')).toBeLessThan(
       aliasJob.indexOf('- name: Verify aliased staging OAuth redirect URIs')
     );
+  });
+
+  it('retries a safe OAuth test failure with clean artifacts and shared guard state', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const oauthStep = getStepBlock(
+      getJobBlock(release, 'alias-staging'),
+      'Verify aliased staging OAuth redirect URIs'
+    );
+    const root = mkdtempSync(resolve(tmpdir(), 'jovie-oauth-retry-'));
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const counter = resolve(root, 'attempt-count');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+[ "\${PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN:-}" = "true" ] || exit 43
+attempt=0
+if [ -f "$OAUTH_TEST_COUNTER" ]; then
+  attempt="$(cat "$OAUTH_TEST_COUNTER")"
+fi
+attempt=$((attempt + 1))
+printf '%s' "$attempt" > "$OAUTH_TEST_COUNTER"
+if [ -e test-results ] || [ -L test-results ] || [ -e playwright-report ] || [ -L playwright-report ]; then
+  exit 40
+fi
+if [ "$attempt" -eq 1 ]; then
+  mkdir -p test-results
+  printf '# Error context\n\nSafe retry diagnostics.\n' > test-results/error-context.md
+  exit 1
+fi
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'sleep'),
+        '#!/usr/bin/env bash\nexit 0\n',
+        {
+          mode: 0o700,
+        }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(oauthStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_WORKSPACE: workspace,
+            OAUTH_TEST_COUNTER: counter,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(readFileSync(counter, 'utf8')).toBe('2');
+      const attemptOne = resolve(
+        runnerTemp,
+        'aliased-staging-oauth-retries/attempt-1'
+      );
+      expect(
+        readFileSync(
+          resolve(attemptOne, 'failed-artifacts/test-results/error-context.md'),
+          'utf8'
+        )
+      ).toContain('Safe retry diagnostics.');
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('stops OAuth retries when the artifact guard poisons shared state', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const oauthStep = getStepBlock(
+      getJobBlock(release, 'alias-staging'),
+      'Verify aliased staging OAuth redirect URIs'
+    );
+    const root = mkdtempSync(resolve(tmpdir(), 'jovie-oauth-guard-block-'));
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const counter = resolve(root, 'attempt-count');
+      const sleepMarker = resolve(root, 'sleep-called');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+attempt=0
+if [ -f "$OAUTH_TEST_COUNTER" ]; then
+  attempt="$(cat "$OAUTH_TEST_COUNTER")"
+fi
+attempt=$((attempt + 1))
+printf '%s' "$attempt" > "$OAUTH_TEST_COUNTER"
+if [ "$attempt" -gt 1 ]; then
+  exit 42
+fi
+mkdir -p test-results "$RUNNER_TEMP/safe-playwright-producer"
+printf '{"source":"unsafe-attempt"}' > test-results/attempt-one.json
+touch "$RUNNER_TEMP/safe-playwright-producer/blocked"
+exit 23
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'sleep'),
+        '#!/usr/bin/env bash\ntouch "$OAUTH_SLEEP_MARKER"\n',
+        { mode: 0o700 }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(oauthStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_WORKSPACE: workspace,
+            OAUTH_SLEEP_MARKER: sleepMarker,
+            OAUTH_TEST_COUNTER: counter,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(23);
+      expect(readFileSync(counter, 'utf8')).toBe('1');
+      expect(result.stdout).toContain('refusing an unsafe retry');
+      expect(() => readFileSync(sleepMarker, 'utf8')).toThrow();
+      expect(
+        readFileSync(
+          resolve(runnerTemp, 'safe-playwright-producer/blocked'),
+          'utf8'
+        )
+      ).toBe('');
+      expect(
+        readFileSync(
+          resolve(
+            runnerTemp,
+            'aliased-staging-oauth-retries/attempt-1/failed-artifacts/test-results/attempt-one.json'
+          ),
+          'utf8'
+        )
+      ).toContain('unsafe-attempt');
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
   });
 });
 

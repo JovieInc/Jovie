@@ -1178,6 +1178,10 @@ ${fixtureCheckout}
     expect(oauthProbe).toContain(
       'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
     );
+    expect(oauthProbe).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(
+      productionRelease.match(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/g)
+    ).toHaveLength(1);
     const action = readFileSync(
       join(githubRoot, 'actions/upload-safe-playwright-artifact/action.yml'),
       'utf8'

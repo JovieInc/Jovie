@@ -1,0 +1,14 @@
+/*
+ * Artist-profile hero + adaptive intro wrapper (System B).
+ *
+ * The combined hero/mode-switcher mount sits on the cinematic dark surface;
+ * the color moves here because literal bg-black utilities are banned on this
+ * family by the System B style guard.
+ *
+ * Scoped to the `ap-hero-intro` prefix.
+ */
+
+.ap-hero-intro,
+.ap-hero-intro__adaptive {
+  background-color: var(--system-b-cinematic-black);
+}

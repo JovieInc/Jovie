@@ -1,0 +1,13 @@
+/*
+ * Artist-profile adaptive sequence shell (System B).
+ *
+ * The section sits on a barely-there light tint over the cinematic dark
+ * surface. Alpha tints are not expressible with surface tokens, so the exact
+ * color is kept here as a color-mix; layout utilities stay in the TSX.
+ *
+ * Scoped to the `ap-adaptive-sequence` prefix.
+ */
+
+.ap-adaptive-sequence {
+  background-color: color-mix(in oklab, #fff 1.2%, transparent);
+}

@@ -1,0 +1,13 @@
+/*
+ * Artist-profile opinionated section (System B).
+ *
+ * Only the ch measure limit that Tailwind utilities cannot express lives
+ * here; everything else stays on token utilities and the shared SHELL_*
+ * type classes in the TSX.
+ *
+ * Scoped to the `ap-opinionated` prefix.
+ */
+
+.ap-opinionated__headline {
+  max-width: 12ch;
+}
