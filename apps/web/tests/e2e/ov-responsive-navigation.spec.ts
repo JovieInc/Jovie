@@ -13,6 +13,11 @@ async function enterPersona(
   persona: 'admin' | 'creator-ready',
   redirect: string
 ): Promise<void> {
+  const provisionResponse = await page.request.post(
+    '/api/dev/test-auth/session',
+    { data: { persona } }
+  );
+  expect(provisionResponse.ok()).toBe(true);
   await page.goto(
     `/api/dev/test-auth/enter?persona=${persona}&redirect=${encodeURIComponent(redirect)}`,
     { waitUntil: 'domcontentloaded' }
@@ -165,6 +170,7 @@ test.describe('OV responsive navigation exclusivity', () => {
     });
 
     test(`${viewport.label}: Jovie navigation is role-invariant and non-admin OV access cannot leak operator links`, async ({
+      browser,
       page,
     }) => {
       test.setTimeout(180_000);
@@ -188,26 +194,43 @@ test.describe('OV responsive navigation exclusivity', () => {
         page.getByRole('navigation', { name: 'OV Navigation' })
       ).toHaveCount(0);
 
-      await enterPersona(page, 'creator-ready', APP_ROUTES.CHAT);
-      const creatorCustomerNavigation = page.getByRole('navigation', {
-        name: customerNavigationName,
+      const creatorContext = await browser.newContext({
+        baseURL: process.env.BASE_URL ?? 'http://localhost:3100',
+        viewport,
       });
-      await expect(creatorCustomerNavigation).toBeVisible();
-      expect(
-        await customerNavigationContract(
-          creatorCustomerNavigation,
-          viewport.width < 1024
-        )
-      ).toEqual(adminCustomerContract);
+      const creatorPage = await creatorContext.newPage();
 
-      await enterPersona(page, 'creator-ready', APP_ROUTES.OV);
-      await expect(page).toHaveURL(/\/app\/?$/);
-      await expect(
-        page.getByRole('navigation', { name: 'OV Mobile Navigation' })
-      ).toHaveCount(0);
-      await expect(
-        page.getByRole('navigation', { name: 'OV Navigation' })
-      ).toHaveCount(0);
+      try {
+        const creatorProvisionResponse = await creatorPage.request.post(
+          '/api/dev/test-auth/session',
+          { data: { persona: 'creator-ready' } }
+        );
+        expect(creatorProvisionResponse.ok()).toBe(true);
+        await enterPersona(creatorPage, 'creator-ready', APP_ROUTES.CHAT);
+        const creatorCustomerNavigation = creatorPage.getByRole('navigation', {
+          name: customerNavigationName,
+        });
+        await expect(creatorCustomerNavigation).toBeVisible();
+        expect(
+          await customerNavigationContract(
+            creatorCustomerNavigation,
+            viewport.width < 1024
+          )
+        ).toEqual(adminCustomerContract);
+
+        await enterPersona(creatorPage, 'creator-ready', APP_ROUTES.OV);
+        await expect(creatorPage).toHaveURL(/\/app\/?$/);
+        await expect(
+          creatorPage.getByRole('navigation', {
+            name: 'OV Mobile Navigation',
+          })
+        ).toHaveCount(0);
+        await expect(
+          creatorPage.getByRole('navigation', { name: 'OV Navigation' })
+        ).toHaveCount(0);
+      } finally {
+        await creatorContext.close();
+      }
     });
   }
 });
