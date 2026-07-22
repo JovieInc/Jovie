@@ -11,7 +11,7 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
-import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { useOptionalHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
@@ -88,12 +88,10 @@ function AuthShellInner({
     [showMobileTabs]
   );
   const searchSurface = useMemo(() => {
-    if (!headerActionsState?.headerSearchAdapter) {
-      return null;
-    }
-
-    return <HeaderSearchSurfaceFromContext className='w-full sm:w-auto' />;
-  }, [headerActionsState?.headerSearchAdapter]);
+    return headerActionsState ? (
+      <HeaderSearchSurfaceFromContext className='w-full sm:w-auto' />
+    ) : null;
+  }, [headerActionsState]);
   const shellVariant = shellChatV1Enabled ? 'shellChatV1' : 'legacy';
   const audioPlayer = useMemo(
     () => <PersistentAudioBar variant={shellVariant} />,

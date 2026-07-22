@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
+import { OPEN_HEADER_SEARCH_EVENT } from '@/components/shell/header-search-events';
 import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 import {
   mockRouterPush,
@@ -197,8 +198,10 @@ describe('DashboardNav', () => {
     expect(getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
   });
 
-  it('opens the global command palette from Search instead of navigating', () => {
+  it('opens the shared header search from Search instead of navigating', () => {
+    const onOpenSearch = vi.fn();
     const onOpenPalette = vi.fn();
+    globalThis.addEventListener(OPEN_HEADER_SEARCH_EVENT, onOpenSearch);
     globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpenPalette);
 
     try {
@@ -212,9 +215,11 @@ describe('DashboardNav', () => {
 
       fireEvent.click(searchButton);
 
-      expect(onOpenPalette).toHaveBeenCalledTimes(1);
+      expect(onOpenSearch).toHaveBeenCalledTimes(1);
+      expect(onOpenPalette).not.toHaveBeenCalled();
       expect(mockRouterPush).not.toHaveBeenCalled();
     } finally {
+      globalThis.removeEventListener(OPEN_HEADER_SEARCH_EVENT, onOpenSearch);
       globalThis.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpenPalette);
     }
   });

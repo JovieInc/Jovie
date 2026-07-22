@@ -569,7 +569,7 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
   ReleaseSidebar: () => null,
 }));
 
-import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import type { HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
 import {
   HeaderActionsProvider,
@@ -625,7 +625,12 @@ function getLatestTableProps() {
 }
 
 function openDesktopTaskSearch() {
-  fireEvent.click(screen.getByRole('button', { name: /filter tasks/i }));
+  fireEvent.click(
+    within(screen.getByTestId('header-actions-host')).getByRole('button', {
+      name: 'Search',
+    })
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Filter Current View' }));
   return screen.getByRole('combobox', { name: 'Filter Tasks' });
 }
 
@@ -1260,15 +1265,14 @@ describe('TasksPageClient', () => {
     expect(screen.getByRole('button', { name: 'Next Task' })).toBeEnabled();
   }, 10000);
 
-  it('registers shell search exposing the task count in the shared trigger', () => {
+  it('registers task filtering behind the shared global search trigger', () => {
     renderPage();
 
-    const filterTrigger = screen.getByRole('button', { name: /filter tasks/i });
-    expect(filterTrigger).toHaveTextContent('2');
-    expect(filterTrigger).toHaveAttribute('data-app-search-trigger', 'true');
-    expect(
-      screen.queryByRole('button', { name: 'Search tasks' })
-    ).not.toBeInTheDocument();
+    expect(latestHeaderSearchAdapter?.totalCount).toBe(2);
+    const searchTrigger = within(
+      screen.getByTestId('header-actions-host')
+    ).getByRole('button', { name: 'Search' });
+    expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
     expect(
       within(screen.getByTestId('header-actions-host')).getByRole('button', {
         name: 'Create Task',

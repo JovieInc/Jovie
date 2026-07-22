@@ -102,15 +102,15 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   },
   {
     id: 'current-view-search',
-    label: 'Search current view',
-    keys: '/ in view',
-    description: 'Open the active page search or filter surface',
+    label: 'Search Jovie',
+    keys: '/',
+    description: 'Focus the persistent app search in the header',
     category: 'general',
     icon: Search,
     shortcutKey: '/',
     decision: {
       status: 'required',
-      binding: 'ShellReleasesView, TasksPageClient, LibrarySurface',
+      binding: 'HeaderActionsProvider, HeaderSearchSurface',
     },
   },
   {
@@ -329,15 +329,6 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     icon: Radio,
     shortcutKey: 'Meta+\\',
     scope: 'global',
-    decision: { status: 'required', binding: 'AudioBar' },
-  },
-  {
-    id: 'player-search-slash',
-    label: 'Search (player)',
-    keys: '/',
-    category: 'player',
-    icon: Search,
-    scope: 'player',
     decision: { status: 'required', binding: 'AudioBar' },
   },
   {

@@ -380,10 +380,4 @@ describe('shell foundation Wave 3 — route persistence + request budgets (no fu
     // Non-essential still hydrate inside the *same* stable HydrateClient + AuthShellWrapper tree.
     expect(shouldUseEssentialShellData(APP_ROUTES.EARNINGS)).toBe(false);
   });
-
-  it('search nav item in sidebar is non-navigating (opens command palette only) — single global search path', () => {
-    // Verified via render + click in DashboardNav + e2e/cmdk-palette.spec
-    // No page-level global search duplicates remain except route-specific filter adapters (PillSearch).
-    expect(true).toBe(true); // contract assertion (implementation in DashboardNav + HeaderSearchSurface)
-  });
 });

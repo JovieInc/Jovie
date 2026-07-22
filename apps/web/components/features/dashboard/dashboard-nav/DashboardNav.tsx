@@ -8,7 +8,6 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { NavBadge } from '@/components/atoms/NavBadge';
 import { toast } from '@/components/feedback';
-import { openCommandPalette } from '@/components/organisms/command-palette-events';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {
   SidebarGroup,
@@ -17,6 +16,7 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
+import { openHeaderSearch } from '@/components/shell/header-search-events';
 import {
   readThreadReadState,
   type SidebarThread,
@@ -429,7 +429,7 @@ export function DashboardNav(_: DashboardNavProps) {
   }, []);
 
   const handleSearchClick = useCallback(() => {
-    openCommandPalette();
+    openHeaderSearch();
   }, []);
 
   const handleOpenArtistProfilePanel = useCallback(() => {

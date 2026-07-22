@@ -13,7 +13,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
-import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { APP_ROUTES } from '@/constants/routes';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import {
@@ -1001,8 +1001,9 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'Filter library assets' })
+      screen.getByRole('button', { name: 'Filter Current View' })
     );
     fireEvent.change(screen.getByLabelText('Filter library assets'), {
       target: { value: 'Never' },

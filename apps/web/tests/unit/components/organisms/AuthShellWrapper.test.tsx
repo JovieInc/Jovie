@@ -59,7 +59,7 @@ vi.mock('@/contexts/HeaderActionsContext', () => ({
   useRegisterHeaderSearch: vi.fn(),
 }));
 
-vi.mock('@/components/shell/HeaderSearchSurface', () => ({
+vi.mock('@/components/shell/HeaderSearchSurfaceFromContext', () => ({
   HeaderSearchSurface: () => null,
   HeaderSearchSurfaceFromContext: () => null,
 }));

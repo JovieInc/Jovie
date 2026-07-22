@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useEffect, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
+import { OPEN_HEADER_SEARCH_EVENT } from '@/components/shell/header-search-events';
 import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 import {
   mockClearPendingShell,
@@ -28,18 +28,18 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
   }),
 }));
 
-function CommandPaletteHarness() {
+function HeaderSearchHarness() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const openPalette = () => setOpen(true);
-    globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, openPalette);
+    const openSearch = () => setOpen(true);
+    globalThis.addEventListener(OPEN_HEADER_SEARCH_EVENT, openSearch);
     return () => {
-      globalThis.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, openPalette);
+      globalThis.removeEventListener(OPEN_HEADER_SEARCH_EVENT, openSearch);
     };
   }, []);
 
-  return open ? <input aria-label='Command palette search' /> : null;
+  return open ? <input aria-label='Search Jovie' /> : null;
 }
 
 describe('DashboardNav interactions', () => {
@@ -142,10 +142,10 @@ describe('DashboardNav interactions', () => {
     expect(labelNode).toHaveClass('group-data-[collapsible=icon]:hidden');
   });
 
-  it('opens command search from the Design V1 sidebar search row', async () => {
+  it('opens header search from the Design V1 sidebar search row', async () => {
     const user = userEvent.setup();
     const listener = vi.fn();
-    globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, listener);
+    globalThis.addEventListener(OPEN_HEADER_SEARCH_EVENT, listener);
 
     renderDashboardNav({
       renderFn: render,
@@ -155,21 +155,21 @@ describe('DashboardNav interactions', () => {
     await user.click(screen.getByRole('button', { name: 'Search' }));
 
     expect(listener).toHaveBeenCalledTimes(1);
-    globalThis.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, listener);
+    globalThis.removeEventListener(OPEN_HEADER_SEARCH_EVENT, listener);
   });
 
-  it('opens the command palette when clicking the Design V1 sidebar search row', async () => {
+  it('opens the header input when clicking the Design V1 sidebar search row', async () => {
     const user = userEvent.setup();
 
     renderDashboardNav({
       renderFn: render,
       appFlags: { DESIGN_V1: true },
-      children: <CommandPaletteHarness />,
+      children: <HeaderSearchHarness />,
     });
 
     await user.click(screen.getByRole('button', { name: 'Search' }));
 
-    expect(screen.getByLabelText('Command palette search')).toBeInTheDocument();
+    expect(screen.getByLabelText('Search Jovie')).toBeInTheDocument();
   });
 
   it('groups the Design V1 shell into top nav and artist sections without duplicate Settings', () => {

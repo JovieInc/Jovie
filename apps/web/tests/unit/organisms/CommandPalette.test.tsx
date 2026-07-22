@@ -132,6 +132,12 @@ describe('CommandPalette', () => {
     expect(input).toHaveFocus();
   });
 
+  it('continues to open on Ctrl+K independently of sidebar Search', () => {
+    render(withDashboard(<CommandPalette />));
+    fireEvent.keyDown(globalThis, { key: 'k', ctrlKey: true });
+    expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
+  });
+
   it('lists recent chats with safe fallback titles', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
