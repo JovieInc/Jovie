@@ -14,7 +14,12 @@ const {
 
 const BYPASS_HEADER = 'x-vercel-protection-bypass';
 const SET_BYPASS_COOKIE_HEADER = 'x-vercel-set-bypass-cookie';
-const PUBLIC_PROBE_COOKIE_NAMES = new Set(['jv_country', 'jv_cc_required']);
+const PUBLIC_PROBE_COOKIE_NAMES = new Set([
+  'jv_cc_required',
+  'jv_city',
+  'jv_country',
+  'jv_region',
+]);
 const ZERO_DYNAMIC_SECRET_RECEIPT = 'jovie-protected-probe:no-dynamic-secrets';
 const BUILD_INFO_PATH = '/api/health/build-info';
 const DEFAULT_PROBE_TIMEOUT_MS = 120_000;
