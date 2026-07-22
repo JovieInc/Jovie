@@ -1803,7 +1803,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   overflow: clip;
   padding-top: calc(
     var(--homepage-header-height) +
-    clamp(var(--space-12), 5.5vw, var(--space-20))
+    clamp(var(--space-10), 4.25vw, var(--space-16))
   );
   background: var(--system-b-bg-page);
   color: var(--color-text-primary-token);
@@ -1844,15 +1844,19 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-poster-hero__actions {
-  margin-top: var(--space-8);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-7);
 }
 
 .homepage-poster-hero__seam {
   position: relative;
   z-index: 2;
-  width: min(34rem, calc(100% - var(--homepage-page-gutter) * 2));
+  width: min(48rem, calc(100% - var(--homepage-page-gutter) * 2));
   min-height: var(--space-6);
-  margin-block: var(--space-8) var(--space-6);
+  margin-block: var(--space-5) var(--space-6);
 }
 
 .homepage-poster-hero__electric-seam {
@@ -3754,7 +3758,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-closed-loop-headline {
-  max-width: 14ch;
+  max-width: 28ch;
   margin: 0;
   color: var(--color-text-primary-token);
   font-family:
@@ -4659,7 +4663,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-opportunity-section__copy {
-  grid-column: 1 / span 5;
+  grid-column: 1 / span 6;
   grid-row: 1;
   align-self: start;
 }
@@ -4684,7 +4688,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 /* Opportunity headline rides the shared marketing title ramp (sentence case,
    0 tracking) so it sits one tier below the hero display. */
 .homepage-opportunity-section__headline {
-  max-width: 14ch;
+  max-width: 19ch;
   margin: 0;
   color: var(--system-b-text-primary);
   font-family: var(--font-sans);
@@ -4717,7 +4721,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 /* The demo shares row 1 with the copy so the composer proof sits beside the
    headline instead of auto-placing below the card row (dead band). */
 .homepage-opportunity-section__demo {
-  grid-column: 6 / -1;
+  grid-column: 7 / -1;
   grid-row: 1;
   min-width: 0;
   align-self: start;
@@ -4801,7 +4805,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-workspace-section__copy h2 {
   display: grid;
-  max-width: 12ch;
+  max-width: 30ch;
 }
 
 .homepage-workspace-visual {
