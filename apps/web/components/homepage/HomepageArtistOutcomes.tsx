@@ -54,7 +54,6 @@ export function HomepageArtistOutcomes({
         >
           {cards.map(card => (
             <li key={card.id} className='homepage-artist-outcome'>
-              <h3>{card.title}</h3>
               <figure className='homepage-artist-outcome__media'>
                 <Image
                   src={card.image.publicUrl}
@@ -64,6 +63,9 @@ export function HomepageArtistOutcomes({
                   sizes='(min-width: 1360px) 390px, (min-width: 768px) 30vw, calc(100vw - 3rem)'
                   loading='lazy'
                 />
+                <figcaption className='homepage-artist-outcome__caption'>
+                  <h3>{card.title}</h3>
+                </figcaption>
               </figure>
             </li>
           ))}

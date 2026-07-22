@@ -50,11 +50,9 @@ function MarketingPricingPlanCard({
         aria-hidden='true'
       />
       <div className='marketing-pricing-plan-card__header'>
-        <div className='min-w-0'>
-          <p className='marketing-pricing-plan-card__name'>{plan.name}</p>
-          <p className='marketing-pricing-plan-card__body'>{plan.body}</p>
-        </div>
         <span className='marketing-pricing-plan-card__badge'>{plan.badge}</span>
+        <p className='marketing-pricing-plan-card__name'>{plan.name}</p>
+        <p className='marketing-pricing-plan-card__body'>{plan.body}</p>
       </div>
 
       <p className='marketing-pricing-plan-card__price'>

@@ -1848,7 +1848,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--space-3);
-  margin-top: var(--space-7);
+  margin-top: var(--space-6);
 }
 
 .homepage-poster-hero__seam {
@@ -3278,6 +3278,23 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-variant-numeric: tabular-nums;
 }
 
+/* Quiet feature-accent rotation on the step numerals — color lives on small
+   text only, matching the outcome-card title rules. */
+.system-b-mounted-home-workspace-callout:nth-child(1)
+.system-b-mounted-home-workspace-callout-label {
+  color: var(--color-accent-blue);
+}
+
+.system-b-mounted-home-workspace-callout:nth-child(2)
+  .system-b-mounted-home-workspace-callout-label {
+  color: var(--color-accent-purple);
+}
+
+.system-b-mounted-home-workspace-callout:nth-child(3)
+  .system-b-mounted-home-workspace-callout-label {
+  color: var(--color-accent-teal);
+}
+
 .system-b-mounted-home-workspace-callout
   .system-b-mounted-home-workspace-callout-title {
   color: var(--color-text-primary-token);
@@ -4093,7 +4110,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   display: grid;
   min-width: 0;
-  gap: var(--space-4);
   border-top: var(--space-px) solid var(--homepage-chapter-rule);
   padding: var(--space-5) 0 0;
 }
@@ -4111,29 +4127,50 @@ body:has(.home-viewport)::-webkit-scrollbar {
   content: "";
 }
 
+/* Editorial overlay: the card title rides on the artwork behind a flat tint
+   band (gradients are contract-forbidden in this block), white display type
+   with a small feature-accent rule — Apple tile register. */
+.homepage-artist-outcome__caption {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  padding: var(--space-6);
+  background: color-mix(in oklab, var(--system-b-bg-page) 52%, transparent);
+}
+
 .homepage-artist-outcome h3 {
   margin: 0;
   color: var(--color-text-primary-token);
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--leading-tight);
-  letter-spacing: 0;
+  letter-spacing: -0.015em;
+  text-shadow: 0 1px 10px
+    color-mix(in oklab, var(--system-b-bg-page) 85%, transparent);
 }
 
-/* Feature differentiation: Geist feature accent on card TITLE TEXT ONLY
-   (design/jovie-design-decision-log 2026-07-05 — never on container
-   backgrounds, CTAs, icon backgrounds, or decorative glows).
+.homepage-artist-outcome h3::before {
+  display: block;
+  width: var(--space-8);
+  height: 2px;
+  margin-bottom: var(--space-3);
+  background: currentcolor;
+  content: "";
+}
+
+/* Feature differentiation: accent on the title rule only (never container
+   backgrounds, CTAs, or decorative glows).
    Streams = track/analytics blue, Fans = artist purple, Paid = success green. */
-.homepage-artist-outcome:nth-child(1) h3 {
-  color: var(--color-accent-blue);
+.homepage-artist-outcome:nth-child(1) h3::before {
+  background: var(--color-accent-blue);
 }
 
-.homepage-artist-outcome:nth-child(2) h3 {
-  color: var(--color-accent-purple);
+.homepage-artist-outcome:nth-child(2) h3::before {
+  background: var(--color-accent-purple);
 }
 
-.homepage-artist-outcome:nth-child(3) h3 {
-  color: var(--color-accent-green);
+.homepage-artist-outcome:nth-child(3) h3::before {
+  background: var(--color-accent-green);
 }
 
 .homepage-artist-outcome__media {
@@ -4582,6 +4619,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
     aspect-ratio: 0.86;
   }
 
+  .homepage-artist-outcome__caption {
+    padding: var(--space-5);
+  }
+
   .homepage-outcome-heading {
     max-width: 12ch;
     font-size: clamp(var(--text-3xl), 10vw, var(--text-4xl));
@@ -4643,9 +4684,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   --homepage-grid-max: var(--ds-public-content-max);
   --homepage-grid-gutter: var(--homepage-page-gutter);
   --homepage-chapter-space: clamp(
-    calc(var(--space-24) + var(--space-8)),
-    10vw,
-    calc(var(--space-24) * 2)
+    calc(var(--space-24) + var(--space-2)),
+    8.5vw,
+    calc(var(--space-24) + var(--space-16))
   );
   --homepage-chapter-rule: color-mix(
     in oklab,
@@ -4790,6 +4831,22 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-tight);
   letter-spacing: -0.015em;
+}
+
+/* Same quiet accent rotation as the workspace numerals, on title text only. */
+.homepage-opportunity-section__item:nth-child(1)
+.homepage-opportunity-section__item-title {
+  color: var(--color-accent-blue);
+}
+
+.homepage-opportunity-section__item:nth-child(2)
+  .homepage-opportunity-section__item-title {
+  color: var(--color-accent-purple);
+}
+
+.homepage-opportunity-section__item:nth-child(3)
+  .homepage-opportunity-section__item-title {
+  color: var(--color-accent-teal);
 }
 
 .homepage-opportunity-section__demo-copy p,
@@ -5133,9 +5190,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
 @media (max-width: 767px) {
   .home-viewport {
     --homepage-chapter-space: clamp(
-      var(--space-20),
-      22vw,
-      calc(var(--space-24) + var(--space-8))
+      var(--space-16),
+      18vw,
+      calc(var(--space-24) + var(--space-2))
     );
   }
 
