@@ -277,6 +277,8 @@ describe('origin-bound Vercel protection bypass', () => {
         sensitiveCookieValues([
           { name: 'jv_country', value: 'US' },
           { name: 'jv_cc_required', value: '1' },
+          { name: 'jv_city', value: 'Des Moines' },
+          { name: 'jv_region', value: 'Iowa' },
         ])
       );
       expect(readFileSync(receiptPath, 'utf8')).toBe(
@@ -287,14 +289,17 @@ describe('origin-bound Vercel protection bypass', () => {
     }
   });
 
-  it('keeps an unknown short dynamic cookie value in the sensitive receipt', () => {
+  it('filters public geo metadata but keeps audience and unknown short cookies sensitive', () => {
     expect(
       sensitiveCookieValues([
         { name: 'jv_country', value: 'US' },
         { name: 'jv_cc_required', value: '1' },
+        { name: 'jv_city', value: 'Des Moines' },
+        { name: 'jv_region', value: 'Iowa' },
+        { name: 'jv_aid', value: 'audience-cookie-value' },
         { name: '__unknown_dynamic_cookie', value: '1' },
       ])
-    ).toEqual(['1']);
+    ).toEqual(['audience-cookie-value', '1']);
   });
 
   it('never attaches the bypass credential to canonical production', () => {
