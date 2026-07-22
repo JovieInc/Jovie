@@ -1,5 +1,12 @@
 import { APP_ROUTES } from '@/constants/routes';
 
+export type DashboardSegmentSkeletonVariant =
+  | 'default'
+  | 'admin'
+  | 'insights'
+  | 'profile'
+  | 'tour';
+
 function normalizeAppShellPath(pathname: string): string {
   const normalizedSegments = pathname
     .split('/')
@@ -112,7 +119,37 @@ export function isTasksShellRoute(pathname: string | null): boolean {
 }
 
 export function isInsightsShellRoute(pathname: string | null): boolean {
-  return matchesRoutePrefix(pathname, APP_ROUTES.INSIGHTS);
+  return matchesRoutePrefix(
+    pathname,
+    APP_ROUTES.INSIGHTS,
+    `${APP_ROUTES.LEGACY_DASHBOARD}/insights`
+  );
+}
+
+export function isAdminShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(pathname, APP_ROUTES.ADMIN);
+}
+
+export function isProfileShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(pathname, APP_ROUTES.PROFILES);
+}
+
+export function isTouringShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(
+    pathname,
+    APP_ROUTES.TOUR_DATES,
+    APP_ROUTES.DASHBOARD_TOUR_DATES
+  );
+}
+
+export function resolveDashboardSegmentSkeletonVariant(
+  pathname: string | null
+): DashboardSegmentSkeletonVariant {
+  if (isAdminShellRoute(pathname)) return 'admin';
+  if (isInsightsShellRoute(pathname)) return 'insights';
+  if (isProfileShellRoute(pathname)) return 'profile';
+  if (isTouringShellRoute(pathname)) return 'tour';
+  return 'default';
 }
 
 export function isPresenceShellRoute(pathname: string | null): boolean {

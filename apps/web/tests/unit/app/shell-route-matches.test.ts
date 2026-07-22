@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isAdminShellRoute,
   isAudienceShellRoute,
   isCalendarShellRoute,
   isChatShellRoute,
@@ -7,11 +8,14 @@ import {
   isLibraryShellRoute,
   isLyricsShellRoute,
   isPresenceShellRoute,
+  isProfileShellRoute,
   isReleasesShellRoute,
   isSettingsShellRoute,
   isTasksShellRoute,
   isThreadsShellRoute,
+  isTouringShellRoute,
   resolveAppShellRequestPath,
+  resolveDashboardSegmentSkeletonVariant,
   shouldRedirectToOnboarding,
   shouldUseEssentialShellData,
 } from '@/app/app/(shell)/shell-route-matches';
@@ -153,6 +157,59 @@ describe('isInsightsShellRoute', () => {
     expect(isInsightsShellRoute(`${APP_ROUTES.INSIGHTS}/priority/high`)).toBe(
       true
     );
+  });
+
+  it('matches the legacy dashboard insights redirect route', () => {
+    expect(
+      isInsightsShellRoute(`${APP_ROUTES.LEGACY_DASHBOARD}/insights`)
+    ).toBe(true);
+  });
+});
+
+describe('remaining route-shaped shell skeleton matchers', () => {
+  it('matches the full admin subtree without matching settings admin', () => {
+    expect(isAdminShellRoute(APP_ROUTES.ADMIN)).toBe(true);
+    expect(isAdminShellRoute(APP_ROUTES.ADMIN_ACTIVITY)).toBe(true);
+    expect(isAdminShellRoute(APP_ROUTES.SETTINGS_ADMIN)).toBe(false);
+  });
+
+  it('matches the canonical profiles workspace only', () => {
+    expect(isProfileShellRoute(APP_ROUTES.PROFILES)).toBe(true);
+    expect(isProfileShellRoute(APP_ROUTES.DASHBOARD_PROFILE)).toBe(false);
+    expect(isProfileShellRoute(`${APP_ROUTES.DASHBOARD}/profile`)).toBe(false);
+    expect(isProfileShellRoute(APP_ROUTES.SETTINGS_ARTIST_PROFILE)).toBe(false);
+  });
+
+  it('matches canonical and legacy tour workspaces without claiming touring settings', () => {
+    expect(isTouringShellRoute(APP_ROUTES.TOUR_DATES)).toBe(true);
+    expect(isTouringShellRoute(APP_ROUTES.DASHBOARD_TOUR_DATES)).toBe(true);
+    expect(isTouringShellRoute(APP_ROUTES.SETTINGS_TOURING)).toBe(false);
+    expect(isTouringShellRoute(APP_ROUTES.CALENDAR)).toBe(false);
+  });
+});
+
+describe('resolveDashboardSegmentSkeletonVariant', () => {
+  it.each([
+    [APP_ROUTES.ADMIN_ACTIVITY, 'admin'],
+    [APP_ROUTES.INSIGHTS, 'insights'],
+    [`${APP_ROUTES.LEGACY_DASHBOARD}/insights`, 'insights'],
+    [APP_ROUTES.PROFILES, 'profile'],
+    [APP_ROUTES.DASHBOARD_PROFILE, 'default'],
+    [APP_ROUTES.TOUR_DATES, 'tour'],
+    [APP_ROUTES.DASHBOARD_TOUR_DATES, 'tour'],
+    [APP_ROUTES.SETTINGS_TOURING, 'default'],
+    [APP_ROUTES.EARNINGS, 'default'],
+    [null, 'default'],
+  ] as const)('resolves %s to %s', (pathname, expected) => {
+    expect(resolveDashboardSegmentSkeletonVariant(pathname)).toBe(expected);
+  });
+
+  it('keeps touring settings out of the tour workspace family', () => {
+    expect(isSettingsShellRoute(APP_ROUTES.SETTINGS_TOURING)).toBe(true);
+    expect(isTouringShellRoute(APP_ROUTES.SETTINGS_TOURING)).toBe(false);
+    expect(
+      resolveDashboardSegmentSkeletonVariant(APP_ROUTES.SETTINGS_TOURING)
+    ).toBe('default');
   });
 });
 
