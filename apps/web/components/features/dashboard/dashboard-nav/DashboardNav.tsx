@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { NavBadge } from '@/components/atoms/NavBadge';
 import { toast } from '@/components/feedback';
 import { openCommandPalette } from '@/components/organisms/command-palette-events';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
@@ -238,17 +239,24 @@ export function DashboardNav(_: DashboardNavProps) {
   const navSections = useMemo<readonly DashboardNavSection[]>(() => {
     const decorateItem = (item: NavItem): NavItem => {
       if (item.id === 'tasks') {
+        const taskCount = canAccessTasksWorkspace
+          ? formatTaskBadge(taskStats, tasksSeenAt)
+          : undefined;
+
         return {
           ...item,
           badge: (() => {
             if (isPlanGateLoading) return undefined;
-            if (canAccessTasksWorkspace)
-              return formatTaskBadge(taskStats, tasksSeenAt);
-            return (
-              <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-3xs font-semibold tracking-wider text-secondary-token'>
-                Pro
-              </span>
-            );
+            if (canAccessTasksWorkspace) {
+              return taskCount == null ? undefined : (
+                <NavBadge
+                  variant='count'
+                  count={taskCount}
+                  aria-label={`${taskCount} ${tasksSeenAt ? 'new ' : ''}active tasks`}
+                />
+              );
+            }
+            return <NavBadge variant='pro' />;
           })(),
         };
       }

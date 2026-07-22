@@ -19,7 +19,6 @@ import {
 } from 'react';
 import { toast } from '@/components/feedback';
 import {
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
@@ -406,9 +405,11 @@ export function NavMenuItem({
               </NavMenuInteractiveElement>
             </SidebarMenuButton>
           )}
-          {!useShellNavItem && item.badge != null && (
-            <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
-          )}
+          {!useShellNavItem && item.badge != null ? (
+            <span className='pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 group-data-[collapsible=icon]:hidden'>
+              {item.badge}
+            </span>
+          ) : null}
           {actions}
           {children}
         </SidebarMenuItem>

@@ -431,7 +431,7 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByText('2')).toBeDefined();
+    expect(getByText('2')).toHaveAttribute('aria-label', '2 new active tasks');
     expect(queryByText('7')).toBeNull();
     expect(mockUseTaskStatsQuery).toHaveBeenCalledWith('profile_123', {
       enabled: true,
@@ -456,13 +456,15 @@ describe('DashboardNav', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    const tasksLink = getByRole('link', { name: 'Tasks 7' });
+    const tasksLink = getByRole('link', { name: 'Tasks 7 active tasks' });
     expect(tasksLink.className).toContain('h-7');
     expect(tasksLink.className).toContain(
       'grid-cols-[22px_minmax(0,1fr)_34px]'
     );
     expect(tasksLink.className).toContain('text-xs');
-    expect(getByText('7')).toBeDefined();
+    const taskBadge = getByText('7');
+    expect(taskBadge).toHaveAttribute('data-nav-badge', 'count');
+    expect(taskBadge).toHaveAttribute('aria-label', '7 active tasks');
   });
 
   it('renders the Pro badge when tasks are locked', () => {
@@ -473,7 +475,7 @@ describe('DashboardNav', () => {
 
     const { getByText } = renderDashboardNav({ renderFn: fastRender });
 
-    expect(getByText('Pro')).toBeDefined();
+    expect(getByText('Pro')).toHaveAttribute('data-nav-badge', 'pro');
     expect(mockUseTaskStatsQuery).toHaveBeenCalledWith('', {
       enabled: false,
       seenAt: null,
