@@ -738,8 +738,7 @@ export const connectorStatusEnum = pgEnum('connector_status', [
 ]);
 
 /** TS union derived from the Postgres `connector_status` enum. */
-export type ConnectorDbStatus =
-  (typeof connectorStatusEnum.enumValues)[number];
+export type ConnectorDbStatus = (typeof connectorStatusEnum.enumValues)[number];
 
 export const webhookProviderEnum = pgEnum('webhook_provider', [
   'spotify',
