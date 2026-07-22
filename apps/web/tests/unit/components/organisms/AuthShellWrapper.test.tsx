@@ -170,6 +170,16 @@ describe('AuthShellWrapper', () => {
     expect(screen.getByText('child content')).toBeInTheDocument();
   });
 
+  it('passes the server-resolved mode into route configuration', () => {
+    render(
+      <AuthShellWrapper mode='ov'>
+        <div>OV content</div>
+      </AuthShellWrapper>
+    );
+
+    expect(useAuthRouteConfigMock).toHaveBeenCalledWith('ov');
+  });
+
   it('passes preview panel default-open state through to provider on dashboard routes', () => {
     render(
       <AuthShellWrapper previewPanelDefaultOpen>

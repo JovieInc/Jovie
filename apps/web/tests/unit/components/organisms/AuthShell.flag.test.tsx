@@ -6,21 +6,28 @@ import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
 
+const { unifiedSidebarMock } = vi.hoisted(() => ({
+  unifiedSidebarMock: vi.fn(),
+}));
+
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({ toggle: vi.fn() }),
 }));
 
 vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
+    sidebar,
     header,
     main,
     variant,
   }: {
+    sidebar: ReactNode;
     header?: ReactNode;
     main: ReactNode;
     variant: 'legacy' | 'shellChatV1';
   }) => (
     <div data-testid='app-shell-frame' data-shell-design={variant}>
+      {sidebar}
       {header}
       {main}
     </div>
@@ -40,7 +47,20 @@ vi.mock('@/components/organisms/Sidebar', () => ({
 }));
 
 vi.mock('@/components/organisms/UnifiedSidebar', () => ({
-  UnifiedSidebar: () => <aside>Sidebar</aside>,
+  UnifiedSidebar: ({
+    section,
+    variant,
+  }: {
+    section: string;
+    variant?: string;
+  }) => {
+    unifiedSidebarMock({ section, variant });
+    return (
+      <aside data-section={section} data-variant={variant}>
+        Sidebar
+      </aside>
+    );
+  },
 }));
 
 vi.mock('@/contexts/RightPanelContext', () => ({
@@ -73,6 +93,16 @@ function renderAuthShell(designV1: boolean) {
   );
 }
 
+function renderOvAuthShell() {
+  render(
+    <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+      <AuthShell section='ov' breadcrumbs={[]}>
+        <div>OV Content</div>
+      </AuthShell>
+    </AppFlagProvider>
+  );
+}
+
 describe('AuthShell DESIGN_V1 wiring', () => {
   beforeEach(() => {
     localStorage.removeItem(FF_OVERRIDES_KEY);
@@ -100,5 +130,12 @@ describe('AuthShell DESIGN_V1 wiring', () => {
     expect(
       screen.queryByRole('button', { name: 'Toggle Sidebar' })
     ).not.toBeInTheDocument();
+  });
+
+  it('propagates OV mode to the sidebar on the first render', () => {
+    renderOvAuthShell();
+
+    expect(screen.getByText('Sidebar')).toHaveAttribute('data-section', 'ov');
+    expect(screen.getByText('Sidebar')).toHaveAttribute('data-variant', 'ov');
   });
 });

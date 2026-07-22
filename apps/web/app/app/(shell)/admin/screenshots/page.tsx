@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { getScreenshots } from '@/lib/admin/screenshots';
 import { CANONICAL_SURFACES } from '@/lib/canonical-surfaces';
 import { captureError } from '@/lib/error-tracking';
@@ -37,6 +38,8 @@ export const metadata: Metadata = {
 export const runtime = 'nodejs';
 
 export default async function AdminScreenshotsPage() {
+  await requireCurrentAdminPageAccess();
+
   let screenshots: Awaited<ReturnType<typeof getScreenshots>> = [];
   let catalogError: string | undefined;
   try {

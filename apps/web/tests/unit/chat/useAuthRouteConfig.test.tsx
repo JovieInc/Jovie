@@ -1,5 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 
 const { mockUsePathname, mockUseSearchParams } = vi.hoisted(() => ({
@@ -87,5 +88,21 @@ describe('useAuthRouteConfig', () => {
     expect(result.current.breadcrumbs).toEqual([
       { label: 'Tour dates', href: '/app/tour-dates' },
     ]);
+  });
+
+  it('uses the server-provided OV mode even when a rewrite exposes the legacy pathname', () => {
+    mockUsePathname.mockReturnValue('/app/admin/ops');
+
+    const { result } = renderHook(() => useAuthRouteConfig('ov'));
+
+    expect(result.current.section).toBe('ov');
+  });
+
+  it('keeps customer routes in customer sections', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
+
+    const { result } = renderHook(() => useAuthRouteConfig('customer'));
+
+    expect(result.current.section).toBe('dashboard');
   });
 });

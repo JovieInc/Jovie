@@ -102,7 +102,7 @@ function renderUnifiedSidebar({
   readonly overrideContent?: ReactNode;
   readonly designV1?: boolean;
   readonly pathname?: string;
-  readonly section?: 'admin' | 'dashboard' | 'library' | 'settings';
+  readonly section?: 'admin' | 'dashboard' | 'library' | 'ov' | 'settings';
 } = {}) {
   mockUsePathname.mockReturnValue(pathname);
   const queryClient = new QueryClient({
@@ -207,5 +207,29 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
+  });
+
+  it('renders dedicated operator navigation without the customer dashboard nav', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.ADMIN_OPS,
+      section: 'ov',
+    });
+
+    expect(
+      screen.getByRole('navigation', { name: 'OV navigation' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.ADMIN
+    );
+    expect(screen.getByRole('link', { name: 'Ops' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.ADMIN_OPS
+    );
+    expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.ADMIN_FEATURES
+    );
+    expect(screen.queryByTestId('dashboard-nav')).not.toBeInTheDocument();
   });
 });

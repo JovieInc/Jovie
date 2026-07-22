@@ -14,6 +14,7 @@ import {
   getNightlyTestingAgentStatus,
   getPublicProfileCanaryStatus,
 } from '@/lib/admin/ops-queries';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import type { CanaryReport } from '@/lib/canaries/public-profile';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
@@ -150,12 +151,14 @@ async function getInitialShippingData(): Promise<{
 export default async function AdminOpsPage({
   searchParams,
 }: Readonly<{ readonly searchParams: Promise<SearchParams> }>) {
+  await requireCurrentAdminPageAccess();
+
   const params = await searchParams;
   const presentationMode = resolvePresentationMode(params.mode);
 
-  // The admin layout has already verified admin entitlement; getHudMetrics
-  // accepts the access mode for downstream auth-aware features (e.g. AI ops
-  // dispatch UI). Admin sees full dispatch; kiosk-token would not.
+  // The page-level guard above is authoritative even when Next renders the
+  // surrounding layouts in parallel. Admin sees full dispatch; kiosk-token
+  // would not.
   const [
     metrics,
     shippingPrefetch,

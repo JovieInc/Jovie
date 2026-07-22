@@ -313,35 +313,39 @@ const nextConfig = {
       },
       {
         source: '/app/admin/waitlist',
-        destination: '/app/admin/people?view=waitlist',
+        destination: '/app/ov/people?view=waitlist',
       },
       {
         source: '/app/admin/creators',
-        destination: '/app/admin/people?view=creators',
+        destination: '/app/ov/people?view=creators',
       },
       {
         source: '/app/admin/users',
-        destination: '/app/admin/people?view=users',
+        destination: '/app/ov/people?view=users',
       },
       {
         source: '/app/admin/feedback',
-        destination: '/app/admin/people?view=feedback',
+        destination: '/app/ov/people?view=feedback',
       },
       {
         source: '/app/admin/leads',
-        destination: '/app/admin/growth?view=leads',
+        destination: '/app/ov/growth?view=leads',
       },
       {
         source: '/app/admin/outreach',
-        destination: '/app/admin/growth?view=outreach',
+        destination: '/app/ov/growth?view=outreach',
       },
       {
         source: '/app/admin/campaigns',
-        destination: '/app/admin/growth?view=campaigns',
+        destination: '/app/ov/growth?view=campaigns',
       },
       {
         source: '/app/admin/ingest',
-        destination: '/app/admin/growth?view=ingest',
+        destination: '/app/ov/growth?view=ingest',
+      },
+      {
+        source: '/app/admin/:path*',
+        destination: '/app/ov/:path*',
       },
     ].map(route => ({
       ...route,
@@ -414,7 +418,12 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    return [];
+    return [
+      {
+        source: '/app/ov/:path*',
+        destination: '/app/admin/:path*',
+      },
+    ];
   },
   env: {
     // Build-time env vars — these get inlined into client bundles by Next.js

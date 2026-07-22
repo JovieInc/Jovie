@@ -41,6 +41,7 @@ import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
+import type { AppShellMode } from '@/types/app-shell';
 import { AuthShell } from './AuthShell';
 import { CommandPalette } from './CommandPalette';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
@@ -53,6 +54,7 @@ import {
 export { TableMetaProvider, usePendingShell, useTableMeta };
 
 export interface AuthShellWrapperProps {
+  readonly mode?: AppShellMode;
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
   readonly sidebarDefaultOpen?: boolean;
   readonly previewPanelDefaultOpen?: boolean;
@@ -73,17 +75,19 @@ function KeyboardShortcutsHandler() {
  * AuthShellWrapperInner - Inner component with access to HeaderActionsContext
  */
 function AuthShellWrapperInner({
+  mode,
   persistSidebarCollapsed,
   sidebarDefaultOpen,
   previewPanelDefaultOpen,
   children,
 }: Readonly<{
+  mode: AppShellMode;
   persistSidebarCollapsed?: AuthShellWrapperProps['persistSidebarCollapsed'];
   sidebarDefaultOpen?: boolean;
   previewPanelDefaultOpen?: boolean;
   children: ReactNode;
 }>) {
-  const config = useAuthRouteConfig();
+  const config = useAuthRouteConfig(mode);
   const pathname = usePathname();
   const headerActions = useHeaderActions();
   const isElectron = useIsElectronRuntime();
@@ -303,6 +307,7 @@ function AuthShellWrapperInner({
  * Separates routing concerns (hook) from layout (AuthShell).
  */
 export function AuthShellWrapper({
+  mode = 'customer',
   persistSidebarCollapsed,
   sidebarDefaultOpen,
   previewPanelDefaultOpen,
@@ -314,6 +319,7 @@ export function AuthShellWrapper({
         <HeaderActionsProvider>
           <ShellSidebarOverrideProvider>
             <AuthShellWrapperInner
+              mode={mode}
               persistSidebarCollapsed={persistSidebarCollapsed}
               sidebarDefaultOpen={sidebarDefaultOpen}
               previewPanelDefaultOpen={previewPanelDefaultOpen}

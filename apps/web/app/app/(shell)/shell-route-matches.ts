@@ -168,6 +168,10 @@ export function isCalendarShellRoute(pathname: string | null): boolean {
   return matchesRoutePrefix(pathname, APP_ROUTES.CALENDAR);
 }
 
+export function isOvShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(pathname, APP_ROUTES.OV);
+}
+
 function isDashboardSubRoute(pathname: string | null): boolean {
   return matchesNestedRoute(pathname, APP_ROUTES.LEGACY_DASHBOARD);
 }
@@ -188,6 +192,7 @@ function isLightweightShellRoute(pathname: string | null): boolean {
     isPresenceShellRoute(pathname) ||
     isAudienceShellRoute(pathname) ||
     isCalendarShellRoute(pathname) ||
+    isOvShellRoute(pathname) ||
     isDashboardSubRoute(pathname) ||
     isSettingsShellRoute(pathname)
   );

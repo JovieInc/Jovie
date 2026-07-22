@@ -11,12 +11,18 @@ vi.mock('@/components/organisms/AppShellSkeleton', () => ({
     main,
     audioPlayer,
     variant,
+    brandVariant,
   }: {
     main?: React.ReactNode;
     audioPlayer?: React.ReactNode;
     variant?: string;
+    brandVariant?: string;
   }) => (
-    <div data-testid='app-shell-skeleton' data-variant={variant}>
+    <div
+      data-testid='app-shell-skeleton'
+      data-variant={variant}
+      data-brand-variant={brandVariant}
+    >
       {main}
       {audioPlayer}
     </div>
@@ -105,5 +111,41 @@ describe('CinematicAppBoot', () => {
     expect(getByTestId('app-shell-skeleton')).toContainElement(
       getByTestId('audio-player')
     );
+  });
+
+  it('renders the OV-branded skeleton immediately instead of flashing the Jovie cinematic', () => {
+    const { getByTestId, queryByTestId } = render(
+      <CinematicAppBoot
+        brandVariant='ov'
+        main={undefined}
+        variant='shellChatV1'
+      />
+    );
+
+    expect(queryByTestId('cinematic-app-boot')).toBeNull();
+    expect(getByTestId('app-shell-skeleton')).toHaveAttribute(
+      'data-brand-variant',
+      'ov'
+    );
+  });
+
+  it('does not consume the Jovie cinematic when OV mounts first', () => {
+    const ovRender = render(
+      <CinematicAppBoot
+        brandVariant='ov'
+        main={undefined}
+        variant='shellChatV1'
+      />
+    );
+
+    expect(globalThis.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+    ovRender.unmount();
+
+    const { queryByTestId } = render(
+      <CinematicAppBoot main={undefined} variant='shellChatV1' />
+    );
+
+    expect(queryByTestId('cinematic-app-boot')).not.toBeNull();
+    expect(globalThis.sessionStorage.getItem(STORAGE_KEY)).toBe('1');
   });
 });

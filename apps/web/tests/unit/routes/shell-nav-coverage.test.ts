@@ -9,6 +9,7 @@ import {
   userSettingsNavigation,
 } from '@/components/features/dashboard/dashboard-nav/config';
 import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
+import { APP_ROUTES } from '@/constants/routes';
 
 const SHELL_ROOT = path.resolve(__dirname, '../../../app/app/(shell)');
 
@@ -19,11 +20,13 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/library':
     'Canonical library page for releases, merch, images, videos, and audio',
   '/app/threads': 'Legacy all threads route redirects to chats',
-  '/app/admin/investors/links': 'Sub-tool reached from Investors workspace',
-  '/app/admin/investors/settings':
+  '/app/ov/investors/links': 'Sub-tool reached from Investors workspace',
+  '/app/ov/investors/settings':
     'Sub-tool reached from Investors workspace actions',
-  '/app/admin/interviews': 'Internal admin review workspace (manual entry)',
-  '/app/admin/playlists': 'Internal admin workflow (manual entry)',
+  '/app/ov/interviews': 'Internal admin review workspace (manual entry)',
+  '/app/ov/playlists': 'Internal admin workflow (manual entry)',
+  '/app/ov/agent-runs/[id]':
+    'Dynamic operator debug route reached from an agent run action',
   '/app/dashboard/releases/[releaseId]/tasks':
     'Dynamic workflow route reached from releases actions',
   '/app/releases/[releaseId]/tasks':
@@ -65,7 +68,15 @@ function toRoutePath(filePath: string): string {
     .filter(segment => !/^\([^/]+\)$/.test(segment))
     .join('/');
 
-  return `/app${relativePath ? `/${relativePath}` : ''}`;
+  const physicalRoute = `/app${relativePath ? `/${relativePath}` : ''}`;
+  if (
+    physicalRoute === APP_ROUTES.LEGACY_ADMIN ||
+    physicalRoute.startsWith(`${APP_ROUTES.LEGACY_ADMIN}/`)
+  ) {
+    return physicalRoute.replace(APP_ROUTES.LEGACY_ADMIN, APP_ROUTES.OV);
+  }
+
+  return physicalRoute;
 }
 
 function findShellPages(dir: string = SHELL_ROOT): ShellPage[] {

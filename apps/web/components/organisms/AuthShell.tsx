@@ -18,11 +18,12 @@ import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader'
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
 import { useAppFlag } from '@/lib/flags/client';
+import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { PersistentAudioBar } from './PersistentAudioBar';
 export interface AuthShellProps {
-  readonly section: 'admin' | 'dashboard' | 'library' | 'settings';
+  readonly section: AppShellSection;
   readonly breadcrumbs: DashboardBreadcrumbItem[];
   readonly headerBadge?: ReactNode;
   readonly headerAction?: ReactNode;
@@ -78,7 +79,12 @@ function AuthShellInner({
   // The sidebar only depends on `section` — it shouldn't remount when
   // navigating between pages within the same section.
   const sidebar = useMemo(
-    () => <UnifiedSidebar section={section} />,
+    () => (
+      <UnifiedSidebar
+        section={section}
+        variant={section === 'ov' ? 'ov' : 'jovie'}
+      />
+    ),
     [section]
   );
 

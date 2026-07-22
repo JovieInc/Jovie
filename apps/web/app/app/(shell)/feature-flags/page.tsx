@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   description: 'Redirects to the canonical admin feature-flags workspace.',
 };
 
+/** Redirect-only compatibility route; OV owns the feature-flags surface. */
 export default function LegacyFeatureFlagsPage() {
   redirect(APP_ROUTES.ADMIN_FEATURES);
 }

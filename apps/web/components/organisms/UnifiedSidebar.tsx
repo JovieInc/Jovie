@@ -6,7 +6,26 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import { ArrowLeft, Copy, RefreshCw, Settings } from 'lucide-react';
+import {
+  Activity,
+  ArrowLeft,
+  Banknote,
+  Briefcase,
+  Cable,
+  Copy,
+  Flag,
+  FolderKanban,
+  Gauge,
+  Image as ImageIcon,
+  LayoutDashboard,
+  type LucideIcon,
+  Map,
+  RefreshCw,
+  Settings,
+  Share2,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -28,6 +47,10 @@ import {
 import { UserButton } from '@/components/organisms/user-button';
 import { getVersionUpdateTitle } from '@/components/shell/getVersionUpdateTitle';
 import { InstallBanner } from '@/components/shell/InstallBanner';
+import {
+  ADMIN_NAV_REGISTRY,
+  type AdminWorkspaceId,
+} from '@/constants/admin-navigation';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
@@ -52,17 +75,56 @@ import {
 } from '@/lib/hooks/useVersionMonitor';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
+import type { AppShellSection } from '@/types/app-shell';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 
 export interface UnifiedSidebarProps {
-  readonly section: 'admin' | 'dashboard' | 'library' | 'settings';
+  readonly section: AppShellSection;
   /** Brand skin for the shell chrome. 'ov' is the internal/admin skin (JOV-4083). */
   readonly variant?: BrandVariant;
 }
 
 const VERSION_DISMISSAL_KEY = 'jovie-version-update-dismissed';
 const VERSION_NOTIFICATION_DELAY_MS = 10_000;
+
+const OV_ICON_BY_ID: Record<AdminWorkspaceId, LucideIcon> = {
+  overview: LayoutDashboard,
+  ops: Gauge,
+  people: Users,
+  growth: FolderKanban,
+  platform_connections: Cable,
+  activity: Activity,
+  investors: Briefcase,
+  screenshots: ImageIcon,
+  costs: Banknote,
+  revenue_lift: TrendingUp,
+  share_studio: Share2,
+  system_map: Map,
+  features: Flag,
+};
+
+const OV_NAV_SECTIONS = [
+  {
+    label: 'Workspaces',
+    items: ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces'),
+  },
+  {
+    label: 'Utilities',
+    items: ADMIN_NAV_REGISTRY.filter(item => item.section === 'utilities'),
+  },
+].map(section => ({
+  ...section,
+  items: section.items.map(
+    (item): NavItem => ({
+      id: `ov_${item.id}`,
+      name: item.label,
+      href: item.href,
+      description: item.description,
+      icon: OV_ICON_BY_ID[item.id],
+    })
+  ),
+}));
 
 /** Render a group of nav items */
 function SettingsNavGroup({
@@ -121,6 +183,25 @@ function SettingsNavGroup({
         );
       })}
     </SidebarMenu>
+  );
+}
+
+/** Dedicated operator navigation; customer DashboardNav stays customer-only. */
+function OperatorNavigation({ pathname }: { readonly pathname: string }) {
+  return (
+    <nav
+      aria-label='OV Navigation'
+      className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
+    >
+      {OV_NAV_SECTIONS.map(section => (
+        <div key={section.label}>
+          <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
+            {section.label}
+          </span>
+          <SettingsNavGroup items={section.items} pathname={pathname} />
+        </div>
+      ))}
+    </nav>
   );
 }
 
@@ -389,10 +470,11 @@ export function UnifiedSidebar({
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
-  const isAdmin = section === 'admin';
+  const isAdmin = section === 'admin' || section === 'ov';
   const isInLibrary = section === 'library';
   const isRouteSidebar = isInSettings || isInLibrary;
-  const isDashboardOrAdmin = section === 'dashboard' || section === 'admin';
+  const isDashboardOrAdmin =
+    section === 'dashboard' || section === 'admin' || section === 'ov';
   const hasMultipleProfiles = creatorProfiles.length >= 2;
 
   const { profileHref } = useProfileData(isDashboardOrAdmin);
@@ -431,7 +513,9 @@ export function UnifiedSidebar({
       <SidebarContent className='min-h-0 flex-1 px-2.5 pb-2.5 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
-            {isInSettings ? (
+            {section === 'ov' ? (
+              <OperatorNavigation pathname={pathname} />
+            ) : isInSettings ? (
               <SettingsNavigation pathname={pathname} section={section} />
             ) : isInLibrary ? (
               (sidebarOverride?.content ?? null)

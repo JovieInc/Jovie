@@ -6,6 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import { AppFlagProvider, useAppFlag } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
@@ -785,7 +786,7 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       const adminLink = screen.getByRole('link', { name: 'Admin Panel' });
-      expect(adminLink).toHaveAttribute('href', '/app/admin');
+      expect(adminLink).toHaveAttribute('href', APP_ROUTES.OV);
     });
   });
 

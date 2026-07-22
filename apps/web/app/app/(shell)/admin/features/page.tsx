@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { captureError } from '@/lib/error-tracking';
 import {
   type FeatureFlagAdminRow,
@@ -15,6 +16,8 @@ export const metadata: Metadata = {
 export const runtime = 'nodejs';
 
 export default async function AdminFeaturesPage() {
+  await requireCurrentAdminPageAccess();
+
   let rows: FeatureFlagAdminRow[] = [];
   try {
     rows = await getFeatureFlagAdminRows();

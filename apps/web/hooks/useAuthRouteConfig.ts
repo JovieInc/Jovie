@@ -11,10 +11,11 @@ import {
 } from '@/constants/admin-navigation';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
+import type { AppShellMode, AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
 export interface AuthRouteConfig {
-  section: 'admin' | 'dashboard' | 'library' | 'settings';
+  section: AppShellSection;
   breadcrumbs: DashboardBreadcrumbItem[];
   showMobileTabs: boolean;
   isTableRoute: boolean;
@@ -51,16 +52,17 @@ export function getDemoBreadcrumbSegment(pathname: string): string {
  *
  * Separates routing concerns from layout component.
  */
-export function useAuthRouteConfig(): AuthRouteConfig {
+export function useAuthRouteConfig(
+  mode: AppShellMode = 'customer'
+): AuthRouteConfig {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isDemoRoute = isDemoRoutePath(pathname);
 
   // Detect section based on pathname
-  const section = useMemo<
-    'admin' | 'dashboard' | 'library' | 'settings'
-  >(() => {
-    if (pathname.startsWith(APP_ROUTES.ADMIN)) return 'admin';
+  const section = useMemo<AppShellSection>(() => {
+    if (mode === 'ov') return 'ov';
+    if (pathname.startsWith(APP_ROUTES.LEGACY_ADMIN)) return 'admin';
     if (pathname.startsWith(APP_ROUTES.SETTINGS)) return 'settings';
     if (
       pathname === APP_ROUTES.LIBRARY ||
@@ -69,7 +71,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
       return 'library';
     }
     return 'dashboard';
-  }, [pathname]);
+  }, [mode, pathname]);
 
   // Generate breadcrumbs from pathname
   const breadcrumbs = useMemo<DashboardBreadcrumbItem[]>(() => {

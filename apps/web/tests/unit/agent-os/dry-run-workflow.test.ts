@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   AgentOsDryRunWorkflowInputSchema,
   buildAgentOsDryRunArtifact,
@@ -42,7 +43,7 @@ describe('AgentOS dry-run workflow artifact', () => {
       status: 'done',
       modelRoute: 'deterministic',
       linearIssueId: 'JOV-1971',
-      adminSurface: '/app/admin/ops',
+      adminSurface: APP_ROUTES.ADMIN_OPS,
       costEstimate: {
         usd: 0,
         route: 'deterministic',

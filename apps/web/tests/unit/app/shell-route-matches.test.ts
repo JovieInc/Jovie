@@ -7,6 +7,7 @@ import {
   isInsightsShellRoute,
   isLibraryShellRoute,
   isLyricsShellRoute,
+  isOvShellRoute,
   isPresenceShellRoute,
   isProfileShellRoute,
   isReleasesShellRoute,
@@ -252,6 +253,14 @@ describe('isCalendarShellRoute', () => {
   });
 });
 
+describe('isOvShellRoute', () => {
+  it('matches the OV root and nested internal routes only', () => {
+    expect(isOvShellRoute(APP_ROUTES.OV)).toBe(true);
+    expect(isOvShellRoute(APP_ROUTES.ADMIN_OPS)).toBe(true);
+    expect(isOvShellRoute(APP_ROUTES.DASHBOARD)).toBe(false);
+  });
+});
+
 describe('isSettingsShellRoute', () => {
   it('matches the settings root and nested settings subroutes', () => {
     expect(isSettingsShellRoute(APP_ROUTES.SETTINGS)).toBe(true);
@@ -302,6 +311,11 @@ describe('shouldUseEssentialShellData', () => {
 
   it('returns true for dashboard root', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD)).toBe(true);
+  });
+
+  it('uses essential shell data for OV routes', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.OV)).toBe(true);
+    expect(shouldUseEssentialShellData(APP_ROUTES.ADMIN_OPS)).toBe(true);
   });
 
   it('does not treat the legacy dashboard root as a nested dashboard subroute', () => {

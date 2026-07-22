@@ -8,6 +8,7 @@ import {
 } from '@/components/atoms/jovie-icon-path';
 import { type AppShellFrameVariant } from '@/components/organisms/AppShellFrame';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
+import type { BrandVariant } from '@/lib/brand/tokens';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 const LOGO_ASPECT_RATIO = 347.97 / 353.68;
@@ -33,6 +34,8 @@ interface CinematicAppBootProps {
   readonly audioPlayer?: ReactNode;
   /** AppShellSkeleton variant — preserved across cinematic + skeleton fallbacks. */
   readonly variant: AppShellFrameVariant;
+  /** Brand skin rendered during the initial server/Suspense fallback. */
+  readonly brandVariant?: BrandVariant;
   /**
    * Set to false for unauthenticated onboarding front-door surfaces (/start)
    * that render AppShellFrame with sidebar={null}. When false:
@@ -72,6 +75,7 @@ export function CinematicAppBoot({
   main,
   audioPlayer,
   variant,
+  brandVariant = 'jovie',
   hasSidebar = true,
 }: CinematicAppBootProps) {
   const [mounted, setMounted] = useState(false);
@@ -82,6 +86,8 @@ export function CinematicAppBoot({
 
   useEffect(() => {
     setMounted(true);
+    if (brandVariant === 'ov') return;
+
     // sessionStorage is unavailable in some private-browsing modes — fail
     // safe to "skip cinematic" rather than throw.
     try {
@@ -99,15 +105,21 @@ export function CinematicAppBoot({
     } catch {
       // sessionStorage blocked — default to skipping the cinematic.
     }
-  }, []);
+  }, [brandVariant]);
 
   const skeletonSidebar = hasSidebar === false ? null : undefined;
 
-  if (!mounted || prefersReducedMotion || !shouldPlay) {
+  if (
+    brandVariant === 'ov' ||
+    !mounted ||
+    prefersReducedMotion ||
+    !shouldPlay
+  ) {
     return (
       <AppShellSkeleton
         main={main}
         audioPlayer={audioPlayer}
+        brandVariant={brandVariant}
         variant={variant}
         sidebar={skeletonSidebar}
       />

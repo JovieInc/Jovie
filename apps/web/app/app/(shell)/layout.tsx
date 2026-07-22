@@ -9,6 +9,10 @@ import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
+import {
+  APP_SHELL_MODE_HEADER,
+  parseTrustedAppShellMode,
+} from '@/lib/app-shell/mode';
 import { canAccessAppShell } from '@/lib/auth/access-route-redirect';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -18,6 +22,7 @@ import ChatLoading from './chat/loading';
 import { DashboardShellContent } from './DashboardShellContent';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
 import { LibraryLoadingState } from './library/LibrarySurface';
+import { requireAppShellModeAccess } from './shell-mode';
 import {
   isChatShellRoute,
   isLibraryShellRoute,
@@ -72,6 +77,9 @@ export default async function AppShellLayout({
       headerStore.get('x-matched-path'),
       headerStore.get('x-invoke-path')
     );
+    const mode = parseTrustedAppShellMode(
+      headerStore.get(APP_SHELL_MODE_HEADER)
+    );
 
     if (!auth.userId) {
       redirect(
@@ -80,6 +88,11 @@ export default async function AppShellLayout({
         })
       );
     }
+
+    // OV authorization is resolved before the shared shell/data tree is
+    // returned. This keeps unauthorized RSC responses free of admin content
+    // and gives the client its mode on the first render (no customer flash).
+    await requireAppShellModeAccess(mode);
 
     const authResult = await resolveUserState({
       knownClerkUserId: auth.userId,
@@ -126,6 +139,7 @@ export default async function AppShellLayout({
       <CinematicAppBoot
         main={routeMain}
         audioPlayer={audioPlayer}
+        brandVariant={mode === 'ov' ? 'ov' : 'jovie'}
         variant={shellVariant}
       />
     );
@@ -143,7 +157,11 @@ export default async function AppShellLayout({
     return (
       <NuqsProvider>
         <Suspense fallback={shellFallback}>
-          <DashboardShellContent userId={auth.userId} pathname={pathname}>
+          <DashboardShellContent
+            userId={auth.userId}
+            pathname={pathname}
+            mode={mode}
+          >
             {children}
           </DashboardShellContent>
         </Suspense>

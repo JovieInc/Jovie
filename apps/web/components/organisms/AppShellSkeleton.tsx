@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { BrandVariant } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 import { AppShellFrame, type AppShellFrameVariant } from './AppShellFrame';
 
@@ -20,8 +21,10 @@ const NAV_ITEMS_2 = [
 
 function DefaultSidebarSkeleton({
   isShellChatV1,
+  brandVariant,
 }: {
   readonly isShellChatV1: boolean;
+  readonly brandVariant: BrandVariant;
 }) {
   return (
     <div
@@ -30,7 +33,8 @@ function DefaultSidebarSkeleton({
       // without a width/header reflow.
       className={cn(
         'max-lg:hidden bg-sidebar lg:flex lg:shrink-0 lg:flex-col',
-        isShellChatV1 ? 'lg:w-(--app-shell-sidebar-width)' : 'lg:w-58'
+        isShellChatV1 ? 'lg:w-(--app-shell-sidebar-width)' : 'lg:w-58',
+        brandVariant === 'ov' && 'ov-mode'
       )}
     >
       <div
@@ -99,6 +103,7 @@ export function AppShellSkeleton({
   main: mainOverride,
   audioPlayer,
   variant,
+  brandVariant = 'jovie',
   sidebar: sidebarOverride,
 }: {
   readonly main?: ReactNode;
@@ -109,6 +114,8 @@ export function AppShellSkeleton({
    * Defaults to 'legacy' to match the production default state.
    */
   readonly variant?: AppShellFrameVariant;
+  /** Brand skin for the sidebar fallback. */
+  readonly brandVariant?: BrandVariant;
   /**
    * Override the sidebar skeleton. Pass `null` for unauthenticated onboarding
    * surfaces (e.g. /start) that intentionally render without sidebar.
@@ -122,7 +129,10 @@ export function AppShellSkeleton({
     sidebarOverride !== undefined ? (
       sidebarOverride
     ) : (
-      <DefaultSidebarSkeleton isShellChatV1={isShellChatV1} />
+      <DefaultSidebarSkeleton
+        isShellChatV1={isShellChatV1}
+        brandVariant={brandVariant}
+      />
     );
 
   return (

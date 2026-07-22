@@ -1,4 +1,9 @@
+import { headers } from 'next/headers';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
+import {
+  APP_SHELL_MODE_HEADER,
+  parseTrustedAppShellMode,
+} from '@/lib/app-shell/mode';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getAppFlagValue } from '@/lib/flags/server';
 
@@ -11,10 +16,16 @@ import { getAppFlagValue } from '@/lib/flags/server';
  * the legacy sidebar/header geometry before the real shell mounts.
  */
 export default async function AppLoading() {
-  const auth = await getCachedAuth();
+  const [auth, headerStore] = await Promise.all([getCachedAuth(), headers()]);
   const shellChatV1 = await getAppFlagValue('DESIGN_V1', {
     userId: auth.userId,
   });
+  const mode = parseTrustedAppShellMode(headerStore.get(APP_SHELL_MODE_HEADER));
 
-  return <AppShellSkeleton variant={shellChatV1 ? 'shellChatV1' : 'legacy'} />;
+  return (
+    <AppShellSkeleton
+      brandVariant={mode === 'ov' ? 'ov' : 'jovie'}
+      variant={shellChatV1 ? 'shellChatV1' : 'legacy'}
+    />
+  );
 }

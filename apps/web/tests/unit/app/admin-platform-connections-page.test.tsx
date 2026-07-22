@@ -38,6 +38,10 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
 
+vi.mock('@/lib/admin/page-access', () => ({
+  requireCurrentAdminPageAccess: vi.fn().mockResolvedValue('user_admin'),
+}));
+
 vi.mock(
   '@/app/app/(shell)/admin/platform-connections/platform-connections-data',
   () => ({

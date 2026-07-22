@@ -429,7 +429,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('does not show the passive billing-status toast on admin surfaces', () => {
-    mockUsePathname.mockReturnValue('/app/admin');
+    mockUsePathname.mockReturnValue(APP_ROUTES.OV);
     mockUseBillingStatusQuery.mockReturnValue({
       data: null,
       isLoading: false,
@@ -442,7 +442,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('does not show the passive billing-status toast after a clean admin login with a healthy subscription', () => {
-    mockUsePathname.mockReturnValue('/app/admin/ops');
+    mockUsePathname.mockReturnValue(APP_ROUTES.ADMIN_OPS);
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
       isLoading: false,

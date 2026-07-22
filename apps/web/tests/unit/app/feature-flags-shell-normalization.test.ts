@@ -36,6 +36,7 @@ describe('feature flags shell normalization', () => {
     );
     expect(source).not.toContain('FeatureFlagsTable');
     expect(source).not.toContain('loadAppShellRouteContext');
+    expect(source).not.toContain('getCurrentUserEntitlements');
   });
 
   it('keeps the canonical operational feature-flags surface under admin', () => {
