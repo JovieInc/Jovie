@@ -732,6 +732,7 @@ jobs:
           fi
 
           required_runtime_env=(
+            BETTER_AUTH_URL
             NEXT_PUBLIC_BETTER_AUTH_URL
             BETTER_AUTH_SECRET
             DATABASE_URL
@@ -769,8 +770,15 @@ jobs:
             fi
           done
 
+          if ! pnpm --filter=@jovie/web exec tsx \
+            scripts/reconcile-vercel-build-env.ts \
+            --file=.vercel/.env.production.local; then
+            fail_stage "Unable to reconcile the canonical production build environment." production_artifact_failed
+          fi
+
           if ! pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts \
-            --target=prd --source=env; then
+            --target=prd --source=vercel-file \
+            --file=.vercel/.env.production.local; then
             fail_stage "Production signup configuration is incomplete." production_artifact_failed
           fi
 
@@ -867,7 +875,7 @@ jobs:
           }
           export -f production_stage
           doppler run --project jovie-web --config prd \
-            --only-secrets=NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY \
+            --only-secrets=BETTER_AUTH_URL,NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY \
             --no-fallback -- env -u DOPPLER_TOKEN bash -c production_stage
 
       - name: Recheck main immediately before production promotion
