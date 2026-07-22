@@ -68,15 +68,16 @@ async function completeAuthorityCreatePageApproval(input: {
   const platform = isAuthorityPagePlatform(raw.platform)
     ? raw.platform
     : 'fandom';
-  const artistName =
-    typeof raw.artistName === 'string' && raw.artistName.trim().length > 0
-      ? raw.artistName.trim()
-      : typeof raw.graphContext?.artistName === 'string'
-        ? raw.graphContext.artistName.trim()
-        : 'Artist';
+  let artistName = 'Artist';
+  if (typeof raw.artistName === 'string' && raw.artistName.trim().length > 0) {
+    artistName = raw.artistName.trim();
+  } else if (typeof raw.graphContext?.artistName === 'string') {
+    const fromGraph = raw.graphContext.artistName.trim();
+    if (fromGraph.length > 0) artistName = fromGraph;
+  }
 
   const graphContext: ClaimedGraphContext = {
-    ...(raw.graphContext ?? {}),
+    ...raw.graphContext,
     artistName,
   };
 

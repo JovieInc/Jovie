@@ -12,7 +12,6 @@
 
 import { eq } from 'drizzle-orm';
 import {
-  AUTHORITY_PAGE_PLATFORMS,
   AUTHORITY_PLATFORM_META,
   type AuthorityPagePlatform,
   type ClaimedGraphContext,
@@ -166,7 +165,7 @@ export function buildAuthorityCreatePagePayload(
   const artistName = input.artistName.trim();
   const graphContext: ClaimedGraphContext = {
     artistName,
-    ...(input.graphContext ?? {}),
+    ...input.graphContext,
     jovieUsername:
       input.graphContext?.jovieUsername ?? input.jovieUsername ?? null,
   };
@@ -175,10 +174,7 @@ export function buildAuthorityCreatePagePayload(
   const primaryActionLabel =
     gap.publishGate === 'human_only' ? 'Review draft' : 'Draft page';
 
-  const title =
-    gap.platform === 'fandom'
-      ? `Create ${meta.label} page for ${artistName}`
-      : `Create ${meta.label} page for ${artistName}`;
+  const title = `Create ${meta.label} page for ${artistName}`;
 
   const createUrl =
     gap.platform === 'fandom'
@@ -309,4 +305,4 @@ export async function emitAuthorityPageGapOpportunities(
 }
 
 /** Platforms known to the detector (exported for tests / docs). */
-export const SCANNED_AUTHORITY_PLATFORMS = AUTHORITY_PAGE_PLATFORMS;
+export { AUTHORITY_PAGE_PLATFORMS as SCANNED_AUTHORITY_PLATFORMS } from '@/lib/authority';

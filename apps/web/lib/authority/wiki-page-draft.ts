@@ -226,6 +226,12 @@ function buildWikipediaBody(context: ClaimedGraphContext): string {
     p => p.confirmed !== false
   );
 
+  const genreWikilinks =
+    context.genres && context.genres.length > 0
+      ? context.genres.map(g => '[[' + g.trim() + ']]').join(', ')
+      : null;
+  const bioSuffix = nonEmpty(context.bio) ? ' ' + context.bio.trim() : '';
+
   const lines: string[] = [
     `> **HUMAN GATE:** Do not publish this stub to Wikipedia without independent notability review.`,
     `> Only include claims with reliable secondary sources. Prefer confirmed press below.`,
@@ -233,13 +239,11 @@ function buildWikipediaBody(context: ClaimedGraphContext): string {
     `{{Infobox musical artist`,
     `| name = ${name}`,
     aliases.length > 0 ? `| alias = ${aliases.join(', ')}` : null,
-    context.genres && context.genres.length > 0
-      ? `| genre = ${context.genres.map(g => `[[${g.trim()}]]`).join(', ')}`
-      : null,
+    genreWikilinks ? `| genre = ${genreWikilinks}` : null,
     `| occupation = Musician`,
     `}}`,
     ``,
-    `'''${name}''' is a musician.${nonEmpty(context.bio) ? ` ${context.bio.trim()}` : ''}`,
+    `'''${name}''' is a musician.${bioSuffix}`,
     ``,
   ].filter((line): line is string => line !== null);
 
@@ -336,12 +340,14 @@ export function buildAuthorityPageDraft(
   }
 
   const meta = AUTHORITY_PLATFORM_META[platform];
-  const bodyMarkdown =
-    platform === 'fandom'
-      ? buildFandomBody(context)
-      : platform === 'genius'
-        ? buildGeniusBody(context)
-        : buildWikipediaBody(context);
+  let bodyMarkdown: string;
+  if (platform === 'fandom') {
+    bodyMarkdown = buildFandomBody(context);
+  } else if (platform === 'genius') {
+    bodyMarkdown = buildGeniusBody(context);
+  } else {
+    bodyMarkdown = buildWikipediaBody(context);
+  }
 
   return {
     platform,
