@@ -295,8 +295,7 @@ function resolveAuthStatePath(authPath?: string) {
   return DEFAULT_AUTH_STATE_PATHS.find(path => existsSync(path));
 }
 
-function loadAuthCookies(baseUrl: string, authPath?: string) {
-  const domain = new URL(baseUrl).hostname;
+function loadAuthCookies(_baseUrl: string, authPath?: string) {
   const explicitAuthStatePath = authPath
     ? resolveAuthStatePath(authPath)
     : undefined;
@@ -311,25 +310,6 @@ function loadAuthCookies(baseUrl: string, authPath?: string) {
       path: cookie.path || '/',
       sameSite: normalizeSameSite(cookie.sameSite),
     }));
-  }
-
-  // E2E test auth bypass: inject synthetic bypass cookies so the middleware
-  // skips Clerk auth entirely. This allows perf measurement of authenticated
-  // routes without a real Clerk session.
-  const testAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
-  const testUserId = process.env.E2E_CLERK_USER_ID?.trim();
-  if (testAuthBypass && testUserId) {
-    return [
-      { domain, name: '__e2e_test_mode', path: '/', value: 'bypass-auth' },
-      { domain, name: '__e2e_test_user_id', path: '/', value: testUserId },
-    ] satisfies readonly AuthCookie[];
-  }
-
-  const cookieValue = process.env.CLERK_SESSION_COOKIE?.trim();
-  if (cookieValue) {
-    return [
-      { domain, name: '__session', path: '/', value: cookieValue },
-    ] satisfies readonly AuthCookie[];
   }
 
   const storageStatePath = resolveAuthStatePath(authPath);

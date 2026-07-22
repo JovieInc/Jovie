@@ -198,7 +198,7 @@ async function startServer(baseUrl: string, artifactDir: string) {
       HOSTNAME: hostname,
       PORT: String(port),
       // Enable test auth bypass so authenticated routes can be measured
-      // without real Clerk sessions. The budget-guard injects bypass cookies.
+      // using the signed Better Auth state produced by perf:auth.
       E2E_USE_TEST_AUTH_BYPASS: '1',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -344,17 +344,9 @@ function measureDashboardSample(
   const resolvedAuthPath = resolveAuthPath(authPath);
   const requiresAuth = requiresDashboardAuth(route, routeId);
 
-  const hasTestBypass =
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
-    Boolean(process.env.E2E_CLERK_USER_ID?.trim());
-  if (
-    requiresAuth &&
-    !hasTestBypass &&
-    !process.env.CLERK_SESSION_COOKIE &&
-    !resolvedAuthPath
-  ) {
+  if (requiresAuth && !resolvedAuthPath) {
     throw new Error(
-      'Dashboard mode requires CLERK_SESSION_COOKIE, --auth-path, or E2E_USE_TEST_AUTH_BYPASS=1 with E2E_CLERK_USER_ID.'
+      'Dashboard mode requires --auth-path from the Better Auth perf:auth bootstrap.'
     );
   }
   if (resolvedAuthPath) {

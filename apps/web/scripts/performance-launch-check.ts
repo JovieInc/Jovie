@@ -71,7 +71,7 @@ function assertSuccess(result: CommandResult, message: string) {
   );
 }
 
-function readBypassUserId(filePath: string) {
+function readBetterAuthUserId(filePath: string) {
   const state = JSON.parse(readFileSync(filePath, 'utf8')) as StorageStateLike;
   return (
     state.cookies?.find(cookie => cookie.name === '__e2e_test_user_id')
@@ -314,7 +314,7 @@ function printSummary(summary: GuardSummary) {
 async function main() {
   const originalCi = process.env.CI;
   const hadBypass = process.env.E2E_USE_TEST_AUTH_BYPASS;
-  const originalUserId = process.env.E2E_CLERK_USER_ID;
+  const originalUserId = process.env.E2E_BETTER_AUTH_USER_ID;
   const artifactDir = resolve(perfRoot, `launch-check-${timestampLabel()}`);
   ensureDir(artifactDir);
 
@@ -338,11 +338,11 @@ async function main() {
       'creator-ready'
     );
 
-    const requireBypassUserId = (
+    const requireBetterAuthUserId = (
       authPath: string,
       persona: 'creator' | 'creator-ready'
     ) => {
-      const userId = readBypassUserId(authPath);
+      const userId = readBetterAuthUserId(authPath);
       if (!userId) {
         throw new Error(
           `Auth bootstrap for ${persona} did not persist __e2e_test_user_id in ${authPath}.`
@@ -351,7 +351,7 @@ async function main() {
       return userId;
     };
 
-    process.env.E2E_CLERK_USER_ID = requireBypassUserId(
+    process.env.E2E_BETTER_AUTH_USER_ID = requireBetterAuthUserId(
       onboardingAuthPath,
       'creator'
     );
@@ -366,7 +366,7 @@ async function main() {
       runs: 3,
     });
 
-    process.env.E2E_CLERK_USER_ID = requireBypassUserId(
+    process.env.E2E_BETTER_AUTH_USER_ID = requireBetterAuthUserId(
       creatorReadyAuthPath,
       'creator-ready'
     );
@@ -408,9 +408,9 @@ async function main() {
     }
 
     if (originalUserId === undefined) {
-      delete process.env.E2E_CLERK_USER_ID;
+      delete process.env.E2E_BETTER_AUTH_USER_ID;
     } else {
-      process.env.E2E_CLERK_USER_ID = originalUserId;
+      process.env.E2E_BETTER_AUTH_USER_ID = originalUserId;
     }
 
     await stopServer(child);
