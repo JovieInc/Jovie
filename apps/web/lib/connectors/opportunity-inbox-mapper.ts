@@ -33,7 +33,8 @@ const PRIMARY_ACTION_LABEL_BY_KIND: Readonly<Record<string, string>> = {
 
 function primaryActionLabelFromPayload(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null;
-  const label = (payload as { primaryActionLabel?: unknown }).primaryActionLabel;
+  const label = (payload as { primaryActionLabel?: unknown })
+    .primaryActionLabel;
   return typeof label === 'string' && label.trim().length > 0
     ? label.trim()
     : null;

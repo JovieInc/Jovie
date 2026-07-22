@@ -10,12 +10,12 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { requireAuth } from '@/lib/auth/require-auth';
 import {
   AUTHORITY_PAGE_PLATFORMS,
-  buildAuthorityPageDraft,
   type AuthorityPagePlatform,
+  buildAuthorityPageDraft,
 } from '@/lib/authority';
-import { requireAuth } from '@/lib/auth/require-auth';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 

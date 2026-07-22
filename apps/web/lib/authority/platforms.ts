@@ -55,8 +55,7 @@ export const AUTHORITY_PLATFORM_META: Readonly<
     label: 'Wikipedia',
     priority: 3,
     publishGate: 'human_only',
-    createUrlTemplate:
-      'https://en.wikipedia.org/wiki/Wikipedia:Article_wizard',
+    createUrlTemplate: 'https://en.wikipedia.org/wiki/Wikipedia:Article_wizard',
     gapWhy:
       'Wikipedia sitelinks need independent notability sources. Draft only — human review required.',
   },
@@ -65,7 +64,8 @@ export const AUTHORITY_PLATFORM_META: Readonly<
 /** Platforms that product may agent-draft and assist publish in v1. */
 export const AGENT_ASSISTED_AUTHORITY_PLATFORMS: readonly AuthorityPagePlatform[] =
   AUTHORITY_PAGE_PLATFORMS.filter(
-    platform => AUTHORITY_PLATFORM_META[platform].publishGate === 'agent_assisted'
+    platform =>
+      AUTHORITY_PLATFORM_META[platform].publishGate === 'agent_assisted'
   );
 
 export function isAuthorityPagePlatform(

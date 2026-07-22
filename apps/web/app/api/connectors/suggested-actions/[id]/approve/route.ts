@@ -15,12 +15,12 @@
 
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth/require-auth';
 import {
   buildAuthorityPageDraft,
-  isAuthorityPagePlatform,
   type ClaimedGraphContext,
+  isAuthorityPagePlatform,
 } from '@/lib/authority';
-import { requireAuth } from '@/lib/auth/require-auth';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
 import { AUTHORITY_CREATE_PAGE_KIND } from '@/lib/connectors/playbooks/authority-page-gap-detector';
 import {

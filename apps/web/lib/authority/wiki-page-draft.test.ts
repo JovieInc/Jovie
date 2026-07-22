@@ -9,9 +9,7 @@ const TIM_CONTEXT = {
   aliases: ['T. White'],
   genres: ['progressive house', 'trance'],
   jovieUsername: 'tim',
-  releases: [
-    { title: 'Sample Release', year: '2019', role: 'Producer' },
-  ],
+  releases: [{ title: 'Sample Release', year: '2019', role: 'Producer' }],
   collabs: [
     {
       name: 'Cosmic Gate',
@@ -22,7 +20,8 @@ const TIM_CONTEXT = {
   ],
   confirmedPress: [
     {
-      title: 'Young adults cool with influencers pushing products, not politics',
+      title:
+        'Young adults cool with influencers pushing products, not politics',
       outlet: 'NBCLX',
       url: 'https://www.lx.com/politics/example/15880/',
       confirmed: true,
@@ -44,9 +43,7 @@ describe('buildAuthorityPageDraft', () => {
     expect(draft.bodyMarkdown).toContain('Sample Release');
     expect(draft.bodyMarkdown).not.toContain('Grammy');
     expect(draft.createUrl).toContain('edm.fandom.com');
-    expect(draft.sources).toContain(
-      'https://edm.fandom.com/wiki/Cosmic_Gate'
-    );
+    expect(draft.sources).toContain('https://edm.fandom.com/wiki/Cosmic_Gate');
   });
 
   it('builds a Genius draft with sources section', () => {
@@ -64,9 +61,7 @@ describe('buildAuthorityPageDraft', () => {
     expect(draft.humanGateRequired).toBe(true);
     expect(draft.publishGate).toBe('human_only');
     expect(draft.bodyMarkdown).toContain('HUMAN GATE');
-    expect(draft.checklist.some(item => /human review/i.test(item))).toBe(
-      true
-    );
+    expect(draft.checklist.some(item => /human review/i.test(item))).toBe(true);
   });
 
   it('throws when artist name is empty', () => {

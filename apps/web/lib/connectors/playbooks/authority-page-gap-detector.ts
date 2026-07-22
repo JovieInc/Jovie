@@ -97,7 +97,10 @@ const SURFACE_PLATFORM_ALIASES: Readonly<
 };
 
 function normalizePlatformKey(platform: string): string {
-  return platform.trim().toLowerCase().replaceAll(/[\s-]+/g, '_');
+  return platform
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[\s-]+/g, '_');
 }
 
 export function surfaceCoversAuthorityPlatform(

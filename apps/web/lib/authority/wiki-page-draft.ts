@@ -63,7 +63,9 @@ function nonEmpty(value: string | null | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function uniqueNonEmpty(values: readonly (string | null | undefined)[]): string[] {
+function uniqueNonEmpty(
+  values: readonly (string | null | undefined)[]
+): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const value of values) {
@@ -104,7 +106,10 @@ function introParagraph(context: ClaimedGraphContext): string {
   const name = context.artistName.trim();
   const genres =
     context.genres && context.genres.length > 0
-      ? context.genres.map(g => g.trim()).filter(Boolean).join(', ')
+      ? context.genres
+          .map(g => g.trim())
+          .filter(Boolean)
+          .join(', ')
       : null;
   const genreClause = genres ? ` working in ${genres}` : '';
   if (nonEmpty(context.bio)) {
@@ -118,7 +123,9 @@ function buildFandomBody(context: ClaimedGraphContext): string {
   const aliases = uniqueNonEmpty(context.aliases ?? []);
   const releases = context.releases ?? [];
   const collabs = context.collabs ?? [];
-  const press = (context.confirmedPress ?? []).filter(p => p.confirmed !== false);
+  const press = (context.confirmedPress ?? []).filter(
+    p => p.confirmed !== false
+  );
 
   const lines: string[] = [
     `{{Infobox artist`,
@@ -169,14 +176,11 @@ function buildGeniusBody(context: ClaimedGraphContext): string {
   const aliases = uniqueNonEmpty(context.aliases ?? []);
   const releases = context.releases ?? [];
   const collabs = context.collabs ?? [];
-  const press = (context.confirmedPress ?? []).filter(p => p.confirmed !== false);
+  const press = (context.confirmedPress ?? []).filter(
+    p => p.confirmed !== false
+  );
 
-  const lines: string[] = [
-    `# ${name}`,
-    ``,
-    introParagraph(context),
-    ``,
-  ];
+  const lines: string[] = [`# ${name}`, ``, introParagraph(context), ``];
 
   if (aliases.length > 0) {
     lines.push(`**Also known as:** ${aliases.join(', ')}`, ``);
@@ -218,7 +222,9 @@ function buildWikipediaBody(context: ClaimedGraphContext): string {
   const aliases = uniqueNonEmpty(context.aliases ?? []);
   const releases = context.releases ?? [];
   const collabs = context.collabs ?? [];
-  const press = (context.confirmedPress ?? []).filter(p => p.confirmed !== false);
+  const press = (context.confirmedPress ?? []).filter(
+    p => p.confirmed !== false
+  );
 
   const lines: string[] = [
     `> **HUMAN GATE:** Do not publish this stub to Wikipedia without independent notability review.`,
