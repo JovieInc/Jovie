@@ -36,6 +36,7 @@
     "tokens:build": "node scripts/build-design-tokens.mjs",
     "tokens:check": "node scripts/build-design-tokens.mjs --check",
     "lint:button-canon-ratchet": "vitest run --config=vitest.config.mts tests/unit/design-system/button-canon-ratchet.test.ts",
+    "lint:app-ia": "vitest run --config=vitest.config.mts components/features/dashboard/dashboard-nav/config.test.ts tests/unit/components/table/PageToolbar.test.tsx tests/unit/routes/shell-nav-coverage.test.ts tests/unit/design-system/component-family-ratchet.test.ts",
     "lint:seo": "node scripts/seo-ratchet-guard.mjs && vitest run --config=vitest.config.fast.mts tests/app/seo-ratchet.test.ts tests/app/robots.test.ts tests/app/sitemap.test.ts",
     "lint:seo:live": "tsx scripts/seo-ratchet-live.ts",
     "playbooks:validate": "tsx scripts/validate-playbooks.ts",

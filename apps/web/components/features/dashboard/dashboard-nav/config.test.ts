@@ -15,13 +15,22 @@ const CANONICAL_SIX = [
   ['tasks', 'Tasks', APP_ROUTES.TASKS],
 ] as const;
 
-function toContract(items: typeof primaryNavigation) {
+function toContract(items: readonly (typeof primaryNavigation)[number][]) {
   return items.map(item => [item.id, item.name, item.href]);
 }
 
 describe('canonical customer shell navigation', () => {
   it('keeps the founder-approved six destinations in exact order', () => {
     expect(toContract(primaryNavigation)).toEqual(CANONICAL_SIX);
+  });
+
+  it('detects missing and reordered canonical destinations', () => {
+    expect(toContract(primaryNavigation.slice(0, -1))).not.toEqual(
+      CANONICAL_SIX
+    );
+    expect(toContract([...primaryNavigation].reverse())).not.toEqual(
+      CANONICAL_SIX
+    );
   });
 
   it('derives mobile primary + More destinations from the same object identities', () => {
