@@ -1,28 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { SuggestedPrompts } from '@/components/jovie/components/SuggestedPrompts';
+import {
+  CHAT_STARTER_ACTION_ORDER,
+  CHAT_STARTER_ACTIONS,
+} from '@/components/jovie/starter-actions';
 import { fastRender } from '@/tests/utils/fast-render';
 
 describe('SuggestedPrompts', () => {
-  const defaultStarterActions = [
-    {
-      label: 'Plan A Release',
-      prompt: 'Help me plan my next release.',
-    },
-    {
-      label: 'Generate Album Art',
-      prompt: 'Generate album art for my latest release.',
-    },
-    {
-      label: 'Build Artist Profile',
-      prompt: 'Help me polish my artist profile.',
-    },
-    {
-      label: "What's Working Right Now?",
-      prompt:
-        "What's working for me right now? Help me see what's gaining traction.",
-    },
-  ] as const;
+  const defaultStarterActions = CHAT_STARTER_ACTION_ORDER.map(
+    id => CHAT_STARTER_ACTIONS[id]
+  );
 
   it('renders default hero-style pills (mirrors homepage intent)', () => {
     const onSelect = vi.fn();
