@@ -97,7 +97,7 @@ export function sumMonthUsage(state, key = monthKey()) {
  *   usage: number,
  *   limit?: number,
  *   throttleRatio?: number,
- * }} [input]
+ * }} input
  * @returns {{
  *   action: 'allow' | 'throttle' | 'fallback',
  *   usage: number,
@@ -107,14 +107,10 @@ export function sumMonthUsage(state, key = monthKey()) {
  *   message: string,
  * }}
  */
-export function decideBudget(input = {}) {
-  const {
-    usage,
-    limit = DEFAULT_MONTHLY_LIMIT,
-    throttleRatio = THROTTLE_RATIO,
-  } = /** @type {{ usage?: number, limit?: number, throttleRatio?: number }} */ (
-    input
-  );
+export function decideBudget(input) {
+  const usage = input?.usage;
+  const limit = input?.limit ?? DEFAULT_MONTHLY_LIMIT;
+  const throttleRatio = input?.throttleRatio ?? THROTTLE_RATIO;
   if (typeof usage !== 'number' || usage < 0 || !Number.isFinite(usage)) {
     throw new Error(`usage must be a non-negative number; got ${usage}`);
   }
