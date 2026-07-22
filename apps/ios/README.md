@@ -5,6 +5,7 @@ Native iOS foundation for Jovie. The app is dark-only, simulator-tested, and wir
 ## Prerequisites
 
 - Full Xcode with iOS 18 simulator support selected via `xcode-select`
+- Ruby 3.1+ with Bundler 2.4.22 for the root Fastlane bundle
 - Clerk native application registered for bundle ID `ie.jov.Jovie`
 - iOS URL scheme `ie.jov.jovie`; native auth completes at `ie.jov.jovie://auth/complete`
 - Associated Domains set to `webcredentials:{CLERK_FRONTEND_API_HOST}`

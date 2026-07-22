@@ -425,7 +425,7 @@ async function renderPngAsset(
   }
 ): Promise<Buffer> {
   const sharp = await getSharp();
-  return sharp(input, { failOnError: false })
+  return sharp(input, { failOn: 'none' })
     .rotate()
     .resize({
       width: options.width,

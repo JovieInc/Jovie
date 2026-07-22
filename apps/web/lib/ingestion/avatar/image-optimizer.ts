@@ -57,7 +57,7 @@ export async function optimizeToAvatarAvif(
   inputBuffer: Buffer
 ): Promise<OptimizedAvatar> {
   const sharp = await getSharp();
-  const baseImage = sharp(inputBuffer, { failOnError: false })
+  const baseImage = sharp(inputBuffer, { failOn: 'none' })
     .rotate()
     .withMetadata({ orientation: undefined });
 

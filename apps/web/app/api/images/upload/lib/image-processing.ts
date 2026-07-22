@@ -63,7 +63,7 @@ export async function optimizeImageToAvif(file: File): Promise<{
   const inputBuffer = await fileToBuffer(file);
 
   const baseImage = sharp(inputBuffer, {
-    failOnError: false,
+    failOn: 'none',
   })
     .rotate()
     .withMetadata({ orientation: undefined });
@@ -96,7 +96,7 @@ export async function convertImageBufferToJpeg(
   const sharp = await getSharp();
 
   return sharp(inputBuffer, {
-    failOnError: false,
+    failOn: 'none',
   })
     .rotate()
     .withMetadata({ orientation: undefined })
@@ -117,7 +117,7 @@ async function processPressPhotoSizesFromBuffer(
   inputBuffer: Buffer
 ): Promise<Record<string, Buffer>> {
   const sharp = await getSharp();
-  const baseImage = sharp(inputBuffer, { failOnError: false })
+  const baseImage = sharp(inputBuffer, { failOn: 'none' })
     .rotate()
     .withMetadata({ orientation: undefined });
 
@@ -182,7 +182,7 @@ async function processAvatarSizesFromBuffer(
   inputBuffer: Buffer
 ): Promise<Record<string, Buffer>> {
   const sharp = await getSharp();
-  const baseImage = sharp(inputBuffer, { failOnError: false })
+  const baseImage = sharp(inputBuffer, { failOn: 'none' })
     .rotate()
     .withMetadata({ orientation: undefined });
 
@@ -281,7 +281,7 @@ export async function getImageBufferMetadata(buffer: Buffer): Promise<{
   height: number | null;
 }> {
   const sharp = await getSharp();
-  const metadata = await sharp(buffer, { failOnError: false }).metadata();
+  const metadata = await sharp(buffer, { failOn: 'none' }).metadata();
 
   return {
     width: metadata.width ?? null,
