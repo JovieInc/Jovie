@@ -71,6 +71,7 @@ describe('pr-check-failures', () => {
       'CI Risk Classifier',
       'Secret Scan (gitleaks + trufflehog)',
       'Migration Guard',
+      'Visual Approval Guard',
     ]);
     expect(ADVISORY_CHECK_NAMES).toContain('Preview Deploy');
     expect(ADVISORY_CHECK_NAMES).toContain(
@@ -105,6 +106,7 @@ describe('pr-check-failures', () => {
       { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
       { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
       { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Visual Approval Guard' },
       {
         bucket: 'pending',
         state: 'IN_PROGRESS',
@@ -126,6 +128,7 @@ describe('pr-check-failures', () => {
       { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
       { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
       { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Visual Approval Guard' },
       {
         bucket: 'pending',
         state: 'IN_PROGRESS',
@@ -147,6 +150,7 @@ describe('pr-check-failures', () => {
       { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
       { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
       { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Visual Approval Guard' },
     ];
 
     expect(
@@ -165,6 +169,7 @@ describe('pr-check-failures', () => {
       { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
       { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
       { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Visual Approval Guard' },
     ];
     const skippedDupes = [
       {
@@ -210,6 +215,7 @@ describe('pr-check-failures', () => {
       { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
       { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
       { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Visual Approval Guard' },
     ];
     const oldFailure = {
       bucket: 'fail',

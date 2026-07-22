@@ -623,6 +623,9 @@ importers:
       babel-plugin-react-compiler:
         specifier: 19.1.0-rc.3
         version: 19.1.0-rc.3
+      chromatic:
+        specifier: 16.10.0
+        version: 16.10.0
       danger:
         specifier: ^13.0.10
         version: 13.0.10
@@ -25199,7 +25202,7 @@ snapshots:
 
   chromatic@16.10.0:
     dependencies:
-      semver: 7.8.1
+      semver: 7.8.5
 
   chrome-launcher@0.13.4:
     dependencies:

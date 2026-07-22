@@ -91,6 +91,17 @@ const config: StorybookConfig = {
           replacement: require.resolve('./enrich-profile-mock.ts'),
         },
         {
+          // task-actions.ts dynamically imports lib/ai/anthropic
+          // (@anthropic-ai/sdk, Node-only) — keep it out of the browser
+          // preview bundle.
+          find: '@/app/app/(shell)/dashboard/releases/task-actions',
+          replacement: require.resolve('./release-task-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/releases/catalog-task-actions',
+          replacement: require.resolve('./release-task-actions-mock.ts'),
+        },
+        {
           // lib/auth/better-auth.ts imports this RELATIVELY
           // ('./apple-client-secret'), so a plain '@/…' find never matches.
           // Full-specifier regex: .replace() swaps the entire id for the
@@ -178,6 +189,13 @@ const config: StorybookConfig = {
           find: 'next/server',
           replacement: require.resolve('./next-server-mock.js'),
         },
+        {
+          // next/constants (pulled in by @sentry/nextjs' isBuild util)
+          // evaluates `process?.features?.typescript` at module top level,
+          // which crashes plain-browser story extraction (Chromatic).
+          find: 'next/constants',
+          replacement: require.resolve('./next-constants-mock.js'),
+        },
         // Mock Next.js navigation for Storybook
         {
           find: 'next/navigation',
@@ -254,6 +272,11 @@ const config: StorybookConfig = {
     // Suppress "use client" directive warnings in build output
     config.build = {
       ...config.build,
+      // Vite's default target includes safari14, for which esbuild cannot
+      // lower the object-rest destructuring used in @jovie/ui components —
+      // the final chunk transpile fails with "Transforming destructuring …
+      // is not supported yet". es2020 keeps that syntax as-is.
+      target: 'es2020',
       rollupOptions: {
         ...config.build?.rollupOptions,
         onwarn(warning, warn) {
