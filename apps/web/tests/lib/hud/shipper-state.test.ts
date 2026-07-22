@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   afterAll,
@@ -10,34 +11,18 @@ import {
   vi,
 } from 'vitest';
 
-const mockedOs = vi.hoisted(() => ({ home: '' }));
+// Isolate from the real ~/.hermes before any path is computed: shipper-state.ts
+// reads the machine-local pause sentinel ($HOME/.hermes/shipping-paused) and
+// these tests write fixture state — neither may touch the real home dir.
+// os.homedir() honors $HOME on POSIX, and the lib computes its paths at import.
+process.env.HOME = mkdtempSync(join(tmpdir(), 'hud-shipper-test-home-'));
 
-vi.mock('node:os', async importOriginal => {
-  const actual = await importOriginal<typeof import('node:os')>();
-  const mocked = { ...actual, homedir: () => mockedOs.home };
-  return { ...mocked, default: mocked };
-});
-
-let hermesDir = '';
-let stateDir = '';
-let logsDir = '';
-let jobsLogPath = '';
-let inflightPath = '';
-let whatShippedPath = '';
-
-beforeAll(() => {
-  mockedOs.home = mkdtempSync(join('/tmp', 'jovie-shipper-state-test-'));
-  hermesDir = join(mockedOs.home, '.hermes');
-  stateDir = join(hermesDir, 'state');
-  logsDir = join(hermesDir, 'logs');
-  jobsLogPath = join(logsDir, 'jobs.jsonl');
-  inflightPath = join(stateDir, 'inflight-ship-jobs.json');
-  whatShippedPath = join(stateDir, 'what_shipped.json');
-});
-
-afterAll(() => {
-  rmSync(mockedOs.home, { force: true, recursive: true });
-});
+const hermesDir = join(homedir(), '.hermes');
+const stateDir = join(hermesDir, 'state');
+const logsDir = join(hermesDir, 'logs');
+const jobsLogPath = join(logsDir, 'jobs.jsonl');
+const inflightPath = join(stateDir, 'inflight-ship-jobs.json');
+const whatShippedPath = join(stateDir, 'what_shipped.json');
 
 function writeJsonl(path: string, rows: readonly object[]): void {
   writeFileSync(path, rows.map(row => JSON.stringify(row)).join('\n'));
