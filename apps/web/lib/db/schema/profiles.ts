@@ -223,6 +223,10 @@ export const creatorProfiles = pgTable(
     stripeConnectLastSyncedAt: timestamp('stripe_connect_last_synced_at'),
     stripeConnectLastEventAt: timestamp('stripe_connect_last_event_at'),
     nextTaskNumber: integer('next_task_number').default(1).notNull(),
+    // Monotonic compare-and-swap token for dashboard profile edits. This is
+    // intentionally separate from updatedAt so JSON timestamp precision can
+    // never turn a valid edit into a false conflict.
+    profileEditVersion: integer('profile_edit_version').default(1).notNull(),
     smsAccessRequestedAt: timestamp('sms_access_requested_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),

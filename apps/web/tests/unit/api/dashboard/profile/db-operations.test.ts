@@ -11,6 +11,9 @@ const mockEq = vi.hoisted(() =>
     right,
   }))
 );
+const mockAnd = vi.hoisted(() =>
+  vi.fn((...conditions: unknown[]) => ({ conditions }))
+);
 const mockDb = vi.hoisted(() => ({
   select: mockDbSelect,
   update: mockDbUpdate,
@@ -29,6 +32,7 @@ vi.mock('drizzle-orm', async () => {
     await vi.importActual<typeof import('drizzle-orm')>('drizzle-orm');
   return {
     ...actual,
+    and: mockAnd,
     eq: mockEq,
   };
 });
@@ -117,6 +121,103 @@ describe('updateProfileRecords', () => {
     expect(result).toBeInstanceOf(NextResponse);
     expect(mockDbUpdate).toHaveBeenCalledTimes(1);
     expect(mockDbUpdate).toHaveBeenCalledWith(creatorProfiles);
+  });
+
+  it('atomically rejects an older write after a newer write wins the same version', async () => {
+    mockGetUserByClerkId.mockResolvedValue({ id: 'user-1' });
+
+    let persistedBio = 'Original';
+    let persistedVersion = 1;
+    mockDbSelect.mockImplementation((selection: Record<string, unknown>) => ({
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn(async () =>
+        Object.keys(selection).length === 1 && 'profileEditVersion' in selection
+          ? [{ profileEditVersion: persistedVersion }]
+          : [
+              {
+                usernameNormalized: 'testartist',
+                settings: {},
+                profileEditVersion: 1,
+              },
+            ]
+      ),
+    }));
+    let markOlderWriteReached: (() => void) | undefined;
+    const olderWriteReached = new Promise<void>(resolve => {
+      markOlderWriteReached = resolve;
+    });
+    let releaseOlderWrite: (() => void) | undefined;
+    const olderWriteGate = new Promise<void>(resolve => {
+      releaseOlderWrite = resolve;
+    });
+
+    mockDbUpdate.mockImplementation(() => {
+      let values: Record<string, unknown> = {};
+      let predicate: { conditions: Array<{ left: unknown; right: unknown }> };
+      const chain = {
+        set(nextValues: Record<string, unknown>) {
+          values = nextValues;
+          return chain;
+        },
+        where(nextPredicate: typeof predicate) {
+          predicate = nextPredicate;
+          return chain;
+        },
+        async returning() {
+          if (values.bio === 'Older A') {
+            markOlderWriteReached?.();
+            await olderWriteGate;
+          }
+          const versionCondition = predicate.conditions.find(
+            condition => condition.left === creatorProfiles.profileEditVersion
+          );
+          if (versionCondition?.right !== persistedVersion) return [];
+          persistedBio = String(values.bio);
+          persistedVersion += 1;
+          return [
+            {
+              id: 'profile-1',
+              bio: persistedBio,
+              profileEditVersion: persistedVersion,
+            },
+          ];
+        },
+      };
+      return chain;
+    });
+
+    const { updateProfileRecords } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+    const older = updateProfileRecords({
+      clerkUserId: 'clerk_123',
+      displayNameForUserUpdate: undefined,
+      dbProfileUpdates: { bio: 'Older A' },
+      expectedVersion: 1,
+    });
+    await olderWriteReached;
+    const newer = updateProfileRecords({
+      clerkUserId: 'clerk_123',
+      displayNameForUserUpdate: undefined,
+      dbProfileUpdates: { bio: 'Newer B' },
+      expectedVersion: 1,
+    });
+
+    const newerResult = await newer;
+    releaseOlderWrite?.();
+    const olderResult = await older;
+
+    expect(newerResult).not.toBeInstanceOf(NextResponse);
+    expect(olderResult).toBeInstanceOf(NextResponse);
+    expect((olderResult as NextResponse).status).toBe(409);
+    expect(await (olderResult as NextResponse).json()).toMatchObject({
+      code: 'VERSION_CONFLICT',
+      expectedVersion: 1,
+      currentVersion: 2,
+    });
+    expect(persistedBio).toBe('Newer B');
+    expect(persistedVersion).toBe(2);
   });
 
   it('loads the profile through the user lookup and creator_profiles relation', async () => {

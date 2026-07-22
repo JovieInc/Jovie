@@ -32,6 +32,8 @@ export interface ProfileSettingsUpdate {
  */
 export interface ProfileUpdateInput {
   profileId?: string;
+  /** Compare-and-swap token returned by the previous profile response. */
+  expectedVersion?: number;
   updates: {
     displayName?: string;
     username?: string;
@@ -66,6 +68,7 @@ export interface ProfileData {
   settings?: Record<string, unknown> | null;
   creatorType: string | null;
   isPublic: boolean;
+  profileEditVersion: number;
 }
 
 /**

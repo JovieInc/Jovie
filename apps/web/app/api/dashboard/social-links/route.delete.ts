@@ -95,8 +95,9 @@ export async function DELETE(req: Request) {
         return versioning.response;
       }
 
+      let updatedRows: Array<{ id: string }> = [];
       if (action === 'accept') {
-        await tx
+        updatedRows = await tx
           .update(socialLinks)
           .set({
             state: 'active',
@@ -104,9 +105,16 @@ export async function DELETE(req: Request) {
             version: versioning.nextVersion,
             updatedAt: new Date(),
           })
-          .where(eq(socialLinks.id, linkId));
+          .where(
+            and(
+              eq(socialLinks.id, linkId),
+              eq(socialLinks.creatorProfileId, profileId),
+              eq(socialLinks.version, versioning.currentVersion)
+            )
+          )
+          .returning({ id: socialLinks.id });
       } else if (action === 'dismiss') {
-        await tx
+        updatedRows = await tx
           .update(socialLinks)
           .set({
             state: 'rejected',
@@ -114,7 +122,36 @@ export async function DELETE(req: Request) {
             version: versioning.nextVersion,
             updatedAt: new Date(),
           })
-          .where(eq(socialLinks.id, linkId));
+          .where(
+            and(
+              eq(socialLinks.id, linkId),
+              eq(socialLinks.creatorProfileId, profileId),
+              eq(socialLinks.version, versioning.currentVersion)
+            )
+          )
+          .returning({ id: socialLinks.id });
+      }
+
+      if (updatedRows.length === 0) {
+        const [currentLink] = await tx
+          .select({ version: socialLinks.version })
+          .from(socialLinks)
+          .where(
+            and(
+              eq(socialLinks.id, linkId),
+              eq(socialLinks.creatorProfileId, profileId)
+            )
+          )
+          .limit(1);
+        return NextResponse.json(
+          {
+            error: 'Conflict: Link has been modified by another request',
+            code: 'VERSION_CONFLICT',
+            expectedVersion: versioning.currentVersion,
+            currentVersion: currentLink?.version,
+          },
+          { status: 409, headers: combinedHeaders }
+        );
       }
 
       await syncPrimaryMusicUrlsFromSocialLinks(tx, profileId);

@@ -9,6 +9,7 @@ export interface TestProfileUpdateParams {
   usernameUpdate?: string;
   displayNameForUserUpdate?: string;
   avatarUrl?: string;
+  expectedVersion?: number;
 }
 
 export async function handleTestProfileUpdate({
@@ -16,6 +17,7 @@ export async function handleTestProfileUpdate({
   dbProfileUpdates,
   usernameUpdate,
   displayNameForUserUpdate,
+  expectedVersion,
 }: TestProfileUpdateParams) {
   const existingProfileRecord = await getProfileByClerkId(clerkUserId);
   const existingProfile = existingProfileRecord?.profile ?? null;
@@ -31,6 +33,7 @@ export async function handleTestProfileUpdate({
     clerkUserId,
     dbProfileUpdates,
     displayNameForUserUpdate,
+    expectedVersion,
   });
 
   if (updateResult instanceof NextResponse) {
@@ -42,6 +45,7 @@ export async function handleTestProfileUpdate({
     username: updateResult.updatedProfile.username,
     displayName: updateResult.updatedProfile.displayName,
     usernameNormalized: updateResult.updatedProfile.usernameNormalized,
+    profileEditVersion: updateResult.updatedProfile.profileEditVersion,
   };
   return NextResponse.json(
     { profile: responseProfile },

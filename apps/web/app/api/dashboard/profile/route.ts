@@ -29,6 +29,7 @@ export const runtime = 'nodejs';
 async function parseProfileUpdateRequest(req: Request) {
   const parsedBody = await parseJsonBody<{
     updates?: Record<string, unknown>;
+    expectedVersion?: unknown;
   } | null>(req, {
     route: 'PUT /api/dashboard/profile',
     headers: NO_STORE_HEADERS,
@@ -37,6 +38,16 @@ async function parseProfileUpdateRequest(req: Request) {
     return parsedBody.response;
   }
   const updates = parsedBody.data?.updates ?? {};
+  const expectedVersion = parsedBody.data?.expectedVersion;
+  if (
+    expectedVersion !== undefined &&
+    (!Number.isInteger(expectedVersion) || Number(expectedVersion) < 1)
+  ) {
+    return NextResponse.json(
+      { error: 'Invalid expected profile version' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
   const updatesValidation = validateUpdatesPayload(updates);
   if (!updatesValidation.ok) {
     return updatesValidation.response;
@@ -52,6 +63,8 @@ async function parseProfileUpdateRequest(req: Request) {
 
   return {
     parsedUpdates,
+    expectedVersion:
+      expectedVersion === undefined ? undefined : Number(expectedVersion),
     ...context,
   } as const;
 }
@@ -130,6 +143,7 @@ export async function PUT(req: Request) {
         displayNameForUserUpdate,
         avatarUrl,
         usernameUpdate,
+        expectedVersion,
       } = parsedRequest;
       const currentProfileRecord = await getProfileByClerkId(clerkUserId);
       const currentProfile = currentProfileRecord?.profile ?? null;
@@ -154,6 +168,7 @@ export async function PUT(req: Request) {
           usernameUpdate: effectiveUsernameUpdate,
           displayNameForUserUpdate: effectiveDisplayNameForUserUpdate,
           avatarUrl: effectiveAvatarUrl,
+          expectedVersion,
         });
       }
 
@@ -176,6 +191,7 @@ export async function PUT(req: Request) {
           clerkUserId,
           dbProfileUpdates,
           displayNameForUserUpdate: effectiveDisplayNameForUserUpdate,
+          expectedVersion,
         });
       } catch (error) {
         await attemptClerkRollback(rollback, clerkUserId, 'db_update_failed');

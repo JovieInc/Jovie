@@ -1,12 +1,23 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FetchError } from '@/lib/queries/fetch';
+import { queryKeys } from '@/lib/queries/keys';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { ProfileContactSidebar } from './ProfileContactSidebar';
 
-type MutationOptions = {
-  onSuccess?: () => void;
-  onError?: () => void;
+type DeferredMutationCall = {
+  variables: Record<string, unknown>;
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
 };
 
 const mockState = vi.hoisted(() => ({
@@ -19,6 +30,7 @@ const mockState = vi.hoisted(() => ({
     location: 'Los Angeles, CA',
     hometown: 'Chicago, IL',
     activeSinceYear: 2019,
+    profileEditVersion: 1,
     links: [
       {
         id: 'link-a',
@@ -26,6 +38,7 @@ const mockState = vi.hoisted(() => ({
         url: 'https://alpha.example',
         platform: 'alpha',
         isVisible: true,
+        version: 1,
       },
       {
         id: 'link-b',
@@ -33,6 +46,7 @@ const mockState = vi.hoisted(() => ({
         url: 'https://beta.example',
         platform: 'beta',
         isVisible: true,
+        version: 1,
       },
       {
         id: 'link-c',
@@ -40,6 +54,7 @@ const mockState = vi.hoisted(() => ({
         url: 'https://gamma.example',
         platform: 'gamma',
         isVisible: true,
+        version: 1,
       },
     ],
     profilePath: '/artist',
@@ -48,14 +63,9 @@ const mockState = vi.hoisted(() => ({
       appleMusic: { connected: false, artistName: null },
     },
   },
-  profileCalls: [] as Array<{
-    variables: Record<string, unknown>;
-    options: MutationOptions;
-  }>,
-  removeCalls: [] as Array<{
-    variables: { profileId: string; linkId: string };
-    options: MutationOptions;
-  }>,
+  profileCalls: [] as DeferredMutationCall[],
+  removeCalls: [] as DeferredMutationCall[],
+  useRealProfileMutation: false,
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -68,7 +78,11 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
-    selectedProfile: { id: 'profile-1', settings: {} },
+    selectedProfile: {
+      id: 'profile-1',
+      settings: {},
+      profileEditVersion: 1,
+    },
   }),
 }));
 
@@ -179,6 +193,9 @@ vi.mock('./ProfileAboutTab', () => ({
       <button type='button' onClick={() => onBioChange('Bio B')}>
         Set bio B
       </button>
+      <button type='button' onClick={() => onBioChange('Bio C')}>
+        Set bio C
+      </button>
       <button type='button' onClick={() => onLocationChange('Seattle, WA')}>
         Set location
       </button>
@@ -222,11 +239,28 @@ const detectedLink: DetectedLink = {
   isValid: true,
 };
 
+const detectedAlphaLink: DetectedLink = {
+  ...detectedLink,
+  platform: {
+    ...detectedLink.platform,
+    id: 'alpha',
+    name: 'Alpha',
+  },
+  normalizedUrl: 'https://alpha.example/newer',
+  originalUrl: 'https://alpha.example/newer',
+  suggestedTitle: 'Alpha',
+};
+
 vi.mock('./SidebarLinkInput', () => ({
   SidebarLinkInput: ({ onAdd }: { onAdd: (link: DetectedLink) => void }) => (
-    <button type='button' onClick={() => onAdd(detectedLink)}>
-      Add Delta
-    </button>
+    <div>
+      <button type='button' onClick={() => onAdd(detectedLink)}>
+        Add Delta
+      </button>
+      <button type='button' onClick={() => onAdd(detectedAlphaLink)}>
+        Add Alpha
+      </button>
+    </div>
   ),
 }));
 
@@ -242,26 +276,35 @@ vi.mock('@/features/dashboard/molecules/useEmailSignatureMenuAction', () => ({
   useEmailSignatureMenuAction: () => ({ action: {}, modal: null }),
 }));
 
-vi.mock('@/lib/queries', () => ({
-  useDeletePressPhotoMutation: () => ({ mutateAsync: vi.fn() }),
-  useDspMatchesQuery: () => ({ data: [] }),
-  usePressPhotosQuery: () => ({ data: [] }),
-  usePressPhotoUploadMutation: () => ({ mutateAsync: vi.fn() }),
-  useProfileMonetizationSummary: () => ({ data: null }),
-  useProfileSaveMutation: () => ({
-    mutate: (variables: Record<string, unknown>, options: MutationOptions) => {
-      mockState.profileCalls.push({ variables, options });
+vi.mock('@/lib/queries', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/queries')>('@/lib/queries');
+  return {
+    ...actual,
+    useDeletePressPhotoMutation: () => ({ mutateAsync: vi.fn() }),
+    useDspMatchesQuery: () => ({ data: [] }),
+    usePressPhotosQuery: () => ({ data: [] }),
+    usePressPhotoUploadMutation: () => ({ mutateAsync: vi.fn() }),
+    useProfileMonetizationSummary: () => ({ data: null }),
+    useProfileSaveMutation: () => {
+      if (mockState.useRealProfileMutation) {
+        return actual.useProfileSaveMutation();
+      }
+      return {
+        mutateAsync: (variables: Record<string, unknown>) =>
+          new Promise((resolve, reject) => {
+            mockState.profileCalls.push({ variables, resolve, reject });
+          }),
+      };
     },
-  }),
-  useRemoveSocialLinkMutation: () => ({
-    mutate: (
-      variables: { profileId: string; linkId: string },
-      options: MutationOptions
-    ) => {
-      mockState.removeCalls.push({ variables, options });
-    },
-  }),
-}));
+    useRemoveSocialLinkMutation: () => ({
+      mutateAsync: (variables: Record<string, unknown>) =>
+        new Promise((resolve, reject) => {
+          mockState.removeCalls.push({ variables, resolve, reject });
+        }),
+    }),
+  };
+});
 
 vi.mock('@/features/dashboard/organisms/dsp-matches/hooks', () => ({
   useDspMatchActions: () => ({
@@ -273,9 +316,19 @@ vi.mock('@/features/dashboard/organisms/dsp-matches/hooks', () => ({
 }));
 
 function renderEditingSidebar() {
-  const view = render(<ProfileContactSidebar />);
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  queryClient.setQueryData(queryKeys.user.profile(), {
+    ...mockState.initialPreviewData,
+  });
+  const view = render(
+    <QueryClientProvider client={queryClient}>
+      <ProfileContactSidebar />
+    </QueryClientProvider>
+  );
   fireEvent.click(screen.getByRole('button', { name: 'Edit profile' }));
-  return view;
+  return { ...view, queryClient };
 }
 
 function openAboutTab() {
@@ -288,12 +341,51 @@ function linkTitles() {
     .map(link => within(link).getByText(/Alpha|Beta|Gamma|Delta/).textContent);
 }
 
+async function resolveProfileCall(
+  index: number,
+  profileEditVersion: number,
+  bio: string | null = 'Original bio'
+) {
+  await act(async () => {
+    mockState.profileCalls[index]?.resolve({
+      profile: {
+        ...mockState.initialPreviewData,
+        bio,
+        profileEditVersion,
+      },
+    });
+    await Promise.resolve();
+  });
+}
+
+async function rejectProfileCall(index: number) {
+  await act(async () => {
+    mockState.profileCalls[index]?.reject(new Error('save failed'));
+    await Promise.resolve();
+  });
+}
+
+async function resolveRemoveCall(index: number, version = 2) {
+  await act(async () => {
+    mockState.removeCalls[index]?.resolve({ ok: true, version });
+    await Promise.resolve();
+  });
+}
+
+async function rejectRemoveCall(index: number) {
+  await act(async () => {
+    mockState.removeCalls[index]?.reject(new Error('remove failed'));
+    await Promise.resolve();
+  });
+}
+
 describe('ProfileContactSidebar optimistic mutation sequencing', () => {
   beforeEach(() => {
     mockState.profileCalls.length = 0;
     mockState.removeCalls.length = 0;
     mockState.toastSuccess.mockReset();
     mockState.toastError.mockReset();
+    mockState.useRealProfileMutation = false;
     vi.unstubAllGlobals();
   });
 
@@ -313,25 +405,34 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     expect(status).toHaveAttribute('data-state', 'saving');
     expect(mockState.profileCalls).toHaveLength(1);
 
-    act(() => mockState.profileCalls[0]?.options.onSuccess?.());
+    await resolveProfileCall(0, 2, 'Bio A');
 
     expect(status).toHaveAttribute('data-state', 'saved');
     expect(screen.getByTestId('profile-contact-tabbed-card')).toBe(card);
     expect(screen.getByTestId('profile-rail-mutation-status')).toBe(status);
   });
 
-  it('keeps B when B succeeds before an older A request fails', async () => {
+  it('serializes one request at a time and coalesces queued values to the newest intent', async () => {
     const user = userEvent.setup();
     renderEditingSidebar();
     openAboutTab();
 
     await user.click(screen.getByRole('button', { name: 'Set bio A' }));
     await user.click(screen.getByRole('button', { name: 'Set bio B' }));
+    await user.click(screen.getByRole('button', { name: 'Set bio C' }));
 
-    act(() => mockState.profileCalls[1]?.options.onSuccess?.());
-    act(() => mockState.profileCalls[0]?.options.onError?.());
+    expect(mockState.profileCalls).toHaveLength(1);
+    expect(screen.getByTestId('bio-value')).toHaveTextContent('Bio C');
 
-    expect(screen.getByTestId('bio-value')).toHaveTextContent('Bio B');
+    await resolveProfileCall(0, 2, 'Bio A');
+    await waitFor(() => expect(mockState.profileCalls).toHaveLength(2));
+    expect(mockState.profileCalls[1]?.variables).toEqual({
+      expectedVersion: 2,
+      updates: { bio: 'Bio C' },
+    });
+    await resolveProfileCall(1, 3, 'Bio C');
+
+    expect(screen.getByTestId('bio-value')).toHaveTextContent('Bio C');
     expect(screen.getByTestId('profile-rail-mutation-status')).toHaveAttribute(
       'data-state',
       'saved'
@@ -339,35 +440,215 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     expect(mockState.toastError).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ['A then B failures', [0, 1]],
-    ['B then A failures', [1, 0]],
-  ] as const)('returns to the confirmed baseline for %s', async (_label, completionOrder) => {
+  it('uses real TanStack mutateAsync settlement without a stuck status or stale cache', async () => {
+    mockState.useRealProfileMutation = true;
+    const requests: Array<{
+      body: {
+        expectedVersion?: number;
+        updates: { bio?: string };
+      };
+      resolve: (response: Response) => void;
+    }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+        const body = JSON.parse(
+          String(init?.body)
+        ) as (typeof requests)[number]['body'];
+        return new Promise<Response>(resolve => {
+          requests.push({ body, resolve });
+        });
+      })
+    );
+
+    const user = userEvent.setup();
+    const { queryClient } = renderEditingSidebar();
+    openAboutTab();
+
+    await user.click(screen.getByRole('button', { name: 'Set bio A' }));
+    await user.click(screen.getByRole('button', { name: 'Set bio B' }));
+    await user.click(screen.getByRole('button', { name: 'Set bio C' }));
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.body).toEqual({
+      expectedVersion: 1,
+      updates: { bio: 'Bio A' },
+    });
+
+    await act(async () => {
+      requests[0]?.resolve(
+        Response.json({
+          profile: {
+            ...mockState.initialPreviewData,
+            bio: 'Bio A',
+            profileEditVersion: 2,
+          },
+        })
+      );
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests[1]?.body).toEqual({
+      expectedVersion: 2,
+      updates: { bio: 'Bio C' },
+    });
+
+    await act(async () => {
+      requests[1]?.resolve(
+        Response.json({
+          profile: {
+            ...mockState.initialPreviewData,
+            bio: 'Bio C',
+            profileEditVersion: 3,
+          },
+        })
+      );
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('profile-rail-mutation-status')
+      ).toHaveAttribute('data-state', 'saved')
+    );
+    expect(screen.getByTestId('bio-value')).toHaveTextContent('Bio C');
+    expect(queryClient.getQueryData(queryKeys.user.profile())).toMatchObject({
+      bio: 'Bio C',
+      profileEditVersion: 3,
+    });
+  });
+
+  it('advances the profile CAS token after a cross-tab conflict before draining the latest intent', async () => {
+    mockState.useRealProfileMutation = true;
+    const requests: Array<{
+      body: {
+        expectedVersion?: number;
+        updates: { bio?: string };
+      };
+      resolve: (response: Response) => void;
+    }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+        const body = JSON.parse(
+          String(init?.body)
+        ) as (typeof requests)[number]['body'];
+        return new Promise<Response>(resolve => {
+          requests.push({ body, resolve });
+        });
+      })
+    );
+    const user = userEvent.setup();
+    const { queryClient } = renderEditingSidebar();
+    openAboutTab();
+
+    await user.click(screen.getByRole('button', { name: 'Set bio A' }));
+    await user.click(screen.getByRole('button', { name: 'Set bio B' }));
+    expect(requests).toHaveLength(1);
+
+    await act(async () => {
+      requests[0]?.resolve(
+        Response.json(
+          {
+            error: 'Conflict: Profile has been modified by another request',
+            code: 'VERSION_CONFLICT',
+            expectedVersion: 1,
+            currentVersion: 2,
+          },
+          { status: 409 }
+        )
+      );
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests[1]?.body).toEqual({
+      expectedVersion: 2,
+      updates: { bio: 'Bio B' },
+    });
+
+    await act(async () => {
+      requests[1]?.resolve(
+        Response.json({
+          profile: {
+            ...mockState.initialPreviewData,
+            bio: 'Bio B',
+            profileEditVersion: 3,
+          },
+        })
+      );
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('profile-rail-mutation-status')
+      ).toHaveAttribute('data-state', 'saved')
+    );
+    expect(screen.getByTestId('bio-value')).toHaveTextContent('Bio B');
+    expect(queryClient.getQueryData(queryKeys.user.profile())).toMatchObject({
+      bio: 'Bio B',
+      profileEditVersion: 3,
+    });
+  });
+
+  it('continues to the newest queued intent when the in-flight save fails', async () => {
     const user = userEvent.setup();
     renderEditingSidebar();
     openAboutTab();
 
     await user.click(screen.getByRole('button', { name: 'Set bio A' }));
     await user.click(screen.getByRole('button', { name: 'Set bio B' }));
-    for (const index of completionOrder) {
-      act(() => mockState.profileCalls[index]?.options.onError?.());
-    }
+    await rejectProfileCall(0);
+    await waitFor(() => expect(mockState.profileCalls).toHaveLength(2));
+    await resolveProfileCall(1, 2, 'Bio B');
 
-    expect(screen.getByTestId('bio-value')).toHaveTextContent('Original bio');
+    expect(screen.getByTestId('bio-value')).toHaveTextContent('Bio B');
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(mockState.toastError).not.toHaveBeenCalled();
+  });
+
+  it('returns to the last confirmed value when the newest queued save fails', async () => {
+    const user = userEvent.setup();
+    renderEditingSidebar();
+    openAboutTab();
+
+    await user.click(screen.getByRole('button', { name: 'Set bio A' }));
+    await user.click(screen.getByRole('button', { name: 'Set bio B' }));
+    await resolveProfileCall(0, 2, 'Bio A');
+    await waitFor(() => expect(mockState.profileCalls).toHaveLength(2));
+    await rejectProfileCall(1);
+
+    expect(screen.getByTestId('bio-value')).toHaveTextContent('Bio A');
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
-  it('reconciles to A when B fails before the older A request succeeds', async () => {
+  it('retries a conflicted profile save with the authoritative server version', async () => {
     const user = userEvent.setup();
     renderEditingSidebar();
     openAboutTab();
 
     await user.click(screen.getByRole('button', { name: 'Set bio A' }));
-    await user.click(screen.getByRole('button', { name: 'Set bio B' }));
-    act(() => mockState.profileCalls[1]?.options.onError?.());
-    act(() => mockState.profileCalls[0]?.options.onSuccess?.());
+    await act(async () => {
+      mockState.profileCalls[0]?.reject(
+        new FetchError('Conflict', 409, undefined, {
+          code: 'VERSION_CONFLICT',
+          currentVersion: 2,
+          expectedVersion: 1,
+        })
+      );
+      await Promise.resolve();
+    });
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
 
-    expect(screen.getByTestId('bio-value')).toHaveTextContent('Bio A');
+    expect(mockState.profileCalls[1]?.variables).toEqual({
+      expectedVersion: 2,
+      updates: { bio: 'Bio A' },
+    });
+    await resolveProfileCall(1, 3, 'Bio A');
+    expect(screen.getByTestId('profile-rail-mutation-status')).toHaveAttribute(
+      'data-state',
+      'saved'
+    );
   });
 
   it('rolls back only the failed field and retries its intended value', async () => {
@@ -377,7 +658,8 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
 
     await user.click(screen.getByRole('button', { name: 'Set bio A' }));
     await user.click(screen.getByRole('button', { name: 'Set location' }));
-    act(() => mockState.profileCalls[0]?.options.onError?.());
+    await rejectProfileCall(0);
+    await waitFor(() => expect(mockState.profileCalls).toHaveLength(2));
 
     expect(screen.getByTestId('bio-value')).toHaveTextContent('Original bio');
     expect(screen.getByTestId('location-value')).toHaveTextContent(
@@ -391,10 +673,13 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(screen.getByTestId('bio-value')).toHaveTextContent('Bio A');
+    expect(mockState.profileCalls).toHaveLength(2);
+    await resolveProfileCall(1, 2);
+    await waitFor(() => expect(mockState.profileCalls).toHaveLength(3));
     expect(mockState.profileCalls[2]?.variables).toEqual({
+      expectedVersion: 2,
       updates: { bio: 'Bio A' },
     });
-    act(() => mockState.profileCalls[2]?.options.onSuccess?.());
     expect(screen.getByTestId('profile-rail-mutation-status')).toHaveAttribute(
       'data-state',
       'saving'
@@ -407,8 +692,8 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
 
     await user.click(screen.getByRole('button', { name: 'Remove link-a' }));
     await user.click(screen.getByRole('button', { name: 'Remove link-b' }));
-    act(() => mockState.removeCalls[1]?.options.onSuccess?.());
-    act(() => mockState.removeCalls[0]?.options.onError?.());
+    await resolveRemoveCall(1);
+    await rejectRemoveCall(0);
 
     expect(linkTitles()).toEqual(['Alpha', 'Gamma']);
 
@@ -416,8 +701,143 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     expect(mockState.removeCalls[2]?.variables).toEqual({
       profileId: 'profile-1',
       linkId: 'link-a',
+      expectedVersion: 1,
     });
     expect(linkTitles()).toEqual(['Gamma']);
+  });
+
+  it('retries a conflicted removal with the authoritative link version', async () => {
+    const user = userEvent.setup();
+    renderEditingSidebar();
+
+    await user.click(screen.getByRole('button', { name: 'Remove link-a' }));
+    await act(async () => {
+      mockState.removeCalls[0]?.reject(
+        new FetchError('Conflict', 409, undefined, {
+          code: 'VERSION_CONFLICT',
+          currentVersion: 2,
+          expectedVersion: 1,
+        })
+      );
+      await Promise.resolve();
+    });
+    expect(linkTitles()).toEqual(['Alpha', 'Beta', 'Gamma']);
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(mockState.removeCalls[1]?.variables).toEqual({
+      profileId: 'profile-1',
+      linkId: 'link-a',
+      expectedVersion: 2,
+    });
+    await resolveRemoveCall(1, 3);
+    expect(linkTitles()).toEqual(['Beta', 'Gamma']);
+    expect(screen.getByTestId('profile-rail-mutation-status')).toHaveAttribute(
+      'data-state',
+      'saved'
+    );
+  });
+
+  it('waits for a same-platform remove and re-adds with the returned version', async () => {
+    const user = userEvent.setup();
+    const requests: Array<{
+      body: Record<string, unknown>;
+      resolve: (response: Response) => void;
+    }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return new Promise<Response>(resolve => {
+          requests.push({ body, resolve });
+        });
+      })
+    );
+    renderEditingSidebar();
+
+    await user.click(screen.getByRole('button', { name: 'Remove link-a' }));
+    await user.click(screen.getByRole('button', { name: 'Add Social link' }));
+    await user.click(screen.getByRole('button', { name: 'Add Alpha' }));
+
+    expect(requests).toHaveLength(0);
+    expect(mockState.removeCalls[0]?.variables).toEqual({
+      profileId: 'profile-1',
+      linkId: 'link-a',
+      expectedVersion: 1,
+    });
+
+    await resolveRemoveCall(0, 2);
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]?.body).toMatchObject({
+      profileId: 'profile-1',
+      platform: 'alpha',
+      expectedVersion: 2,
+    });
+
+    await act(async () => {
+      requests[0]?.resolve(
+        Response.json({ linkId: 'link-a', version: 3, outcome: 'updated' })
+      );
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('profile-rail-mutation-status')
+      ).toHaveAttribute('data-state', 'saved')
+    );
+    expect(linkTitles()).toEqual(['Beta', 'Gamma', 'Alpha']);
+  });
+
+  it('refreshes a conflicted link token before the queued same-platform re-add', async () => {
+    const user = userEvent.setup();
+    const requests: Array<{
+      body: Record<string, unknown>;
+      resolve: (response: Response) => void;
+    }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return new Promise<Response>(resolve => {
+          requests.push({ body, resolve });
+        });
+      })
+    );
+    renderEditingSidebar();
+
+    await user.click(screen.getByRole('button', { name: 'Remove link-a' }));
+    await user.click(screen.getByRole('button', { name: 'Add Social link' }));
+    await user.click(screen.getByRole('button', { name: 'Add Alpha' }));
+
+    await act(async () => {
+      mockState.removeCalls[0]?.reject(
+        new FetchError('Conflict', 409, undefined, {
+          code: 'VERSION_CONFLICT',
+          currentVersion: 2,
+          expectedVersion: 1,
+        })
+      );
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]?.body).toMatchObject({
+      profileId: 'profile-1',
+      platform: 'alpha',
+      expectedVersion: 2,
+    });
+
+    await act(async () => {
+      requests[0]?.resolve(
+        Response.json({ linkId: 'link-a', version: 3, outcome: 'updated' })
+      );
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('profile-rail-mutation-status')
+      ).toHaveAttribute('data-state', 'saved')
+    );
+    expect(linkTitles()).toEqual(['Beta', 'Gamma', 'Alpha']);
+    expect(mockState.toastError).not.toHaveBeenCalled();
   });
 
   it('preserves a completed add when an earlier remove rolls back', async () => {
@@ -442,11 +862,11 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     await act(async () => {
       resolveFetch?.({
         ok: true,
-        json: async () => ({ linkId: 'link-d' }),
+        json: async () => ({ linkId: 'link-d', version: 1 }),
       } as Response);
       await Promise.resolve();
     });
-    act(() => mockState.removeCalls[0]?.options.onError?.());
+    await rejectRemoveCall(0);
 
     expect(linkTitles()).toEqual(['Alpha', 'Beta', 'Gamma', 'Delta']);
   });
@@ -494,7 +914,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     expect(mockState.profileCalls).toHaveLength(1);
 
     view.unmount();
-    act(() => mockState.profileCalls[0]?.options.onError?.());
+    await rejectProfileCall(0);
     expect(mockState.toastError).not.toHaveBeenCalled();
 
     renderEditingSidebar();
@@ -512,7 +932,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     const aboutContent = screen.getByTestId('bio-value').parentElement;
 
     await user.click(screen.getByRole('button', { name: 'Set bio A' }));
-    act(() => mockState.profileCalls[0]?.options.onError?.());
+    await rejectProfileCall(0);
     expect(status).toHaveAttribute('data-state', 'error');
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 

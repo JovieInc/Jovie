@@ -442,6 +442,7 @@ export function ChatPageClient({
         url: link.url,
         platform: link.platform,
         isVisible: true,
+        version: link.version ?? 1,
       })),
     [socialLinks]
   );
@@ -465,6 +466,7 @@ export function ChatPageClient({
           activeProfile.settings as Record<string, unknown> | null
         ) ?? null,
       activeSinceYear: activeProfile.activeSinceYear ?? null,
+      profileEditVersion: activeProfile.profileEditVersion,
       links: previewLinks,
       profilePath: `/${activeProfile.username}`,
       dspConnections: {

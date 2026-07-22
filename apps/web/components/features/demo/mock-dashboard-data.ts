@@ -62,6 +62,7 @@ const DEFAULT_DEMO_PROFILE: CreatorProfile = {
   ingestionStatus: 'idle',
   lastIngestionError: null,
   profileViews: 2_847,
+  profileEditVersion: 1,
   onboardingCompletedAt: now,
   settings: {},
   theme: {},

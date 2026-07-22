@@ -22,7 +22,20 @@ const confirmLinkSchema = chatToolSchema({
   platform: z.string().min(1),
   url: httpUrlSchema,
   normalizedUrl: httpUrlSchema,
+  expectedVersion: z.number().int().min(1).optional(),
 });
+
+function linkVersionConflict(expectedVersion: number, currentVersion?: number) {
+  return NextResponse.json(
+    {
+      error: 'Conflict: Link has been modified by another request',
+      code: 'VERSION_CONFLICT',
+      expectedVersion,
+      currentVersion,
+    },
+    { status: 409, headers: NO_CACHE_HEADERS }
+  );
+}
 
 /**
  * POST /api/chat/confirm-link
@@ -57,7 +70,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const { profileId, platform, normalizedUrl } = parseResult.data;
+  const { profileId, platform, normalizedUrl, expectedVersion } =
+    parseResult.data;
 
   try {
     // Verify profile ownership by joining users table to compare Clerk IDs
@@ -106,7 +120,7 @@ export async function POST(req: Request) {
 
     // Check for existing link with same platform (prevent duplicates)
     const [existingLink] = await db
-      .select({ id: socialLinks.id })
+      .select({ id: socialLinks.id, version: socialLinks.version })
       .from(socialLinks)
       .where(
         and(
@@ -117,21 +131,49 @@ export async function POST(req: Request) {
       .limit(1);
 
     let linkId: string;
+    let linkVersion: number;
     /** Distinguishes create vs overwrite for truthful client copy (JOV-3549). */
     let outcome: 'created' | 'updated';
 
     if (existingLink) {
+      const currentVersion = existingLink.version ?? 1;
+      if (expectedVersion !== undefined && expectedVersion !== currentVersion) {
+        return linkVersionConflict(expectedVersion, currentVersion);
+      }
+
       // Update existing link URL instead of creating duplicate
-      await db
+      const rows = await db
         .update(socialLinks)
         .set({
           url: detected.normalizedUrl,
           isActive: true,
           state: 'active',
+          version: currentVersion + 1,
           updatedAt: new Date(),
         })
-        .where(eq(socialLinks.id, existingLink.id));
-      linkId = existingLink.id;
+        .where(
+          and(
+            eq(socialLinks.id, existingLink.id),
+            eq(socialLinks.creatorProfileId, profileId),
+            eq(socialLinks.version, currentVersion)
+          )
+        )
+        .returning({ id: socialLinks.id, version: socialLinks.version });
+      if (!rows[0]) {
+        const [currentLink] = await db
+          .select({ version: socialLinks.version })
+          .from(socialLinks)
+          .where(
+            and(
+              eq(socialLinks.id, existingLink.id),
+              eq(socialLinks.creatorProfileId, profileId)
+            )
+          )
+          .limit(1);
+        return linkVersionConflict(currentVersion, currentLink?.version);
+      }
+      linkId = rows[0].id;
+      linkVersion = rows[0].version;
       outcome = 'updated';
     } else {
       // Insert new social link
@@ -155,6 +197,7 @@ export async function POST(req: Request) {
         throw new Error('Insert returned no rows');
       }
       linkId = rows[0].id;
+      linkVersion = 1;
       outcome = 'created';
     }
 
@@ -184,6 +227,7 @@ export async function POST(req: Request) {
         success: true,
         platform: detected.platform.id,
         linkId,
+        version: linkVersion,
         outcome,
       },
       { headers: NO_CACHE_HEADERS }

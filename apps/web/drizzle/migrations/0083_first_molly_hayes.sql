@@ -1,0 +1,1 @@
+ALTER TABLE "creator_profiles" ADD COLUMN "profile_edit_version" integer DEFAULT 1 NOT NULL;

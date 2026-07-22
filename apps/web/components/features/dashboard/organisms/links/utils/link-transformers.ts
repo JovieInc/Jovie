@@ -243,6 +243,7 @@ export function convertLinksToDashboardFormat(links: LinkItem[]) {
     isVisible: link.isVisible,
     verificationStatus: link.verificationStatus ?? 'unverified',
     category: mapCategoryForPreview(link.category),
+    version: link.version,
   }));
 }
 

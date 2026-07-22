@@ -4,7 +4,7 @@
  * Database operations for profile updates.
  */
 
-import { eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
@@ -18,6 +18,7 @@ export interface UpdateProfileRecordsParams {
   clerkUserId: string;
   dbProfileUpdates: Record<string, unknown>;
   displayNameForUserUpdate: string | undefined;
+  expectedVersion?: number;
 }
 
 export interface UpdateProfileRecordsResult {
@@ -29,6 +30,7 @@ export async function updateProfileRecords({
   clerkUserId,
   dbProfileUpdates,
   displayNameForUserUpdate,
+  expectedVersion,
 }: UpdateProfileRecordsParams): Promise<
   UpdateProfileRecordsResult | NextResponse
 > {
@@ -46,6 +48,7 @@ export async function updateProfileRecords({
       settings: creatorProfiles.settings,
       theme: creatorProfiles.theme,
       avatarUrl: creatorProfiles.avatarUrl,
+      profileEditVersion: creatorProfiles.profileEditVersion,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.userId, user.id))
@@ -98,13 +101,40 @@ export async function updateProfileRecords({
     ...(finalTheme === undefined ? {} : { theme: finalTheme }),
   };
 
+  const currentVersion = existingProfile?.profileEditVersion ?? 1;
+  const compareVersion = expectedVersion ?? currentVersion;
   const [updatedProfile] = await db
     .update(creatorProfiles)
-    .set({ ...finalProfileUpdates, updatedAt: new Date() })
-    .where(eq(creatorProfiles.userId, user.id))
+    .set({
+      ...finalProfileUpdates,
+      profileEditVersion: drizzleSql`${creatorProfiles.profileEditVersion} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(creatorProfiles.userId, user.id),
+        eq(creatorProfiles.profileEditVersion, compareVersion)
+      )
+    )
     .returning();
 
   if (!updatedProfile) {
+    if (existingProfile) {
+      const [currentProfile] = await db
+        .select({ profileEditVersion: creatorProfiles.profileEditVersion })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.userId, user.id))
+        .limit(1);
+      return NextResponse.json(
+        {
+          error: 'Conflict: Profile has been modified by another request',
+          code: 'VERSION_CONFLICT',
+          currentVersion: currentProfile?.profileEditVersion,
+          expectedVersion: compareVersion,
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
     return NextResponse.json(
       { error: 'Profile not found' },
       { status: 404, headers: NO_STORE_HEADERS }

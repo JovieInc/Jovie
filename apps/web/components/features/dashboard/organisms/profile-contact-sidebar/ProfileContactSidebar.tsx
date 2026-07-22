@@ -26,6 +26,8 @@ import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
 import {
+  FetchError,
+  fetchWithTimeout,
   type ProfileUpdateInput,
   useDeletePressPhotoMutation,
   useDspMatchesQuery,
@@ -134,6 +136,14 @@ interface FieldOperationLedger {
   baseline: EditableProfileValue;
   readonly operations: Map<number, FieldOperation>;
 }
+interface QueuedFieldSave {
+  readonly field: EditableProfileField;
+  readonly generation: number;
+  readonly previewValue: EditableProfileValue;
+  readonly updates: EditableProfileUpdate;
+  readonly errorMessage: string;
+  readonly epoch: number;
+}
 
 type ProfileRailMutationStatus =
   | { state: 'idle' | 'saving' | 'saved' }
@@ -185,24 +195,49 @@ function createTempLinkId(): string {
   return `temp-${Date.now()}-${tempLinkIdCounter}`;
 }
 
+async function enqueuePlatformMutation<T>(
+  queues: Map<string, Promise<unknown>>,
+  platform: string,
+  operation: () => Promise<T>
+): Promise<T> {
+  const previous = queues.get(platform) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  queues.set(platform, current);
+  try {
+    return await current;
+  } finally {
+    if (queues.get(platform) === current) queues.delete(platform);
+  }
+}
+
 /** Persist a detected link to the server. Returns the server-assigned linkId. */
 async function confirmLinkOnServer(
   profileId: string,
-  link: DetectedLink
-): Promise<string> {
-  const response = await fetch('/api/chat/confirm-link', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      profileId,
-      platform: link.platform.id,
-      url: link.originalUrl,
-      normalizedUrl: link.normalizedUrl,
-    }),
-  });
-  if (!response.ok) throw new Error('Failed to add link');
-  const { linkId } = (await response.json()) as { linkId: string };
-  return linkId;
+  link: DetectedLink,
+  expectedVersion?: number
+): Promise<{ linkId: string; version: number }> {
+  return fetchWithTimeout<{ linkId: string; version: number }>(
+    '/api/chat/confirm-link',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId,
+        platform: link.platform.id,
+        url: link.originalUrl,
+        normalizedUrl: link.normalizedUrl,
+        expectedVersion,
+      }),
+    }
+  );
+}
+
+function getConflictVersion(error: unknown): number | undefined {
+  if (!(error instanceof FetchError) || error.status !== 409) return undefined;
+  const currentVersion = error.parsedBody?.currentVersion;
+  return typeof currentVersion === 'number' && Number.isInteger(currentVersion)
+    ? currentVersion
+    : undefined;
 }
 
 /** Convert preview-panel links into the LegacySocialLink shape the public surface expects. */
@@ -243,7 +278,16 @@ export function ProfileContactSidebar() {
   const fieldOperationLedgersRef = useRef<
     Partial<Record<EditableProfileField, FieldOperationLedger>>
   >({});
+  const queuedFieldSavesRef = useRef<
+    Map<EditableProfileField, QueuedFieldSave>
+  >(new Map());
+  const profileSaveWorkerRunningRef = useRef(false);
+  const profileVersionRef = useRef<number | undefined>(
+    previewData?.profileEditVersion ?? selectedProfile?.profileEditVersion
+  );
   const linkGenerationRef = useRef<Map<string, number>>(new Map());
+  const linkVersionByPlatformRef = useRef<Map<string, number>>(new Map());
+  const linkPlatformQueueRef = useRef<Map<string, Promise<unknown>>>(new Map());
   const pendingOperationCountRef = useRef(0);
   const activeMutationErrorRef = useRef<Extract<
     ProfileRailMutationStatus,
@@ -253,12 +297,28 @@ export function ProfileContactSidebar() {
     useState<ProfileRailMutationStatus>(IDLE_MUTATION_STATUS);
 
   useEffect(() => {
+    const queuedFieldSaves = queuedFieldSavesRef.current;
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       operationEpochRef.current += 1;
+      queuedFieldSaves.clear();
     };
   }, []);
+
+  useEffect(() => {
+    profileVersionRef.current =
+      previewData?.profileEditVersion ?? selectedProfile?.profileEditVersion;
+    for (const link of previewData?.links ?? []) {
+      if (link.version !== undefined) {
+        linkVersionByPlatformRef.current.set(link.platform, link.version);
+      }
+    }
+  }, [
+    previewData?.links,
+    previewData?.profileEditVersion,
+    selectedProfile?.profileEditVersion,
+  ]);
 
   const patchPreviewData = useCallback(
     (updater: (current: PreviewPanelData) => PreviewPanelData) => {
@@ -430,6 +490,88 @@ export function ProfileContactSidebar() {
     [deletePressPhotoMutation]
   );
 
+  const drainProfileSaveQueue = useCallback(async () => {
+    if (profileSaveWorkerRunningRef.current) return;
+    profileSaveWorkerRunningRef.current = true;
+
+    try {
+      while (queuedFieldSavesRef.current.size > 0) {
+        const nextEntry = queuedFieldSavesRef.current.entries().next().value;
+        if (!nextEntry) break;
+        const [field, queuedSave] = nextEntry;
+        queuedFieldSavesRef.current.delete(field);
+
+        try {
+          const result = await profileMutation.mutateAsync({
+            expectedVersion: profileVersionRef.current,
+            updates: queuedSave.updates,
+          });
+          profileVersionRef.current = result.profile.profileEditVersion;
+
+          const operation = fieldOperationLedgersRef.current[
+            field
+          ]?.operations.get(queuedSave.generation);
+          if (
+            mountedRef.current &&
+            operationEpochRef.current === queuedSave.epoch &&
+            operation
+          ) {
+            operation.state = 'succeeded';
+            patchPreviewData(data => ({
+              ...data,
+              profileEditVersion: result.profile.profileEditVersion,
+            }));
+            reconcileFieldOperations(field);
+          }
+          completeMutationSuccess();
+        } catch (error) {
+          const conflictVersion = getConflictVersion(error);
+          if (conflictVersion !== undefined) {
+            profileVersionRef.current = conflictVersion;
+          }
+          const operation = fieldOperationLedgersRef.current[
+            field
+          ]?.operations.get(queuedSave.generation);
+          const canReconcile =
+            mountedRef.current &&
+            operationEpochRef.current === queuedSave.epoch &&
+            operation;
+          if (!canReconcile) {
+            completeMutationSuccess();
+            continue;
+          }
+
+          operation.state = 'failed';
+          reconcileFieldOperations(field);
+          const isLatestIntent =
+            fieldGenerationRef.current[field] === queuedSave.generation;
+          if (!isLatestIntent) {
+            completeMutationSuccess();
+            continue;
+          }
+
+          const retry = () =>
+            saveProfileFieldRef.current(
+              field,
+              queuedSave.previewValue,
+              queuedSave.updates,
+              queuedSave.errorMessage
+            );
+          completeMutationError(queuedSave.errorMessage, retry);
+          toast.error(queuedSave.errorMessage);
+        }
+      }
+    } finally {
+      profileSaveWorkerRunningRef.current = false;
+    }
+  }, [
+    completeMutationError,
+    completeMutationSuccess,
+    patchPreviewData,
+    profileMutation,
+    reconcileFieldOperations,
+  ]);
+
   const saveProfileField = useCallback<SaveProfileField>(
     (field, previewValue, updates, errorMessage) => {
       if (!selectedProfile) return;
@@ -450,69 +592,32 @@ export function ProfileContactSidebar() {
         state: 'pending',
       });
 
+      const superseded = queuedFieldSavesRef.current.get(field);
+      if (superseded) {
+        const supersededOperation = ledger.operations.get(
+          superseded.generation
+        );
+        if (supersededOperation) supersededOperation.state = 'failed';
+        completeMutationSuccess();
+      }
+
+      queuedFieldSavesRef.current.set(field, {
+        field,
+        generation,
+        previewValue,
+        updates,
+        errorMessage,
+        epoch,
+      });
       patchPreviewData(data => ({ ...data, [field]: previewValue }));
       beginMutationStatus();
-      profileMutation.mutate(
-        { updates },
-        {
-          onSuccess: () => {
-            const operation =
-              fieldOperationLedgersRef.current[field]?.operations.get(
-                generation
-              );
-            if (
-              mountedRef.current &&
-              operationEpochRef.current === epoch &&
-              operation
-            ) {
-              operation.state = 'succeeded';
-              reconcileFieldOperations(field);
-            }
-            completeMutationSuccess();
-          },
-          onError: () => {
-            const operation =
-              fieldOperationLedgersRef.current[field]?.operations.get(
-                generation
-              );
-            const canReconcile =
-              mountedRef.current &&
-              operationEpochRef.current === epoch &&
-              operation;
-            if (!canReconcile) {
-              completeMutationSuccess();
-              return;
-            }
-
-            operation.state = 'failed';
-            reconcileFieldOperations(field);
-            const isLatestIntent =
-              fieldGenerationRef.current[field] === generation;
-            if (!isLatestIntent) {
-              completeMutationSuccess();
-              return;
-            }
-
-            const retry = () =>
-              saveProfileFieldRef.current(
-                field,
-                previewValue,
-                updates,
-                errorMessage
-              );
-            completeMutationError(errorMessage, retry);
-            toast.error(errorMessage);
-          },
-        }
-      );
+      void drainProfileSaveQueue();
     },
     [
       beginMutationStatus,
-      completeMutationError,
       completeMutationSuccess,
+      drainProfileSaveQueue,
       patchPreviewData,
-      profileMutation,
-      reconcileFieldOperations,
       selectedProfile,
     ]
   );
@@ -583,6 +688,7 @@ export function ProfileContactSidebar() {
   const reconcileAfterPersist = useCallback(
     (
       linkId: string,
+      version: number,
       optimisticId: string,
       platformName: string,
       profileId: string
@@ -590,10 +696,9 @@ export function ProfileContactSidebar() {
       if (deletedWhilePendingRef.current.has(optimisticId)) {
         deletedWhilePendingRef.current.delete(optimisticId);
         if (linkId) {
-          removeLinkMutation.mutate(
-            { profileId, linkId },
-            { onError: () => {} }
-          );
+          void removeLinkMutation
+            .mutateAsync({ profileId, linkId, expectedVersion: version })
+            .catch(() => undefined);
         }
         return;
       }
@@ -602,9 +707,11 @@ export function ProfileContactSidebar() {
         if (current) {
           patchPreviewData(data => ({
             ...data,
-            links: data.links.map(l =>
-              l.id === optimisticId ? { ...l, id: linkId } : l
-            ),
+            links: data.links
+              .filter(l => l.id !== linkId || l.id === optimisticId)
+              .map(l =>
+                l.id === optimisticId ? { ...l, id: linkId, version } : l
+              ),
           }));
         }
       }
@@ -701,6 +808,11 @@ export function ProfileContactSidebar() {
         }
       }
 
+      linkGenerationRef.current.set(
+        link.platform.id,
+        (linkGenerationRef.current.get(link.platform.id) ?? 0) + 1
+      );
+
       // Optimistically add to sidebar
       const optimisticLink: PreviewPanelLink = {
         id: createTempLinkId(),
@@ -729,23 +841,44 @@ export function ProfileContactSidebar() {
       const epoch = operationEpochRef.current;
       beginMutationStatus();
       try {
-        const linkId = await confirmLinkOnServer(selectedProfile.id, link);
+        const { linkId, version } = await enqueuePlatformMutation(
+          linkPlatformQueueRef.current,
+          link.platform.id,
+          () =>
+            confirmLinkOnServer(
+              selectedProfile.id,
+              link,
+              linkVersionByPlatformRef.current.get(link.platform.id)
+            )
+        );
+        linkVersionByPlatformRef.current.set(link.platform.id, version);
         if (operationEpochRef.current === epoch) {
           reconcileAfterPersist(
             linkId,
+            version,
             optimisticLink.id,
             link.platform.name,
             selectedProfile.id
           );
         } else if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
           deletedWhilePendingRef.current.delete(optimisticLink.id);
-          removeLinkMutation.mutate(
-            { profileId: selectedProfile.id, linkId },
-            { onError: () => {} }
-          );
+          void removeLinkMutation
+            .mutateAsync({
+              profileId: selectedProfile.id,
+              linkId,
+              expectedVersion: version,
+            })
+            .catch(() => undefined);
         }
         completeMutationSuccess();
-      } catch {
+      } catch (error) {
+        const conflictVersion = getConflictVersion(error);
+        if (conflictVersion !== undefined) {
+          linkVersionByPlatformRef.current.set(
+            link.platform.id,
+            conflictVersion
+          );
+        }
         if (mountedRef.current && operationEpochRef.current === epoch) {
           const reverted = revertOptimisticAdd(optimisticLink.id);
           if (reverted) {
@@ -809,49 +942,79 @@ export function ProfileContactSidebar() {
         return;
       }
 
-      const generation = (linkGenerationRef.current.get(linkId) ?? 0) + 1;
-      linkGenerationRef.current.set(linkId, generation);
+      const generation =
+        (linkGenerationRef.current.get(removedLink.platform) ?? 0) + 1;
+      linkGenerationRef.current.set(removedLink.platform, generation);
       const epoch = operationEpochRef.current;
       beginMutationStatus();
 
-      removeLinkMutation.mutate(
-        { profileId: selectedProfile.id, linkId },
-        {
-          onSuccess: () => {
-            const isCurrent =
-              mountedRef.current &&
-              operationEpochRef.current === epoch &&
-              linkGenerationRef.current.get(linkId) === generation;
-            completeMutationSuccess();
-            if (isCurrent) toast.success('Link removed');
-          },
-          onError: () => {
-            const isCurrent =
-              mountedRef.current &&
-              operationEpochRef.current === epoch &&
-              linkGenerationRef.current.get(linkId) === generation;
-            if (!isCurrent) {
-              completeMutationSuccess();
-              return;
-            }
-
+      void enqueuePlatformMutation(
+        linkPlatformQueueRef.current,
+        removedLink.platform,
+        () =>
+          removeLinkMutation.mutateAsync({
+            profileId: selectedProfile.id,
+            linkId,
+            expectedVersion: removedLink.version ?? 1,
+          })
+      ).then(
+        result => {
+          linkVersionByPlatformRef.current.set(
+            removedLink.platform,
+            result.version ?? (removedLink.version ?? 1) + 1
+          );
+          const isCurrent =
+            mountedRef.current &&
+            operationEpochRef.current === epoch &&
+            linkGenerationRef.current.get(removedLink.platform) === generation;
+          completeMutationSuccess();
+          if (isCurrent) toast.success('Link removed');
+        },
+        error => {
+          const conflictVersion = getConflictVersion(error);
+          const restoredLink =
+            conflictVersion === undefined
+              ? removedLink
+              : { ...removedLink, version: conflictVersion };
+          if (conflictVersion !== undefined) {
+            linkVersionByPlatformRef.current.set(
+              removedLink.platform,
+              conflictVersion
+            );
+          }
+          const isCurrent =
+            mountedRef.current &&
+            operationEpochRef.current === epoch &&
+            linkGenerationRef.current.get(removedLink.platform) === generation;
+          if (!isCurrent) {
             patchPreviewData(data => {
-              if (data.links.some(link => link.id === removedLink.id)) {
+              if (data.links.some(link => link.id === restoredLink.id)) {
                 return data;
               }
               const links = [...data.links];
               links.splice(
                 Math.min(removedIndex, links.length),
                 0,
-                removedLink
+                restoredLink
               );
               return { ...data, links };
             });
-            completeMutationError('Failed to remove link', () =>
-              removeLinkRef.current(linkId)
-            );
-            toast.error('Failed to remove link');
-          },
+            completeMutationSuccess();
+            return;
+          }
+
+          patchPreviewData(data => {
+            if (data.links.some(link => link.id === restoredLink.id)) {
+              return data;
+            }
+            const links = [...data.links];
+            links.splice(Math.min(removedIndex, links.length), 0, restoredLink);
+            return { ...data, links };
+          });
+          completeMutationError('Failed to remove link', () =>
+            removeLinkRef.current(linkId)
+          );
+          toast.error('Failed to remove link');
         }
       );
     },
