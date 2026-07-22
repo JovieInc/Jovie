@@ -384,8 +384,33 @@ def _write_executable(path: pathlib.Path, data: bytes) -> None:
     with path.open("wb") as handle:
         handle.write(data)
         handle.flush()
+        path.chmod(0o755)
         os.fsync(handle.fileno())
-    path.chmod(0o755)
+
+
+def _fsync_directory(path: pathlib.Path) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    descriptor = os.open(path, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _mkdir_durable(path: pathlib.Path) -> None:
+    missing: list[pathlib.Path] = []
+    cursor = path
+    while not cursor.is_dir():
+        if _path_exists(cursor):
+            raise OSError(f"install path is not a directory: {cursor}")
+        missing.append(cursor)
+        parent = cursor.parent
+        if parent == cursor:
+            raise OSError(f"cannot create install path: {path}")
+        cursor = parent
+    for directory in reversed(missing):
+        directory.mkdir()
+        _fsync_directory(directory.parent)
 
 
 class InstallValidationError(Exception):
@@ -435,12 +460,16 @@ def _existing_top_level(destination: pathlib.Path) -> dict[str, pathlib.Path]:
 
 
 def _preflight_install(
-    destination: pathlib.Path,
+    destination: pathlib.Path, contents: dict[str, bytes]
 ) -> tuple[pathlib.Path | None, pathlib.Path | None, str]:
     state_dir = destination / INSTALL_STATE_DIR
     releases = state_dir / INSTALL_RELEASES
     current = _validated_release_link(state_dir / INSTALL_CURRENT, releases)
     pending = _validated_release_link(state_dir / INSTALL_PENDING, releases)
+    if pending is not None and not all(
+        (pending / name).read_bytes() == contents[name] for name in RUNTIME_NAMES
+    ):
+        pending = None
     top_level = _existing_top_level(destination)
     stable = {name: _stable_launcher(name) for name in RUNTIME_NAMES}
 
@@ -473,29 +502,39 @@ def _atomic_release_link(link: pathlib.Path, release: pathlib.Path) -> None:
         temporary.unlink()
     os.symlink(f"{INSTALL_RELEASES}/{release.name}", temporary)
     os.replace(temporary, link)
+    _fsync_directory(link.parent)
 
 
 def _install_launcher(destination: pathlib.Path, name: str, data: bytes) -> None:
     staged = destination / f".{name}.install"
     _write_executable(staged, data)
     os.replace(staged, destination / name)
+    _fsync_directory(destination)
 
 
 def _remove_install_temps(destination: pathlib.Path, state_dir: pathlib.Path) -> None:
+    destination_changed = False
     for name in RUNTIME_NAMES:
         staged = destination / f".{name}.install"
         if _path_exists(staged):
             try:
                 staged.unlink()
+                destination_changed = True
             except OSError:
                 pass
+    if destination_changed:
+        _fsync_directory(destination)
+    state_changed = False
     for name in (INSTALL_CURRENT, INSTALL_PENDING):
         staged = state_dir / f".{name}.install"
         if _path_exists(staged):
             try:
                 staged.unlink()
+                state_changed = True
             except OSError:
                 pass
+    if state_changed:
+        _fsync_directory(state_dir)
 
 
 def install(destination_root: str | None) -> int:
@@ -521,40 +560,48 @@ def install(destination_root: str | None) -> int:
     pending = state_dir / INSTALL_PENDING
 
     try:
-        current_target, pending_target, mode = _preflight_install(destination)
+        current_target, pending_target, mode = _preflight_install(destination, contents)
     except (InstallValidationError, OSError):
         print("install validation failed", file=sys.stderr)
         return 2
 
     release: pathlib.Path | None = pending_target
     try:
-        destination.mkdir(parents=True, exist_ok=True)
-        state_dir.mkdir(parents=True, exist_ok=True)
+        _mkdir_durable(destination)
+        _mkdir_durable(state_dir)
         releases = state_dir / INSTALL_RELEASES
-        releases.mkdir(parents=True, exist_ok=True)
+        _mkdir_durable(releases)
         if release is None:
             release = pathlib.Path(tempfile.mkdtemp(prefix="release-", dir=releases))
+            _fsync_directory(releases)
             for name, data in contents.items():
                 _write_executable(release / name, data)
+            _fsync_directory(release)
 
         if mode == "legacy" and current_target is None:
             prior = pathlib.Path(tempfile.mkdtemp(prefix="prior-", dir=releases))
+            _fsync_directory(releases)
             for name in RUNTIME_NAMES:
                 source = destination / name
                 _write_executable(prior / name, source.read_bytes())
+            _fsync_directory(prior)
             _atomic_release_link(current, prior)
             current_target = prior
 
-        if not _path_exists(pending):
+        if pending_target is None:
             _atomic_release_link(pending, release)
 
         for name in RUNTIME_NAMES:
             _install_launcher(destination, name, _stable_launcher(name))
 
         os.replace(pending, current)
+        _fsync_directory(state_dir)
         _remove_install_temps(destination, state_dir)
     except OSError:
-        _remove_install_temps(destination, state_dir)
+        try:
+            _remove_install_temps(destination, state_dir)
+        except OSError:
+            pass
         print("install failed", file=sys.stderr)
         return 2
     return 0

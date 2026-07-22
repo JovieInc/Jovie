@@ -111,16 +111,16 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return destination
 
-    def run_install(self, destination, **extra):
+    def run_install(self, destination, controller=CONTROLLER, **extra):
         return subprocess.run(
-            [sys.executable, str(CONTROLLER), "install", "--destination-root", str(destination)],
+            [sys.executable, str(controller), "install", "--destination-root", str(destination)],
             capture_output=True,
             text=True,
             env=self.env(**extra),
             check=False,
         )
 
-    def run_install_with_crash(self, destination, replace_number):
+    def run_install_with_crash(self, destination, replace_number, controller=CONTROLLER):
         startup = self.root / f"sitecustomize-{replace_number}"
         startup.mkdir()
         (startup / "sitecustomize.py").write_text(
@@ -139,6 +139,7 @@ class FallbackTests(unittest.TestCase):
         )
         return self.run_install(
             destination,
+            controller=controller,
             INSTALL_CRASH_AFTER_REPLACE=replace_number,
             PYTHONPATH=startup,
         )
@@ -165,6 +166,15 @@ class FallbackTests(unittest.TestCase):
             target.write_bytes(legacy[name])
             target.chmod(0o755)
         return legacy
+
+    def write_distinct_source(self, label):
+        source_root = self.root / f"source-{label}" / "scripts/hermes"
+        source_root.mkdir(parents=True)
+        for source in (WRAPPER, CONTROLLER, SIDECAR):
+            target = source_root / source.name
+            target.write_bytes(source.read_bytes() + f"\n# artifact {label} {source.name}\n".encode())
+            target.chmod(0o755)
+        return source_root / CONTROLLER.name
 
     def start_linear(self):
         LinearHandler.requests = []
@@ -509,6 +519,98 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(
             sorted(path.name for path in invalid.iterdir()), sorted(RUNTIME_NAMES)
         )
+
+    def test_installer_orders_file_and_directory_durability_operations(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "fallback_controller_durability", CONTROLLER
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        events = []
+        real_chmod = module.pathlib.Path.chmod
+        real_fsync = module.os.fsync
+        real_fsync_directory = module._fsync_directory
+        real_replace = module.os.replace
+
+        def chmod(path, mode):
+            events.append(("chmod", path))
+            return real_chmod(path, mode)
+
+        def fsync(descriptor):
+            events.append(("fsync", descriptor))
+            return real_fsync(descriptor)
+
+        def fsync_directory(path):
+            events.append(("directory-fsync", path))
+            return real_fsync_directory(path)
+
+        def replace(source, target):
+            events.append(("replace", pathlib.Path(target)))
+            return real_replace(source, target)
+
+        destination = self.root / "durable-bin"
+        with (
+            mock.patch.object(module.pathlib.Path, "chmod", new=chmod),
+            mock.patch.object(module.os, "fsync", side_effect=fsync),
+            mock.patch.object(module, "_fsync_directory", side_effect=fsync_directory),
+            mock.patch.object(module.os, "replace", side_effect=replace),
+        ):
+            self.assertEqual(module.install(str(destination)), 0)
+
+        for index, event in enumerate(events):
+            if event[0] == "chmod":
+                self.assertEqual(events[index + 1][0], "fsync")
+            if event[0] == "replace":
+                self.assertEqual(events[index + 1][0], "directory-fsync")
+
+        synced_directories = {
+            path.resolve()
+            for kind, path in events
+            if kind == "directory-fsync"
+        }
+        state_dir = destination / ".symphony-codex-auth-fallback"
+        releases = state_dir / "releases"
+        release = (state_dir / "current").resolve()
+        self.assertTrue(
+            {path.resolve() for path in (destination, state_dir, releases, release)}
+            <= synced_directories
+        )
+
+    def test_reentry_replaces_mismatched_pending_release_with_current_artifacts(self):
+        destination = self.root / "reentry-bin"
+        source_a = self.write_distinct_source("A")
+        source_b = self.write_distinct_source("B")
+        source_c = self.write_distinct_source("C")
+
+        self.assertEqual(self.run_install(destination, controller=source_a).returncode, 0)
+        current = destination / ".symphony-codex-auth-fallback/current"
+        pending = destination / ".symphony-codex-auth-fallback/pending"
+        current_a = current.resolve()
+
+        crashed = self.run_install_with_crash(
+            destination, 5, controller=source_b
+        )
+        self.assertLess(crashed.returncode, 0)
+        self.assertTrue(current.is_symlink())
+        self.assertTrue(pending.is_symlink())
+        self.assertEqual(current.resolve(), current_a)
+        pending_b = pending.resolve()
+        self.assertNotEqual(
+            (current_a / "symphony-codex-exhausted.py").read_bytes(),
+            (pending_b / "symphony-codex-exhausted.py").read_bytes(),
+        )
+
+        result = self.run_install(destination, controller=source_c)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        current_c = current.resolve()
+        for name in RUNTIME_NAMES:
+            self.assertEqual((current_c / name).read_bytes(), (source_c.parent / name).read_bytes())
+            self.assertNotEqual((current_c / name).read_bytes(), (pending_b / name).read_bytes())
 
     def test_installer_rolls_back_induced_mid_migration_failure(self):
         destination = self.root / "legacy-bin"
