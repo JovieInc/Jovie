@@ -210,7 +210,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.getByRole('navigation', { name: 'OV navigation' })
+      screen.getByRole('navigation', { name: 'OV Navigation' })
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute(
       'href',
