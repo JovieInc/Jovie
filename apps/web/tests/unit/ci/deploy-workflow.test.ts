@@ -2149,6 +2149,182 @@ exit 23
       rmSync(root, { force: true, recursive: true });
     }
   });
+
+  it('retries the production OAuth probe with quarantined attempt artifacts', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const probeStep = getStepBlock(
+      getJobBlock(release, 'production-oauth-gate'),
+      'Probe production Better Auth Google + Apple runtime'
+    );
+    const root = mkdtempSync(resolve(tmpdir(), 'jovie-prod-oauth-retry-'));
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const counter = resolve(root, 'attempt-count');
+      const githubOutput = resolve(root, 'github-output');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(githubOutput, '');
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+[ "\${PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN:-}" = "true" ] || exit 43
+attempt=0
+if [ -f "$OAUTH_TEST_COUNTER" ]; then
+  attempt="$(cat "$OAUTH_TEST_COUNTER")"
+fi
+attempt=$((attempt + 1))
+printf '%s' "$attempt" > "$OAUTH_TEST_COUNTER"
+if [ -e test-results ] || [ -L test-results ] || [ -e playwright-report ] || [ -L playwright-report ]; then
+  exit 40
+fi
+if [ "$attempt" -eq 1 ]; then
+  mkdir -p test-results
+  printf '# Error context\\n\\nSafe retry diagnostics.\\n' > test-results/error-context.md
+  printf '%s' '{"suites":[{"results":[{"status":"failed","errors":[{"message":"browser crashed before assertions"}]}]}]}' > "$PLAYWRIGHT_JSON_OUTPUT_NAME"
+  exit 1
+fi
+printf '%s' '{"suites":[{"results":[{"status":"passed"},{"status":"passed"}]}]}' > "$PLAYWRIGHT_JSON_OUTPUT_NAME"
+exit 0
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'sleep'),
+        '#!/usr/bin/env bash\nexit 0\n',
+        { mode: 0o700 }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(probeStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: githubOutput,
+            GITHUB_WORKSPACE: workspace,
+            OAUTH_TEST_COUNTER: counter,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(readFileSync(counter, 'utf8')).toBe('2');
+      const outputs = readFileSync(githubOutput, 'utf8');
+      expect(outputs).toContain('ba_health=passed');
+      expect(outputs).toContain('oauth_status=passed');
+      expect(
+        readFileSync(
+          resolve(
+            runnerTemp,
+            'production-oauth-gate-retries/attempt-1/failed-artifacts/test-results/error-context.md'
+          ),
+          'utf8'
+        )
+      ).toContain('Safe retry diagnostics.');
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('stops production OAuth probe retries when the artifact guard poisons shared state', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const probeStep = getStepBlock(
+      getJobBlock(release, 'production-oauth-gate'),
+      'Probe production Better Auth Google + Apple runtime'
+    );
+    const root = mkdtempSync(resolve(tmpdir(), 'jovie-prod-oauth-block-'));
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const counter = resolve(root, 'attempt-count');
+      const sleepMarker = resolve(root, 'sleep-called');
+      const githubOutput = resolve(root, 'github-output');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(githubOutput, '');
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+attempt=0
+if [ -f "$OAUTH_TEST_COUNTER" ]; then
+  attempt="$(cat "$OAUTH_TEST_COUNTER")"
+fi
+attempt=$((attempt + 1))
+printf '%s' "$attempt" > "$OAUTH_TEST_COUNTER"
+if [ "$attempt" -gt 1 ]; then
+  exit 42
+fi
+mkdir -p test-results "$RUNNER_TEMP/safe-playwright-producer"
+printf '{"source":"unsafe-attempt"}' > test-results/attempt-one.json
+touch "$RUNNER_TEMP/safe-playwright-producer/blocked"
+exit 23
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'sleep'),
+        '#!/usr/bin/env bash\ntouch "$OAUTH_SLEEP_MARKER"\n',
+        { mode: 0o700 }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(probeStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: githubOutput,
+            GITHUB_WORKSPACE: workspace,
+            OAUTH_SLEEP_MARKER: sleepMarker,
+            OAUTH_TEST_COUNTER: counter,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
+      expect(readFileSync(counter, 'utf8')).toBe('1');
+      expect(result.stdout).toContain('refusing an unsafe retry');
+      expect(() => readFileSync(sleepMarker, 'utf8')).toThrow();
+      expect(readFileSync(githubOutput, 'utf8')).not.toContain('oauth_status=');
+      expect(
+        readFileSync(
+          resolve(runnerTemp, 'safe-playwright-producer/blocked'),
+          'utf8'
+        )
+      ).toBe('');
+      expect(
+        readFileSync(
+          resolve(
+            runnerTemp,
+            'production-oauth-gate-retries/attempt-1/failed-artifacts/test-results/attempt-one.json'
+          ),
+          'utf8'
+        )
+      ).toContain('unsafe-attempt');
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
 });
 
 describe('CI E2E smoke workflow', () => {
