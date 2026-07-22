@@ -1324,12 +1324,16 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     const buildIndex = workflow.indexOf(
       '- name: Build (preview target for staging verification)'
     );
+    const readinessAllowlist =
+      readinessStep.match(/--only-secrets=([^\s]+)/)?.[1]?.split(',') ?? [];
 
     expect(readinessIndex).toBeGreaterThanOrEqual(0);
     expect(buildIndex).toBeGreaterThan(readinessIndex);
     expect(readinessStep).toContain('--target=stg');
     expect(readinessStep).toContain('--source=env');
     expect(readinessStep).not.toContain('--source=vercel-file');
+    expect(readinessAllowlist).toContain('BETTER_AUTH_URL');
+    expect(readinessAllowlist).toContain('NEXT_PUBLIC_BETTER_AUTH_URL');
     expect(buildStep).toContain('vercel build');
   });
 
