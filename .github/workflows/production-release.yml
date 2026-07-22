@@ -174,7 +174,7 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: >-
           doppler run --project jovie-web --config stg
-          --only-secrets=NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_PROFILE_URL,NEXT_PUBLIC_PROFILE_HOSTNAME
+          --only-secrets=BETTER_AUTH_URL,NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_PROFILE_URL,NEXT_PUBLIC_PROFILE_HOSTNAME
           --no-fallback -- env -u DOPPLER_TOKEN pnpm --filter=@jovie/web exec
           tsx scripts/check-signup-readiness.ts --target=stg --source=env
       - name: Build (preview target for staging verification)
