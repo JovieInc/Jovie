@@ -3744,7 +3744,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-closed-loop-copy {
-  grid-column: 1 / span 5;
+  grid-column: 1 / span 6;
   align-self: start;
 }
 
@@ -3781,7 +3781,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-closed-loop-story {
-  grid-column: 6 / -1;
+  grid-column: 7 / -1;
   display: grid;
   min-width: 0;
   grid-template-columns: minmax(calc(var(--space-24) * 2), 0.72fr) minmax(
@@ -4796,7 +4796,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-workspace-section__copy {
-  grid-column: 1 / span 5;
+  grid-column: 1 / span 7;
   max-width: none;
   margin-inline: 0;
   justify-self: stretch;
