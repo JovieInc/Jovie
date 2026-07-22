@@ -1,25 +1,36 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-const hermesDir = join(homedir(), '.hermes');
-const stateDir = join(hermesDir, 'state');
-const logsDir = join(hermesDir, 'logs');
-const jobsLogPath = join(logsDir, 'jobs.jsonl');
-const inflightPath = join(stateDir, 'inflight-ship-jobs.json');
-const whatShippedPath = join(stateDir, 'what_shipped.json');
+// Hermetic fixtures: the readers default to the live ~/.hermes ops state, so
+// every fixture path the test controls is pointed at a private temp dir via
+// HudShipperStatePaths overrides. Nothing here touches the real shipper state.
+let fixtureDir: string;
+let logsDir: string;
+let jobsLogPath: string;
+let inflightPath: string;
+let whatShippedPath: string;
+let pauseSentinelPath: string;
+let errLogPath: string;
 
 function writeJsonl(path: string, rows: readonly object[]): void {
   writeFileSync(path, rows.map(row => JSON.stringify(row)).join('\n'));
 }
 
-describe('getHudShipperStatus', () => {
-  beforeEach(() => {
-    mkdirSync(stateDir, { recursive: true });
-    mkdirSync(logsDir, { recursive: true });
-  });
+beforeEach(() => {
+  fixtureDir = mkdtempSync(join(tmpdir(), 'shipper-state-test-'));
+  logsDir = join(fixtureDir, 'logs');
+  mkdirSync(logsDir, { recursive: true });
+  jobsLogPath = join(logsDir, 'jobs.jsonl');
+  inflightPath = join(fixtureDir, 'inflight-ship-jobs.json');
+  whatShippedPath = join(fixtureDir, 'what_shipped.json');
+  // Deliberately absent unless a test creates it.
+  pauseSentinelPath = join(fixtureDir, 'shipping-paused');
+  errLogPath = join(logsDir, 'shipper.err.log');
+});
 
+describe('getHudShipperStatus', () => {
   it('parses in-flight jobs and recent shipper events', async () => {
     writeJsonl(jobsLogPath, [
       {
@@ -55,7 +66,13 @@ describe('getHudShipperStatus', () => {
     );
 
     const { getHudShipperStatus } = await import('@/lib/hud/shipper-state');
-    const payload = getHudShipperStatus();
+    const payload = getHudShipperStatus({
+      hermesDir: fixtureDir,
+      jobsLogPath,
+      pauseSentinelPath,
+      inflightJournalPath: inflightPath,
+      errLogPath,
+    });
 
     expect(payload.availability).toBe('available');
     expect(payload.dispatchableCount).toBe(4);
@@ -66,10 +83,6 @@ describe('getHudShipperStatus', () => {
 });
 
 describe('getHudWhatShipped', () => {
-  beforeEach(() => {
-    mkdirSync(stateDir, { recursive: true });
-  });
-
   it('normalizes what_shipped entries', async () => {
     writeFileSync(
       whatShippedPath,
@@ -85,7 +98,7 @@ describe('getHudWhatShipped', () => {
     );
 
     const { getHudWhatShipped } = await import('@/lib/hud/shipper-state');
-    const payload = getHudWhatShipped();
+    const payload = getHudWhatShipped({ whatShippedPath });
 
     expect(payload.availability).toBe('available');
     expect(payload.entries).toHaveLength(1);
