@@ -74,7 +74,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install pytest
-        run: pip install pytest --quiet
+        run: pip install pytest==8.4.2 --quiet
 
       - name: Run brand-scrub unit tests
         run: pytest scripts/tests/test_brand_scrub.py -v

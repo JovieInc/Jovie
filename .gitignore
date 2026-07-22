@@ -55,6 +55,8 @@ apps/web/.swc/
 
 # misc
 .DS_Store
+__pycache__/
+*.py[cod]
 *.pem
 *.log
 .eslintcache

@@ -172,7 +172,7 @@ while IFS= read -r pr; do
 
   # Setup pnpm and install
   if ! command -v pnpm >/dev/null 2>&1; then
-    npm install -g pnpm@latest >/dev/null 2>&1
+    npm install -g pnpm@9.15.4 >/dev/null 2>&1
   fi
 
   if ! pnpm install --frozen-lockfile >/dev/null 2>&1; then
