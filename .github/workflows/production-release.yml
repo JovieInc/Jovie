@@ -1047,30 +1047,45 @@ jobs:
               PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" \
               --run -- pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
-              --project=chromium --reporter=json || probe_status=$?
+              --project=chromium --no-deps --reporter=json || probe_status=$?
             if [ "$probe_status" -eq 0 ] && jq -e '
-              def specs:
-                .suites[0].suites[0].specs;
+              def oauth_suites:
+                [.suites[]? | select(
+                  type == "object" and
+                  .title == "oauth-providers.spec.ts" and
+                  .file == "oauth-providers.spec.ts"
+                )];
+              def oauth_specs:
+                oauth_suites[0].suites[0].specs;
               type == "object" and (.suites | type == "array") and
               (.suites | length) == 1 and
-              .suites[0].title == "oauth-providers.spec.ts" and
-              .suites[0].file == "tests/e2e/oauth-providers.spec.ts" and
-              (.suites[0].suites | type == "array") and
-              (.suites[0].suites | length) == 1 and
-              .suites[0].suites[0].title == "candidate-bound Better Auth OAuth runtime @production-smoke" and
-              (specs | type == "array") and
-              (specs | map(.title)) == [
+              (oauth_suites | length) == 1 and
+              (oauth_suites[0].specs | type == "array") and
+              (oauth_suites[0].specs | length) == 0 and
+              (oauth_suites[0].suites | type == "array") and
+              (oauth_suites[0].suites | length) == 1 and
+              oauth_suites[0].suites[0].title == "candidate-bound Better Auth OAuth runtime @production-smoke" and
+              (oauth_specs | type == "array") and
+              (oauth_specs | map(.title)) == [
                 "google UI starts the exact Better Auth provider redirect",
                 "apple UI starts the exact Better Auth provider redirect"
               ] and
-              all(specs[];
+              all(oauth_specs[];
                 (.tests | type == "array") and
                 (.tests | length) == 1 and
+                (.tests[0].status == "expected" or .tests[0].status == "flaky") and
+                .tests[0].expectedStatus == "passed" and
                 .tests[0].projectName == "chromium" and
                 (.tests[0].results | type == "array") and
                 (.tests[0].results | length) > 0 and
                 .tests[0].results[-1].status == "passed"
-              )
+              ) and
+              (.errors | type == "array") and
+              (.errors | length) == 0 and
+              (.stats | type == "object") and
+              (.stats.unexpected // 0) == 0 and
+              (.stats.skipped // 0) == 0 and
+              ((.stats.expected // 0) + (.stats.flaky // 0) == 2)
             ' >/dev/null "$report"; then
               {
                 echo "ba_health=passed"
@@ -1092,16 +1107,56 @@ jobs:
             # Only explicit runtime-contract assertions in a valid Playwright
             # report confirm a regression. Browser/tool/network/report failures
             # remain uncertainty and can never request rollback.
-            if [ -s "$report" ] && jq -e '
-              def results:
-                [ .suites[]? | .. | objects | select(has("results")) | .results[]? ];
+            if [ "$probe_status" -ne 0 ] && [ -s "$report" ] && jq -e '
+              def oauth_suites:
+                [.suites[]? | select(
+                  type == "object" and
+                  .title == "oauth-providers.spec.ts" and
+                  .file == "oauth-providers.spec.ts"
+                )];
+              def oauth_specs:
+                oauth_suites[0].suites[0].specs;
+              def oauth_tests:
+                [oauth_specs[]?.tests[]?];
+              def final_results:
+                [oauth_tests[]?.results[-1]];
               type == "object" and (.suites | type == "array") and
-              (results | map(select(.status == "failed")) | length) > 0 and
-              all(results[] | select(.status != "passed" and .status != "skipped");
-                .status == "failed" and
-                ([.errors[]?.message // ""] | any(
-                  contains("CONFIRMED_OAUTH_RUNTIME_CONTRACT")
-                ))
+              (.suites | length) == 1 and
+              (oauth_suites | length) == 1 and
+              (oauth_suites[0].specs | type == "array") and
+              (oauth_suites[0].specs | length) == 0 and
+              (oauth_suites[0].suites | type == "array") and
+              (oauth_suites[0].suites | length) == 1 and
+              oauth_suites[0].suites[0].title == "candidate-bound Better Auth OAuth runtime @production-smoke" and
+              (oauth_specs | type == "array") and
+              (oauth_specs | map(.title)) == [
+                "google UI starts the exact Better Auth provider redirect",
+                "apple UI starts the exact Better Auth provider redirect"
+              ] and
+              (oauth_tests | length) == 2 and
+              all(oauth_specs[];
+                (.tests | type == "array") and
+                (.tests | length) == 1 and
+                (
+                  (.tests[0].status == "unexpected" and
+                    .tests[0].results[-1].status == "failed") or
+                  (.tests[0].status == "expected" and
+                    .tests[0].results[-1].status == "passed")
+                ) and
+                .tests[0].projectName == "chromium" and
+                .tests[0].expectedStatus == "passed" and
+                (.tests[0].results | type == "array") and
+                (.tests[0].results | length) > 0
+              ) and
+              (final_results | map(select(.status == "failed")) | length) > 0 and
+              all(final_results[];
+                .status == "passed" or
+                (
+                  .status == "failed" and
+                  ([.errors[]?.message // ""] | any(
+                    contains("CONFIRMED_OAUTH_RUNTIME_CONTRACT")
+                  ))
+                )
               )
             ' >/dev/null "$report"; then
               confirmed_attempts=$((confirmed_attempts + 1))
