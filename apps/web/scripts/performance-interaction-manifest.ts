@@ -1,8 +1,13 @@
+import { AUDIO_PERFORMANCE_BUDGETS } from '@jovie/audio-contracts';
 import { APP_ROUTES } from '../constants/routes';
 
 export type InteractionTier = 'P0' | 'P1' | 'P2';
 
 export type InteractionClass =
+  | 'audio-buffer-recovery'
+  | 'audio-playback-readiness'
+  | 'audio-seek-settle'
+  | 'audio-shell-continuity'
   | 'audio-transport-visual-response'
   | 'cached-route-view-switch'
   | 'chat-message-round-trip'
@@ -91,8 +96,33 @@ export interface InteractionScenarioDefinition {
 }
 
 export const INTERACTION_CLASS_BUDGETS = {
+  'audio-buffer-recovery': {
+    firstFeedbackP95Ms: AUDIO_PERFORMANCE_BUDGETS['buffer-recovery'].maxP95Ms,
+    usableStateP95Ms: AUDIO_PERFORMANCE_BUDGETS['buffer-recovery'].maxP95Ms,
+    targetLabel: 'Buffer recovery <=1000ms p95',
+  },
+  'audio-playback-readiness': {
+    firstFeedbackP95Ms: AUDIO_PERFORMANCE_BUDGETS['play-to-audible'].maxP95Ms,
+    usableStateP95Ms: AUDIO_PERFORMANCE_BUDGETS['play-to-audible'].maxP95Ms,
+    targetLabel: 'Playback intent to audible media <=250ms p95',
+  },
+  'audio-seek-settle': {
+    firstFeedbackP95Ms:
+      AUDIO_PERFORMANCE_BUDGETS['timeline-scrub-settle'].maxP95Ms,
+    usableStateP95Ms:
+      AUDIO_PERFORMANCE_BUDGETS['timeline-scrub-settle'].maxP95Ms,
+    targetLabel: 'Seek intent to settled playhead <=250ms p95',
+  },
+  'audio-shell-continuity': {
+    firstFeedbackP95Ms:
+      AUDIO_PERFORMANCE_BUDGETS['shell-transition-continuity'].maxP95Ms,
+    usableStateP95Ms:
+      AUDIO_PERFORMANCE_BUDGETS['shell-transition-continuity'].maxP95Ms,
+    targetLabel: 'Shell transition without playback loss <=100ms p95',
+  },
   'audio-transport-visual-response': {
-    firstFeedbackP95Ms: 50,
+    firstFeedbackP95Ms:
+      AUDIO_PERFORMANCE_BUDGETS['pause-visual-response'].maxP95Ms,
     targetLabel: 'Audio transport visual response <=50ms p95',
   },
   'cached-route-view-switch': {
@@ -477,6 +507,175 @@ export const INTERACTION_HOT_PATHS = [
     selectors: {
       firstFeedback: '[aria-label="Lyrics"]',
       usableState: '[aria-label="Lyrics"]',
+    },
+    firstSlice: false,
+  },
+  {
+    id: 'audio-play-to-audible',
+    title: 'Audio playback becomes audible after intent',
+    tier: 'P1',
+    route: APP_ROUTES.CHAT,
+    requiresAuth: true,
+    interactionClass: 'audio-playback-readiness',
+    managerLoopProximity: 'medium',
+    expectedFrequency: 'high',
+    trustRisk: 'medium',
+    budget: INTERACTION_CLASS_BUDGETS['audio-playback-readiness'],
+    ia: {
+      trigger: 'Spacebar or player play control with a loaded track',
+      focusOrigin: 'Player transport or current app-shell region',
+      firstVisibleFeedback: 'Transport acknowledges playback intent',
+      usableState: 'Media emits playing and the playhead advances',
+      focusDestination: 'Transport control or prior app-shell region',
+      escapePath: 'Pause control stops playback',
+      returnFocus: 'Prior focused app-shell region',
+      contextPreservation: ['current track', 'playhead', 'lyrics state'],
+      dataTrustClass: 'playback-only',
+      feedbackSemantics: ['pressed', 'active', 'failure'],
+    },
+    likelyRootCauseBuckets: ['audio-pipeline-delay', 'main-thread-blocking'],
+    selectors: {
+      firstFeedback: '[aria-label*="Pause"], [aria-label*="Play"]',
+      usableState: '[aria-label*="Pause"]',
+    },
+    firstSlice: false,
+  },
+  {
+    id: 'audio-timeline-scrub-settle',
+    title: 'Audio timeline scrub settles the playhead',
+    tier: 'P1',
+    route: APP_ROUTES.RELEASES,
+    requiresAuth: true,
+    interactionClass: 'audio-seek-settle',
+    managerLoopProximity: 'medium',
+    expectedFrequency: 'high',
+    trustRisk: 'medium',
+    budget: INTERACTION_CLASS_BUDGETS['audio-seek-settle'],
+    ia: {
+      trigger: 'Pointer, keyboard, or assistive input changes the seek range',
+      focusOrigin: 'Audio timeline seek range',
+      firstVisibleFeedback: 'Playhead reflects the requested position',
+      usableState: 'Media emits seeked at the requested position',
+      focusDestination: 'Audio timeline seek range',
+      escapePath: 'A later seek supersedes the current seek',
+      returnFocus: 'Audio timeline seek range',
+      contextPreservation: ['current track', 'playback state', 'lyrics state'],
+      dataTrustClass: 'playback-only',
+      feedbackSemantics: ['active', 'stale', 'failure'],
+    },
+    likelyRootCauseBuckets: ['audio-pipeline-delay', 'main-thread-blocking'],
+    selectors: {
+      firstFeedback: '[aria-label="Seek track"]',
+      focusOrigin: '[aria-label="Seek track"]',
+      usableState: '[aria-label="Seek track"]',
+    },
+    firstSlice: false,
+  },
+  {
+    id: 'audio-cue-jump-settle',
+    title: 'Audio cue jump settles the playhead',
+    tier: 'P1',
+    route: APP_ROUTES.RELEASES,
+    requiresAuth: true,
+    interactionClass: 'audio-seek-settle',
+    managerLoopProximity: 'medium',
+    expectedFrequency: 'medium',
+    trustRisk: 'medium',
+    budget: {
+      ...INTERACTION_CLASS_BUDGETS['audio-seek-settle'],
+      firstFeedbackP95Ms: AUDIO_PERFORMANCE_BUDGETS['cue-jump-settle'].maxP95Ms,
+      usableStateP95Ms: AUDIO_PERFORMANCE_BUDGETS['cue-jump-settle'].maxP95Ms,
+      targetLabel: 'Cue jump to settled playhead <=250ms p95',
+    },
+    ia: {
+      trigger: 'Activate a cue row',
+      focusOrigin: 'Selected cue row',
+      firstVisibleFeedback: 'Playhead reflects the cue position',
+      usableState: 'Media emits seeked at the cue position',
+      focusDestination: 'Selected cue row',
+      escapePath: 'A later cue or timeline seek supersedes the jump',
+      returnFocus: 'Selected cue row',
+      contextPreservation: ['current track', 'playback state', 'cue list'],
+      dataTrustClass: 'playback-only',
+      feedbackSemantics: ['active', 'stale', 'failure'],
+    },
+    likelyRootCauseBuckets: ['audio-pipeline-delay', 'main-thread-blocking'],
+    selectors: {
+      firstFeedback: '[aria-label="Seek track"]',
+      usableState: '[aria-label="Seek track"]',
+    },
+    firstSlice: false,
+  },
+  {
+    id: 'audio-buffer-recovery',
+    title: 'Audio resumes after buffering',
+    tier: 'P0',
+    route: APP_ROUTES.CHAT,
+    requiresAuth: true,
+    interactionClass: 'audio-buffer-recovery',
+    managerLoopProximity: 'high',
+    expectedFrequency: 'low',
+    trustRisk: 'high',
+    budget: INTERACTION_CLASS_BUDGETS['audio-buffer-recovery'],
+    ia: {
+      trigger: 'Playing media emits waiting or stalled',
+      focusOrigin: 'Current app-shell region',
+      firstVisibleFeedback: 'Player exposes buffering state',
+      usableState: 'Media emits playing and the playhead resumes',
+      focusDestination: 'Prior focused app-shell region',
+      escapePath: 'Pause or track change cancels recovery',
+      returnFocus: 'Prior focused app-shell region',
+      contextPreservation: ['current track', 'playhead', 'lyrics state'],
+      dataTrustClass: 'playback-only',
+      feedbackSemantics: ['pending', 'active', 'failure'],
+    },
+    likelyRootCauseBuckets: [
+      'audio-pipeline-delay',
+      'network-gated-ui',
+      'main-thread-blocking',
+    ],
+    selectors: {
+      firstFeedback: '[data-testid="track-sidebar"] [aria-live="polite"]',
+      usableState: '[data-testid="track-sidebar"] [aria-live="polite"]',
+    },
+    firstSlice: false,
+  },
+  {
+    id: 'audio-shell-transition-continuity',
+    title: 'Audio continues across app-shell transitions',
+    tier: 'P0',
+    route: APP_ROUTES.CHAT,
+    requiresAuth: true,
+    interactionClass: 'audio-shell-continuity',
+    managerLoopProximity: 'high',
+    expectedFrequency: 'high',
+    trustRisk: 'high',
+    budget: INTERACTION_CLASS_BUDGETS['audio-shell-continuity'],
+    ia: {
+      trigger: 'Navigate between authenticated app-shell views while playing',
+      focusOrigin: 'App-shell navigation or command surface',
+      firstVisibleFeedback: 'Destination shell paints',
+      usableState: 'Destination is operable while the same playhead advances',
+      focusDestination: 'Destination route focus target',
+      escapePath: 'Back navigation returns to the prior view',
+      returnFocus: 'Prior route shell region after back navigation',
+      contextPreservation: [
+        'current track',
+        'playhead',
+        'playback state',
+        'lyrics state',
+      ],
+      dataTrustClass: 'playback-only',
+      feedbackSemantics: ['active', 'failure'],
+    },
+    likelyRootCauseBuckets: [
+      'audio-pipeline-delay',
+      'bundle-hydration-cost',
+      'main-thread-blocking',
+    ],
+    selectors: {
+      firstFeedback: '[data-testid="app-shell-scroll"], main',
+      usableState: '[aria-label*="Pause"]',
     },
     firstSlice: false,
   },
