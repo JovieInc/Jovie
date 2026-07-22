@@ -15,6 +15,7 @@ const config = {
     'analysis.ts',
     'beat-grid.ts',
     'lyrics.ts',
+    'performance.ts',
     'playback.ts',
     '!**/*.test.ts',
   ],
@@ -23,6 +24,7 @@ const config = {
     'analysis.test.ts',
     'beat-grid.test.ts',
     'lyrics.test.ts',
+    'performance.test.ts',
     'playback.test.ts',
   ],
   vitest: {
