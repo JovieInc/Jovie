@@ -554,6 +554,7 @@ jobs:
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie
           EXPECTED_VERCEL_ENVIRONMENT: preview
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_DYNAMIC_SECRETS_FILE: ${{ runner.temp }}/playwright-dynamic-cookie-values
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |

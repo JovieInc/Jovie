@@ -1933,6 +1933,8 @@ describe('canary health gate workflow', () => {
     expect(oauthStep).toContain(
       'PLAYWRIGHT_DYNAMIC_SECRETS_FILE: ${{ runner.temp }}/playwright-dynamic-cookie-values'
     );
+    expect(oauthStep).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(oauthStep).not.toContain('PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES');
     expect(oauthStep).toContain(
       'attempt_artifact_root="$oauth_retry_root/attempt-${attempt}"'
     );
