@@ -884,6 +884,7 @@ describe('deploy workflow Vercel env resolution', () => {
       getJobBlock(workflow, 'alias-staging'),
       'Verify aliased staging OAuth redirect URIs'
     );
+    const productionOauthJob = getJobBlock(workflow, 'production-oauth-gate');
 
     expect(oauthStep).toContain(
       'if PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \\\n'
@@ -892,9 +893,12 @@ describe('deploy workflow Vercel env resolution', () => {
       'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run --'
     );
     expect(oauthStep).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(productionOauthJob).toContain(
+      "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
+    );
     expect(
       workflow.match(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/g)
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     expect(oauthStep).toContain(
       'pnpm exec playwright test tests/e2e/oauth-providers.spec.ts'
     );
@@ -2145,6 +2149,196 @@ exit 23
           'utf8'
         )
       ).toContain('unsafe-attempt');
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('retries production OAuth with quarantined artifacts and a clean producer workspace', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const oauthJob = getJobBlock(release, 'production-oauth-gate');
+    const oauthStep = getStepBlock(
+      oauthJob,
+      'Probe production Better Auth Google + Apple runtime'
+    );
+    const root = mkdtempSync(
+      resolve(tmpdir(), 'jovie-production-oauth-retry-')
+    );
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const counter = resolve(root, 'attempt-count');
+      const githubOutput = resolve(root, 'github-output');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+[ "\${PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN:-}" = "true" ] || exit 43
+attempt=0
+if [ -f "$OAUTH_TEST_COUNTER" ]; then
+  attempt="$(cat "$OAUTH_TEST_COUNTER")"
+fi
+attempt=$((attempt + 1))
+printf '%s' "$attempt" > "$OAUTH_TEST_COUNTER"
+if [ -e test-results ] || [ -L test-results ] || [ -e playwright-report ] || [ -L playwright-report ]; then
+  exit 40
+fi
+mkdir -p test-results
+printf '# Error context\n\nSafe production retry diagnostics.\n' > test-results/error-context.md
+if [ "$attempt" -eq 1 ]; then
+  printf '%s' '{"suites":[{"results":[{"status":"passed"},{"status":"failed","errors":[{"message":"CONFIRMED_OAUTH_RUNTIME_CONTRACT: apple navigation timed out"}]}]}]}' > "$PLAYWRIGHT_JSON_OUTPUT_NAME"
+  exit 1
+fi
+printf '%s' '{"suites":[{"results":[{"status":"passed"},{"status":"passed"}]}]}' > "$PLAYWRIGHT_JSON_OUTPUT_NAME"
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'sleep'),
+        '#!/usr/bin/env bash\nexit 0\n',
+        { mode: 0o700 }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(oauthStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: githubOutput,
+            GITHUB_WORKSPACE: workspace,
+            OAUTH_TEST_COUNTER: counter,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(readFileSync(counter, 'utf8')).toBe('2');
+      expect(readFileSync(githubOutput, 'utf8')).toContain(
+        'oauth_status=passed'
+      );
+      expect(
+        readFileSync(
+          resolve(
+            runnerTemp,
+            'production-oauth-retries/attempt-1/failed-artifacts/test-results/error-context.md'
+          ),
+          'utf8'
+        )
+      ).toContain('Safe production retry diagnostics.');
+      expect(
+        readFileSync(
+          resolve(
+            runnerTemp,
+            'production-oauth-retries/attempt-1/failed-artifacts/oauth-provider-report.json'
+          ),
+          'utf8'
+        )
+      ).toContain('CONFIRMED_OAUTH_RUNTIME_CONTRACT');
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('stops production OAuth retries when the artifact guard poisons shared state', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const oauthStep = getStepBlock(
+      getJobBlock(release, 'production-oauth-gate'),
+      'Probe production Better Auth Google + Apple runtime'
+    );
+    const root = mkdtempSync(
+      resolve(tmpdir(), 'jovie-production-oauth-poison-')
+    );
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const counter = resolve(root, 'attempt-count');
+      const githubOutput = resolve(root, 'github-output');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+attempt=0
+if [ -f "$OAUTH_TEST_COUNTER" ]; then
+  attempt="$(cat "$OAUTH_TEST_COUNTER")"
+fi
+attempt=$((attempt + 1))
+printf '%s' "$attempt" > "$OAUTH_TEST_COUNTER"
+mkdir -p test-results "$RUNNER_TEMP/safe-playwright-producer"
+printf '%s' '{"source":"unsafe-attempt"}' > test-results/attempt-one.json
+touch "$RUNNER_TEMP/safe-playwright-producer/blocked"
+printf '%s' '{"suites":[{"results":[{"status":"failed","errors":[{"message":"CONFIRMED_OAUTH_RUNTIME_CONTRACT: untrusted"}]}]}]}' > "$PLAYWRIGHT_JSON_OUTPUT_NAME"
+exit 23
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'sleep'),
+        '#!/usr/bin/env bash\nexit 42\n',
+        { mode: 0o700 }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(oauthStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: githubOutput,
+            GITHUB_WORKSPACE: workspace,
+            OAUTH_TEST_COUNTER: counter,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status).toBe(1);
+      expect(readFileSync(counter, 'utf8')).toBe('1');
+      expect(`${result.stdout}\n${result.stderr}`).toContain(
+        'refusing an unsafe retry'
+      );
+      expect(readFileSync(githubOutput, 'utf8')).not.toContain(
+        'oauth_status=failed'
+      );
+      expect(
+        readFileSync(
+          resolve(
+            runnerTemp,
+            'production-oauth-retries/attempt-1/failed-artifacts/test-results/attempt-one.json'
+          ),
+          'utf8'
+        )
+      ).toContain('unsafe-attempt');
+      expect(
+        readFileSync(
+          resolve(
+            runnerTemp,
+            'production-oauth-retries/attempt-1/failed-artifacts/oauth-provider-report.json'
+          ),
+          'utf8'
+        )
+      ).toContain('CONFIRMED_OAUTH_RUNTIME_CONTRACT');
     } finally {
       rmSync(root, { force: true, recursive: true });
     }
