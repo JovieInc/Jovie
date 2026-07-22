@@ -1007,6 +1007,9 @@ function LibraryRail({
   const createNameId = useId();
   const releaseTypes = uniqueSorted(assets.map(asset => asset.releaseType));
   const statuses = uniqueSorted(assets.map(asset => asset.status));
+  const approvalStatuses = uniqueSorted(
+    assets.map(asset => asset.approvalStatus)
+  );
   const releaseTags = uniqueSorted(assets.flatMap(releaseTagsForAsset));
   const providerKeys = uniqueSorted(
     assets.flatMap(asset => asset.providers.map(provider => provider.key))
