@@ -1205,6 +1205,7 @@ export const MERGE_QUEUE_REPO_PATHS = Object.freeze({
   branchProtection: BRANCH_PROTECTION_RULESET_PATH,
   ciWorkflow: CI_WORKFLOW_PATH,
   autoenrollWorkflow: MERGE_QUEUE_AUTOENROLL_WORKFLOW_PATH,
+  drainScript: 'scripts/drain-pr-queue.sh',
 });
 
 /**
@@ -1275,6 +1276,76 @@ export function validateMergeQueueEnrollHotPath(workflowYaml = '') {
   ) {
     errors.push(
       'enroll hot path must authorize only the native queue controller'
+    );
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
+const NATIVE_DRAIN_TRANSPORT_AREAS = Object.freeze(['enrollment', 'dequeue']);
+
+function extractNativeDrainTransportArea(script, area) {
+  const startMarker = `# native-queue-transport:${area}:start`;
+  const endMarker = `# native-queue-transport:${area}:end`;
+  const start = script.indexOf(startMarker);
+  const end = script.indexOf(endMarker, start + startMarker.length);
+  if (start < 0 || end < 0) return '';
+  return script.slice(start, end + endMarker.length);
+}
+
+/**
+ * Native queue mutations must never use the legacy Graphite transport label.
+ * Marked transport regions make this invariant deterministic without trying to
+ * parse arbitrary Bash control flow.
+ *
+ * @param {string} drainScript
+ */
+export function validateNativeDrainQueueLabelIsolation(drainScript = '') {
+  const errors = [];
+  const areas = new Map();
+  const legacyLabelPatterns = [
+    /--(?:add|remove)-label\s+["']?merge-queue["']?/,
+    /index\(["']merge-queue["']\)/,
+    /(?:^|[\s"'=])merge-queue(?:[\s"']|$)/m,
+  ];
+
+  for (const area of NATIVE_DRAIN_TRANSPORT_AREAS) {
+    const block = extractNativeDrainTransportArea(drainScript, area);
+    areas.set(area, block);
+    if (!block) {
+      errors.push(`native drain ${area} transport markers are required`);
+      continue;
+    }
+    if (legacyLabelPatterns.some(pattern => pattern.test(block))) {
+      errors.push(
+        `native drain ${area} must not read, write, or require the legacy merge-queue label`
+      );
+    }
+  }
+
+  const enrollment = areas.get('enrollment') ?? '';
+  if (!/merge-queue-backend\.mjs enroll "\$n" "\$head_oid"/.test(enrollment)) {
+    errors.push(
+      'native drain enrollment must bind the exact head to backend enrollment'
+    );
+  }
+  if (
+    !/--arg expected_head "\$expected_head"/.test(enrollment) ||
+    !/\.headRefOid/.test(enrollment)
+  ) {
+    errors.push(
+      'native drain enrollment must retain its exact-head postcondition'
+    );
+  }
+
+  const dequeue = areas.get('dequeue') ?? '';
+  if (!/merge-queue-backend\.mjs dequeue "\$n"/.test(dequeue)) {
+    errors.push('native drain dequeue must prove the backend postcondition');
+  }
+
+  if (!/\$backend == "graphite" and \. == "merge-queue"/.test(drainScript)) {
+    errors.push(
+      'legacy merge-queue eligibility may exist only behind the explicit Graphite backend'
     );
   }
 
