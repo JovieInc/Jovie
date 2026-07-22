@@ -56,6 +56,7 @@ interface BuildDropdownItemsParams {
   userInitials: string;
   formattedUsername: string | null;
   handleProfile: () => void;
+  handleHelp: () => void;
   handleSettings: () => void;
   iosAlphaAccess: {
     hasAccess: boolean;
@@ -90,6 +91,7 @@ function buildDropdownItems({
   userInitials,
   formattedUsername,
   handleProfile,
+  handleHelp,
   handleSettings,
   iosAlphaAccess,
   usageStatsUrl,
@@ -107,12 +109,16 @@ function buildDropdownItems({
       type: 'custom',
       id: 'profile-card',
       render: () => (
-        <button
-          type='button'
-          onClick={handleProfile}
-          className='w-full cursor-pointer rounded-xl px-2.5 py-2 hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover text-left'
+        <div
+          data-testid='user-menu-identity-row'
+          className='grid min-h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-1'
         >
-          <div className='flex w-full items-center gap-2.5'>
+          <button
+            type='button'
+            onClick={handleProfile}
+            aria-label={`Open profile for ${displayName}`}
+            className='flex min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left hover:bg-interactive-hover focus-visible:bg-interactive-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+          >
             <Avatar
               src={userImageUrl}
               alt={displayName || 'User avatar'}
@@ -121,8 +127,11 @@ function buildDropdownItems({
               className='shrink-0'
             />
             <div className='min-w-0 flex-1'>
-              <div className='flex items-center gap-2'>
-                <span className='truncate text-app font-medium text-primary-token'>
+              <div className='flex min-w-0 items-center gap-2'>
+                <span
+                  title={displayName}
+                  className='min-w-0 flex-1 truncate text-app font-medium text-primary-token'
+                >
                   {displayName}
                 </span>
                 {billingStatus.isPro && (
@@ -135,14 +144,26 @@ function buildDropdownItems({
                   </Badge>
                 )}
               </div>
-              {formattedUsername && (
-                <p className='truncate text-2xs text-tertiary-token mt-0.5'>
-                  {formattedUsername}
-                </p>
-              )}
+              <p
+                aria-hidden={formattedUsername ? undefined : true}
+                className='mt-0.5 h-4 truncate text-2xs text-tertiary-token'
+              >
+                {formattedUsername ?? '\u00A0'}
+              </p>
             </div>
-          </div>
-        </button>
+          </button>
+          <Button
+            type='button'
+            variant='secondary'
+            size='sm'
+            onClick={handleHelp}
+            className='shrink-0 gap-1 px-2'
+            aria-label='Help'
+          >
+            <HelpCircle aria-hidden='true' className='h-3.5 w-3.5' />
+            <span>Help</span>
+          </Button>
+        </div>
       ),
     },
     { type: 'separator', id: 'sep-1' },
@@ -400,6 +421,11 @@ export function UserButton({
   const { userImageUrl, displayName, userInitials, formattedUsername } =
     userInfo;
 
+  const handleHelp = useCallback(() => {
+    window.open(APP_ROUTES.SUPPORT, '_blank', 'noopener,noreferrer');
+    setIsMenuOpen(false);
+  }, [setIsMenuOpen]);
+
   useEffect(() => {
     if (!isElectronRuntime || !isLoaded || !user) {
       setIOSAlphaAccess({ hasAccess: false, installUrl: null });
@@ -489,6 +515,7 @@ export function UserButton({
     userInitials,
     formattedUsername,
     handleProfile,
+    handleHelp,
     handleSettings,
     iosAlphaAccess,
     usageStatsUrl: APP_ROUTES.SETTINGS_USAGE,
@@ -553,7 +580,7 @@ export function UserButton({
         align={trigger ? 'start' : 'end'}
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
-        contentClassName='w-60'
+        contentClassName='w-60 max-w-[calc(100vw-1rem)]'
       />
       <DashboardFeedbackModal
         isOpen={isFeedbackOpen}
