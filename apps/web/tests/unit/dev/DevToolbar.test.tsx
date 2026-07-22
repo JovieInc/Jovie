@@ -48,13 +48,19 @@ const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
 const TOOLBAR_OPEN_KEY = '__dev_toolbar_open';
 
 function renderToolbar(
-  props?: Partial<{ env: string; sha: string; version: string }>
+  props?: Partial<{
+    env: string;
+    sha: string;
+    version: string;
+    defaultHidden: boolean;
+  }>
 ) {
   return render(
     <DevToolbar
       env={props?.env ?? 'development'}
       sha={props?.sha ?? 'abc1234'}
       version={props?.version ?? '1.0.0'}
+      defaultHidden={props?.defaultHidden}
     />
   );
 }
@@ -91,6 +97,7 @@ describe('DevToolbar', () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
     document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
   });
 
@@ -113,6 +120,15 @@ describe('DevToolbar', () => {
     it('shows the full toolbar when no localStorage key is set (first visit)', () => {
       renderToolbar();
       expect(screen.getByText('development')).toBeInTheDocument();
+    });
+
+    it('defaults chat usage to the minimally intrusive Dev pill', () => {
+      renderToolbar({ defaultHidden: true });
+
+      expect(
+        screen.getByRole('button', { name: 'Show Dev Toolbar' })
+      ).toBeInTheDocument();
+      expect(screen.queryByText('development')).not.toBeInTheDocument();
     });
 
     it('shows the "Dev" pill when localStorage says hidden', () => {
@@ -172,6 +188,52 @@ describe('DevToolbar', () => {
       expect(
         document.documentElement.style.getPropertyValue('--dev-toolbar-height')
       ).toBe('0px');
+    });
+  });
+
+  describe('flag drawer containment', () => {
+    it('removes collapsed drawer controls from accessibility traversal', () => {
+      renderToolbar();
+
+      expect(
+        screen.queryByRole('textbox', { name: 'Search Flags' })
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText('claim handle')).not.toBeInTheDocument();
+    });
+
+    it('contains expanded controls in a viewport-bound scroll region', () => {
+      renderToolbar();
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Expand Dev Toolbar' })
+      );
+
+      const drawer = screen.getByTestId('dev-toolbar-flag-drawer');
+      const bottomBar = screen.getByTestId('dev-toolbar-bottom-bar');
+
+      expect(drawer).toHaveClass('overflow-y-auto');
+      expect(drawer).toHaveStyle({
+        maxHeight: 'min(400px, calc(100dvh - 7rem))',
+      });
+      expect(bottomBar).toHaveClass('overflow-x-auto');
+      expect(
+        screen.getByRole('textbox', { name: 'Search Flags' })
+      ).toBeInTheDocument();
+    });
+
+    it('tracks expanded height changes so the app shell keeps actions clear', () => {
+      const observe = vi.fn();
+      const disconnect = vi.fn();
+      class ResizeObserverMock {
+        observe = observe;
+        disconnect = disconnect;
+        unobserve = vi.fn();
+      }
+      vi.stubGlobal('ResizeObserver', ResizeObserverMock);
+
+      renderToolbar();
+
+      expect(observe).toHaveBeenCalledWith(screen.getByTestId('dev-toolbar'));
     });
   });
 

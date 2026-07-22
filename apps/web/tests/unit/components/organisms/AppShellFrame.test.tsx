@@ -101,6 +101,20 @@ describe('AppShellFrame', () => {
     expect(rightRail).toHaveClass('sticky', 'top-0');
   });
 
+  it('reserves dev-toolbar height inside the shell scroll pane', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+      />
+    );
+
+    expect(screen.getByTestId('app-shell-scroll')).toHaveClass(
+      'pb-[var(--dev-toolbar-height,0px)]'
+    );
+  });
+
   it('marks composer focus on the shell frame for chrome retreat styles', () => {
     render(
       <AppShellFrame

@@ -26,7 +26,14 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAppFlag, useStoredAppFlagOverrides } from '@/lib/flags/client';
@@ -251,10 +258,12 @@ export function DevToolbar({
   env,
   sha,
   version,
+  defaultHidden = false,
 }: Readonly<{
   env: string;
   sha: string;
   version: string;
+  defaultHidden?: boolean;
 }>) {
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(true);
@@ -314,9 +323,10 @@ export function DevToolbar({
   useEffect(() => {
     setMounted(true);
     setOpen(localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1');
-    setHidden(localStorage.getItem(TOOLBAR_HIDDEN_KEY) === '1');
+    const storedHidden = localStorage.getItem(TOOLBAR_HIDDEN_KEY);
+    setHidden(storedHidden === null ? defaultHidden : storedHidden === '1');
     setSwEnabled(localStorage.getItem(SW_ENABLED_KEY) === '1');
-  }, []);
+  }, [defaultHidden]);
 
   // Keyboard shortcut: Cmd+Shift+D (Mac) / Ctrl+Shift+D (other)
   useEffect(() => {
@@ -350,7 +360,7 @@ export function DevToolbar({
 
   // Expose toolbar height as a CSS variable so scrollable content areas can
   // add their own bottom padding without shrinking the full-viewport app shell.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (hidden) {
       document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
       return;
@@ -363,9 +373,13 @@ export function DevToolbar({
       );
     };
     updateVar();
-    const timer = setTimeout(updateVar, 220);
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(updateVar);
+    if (toolbarRef.current) observer?.observe(toolbarRef.current);
     return () => {
-      clearTimeout(timer);
+      observer?.disconnect();
       document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
     };
   }, [open, hidden]);
@@ -730,123 +744,123 @@ export function DevToolbar({
       className='fixed bottom-0 left-0 right-0 z-[9999] font-mono text-xs'
     >
       {/* Expanded panel */}
-      <div
-        className='overflow-hidden border-t border-default backdrop-blur-sm bg-surface-1/80'
-        style={{
-          maxHeight: open ? '400px' : '0px',
-          borderTopWidth: open ? undefined : 0,
-          transitionDuration: 'var(--duration-subtle)',
-          transitionProperty: 'max-height, border-top-width',
-          transitionTimingFunction: 'var(--ease-subtle)',
-        }}
-      >
-        <div className='flex flex-col'>
-          {/* Search bar */}
-          <div className='flex items-center gap-2 px-4 py-2 border-b border-subtle'>
-            <Search size={12} className='shrink-0 text-quaternary-token' />
-            <input
-              ref={searchRef}
-              type='text'
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder='Search flags...'
-              className='flex-1 bg-transparent text-(--color-text-primary) placeholder:text-quaternary-token outline-none text-xs'
-              aria-label='Search Flags'
-            />
-            {search && (
-              <Button
-                type='button'
-                variant='ghost'
-                onClick={() => setSearch('')}
-                className='h-auto w-auto shrink-0 p-0 text-quaternary-token hover:bg-transparent hover:text-(--color-text-primary) transition-colors'
-                aria-label='Clear Search'
-              >
-                <X size={11} />
-              </Button>
-            )}
-            <span className='shrink-0 text-3xs text-quaternary-token'>
-              {matchCount} of {filteredFlags.total}
-            </span>
-          </div>
-
-          {/* Flags list */}
-          <div className='px-4 py-2 max-h-48 overflow-y-auto'>
-            {/* Overridden flags group */}
-            {filteredFlags.overridden.length > 0 && (
-              <div className='mb-2 border-l-2 border-accent pl-3'>
-                <div className='flex items-center justify-between mb-1'>
-                  <span className='text-3xs font-semibold uppercase tracking-wide text-accent'>
-                    Overrides ({filteredFlags.overridden.length})
-                  </span>
-                  <Button
-                    type='button'
-                    variant='link'
-                    onClick={overridesCtx.clearOverrides}
-                    className='text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
-                  >
-                    Clear All
-                  </Button>
-                </div>
-                <div className='flex flex-col gap-0.5'>
-                  {filteredFlags.overridden.map(flag => (
-                    <FlagRow
-                      key={flag.key}
-                      label={flag.name.toLowerCase().replaceAll('_', ' ')}
-                      flashing={flashedKey === flag.key}
-                      isOverridden
-                      checked={overrides[flag.key]}
-                      serverDefault={flag.serverDefault}
-                      onCheckedChange={v => setOrClearOverride(flag.key, v)}
-                      onClear={() => overridesCtx.removeOverride(flag.key)}
-                      source={flag.source}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Orphan overrides — keys in localStorage that no longer match the contract */}
-            {orphanKeys.length > 0 && !search && (
-              <OrphanOverrides
-                keys={orphanKeys}
-                onPurge={overridesCtx.purgeOrphans}
+      {open ? (
+        <div
+          data-testid='dev-toolbar-flag-drawer'
+          className='overflow-y-auto border-t border-default backdrop-blur-sm bg-surface-1/80'
+          style={{ maxHeight: 'min(400px, calc(100dvh - 7rem))' }}
+        >
+          <div className='flex flex-col'>
+            {/* Search bar */}
+            <div className='flex items-center gap-2 px-4 py-2 border-b border-subtle'>
+              <Search size={12} className='shrink-0 text-quaternary-token' />
+              <input
+                ref={searchRef}
+                type='text'
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder='Search flags...'
+                className='flex-1 bg-transparent text-(--color-text-primary) placeholder:text-quaternary-token outline-none text-xs'
+                aria-label='Search Flags'
               />
-            )}
+              {search && (
+                <Button
+                  type='button'
+                  variant='ghost'
+                  onClick={() => setSearch('')}
+                  className='h-auto w-auto shrink-0 p-0 text-quaternary-token hover:bg-transparent hover:text-(--color-text-primary) transition-colors'
+                  aria-label='Clear Search'
+                >
+                  <X size={11} />
+                </Button>
+              )}
+              <span className='shrink-0 text-3xs text-quaternary-token'>
+                {matchCount} of {filteredFlags.total}
+              </span>
+            </div>
 
-            {/* Non-overridden flags */}
-            {filteredFlags.nonOverridden.length > 0 && (
-              <div className='flex flex-col gap-0.5'>
-                {filteredFlags.nonOverridden.map(flag => {
-                  const checked =
-                    flag.source === 'code' ? flag.serverDefault : false;
-                  return (
-                    <FlagRow
-                      key={flag.key}
-                      label={flag.name.toLowerCase().replaceAll('_', ' ')}
-                      flashing={flashedKey === flag.key}
-                      isOverridden={false}
-                      checked={checked}
-                      onCheckedChange={v => setOrClearOverride(flag.key, v)}
-                      onClear={() => overridesCtx.removeOverride(flag.key)}
-                      source={flag.source}
-                    />
-                  );
-                })}
-              </div>
-            )}
+            {/* Flags list */}
+            <div className='px-4 py-2 max-h-48 overflow-y-auto'>
+              {/* Overridden flags group */}
+              {filteredFlags.overridden.length > 0 && (
+                <div className='mb-2 border-l-2 border-accent pl-3'>
+                  <div className='flex items-center justify-between mb-1'>
+                    <span className='text-3xs font-semibold uppercase tracking-wide text-accent'>
+                      Overrides ({filteredFlags.overridden.length})
+                    </span>
+                    <Button
+                      type='button'
+                      variant='link'
+                      onClick={overridesCtx.clearOverrides}
+                      className='text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
+                    >
+                      Clear All
+                    </Button>
+                  </div>
+                  <div className='flex flex-col gap-0.5'>
+                    {filteredFlags.overridden.map(flag => (
+                      <FlagRow
+                        key={flag.key}
+                        label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                        flashing={flashedKey === flag.key}
+                        isOverridden
+                        checked={overrides[flag.key]}
+                        serverDefault={flag.serverDefault}
+                        onCheckedChange={v => setOrClearOverride(flag.key, v)}
+                        onClear={() => overridesCtx.removeOverride(flag.key)}
+                        source={flag.source}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
-            {/* Empty search state */}
-            {matchCount === 0 && search && (
-              <div className='py-3 text-center text-quaternary-token'>
-                No flags match &lsquo;{search}&rsquo;
-              </div>
-            )}
+              {/* Orphan overrides — keys in localStorage that no longer match the contract */}
+              {orphanKeys.length > 0 && !search && (
+                <OrphanOverrides
+                  keys={orphanKeys}
+                  onPurge={overridesCtx.purgeOrphans}
+                />
+              )}
+
+              {/* Non-overridden flags */}
+              {filteredFlags.nonOverridden.length > 0 && (
+                <div className='flex flex-col gap-0.5'>
+                  {filteredFlags.nonOverridden.map(flag => {
+                    const checked =
+                      flag.source === 'code' ? flag.serverDefault : false;
+                    return (
+                      <FlagRow
+                        key={flag.key}
+                        label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                        flashing={flashedKey === flag.key}
+                        isOverridden={false}
+                        checked={checked}
+                        onCheckedChange={v => setOrClearOverride(flag.key, v)}
+                        onClear={() => overridesCtx.removeOverride(flag.key)}
+                        source={flag.source}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Empty search state */}
+              {matchCount === 0 && search && (
+                <div className='py-3 text-center text-quaternary-token'>
+                  No flags match &lsquo;{search}&rsquo;
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Bottom bar (always visible) */}
-      <div className='relative flex items-center h-9 px-4 gap-2 border-t border-default backdrop-blur-sm bg-surface-1/80 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'>
+      <div
+        data-testid='dev-toolbar-bottom-bar'
+        className='relative flex items-center h-9 overflow-x-auto overscroll-x-contain px-4 gap-2 border-t border-default backdrop-blur-sm bg-surface-1/80 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'
+      >
         {/* Center: brand logo */}
         <div className='absolute left-1/2 -translate-x-1/2 pointer-events-none'>
           <BrandLogo size={16} tone='auto' aria-hidden rounded={false} />
