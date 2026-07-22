@@ -92,7 +92,12 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     const UUID_REGEX =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let lastPart = parts[parts.length - 1];
-    if (isChatThreadPath(parts)) {
+    if (
+      pathname === APP_ROUTES.LIBRARY &&
+      searchParams.get('view') === 'releases'
+    ) {
+      lastPart = 'releases';
+    } else if (isChatThreadPath(parts)) {
       lastPart = 'chat';
     } else if (UUID_REGEX.test(lastPart) && parts.length >= 2) {
       lastPart = parts[parts.length - 2];

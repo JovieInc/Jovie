@@ -45,6 +45,38 @@ describe('useAuthRouteConfig', () => {
     expect(result.current.section).toBe('library');
   });
 
+  it('labels the releases library view as Releases', () => {
+    mockUsePathname.mockReturnValue('/app/library');
+    mockUseSearchParams.mockReturnValue(new URLSearchParams('view=releases'));
+
+    const { result } = renderHook(() => useAuthRouteConfig());
+
+    expect(result.current.breadcrumbs).toEqual([
+      { label: 'Releases', href: '/app/library' },
+    ]);
+  });
+
+  it('keeps the default library view labeled Library', () => {
+    mockUsePathname.mockReturnValue('/app/library');
+
+    const { result } = renderHook(() => useAuthRouteConfig());
+
+    expect(result.current.breadcrumbs).toEqual([
+      { label: 'Library', href: '/app/library' },
+    ]);
+  });
+
+  it('keeps other library views labeled Library', () => {
+    mockUsePathname.mockReturnValue('/app/library');
+    mockUseSearchParams.mockReturnValue(new URLSearchParams('view=audio'));
+
+    const { result } = renderHook(() => useAuthRouteConfig());
+
+    expect(result.current.breadcrumbs).toEqual([
+      { label: 'Library', href: '/app/library' },
+    ]);
+  });
+
   it('treats the canonical tour dates route as a dashboard table surface', () => {
     mockUsePathname.mockReturnValue('/app/tour-dates');
 
