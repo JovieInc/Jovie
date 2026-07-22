@@ -83,7 +83,7 @@ export function HomepageElectricSeam({
         <path
           d={SEAM_PATH}
           fill='none'
-          opacity='0.16'
+          opacity='0.3'
           stroke='var(--homepage-electric-seam-base)'
           strokeWidth='0.8'
         />
@@ -92,7 +92,7 @@ export function HomepageElectricSeam({
           d={SEAM_PATH}
           fill='none'
           filter={`url(#${glowFilterId})`}
-          opacity='0.24'
+          opacity='0.45'
           stroke='var(--homepage-electric-seam-glow)'
           strokeWidth='2.2'
         />

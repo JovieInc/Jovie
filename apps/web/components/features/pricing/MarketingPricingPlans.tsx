@@ -7,6 +7,7 @@ import {
   getVisibleMarketingPricingPlans,
   isMarketingPlanActive,
   type MarketingPricingPlan,
+  type MarketingPricingPlanId,
 } from '@/data/marketingPricingPlans';
 import { cn } from '@/lib/utils';
 
@@ -15,14 +16,25 @@ type MarketingPricingCtaVariant = 'primary' | 'secondary';
 
 function MarketingPricingPlanCard({
   ctaVariant,
+  emphasizedPlanId,
   mode,
   plan,
 }: Readonly<{
   ctaVariant: MarketingPricingCtaVariant;
+  emphasizedPlanId?: MarketingPricingPlanId;
   mode: MarketingPricingMode;
   plan: MarketingPricingPlan;
 }>) {
   const active = isMarketingPlanActive(plan.id);
+  // When a plan is emphasized, it owns the single primary CTA for the section;
+  // every sibling demotes to a quiet ghost button.
+  const resolvedVariant = emphasizedPlanId
+    ? plan.id === emphasizedPlanId
+      ? 'primary'
+      : 'ghost'
+    : ctaVariant === 'primary'
+      ? 'primary'
+      : 'ghost';
 
   return (
     <article
@@ -38,11 +50,9 @@ function MarketingPricingPlanCard({
         aria-hidden='true'
       />
       <div className='marketing-pricing-plan-card__header'>
-        <div className='min-w-0'>
-          <p className='marketing-pricing-plan-card__name'>{plan.name}</p>
-          <p className='marketing-pricing-plan-card__body'>{plan.body}</p>
-        </div>
         <span className='marketing-pricing-plan-card__badge'>{plan.badge}</span>
+        <p className='marketing-pricing-plan-card__name'>{plan.name}</p>
+        <p className='marketing-pricing-plan-card__body'>{plan.body}</p>
       </div>
 
       <p className='marketing-pricing-plan-card__price'>
@@ -50,11 +60,7 @@ function MarketingPricingPlanCard({
         {plan.cadence ? <span>{plan.cadence}</span> : null}
       </p>
 
-      <Button
-        variant={ctaVariant === 'primary' ? 'primary' : 'ghost'}
-        size='md'
-        asChild
-      >
+      <Button variant={resolvedVariant} size='md' asChild>
         <Link href={getMarketingPlanHref(plan.id)} prefetch={false}>
           {getMarketingPlanCtaLabel(plan)}
         </Link>
@@ -74,10 +80,12 @@ function MarketingPricingPlanCard({
 
 export function MarketingPricingPlans({
   ctaVariant = 'primary',
+  emphasizedPlanId,
   mode = 'compact',
   className,
 }: Readonly<{
   ctaVariant?: MarketingPricingCtaVariant;
+  emphasizedPlanId?: MarketingPricingPlanId;
   mode?: MarketingPricingMode;
   className?: string;
 }>) {
@@ -94,6 +102,7 @@ export function MarketingPricingPlans({
       {visiblePlans.map(plan => (
         <MarketingPricingPlanCard
           ctaVariant={ctaVariant}
+          emphasizedPlanId={emphasizedPlanId}
           key={plan.id}
           mode={mode}
           plan={plan}

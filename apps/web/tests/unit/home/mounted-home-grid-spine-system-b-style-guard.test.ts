@@ -70,11 +70,10 @@ describe('mounted homepage grid spine System B source contract', () => {
     for (const mount of [
       '<HomepagePosterHero',
       '<HomeTrustSection',
+      '<HomepageMeetJovie',
       '<HomepageOpportunitySection',
       '<HomepageWorkspaceSectionLazy',
-      '<HomepageArtistOutcomes',
       '<HomepageClosedLoop',
-      '<HomepageV2Pricing',
       '<HomepageV2FinalCta',
       '<FaqSection',
     ]) {
