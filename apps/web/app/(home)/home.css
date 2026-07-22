@@ -3365,7 +3365,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   justify-content: center;
   color: var(--color-text-tertiary-token);
   filter: grayscale(1);
-  opacity: 1;
+  opacity: 0.72;
 }
 
 .system-b-mounted-home-trust-strip .system-b-mounted-home-trust-strip-logo {
@@ -3793,10 +3793,25 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-closed-loop-visual {
+  position: relative;
   width: 100%;
-  max-width: calc(var(--space-24) * 3);
+  max-width: calc(var(--space-24) * 3 + var(--space-8));
   margin: 0 auto;
   color: var(--color-text-tertiary-token);
+}
+
+/* The one cyan accent moment for the chapter: a soft signal glow behind the
+   loop, matching the hero seam's register. */
+.homepage-closed-loop-visual::before {
+  position: absolute;
+  inset: 12%;
+  z-index: -1;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--system-b-accent-cyan) 16%, transparent);
+  content: "";
+  filter: blur(48px);
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .homepage-closed-loop-visual-svg {
@@ -3810,6 +3825,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-text-tertiary-token);
 }
 
+.homepage-closed-loop-visual-pulse,
+.homepage-closed-loop-visual-node--active {
+  color: var(--system-b-accent-cyan);
+}
+
 .homepage-closed-loop-visual-arc,
 .homepage-closed-loop-visual-nodes,
 .homepage-closed-loop-visual-hub {
@@ -3817,12 +3837,28 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-closed-loop-visual-arc--muted,
-.homepage-closed-loop-visual-plus {
+.homepage-closed-loop-visual-core {
   color: var(--color-text-secondary-token);
 }
 
 .homepage-closed-loop-visual-hub {
   fill: var(--system-b-bg-surface-0);
+}
+
+/* Signal pulse: one short cyan arc with a head dot, orbiting the ring slowly.
+   Transform-only; fully disabled under prefers-reduced-motion. */
+@keyframes homepage-closed-loop-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .homepage-closed-loop-visual-pulse {
+    animation: homepage-closed-loop-orbit 14s linear infinite;
+    transform-box: view-box;
+    transform-origin: center;
+  }
 }
 
 .homepage-closed-loop-visual-caption {

@@ -114,9 +114,17 @@ function ClosedLoopVisual() {
           cy='120'
           r='76'
           stroke='currentColor'
-          strokeDasharray='2 8'
           strokeWidth='1'
         />
+        <g className='homepage-closed-loop-visual-pulse'>
+          <path
+            d='M120 44a76 76 0 0 1 37.7 10'
+            stroke='currentColor'
+            strokeLinecap='round'
+            strokeWidth='1.5'
+          />
+          <circle cx='157.7' cy='54' fill='currentColor' r='2.6' />
+        </g>
         <path
           className='homepage-closed-loop-visual-arc'
           d='M120 44a76 76 0 0 1 72 52'
@@ -139,7 +147,12 @@ function ClosedLoopVisual() {
           strokeWidth='1.5'
         />
         <g className='homepage-closed-loop-visual-nodes' fill='currentColor'>
-          <circle cx='120' cy='44' r='3' />
+          <circle
+            className='homepage-closed-loop-visual-node--active'
+            cx='120'
+            cy='44'
+            r='3'
+          />
           <circle cx='192.3' cy='96.5' r='3' />
           <circle cx='164.7' cy='181.5' r='3' />
           <circle cx='75.3' cy='181.5' r='3' />
@@ -154,12 +167,12 @@ function ClosedLoopVisual() {
           stroke='currentColor'
           strokeWidth='1'
         />
-        <path
-          className='homepage-closed-loop-visual-plus'
-          d='M111 120h18M120 111v18'
-          stroke='currentColor'
-          strokeLinecap='round'
-          strokeWidth='1.5'
+        <circle
+          className='homepage-closed-loop-visual-core'
+          cx='120'
+          cy='120'
+          fill='currentColor'
+          r='3'
         />
         <defs>
           <marker
