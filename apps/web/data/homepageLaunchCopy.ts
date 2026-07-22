@@ -29,6 +29,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
   hero: {
     headline: 'Jovie runs your music career.',
     subhead: 'You make the music.',
+    lede: 'Jovie is the AI artist workspace that surfaces opportunities in your catalog and helps you ship the next one.',
     primaryCta: {
       ...HOMEPAGE_FRONT_DOOR_CTA.primary,
       label: 'Get started',
@@ -46,7 +47,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
   workspace: {
     kicker: 'What Jovie finds.',
     headline: 'All your music.\nWorking while you sleep.',
-    screenshotKey: 'shell-v1-releases-desktop',
+    screenshotKey: 'shell-v1-library-desktop',
     callouts: [
       {
         key: 'import',

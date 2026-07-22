@@ -15,7 +15,9 @@ export interface HomepagePosterHeroCta {
 export interface HomepagePosterHeroProps {
   readonly headline: string;
   readonly subtitle: string;
+  readonly lede?: string;
   readonly primaryCta: HomepagePosterHeroCta;
+  readonly secondaryCta?: HomepagePosterHeroCta;
   readonly media: ReactNode;
   readonly seam: ReactNode;
   readonly trackedLinkComponent?: ElementType;
@@ -25,18 +27,20 @@ export interface HomepagePosterHeroProps {
 export function HomepagePosterHero({
   headline,
   subtitle,
+  lede,
   primaryCta,
+  secondaryCta,
   media,
   seam,
   trackedLinkComponent = Link,
   headingId = 'homepage-poster-hero-heading',
 }: HomepagePosterHeroProps) {
   const LinkComponent = trackedLinkComponent;
-  const analyticsProps =
-    trackedLinkComponent !== Link && primaryCta.eventName
+  const analyticsPropsFor = (cta: HomepagePosterHeroCta) =>
+    trackedLinkComponent !== Link && cta.eventName
       ? {
-          eventName: primaryCta.eventName,
-          eventProperties: primaryCta.eventProperties,
+          eventName: cta.eventName,
+          eventProperties: cta.eventProperties,
         }
       : {};
 
@@ -51,12 +55,13 @@ export function HomepagePosterHero({
           {headline}
         </h1>
         <p className='homepage-poster-hero__subtitle'>{subtitle}</p>
+        {lede ? <p className='homepage-poster-hero__lede'>{lede}</p> : null}
         <div className='homepage-poster-hero__actions'>
           <Button asChild size='md' variant='primary'>
             <LinkComponent
               href={primaryCta.href}
               prefetch={primaryCta.prefetch}
-              {...analyticsProps}
+              {...analyticsPropsFor(primaryCta)}
               data-testid='homepage-primary-cta'
               data-cta-sign-up={primaryCta.signUp ? 'true' : undefined}
             >
@@ -65,6 +70,18 @@ export function HomepagePosterHero({
               </HomepageCtaPendingLabel>
             </LinkComponent>
           </Button>
+          {secondaryCta ? (
+            <Button asChild size='md' variant='secondary'>
+              <LinkComponent
+                href={secondaryCta.href}
+                prefetch={secondaryCta.prefetch}
+                {...analyticsPropsFor(secondaryCta)}
+                data-testid='homepage-secondary-cta'
+              >
+                {secondaryCta.label}
+              </LinkComponent>
+            </Button>
+          ) : null}
         </div>
       </div>
       <div

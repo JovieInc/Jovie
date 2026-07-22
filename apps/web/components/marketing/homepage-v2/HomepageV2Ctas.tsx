@@ -69,6 +69,7 @@ export function HomepageV2Pricing() {
           />
 
           <MarketingPricingPlans
+            emphasizedPlanId='pro'
             mode='compact'
             className='system-b-mounted-home-pricing-plans'
           />

@@ -1945,6 +1945,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 @media (prefers-reduced-motion: no-preference) {
   .homepage-poster-hero__headline,
   .homepage-poster-hero__subtitle,
+  .homepage-poster-hero__lede,
   .homepage-poster-hero__actions,
   .homepage-poster-hero__seam,
   .homepage-poster-hero__media {
@@ -1954,6 +1955,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
   .homepage-poster-hero__subtitle {
     animation-delay: 70ms;
+  }
+
+  .homepage-poster-hero__lede {
+    animation-delay: 105ms;
   }
 
   .homepage-poster-hero__actions {
@@ -2032,7 +2037,28 @@ body:has(.home-viewport)::-webkit-scrollbar {
   border: 1px solid var(--system-b-app-frame-seam);
   border-radius: var(--radius-xl);
   background: var(--system-b-bg-surface-1);
-  box-shadow: var(--shadow-card);
+  box-shadow:
+    var(--shadow-card),
+    0 40px 120px rgba(0, 0, 0, 0.55);
+}
+
+/* Cinematic stage light: a single hairline of light caught on the pane's top
+   edge, brightest at center and falling off before the corners. */
+.homepage-product-pane::after {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: 1px;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent 4%,
+    color-mix(in oklab, var(--system-b-text-primary) 26%, transparent) 32%,
+    color-mix(in oklab, var(--system-b-text-primary) 34%, transparent) 50%,
+    color-mix(in oklab, var(--system-b-text-primary) 26%, transparent) 68%,
+    transparent 96%
+  );
+  pointer-events: none;
 }
 
 .homepage-product-pane__image {
@@ -3510,6 +3536,21 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-text-primary-token);
 }
 
+/* Closing light: a low, wide glow behind the final ask so the page closes on
+   the same cinematic register as the hero product stage. */
+.system-b-mounted-home-footer-cta::before {
+  position: absolute;
+  inset: auto 10% -32%;
+  z-index: 0;
+  height: 62%;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-blue-subtle);
+  content: "";
+  filter: blur(90px);
+  opacity: 0.34;
+  pointer-events: none;
+}
+
 .system-b-mounted-home-footer-cta-container {
   position: relative;
   z-index: 1;
@@ -4071,15 +4112,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
   height: 100%;
   object-fit: cover;
   object-position: center top;
-  opacity: 0.88;
-  transition:
-    opacity var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
-    filter var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
+  opacity: 1;
+  transition: filter var(--ds-motion-subtle-duration)
+    var(--ds-motion-subtle-easing);
 }
 
 .homepage-artist-outcome:hover .homepage-artist-outcome__media img {
   filter: brightness(1.06);
-  opacity: 1;
 }
 
 /* Staggered rise-in on load (transform/opacity only — zero layout shift).

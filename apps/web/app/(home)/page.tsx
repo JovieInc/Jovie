@@ -212,6 +212,7 @@ function HomepageHero() {
         headingId='home-hero-heading'
         headline={HERO_COPY.headline}
         subtitle={HERO_COPY.subhead}
+        lede={HERO_COPY.lede}
         trackedLinkComponent={HomepageTrackedLink}
         primaryCta={{
           label: HERO_COPY.primaryCta.label,
@@ -221,6 +222,15 @@ function HomepageHero() {
           eventProperties: {
             cta: 'primary',
             label: HERO_COPY.primaryCta.label,
+          },
+        }}
+        secondaryCta={{
+          label: HERO_COPY.secondaryCta.label,
+          href: HERO_COPY.secondaryCta.href,
+          eventName: 'homepage_hero_secondary_cta_clicked',
+          eventProperties: {
+            cta: 'secondary',
+            label: HERO_COPY.secondaryCta.label,
           },
         }}
         seam={
