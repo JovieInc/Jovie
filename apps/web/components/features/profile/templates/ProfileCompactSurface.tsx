@@ -26,7 +26,6 @@ import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { track } from '@/lib/analytics';
-import { Mark } from '@/lib/brand/primitives';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import {
@@ -288,7 +287,6 @@ export function ProfileCompactSurface({
   dataTestId,
   hideBackButton = false,
   hideMoreMenu = false,
-  hideJovieBranding = false,
   headerSocialLinksOverride,
   renderInteractiveOverlays = true,
   renderSemanticHeading = true,
@@ -428,19 +426,18 @@ export function ProfileCompactSurface({
   const isMenuActive =
     drawerOpen && drawerView === 'menu' && activeVisiblePrimaryTab !== 'tour';
   const topChromeButtonClassName =
-    'h-11! w-11! border-white/14 bg-black/24 text-white dark:text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md hover:bg-black/36';
+    'profile-top-chrome-icon text-white dark:text-white';
+  // 28px visual glyph box with a 44×44 hit area: box-content + p-2 grows the
+  // hit box to 44px while -m-2 cancels the layout footprint (no shift).
   const socialIconClassName =
-    'inline-flex h-7 w-7 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
-  // Composition rule (#11899, lib/profile/composition.ts): hero media has
-  // priority — it grows with the viewport (flex-1, #11083) but never shrinks
-  // below the 240px floor (min-h-60). On short viewports it locks to exactly
-  // the floor and the rail below scrolls; the image crops (object-cover),
-  // never squashes.
-  // Compact viewports (height ≤820, iPhone SE / short chrome): compress the
-  // hero to ≤190px so the bento release card stays above the fold
-  // (profile-mobile-viewport-stability). Taller phones keep flex growth.
+    'box-content inline-flex h-7 w-7 items-center justify-center p-2 -m-2 text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+  // Composition rule: the home hero has one definite token-driven height
+  // (h-(--cover-height) = clamp(220px, 34svh, 400px)) on every viewport. It
+  // never shrink-wraps — the old short-viewport min-h-0/flex-none band
+  // collapse is gone. Media crops via object-cover, never squashes; the
+  // carousel below owns the remaining viewport height.
   const heroHeightClassName = isHomeMode
-    ? 'min-h-(--cover-height) flex-1 [@media(max-height:820px)]:flex-none [@media(max-height:820px)]:min-h-0 [@media(max-height:820px)]:max-h-[190px]'
+    ? 'h-(--cover-height) shrink-0'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))]';
   const homeContentColumnClassName = 'min-h-0 flex-1';
   const homeContentScrollClassName = 'min-h-0 flex-1';
@@ -592,8 +589,10 @@ export function ProfileCompactSurface({
                 )}
               </div>
 
-              <div className='profile-cover-home-gradient pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.1)_0%,rgba(2,3,4,0.18)_30%,rgba(3,4,6,0.48)_64%,rgba(5,6,8,0.94)_88%,var(--profile-stage-bg)_100%)]' />
-              <div className='profile-cover-home-fade pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,var(--profile-stage-bg)_90%)]' />
+              <div
+                className='profile-cover-home-gradient pointer-events-none'
+                aria-hidden='true'
+              />
             </>
           ) : null}
 
@@ -617,7 +616,7 @@ export function ProfileCompactSurface({
                 <CircleIconButton
                   onClick={onBack}
                   size='lg'
-                  variant='pearl'
+                  variant='pearlQuiet'
                   className={topChromeButtonClassName}
                   ariaLabel='Back'
                 >
@@ -645,15 +644,14 @@ export function ProfileCompactSurface({
                 <CircleIconButton
                   onClick={onOpenMenu}
                   size='lg'
-                  variant='pearl'
+                  variant='pearlQuiet'
                   className={topChromeButtonClassName}
                   ariaLabel='Menu'
                 >
-                  {hideJovieBranding ? (
-                    <MoreHorizontal className='h-5 w-5' />
-                  ) : (
-                    <Mark size={18} className='h-5 w-5' />
-                  )}
+                  {/* The drawer is an overflow menu (Share / Pay / Contact), so
+                      the trigger wears the overflow ellipsis — never a brand
+                      mark or gear. */}
+                  <MoreHorizontal className='h-5 w-5' />
                 </CircleIconButton>
               )}
             </div>
@@ -665,7 +663,7 @@ export function ProfileCompactSurface({
               data-testid='profile-hero-identity-block'
             >
               <div
-                className='min-w-0 px-3 py-2.5 [overflow-wrap:anywhere] [@media(max-height:820px)]:px-2.5 [@media(max-height:820px)]:py-2'
+                className='min-w-0 py-2 [overflow-wrap:anywhere]'
                 data-testid='profile-hero-identity-content'
               >
                 <IdentityHeading
@@ -679,7 +677,7 @@ export function ProfileCompactSurface({
                     href={profileHref}
                     prefetch={false}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md text-3xl font-semibold leading-none tracking-normal text-(--profile-status-pill-fg) drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
+                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md py-2.5 -my-2.5 text-3xl font-semibold leading-none tracking-normal text-(--profile-status-pill-fg) drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
                   >
                     <span className='min-w-0 max-w-full [overflow-wrap:anywhere]'>
                       {artist.name}
@@ -696,7 +694,7 @@ export function ProfileCompactSurface({
                   </Link>
                 </IdentityHeading>
 
-                <div className='mt-1 flex min-w-0 items-center justify-between gap-2 [@media(max-height:820px)]:mt-0.5'>
+                <div className='mt-2 flex min-w-0 items-center justify-between gap-2 [@media(max-height:820px)]:mt-1'>
                   <p className='flex min-w-0 items-center gap-1.5 text-xs font-medium leading-4 tracking-normal text-white/74 [@media(max-height:820px)]:text-2xs'>
                     <span className='min-w-0 truncate'>{heroSubtitle}</span>
                     {locationLabel ? (
@@ -787,7 +785,16 @@ export function ProfileCompactSurface({
               // shell edge, where profile-compact-surface already clips.
               isHomeMode && '-mx-(--page-pad) px-(--page-pad)',
               homeContentScrollClassName,
-              showBottomNav ? CONTENT_SAFE_AREA_BOTTOM_PADDING : 'pb-0',
+              // Home mode: the scroll region becomes a flex column so the
+              // carousel rail can flex into the full remaining height
+              // (percentage heights fail against flexed parents).
+              isHomeMode && 'flex flex-col',
+              // Exactly ONE tab-bar reservation: when the bar is visible it
+              // is in-flow below the scroll region and IS the reservation
+              // (no extra padding — that double-counted ~74px of dead space).
+              // When the bar is hidden (cold visitor) the padding reserves
+              // the same footprint so the bar appearing causes no shift.
+              showBottomNav ? 'pb-0' : CONTENT_SAFE_AREA_BOTTOM_PADDING,
               !isHomeMode &&
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
             )}
@@ -812,6 +819,7 @@ export function ProfileCompactSurface({
                 merchCards={merchCards}
                 releases={releases}
                 hasTip={hasTip}
+                pacArtPriority={!resolvedHeroImageUrl}
               />
             ) : (
               <ProfilePrimaryTabPanel
