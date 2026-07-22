@@ -13,7 +13,27 @@ import type {
 } from '@/types/hud-shipper';
 
 const SHIPPER_JOB = 'codex-issue-shipper';
-const DEFAULT_HERMES_DIR = join(homedir(), '.hermes');
+const JOBS_LOG_PATH = join(homedir(), '.hermes', 'logs', 'jobs.jsonl');
+const PAUSE_SENTINEL_PATH = join(homedir(), '.hermes', 'shipping-paused');
+const INFLIGHT_JOURNAL_PATH = join(
+  homedir(),
+  '.hermes',
+  'state',
+  'inflight-ship-jobs.json'
+);
+const WHAT_SHIPPED_PATH = join(
+  homedir(),
+  '.hermes',
+  'state',
+  'what_shipped.json'
+);
+const SHIPPER_ERR_LOG_PATH = join(
+  homedir(),
+  '.hermes',
+  'logs',
+  'launchd',
+  'cron-codex-issue-shipper.err.log'
+);
 
 interface ShipperLogEvent {
   readonly job?: string;
@@ -28,19 +48,8 @@ interface ShipperLogEvent {
   readonly error?: string;
 }
 
-/** Path overrides so tests can point the readers at a temp dir instead of the
- * live ~/.hermes ops state. Production callers use the defaults. */
-export interface HudShipperStatePaths {
-  readonly hermesDir?: string;
-  readonly jobsLogPath?: string;
-  readonly pauseSentinelPath?: string;
-  readonly inflightJournalPath?: string;
-  readonly errLogPath?: string;
-  readonly whatShippedPath?: string;
-}
-
-function hermesStateAvailable(hermesDir: string): boolean {
-  return existsSync(hermesDir);
+function hermesStateAvailable(): boolean {
+  return existsSync(join(homedir(), '.hermes'));
 }
 
 function tailLines(path: string, maxLines: number): string[] {
@@ -72,10 +81,10 @@ function parseShipperEvents(lines: readonly string[]): ShipperLogEvent[] {
   return events;
 }
 
-function readInflightJobs(journalPath: string): HudInflightJob[] {
-  if (!existsSync(journalPath)) return [];
+function readInflightJobs(): HudInflightJob[] {
+  if (!existsSync(INFLIGHT_JOURNAL_PATH)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(journalPath, 'utf8'));
+    const parsed = JSON.parse(readFileSync(INFLIGHT_JOURNAL_PATH, 'utf8'));
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (entry): entry is HudInflightJob =>
@@ -131,28 +140,15 @@ function formatAgentLabel(
   return plans.map(plan => `#${plan.issue} → ${plan.branch}`);
 }
 
-function readRecentErrors(errLogPath: string): string[] {
-  const lines = tailLines(errLogPath, 40);
+function readRecentErrors(): string[] {
+  const lines = tailLines(SHIPPER_ERR_LOG_PATH, 40);
   return lines.slice(-5);
 }
 
-export function getHudShipperStatus(
-  paths: HudShipperStatePaths = {}
-): HudShipperStatusPayload {
-  const hermesDir = paths.hermesDir ?? DEFAULT_HERMES_DIR;
-  const jobsLogPath =
-    paths.jobsLogPath ?? join(hermesDir, 'logs', 'jobs.jsonl');
-  const pauseSentinelPath =
-    paths.pauseSentinelPath ?? join(hermesDir, 'shipping-paused');
-  const inflightJournalPath =
-    paths.inflightJournalPath ??
-    join(hermesDir, 'state', 'inflight-ship-jobs.json');
-  const errLogPath =
-    paths.errLogPath ??
-    join(hermesDir, 'logs', 'launchd', 'cron-codex-issue-shipper.err.log');
+export function getHudShipperStatus(): HudShipperStatusPayload {
   const generatedAtIso = new Date().toISOString();
 
-  if (!hermesStateAvailable(hermesDir)) {
+  if (!hermesStateAvailable()) {
     return {
       availability: 'unavailable',
       state: 'not_running',
@@ -171,9 +167,9 @@ export function getHudShipperStatus(
     };
   }
 
-  const events = parseShipperEvents(tailLines(jobsLogPath, 200));
-  const isPaused = existsSync(pauseSentinelPath);
-  const inFlightJobs = readInflightJobs(inflightJournalPath);
+  const events = parseShipperEvents(tailLines(JOBS_LOG_PATH, 200));
+  const isPaused = existsSync(PAUSE_SENTINEL_PATH);
+  const inFlightJobs = readInflightJobs();
   const lastFinish = [...events]
     .reverse()
     .find(event => event.event === 'finish');
@@ -230,7 +226,7 @@ export function getHudShipperStatus(
       ? formatAgentLabel(lastPlanned.plans)
       : [],
     lastError: lastFatal?.error ?? null,
-    recentErrors: readRecentErrors(errLogPath),
+    recentErrors: readRecentErrors(),
     capacity: lastScanned?.capacity ?? null,
     generatedAtIso,
   };
@@ -267,15 +263,10 @@ function normalizeWhatShippedEntry(value: unknown): HudWhatShippedEntry | null {
   };
 }
 
-export function getHudWhatShipped(
-  paths: HudShipperStatePaths = {}
-): HudWhatShippedPayload {
-  const hermesDir = paths.hermesDir ?? DEFAULT_HERMES_DIR;
-  const whatShippedPath =
-    paths.whatShippedPath ?? join(hermesDir, 'state', 'what_shipped.json');
+export function getHudWhatShipped(): HudWhatShippedPayload {
   const generatedAtIso = new Date().toISOString();
 
-  if (!existsSync(whatShippedPath)) {
+  if (!existsSync(WHAT_SHIPPED_PATH)) {
     return {
       availability: 'unavailable',
       entries: [],
@@ -284,7 +275,7 @@ export function getHudWhatShipped(
   }
 
   try {
-    const parsed = JSON.parse(readFileSync(whatShippedPath, 'utf8'));
+    const parsed = JSON.parse(readFileSync(WHAT_SHIPPED_PATH, 'utf8'));
     const rawEntries = Array.isArray(parsed)
       ? parsed
       : Array.isArray((parsed as { entries?: unknown }).entries)

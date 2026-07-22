@@ -1,37 +1,55 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
-// Hermetic fixtures: the readers default to the live ~/.hermes ops state, so
-// every fixture path the test controls is pointed at a private temp dir via
-// HudShipperStatePaths overrides. Nothing here touches the real shipper state.
-let fixtureDir: string;
-let logsDir: string;
-let jobsLogPath: string;
-let inflightPath: string;
-let whatShippedPath: string;
-let pauseSentinelPath: string;
-let errLogPath: string;
+const mockedOs = vi.hoisted(() => ({ home: '' }));
+
+vi.mock('node:os', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  const mocked = { ...actual, homedir: () => mockedOs.home };
+  return { ...mocked, default: mocked };
+});
+
+let hermesDir = '';
+let stateDir = '';
+let logsDir = '';
+let jobsLogPath = '';
+let inflightPath = '';
+let whatShippedPath = '';
+
+beforeAll(() => {
+  mockedOs.home = mkdtempSync(join('/tmp', 'jovie-shipper-state-test-'));
+  hermesDir = join(mockedOs.home, '.hermes');
+  stateDir = join(hermesDir, 'state');
+  logsDir = join(hermesDir, 'logs');
+  jobsLogPath = join(logsDir, 'jobs.jsonl');
+  inflightPath = join(stateDir, 'inflight-ship-jobs.json');
+  whatShippedPath = join(stateDir, 'what_shipped.json');
+});
+
+afterAll(() => {
+  rmSync(mockedOs.home, { force: true, recursive: true });
+});
 
 function writeJsonl(path: string, rows: readonly object[]): void {
   writeFileSync(path, rows.map(row => JSON.stringify(row)).join('\n'));
 }
 
-beforeEach(() => {
-  fixtureDir = mkdtempSync(join(tmpdir(), 'shipper-state-test-'));
-  logsDir = join(fixtureDir, 'logs');
-  mkdirSync(logsDir, { recursive: true });
-  jobsLogPath = join(logsDir, 'jobs.jsonl');
-  inflightPath = join(fixtureDir, 'inflight-ship-jobs.json');
-  whatShippedPath = join(fixtureDir, 'what_shipped.json');
-  // Deliberately absent unless a test creates it.
-  pauseSentinelPath = join(fixtureDir, 'shipping-paused');
-  errLogPath = join(logsDir, 'shipper.err.log');
-});
-
 describe('getHudShipperStatus', () => {
-  it('parses in-flight jobs and recent shipper events', async () => {
+  beforeEach(() => {
+    mkdirSync(stateDir, { recursive: true });
+    mkdirSync(logsDir, { recursive: true });
+  });
+
+  it('reports idle from hermetic state without the operator pause sentinel', async () => {
     writeJsonl(jobsLogPath, [
       {
         job: 'codex-issue-shipper',
@@ -66,13 +84,7 @@ describe('getHudShipperStatus', () => {
     );
 
     const { getHudShipperStatus } = await import('@/lib/hud/shipper-state');
-    const payload = getHudShipperStatus({
-      hermesDir: fixtureDir,
-      jobsLogPath,
-      pauseSentinelPath,
-      inflightJournalPath: inflightPath,
-      errLogPath,
-    });
+    const payload = getHudShipperStatus();
 
     expect(payload.availability).toBe('available');
     expect(payload.dispatchableCount).toBe(4);
@@ -83,6 +95,10 @@ describe('getHudShipperStatus', () => {
 });
 
 describe('getHudWhatShipped', () => {
+  beforeEach(() => {
+    mkdirSync(stateDir, { recursive: true });
+  });
+
   it('normalizes what_shipped entries', async () => {
     writeFileSync(
       whatShippedPath,
@@ -98,7 +114,7 @@ describe('getHudWhatShipped', () => {
     );
 
     const { getHudWhatShipped } = await import('@/lib/hud/shipper-state');
-    const payload = getHudWhatShipped({ whatShippedPath });
+    const payload = getHudWhatShipped();
 
     expect(payload.availability).toBe('available');
     expect(payload.entries).toHaveLength(1);

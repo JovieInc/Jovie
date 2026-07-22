@@ -8,6 +8,7 @@ import {
   validateLiveMergeQueueRuleset,
   validateMergeQueueEnrollHotPath,
   validateMergeQueueRepoConfig,
+  validateNativeDrainQueueLabelIsolation,
 } from './lib/merge-queue-guard.mjs';
 import { DEFAULT_MERGE_QUEUE_BACKEND } from './merge-queue-backend.mjs';
 
@@ -68,12 +69,15 @@ function runValidate({ checkLive = false } = {}) {
   const autoenrollWorkflowYaml = readRepoFile(
     MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow
   );
+  const drainScript = readRepoFile(MERGE_QUEUE_REPO_PATHS.drainScript);
   const repoValidation = validateMergeQueueRepoConfig({
     backend,
     branchProtectionYaml,
     ciWorkflowYaml,
   });
   const enrollHotPath = validateMergeQueueEnrollHotPath(autoenrollWorkflowYaml);
+  const drainLabelIsolation =
+    validateNativeDrainQueueLabelIsolation(drainScript);
 
   if (repoValidation.warnings.length > 0) {
     console.warn('Merge queue repo-config warnings:');
@@ -82,7 +86,7 @@ function runValidate({ checkLive = false } = {}) {
     }
   }
 
-  if (!repoValidation.ok || !enrollHotPath.ok) {
+  if (!repoValidation.ok || !enrollHotPath.ok || !drainLabelIsolation.ok) {
     if (!repoValidation.ok) {
       console.error('Merge queue repo-config validation failed:');
       for (const error of repoValidation.errors) {
@@ -95,6 +99,12 @@ function runValidate({ checkLive = false } = {}) {
         console.error(`- ${error}`);
       }
     }
+    if (!drainLabelIsolation.ok) {
+      console.error('Native drain label-isolation validation failed:');
+      for (const error of drainLabelIsolation.errors) {
+        console.error(`- ${error}`);
+      }
+    }
     process.exitCode = 1;
     return;
   }
@@ -103,6 +113,7 @@ function runValidate({ checkLive = false } = {}) {
     `Repo config OK — required aggregates: ${repoValidation.contexts.join(', ')}`
   );
   console.log('Enroll hot path OK — no test-only dependency bootstrap');
+  console.log('Native drain OK — no legacy merge-queue label dependency');
 
   if (!checkLive) {
     return;

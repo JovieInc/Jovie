@@ -84,7 +84,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install pytest
-        run: pip install pytest --quiet
+        run: pip install pytest==8.4.2 --quiet
 
       - name: Run slopcheck unit tests
         run: pytest scripts/tests/test_slopcheck.py -v

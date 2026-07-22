@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Backend-routed PR queue drain. Graphite uses the merge-queue label as its
 # transport; GitHub native uses exact-head enrollment and authoritative queue
-# state while retaining the label only as intent/audit evidence.
+# state without reading, writing, or requiring that legacy transport label.
 # Autonomous shipping (2026-07-06): taste gates are advisory — only hold/gated/needs-human block.
 #
 # It deliberately does NOT:
@@ -117,6 +117,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
     fi
     return 0
   fi
+  # native-queue-transport:enrollment:start
   if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
     head_oid="$(jq -r '.headRefOid // empty' <<<"$current")"
     if [[ ! "$head_oid" =~ ^[0-9a-fA-F]{40}$ ]]; then
@@ -136,7 +137,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
     if ! current="$(gh_retry pr view "$n" -R "$REPO" \
       --json state,isDraft,mergeable,labels,headRefOid 2>/dev/null)"; then
       echo "    !! could not refresh #$n after native enrollment; compensating" >&2
-      if ! remove_held_queue_label_strict "$n"; then
+      if ! dequeue_strict "$n"; then
         echo "    !! CRITICAL: could not compensate uncertain native enrollment for #$n" >&2
         return 1
       fi
@@ -154,49 +155,17 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
       ) | not)
     ' <<<"$current" >/dev/null; then
       echo "    ⏸ eligibility changed during native enrollment for #$n; compensating"
-      if ! remove_held_queue_label_strict "$n"; then
+      if ! dequeue_strict "$n"; then
         echo "    !! CRITICAL: could not compensate held native enrollment for #$n" >&2
         return 1
       fi
       return 2
     fi
 
-    # Audit label is best-effort evidence only: external watchers (e.g.
-    # Graphite's account-less unlabel hook) can strip it within seconds, and a
-    # missing audit label must never unwind a proven native enrollment
-    # (GH-14694: drain repeatedly dequeued freshly-enrolled PRs when the label
-    # vanished between the write and the final proof).
-    if ! gh_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
-      echo "    note: could not record native intent label for #$n (non-fatal)"
-    fi
-
-    # Final proof re-verifies eligibility and native queue membership — never
-    # the audit label, which external watchers may legitimately strip. The
-    # labeled event remains a later safety net; this controller does not rely
-    # on that event to repair its own mutation.
-    if ! current="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,labels,headRefOid 2>/dev/null)" \
-      || ! jq -e --arg expected_head "$expected_head" '
-        .state == "OPEN"
-        and (.isDraft | not)
-        and .mergeable == "MERGEABLE"
-        and ((.headRefOid // "") | ascii_downcase) == $expected_head
-        and ([.labels[].name] | any(
-          . == "needs-human" or . == "hold" or . == "gated"
-          or . == "queue-deferred" or . == "needs-conflict-resolution"
-          or . == "fast"
-        ) | not)
-      ' <<<"$current" >/dev/null; then
-      echo "    ⏸ eligibility changed while recording native enrollment for #$n; compensating"
-      if ! remove_held_queue_label_strict "$n"; then
-        echo "    !! CRITICAL: could not compensate final native eligibility failure for #$n" >&2
-        return 1
-      fi
-      return 2
-    fi
     echo "    +native-queue on #$n at $head_oid"
     return 0
   fi
+  # native-queue-transport:enrollment:end
   if ! gh_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
     echo "    !! failed to add merge-queue on #$n" >&2
     return 1
@@ -204,7 +173,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
   if ! current="$(gh_retry pr view "$n" -R "$REPO" \
     --json state,isDraft,mergeable,labels 2>/dev/null)"; then
     echo "    !! could not verify #$n after enrollment" >&2
-    if ! remove_held_queue_label_strict "$n"; then
+    if ! dequeue_strict "$n"; then
       echo "    !! CRITICAL: could not prove failed enrollment was compensated for #$n" >&2
     fi
     return 1
@@ -224,13 +193,13 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
     return 0
   fi
   echo "    !! enrollment verification failed for #$n" >&2
-  if ! remove_held_queue_label_strict "$n"; then
+  if ! dequeue_strict "$n"; then
     echo "    !! CRITICAL: could not prove failed enrollment was compensated for #$n" >&2
   fi
   return 1
 }
 
-remove_held_queue_label_strict() {  # remove_held_queue_label_strict <num>
+dequeue_strict() {  # dequeue_strict <num>
   local n="$1" current
   if [[ "$DRY_RUN" == "1" ]]; then
     if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
@@ -240,24 +209,16 @@ remove_held_queue_label_strict() {  # remove_held_queue_label_strict <num>
     fi
     return 0
   fi
+  # native-queue-transport:dequeue:start
   if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
     if ! node scripts/merge-queue-backend.mjs dequeue "$n" >/dev/null; then
       echo "    !! failed to prove native dequeue for held PR #$n" >&2
       return 1
     fi
-    if ! current="$(gh_retry pr view "$n" -R "$REPO" --json labels 2>/dev/null)"; then
-      echo "    !! could not read intent label after native dequeue for #$n" >&2
-      return 1
-    fi
-    if jq -e '([.labels[].name] | index("merge-queue")) != null' <<<"$current" >/dev/null; then
-      if ! gh_retry pr edit "$n" -R "$REPO" --remove-label merge-queue >/dev/null; then
-        echo "    !! failed to remove native intent label from #$n" >&2
-        return 1
-      fi
-    fi
     echo "    -native-queue on #$n"
     return 0
   fi
+  # native-queue-transport:dequeue:end
   if ! gh_retry pr edit "$n" -R "$REPO" --remove-label merge-queue >/dev/null; then
     echo "    !! failed to remove merge-queue hold violation from #$n" >&2
     return 1
@@ -414,11 +375,11 @@ echo "$SNAP" | jq -r '
   ] | .[]'
 
 # --- DEQUEUE: hard-gated PRs must not occupy queue slots ---
-echo "=== DEQUEUE (hard gates → -merge-queue) ==="
+echo "=== DEQUEUE (hard gates → queue removal) ==="
 while read -r pr; do
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     echo "  #$n  $t"
-    if ! remove_held_queue_label_strict "$n"; then
+    if ! dequeue_strict "$n"; then
       echo "::error::Failed to prove held PR #$n is outside merge queue" >&2
       exit 1
     fi
@@ -439,7 +400,7 @@ while read -r pr; do
 # PRs (13741/13746/13779) through synchronized dequeue/re-enroll cycles.
 # Dequeue only on: needs-conflict-resolution, a CONFIRMED merge conflict
 # (m == CONFLICTING, never UNKNOWN), or actually-failing checks (.fail).
-echo "=== DEQUEUE (conflict / failing → -merge-queue) ==="
+echo "=== DEQUEUE (conflict / failing → queue removal) ==="
 echo "$SNAP" | jq -c '.[]
   | select(.q == true)
   | select((.head|startswith("gtmq_"))|not)
@@ -460,7 +421,7 @@ echo "$SNAP" | jq -c '.[]
     ' <<<"$pr")
     echo "  #$n  $t  ✗ $reason"
     if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
-      if ! remove_held_queue_label_strict "$n"; then
+      if ! dequeue_strict "$n"; then
         echo "::error::Failed to prove PR #$n is outside native merge queue" >&2
         exit 1
       fi
@@ -474,9 +435,9 @@ echo "$SNAP" | jq -c '.[]
 # mergeStateStatus==CLEAN: zombie cancelled/queued required-check runs (from
 # cancel-in-progress) pin otherwise-green PRs at BLOCKED, and gating enrollment on
 # CLEAN meant those PRs never entered the queue. Enrolling a not-yet-green PR is
-# safe — Graphite re-validates and the dequeue step above removes any that truly
+# safe — the backend re-validates and the dequeue step above removes any that truly
 # fail. `.fail` only counts terminal failing checks, not pending/queued ones.
-echo "=== ENROLL (mergeable + not failing → +merge-queue) ==="
+echo "=== ENROLL (mergeable + not failing → queue admission) ==="
 # Honor the checked-in queue policy's maxQueueDepth. Use process substitution rather
 # than a pipe so ENROLLED_THIS_RUN remains in the parent shell and the cap is
 # actually enforced.
