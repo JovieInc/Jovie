@@ -1,9 +1,11 @@
 'use client';
+import { Button } from '@jovie/ui';
 import { Plus } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
+  type PreviewPanelData,
   type PreviewPanelLink,
   usePreviewPanelData,
   usePreviewPanelState,
@@ -24,6 +26,7 @@ import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
 import {
+  type ProfileUpdateInput,
   useDeletePressPhotoMutation,
   useDspMatchesQuery,
   usePressPhotosQuery,
@@ -109,6 +112,74 @@ function resolveCategoryFromTab(
 
 let tempLinkIdCounter = 0;
 
+type EditableProfileField = 'bio' | 'location' | 'hometown' | 'genres';
+type EditableProfileValue = PreviewPanelData[EditableProfileField];
+type EditableProfileUpdate = Pick<
+  ProfileUpdateInput['updates'],
+  EditableProfileField
+>;
+type SaveProfileField = (
+  field: EditableProfileField,
+  previewValue: EditableProfileValue,
+  updates: EditableProfileUpdate,
+  errorMessage: string
+) => void;
+type FieldOperationState = 'pending' | 'succeeded' | 'failed';
+interface FieldOperation {
+  readonly generation: number;
+  readonly previewValue: EditableProfileValue;
+  state: FieldOperationState;
+}
+interface FieldOperationLedger {
+  baseline: EditableProfileValue;
+  readonly operations: Map<number, FieldOperation>;
+}
+
+type ProfileRailMutationStatus =
+  | { state: 'idle' | 'saving' | 'saved' }
+  | { state: 'error'; message: string; retry: () => void };
+
+const IDLE_MUTATION_STATUS: ProfileRailMutationStatus = { state: 'idle' };
+
+function ProfileRailMutationStatusRow({
+  status,
+}: {
+  readonly status: ProfileRailMutationStatus;
+}) {
+  return (
+    <div
+      data-testid='profile-rail-mutation-status'
+      data-state={status.state}
+      role='status'
+      aria-live='polite'
+      aria-atomic='true'
+      className='flex h-7 shrink-0 items-center justify-end gap-1.5 overflow-hidden whitespace-nowrap text-2xs text-tertiary-token'
+    >
+      {status.state === 'saving' ? 'Saving…' : null}
+      {status.state === 'saved' ? 'Saved' : null}
+      {status.state === 'error' ? (
+        <>
+          <span>{status.message}</span>
+          <Button
+            type='button'
+            variant='link'
+            size='sm'
+            className='h-auto min-h-0 px-0 py-0 text-2xs'
+            onClick={status.retry}
+          >
+            Retry
+          </Button>
+        </>
+      ) : null}
+      {status.state === 'idle' ? (
+        <span className='invisible' aria-hidden='true'>
+          Saved
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function createTempLinkId(): string {
   tempLinkIdCounter += 1;
   return `temp-${Date.now()}-${tempLinkIdCounter}`;
@@ -161,6 +232,103 @@ export function ProfileContactSidebar() {
   const previewDataRef = useRef(previewData);
   previewDataRef.current = previewData;
 
+  const mountedRef = useRef(true);
+  const operationEpochRef = useRef(0);
+  const fieldGenerationRef = useRef<Record<EditableProfileField, number>>({
+    bio: 0,
+    location: 0,
+    hometown: 0,
+    genres: 0,
+  });
+  const fieldOperationLedgersRef = useRef<
+    Partial<Record<EditableProfileField, FieldOperationLedger>>
+  >({});
+  const linkGenerationRef = useRef<Map<string, number>>(new Map());
+  const pendingOperationCountRef = useRef(0);
+  const activeMutationErrorRef = useRef<Extract<
+    ProfileRailMutationStatus,
+    { state: 'error' }
+  > | null>(null);
+  const [mutationStatus, setMutationStatus] =
+    useState<ProfileRailMutationStatus>(IDLE_MUTATION_STATUS);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      operationEpochRef.current += 1;
+    };
+  }, []);
+
+  const patchPreviewData = useCallback(
+    (updater: (current: PreviewPanelData) => PreviewPanelData) => {
+      const current = previewDataRef.current;
+      if (!current) return null;
+      const next = updater(current);
+      previewDataRef.current = next;
+      setPreviewData(next);
+      return next;
+    },
+    [setPreviewData]
+  );
+
+  const beginMutationStatus = useCallback(() => {
+    pendingOperationCountRef.current += 1;
+    activeMutationErrorRef.current = null;
+    if (mountedRef.current) setMutationStatus({ state: 'saving' });
+  }, []);
+
+  const completeMutationSuccess = useCallback(() => {
+    pendingOperationCountRef.current = Math.max(
+      0,
+      pendingOperationCountRef.current - 1
+    );
+    if (!mountedRef.current) return;
+    if (activeMutationErrorRef.current) {
+      setMutationStatus(activeMutationErrorRef.current);
+      return;
+    }
+    setMutationStatus({
+      state: pendingOperationCountRef.current > 0 ? 'saving' : 'saved',
+    });
+  }, []);
+
+  const completeMutationError = useCallback(
+    (message: string, retry: () => void) => {
+      pendingOperationCountRef.current = Math.max(
+        0,
+        pendingOperationCountRef.current - 1
+      );
+      if (!mountedRef.current) return;
+      const errorStatus = { state: 'error', message, retry } as const;
+      activeMutationErrorRef.current = errorStatus;
+      setMutationStatus(errorStatus);
+    },
+    []
+  );
+
+  const reconcileFieldOperations = useCallback(
+    (field: EditableProfileField) => {
+      const ledger = fieldOperationLedgersRef.current[field];
+      if (!ledger) return;
+
+      const operations = [...ledger.operations.values()].sort(
+        (left, right) => right.generation - left.generation
+      );
+      const visibleOperation = operations.find(
+        operation => operation.state !== 'failed'
+      );
+      const visibleValue = visibleOperation?.previewValue ?? ledger.baseline;
+      patchPreviewData(data => ({ ...data, [field]: visibleValue }));
+
+      if (!operations.some(operation => operation.state === 'pending')) {
+        ledger.baseline = visibleValue;
+        ledger.operations.clear();
+      }
+    },
+    [patchPreviewData]
+  );
+
   // Tab state
   const [selectedCategory, setSelectedCategory] = useState<
     CategoryOption | 'about'
@@ -203,6 +371,10 @@ export function ProfileContactSidebar() {
   // after the add completes to avoid orphaned server records.
   const pendingAddsRef = useRef<Set<string>>(new Set());
   const deletedWhilePendingRef = useRef<Set<string>>(new Set());
+
+  const saveProfileFieldRef = useRef<SaveProfileField>(() => {});
+  const removeLinkRef = useRef<(linkId: string) => void>(() => {});
+  const addLinkRef = useRef<(link: DetectedLink) => void>(() => {});
 
   // Resolve category to ensure it's a valid tab value
   const resolvedCategory = useMemo(() => {
@@ -258,79 +430,144 @@ export function ProfileContactSidebar() {
     [deletePressPhotoMutation]
   );
 
-  // Handle bio change — save to server and instantly update sidebar
-  const handleBioChange = useCallback(
-    (value: string) => {
-      if (!selectedProfile || !previewData) return;
-      setPreviewData({ ...previewData, bio: value || null });
+  const saveProfileField = useCallback<SaveProfileField>(
+    (field, previewValue, updates, errorMessage) => {
+      if (!selectedProfile) return;
+      const current = previewDataRef.current;
+      if (!current) return;
+
+      const generation = fieldGenerationRef.current[field] + 1;
+      fieldGenerationRef.current[field] = generation;
+      const epoch = operationEpochRef.current;
+      let ledger = fieldOperationLedgersRef.current[field];
+      if (!ledger || ledger.operations.size === 0) {
+        ledger = { baseline: current[field], operations: new Map() };
+        fieldOperationLedgersRef.current[field] = ledger;
+      }
+      ledger.operations.set(generation, {
+        generation,
+        previewValue,
+        state: 'pending',
+      });
+
+      patchPreviewData(data => ({ ...data, [field]: previewValue }));
+      beginMutationStatus();
       profileMutation.mutate(
-        { updates: { bio: value } },
+        { updates },
         {
+          onSuccess: () => {
+            const operation =
+              fieldOperationLedgersRef.current[field]?.operations.get(
+                generation
+              );
+            if (
+              mountedRef.current &&
+              operationEpochRef.current === epoch &&
+              operation
+            ) {
+              operation.state = 'succeeded';
+              reconcileFieldOperations(field);
+            }
+            completeMutationSuccess();
+          },
           onError: () => {
-            setPreviewData({ ...previewData, bio: previewData.bio });
-            toast.error('Failed to update bio');
+            const operation =
+              fieldOperationLedgersRef.current[field]?.operations.get(
+                generation
+              );
+            const canReconcile =
+              mountedRef.current &&
+              operationEpochRef.current === epoch &&
+              operation;
+            if (!canReconcile) {
+              completeMutationSuccess();
+              return;
+            }
+
+            operation.state = 'failed';
+            reconcileFieldOperations(field);
+            const isLatestIntent =
+              fieldGenerationRef.current[field] === generation;
+            if (!isLatestIntent) {
+              completeMutationSuccess();
+              return;
+            }
+
+            const retry = () =>
+              saveProfileFieldRef.current(
+                field,
+                previewValue,
+                updates,
+                errorMessage
+              );
+            completeMutationError(errorMessage, retry);
+            toast.error(errorMessage);
           },
         }
       );
     },
-    [selectedProfile, previewData, setPreviewData, profileMutation]
+    [
+      beginMutationStatus,
+      completeMutationError,
+      completeMutationSuccess,
+      patchPreviewData,
+      profileMutation,
+      reconcileFieldOperations,
+      selectedProfile,
+    ]
+  );
+  saveProfileFieldRef.current = saveProfileField;
+
+  // Handle bio change — save to server and instantly update sidebar
+  const handleBioChange = useCallback(
+    (value: string) => {
+      saveProfileField(
+        'bio',
+        value || null,
+        { bio: value },
+        'Failed to update bio'
+      );
+    },
+    [saveProfileField]
   );
 
   // Handle location change — save to server and instantly update sidebar
   const handleLocationChange = useCallback(
     (value: string | null) => {
-      if (!selectedProfile || !previewData) return;
-      setPreviewData({ ...previewData, location: value });
-      profileMutation.mutate(
-        { updates: { location: value } },
-        {
-          onError: () => {
-            setPreviewData({ ...previewData, location: previewData.location });
-            toast.error('Failed to update location');
-          },
-        }
+      saveProfileField(
+        'location',
+        value,
+        { location: value },
+        'Failed to update location'
       );
     },
-    [selectedProfile, previewData, setPreviewData, profileMutation]
+    [saveProfileField]
   );
 
   // Handle hometown change — save to server and instantly update sidebar
   const handleHometownChange = useCallback(
     (value: string | null) => {
-      if (!selectedProfile || !previewData) return;
-      setPreviewData({ ...previewData, hometown: value });
-      profileMutation.mutate(
-        { updates: { hometown: value } },
-        {
-          onError: () => {
-            setPreviewData({
-              ...previewData,
-              hometown: previewData.hometown,
-            });
-            toast.error('Failed to update hometown');
-          },
-        }
+      saveProfileField(
+        'hometown',
+        value,
+        { hometown: value },
+        'Failed to update hometown'
       );
     },
-    [selectedProfile, previewData, setPreviewData, profileMutation]
+    [saveProfileField]
   );
 
   // Handle genres change — save to server and instantly update sidebar
   const handleGenresChange = useCallback(
     (value: string[]) => {
-      if (!selectedProfile || !previewData) return;
-      setPreviewData({ ...previewData, genres: value });
-      profileMutation.mutate(
-        { updates: { genres: value } },
-        {
-          onError: () => {
-            setPreviewData({ ...previewData, genres: previewData.genres });
-            toast.error('Failed to update genres');
-          },
-        }
+      saveProfileField(
+        'genres',
+        value,
+        { genres: value },
+        'Failed to update genres'
       );
     },
-    [selectedProfile, previewData, setPreviewData, profileMutation]
+    [saveProfileField]
   );
 
   // Existing platform IDs for filtering suggestions
@@ -363,17 +600,17 @@ export function ProfileContactSidebar() {
       if (linkId) {
         const current = previewDataRef.current;
         if (current) {
-          setPreviewData({
-            ...current,
-            links: current.links.map(l =>
+          patchPreviewData(data => ({
+            ...data,
+            links: data.links.map(l =>
               l.id === optimisticId ? { ...l, id: linkId } : l
             ),
-          });
+          }));
         }
       }
-      toast.success(`${platformName} link added`);
+      if (mountedRef.current) toast.success(`${platformName} link added`);
     },
-    [removeLinkMutation, setPreviewData]
+    [patchPreviewData, removeLinkMutation]
   );
 
   // Revert optimistic add on failure
@@ -381,18 +618,19 @@ export function ProfileContactSidebar() {
     (optimisticId: string) => {
       if (deletedWhilePendingRef.current.has(optimisticId)) {
         deletedWhilePendingRef.current.delete(optimisticId);
-        return;
+        return false;
       }
       const current = previewDataRef.current;
       if (current) {
-        setPreviewData({
-          ...current,
-          links: current.links.filter(l => l.id !== optimisticId),
-        });
+        patchPreviewData(data => ({
+          ...data,
+          links: data.links.filter(l => l.id !== optimisticId),
+        }));
       }
-      toast.error('Failed to add link');
+      if (mountedRef.current) toast.error('Failed to add link');
+      return true;
     },
-    [setPreviewData]
+    [patchPreviewData]
   );
 
   // Handle adding a new link (opens smart input)
@@ -447,11 +685,13 @@ export function ProfileContactSidebar() {
   // Handle smart add — receives a detected link from SidebarLinkInput
   const handleSmartAddLink = useCallback(
     async (link: DetectedLink) => {
-      if (!selectedProfile || !previewData) return;
+      if (!selectedProfile) return;
+      const current = previewDataRef.current;
+      if (!current) return;
 
       // Prevent duplicate platforms (except YouTube which can have multiple channels)
       if (link.platform.id !== 'youtube') {
-        const existingLink = previewData.links.find(
+        const existingLink = current.links.find(
           l => l.platform === link.platform.id
         );
         if (existingLink) {
@@ -470,10 +710,10 @@ export function ProfileContactSidebar() {
         isVisible: true,
       };
 
-      setPreviewData({
-        ...previewData,
-        links: [...previewData.links, optimisticLink],
-      });
+      patchPreviewData(data => ({
+        ...data,
+        links: [...data.links, optimisticLink],
+      }));
 
       setIsAddingLink(false);
 
@@ -486,46 +726,74 @@ export function ProfileContactSidebar() {
 
       // Save to server via confirm-link endpoint
       pendingAddsRef.current.add(optimisticLink.id);
+      const epoch = operationEpochRef.current;
+      beginMutationStatus();
       try {
         const linkId = await confirmLinkOnServer(selectedProfile.id, link);
-        reconcileAfterPersist(
-          linkId,
-          optimisticLink.id,
-          link.platform.name,
-          selectedProfile.id
-        );
+        if (operationEpochRef.current === epoch) {
+          reconcileAfterPersist(
+            linkId,
+            optimisticLink.id,
+            link.platform.name,
+            selectedProfile.id
+          );
+        } else if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
+          deletedWhilePendingRef.current.delete(optimisticLink.id);
+          removeLinkMutation.mutate(
+            { profileId: selectedProfile.id, linkId },
+            { onError: () => {} }
+          );
+        }
+        completeMutationSuccess();
       } catch {
-        revertOptimisticAdd(optimisticLink.id);
+        if (mountedRef.current && operationEpochRef.current === epoch) {
+          const reverted = revertOptimisticAdd(optimisticLink.id);
+          if (reverted) {
+            completeMutationError('Failed to add link', () =>
+              addLinkRef.current(link)
+            );
+          } else {
+            completeMutationSuccess();
+          }
+        } else {
+          completeMutationSuccess();
+        }
       } finally {
         pendingAddsRef.current.delete(optimisticLink.id);
       }
     },
     [
       selectedProfile,
-      previewData,
-      setPreviewData,
       resolvedCategory,
       reconcileAfterPersist,
       revertOptimisticAdd,
+      removeLinkMutation,
+      patchPreviewData,
+      beginMutationStatus,
+      completeMutationError,
+      completeMutationSuccess,
     ]
   );
+  addLinkRef.current = link => {
+    void handleSmartAddLink(link);
+  };
 
   // Handle removing a link
   const handleRemoveLink = useCallback(
     (linkId: string) => {
-      if (!previewData || !selectedProfile) return;
+      if (!selectedProfile) return;
+      const current = previewDataRef.current;
+      if (!current) return;
 
-      const removedLink = previewData.links.find(l => l.id === linkId);
+      const removedIndex = current.links.findIndex(l => l.id === linkId);
+      const removedLink = current.links[removedIndex];
       if (!removedLink) return;
 
-      // Snapshot current links before optimistic removal for rollback
-      const previousLinks = previewData.links;
-
       // Optimistically remove from sidebar
-      setPreviewData({
-        ...previewData,
-        links: previewData.links.filter(l => l.id !== linkId),
-      });
+      patchPreviewData(data => ({
+        ...data,
+        links: data.links.filter(l => l.id !== linkId),
+      }));
 
       // If the add is still in flight, mark for server delete after it completes
       if (linkId.startsWith('temp-') && pendingAddsRef.current.has(linkId)) {
@@ -541,25 +809,62 @@ export function ProfileContactSidebar() {
         return;
       }
 
+      const generation = (linkGenerationRef.current.get(linkId) ?? 0) + 1;
+      linkGenerationRef.current.set(linkId, generation);
+      const epoch = operationEpochRef.current;
+      beginMutationStatus();
+
       removeLinkMutation.mutate(
         { profileId: selectedProfile.id, linkId },
         {
           onSuccess: () => {
-            toast.success('Link removed');
+            const isCurrent =
+              mountedRef.current &&
+              operationEpochRef.current === epoch &&
+              linkGenerationRef.current.get(linkId) === generation;
+            completeMutationSuccess();
+            if (isCurrent) toast.success('Link removed');
           },
           onError: () => {
-            // Revert on failure — read current previewData from ref to avoid stale closure
-            const current = previewDataRef.current;
-            if (current) {
-              setPreviewData({ ...current, links: previousLinks });
+            const isCurrent =
+              mountedRef.current &&
+              operationEpochRef.current === epoch &&
+              linkGenerationRef.current.get(linkId) === generation;
+            if (!isCurrent) {
+              completeMutationSuccess();
+              return;
             }
+
+            patchPreviewData(data => {
+              if (data.links.some(link => link.id === removedLink.id)) {
+                return data;
+              }
+              const links = [...data.links];
+              links.splice(
+                Math.min(removedIndex, links.length),
+                0,
+                removedLink
+              );
+              return { ...data, links };
+            });
+            completeMutationError('Failed to remove link', () =>
+              removeLinkRef.current(linkId)
+            );
             toast.error('Failed to remove link');
           },
         }
       );
     },
-    [previewData, selectedProfile, setPreviewData, removeLinkMutation]
+    [
+      beginMutationStatus,
+      completeMutationError,
+      completeMutationSuccess,
+      patchPreviewData,
+      removeLinkMutation,
+      selectedProfile,
+    ]
   );
+  removeLinkRef.current = handleRemoveLink;
 
   // Header parts hook needs to be called unconditionally
   const { overflowActions: baseOverflowActions } = useProfileHeaderParts({
@@ -729,6 +1034,7 @@ export function ProfileContactSidebar() {
         }
         contentClassName='pt-2'
       >
+        <ProfileRailMutationStatusRow status={mutationStatus} />
         {resolvedCategory === 'about' ? (
           <ProfileAboutTab
             bio={bio}

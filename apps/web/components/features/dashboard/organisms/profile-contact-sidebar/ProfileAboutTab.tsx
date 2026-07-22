@@ -98,6 +98,7 @@ function EditableBio({
     return (
       <button
         type='button'
+        aria-label='Edit Bio'
         onClick={() => {
           setDraft(value ?? '');
           setEditing(true);
@@ -118,6 +119,7 @@ function EditableBio({
   return (
     <textarea
       ref={textareaRef}
+      aria-label='Bio'
       value={draft}
       onChange={e => setDraft(e.target.value)}
       onBlur={handleSave}
