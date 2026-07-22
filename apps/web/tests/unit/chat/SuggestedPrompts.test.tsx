@@ -31,16 +31,17 @@ describe('SuggestedPrompts', () => {
     );
 
     expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
-    expect(getByText('Plan A Release')).toBeTruthy();
+    expect(getByText('Plan a Release')).toBeTruthy();
     const generateAlbumArt = getByText('Generate Album Art').closest('button');
     expect(generateAlbumArt).toBeTruthy();
     expect(generateAlbumArt).toBeDisabled();
     expect(getByText('Build Artist Profile')).toBeTruthy();
-    expect(getByText("What's Working Right Now?")).toBeTruthy();
+    expect(getByText('Review Signals')).toBeTruthy();
     // Full title is always on the pill for truncated overflow discoverability.
-    expect(
-      getByText("What's Working Right Now?").closest('button')
-    ).toHaveAttribute('title', "What's Working Right Now?");
+    expect(getByText('Review Signals').closest('button')).toHaveAttribute(
+      'title',
+      'Review Signals'
+    );
 
     // Old task-list entries should be gone — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();
@@ -70,13 +71,13 @@ describe('SuggestedPrompts', () => {
     const { queryByText, getByText } = fastRender(
       <SuggestedPrompts
         onSelect={onSelect}
-        excludeLabels={['Generate Album Art', 'Plan A Release']}
+        excludeActionIds={['generate-album-art', 'plan-release']}
       />
     );
 
     expect(queryByText('Generate Album Art')).toBeNull();
-    expect(queryByText('Plan A Release')).toBeNull();
-    expect(getByText("What's Working Right Now?")).toBeTruthy();
+    expect(queryByText('Plan a Release')).toBeNull();
+    expect(getByText('Review Signals')).toBeTruthy();
   });
 
   it('uses flat prompt icons without always-on icon backgrounds', () => {
@@ -84,7 +85,7 @@ describe('SuggestedPrompts', () => {
     const { getByRole } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
 
     const iconShell = getByRole('button', {
-      name: 'Plan A Release',
+      name: 'Plan a Release',
     }).firstElementChild;
 
     expect(iconShell?.className).toContain('text-tertiary-token');
@@ -189,17 +190,37 @@ describe('SuggestedPrompts', () => {
       />
     );
 
-    expect(getByRole('button', { name: 'Plan A Release' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Plan a Release' })).toBeTruthy();
     expect(getByRole('button', { name: 'Generate Album Art' })).toBeDisabled();
-    expect(getByRole('button', { name: 'Generate Pitch' })).toBeTruthy();
     expect(getByRole('button', { name: 'Build Artist Profile' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Review Signals' })).toBeTruthy();
   });
 
   it('calls onSelect with the full prompt when clicked', () => {
     const onSelect = vi.fn();
     const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
-    getByText('Plan A Release').closest('button')?.click();
+    getByText('Plan a Release').closest('button')?.click();
     expect(onSelect).toHaveBeenCalledWith('Help me plan my next release.');
+  });
+
+  it('tracks canonical quick-action vocabulary when selected', () => {
+    const gtag = vi.fn();
+    Object.defineProperty(globalThis.window, 'gtag', {
+      configurable: true,
+      value: gtag,
+    });
+
+    const { getByRole } = fastRender(<SuggestedPrompts onSelect={vi.fn()} />);
+    getByRole('button', { name: 'Plan a Release' }).click();
+
+    expect(gtag).toHaveBeenCalledWith(
+      'event',
+      'chat_starter_action_selected',
+      expect.objectContaining({
+        action: 'plan_release',
+        surface: 'quick_action',
+      })
+    );
   });
 
   it('hides the profile chip when the profile is already complete', () => {

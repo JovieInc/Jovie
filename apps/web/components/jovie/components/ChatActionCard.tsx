@@ -15,6 +15,7 @@ interface ChatActionCardProps {
   readonly title: string;
   readonly body: string;
   readonly actionLabel: string;
+  readonly ariaLabel?: string;
   readonly onAct: () => void;
   readonly onDismiss: () => void;
   readonly className?: string;
@@ -24,6 +25,7 @@ export function ChatActionCard({
   title,
   body,
   actionLabel,
+  ariaLabel,
   onAct,
   onDismiss,
   className,
@@ -32,6 +34,7 @@ export function ChatActionCard({
     <article
       className={cn('system-b-chat-action-card', className)}
       data-testid='chat-action-card'
+      data-starter-action-surface='primary'
     >
       <span className='system-b-chat-action-card-icon-shell' aria-hidden='true'>
         <AlertCircle
@@ -47,6 +50,7 @@ export function ChatActionCard({
           type='button'
           onClick={onAct}
           className='system-b-chat-action-card-primary'
+          aria-label={ariaLabel ?? actionLabel}
         >
           {actionLabel}
           <ArrowRight

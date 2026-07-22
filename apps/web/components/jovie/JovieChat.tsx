@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
+import { track } from '@/lib/analytics';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
@@ -40,6 +41,7 @@ import {
   ChatLoadingConversationSkeleton,
   ChatThreadMessages,
 } from './JovieChatSections';
+import { CHAT_STARTER_ACTIONS } from './starter-actions';
 import type {
   ChatActionCard as ChatActionCardModel,
   JovieChatProps,
@@ -71,6 +73,7 @@ export function JovieChat({
   avatarUrl,
   username,
   isFirstSession = false,
+  isProfileComplete = false,
   actionCards,
   ambientOwnedByShell = false,
 }: JovieChatProps) {
@@ -80,7 +83,7 @@ export function JovieChat({
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   /** Local dismiss ledger for empty-state action cards (session-scoped). */
   const [dismissedActionCardIds, setDismissedActionCardIds] = useState<
-    ReadonlySet<string>
+    ReadonlySet<ChatActionCardModel['id']>
   >(() => new Set());
   /**
    * Pinned opportunity card for empty-thread → card-open mode
@@ -128,23 +131,32 @@ export function JovieChat({
     return actionCards.filter(card => !dismissedActionCardIds.has(card.id));
   }, [actionCards, dismissedActionCardIds]);
 
-  // Rail chips that duplicate a visible action card would show conflicting
-  // enabled/disabled states (e.g. Generate Album Art card vs capability-gated chip).
-  const promptRailExcludeLabels = useMemo(
-    () => visibleActionCards.map(card => card.title),
-    [visibleActionCards]
+  // A configured primary card owns its action for the whole empty-state
+  // session, including after dismissal. Do not resurrect it as a lower-context
+  // secondary chip with a potentially conflicting capability state.
+  const promptRailExcludeActionIds = useMemo(
+    () => actionCards?.map(card => card.id) ?? [],
+    [actionCards]
   );
 
-  const handleDismissActionCard = useCallback((cardId: string) => {
+  const handleDismissActionCard = useCallback((card: ChatActionCardModel) => {
+    track('chat_starter_action_dismissed', {
+      action: CHAT_STARTER_ACTIONS[card.id].telemetryKey,
+      surface: 'card',
+    });
     setDismissedActionCardIds(prev => {
       const next = new Set(prev);
-      next.add(cardId);
+      next.add(card.id);
       return next;
     });
   }, []);
 
   const handleActOnActionCard = useCallback(
     (card: ChatActionCardModel) => {
+      track('chat_starter_action_selected', {
+        action: CHAT_STARTER_ACTIONS[card.id].telemetryKey,
+        surface: 'card',
+      });
       handleSuggestedPrompt(card.prompt);
     },
     [handleSuggestedPrompt]
@@ -503,7 +515,7 @@ export function JovieChat({
   const showEmptyActionCards =
     showEmptyScaffolding &&
     !showEmptyOpportunityCards &&
-    visibleActionCards.length > 0;
+    Boolean(actionCards?.length);
   // Prompt rail is the zero-opportunity scaffolding path (JOV-3547). Hide it
   // when opportunity cards own the empty state so the rail does not compete.
   const showEmptyPromptRail =
@@ -756,8 +768,9 @@ export function JovieChat({
                             title={card.title}
                             body={card.body}
                             actionLabel={card.actionLabel}
+                            ariaLabel={card.title}
                             onAct={() => handleActOnActionCard(card)}
-                            onDismiss={() => handleDismissActionCard(card.id)}
+                            onDismiss={() => handleDismissActionCard(card)}
                           />
                         ))}
                       </div>
@@ -773,9 +786,10 @@ export function JovieChat({
                       <SuggestedPrompts
                         onSelect={handleSuggestedPrompt}
                         isFirstSession={isFirstSession}
+                        isProfileComplete={isProfileComplete}
                         layout='rail'
                         dimmed={composerPickerOpen}
-                        excludeLabels={promptRailExcludeLabels}
+                        excludeActionIds={promptRailExcludeActionIds}
                       />
                     </div>
                   ) : null}

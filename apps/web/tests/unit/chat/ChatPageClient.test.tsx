@@ -235,15 +235,15 @@ describe('ChatPageClient', () => {
     expect(capturedActionCards).toHaveLength(3);
     expect(capturedActionCards?.[0]).toEqual(
       expect.objectContaining({
-        id: 'connect-music-catalog',
-        title: 'Connect Your Music Catalog',
-        actionLabel: 'Plan Setup',
+        id: 'build-artist-profile',
+        title: 'Build Artist Profile',
+        actionLabel: 'Build Profile',
         prompt:
-          'Help me connect my music catalog for Test Artist. Use the current profile context and give me the next setup step.',
+          'Help me build my artist profile for Test Artist. Start by connecting my music catalog and give me the next setup step.',
       })
     );
     expect(capturedActionCards?.map(card => card.id)).toEqual([
-      'connect-music-catalog',
+      'build-artist-profile',
       'plan-release',
       'generate-album-art',
     ]);
@@ -277,7 +277,7 @@ describe('ChatPageClient', () => {
     expect(capturedActionCards?.map(card => card.id)).toEqual([
       'plan-release',
       'generate-album-art',
-      'whats-working',
+      'review-signals',
     ]);
   });
 
