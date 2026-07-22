@@ -88,4 +88,10 @@ export interface ArtistNotificationsCTAProps {
   readonly source?: NotificationSource;
   readonly sourceContext?: NotificationSourceContext;
   readonly triggerLabel?: string;
+  /**
+   * Optional override for the trigger button's className. Used by surface
+   * empty states that need the trigger on the unified 36px CTA scale instead
+   * of the default 48px pill.
+   */
+  readonly triggerClassName?: string;
 }

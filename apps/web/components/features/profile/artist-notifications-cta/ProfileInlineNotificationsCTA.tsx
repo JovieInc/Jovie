@@ -9,6 +9,10 @@ import { captureError } from '@/lib/error-tracking';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
+import {
+  getCaptureDismissalStatus,
+  invalidateCaptureDismissalStatus,
+} from '@/lib/profile/capture-dismissal-client';
 import { readProfileAccentTheme } from '@/lib/profile/profile-theme';
 import {
   useUpdateContentPreferencesMutation,
@@ -57,6 +61,8 @@ export interface ProfileInlineNotificationsCTAProps {
   readonly source?: NotificationSource;
   readonly sourceContext?: NotificationSourceContext;
   readonly triggerLabel?: string;
+  /** Optional trigger className override (e.g. the 36px empty-state CTA). */
+  readonly triggerClassName?: string;
   readonly experimentVariant?: ProfileAlertOptInVariant;
 }
 
@@ -169,6 +175,7 @@ export function ProfileInlineNotificationsCTA({
   source,
   sourceContext,
   triggerLabel: triggerLabelProp,
+  triggerClassName: triggerClassNameProp,
   experimentVariant,
 }: ProfileInlineNotificationsCTAProps) {
   const { contentPreferences, artistEmail, subscriptionDetails } =
@@ -401,19 +408,11 @@ export function ProfileInlineNotificationsCTA({
     }
 
     let isActive = true;
-    fetch(`/api/profile/capture-dismissal?artist_id=${artist.id}`, {
-      cache: 'no-store',
-    })
-      .then(async response => {
-        if (!response.ok) return;
-        const data = (await response.json()) as {
-          readonly suppressed?: boolean;
-        };
-        if (isActive) {
-          setCaptureSuppressed(Boolean(data.suppressed));
-        }
-      })
-      .catch(() => {});
+    void getCaptureDismissalStatus(artist.id).then(data => {
+      if (isActive) {
+        setCaptureSuppressed(Boolean(data?.suppressed));
+      }
+    });
 
     return () => {
       isActive = false;
@@ -579,6 +578,7 @@ export function ProfileInlineNotificationsCTA({
         throw new Error('Capture dismissal failed');
       }
 
+      invalidateCaptureDismissalStatus(artist.id);
       handleClose();
     } catch (error) {
       void captureError('Profile capture dismissal failed', error, {
@@ -837,7 +837,7 @@ export function ProfileInlineNotificationsCTA({
   const triggerLabel = isSubscribed
     ? 'Manage alerts'
     : (triggerLabelProp ?? 'Get alerts');
-  const triggerClassName = getTriggerClassName(variant);
+  const triggerClassName = triggerClassNameProp ?? getTriggerClassName(variant);
   const trigger =
     isInline || hideTrigger ? null : (
       <button

@@ -41,6 +41,7 @@ const PROFILE_SHELL = join(
   'profile-shell',
   'ProfileShell.tsx'
 );
+const DESIGN_SYSTEM = join(ROOT, 'styles', 'design-system.css');
 
 const REPRESENTATIVE_PROFILE_ENTRYPOINTS = [
   join(ROOT, 'app', '[username]', 'page.tsx'),
@@ -109,8 +110,14 @@ describe('public profile contract guard', () => {
     expect(readFileSync(PROFILE_COMPACT_SURFACE, 'utf8')).toContain(
       '--profile-content-bg'
     );
+    // The hero legibility gradient is the --profile-stage-bg consumer: the
+    // surface renders the class hook, the token reference lives in the
+    // gradient rule in design-system.css.
     expect(readFileSync(PROFILE_COMPACT_SURFACE, 'utf8')).toContain(
-      '--profile-stage-bg'
+      'profile-cover-home-gradient'
+    );
+    expect(readFileSync(DESIGN_SYSTEM, 'utf8')).toMatch(
+      /\.profile-cover-home-gradient[\s\S]{0,400}var\(--profile-stage-bg\)/
     );
     expect(readFileSync(PROFILE_SHELL, 'utf8')).toContain(
       '--profile-shell-header-max-width'
