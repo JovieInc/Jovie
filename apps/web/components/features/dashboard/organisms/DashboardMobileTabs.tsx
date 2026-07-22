@@ -1,9 +1,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
-  adminNavigation,
   filterProfilesWorkspaceNavigation,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
@@ -20,7 +18,6 @@ function toMenuItem(item: NavItem): LiquidGlassMenuItem {
 }
 
 const PRIMARY_ITEMS = mobilePrimaryNavigation.map(toMenuItem);
-const ADMIN_ITEMS = adminNavigation.map(toMenuItem);
 
 export interface DashboardMobileTabsProps {
   readonly className?: string;
@@ -29,7 +26,6 @@ export interface DashboardMobileTabsProps {
 export function DashboardMobileTabs({
   className,
 }: DashboardMobileTabsProps): React.JSX.Element {
-  const { isAdmin } = useDashboardData();
   const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
   const { signOut } = useAuthSafe();
   const expandedItems = useMemo(
@@ -49,7 +45,6 @@ export function DashboardMobileTabs({
     <LiquidGlassMenu
       primaryItems={PRIMARY_ITEMS}
       expandedItems={expandedItems}
-      adminItems={isAdmin ? ADMIN_ITEMS : undefined}
       onSignOut={handleSignOut}
       className={cn('lg:hidden', className)}
     />

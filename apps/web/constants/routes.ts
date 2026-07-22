@@ -120,7 +120,8 @@ export const APP_ROUTES = {
   ADMIN_REVENUE_LIFT: '/app/admin/revenue-lift',
   ADMIN_SYSTEM: '/app/admin/system',
   ADMIN_FEATURES: '/app/admin/features',
-  FEATURE_FLAGS: '/app/feature-flags',
+  /** Legacy bookmark preserved as a redirect to ADMIN_FEATURES. */
+  LEGACY_FEATURE_FLAGS: '/app/feature-flags',
 
   // System
   UNAVAILABLE: '/unavailable',

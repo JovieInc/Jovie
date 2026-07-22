@@ -1,8 +1,9 @@
 # Experimental Shell Debt Ledger
 
-`/exp/*` is a noindex, design-only playground. Keep production behavior out of
-this tree: no schema work, no server state assumptions, and no product route
-rewrites. When a design settles, extract the smallest reusable primitive to
+`/exp/*` is a noindex, admin-only design playground. The shared server layout
+must complete its role check and return not-found before rendering prototype
+children. Keep production behavior out of this tree: no schema work, no server
+state assumptions, and no product route rewrites. When a design settles, extract the smallest reusable primitive to
 `@/components/shell/*` or a feature-owned component, then leave the experiment
 as a reference fixture until an owner confirms deletion.
 
@@ -75,6 +76,7 @@ state at route/feature boundaries.
 - Several `/exp` pages contain large local mock datasets and local icon/shim
   components. Deleting them is safe only after the accepted visual decisions are
   captured in production components, tests, screenshots, or design docs.
-- `/exp/layout.tsx` provides shared `QueryProvider` and `TooltipProvider`
-  context for experiments that embed shipped components. Removing it can break
-  preview routes even when the individual pages look static.
+- `/exp/layout.tsx` owns the shared admin role gate plus `QueryProvider` and
+  `TooltipProvider` context for experiments that embed shipped components.
+  Removing or bypassing it can expose prototype payloads or break preview
+  routes even when the individual pages look static.

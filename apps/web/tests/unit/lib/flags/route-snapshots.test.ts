@@ -24,7 +24,8 @@ describe('route flag snapshots', () => {
       APP_ROUTES.RELEASES,
       APP_ROUTES.SETTINGS,
       APP_ROUTES.ADMIN,
-      APP_ROUTES.FEATURE_FLAGS,
+      APP_ROUTES.ADMIN_FEATURES,
+      APP_ROUTES.LEGACY_FEATURE_FLAGS,
     ]) {
       expect(resolveAppShellRouteFlagNames(pathname)).toEqual(
         expect.arrayContaining([

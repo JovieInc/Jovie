@@ -91,21 +91,15 @@ describe('DashboardNav interactions', () => {
     );
   });
 
-  it('shows grouped admin navigation with growth links for admin users', () => {
+  it('keeps admin routes out of artist navigation for admin users', () => {
     renderDashboardNav({
       renderFn: render,
       overrides: { isAdmin: true },
     });
 
-    expect(screen.getByRole('button', { name: 'Admin' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Growth' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.ADMIN_GROWTH
-    );
-    expect(screen.getByRole('link', { name: 'People' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.ADMIN_PEOPLE
-    );
+    expect(screen.queryByRole('button', { name: 'Admin' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Growth' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'People' })).toBeNull();
   });
 
   it('highlights the active route based on pathname', () => {

@@ -76,7 +76,7 @@ Mixed-state contract:
 
 ## /exp/shell-v1
 
-`apps/web/app/exp/shell-v1/page.tsx` is a single-page showcase of every v1 primitive (AudioBar, DspAvatarStack, EntityPopover, LyricsList, MobilePlayerCard, PerformanceCard, ReleaseSidebar, SidebarNavItem, ShellDropdown, ThreadView, ...) rendered without auth. Use it for design review and to QA primitives without touching production data.
+`apps/web/app/exp/shell-v1/page.tsx` is a single-page showcase of every v1 primitive (AudioBar, DspAvatarStack, EntityPopover, LyricsList, MobilePlayerCard, PerformanceCard, ReleaseSidebar, SidebarNavItem, ShellDropdown, ThreadView, ...). The shared `/exp` server layout returns not-found unless the current user has the admin role, before any prototype child data is rendered. Authorized admins can use it for design review and to QA primitives without touching production data.
 
 ## Migration path
 

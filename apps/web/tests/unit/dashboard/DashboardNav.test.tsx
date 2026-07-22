@@ -316,41 +316,16 @@ describe('DashboardNav', () => {
     expect(queryByRole('button', { name: 'Growth' })).toBeNull();
   });
 
-  it('renders full admin navigation for admin users', () => {
-    const { getByRole } = renderDashboardNav({
+  it('keeps admin routes out of artist navigation for admin users', () => {
+    const { queryByRole } = renderDashboardNav({
       renderFn: fastRender,
       overrides: { isAdmin: true },
     });
 
-    expect(getByRole('link', { name: 'People' }).getAttribute('href')).toBe(
-      APP_ROUTES.ADMIN_PEOPLE
-    );
-    expect(getByRole('link', { name: 'Growth' }).getAttribute('href')).toBe(
-      APP_ROUTES.ADMIN_GROWTH
-    );
-    expect(getByRole('link', { name: 'Activity' }).getAttribute('href')).toBe(
-      APP_ROUTES.ADMIN_ACTIVITY
-    );
-  });
-
-  it('defaults the Admin group collapsed', () => {
-    const { getByRole } = renderDashboardNav({
-      renderFn: fastRender,
-      overrides: {
-        isAdmin: true,
-        selectedProfile: {
-          id: 'profile_123',
-          displayName: 'Tim White',
-          username: 'tim',
-          usernameNormalized: 'tim',
-        } as DashboardData['selectedProfile'],
-      },
-    });
-
-    expect(getByRole('button', { name: 'Admin' })).toHaveAttribute(
-      'aria-expanded',
-      'false'
-    );
+    expect(queryByRole('button', { name: 'Admin' })).toBeNull();
+    expect(queryByRole('link', { name: 'People' })).toBeNull();
+    expect(queryByRole('link', { name: 'Growth' })).toBeNull();
+    expect(queryByRole('link', { name: 'Activity' })).toBeNull();
   });
 
   it('renders with different pathname', () => {

@@ -36,7 +36,6 @@ import { usePlanGate } from '@/lib/queries';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
-  adminNavigationSections,
   artistProfileNavItem,
   artistSettingsNavigation,
   filterProfilesWorkspaceNavigation,
@@ -164,7 +163,7 @@ function formatTaskBadge(
 }
 
 export function DashboardNav(_: DashboardNavProps) {
-  const { isAdmin, selectedProfile } = useDashboardData();
+  const { selectedProfile } = useDashboardData();
   const { clearPendingShell, showPendingShell } = usePendingShell();
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
@@ -634,29 +633,6 @@ export function DashboardNav(_: DashboardNavProps) {
             />
           </div>
         ) : null}
-
-        {isAdmin && !isInSettings && (
-          <div data-testid='admin-nav-section' className='mt-3'>
-            <SidebarCollapsibleGroup
-              label='Admin'
-              defaultOpen={false}
-              storageKey='dashboard.admin'
-            >
-              {adminNavigationSections.map(section => (
-                <div
-                  key={section.label}
-                  className='space-y-2'
-                  data-admin-section={section.label}
-                >
-                  <p className='px-2.5 pb-0.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
-                    {section.label}
-                  </p>
-                  {renderSection(section.items)}
-                </div>
-              ))}
-            </SidebarCollapsibleGroup>
-          </div>
-        )}
       </nav>
       {contextMenuOverlay}
     </>

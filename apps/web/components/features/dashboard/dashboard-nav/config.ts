@@ -1,40 +1,23 @@
 import {
-  Activity,
   Banknote,
-  Briefcase,
-  Cable,
   CalendarDays,
   CheckSquare,
-  Flag,
-  FolderKanban,
   Gauge,
   HandCoins,
   Home,
   IdCard,
-  Image as ImageIcon,
   Inbox,
-  LayoutDashboard,
   Lock,
-  type LucideIcon,
   MailCheck,
-  Map,
   Music,
   PieChart,
   Settings,
-  Share2,
   ShieldCheck,
   SquarePen,
-  TrendingUp,
   UserCircle,
   Users,
 } from 'lucide-react';
 
-import {
-  ADMIN_NAV_REGISTRY,
-  ADMIN_PRIMARY_WORKSPACE_IDS,
-  ADMIN_SETTINGS_TOOL_IDS,
-  type AdminWorkspaceId,
-} from '@/constants/admin-navigation';
 import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 
 import type { NavItem } from './types';
@@ -225,84 +208,10 @@ export const artistSettingsNavigation: NavItem[] = [
   },
 ];
 
-/** Admin settings item — shown only to admin users */
-export const adminSettingsNavItem: NavItem = {
-  name: 'Admin',
-  href: APP_ROUTES.SETTINGS_ADMIN,
-  id: 'admin-settings',
-  icon: Settings,
-};
-
 /** Combined settings navigation (all items flat) */
 export const settingsNavigation: NavItem[] = [
   ...userSettingsNavigation,
   ...artistSettingsNavigation,
-];
-
-/** Admin settings item — shown only to admin users */
-
-// Exhaustive map of AdminWorkspaceId → icon. Typed as Record so adding a new
-// workspace id to `AdminWorkspaceId` without a matching icon entry fails
-// typecheck — silent `undefined` returns would otherwise show up as missing
-// icons in the admin sidebar at runtime.
-const adminIconById: Record<AdminWorkspaceId, LucideIcon> = {
-  overview: LayoutDashboard,
-  ops: Gauge,
-  people: Users,
-  growth: FolderKanban,
-  platform_connections: Cable,
-  activity: Activity,
-  investors: Briefcase,
-  screenshots: ImageIcon,
-  costs: Banknote,
-  revenue_lift: TrendingUp,
-  share_studio: Share2,
-  system_map: Map,
-  features: Flag,
-};
-
-function buildAdminNavigationItems(
-  ids: readonly AdminWorkspaceId[]
-): NavItem[] {
-  return ids.map(id => {
-    const item = ADMIN_NAV_REGISTRY.find(entry => entry.id === id);
-
-    if (!item) {
-      throw new Error(`Missing admin navigation registry item for "${id}"`);
-    }
-
-    return {
-      name: item.label,
-      href: item.href,
-      id: `admin_${item.id}`,
-      icon: adminIconById[item.id],
-      description: item.description,
-    };
-  });
-}
-
-export const adminNavigation: NavItem[] = buildAdminNavigationItems(
-  ADMIN_PRIMARY_WORKSPACE_IDS
-);
-
-export const adminSettingsNavigation: NavItem[] = buildAdminNavigationItems(
-  ADMIN_SETTINGS_TOOL_IDS
-);
-
-export interface AdminNavSection {
-  label: string;
-  items: NavItem[];
-}
-
-export const adminNavigationSections: AdminNavSection[] = [
-  {
-    label: 'Workspaces',
-    items: adminNavigation,
-  },
-  {
-    label: 'Utilities',
-    items: adminSettingsNavigation,
-  },
 ];
 
 // ---------------------------------------------------------------------------

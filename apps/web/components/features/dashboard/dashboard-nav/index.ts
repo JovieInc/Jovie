@@ -1,5 +1,4 @@
 export {
-  adminNavigation,
   artistProfileNavItem,
   artistSettingsNavigation,
   dashboardHome,

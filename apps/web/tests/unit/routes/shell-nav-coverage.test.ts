@@ -2,14 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  adminNavigation,
-  adminSettingsNavigation,
   artistSettingsNavigation,
   paymentsNavItem,
   primaryNavigation,
   settingsNavItem,
   userSettingsNavigation,
 } from '@/components/features/dashboard/dashboard-nav/config';
+import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
 
 const SHELL_ROOT = path.resolve(__dirname, '../../../app/app/(shell)');
 
@@ -112,8 +111,7 @@ function getNavRoutePaths(): Set<string> {
     ...userSettingsNavigation,
     paymentsNavItem,
     ...artistSettingsNavigation,
-    ...adminNavigation,
-    ...adminSettingsNavigation,
+    ...ADMIN_NAV_REGISTRY,
   ];
 
   return new Set(
