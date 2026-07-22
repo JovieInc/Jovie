@@ -11,7 +11,11 @@ const meta: Meta<typeof SegmentControl> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function Demo({ disabledOption = false }: { readonly disabledOption?: boolean }) {
+function Demo({
+  disabledOption = false,
+}: {
+  readonly disabledOption?: boolean;
+}) {
   const [value, setValue] = useState<'links' | 'music'>('links');
   return (
     <SegmentControl

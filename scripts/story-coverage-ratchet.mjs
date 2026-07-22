@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * packages/ui atom story-coverage ratchet (visual-testing Phase 2).
  *
@@ -18,15 +19,10 @@
  * Policy: docs/VISUAL_TESTING_POLICY.md (Story Coverage Ratchet)
  */
 
-import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -86,7 +82,9 @@ export function measureStoryCoverage(atomsDir = ATOMS_DIR) {
     covered,
     uncovered: total - covered,
     percent: Math.round(percent * 100) / 100,
-    uncoveredComponents: components.filter(c => !c.covered).map(c => c.component),
+    uncoveredComponents: components
+      .filter(c => !c.covered)
+      .map(c => c.component),
     components,
   };
 }
@@ -106,7 +104,11 @@ export function validateBaseline(baseline) {
   if (baseline.schemaVersion !== 1) {
     errors.push('schemaVersion must be 1');
   }
-  if (typeof baseline.percent !== 'number' || baseline.percent < 0 || baseline.percent > 100) {
+  if (
+    typeof baseline.percent !== 'number' ||
+    baseline.percent < 0 ||
+    baseline.percent > 100
+  ) {
     errors.push('percent must be a number in [0, 100]');
   }
   if (!Number.isInteger(baseline.covered) || baseline.covered < 0) {

@@ -48,12 +48,14 @@ export const LongContent: Story = {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            Confirm a very long destructive action that wraps onto multiple lines
+            Confirm a very long destructive action that wraps onto multiple
+            lines
           </AlertDialogTitle>
           <AlertDialogDescription>
             {Array.from({ length: 4 }, (_, i) => (
               <span key={i}>
-                Additional context paragraph {i + 1}. Ensure narrow containers still fit.
+                Additional context paragraph {i + 1}. Ensure narrow containers
+                still fit.
               </span>
             ))}
           </AlertDialogDescription>

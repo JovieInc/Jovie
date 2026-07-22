@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { InputGroup } from './input-group';
 import { Input } from './input';
+import { InputGroup } from './input-group';
 
 const meta: Meta<typeof InputGroup> = {
   title: 'UI/Atoms/InputGroup',

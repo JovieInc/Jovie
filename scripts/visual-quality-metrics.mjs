@@ -14,11 +14,14 @@
  *   node scripts/visual-quality-metrics.mjs update
  */
 
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  loadState as loadChromaticState,
+  sumMonthUsage,
+} from './chromatic-budget.mjs';
 import { measureStoryCoverage } from './story-coverage-ratchet.mjs';
-import { loadState as loadChromaticState, sumMonthUsage } from './chromatic-budget.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');

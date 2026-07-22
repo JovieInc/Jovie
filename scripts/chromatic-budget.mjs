@@ -25,12 +25,7 @@
  *   1 — invalid args / config error
  */
 
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -231,7 +226,9 @@ function main(argv = process.argv.slice(2)) {
     const usage = sumMonthUsage(next);
     const decision = decideBudget({ usage, limit: next.monthlyLimit });
     if (args.json) {
-      console.log(JSON.stringify({ recorded: args.snapshots, ...decision }, null, 2));
+      console.log(
+        JSON.stringify({ recorded: args.snapshots, ...decision }, null, 2)
+      );
     } else {
       console.log(`recorded ${args.snapshots} snapshots; ${decision.message}`);
     }

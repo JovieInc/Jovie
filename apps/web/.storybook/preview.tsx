@@ -18,11 +18,15 @@ const STABLE_ID_PREFIX = 'sb-stable';
 
 function installDeterministicFixtures(): void {
   if (typeof window === 'undefined') return;
-  if ((window as Window & { __jovieStorybookFixtures?: boolean }).__jovieStorybookFixtures) {
+  if (
+    (window as Window & { __jovieStorybookFixtures?: boolean })
+      .__jovieStorybookFixtures
+  ) {
     return;
   }
-  (window as Window & { __jovieStorybookFixtures?: boolean }).__jovieStorybookFixtures =
-    true;
+  (
+    window as Window & { __jovieStorybookFixtures?: boolean }
+  ).__jovieStorybookFixtures = true;
 
   // Fixed clock — Date.now is the primary source of time drift in snapshots.
   const fixedMs = FIXED_NOW.getTime();
@@ -86,8 +90,9 @@ function installDeterministicFixtures(): void {
   }
 
   // Stable id helper for stories that need an explicit id prop.
-  (window as Window & { __jovieStableId?: (name: string) => string }).__jovieStableId =
-    (name: string) => `${STABLE_ID_PREFIX}-${name}`;
+  (
+    window as Window & { __jovieStableId?: (name: string) => string }
+  ).__jovieStableId = (name: string) => `${STABLE_ID_PREFIX}-${name}`;
 }
 
 // Intercept /api/* fetches to prevent unhandled rejections from TanStack Query

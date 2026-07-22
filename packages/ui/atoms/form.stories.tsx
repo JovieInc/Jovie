@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useForm } from 'react-hook-form';
+import { Button } from './button';
 import {
   Form,
   FormControl,
@@ -10,7 +11,6 @@ import {
   FormMessage,
 } from './form';
 import { Input } from './input';
-import { Button } from './button';
 
 const meta: Meta = {
   title: 'UI/Atoms/Form',
@@ -26,7 +26,10 @@ function DemoForm({ withError = false }: { readonly withError?: boolean }) {
   });
   return (
     <Form {...form}>
-      <form className='flex w-72 flex-col gap-3' onSubmit={form.handleSubmit(() => undefined)}>
+      <form
+        className='flex w-72 flex-col gap-3'
+        onSubmit={form.handleSubmit(() => undefined)}
+      >
         <FormField
           control={form.control}
           name='name'

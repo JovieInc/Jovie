@@ -1,5 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Avatar, AvatarFallback, AvatarImage, AvatarStatusDot, UserAvatar } from './avatar';
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+  AvatarStatusDot,
+  UserAvatar,
+} from './avatar';
 
 const meta: Meta<typeof Avatar> = {
   title: 'UI/Atoms/Avatar',
@@ -21,7 +27,10 @@ export const Default: Story = {
 export const WithImage: Story = {
   render: () => (
     <Avatar size='lg' ring>
-      <AvatarImage src='https://cdn.jov.ie/static/placeholder-avatar.png' alt='Artist' />
+      <AvatarImage
+        src='https://cdn.jov.ie/static/placeholder-avatar.png'
+        alt='Artist'
+      />
       <AvatarFallback>AR</AvatarFallback>
       <AvatarStatusDot status='online' />
     </Avatar>

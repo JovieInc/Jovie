@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Button } from './button';
 import {
   Dialog,
   DialogContent,
@@ -8,7 +9,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from './dialog';
-import { Button } from './button';
 
 const meta: Meta = {
   title: 'UI/Atoms/Dialog',
@@ -27,7 +27,9 @@ export const Default: Story = {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit profile</DialogTitle>
-          <DialogDescription>Update your public display name.</DialogDescription>
+          <DialogDescription>
+            Update your public display name.
+          </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant='secondary'>Cancel</Button>
@@ -44,7 +46,9 @@ export const Narrow: Story = {
       <DialogContent className='max-w-xs'>
         <DialogHeader>
           <DialogTitle>Narrow container</DialogTitle>
-          <DialogDescription>Long content should wrap without overflow.</DialogDescription>
+          <DialogDescription>
+            Long content should wrap without overflow.
+          </DialogDescription>
         </DialogHeader>
       </DialogContent>
     </Dialog>

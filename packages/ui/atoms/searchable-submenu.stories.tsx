@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-import { SearchableList, type SearchableSubmenuItem } from './searchable-submenu';
+import {
+  SearchableList,
+  type SearchableSubmenuItem,
+} from './searchable-submenu';
 
 const ITEMS: SearchableSubmenuItem[] = [
   { id: '1', label: 'Spotify' },

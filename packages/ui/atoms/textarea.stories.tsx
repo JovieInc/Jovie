@@ -29,9 +29,10 @@ export const Error: Story = {
 export const LongContent: Story = {
   args: {
     id: 'ta-long',
-    defaultValue: Array.from({ length: 8 }, (_, i) => `Line ${i + 1} of bio content.`).join(
-      '\n'
-    ),
+    defaultValue: Array.from(
+      { length: 8 },
+      (_, i) => `Line ${i + 1} of bio content.`
+    ).join('\n'),
   },
   decorators: [
     Story => (

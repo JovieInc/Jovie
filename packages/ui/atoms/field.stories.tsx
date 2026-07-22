@@ -13,7 +13,11 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   render: () => (
-    <Field label='Display name' description='Shown on your public profile' id='field-name'>
+    <Field
+      label='Display name'
+      description='Shown on your public profile'
+      id='field-name'
+    >
       <Input placeholder='Artist name' />
     </Field>
   ),
@@ -21,7 +25,12 @@ export const Default: Story = {
 
 export const Error: Story = {
   render: () => (
-    <Field label='Email' error='Enter a valid email address' required id='field-email'>
+    <Field
+      label='Email'
+      error='Enter a valid email address'
+      required
+      id='field-email'
+    >
       <Input type='email' defaultValue='not-an-email' />
     </Field>
   ),

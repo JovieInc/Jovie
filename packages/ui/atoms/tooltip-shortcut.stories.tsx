@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { TooltipShortcut } from './tooltip-shortcut';
-import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 import { Button } from './button';
+import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
+import { TooltipShortcut } from './tooltip-shortcut';
 
 const meta: Meta<typeof TooltipShortcut> = {
   title: 'UI/Atoms/TooltipShortcut',

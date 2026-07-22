@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -72,22 +72,29 @@ describe('story-coverage-ratchet', () => {
     };
     expect(validateBaseline(baseline).ok).toBe(true);
     expect(
-      compareCoverage({ percent: 50, covered: 1, total: 2, uncoveredComponents: [] }, baseline)
-        .ok
+      compareCoverage(
+        { percent: 50, covered: 1, total: 2, uncoveredComponents: [] },
+        baseline
+      ).ok
     ).toBe(true);
     expect(
-      compareCoverage({ percent: 75, covered: 3, total: 4, uncoveredComponents: [] }, baseline)
-        .ok
+      compareCoverage(
+        { percent: 75, covered: 3, total: 4, uncoveredComponents: [] },
+        baseline
+      ).ok
     ).toBe(true);
     expect(
-      compareCoverage({ percent: 40, covered: 2, total: 5, uncoveredComponents: ['x'] }, baseline)
-        .ok
+      compareCoverage(
+        { percent: 40, covered: 2, total: 5, uncoveredComponents: ['x'] },
+        baseline
+      ).ok
     ).toBe(false);
   });
 
   it('rejects invalid baseline', () => {
-    expect(validateBaseline({ schemaVersion: 2, percent: 10, covered: 1, total: 1 }).ok).toBe(
-      false
-    );
+    expect(
+      validateBaseline({ schemaVersion: 2, percent: 10, covered: 1, total: 1 })
+        .ok
+    ).toBe(false);
   });
 });
