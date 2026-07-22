@@ -139,23 +139,18 @@ describe('UnifiedSidebar library route', () => {
     resetDashboardNavTestMocks();
   });
 
-  it('keeps the library route out of the default dashboard navigation', () => {
+  it('keeps the standard dashboard navigation on the library route', () => {
     renderUnifiedSidebar();
 
     expect(screen.queryByText('Loading Library')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Back to App' })).toBeDefined();
+    expect(screen.getByTestId('dashboard-nav')).toBeInTheDocument();
     expect(
-      screen.queryByRole('navigation', { name: 'Library navigation' })
+      screen.queryByRole('link', { name: 'Back to App' })
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: 'Releases' })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: 'Tasks' })
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('user-button')).toBeInTheDocument();
   });
 
-  it('renders the registered library navigation with the app back target', async () => {
+  it('preserves the generic route-override contract for legitimate consumers', async () => {
     renderUnifiedSidebar({
       overrideContent: <button type='button'>Needs Assets</button>,
     });
@@ -165,7 +160,6 @@ describe('UnifiedSidebar library route', () => {
         screen.getByRole('navigation', { name: 'Library filters' })
       ).toBeInTheDocument();
     });
-
     expect(screen.getByRole('button', { name: 'Status' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Needs Assets' })

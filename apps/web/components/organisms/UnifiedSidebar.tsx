@@ -471,13 +471,11 @@ export function UnifiedSidebar({
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin' || section === 'ov';
-  const isInLibrary = section === 'library';
-  const isRouteSidebar = isInSettings || isInLibrary;
-  const isDashboardOrAdmin =
-    section === 'dashboard' || section === 'admin' || section === 'ov';
+  const isRouteSidebar = isInSettings || sidebarOverride !== null;
+  const usesStandardAppNavigation = !isInSettings && sidebarOverride === null;
   const hasMultipleProfiles = creatorProfiles.length >= 2;
 
-  const { profileHref } = useProfileData(isDashboardOrAdmin);
+  const { profileHref } = useProfileData(usesStandardAppNavigation);
 
   return (
     <Sidebar
@@ -517,8 +515,8 @@ export function UnifiedSidebar({
               <OperatorNavigation pathname={pathname} />
             ) : isInSettings ? (
               <SettingsNavigation pathname={pathname} section={section} />
-            ) : isInLibrary ? (
-              (sidebarOverride?.content ?? null)
+            ) : sidebarOverride ? (
+              sidebarOverride.content
             ) : (
               <DashboardNav />
             )}
