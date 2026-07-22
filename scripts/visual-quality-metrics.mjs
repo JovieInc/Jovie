@@ -5,6 +5,7 @@
  * Tracks metrics from docs/VISUAL_TESTING_POLICY.md § Metrics & Ratchets:
  *   - % shared components with stories (up only) — from story-coverage-ratchet
  *   - % stories with interaction tests (up only)
+ *   - Snapshot count telemetry (via chromatic-budget state)
  *   Placeholders for axe / flake / CLS / bypass counters (filled by CI later)
  *
  * Commands:
@@ -16,6 +17,10 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  loadState as loadChromaticState,
+  sumMonthUsage,
+} from './chromatic-budget.mjs';
 import { measureStoryCoverage } from './story-coverage-ratchet.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -60,6 +65,9 @@ export function measureVisualQuality() {
       ? 0
       : Math.round((withInteraction / storyFiles.length) * 10000) / 100;
 
+  const chromatic = loadChromaticState();
+  const monthlySnapshots = sumMonthUsage(chromatic);
+
   return {
     schemaVersion: 1,
     measuredAt: new Date().toISOString(),
@@ -69,6 +77,8 @@ export function measureVisualQuality() {
     storiesTotal: storyFiles.length,
     storiesWithInteraction: withInteraction,
     storiesWithInteractionPercent: interactionPercent,
+    chromaticMonthlySnapshots: monthlySnapshots,
+    chromaticMonthlyLimit: chromatic.monthlyLimit ?? 5000,
     // Placeholders — filled by CI collectors when available (lock_down).
     axeViolationsCritical: null,
     axeViolationsSerious: null,
