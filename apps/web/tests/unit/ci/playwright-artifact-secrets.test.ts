@@ -1179,9 +1179,39 @@ ${fixtureCheckout}
       'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
     );
     expect(oauthProbe).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    const productionGateJob = jobBlock(
+      productionRelease,
+      'production-oauth-gate'
+    );
+    const productionGateProbe = stepBlock(
+      productionGateJob,
+      'Probe production Better Auth Google + Apple runtime'
+    );
+    expect(productionGateProbe).not.toBe('');
+    expect(productionGateProbe).toContain(
+      "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
+    );
+    expect(productionGateProbe).toContain(
+      'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs"'
+    );
+    expect(productionGateProbe).toContain(
+      'oauth_retry_root="$RUNNER_TEMP/production-oauth-gate-retries"'
+    );
+    expect(productionGateProbe).toContain(
+      'quarantine_oauth_artifacts "$attempt_artifact_root/failed-artifacts"'
+    );
+    expect(productionGateProbe).toContain(
+      'if [ -f "$RUNNER_TEMP/safe-playwright-producer/blocked" ]'
+    );
+    expect(productionGateProbe).toContain('refusing an unsafe retry');
+    expect(productionGateProbe).not.toContain(
+      "PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'"
+    );
+    expect(productionGateProbe).not.toContain('PLAYWRIGHT_ARTIFACT_PATHS');
+    expect(productionGateProbe).not.toContain('rm -rf test-results');
     expect(
       productionRelease.match(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/g)
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     const action = readFileSync(
       join(githubRoot, 'actions/upload-safe-playwright-artifact/action.yml'),
       'utf8'
