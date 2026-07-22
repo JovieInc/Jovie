@@ -902,11 +902,14 @@ IFS=',' read -r -a observations <<< "${FAKE_CURL_SEQUENCE:-match}"
 observation="${observations[$((call_index - 1))]:-match}"
 build_sha="$FAKE_BUILD_SHA"
 build_environment="$FAKE_BUILD_ENVIRONMENT"
+http_status="200"
 
 case "$observation" in
   match) ;;
   stale-sha) build_sha="old1234" ;;
   wrong-environment) build_environment="preview" ;;
+  http-503) http_status="503" ;;
+  http-000) http_status="000" ;;
   transient) exit 28 ;;
   *)
     echo "Unknown fake curl observation: $observation" >&2
@@ -914,8 +917,8 @@ case "$observation" in
     ;;
 esac
 
-printf '{"commitSha":"%s","environment":"%s"}\n200\n' \
-  "$build_sha" "$build_environment"
+printf '{"commitSha":"%s","environment":"%s"}\n%s\n' \
+  "$build_sha" "$build_environment" "$http_status"
 '''
     )
     fake_curl.chmod(0o755)
@@ -930,6 +933,7 @@ def _run_alias_verifier(
     max_attempts: int = 1,
     required_rounds: int = 1,
     max_transient_failures: int = 0,
+    route_retries: int | None = 0,
     curl_sequence: str = "match",
     build_environment: str = "production",
 ) -> subprocess.CompletedProcess[str]:
@@ -954,6 +958,8 @@ def _run_alias_verifier(
         "FAKE_BUILD_ENVIRONMENT": build_environment,
         "GITHUB_OUTPUT": str(tmp_path / "github-output"),
     }
+    if route_retries is not None:
+        env["PRODUCTION_ALIAS_ROUTE_RETRIES"] = str(route_retries)
     return subprocess.run(
         ["bash", str(PRODUCTION_ALIAS_SCRIPT)],
         cwd=tmp_path,
@@ -966,7 +972,7 @@ def _run_alias_verifier(
 
 
 def _alias_observation_sequence(
-    *attempts: tuple[str, str, str],
+    *attempts: tuple[str, ...],
 ) -> str:
     return ",".join(observation for attempt in attempts for observation in attempt)
 
@@ -1045,6 +1051,82 @@ def test_alias_verifier_requires_every_latest_observation_to_be_exact(
     assert "attempt 3/3 production-alias/plain: HTTP 000" in result.stdout
 
 
+def test_alias_verifier_retries_transport_unknowns_within_each_route_observation(
+    tmp_path: Path,
+) -> None:
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id="dpl_target",
+        build_sha="new5678",
+        max_attempts=2,
+        required_rounds=2,
+        max_transient_failures=0,
+        route_retries=1,
+        curl_sequence=_alias_observation_sequence(
+            ("transient", "match", "transient", "match", "match"),
+            ("match", "match", "match"),
+        ),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "transport unknown (HTTP 000), retry 1/1" in result.stdout
+    assert "attempt 2/2 production-alias/canary" in result.stdout
+    assert len((tmp_path / "curl-calls").read_text().splitlines()) == 8
+
+
+def test_alias_verifier_retries_successful_http_000_within_each_route_observation(
+    tmp_path: Path,
+) -> None:
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id="dpl_target",
+        build_sha="new5678",
+        route_retries=1,
+        curl_sequence=_alias_observation_sequence(
+            ("http-000", "match", "match", "match"),
+        ),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "transport unknown (HTTP 000), retry 1/1" in result.stdout
+    assert len((tmp_path / "curl-calls").read_text().splitlines()) == 4
+
+
+def test_alias_verifier_default_production_release_budget_fits_eight_minutes() -> None:
+    verifier = PRODUCTION_ALIAS_SCRIPT.read_text()
+
+    def verifier_default(name: str, shell_name: str) -> int:
+        match = re.search(
+            rf'{shell_name}="\$\{{{name}:-([0-9]+)\}}"',
+            verifier,
+        )
+        assert match is not None, f"missing verifier default for {name}"
+        return int(match.group(1))
+
+    max_attempts = verifier_default(
+        "PRODUCTION_ALIAS_MAX_ATTEMPTS", "max_attempts"
+    )
+    retry_seconds = verifier_default(
+        "PRODUCTION_ALIAS_RETRY_SECONDS", "retry_seconds"
+    )
+    route_retries = verifier_default(
+        "PRODUCTION_ALIAS_ROUTE_RETRIES", "route_retries"
+    )
+    curl_max_time = int(re.search(r"--max-time ([0-9]+)", verifier).group(1))
+
+    worst_case_seconds = (
+        3 * max_attempts * (route_retries + 1) * curl_max_time
+        + (max_attempts - 1) * retry_seconds
+    )
+
+    assert max_attempts == 15
+    assert retry_seconds == 10
+    assert route_retries == 1
+    assert curl_max_time == 3
+    assert worst_case_seconds == 410
+    assert worst_case_seconds < 8 * 60
+
+
 def test_alias_verifier_resets_proof_on_observed_identity_mismatch(
     tmp_path: Path,
 ) -> None:
@@ -1078,31 +1160,70 @@ def test_alias_verifier_resets_proof_after_bounded_transport_unknowns(
         max_attempts=6,
         required_rounds=3,
         max_transient_failures=2,
+        route_retries=1,
         curl_sequence=_alias_observation_sequence(
             ("match", "match", "match"),
             ("match", "match", "match"),
-            ("transient", "match", "match"),
-            ("transient", "match", "match"),
-            ("transient", "match", "match"),
+            ("transient", "transient", "match", "match"),
+            ("transient", "transient", "match", "match"),
+            ("transient", "transient", "match", "match"),
             ("match", "match", "match"),
         ),
     )
 
     assert result.returncode == 1
     assert "attempt 6/6 production-alias/plain: HTTP 200" in result.stdout
+    assert len((tmp_path / "curl-calls").read_text().splitlines()) == 21
 
 
 def test_alias_verifier_rejects_stale_sha_even_on_expected_deployment(
     tmp_path: Path,
 ) -> None:
     result = _run_alias_verifier(
-        tmp_path, current_id="dpl_target", build_sha="old1234"
+        tmp_path,
+        current_id="dpl_target",
+        build_sha="old1234",
+        route_retries=2,
+        curl_sequence="stale-sha,match,match",
     )
 
     assert result.returncode == 1
     assert (tmp_path / "github-output").read_text().strip() == (
         "failure_subtype=production_alias_not_updated"
     )
+    assert len((tmp_path / "curl-calls").read_text().splitlines()) == 3
+
+
+def test_alias_verifier_does_not_retry_wrong_environment_response(
+    tmp_path: Path,
+) -> None:
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id="dpl_target",
+        build_sha="new5678",
+        route_retries=2,
+        curl_sequence="wrong-environment,match,match",
+    )
+
+    assert result.returncode == 1
+    assert "environment=preview" in result.stdout
+    assert len((tmp_path / "curl-calls").read_text().splitlines()) == 3
+
+
+def test_alias_verifier_does_not_retry_non_transport_http_response(
+    tmp_path: Path,
+) -> None:
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id="dpl_target",
+        build_sha="new5678",
+        route_retries=2,
+        curl_sequence="http-503,match,match",
+    )
+
+    assert result.returncode == 1
+    assert "HTTP 503" in result.stdout
+    assert len((tmp_path / "curl-calls").read_text().splitlines()) == 3
 
 
 def test_alias_verifier_rejects_wrong_current_id_even_with_expected_sha(
