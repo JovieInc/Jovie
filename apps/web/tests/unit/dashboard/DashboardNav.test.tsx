@@ -1,6 +1,7 @@
 import { fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
 import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 import {
@@ -13,6 +14,10 @@ import {
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
 import { fastRender } from '@/tests/utils/fast-render';
+
+vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
+  ChatPageClient: () => null,
+}));
 
 describe('DashboardNav', () => {
   afterEach(() => {
@@ -116,6 +121,33 @@ describe('DashboardNav', () => {
     expect(activeLink.getAttribute('aria-current')).toBe('page');
   });
 
+  it('composes one current New Chat nav link with matching page heading and title', async () => {
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.CHAT);
+    const { generateMetadata } = await import('@/app/app/(shell)/chat/page');
+    const metadata = await generateMetadata();
+    const title = String(metadata.title);
+
+    const { container, getAllByRole, getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { DESIGN_V1: true },
+      children: (
+        <DashboardHeader
+          breadcrumbs={[{ label: title, href: APP_ROUTES.CHAT }]}
+        />
+      ),
+    });
+
+    expect(title).toBe('New Chat');
+    expect(getByRole('link', { name: title })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(container.querySelectorAll('a[aria-current="page"]')).toHaveLength(
+      1
+    );
+    expect(getAllByRole('heading', { name: title, level: 1 })).toHaveLength(1);
+  });
+
   it('keeps the legacy releases dashboard alias active', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD_RELEASES);
     const { getByRole } = renderDashboardNav({ renderFn: fastRender });
@@ -127,7 +159,7 @@ describe('DashboardNav', () => {
     expect(releasesLink.getAttribute('aria-current')).toBe('page');
   });
 
-  it('only marks New Conversation active on the chat root', () => {
+  it('does not mark New Chat active on a chat thread', () => {
     mockUsePathname.mockReturnValueOnce(`${APP_ROUTES.CHAT}/thread-123`);
 
     const { getByRole } = renderDashboardNav({
@@ -140,7 +172,7 @@ describe('DashboardNav', () => {
     ).toBeNull();
   });
 
-  it('keeps New Conversation on the default shell tone when it is inactive', () => {
+  it('keeps New Chat on the default shell tone when it is inactive', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.RELEASES);
 
     const { getByRole } = renderDashboardNav({
@@ -156,7 +188,7 @@ describe('DashboardNav', () => {
     );
   });
 
-  it('renders one canonical New Conversation nav row in Design V1', () => {
+  it('renders one canonical New Chat nav row in Design V1', () => {
     const { getAllByRole } = renderDashboardNav({
       renderFn: fastRender,
       appFlags: { DESIGN_V1: true },
@@ -439,7 +471,7 @@ describe('DashboardNav', () => {
     });
   });
 
-  it('keeps task badges inline with Design V1 shell nav rows', () => {
+  it('separates the Tasks label and count metadata into stable grid columns', () => {
     mockUseTaskStatsQuery.mockReturnValueOnce({
       data: {
         backlog: 1,
@@ -463,8 +495,29 @@ describe('DashboardNav', () => {
     );
     expect(tasksLink.className).toContain('text-xs');
     const taskBadge = getByText('7');
+    const taskLabel = tasksLink.children.item(1);
+    const taskMetadata = tasksLink.children.item(2);
+
+    expect(taskLabel).toHaveTextContent('Tasks');
+    expect(taskLabel).toHaveClass('justify-self-start');
+    expect(taskMetadata).toHaveClass('justify-self-end', 'shrink-0');
+    expect(taskMetadata).toContainElement(taskBadge);
     expect(taskBadge).toHaveAttribute('data-nav-badge', 'count');
     expect(taskBadge).toHaveAttribute('aria-label', '7 active tasks');
+  });
+
+  it('keeps the Tasks row geometry and accessible name stable without a badge', () => {
+    const { container, getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    const tasksLink = getByRole('link', { name: 'Tasks' });
+    expect(tasksLink).toHaveClass('grid-cols-[22px_minmax(0,1fr)_34px]');
+    expect(tasksLink).not.toHaveAttribute('aria-current');
+    expect(
+      container.querySelector('[data-nav-badge="count"]')
+    ).not.toBeInTheDocument();
   });
 
   it('renders the Pro badge when tasks are locked', () => {
