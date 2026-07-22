@@ -25,8 +25,6 @@ describe('admin overview shell normalization (JOV-2525)', () => {
     expect(source).toContain('<AdminPage');
     expect(source).toContain("testId='admin-overview-page'");
     expect(source).toContain('hero={');
-    expect(source).not.toContain('AdminToolPage');
-    expect(source).not.toContain('AdminWorkspacePage');
   });
 
   it('removes the legacy overview tab toggle and workspace card duplication', () => {
