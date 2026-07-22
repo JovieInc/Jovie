@@ -2195,7 +2195,7 @@ if [ "$attempt" -eq 1 ]; then
   printf '%s' '{"suites":[{"results":[{"status":"passed"},{"status":"failed","errors":[{"message":"CONFIRMED_OAUTH_RUNTIME_CONTRACT: apple navigation timed out"}]}]}]}' > "$PLAYWRIGHT_JSON_OUTPUT_NAME"
   exit 1
 fi
-printf '%s' '{"suites":[{"results":[{"status":"passed"},{"status":"passed"}]}]}' > "$PLAYWRIGHT_JSON_OUTPUT_NAME"
+printf '%s' '{"suites":[{"title":"oauth-providers.spec.ts","file":"tests/e2e/oauth-providers.spec.ts","suites":[{"title":"candidate-bound Better Auth OAuth runtime @production-smoke","specs":[{"title":"google UI starts the exact Better Auth provider redirect","tests":[{"projectName":"chromium","results":[{"status":"passed"}]}]},{"title":"apple UI starts the exact Better Auth provider redirect","tests":[{"projectName":"chromium","results":[{"status":"passed"}]}]}]}]}]}' > "$PLAYWRIGHT_JSON_OUTPUT_NAME"
 `,
         { mode: 0o700 }
       );
@@ -2246,6 +2246,63 @@ printf '%s' '{"suites":[{"results":[{"status":"passed"},{"status":"passed"}]}]}'
           'utf8'
         )
       ).toContain('CONFIRMED_OAUTH_RUNTIME_CONTRACT');
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('accepts a clean report when retry history contains three passed results', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const oauthJob = getJobBlock(release, 'production-oauth-gate');
+    const oauthStep = getStepBlock(
+      oauthJob,
+      'Probe production Better Auth Google + Apple runtime'
+    );
+    const root = mkdtempSync(
+      resolve(tmpdir(), 'jovie-production-oauth-three-pass-')
+    );
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const githubOutput = resolve(root, 'github-output');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+cat > "$PLAYWRIGHT_JSON_OUTPUT_NAME" <<'JSON'
+{"suites":[{"title":"oauth-providers.spec.ts","file":"tests/e2e/oauth-providers.spec.ts","suites":[{"title":"candidate-bound Better Auth OAuth runtime @production-smoke","specs":[{"title":"google UI starts the exact Better Auth provider redirect","tests":[{"projectName":"chromium","results":[{"status":"passed"},{"status":"passed"}]}]},{"title":"apple UI starts the exact Better Auth provider redirect","tests":[{"projectName":"chromium","results":[{"status":"passed"}]}]}]}]}]}
+JSON
+`,
+        { mode: 0o700 }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(oauthStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: githubOutput,
+            GITHUB_WORKSPACE: workspace,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(readFileSync(githubOutput, 'utf8')).toContain(
+        'oauth_status=passed'
+      );
     } finally {
       rmSync(root, { force: true, recursive: true });
     }

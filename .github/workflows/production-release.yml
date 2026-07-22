@@ -1049,11 +1049,28 @@ jobs:
               --run -- pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
               --project=chromium --reporter=json || probe_status=$?
             if [ "$probe_status" -eq 0 ] && jq -e '
-              def results:
-                [ .suites[]? | .. | objects | select(has("results")) | .results[]? ];
+              def specs:
+                .suites[0].suites[0].specs;
               type == "object" and (.suites | type == "array") and
-              (results | map(select(.status == "passed")) | length) == 2 and
-              (results | map(select(.status == "skipped")) | length) == 0
+              (.suites | length) == 1 and
+              .suites[0].title == "oauth-providers.spec.ts" and
+              .suites[0].file == "tests/e2e/oauth-providers.spec.ts" and
+              (.suites[0].suites | type == "array") and
+              (.suites[0].suites | length) == 1 and
+              .suites[0].suites[0].title == "candidate-bound Better Auth OAuth runtime @production-smoke" and
+              (specs | type == "array") and
+              (specs | map(.title)) == [
+                "google UI starts the exact Better Auth provider redirect",
+                "apple UI starts the exact Better Auth provider redirect"
+              ] and
+              all(specs[];
+                (.tests | type == "array") and
+                (.tests | length) == 1 and
+                .tests[0].projectName == "chromium" and
+                (.tests[0].results | type == "array") and
+                (.tests[0].results | length) > 0 and
+                .tests[0].results[-1].status == "passed"
+              )
             ' >/dev/null "$report"; then
               {
                 echo "ba_health=passed"
