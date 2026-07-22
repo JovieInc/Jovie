@@ -96,6 +96,7 @@ Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md
 | `canon/README.md` | Root decision hierarchy: operating system + domain canon |
 | `DESIGN.md` | Operational design-system execution |
 | `docs/PR_FLOW.md` | Shipping, CI tiers, taste gate |
+| `docs/VISUAL_TESTING_POLICY.md` | Visual/a11y gates, Chromatic budget, baseline approval |
 | `docs/marketing/AGENT_GUIDE.md` | Generating or editing any marketing/landing page |
 | `docs/AI_AGENT_GUIDE.md` | API routes, cron, webhooks inventory |
 | `docs/company/operating-principles.md` | Product prioritization canon |

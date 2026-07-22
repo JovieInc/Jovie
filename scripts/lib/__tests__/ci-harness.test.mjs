@@ -33,9 +33,13 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'CI Risk Classifier',
   'Secret Scan (gitleaks + trufflehog)',
   'Migration Guard',
+  'Visual Approval Guard',
   'Unit Tests',
   'Build + Layout (combined)',
   'iOS Build + Test (combined)',
+  'Storybook Visual + A11y (combined)',
+  'Chromatic Visual Regression (combined)',
+  'UI Playwright Visual Smoke (combined)',
   'Promptfoo Evals (deterministic)',
   'Golden Eval Set (deterministic)',
 ];
@@ -182,6 +186,7 @@ describe('ci-harness manifest', () => {
       'Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
+      'Visual Approval Guard',
     ]);
     // Individual harness merge-gate job names must stay in the forbidden pin list
     // so a batch failure bisects instead of evicting siblings. ci-fast is a real
