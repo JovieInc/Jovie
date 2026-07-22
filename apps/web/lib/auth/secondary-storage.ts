@@ -130,7 +130,7 @@ export function resetSecondaryStorageMemoryForTests(): void {
 // Storage implementation
 // ---------------------------------------------------------------------------
 
-export const secondaryStorage: SecondaryStorage = {
+export const secondaryStorage = {
   async get(key) {
     const redis = getRedis();
     if (!redis) {
@@ -274,4 +274,4 @@ export const secondaryStorage: SecondaryStorage = {
       });
     }
   },
-};
+} satisfies SecondaryStorage;
