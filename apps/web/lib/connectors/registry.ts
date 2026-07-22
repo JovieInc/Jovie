@@ -1,10 +1,14 @@
 /**
- * Connector Provider Registry — single source of truth
+ * Connector Provider Registry — single source of truth for connector manifests.
  *
- * Every connector definition lives here. Adding a provider means:
- * 1. Extend CONNECTOR_PROVIDER_IDS in types.ts (and the DB enum via migration).
- * 2. Add an entry to CONNECTOR_REGISTRY below.
- * 3. Wire OAuth/sync/workflow handlers for the new provider.
+ * Adding a provider:
+ * 1. Add the value to `connectorProviderEnum` in `lib/db/schema/enums.ts` (+ migration).
+ * 2. Append the id to `CONNECTOR_PROVIDER_IDS` in `types.ts` (client-safe runtime list).
+ * 3. Add a full `ConnectorDefinition` entry below (scopes, handlers, UI metadata).
+ * 4. Wire OAuth/sync modules referenced by the definition.
+ *
+ * Provider *types* come from the Drizzle enum (`ConnectorProviderId` in enums.ts).
+ * Do not hand-maintain a second union in UI components — import from this module.
  */
 
 import { z } from 'zod';
@@ -23,6 +27,7 @@ export {
   type ConnectorOAuthBundle,
   type ConnectorProviderId,
   type ConnectorStatus,
+  type ConnectorTokenHandler,
 } from './types';
 
 /** Stable id map — prefer these over inline string literals at call sites. */
@@ -31,6 +36,15 @@ export const CONNECTOR_PROVIDERS = {
   google_calendar: 'google_calendar',
 } as const satisfies Record<string, ConnectorProviderId>;
 
+/** Google OAuth scope constants — referenced by registry entries and authorize. */
+export const GOOGLE_OAUTH_SCOPE = {
+  calendarEventsReadonly:
+    'https://www.googleapis.com/auth/calendar.events.readonly',
+  calendarEvents: 'https://www.googleapis.com/auth/calendar.events',
+  gmailReadonly: 'https://www.googleapis.com/auth/gmail.readonly',
+  userinfoEmail: 'https://www.googleapis.com/auth/userinfo.email',
+} as const;
+
 export const CONNECTOR_REGISTRY = {
   [CONNECTOR_PROVIDERS.gmail]: {
     id: CONNECTOR_PROVIDERS.gmail,
@@ -38,6 +52,13 @@ export const CONNECTOR_REGISTRY = {
     description: 'Scan booking emails for tour confirmation signals.',
     iconKey: 'mail',
     oauthBundle: 'google',
+    oauthScopes: [
+      GOOGLE_OAUTH_SCOPE.gmailReadonly,
+      GOOGLE_OAUTH_SCOPE.userinfoEmail,
+    ],
+    tokenHandler: 'shared_token_vault',
+    syncRunner: CONNECTOR_PROVIDERS.gmail,
+    webhookHandler: null,
     displayOrder: 1,
   },
   [CONNECTOR_PROVIDERS.google_calendar]: {
@@ -46,6 +67,14 @@ export const CONNECTOR_REGISTRY = {
     description: 'Read events to detect conflicts and write approved bookings.',
     iconKey: 'calendar',
     oauthBundle: 'google',
+    oauthScopes: [
+      GOOGLE_OAUTH_SCOPE.calendarEventsReadonly,
+      GOOGLE_OAUTH_SCOPE.calendarEvents,
+      GOOGLE_OAUTH_SCOPE.userinfoEmail,
+    ],
+    tokenHandler: 'shared_token_vault',
+    syncRunner: CONNECTOR_PROVIDERS.google_calendar,
+    webhookHandler: null,
     displayOrder: 2,
   },
 } as const satisfies Record<ConnectorProviderId, ConnectorDefinition>;
@@ -67,6 +96,29 @@ export function getConnectorDefinition(
   providerId: ConnectorProviderId
 ): ConnectorDefinition {
   return CONNECTOR_REGISTRY[providerId];
+}
+
+/**
+ * Union of OAuth scopes for all providers in a bundle (deduped, stable order).
+ * Used by the combined Google authorize consent screen.
+ */
+export function getOAuthScopesForBundle(
+  bundle: ConnectorDefinition['oauthBundle']
+): string[] {
+  const seen = new Set<string>();
+  const scopes: string[] = [];
+
+  for (const providerId of CONNECTOR_PROVIDER_IDS) {
+    const definition = CONNECTOR_REGISTRY[providerId];
+    if (definition.oauthBundle !== bundle) continue;
+    for (const scope of definition.oauthScopes) {
+      if (seen.has(scope)) continue;
+      seen.add(scope);
+      scopes.push(scope);
+    }
+  }
+
+  return scopes;
 }
 
 export function isConnectorProviderId(
