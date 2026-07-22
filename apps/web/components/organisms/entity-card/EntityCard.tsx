@@ -50,7 +50,7 @@ interface EntityCardProps {
    * share one design. 'default' keeps the legacy per-treatment layout
    * (chat/app consumers).
    */
-  readonly anatomy?: 'default' | 'unified';
+  readonly anatomy?: 'default' | 'unified' | 'profile-landscape';
 }
 
 type SizeConfig = {
@@ -91,16 +91,23 @@ function EntityCtaControl({
   cta,
   block,
   unified = false,
+  landscape = false,
 }: Readonly<{
   cta: EntityCardCta;
   block: boolean;
   unified?: boolean;
+  landscape?: boolean;
 }>) {
   // Unified anatomy: a CTA with no target is not a button at all — render it
   // as plain muted meta text (e.g. "No Tickets"), never with button chrome.
   if (unified && (cta.disabled || (!cta.href && !cta.onClick))) {
     return (
-      <span className='flex h-9 w-full items-center text-xs text-tertiary-token'>
+      <span
+        className={cn(
+          'flex items-center text-xs text-tertiary-token',
+          landscape ? 'h-8 w-auto' : 'h-9 w-full'
+        )}
+      >
         {cta.label}
       </span>
     );
@@ -110,7 +117,9 @@ function EntityCtaControl({
     'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
     // Unified anatomy: full-width 36px CTA (two CTAs share the row evenly).
     unified
-      ? 'h-9 min-w-0 flex-1'
+      ? landscape
+        ? 'h-8 min-w-0 flex-none'
+        : 'h-9 min-w-0 flex-1'
       : block
         ? 'h-11 w-full'
         : 'h-11 min-w-0 flex-1',
@@ -226,25 +235,29 @@ export function EntityCard({
   anatomy = 'default',
 }: EntityCardProps) {
   const size = SIZE[treatment];
-  const isUnified = anatomy === 'unified';
+  const isProfileLandscape = anatomy === 'profile-landscape';
+  const isUnified = anatomy === 'unified' || isProfileLandscape;
+  const isLandscapeNonMedia = isProfileLandscape && model.kind === 'alerts';
   // Composition shape (#11899): fixed card aspect + semantic media geometry.
   // Album/product/show artwork is square; video thumbnails stay landscape.
   // Text truncates inside the shape; the CTA footer never moves.
   const shapeClassName = shape
     ? cn(getProfileCardShapeClassName(shape), 'overflow-hidden')
     : null;
-  const artClassName = isUnified
-    ? // Unified anatomy: the art zone is a full-width square (album art is
-      // square by default; non-square art object-covers the square zone).
-      'aspect-square rounded-none'
-    : artFit === 'fill'
-      ? 'min-h-0 w-full flex-1 rounded-xl'
-      : shape
-        ? cn(
-            model.kind === 'video' ? 'aspect-video' : 'aspect-square',
-            treatment === 'big' ? 'rounded-2xl' : 'rounded-xl'
-          )
-        : size.artClass;
+  const artClassName = isProfileLandscape
+    ? 'aspect-square self-stretch w-auto rounded'
+    : isUnified
+      ? // Unified anatomy: the art zone is a full-width square (album art is
+        // square by default; non-square art object-covers the square zone).
+        'aspect-square rounded-none'
+      : artFit === 'fill'
+        ? 'min-h-0 w-full flex-1 rounded-xl'
+        : shape
+          ? cn(
+              model.kind === 'video' ? 'aspect-video' : 'aspect-square',
+              treatment === 'big' ? 'rounded-2xl' : 'rounded-xl'
+            )
+          : size.artClass;
   const titleClampClassName = isUnified
     ? 'line-clamp-1'
     : shape && treatment !== 'big'
@@ -281,10 +294,13 @@ export function EntityCard({
       testId={dataTestId ?? `entity-card-${model.kind}`}
       onClick={onClick}
       className={cn(
-        'group flex min-w-0 flex-col text-left transition-[background-color,border-color] duration-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-focus-ring)',
-        treatment === 'big' || isUnified
-          ? 'gap-0 overflow-hidden p-0'
-          : 'gap-3 p-3',
+        'group flex min-w-0 text-left transition-[background-color,border-color] duration-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-focus-ring)',
+        isProfileLandscape ? 'flex-row' : 'flex-col',
+        isProfileLandscape
+          ? cn('gap-0 overflow-hidden', isLandscapeNonMedia ? 'p-0' : 'p-1.5')
+          : treatment === 'big' || isUnified
+            ? 'gap-0 overflow-hidden p-0'
+            : 'gap-3 p-3',
         isPearl
           ? 'rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl hover:bg-(--profile-pearl-bg-hover)'
           : 'rounded-2xl border border-subtle bg-surface-1 shadow-card hover:border-default',
@@ -292,54 +308,64 @@ export function EntityCard({
         className
       )}
     >
-      <div
-        className={cn(
-          'relative flex w-full items-center justify-center overflow-hidden border border-subtle',
-          !isUnified && artFit === 'fill' ? null : 'shrink-0',
-          artClassName,
-          (treatment === 'big' || isUnified) && 'rounded-none border-0',
-          isUnified && 'border-b border-subtle'
-        )}
-        style={artStyle}
-      >
-        {model.imageUrl ? (
-          <ImageWithFallback
-            src={model.imageUrl}
-            alt={model.imageAlt}
-            fill
-            priority={priority}
-            sizes={
-              treatment === 'big' ? '320px' : '(max-width: 767px) 70vw, 300px'
-            }
-            className={
-              // Unified anatomy: square art in a square zone — cover crops
-              // non-square art instead of letterboxing it.
-              isUnified || model.kind !== 'music'
-                ? 'object-cover'
-                : 'object-contain'
-            }
-            fallbackVariant={preset.fallbackVariant}
-            fallbackClassName='bg-transparent'
-          />
-        ) : model.datePill ? (
-          <div className='flex flex-col items-center justify-center text-primary-token'>
-            <span className='text-2xs font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
-              {model.datePill.month}
-            </span>
-            <span className='text-[34px] font-bold leading-none tracking-tighter tabular-nums'>
-              {model.datePill.day}
-            </span>
-          </div>
-        ) : (
-          <Icon
-            className={cn(
-              'text-tertiary-token',
-              isUnified ? 'h-8 w-8' : 'h-7 w-7'
-            )}
-            aria-hidden='true'
-          />
-        )}
-      </div>
+      {isLandscapeNonMedia ? null : (
+        <div
+          className={cn(
+            'relative flex w-full items-center justify-center overflow-hidden',
+            !isUnified && artFit === 'fill' ? null : 'shrink-0',
+            artClassName,
+            !isUnified && 'border border-subtle',
+            (treatment === 'big' || isUnified) &&
+              !isProfileLandscape &&
+              'rounded-none border-0',
+            isUnified && !isProfileLandscape && 'border-b border-subtle',
+            isProfileLandscape && 'border-0'
+          )}
+          style={artStyle}
+        >
+          {model.imageUrl ? (
+            <ImageWithFallback
+              src={model.imageUrl}
+              alt={model.imageAlt}
+              fill
+              priority={priority}
+              sizes={
+                isProfileLandscape
+                  ? '(max-width: 767px) 44vw, 180px'
+                  : treatment === 'big'
+                    ? '320px'
+                    : '(max-width: 767px) 70vw, 300px'
+              }
+              className={
+                // Unified anatomy: square art in a square zone — cover crops
+                // non-square art instead of letterboxing it.
+                isUnified || model.kind !== 'music'
+                  ? 'object-cover'
+                  : 'object-contain'
+              }
+              fallbackVariant={preset.fallbackVariant}
+              fallbackClassName='bg-transparent'
+            />
+          ) : model.datePill ? (
+            <div className='flex flex-col items-center justify-center text-primary-token'>
+              <span className='text-2xs font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+                {model.datePill.month}
+              </span>
+              <span className='text-[34px] font-bold leading-none tracking-tighter tabular-nums'>
+                {model.datePill.day}
+              </span>
+            </div>
+          ) : (
+            <Icon
+              className={cn(
+                'text-tertiary-token',
+                isUnified ? 'h-8 w-8' : 'h-7 w-7'
+              )}
+              aria-hidden='true'
+            />
+          )}
+        </div>
+      )}
 
       <div
         className={cn(
@@ -350,7 +376,9 @@ export function EntityCard({
           // eyebrow + title + CTA always fit; the meta line hides entirely
           // below the card-height threshold where it would clip (see
           // .entity-card-meta in design-system.css).
-          isUnified && 'px-3 py-1.5'
+          isProfileLandscape
+            ? 'justify-center py-2 pl-3 pr-2'
+            : isUnified && 'px-3 py-1.5'
         )}
       >
         {/* Text zone — when the card is height-locked it clips so the CTA
@@ -362,7 +390,12 @@ export function EntityCard({
             isUnified ? 'gap-1' : 'gap-1.5'
           )}
         >
-          <div className='flex min-w-0 items-center justify-between gap-2'>
+          <div
+            className={cn(
+              'flex min-w-0 items-center justify-between gap-2',
+              isProfileLandscape && 'hidden'
+            )}
+          >
             <span
               className={cn(
                 'inline-flex min-w-0 items-center gap-1.5 text-3xs font-semibold leading-none text-tertiary-token',
@@ -401,7 +434,8 @@ export function EntityCard({
             <p
               className={cn(
                 'min-w-0 truncate text-[11.5px] text-tertiary-token',
-                isUnified && 'entity-card-meta'
+                isUnified && 'entity-card-meta',
+                isProfileLandscape && 'text-secondary-token'
               )}
             >
               {metaText}
@@ -426,9 +460,11 @@ export function EntityCard({
             isUnified ? null : 'pt-1',
             PROFILE_CARD_FOOTER_ANCHOR_CLASSNAME,
             isUnified
-              ? isInteractive
-                ? 'flex-row items-stretch'
-                : 'flex-col items-stretch'
+              ? isProfileLandscape
+                ? 'flex-row items-center'
+                : isInteractive
+                  ? 'flex-row items-stretch'
+                  : 'flex-col items-stretch'
               : isInteractive
                 ? size.ctaBlock
                   ? 'flex-col items-stretch'
@@ -446,6 +482,7 @@ export function EntityCard({
                   cta={model.cta}
                   block={size.ctaBlock}
                   unified={isUnified}
+                  landscape={isProfileLandscape}
                 />
               ) : null}
               {model.secondaryCta ? (
@@ -453,6 +490,7 @@ export function EntityCard({
                   cta={model.secondaryCta}
                   block={size.ctaBlock}
                   unified={isUnified}
+                  landscape={isProfileLandscape}
                 />
               ) : null}
             </>
@@ -463,13 +501,19 @@ export function EntityCard({
             // plain muted meta text instead of button chrome.
             model.cta ? (
               model.cta.disabled || (!model.cta.href && !cardHref) ? (
-                <span className='flex h-9 w-full items-center text-xs text-tertiary-token'>
+                <span
+                  className={cn(
+                    'flex items-center text-xs text-tertiary-token',
+                    isProfileLandscape ? 'h-8 w-auto' : 'h-9 w-full'
+                  )}
+                >
                   {model.cta.label}
                 </span>
               ) : (
                 <span
                   className={cn(
-                    'inline-flex h-9 w-full shrink-0 items-center justify-center rounded-full bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle group-hover:bg-btn-primary-hover'
+                    'inline-flex shrink-0 items-center justify-center rounded-full bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-[background-color,transform] duration-subtle group-hover:bg-btn-primary-hover group-active:scale-[0.96] motion-reduce:transform-none',
+                    isProfileLandscape ? 'h-8 w-fit' : 'h-9 w-full'
                   )}
                 >
                   {model.cta.label}

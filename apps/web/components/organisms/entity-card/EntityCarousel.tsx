@@ -6,9 +6,12 @@ import { cn } from '@/lib/utils';
 import { EntityCard } from './EntityCard';
 import type { EntityCardModel, EntitySurface } from './types';
 
+export type EntityCarouselLayout = 'portrait' | 'profile-landscape';
+
 interface EntityCarouselProps {
   readonly items: readonly EntityCardModel[];
   readonly surface?: EntitySurface;
+  readonly layout?: EntityCarouselLayout;
   readonly className?: string;
   readonly dataTestId?: string;
   /**
@@ -32,14 +35,15 @@ const CARD_ITEM_CLASSNAME =
  * false hierarchy, crop the trailing cards, and make the rail look vertically
  * scrollable inside the fixed profile shell.
  *
- * Geometry lives in `.profile-entity-card` (design-system.css): 3:4 aspect
- * ratio, height locked to the track (h-full), width derived from height,
- * capped so no card exceeds ~78vw. The track fills the remaining viewport
- * height (h-full) so primary content never needs vertical scrolling.
+ * Geometry lives in `.profile-entity-card` (design-system.css). Portrait is
+ * the default 3:4, height-locked treatment. `profile-landscape` is the compact
+ * public-profile exception: a full-content-width 9:4 card with one mandatory
+ * snap per viewport and no neighboring-card preview at rest.
  */
 export function EntityCarousel({
   items,
   surface = 'pearl',
+  layout = 'portrait',
   className,
   dataTestId,
   leading,
@@ -72,7 +76,7 @@ export function EntityCarousel({
     const observer = new IntersectionObserver(
       entries => {
         for (const entry of entries) {
-          if (!entry.isIntersecting) {
+          if (!entry.isIntersecting || entry.intersectionRatio < 0.5) {
             continue;
           }
 
@@ -121,7 +125,10 @@ export function EntityCarousel({
       entries => {
         for (const entry of entries) {
           const node = entry.target as HTMLElement;
-          node.dataset.edge = entry.isIntersecting ? 'false' : 'true';
+          node.dataset.edge =
+            entry.isIntersecting && entry.intersectionRatio >= 0.95
+              ? 'false'
+              : 'true';
         }
       },
       { root: track, threshold: 0.95 }
@@ -138,6 +145,11 @@ export function EntityCarousel({
     return null;
   }
 
+  const cardItemClassName = cn(
+    CARD_ITEM_CLASSNAME,
+    layout === 'profile-landscape' && 'w-full'
+  );
+
   return (
     <ul
       ref={trackRef}
@@ -146,9 +158,14 @@ export function EntityCarousel({
         className
       )}
       data-testid={dataTestId ?? 'entity-carousel'}
+      data-layout={layout}
     >
       {leading ? (
-        <li data-carousel-slot='leading' className={CARD_ITEM_CLASSNAME}>
+        <li
+          data-carousel-slot='leading'
+          data-layout={layout}
+          className={cardItemClassName}
+        >
           {leading}
         </li>
       ) : null}
@@ -160,17 +177,18 @@ export function EntityCarousel({
               itemRefs.current[index] = node;
             }}
             data-carousel-index={index}
-            className={CARD_ITEM_CLASSNAME}
+            data-layout={layout}
+            className={cardItemClassName}
           >
             <EntityCard
               model={model}
               treatment='detailed'
-              // Unified profile-card anatomy: full-bleed square art, text
-              // zone, and a full-width CTA — the same design as the featured
-              // PAC card. The hero keeps image priority; carousel art stays
-              // lazy so the LCP image never competes with the cover photo.
+              // The hero keeps image priority; carousel art stays lazy so the
+              // LCP image never competes with the cover photo.
               surface={surface}
-              anatomy='unified'
+              anatomy={
+                layout === 'profile-landscape' ? 'profile-landscape' : 'unified'
+              }
               className='h-full w-full overflow-hidden'
               onClick={
                 onCardClick ? () => onCardClick(index, model) : undefined
@@ -180,7 +198,11 @@ export function EntityCarousel({
         );
       })}
       {trailing ? (
-        <li data-carousel-slot='trailing' className={CARD_ITEM_CLASSNAME}>
+        <li
+          data-carousel-slot='trailing'
+          data-layout={layout}
+          className={cardItemClassName}
+        >
           {trailing}
         </li>
       ) : null}
