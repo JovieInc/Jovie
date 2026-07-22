@@ -23,12 +23,21 @@ DEFAULT_TIMEOUT_SECONDS = 30.0
 MAX_TIMEOUT_SECONDS = 30.0
 DEFAULT_GROK_MAX = 2
 MAX_GROK_MAX = 10
-CONTROL_TIMEOUT_SECONDS = 10.0
+DEFAULT_CONTROL_TIMEOUT_SECONDS = 10.0
+MAX_CONTROL_TIMEOUT_SECONDS = 30.0
 SERVICE = "symphony-ui-pilot.service"
 LINEAR_API = "https://api.linear.app/graphql"
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 LINEAR_ENV_PATH = "~/.config/symphony/linear.env"
 DOTENV_ASSIGNMENT = re.compile(r"^(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+INSTALL_STATE_DIR = ".symphony-codex-auth-fallback"
+INSTALL_CURRENT = "current"
+INSTALL_RELEASES = "releases"
+RUNTIME_NAMES = (
+    "symphony-codex-exhausted",
+    "symphony-codex-exhausted.py",
+    "symphony-grok-sidecar",
+)
 
 LINEAR_QUERY = """
 query {
@@ -90,6 +99,17 @@ def _rotate_executable() -> str | None:
     return shutil.which(configured)
 
 
+def _grok_ship_one_executable() -> str | None:
+    configured = os.environ.get(
+        "GEM_GROK_SHIP_ONE_BIN",
+        str(pathlib.Path.home() / ".local/bin/grok-ship-one"),
+    )
+    executable = pathlib.Path(os.path.expanduser(configured))
+    if not executable.is_absolute():
+        return None
+    return str(executable) if executable.is_file() and os.access(executable, os.X_OK) else None
+
+
 def _captured(command: list[str], timeout: float) -> subprocess.CompletedProcess[bytes] | None:
     """Run a child with all output captured and never returned to the caller."""
 
@@ -120,7 +140,7 @@ def codex_canary_ready() -> tuple[bool, str]:
     command = [
         executable,
         "--config",
-        "shell_environment_policy.inherit=all",
+        "shell_environment_policy.inherit=none",
         "--config",
         "model=gpt-5.6-luna",
         "exec",
@@ -143,9 +163,41 @@ def _systemctl(*args: str) -> list[str]:
     return ["systemctl", "--user", *args]
 
 
+def _control_timeout_seconds() -> float:
+    try:
+        value = float(
+            os.environ.get(
+                "GEM_SYSTEM_CONTROL_TIMEOUT_SECONDS",
+                str(DEFAULT_CONTROL_TIMEOUT_SECONDS),
+            )
+        )
+    except (TypeError, ValueError):
+        return DEFAULT_CONTROL_TIMEOUT_SECONDS
+    if value <= 0:
+        return DEFAULT_CONTROL_TIMEOUT_SECONDS
+    return min(value, MAX_CONTROL_TIMEOUT_SECONDS)
+
+
 def _control(command: list[str]) -> bool:
-    result = _captured(command, min(_timeout_seconds(), CONTROL_TIMEOUT_SECONDS))
+    result = _captured(command, _control_timeout_seconds())
     return result is not None and result.returncode == 0
+
+
+def _active_grok_units() -> bool | None:
+    result = _captured(
+        _systemctl(
+            "list-units",
+            "--type=service",
+            "--state=active",
+            "grok-ship-*.service",
+            "--no-legend",
+            "--no-pager",
+        ),
+        _control_timeout_seconds(),
+    )
+    if result is None or result.returncode != 0:
+        return None
+    return bool(result.stdout.strip())
 
 
 def _grok_limit() -> int:
@@ -211,7 +263,7 @@ def _linear_identifiers() -> list[str] | None:
         headers={"Authorization": key, "Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=CONTROL_TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(request, timeout=_control_timeout_seconds()) as response:
             payload = json.load(response)
     except (OSError, ValueError, TypeError, urllib.error.URLError):
         return None
@@ -233,14 +285,20 @@ def _linear_identifiers() -> list[str] | None:
     return identifiers
 
 
-def _grok_command(identifier: str) -> list[str]:
+def _grok_command(identifier: str, executable: str) -> list[str]:
     unit = f"grok-ship-{identifier}"
+    path = f"{pathlib.Path.home()}/.local/bin:/usr/bin:/bin"
     return [
         "systemd-run",
         "--user",
         f"--unit={unit}",
         "--collect",
-        str(pathlib.Path.home() / ".local/bin/grok-ship-one"),
+        "-p",
+        "Type=exec",
+        "-p",
+        f"Environment=PATH={path}",
+        "/bin/bash",
+        executable,
         identifier,
     ]
 
@@ -248,6 +306,13 @@ def _grok_command(identifier: str) -> list[str]:
 def reconcile() -> int:
     ready, reason = codex_canary_ready()
     if ready:
+        active_grok_units = _active_grok_units()
+        if active_grok_units is None or active_grok_units:
+            print(
+                "codex_not_exhausted recovery_deferred grok_ship_active_unknown",
+                file=sys.stderr,
+            )
+            return 0
         if not _control(_systemctl("start", SERVICE)):
             print("codex_not_exhausted symphony_start_failed", file=sys.stderr)
             return 2
@@ -259,6 +324,10 @@ def reconcile() -> int:
 
     if not _control(_systemctl("stop", SERVICE)):
         print("codex_exhausted symphony_stop_failed", file=sys.stderr)
+        return 2
+    executable = _grok_ship_one_executable()
+    if executable is None:
+        print("codex_exhausted grok_executable_missing", file=sys.stderr)
         return 2
     identifiers = _linear_identifiers()
     if identifiers is None:
@@ -273,7 +342,7 @@ def reconcile() -> int:
         unit = f"grok-ship-{identifier}"
         if _control(_systemctl("is-active", "--quiet", unit)):
             continue
-        if not _control(_grok_command(identifier)):
+        if not _control(_grok_command(identifier, executable)):
             print("codex_exhausted grok_launch_failed", file=sys.stderr)
             return 2
         started += 1
@@ -288,6 +357,44 @@ def _artifacts() -> dict[str, pathlib.Path]:
         "symphony-codex-exhausted.py": root / "symphony-codex-exhausted.py",
         "symphony-grok-sidecar": root / "symphony-grok-sidecar",
     }
+
+
+def _stable_launcher(name: str) -> bytes:
+    if name == "symphony-codex-exhausted.py":
+        return b'''#!/usr/bin/env python3
+from __future__ import annotations
+
+import os
+import pathlib
+import sys
+
+
+controller = (
+    pathlib.Path(__file__).resolve().parent
+    / ".symphony-codex-auth-fallback"
+    / "current"
+    / "symphony-codex-exhausted.py"
+)
+os.execv(sys.executable, [sys.executable, str(controller), *sys.argv[1:]])
+'''
+    command = 'reconcile "$@"' if name == "symphony-grok-sidecar" else '"$@"'
+    return f'''#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd -- "$(dirname -- "${{BASH_SOURCE[0]}}")" && pwd)"
+exec python3 "$SCRIPT_DIR/{INSTALL_STATE_DIR}/{INSTALL_CURRENT}/symphony-codex-exhausted.py" {command}
+'''.encode()
+
+
+def _path_exists(path: pathlib.Path) -> bool:
+    return os.path.lexists(path)
+
+
+def _write_executable(path: pathlib.Path, data: bytes) -> None:
+    with path.open("wb") as handle:
+        handle.write(data)
+        handle.flush()
+        os.fsync(handle.fileno())
+    path.chmod(0o755)
 
 
 def install(destination_root: str | None) -> int:
@@ -305,25 +412,82 @@ def install(destination_root: str | None) -> int:
             return 2
         contents[name] = data
 
-    destination = pathlib.Path(
-        os.path.expanduser(destination_root or "~/.local/bin")
-    ).resolve()
-    stage: pathlib.Path | None = None
+    destination = pathlib.Path(os.path.expanduser(destination_root or "~/.local/bin")).resolve()
+    state_dir = destination / INSTALL_STATE_DIR
+    current = state_dir / INSTALL_CURRENT
+    release: pathlib.Path | None = None
+    migration_backup: pathlib.Path | None = None
+    moved: list[str] = []
+    installed: list[str] = []
+    had_current = _path_exists(current)
+    old_current_target: str | None = None
+    current_switched = False
+    next_current = state_dir / ".current.install"
     try:
         destination.mkdir(parents=True, exist_ok=True)
-        stage = pathlib.Path(tempfile.mkdtemp(prefix=".symphony-install-", dir=destination.parent))
+        state_dir.mkdir(parents=True, exist_ok=True)
+        releases = state_dir / INSTALL_RELEASES
+        releases.mkdir(parents=True, exist_ok=True)
+        if had_current:
+            if not current.is_symlink():
+                raise OSError("current switch is not a symlink")
+            old_current_target = os.readlink(current)
+
+        release = pathlib.Path(tempfile.mkdtemp(prefix="release-", dir=releases))
         for name, data in contents.items():
-            staged = stage / name
-            staged.write_bytes(data)
-            staged.chmod(0o755)
-        for name in contents:
-            os.replace(stage / name, destination / name)
+            _write_executable(release / name, data)
+
+        if not had_current:
+            migration_backup = pathlib.Path(tempfile.mkdtemp(prefix=".migration-", dir=state_dir))
+            for name in RUNTIME_NAMES:
+                target = destination / name
+                if _path_exists(target):
+                    os.replace(target, migration_backup / name)
+                    moved.append(name)
+
+        for name in RUNTIME_NAMES:
+            target = destination / name
+            if _path_exists(target):
+                continue
+            staged = destination / f".{name}.install"
+            _write_executable(staged, _stable_launcher(name))
+            os.replace(staged, target)
+            installed.append(name)
+
+        if _path_exists(next_current):
+            next_current.unlink()
+        os.symlink(f"{INSTALL_RELEASES}/{release.name}", next_current)
+        os.replace(next_current, current)
+        current_switched = True
     except OSError:
+        for name in installed:
+            target = destination / name
+            if _path_exists(target):
+                target.unlink()
+        if migration_backup is not None:
+            for name in reversed(moved):
+                backup = migration_backup / name
+                if _path_exists(backup):
+                    os.replace(backup, destination / name)
+        if current_switched:
+            if _path_exists(current):
+                current.unlink()
+            if old_current_target is not None:
+                os.symlink(old_current_target, current)
+        if _path_exists(next_current):
+            next_current.unlink()
+        if release is not None:
+            shutil.rmtree(release, ignore_errors=True)
+        for name in RUNTIME_NAMES:
+            staged = destination / f".{name}.install"
+            if _path_exists(staged):
+                staged.unlink()
+        if migration_backup is not None:
+            shutil.rmtree(migration_backup, ignore_errors=True)
         print("install failed", file=sys.stderr)
         return 2
-    finally:
-        if stage is not None:
-            shutil.rmtree(stage, ignore_errors=True)
+    if migration_backup is not None:
+        shutil.rmtree(migration_backup, ignore_errors=True)
     return 0
 
 
