@@ -1798,6 +1798,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   display: flex;
   width: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
   flex-direction: column;
   align-items: center;
   overflow: clip;
@@ -1813,6 +1815,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   z-index: 2;
   display: flex;
+  flex-shrink: 0;
   width: min(100%, 68rem);
   flex-direction: column;
   align-items: center;
@@ -1854,6 +1857,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-poster-hero__seam {
   position: relative;
   z-index: 2;
+  flex-shrink: 0;
   width: min(48rem, calc(100% - var(--homepage-page-gutter) * 2));
   min-height: var(--space-6);
   margin-block: var(--space-5) var(--space-6);
@@ -1902,6 +1906,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-poster-hero__media {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
   width: min(
     var(--ds-public-content-max),
     calc(100% - var(--homepage-page-gutter) * 2)
@@ -2076,6 +2084,44 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-product-pane--desktop {
   width: 100%;
   aspect-ratio: 1.6;
+}
+
+/* Full-viewport hero: the media column flexes to the fold and the pane lands
+   flat on the viewport edge — no bottom border or radius — so the crop reads
+   as a deliberate stage floor instead of a clipped card. The rail and pane
+   size each other with flex (percentage heights do not resolve against a
+   zero-basis flex track); the image fills the pane absolutely, which always
+   resolves against the pane's used padding box. */
+.homepage-poster-hero .homepage-hero-command-center {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.homepage-poster-hero .homepage-product-rail {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  aspect-ratio: auto;
+}
+
+.homepage-poster-hero .homepage-product-pane--desktop {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  aspect-ratio: auto;
+}
+
+.homepage-poster-hero .homepage-product-pane {
+  border-bottom: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.homepage-poster-hero .homepage-product-pane__image {
+  position: absolute;
+  inset: 0;
 }
 
 /* The named view timeline feeds the proof-strip scroll animations
@@ -3050,9 +3096,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-poster-hero__headline {
-    max-width: 12ch;
-    font-size: clamp(2.55rem, 11vw, 3.35rem);
-    line-height: 0.92;
+    max-width: 20ch;
+    font-size: clamp(2.4rem, 9vw, 3.1rem);
+    line-height: 0.94;
   }
 
   .homepage-poster-hero__subtitle {
@@ -3581,9 +3627,56 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-block: var(--homepage-chapter-space);
+  padding-block: calc(var(--homepage-chapter-space) + var(--space-16));
   padding-inline: var(--homepage-page-gutter);
   text-align: center;
+}
+
+/* The abyss: two hairline grids on a perspective floor, receding toward a
+   vanishing point below the fold. Cyan at whisper opacity — felt, not seen.
+   The plane is oversized so rotation and drift never expose an edge, and the
+   top mask lets the lines dissolve upward into the page. */
+.system-b-mounted-home-footer-cta-abyss {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 0;
+  height: 62%;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, transparent, black 58%);
+  mask-image: linear-gradient(180deg, transparent, black 58%);
+  perspective: 720px;
+  pointer-events: none;
+}
+
+.system-b-mounted-home-footer-cta-abyss-plane {
+  position: absolute;
+  inset: -70% -25% 0;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--system-b-accent-cyan) 68%, transparent) 0 1px,
+      transparent 1px 96px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in oklab, var(--system-b-accent-cyan) 52%, transparent) 0 1px,
+      transparent 1px 64px
+    );
+  opacity: 0.22;
+  transform: rotateX(58deg);
+  transform-origin: center bottom;
+}
+
+@keyframes homepage-footer-cta-abyss-drift {
+  to {
+    transform: rotateX(58deg) translateY(64px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .system-b-mounted-home-footer-cta-abyss-plane {
+    animation: homepage-footer-cta-abyss-drift 26s linear infinite;
+  }
 }
 
 /* Closing beat: hero-scale Satoshi display so the page ends on the same

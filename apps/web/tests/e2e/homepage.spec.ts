@@ -64,7 +64,7 @@ test.describe('Homepage', () => {
     await expect(hero.getByText('operating system')).toHaveCount(0);
     await expect(
       hero.getByRole('heading', {
-        name: 'Jovie runs your music career.',
+        name: 'Your catalog has untapped potential.',
       })
     ).toBeVisible();
     await expect(hero.getByText('You make the music.')).toBeVisible();
@@ -407,7 +407,7 @@ test.describe('Homepage', () => {
 
     await expect(
       page.getByRole('heading', {
-        name: 'Jovie runs your music career.',
+        name: 'Your catalog has untapped potential.',
       })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,

@@ -27,9 +27,9 @@ export const HOMEPAGE_LAUNCH_COPY = {
       'Jovie is the AI artist workspace that surfaces opportunities in your catalog — presaves, captures, pitches — and helps you ship the next one.',
   },
   hero: {
-    headline: 'Jovie runs your music career.',
-    subhead: 'You make the music.',
-    lede: 'Jovie is the AI artist workspace that surfaces opportunities in your catalog and helps you ship the next one.',
+    headline: 'Your catalog has untapped potential.',
+    subhead: 'Jovie finds it.',
+    lede: 'Drive streams. Capture fans. Get paid.',
     primaryCta: {
       ...HOMEPAGE_FRONT_DOOR_CTA.primary,
       label: 'Get started',

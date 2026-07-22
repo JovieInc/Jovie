@@ -85,6 +85,12 @@ export function HomepageV2FinalCta() {
       data-testid='homepage-v2-final-cta'
       className='homepage-story-final-cta system-b-mounted-home-footer-cta relative isolate overflow-hidden'
     >
+      <div
+        aria-hidden='true'
+        className='system-b-mounted-home-footer-cta-abyss'
+      >
+        <div className='system-b-mounted-home-footer-cta-abyss-plane' />
+      </div>
       <MarketingContainer
         width='page'
         className='system-b-mounted-home-footer-cta-container'
