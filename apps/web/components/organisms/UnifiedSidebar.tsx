@@ -6,26 +6,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import {
-  Activity,
-  ArrowLeft,
-  Banknote,
-  Briefcase,
-  Cable,
-  Copy,
-  Flag,
-  FolderKanban,
-  Gauge,
-  Image as ImageIcon,
-  LayoutDashboard,
-  type LucideIcon,
-  Map,
-  RefreshCw,
-  Settings,
-  Share2,
-  TrendingUp,
-  Users,
-} from 'lucide-react';
+import { ArrowLeft, Copy, LogOut, RefreshCw, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -47,10 +28,6 @@ import {
 import { UserButton } from '@/components/organisms/user-button';
 import { getVersionUpdateTitle } from '@/components/shell/getVersionUpdateTitle';
 import { InstallBanner } from '@/components/shell/InstallBanner';
-import {
-  ADMIN_NAV_REGISTRY,
-  type AdminWorkspaceId,
-} from '@/constants/admin-navigation';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
@@ -63,6 +40,7 @@ import {
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
@@ -76,6 +54,7 @@ import {
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
+import { OPERATOR_NAV_SECTIONS } from './operator-navigation';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 
@@ -88,50 +67,12 @@ export interface UnifiedSidebarProps {
 const VERSION_DISMISSAL_KEY = 'jovie-version-update-dismissed';
 const VERSION_NOTIFICATION_DELAY_MS = 10_000;
 
-const OV_ICON_BY_ID: Record<AdminWorkspaceId, LucideIcon> = {
-  overview: LayoutDashboard,
-  ops: Gauge,
-  people: Users,
-  growth: FolderKanban,
-  platform_connections: Cable,
-  activity: Activity,
-  investors: Briefcase,
-  screenshots: ImageIcon,
-  costs: Banknote,
-  revenue_lift: TrendingUp,
-  share_studio: Share2,
-  system_map: Map,
-  features: Flag,
-};
-
-const OV_NAV_SECTIONS = [
-  {
-    label: 'Workspaces',
-    items: ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces'),
-  },
-  {
-    label: 'Utilities',
-    items: ADMIN_NAV_REGISTRY.filter(item => item.section === 'utilities'),
-  },
-].map(section => ({
-  ...section,
-  items: section.items.map(
-    (item): NavItem => ({
-      id: `ov_${item.id}`,
-      name: item.label,
-      href: item.href,
-      description: item.description,
-      icon: OV_ICON_BY_ID[item.id],
-    })
-  ),
-}));
-
 /** Render a group of nav items */
 function SettingsNavGroup({
   items,
   pathname,
 }: Readonly<{
-  items: NavItem[];
+  items: readonly NavItem[];
   pathname: string;
 }>) {
   return (
@@ -193,7 +134,7 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
       aria-label='OV Navigation'
       className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
     >
-      {OV_NAV_SECTIONS.map(section => (
+      {OPERATOR_NAV_SECTIONS.map(section => (
         <div key={section.label}>
           <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
             {section.label}
@@ -451,6 +392,28 @@ function ShellSidebarInstallBanner() {
   );
 }
 
+function OperatorSessionControls() {
+  const { signOut } = useAuthSafe();
+  const handleSignOut = useCallback(async () => {
+    await signOut({ redirectUrl: '/' });
+  }, [signOut]);
+
+  return (
+    <div className='px-2.5 py-0.5'>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton tooltip='Sign Out' onClick={handleSignOut}>
+            <LogOut className='size-3.5' aria-hidden='true' />
+            <span className='truncate group-data-[collapsible=icon]:hidden'>
+              Sign Out
+            </span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </div>
+  );
+}
+
 /**
  * UnifiedSidebar - Single sidebar component for all post-auth sections
  *
@@ -472,7 +435,7 @@ export function UnifiedSidebar({
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin' || section === 'ov';
   const isRouteSidebar = isInSettings || sidebarOverride !== null;
-  const usesStandardAppNavigation = !isInSettings && sidebarOverride === null;
+  const usesStandardAppNavigation = !isAdmin && !isRouteSidebar;
   const hasMultipleProfiles = creatorProfiles.length >= 2;
 
   const { profileHref } = useProfileData(usesStandardAppNavigation);
@@ -524,7 +487,11 @@ export function UnifiedSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      {isRouteSidebar ? null : (
+      {isRouteSidebar ? null : section === 'ov' ? (
+        <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
+          <OperatorSessionControls />
+        </SidebarFooter>
+      ) : (
         // SidebarFooter is shrink-0; with the restored full-height flex chain
         // (sidebar peer + shell mount both h-full), SidebarContent's flex-1
         // absorbs free space so Settings + Now Playing + banners pin bottom.

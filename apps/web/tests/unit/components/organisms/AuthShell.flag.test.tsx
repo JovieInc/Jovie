@@ -19,17 +19,26 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
     sidebar,
     header,
     main,
+    mobileBottomNav,
+    contentClassName,
     variant,
   }: {
     sidebar: ReactNode;
     header?: ReactNode;
     main: ReactNode;
+    mobileBottomNav?: ReactNode;
+    contentClassName?: string;
     variant: 'legacy' | 'shellChatV1';
   }) => (
-    <div data-testid='app-shell-frame' data-shell-design={variant}>
+    <div
+      data-testid='app-shell-frame'
+      data-shell-design={variant}
+      data-content-class={contentClassName}
+    >
       {sidebar}
       {header}
       {main}
+      {mobileBottomNav}
     </div>
   ),
 }));
@@ -74,19 +83,29 @@ vi.mock('@/features/dashboard/organisms/DashboardHeader', () => ({
 }));
 
 vi.mock('@/features/dashboard/organisms/DashboardMobileTabs', () => ({
-  DashboardMobileTabs: () => <nav>Mobile Tabs</nav>,
+  DashboardMobileTabs: () => <nav aria-label='Dashboard Tabs'>Mobile Tabs</nav>,
+}));
+
+vi.mock('@/components/organisms/OperatorMobileNavigation', () => ({
+  OperatorMobileNavigation: () => (
+    <nav aria-label='OV Mobile Navigation'>OV Mobile Navigation</nav>
+  ),
 }));
 
 vi.mock('@/features/dashboard/organisms/MobileProfileDrawer', () => ({
   MobileProfileDrawer: () => null,
 }));
 
-function renderAuthShell(designV1: boolean) {
-  render(
+function renderAuthShell(designV1: boolean, showMobileTabs = false) {
+  return render(
     <AppFlagProvider
       initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: designV1 }}
     >
-      <AuthShell section='dashboard' breadcrumbs={[]}>
+      <AuthShell
+        section='dashboard'
+        breadcrumbs={[]}
+        showMobileTabs={showMobileTabs}
+      >
         <div>Shell Content</div>
       </AuthShell>
     </AppFlagProvider>
@@ -94,7 +113,7 @@ function renderAuthShell(designV1: boolean) {
 }
 
 function renderOvAuthShell() {
-  render(
+  return render(
     <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
       <AuthShell section='ov' breadcrumbs={[]}>
         <div>OV Content</div>
@@ -137,5 +156,47 @@ describe('AuthShell DESIGN_V1 wiring', () => {
 
     expect(screen.getByText('Sidebar')).toHaveAttribute('data-section', 'ov');
     expect(screen.getByText('Sidebar')).toHaveAttribute('data-variant', 'ov');
+  });
+
+  it('keeps customer and OV mobile navigation mutually exclusive', () => {
+    const { unmount } = renderAuthShell(false, true);
+
+    expect(
+      screen.getByRole('navigation', { name: 'Dashboard Tabs' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'OV Mobile Navigation' })
+    ).not.toBeInTheDocument();
+
+    const customerRender = screen.getByTestId('app-shell-frame');
+    expect(customerRender).toHaveAttribute(
+      'data-content-class',
+      'pb-20 lg:pb-6'
+    );
+
+    unmount();
+    renderOvAuthShell();
+
+    expect(
+      screen.getByRole('navigation', { name: 'OV Mobile Navigation' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Dashboard Tabs' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('app-shell-frame')).toHaveAttribute(
+      'data-content-class',
+      'pb-20 lg:pb-6'
+    );
+  });
+
+  it('adds no mobile-navigation padding when no bottom navigation is mounted', () => {
+    renderAuthShell(false);
+
+    expect(
+      screen.queryByRole('navigation', { name: 'Dashboard Tabs' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('app-shell-frame')).not.toHaveAttribute(
+      'data-content-class'
+    );
   });
 });

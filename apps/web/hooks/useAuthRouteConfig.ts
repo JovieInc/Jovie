@@ -144,9 +144,9 @@ export function useAuthRouteConfig(
     ];
   }, [isDemoRoute, pathname, searchParams]);
 
-  // Show mobile bottom tabs on all authenticated sections so users always
-  // have persistent navigation on mobile (dashboard, settings, and admin).
-  const showMobileTabs = true;
+  // Customer tabs are exclusive to Jovie mode. OV mounts its own mobile
+  // navigation through OperatorMobileNavigation inside AuthShell.
+  const showMobileTabs = mode !== 'ov';
 
   // Table routes that need different overflow behavior.
   // Memoized so downstream consumers don't re-render when navigating

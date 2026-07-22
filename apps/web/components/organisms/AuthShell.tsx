@@ -21,6 +21,7 @@ import { useAppFlag } from '@/lib/flags/client';
 import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
+import { OperatorMobileNavigation } from './OperatorMobileNavigation';
 import { PersistentAudioBar } from './PersistentAudioBar';
 export interface AuthShellProps {
   readonly section: AppShellSection;
@@ -74,6 +75,7 @@ function AuthShellInner({
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;
+  const hasMobileBottomNav = section === 'ov' || showMobileTabs;
 
   // Memoize the sidebar so it doesn't re-render on breadcrumb/header changes.
   // The sidebar only depends on `section` — it shouldn't remount when
@@ -90,8 +92,13 @@ function AuthShellInner({
 
   // Memoize mobile bottom nav — stable across route changes
   const mobileBottomNav = useMemo(
-    () => (showMobileTabs ? <DashboardMobileTabs /> : null),
-    [showMobileTabs]
+    () =>
+      section === 'ov' ? (
+        <OperatorMobileNavigation />
+      ) : showMobileTabs ? (
+        <DashboardMobileTabs />
+      ) : null,
+    [section, showMobileTabs]
   );
   const searchSurface = useMemo(() => {
     return headerActionsState ? (
@@ -129,7 +136,7 @@ function AuthShellInner({
       rightPanel={rightPanel}
       audioPlayer={audioPlayer}
       mobileBottomNav={mobileBottomNav}
-      contentClassName={getContentClassName(showMobileTabs, isTableRoute)}
+      contentClassName={getContentClassName(hasMobileBottomNav, isTableRoute)}
       variant={shellVariant}
       composerFocusActive={isComposerFocused && !isMobile}
     />

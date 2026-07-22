@@ -96,6 +96,7 @@ describe('useAuthRouteConfig', () => {
     const { result } = renderHook(() => useAuthRouteConfig('ov'));
 
     expect(result.current.section).toBe('ov');
+    expect(result.current.showMobileTabs).toBe(false);
   });
 
   it('keeps customer routes in customer sections', () => {
@@ -104,5 +105,6 @@ describe('useAuthRouteConfig', () => {
     const { result } = renderHook(() => useAuthRouteConfig('customer'));
 
     expect(result.current.section).toBe('dashboard');
+    expect(result.current.showMobileTabs).toBe(true);
   });
 });

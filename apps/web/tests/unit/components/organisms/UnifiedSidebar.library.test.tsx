@@ -1,12 +1,13 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
+import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   ShellSidebarOverrideProvider,
@@ -23,8 +24,14 @@ const electronRuntimeMock = vi.hoisted(() => ({
   isElectronRuntime: true,
 }));
 
+const signOutMock = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   useIsElectronRuntime: () => electronRuntimeMock.isElectronRuntime,
+}));
+
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useAuthSafe: () => ({ signOut: signOutMock }),
 }));
 
 vi.mock('@/features/dashboard/dashboard-nav', () => ({
@@ -136,6 +143,7 @@ function renderUnifiedSidebar({
 describe('UnifiedSidebar library route', () => {
   afterEach(() => {
     electronRuntimeMock.isElectronRuntime = true;
+    signOutMock.mockReset();
     resetDashboardNavTestMocks();
   });
 
@@ -212,18 +220,39 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.getByRole('navigation', { name: 'OV Navigation' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.ADMIN
-    );
-    expect(screen.getByRole('link', { name: 'Ops' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.ADMIN_OPS
-    );
-    expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.ADMIN_FEATURES
+    const operatorNavigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    const operatorLinks = within(operatorNavigation).getAllByRole('link');
+
+    expect(
+      operatorLinks.map(link => ({
+        label: link.textContent,
+        href: link.getAttribute('href'),
+      }))
+    ).toEqual(
+      ADMIN_NAV_REGISTRY.map(item => ({
+        label: item.label,
+        href: item.href,
+      }))
     );
     expect(screen.queryByTestId('dashboard-nav')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Sign Out' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps Jovie-mode admin routes on the same customer navigation contract', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.LEGACY_ADMIN,
+      section: 'admin',
+    });
+
+    expect(screen.getByTestId('dashboard-nav')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'OV Navigation' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('user-button')).toBeInTheDocument();
   });
 });
