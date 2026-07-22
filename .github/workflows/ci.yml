@@ -4131,6 +4131,18 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          # Anonymous onboarding chat needs the same arming as the smoke/golden
+          # lanes: SESSION_SECRET mints the onboarding session cookie (503
+          # SESSION_SECRET_NOT_CONFIGURED without it), UPSTASH_REDIS_* keep the
+          # requireRedis limiters from failing closed (429), E2E_TEST_MODE skips
+          # the loopback-shared-bucket anonymous limiter deterministically, and
+          # CHAT_LLM_FAILURE_INJECTION honors the header-gated LLM-failure
+          # fallback (inert unless a request carries x-jovie-e2e-llm-failure).
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          E2E_TEST_MODE: '1'
+          CHAT_LLM_FAILURE_INJECTION: '1'
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
@@ -4151,6 +4163,18 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          # Same anonymous-onboarding arming as the smoke/golden lanes and the
+          # E2E Full step above (JOV-4179): without SESSION_SECRET the first
+          # onboarding message 503s (SESSION_SECRET_NOT_CONFIGURED), without
+          # UPSTASH_REDIS_* + E2E_TEST_MODE the requireRedis limiters fail
+          # closed (429), and without CHAT_LLM_FAILURE_INJECTION the
+          # x-jovie-e2e-llm-failure header is inert so no deterministic
+          # fallback is served.
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          E2E_TEST_MODE: '1'
+          CHAT_LLM_FAILURE_INJECTION: '1'
           SENTRY_E2E_REPORTING: '1'
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: ci-main-e2e-quarantine
@@ -5021,6 +5045,11 @@ jobs:
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
           export URL_ENCRYPTION_KEY="smoke-preview-url-encryption-key"
           export AI_GATEWAY_API_KEY="smoke-preview-ai-gateway-key"
+          # Arms the onboarding LLM-failure fallback spec; matches playwright.config.smoke.ts
+          # and the ci-e2e-smoke lane. Inert unless a request carries
+          # x-jovie-e2e-llm-failure (only start-onboarding-llm-failure and
+          # golden-path send it).
+          export CHAT_LLM_FAILURE_INJECTION=1
           PORT=3260 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
