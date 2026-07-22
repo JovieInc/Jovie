@@ -234,7 +234,7 @@ function sanitizeCollection(raw: unknown): LibraryCollection | null {
 }
 
 export function readPersistedLibraryCollections(): LibraryCollection[] {
-  if (typeof globalThis.window === 'undefined') return [];
+  if (globalThis.window === undefined) return [];
   try {
     const stored = globalThis.localStorage?.getItem(
       LIBRARY_COLLECTIONS_STORAGE_KEY
@@ -253,7 +253,7 @@ export function readPersistedLibraryCollections(): LibraryCollection[] {
 export function persistLibraryCollections(
   collections: readonly LibraryCollection[]
 ): void {
-  if (typeof globalThis.window === 'undefined') return;
+  if (globalThis.window === undefined) return;
   try {
     if (collections.length === 0) {
       globalThis.localStorage?.removeItem(LIBRARY_COLLECTIONS_STORAGE_KEY);
@@ -269,7 +269,7 @@ export function persistLibraryCollections(
 }
 
 export function readPersistedActiveLibraryCollectionId(): string | null {
-  if (typeof globalThis.window === 'undefined') return null;
+  if (globalThis.window === undefined) return null;
   try {
     const stored = globalThis.localStorage?.getItem(
       LIBRARY_ACTIVE_COLLECTION_STORAGE_KEY
@@ -281,7 +281,7 @@ export function readPersistedActiveLibraryCollectionId(): string | null {
 }
 
 export function persistActiveLibraryCollectionId(id: string | null): void {
-  if (typeof globalThis.window === 'undefined') return;
+  if (globalThis.window === undefined) return;
   try {
     if (!id) {
       globalThis.localStorage?.removeItem(
@@ -299,7 +299,16 @@ function createCollectionId(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
     return `col_${globalThis.crypto.randomUUID()}`;
   }
-  return `col_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  // Cryptographically strong fallback when randomUUID is unavailable.
+  const bytes = new Uint8Array(8);
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    globalThis.crypto.getRandomValues(bytes);
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(
+      ''
+    );
+    return `col_${Date.now().toString(36)}_${hex}`;
+  }
+  throw new Error('Secure random number generator is unavailable');
 }
 
 export function createLibraryCollection(input: {

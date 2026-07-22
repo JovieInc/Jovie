@@ -403,9 +403,11 @@ function assetMatchesFilters(
     return false;
   }
   if (filters.releaseTags.size > 0) {
-    const tags = releaseTagsForAsset(asset).map(tag => normalizePillValue(tag));
+    const tags = new Set(
+      releaseTagsForAsset(asset).map(tag => normalizePillValue(tag))
+    );
     const hasTag = Array.from(filters.releaseTags).some(tag =>
-      tags.includes(normalizePillValue(tag))
+      tags.has(normalizePillValue(tag))
     );
     if (!hasTag) return false;
   }
