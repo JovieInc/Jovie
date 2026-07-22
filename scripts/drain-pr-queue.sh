@@ -161,17 +161,19 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
       return 2
     fi
 
+    # Audit label is best-effort evidence only: external watchers (e.g.
+    # Graphite's account-less unlabel hook) can strip it within seconds, and a
+    # missing audit label must never unwind a proven native enrollment
+    # (GH-14694: drain repeatedly dequeued freshly-enrolled PRs when the label
+    # vanished between the write and the final proof).
     if ! gh_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
-      echo "    !! failed to add native intent label for #$n; compensating" >&2
-      if ! remove_held_queue_label_strict "$n"; then
-        echo "    !! CRITICAL: could not compensate unlabeled native enrollment for #$n" >&2
-      fi
-      return 1
+      echo "    note: could not record native intent label for #$n (non-fatal)"
     fi
 
-    # Final label+head proof catches a hard gate racing with the audit-label
-    # write. The labeled event is a later safety net; this controller does not
-    # rely on that event to repair its own mutation.
+    # Final proof re-verifies eligibility and native queue membership — never
+    # the audit label, which external watchers may legitimately strip. The
+    # labeled event remains a later safety net; this controller does not rely
+    # on that event to repair its own mutation.
     if ! current="$(gh_retry pr view "$n" -R "$REPO" \
       --json state,isDraft,mergeable,labels,headRefOid 2>/dev/null)" \
       || ! jq -e --arg expected_head "$expected_head" '
@@ -179,7 +181,6 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
         and (.isDraft | not)
         and .mergeable == "MERGEABLE"
         and ((.headRefOid // "") | ascii_downcase) == $expected_head
-        and ([.labels[].name] | index("merge-queue"))
         and ([.labels[].name] | any(
           . == "needs-human" or . == "hold" or . == "gated"
           or . == "queue-deferred" or . == "needs-conflict-resolution"
