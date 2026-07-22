@@ -14,6 +14,11 @@ if (!issueRef || !outcome) {
   process.exit(1);
 }
 
+if (outcome !== 'retryable' && outcome !== 'in-review') {
+  console.error(`Invalid claim finalizer outcome: ${outcome}`);
+  process.exit(1);
+}
+
 const number = Number.parseInt(String(issueRef).replace(/^#/, ''), 10);
 if (!Number.isFinite(number)) {
   console.error(`Invalid issue number: ${issueRef}`);
