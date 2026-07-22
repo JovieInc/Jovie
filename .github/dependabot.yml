@@ -72,6 +72,11 @@ updates:
       - 'dependencies'
       - 'github-actions'
       - 'automated'
+    groups:
+      # init/analyze load one shared bundle and must move in the same PR.
+      codeql-action:
+        patterns:
+          - 'github/codeql-action'
 
   # Enable version updates for Docker (if needed)
   - package-ecosystem: 'docker'
