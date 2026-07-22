@@ -20,6 +20,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -613,9 +614,16 @@ export function uploadSealedArtifacts(
       ])
     );
 
+    // Invoke the LHCI entrypoint directly with Node. `pnpm exec` performs
+    // project discovery and re-anchors the child at the nearest package root
+    // when its cwd (this isolated upload root) has no package.json — and LHCI
+    // derives its artifact directory from process.cwd(), so a re-anchored
+    // uploader writes links.json into the sealed source tree instead of the
+    // isolated copy ("Lighthouse artifact set changed after validation").
+    // A direct Node spawn pins the uploader's cwd to the isolated root.
     const upload = spawnImpl(
-      'pnpm',
-      ['exec', 'lhci', 'upload', `--config=${uploadConfigPath}`],
+      process.execPath,
+      [resolveLighthouseCliPath(), 'upload', `--config=${uploadConfigPath}`],
       {
         cwd: uploadRoot,
         env: childEnvironment,
@@ -706,6 +714,11 @@ export function uploadSealedArtifacts(
     }
     rmSync(uploadRoot, { force: true, recursive: true });
   }
+}
+
+export function resolveLighthouseCliPath(): string {
+  const requireFromGuard = createRequire(import.meta.url);
+  return requireFromGuard.resolve('@lhci/cli/src/cli.js');
 }
 
 function readOption(argv: readonly string[], name: string): string | undefined {
