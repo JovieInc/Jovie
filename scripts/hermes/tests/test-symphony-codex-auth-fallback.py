@@ -113,6 +113,12 @@ class FallbackTests(unittest.TestCase):
         self.addCleanup(server.server_close)
         return f"http://127.0.0.1:{server.server_port}/graphql"
 
+    def write_linear_env(self, contents):
+        path = self.home / ".config/symphony/linear.env"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents)
+        return path
+
     def test_canary_uses_live_command_and_exact_marker(self):
         canary = self.write_command(
             "codex-rotate",
@@ -214,6 +220,60 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn(" idle", result.stderr)
+
+    def test_usable_sidecar_ignores_malformed_linear_env_before_idle(self):
+        canary = self.write_command("codex-rotate", "echo GEM_MODEL_READY")
+        self.write_linear_env("LINEAR_API_KEY='unterminated\n")
+        systemctl = self.write_command(
+            "systemctl",
+            "printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"; [ \"$2\" != is-active ] || exit \"${GEM_ACTIVE_RC:-0}\"",
+        )
+        destination = self.install_runtime()
+        result = subprocess.run(
+            [str(destination / "symphony-grok-sidecar")],
+            capture_output=True,
+            text=True,
+            env=self.env(GEM_CODEX_ROTATE_BIN=canary, GEM_EVENTS=self.events),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            self.events.read_text().splitlines(),
+            [
+                "systemctl --user start symphony-ui-pilot.service",
+                "systemctl --user is-active --quiet symphony-ui-pilot.service",
+            ],
+        )
+        self.assertIn("idle", result.stderr)
+
+    def test_exhausted_sidecar_loads_linear_key_from_dotenv_without_leaking_it(self):
+        canary = self.write_command("codex-rotate", "exit 1")
+        linear_key = "file-linear-secret"
+        self.write_linear_env(f"# only the key\nexport LINEAR_API_KEY='{linear_key}'\n")
+        systemctl = self.write_command(
+            "systemctl",
+            "printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"; if [ \"$2\" = is-active ]; then [ \"$4\" = grok-ship-JOV-2 ] && exit 0; exit 1; fi; exit 0",
+        )
+        systemd_run = self.write_command(
+            "systemd-run",
+            "printf 'systemd-run %s\\n' \"$*\" >> \"$GEM_EVENTS\"",
+        )
+        destination = self.install_runtime()
+        result = subprocess.run(
+            [str(destination / "symphony-grok-sidecar")],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_CODEX_ROTATE_BIN=canary,
+                LINEAR_API_URL=self.start_linear(),
+                GEM_EVENTS=self.events,
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(LinearHandler.requests[0][0], linear_key)
+        self.assertNotIn(linear_key, result.stdout + result.stderr)
+        self.assertNotIn(linear_key, self.events.read_text())
 
     def test_exhausted_sidecar_stops_symphony_skips_active_and_bounds_launches(self):
         canary = self.write_command("codex-rotate", "exit 1")

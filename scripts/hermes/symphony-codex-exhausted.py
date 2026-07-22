@@ -27,11 +27,13 @@ CONTROL_TIMEOUT_SECONDS = 10.0
 SERVICE = "symphony-ui-pilot.service"
 LINEAR_API = "https://api.linear.app/graphql"
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
+LINEAR_ENV_PATH = "~/.config/symphony/linear.env"
+DOTENV_ASSIGNMENT = re.compile(r"^(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 
 LINEAR_QUERY = """
 query {
   issues(
-    first: 100
+    first: 20
     filter: {
       labels: { name: { eq: "symphony" } }
       state: { name: { in: ["Todo", "In Progress"] } }
@@ -154,8 +156,52 @@ def _grok_limit() -> int:
     return max(0, min(value, MAX_GROK_MAX))
 
 
+def _dotenv_value(raw: str) -> str | None:
+    if not raw:
+        return None
+    if raw[0] in "'\"":
+        quote = raw[0]
+        if len(raw) < 2 or raw[-1] != quote:
+            return None
+        value = raw[1:-1]
+        if quote in value or any(character in value for character in "\\$`"):
+            return None
+        return value or None
+    if any(character.isspace() for character in raw):
+        return None
+    if any(character in raw for character in "'\"\\$`;|&<>(){}"):
+        return None
+    return raw
+
+
+def _linear_api_key_from_file() -> str | None:
+    try:
+        lines = pathlib.Path(os.path.expanduser(LINEAR_ENV_PATH)).read_text(
+            encoding="utf-8"
+        ).splitlines()
+    except (OSError, UnicodeError):
+        return None
+
+    key: str | None = None
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = DOTENV_ASSIGNMENT.fullmatch(line)
+        if match is None or match.group(1) != "LINEAR_API_KEY" or key is not None:
+            return None
+        key = _dotenv_value(match.group(2))
+        if key is None:
+            return None
+    return key
+
+
 def _linear_identifiers() -> list[str] | None:
-    key = os.environ.get("LINEAR_API_KEY")
+    key = (
+        os.environ["LINEAR_API_KEY"]
+        if "LINEAR_API_KEY" in os.environ
+        else _linear_api_key_from_file()
+    )
     if not key:
         return None
     body = json.dumps({"query": LINEAR_QUERY}).encode()
