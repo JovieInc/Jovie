@@ -216,6 +216,44 @@ def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
         assert "run: corepack enable" not in content, workflow_name
 
 
+def test_workflow_test_tooling_is_hash_pinned() -> None:
+    """Security tooling installs must keep package integrity evidence in-repo."""
+    requirements_path = REPO_ROOT / ".github" / "requirements" / "pytest.txt"
+    requirements = requirements_path.read_text(encoding="utf-8")
+    logical_requirements = requirements.replace("\\\n", " ").splitlines()
+
+    assert "pytest==8.4.2" in requirements
+    for requirement in logical_requirements:
+        if not requirement or requirement.startswith("#"):
+            continue
+        assert "==" in requirement, requirement
+        assert "--hash=sha256:" in requirement, requirement
+
+    install_command = (
+        "python -m pip install --quiet --require-hashes "
+        "-r .github/requirements/pytest.txt"
+    )
+    for workflow_name in (
+        "actionlint.yml",
+        "brand-scrub.yml",
+        "ci.yml",
+        "slop-gate.yml",
+    ):
+        workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
+        assert install_command in workflow, workflow_name
+        assert "pip install pytest" not in workflow, workflow_name
+
+
+def test_autofix_uses_corepack_for_pnpm_distribution() -> None:
+    """Avoid an unhashed npm global install on the automated repair path."""
+    script = (REPO_ROOT / "scripts" / "auto-fix-lint-agent-drafts.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "npm install -g pnpm@" not in script
+    assert "corepack prepare pnpm@9.15.4 --activate" in script
+
+
 def test_trigger_guard_materializes_systemic_detector_import_closure() -> None:
     """The detector must not fail before it can classify a systemic failure."""
     step = _step_block("agent-pipeline.yml", "Checkout systemic detector")
