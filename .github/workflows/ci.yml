@@ -1054,7 +1054,7 @@ jobs:
           python-version: '3.12'
       - name: Install pytest (structural regression tests)
         if: steps.structural.outputs.skip != 'true'
-        run: pip install pytest --quiet
+        run: pip install pytest==8.4.2 --quiet
       - name: Run ci-fast lanes
         id: lanes
         env:
