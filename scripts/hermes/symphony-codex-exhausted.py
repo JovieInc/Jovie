@@ -23,8 +23,7 @@ DEFAULT_TIMEOUT_SECONDS = 30.0
 MAX_TIMEOUT_SECONDS = 30.0
 DEFAULT_GROK_MAX = 2
 MAX_GROK_MAX = 10
-DEFAULT_CONTROL_TIMEOUT_SECONDS = 10.0
-MAX_CONTROL_TIMEOUT_SECONDS = 30.0
+CONTROL_TIMEOUT_SECONDS = 10.0
 SERVICE = "symphony-ui-pilot.service"
 LINEAR_API = "https://api.linear.app/graphql"
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
@@ -32,6 +31,7 @@ LINEAR_ENV_PATH = "~/.config/symphony/linear.env"
 DOTENV_ASSIGNMENT = re.compile(r"^(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 INSTALL_STATE_DIR = ".symphony-codex-auth-fallback"
 INSTALL_CURRENT = "current"
+INSTALL_PENDING = "pending"
 INSTALL_RELEASES = "releases"
 RUNTIME_NAMES = (
     "symphony-codex-exhausted",
@@ -100,13 +100,7 @@ def _rotate_executable() -> str | None:
 
 
 def _grok_ship_one_executable() -> str | None:
-    configured = os.environ.get(
-        "GEM_GROK_SHIP_ONE_BIN",
-        str(pathlib.Path.home() / ".local/bin/grok-ship-one"),
-    )
-    executable = pathlib.Path(os.path.expanduser(configured))
-    if not executable.is_absolute():
-        return None
+    executable = pathlib.Path.home() / ".local/bin/grok-ship-one"
     return str(executable) if executable.is_file() and os.access(executable, os.X_OK) else None
 
 
@@ -164,18 +158,7 @@ def _systemctl(*args: str) -> list[str]:
 
 
 def _control_timeout_seconds() -> float:
-    try:
-        value = float(
-            os.environ.get(
-                "GEM_SYSTEM_CONTROL_TIMEOUT_SECONDS",
-                str(DEFAULT_CONTROL_TIMEOUT_SECONDS),
-            )
-        )
-    except (TypeError, ValueError):
-        return DEFAULT_CONTROL_TIMEOUT_SECONDS
-    if value <= 0:
-        return DEFAULT_CONTROL_TIMEOUT_SECONDS
-    return min(value, MAX_CONTROL_TIMEOUT_SECONDS)
+    return CONTROL_TIMEOUT_SECONDS
 
 
 def _control(command: list[str]) -> bool:
@@ -297,7 +280,6 @@ def _grok_command(identifier: str, executable: str) -> list[str]:
         "Type=exec",
         "-p",
         f"Environment=PATH={path}",
-        "/bin/bash",
         executable,
         identifier,
     ]
@@ -307,9 +289,12 @@ def reconcile() -> int:
     ready, reason = codex_canary_ready()
     if ready:
         active_grok_units = _active_grok_units()
-        if active_grok_units is None or active_grok_units:
+        if active_grok_units is None:
+            print("codex_not_exhausted grok_state_query_failed", file=sys.stderr)
+            return 2
+        if active_grok_units:
             print(
-                "codex_not_exhausted recovery_deferred grok_ship_active_unknown",
+                "codex_not_exhausted recovery_deferred grok_ship_active",
                 file=sys.stderr,
             )
             return 0
@@ -369,19 +354,25 @@ import pathlib
 import sys
 
 
-controller = (
-    pathlib.Path(__file__).resolve().parent
-    / ".symphony-codex-auth-fallback"
-    / "current"
-    / "symphony-codex-exhausted.py"
-)
+state_dir = pathlib.Path(__file__).resolve().parent / ".symphony-codex-auth-fallback"
+release_link = state_dir / "current"
+if not release_link.exists():
+    release_link = state_dir / "pending"
+controller = release_link / "symphony-codex-exhausted.py"
+if not controller.is_file():
+    raise SystemExit("symphony-codex-auth-fallback is not installed")
 os.execv(sys.executable, [sys.executable, str(controller), *sys.argv[1:]])
 '''
     command = 'reconcile "$@"' if name == "symphony-grok-sidecar" else '"$@"'
     return f'''#!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${{BASH_SOURCE[0]}}")" && pwd)"
-exec python3 "$SCRIPT_DIR/{INSTALL_STATE_DIR}/{INSTALL_CURRENT}/symphony-codex-exhausted.py" {command}
+STATE_DIR="$SCRIPT_DIR/{INSTALL_STATE_DIR}"
+RELEASE_LINK="$STATE_DIR/{INSTALL_CURRENT}"
+if [[ ! -e "$RELEASE_LINK" ]]; then
+  RELEASE_LINK="$STATE_DIR/{INSTALL_PENDING}"
+fi
+exec python3 "$RELEASE_LINK/symphony-codex-exhausted.py" {command}
 '''.encode()
 
 
@@ -395,6 +386,116 @@ def _write_executable(path: pathlib.Path, data: bytes) -> None:
         handle.flush()
         os.fsync(handle.fileno())
     path.chmod(0o755)
+
+
+class InstallValidationError(Exception):
+    pass
+
+
+def _valid_runtime_file(path: pathlib.Path) -> bool:
+    if path.is_symlink() or not path.is_file():
+        return False
+    try:
+        mode = path.stat().st_mode
+        data = path.read_bytes()
+    except OSError:
+        return False
+    return bool(data.startswith(b"#!") and mode & 0o111)
+
+
+def _validated_release_link(
+    link: pathlib.Path, releases: pathlib.Path
+) -> pathlib.Path | None:
+    if not _path_exists(link):
+        return None
+    if not link.is_symlink():
+        raise InstallValidationError("release link is not a symlink")
+    raw_target = os.readlink(link)
+    target_parts = pathlib.PurePath(raw_target).parts
+    if (
+        pathlib.PurePath(raw_target).is_absolute()
+        or len(target_parts) != 2
+        or target_parts[0] != INSTALL_RELEASES
+    ):
+        raise InstallValidationError("release link target is invalid")
+    release = releases / target_parts[1]
+    if release.parent != releases or not release.is_dir():
+        raise InstallValidationError("release link target is missing")
+    if not all(_valid_runtime_file(release / name) for name in RUNTIME_NAMES):
+        raise InstallValidationError("release link target is incomplete")
+    return release
+
+
+def _existing_top_level(destination: pathlib.Path) -> dict[str, pathlib.Path]:
+    return {
+        name: destination / name
+        for name in RUNTIME_NAMES
+        if _path_exists(destination / name)
+    }
+
+
+def _preflight_install(
+    destination: pathlib.Path,
+) -> tuple[pathlib.Path | None, pathlib.Path | None, str]:
+    state_dir = destination / INSTALL_STATE_DIR
+    releases = state_dir / INSTALL_RELEASES
+    current = _validated_release_link(state_dir / INSTALL_CURRENT, releases)
+    pending = _validated_release_link(state_dir / INSTALL_PENDING, releases)
+    top_level = _existing_top_level(destination)
+    stable = {name: _stable_launcher(name) for name in RUNTIME_NAMES}
+
+    if current is None and pending is None:
+        if not top_level:
+            return None, None, "fresh"
+        if len(top_level) != len(RUNTIME_NAMES) or not all(
+            _valid_runtime_file(path) for path in top_level.values()
+        ):
+            raise InstallValidationError("legacy launcher set is partial or invalid")
+        return None, None, "legacy"
+
+    if current is None:
+        if any(path.read_bytes() != stable[name] for name, path in top_level.items()):
+            raise InstallValidationError("pending install has an invalid launcher")
+        return None, pending, "fresh"
+
+    current_contents = {name: (current / name).read_bytes() for name in RUNTIME_NAMES}
+    for name, path in top_level.items():
+        if not _valid_runtime_file(path):
+            raise InstallValidationError("installed launcher is invalid")
+        if path.read_bytes() not in (stable[name], current_contents[name]):
+            raise InstallValidationError("installed launcher has unexpected contents")
+    return current, pending, "versioned"
+
+
+def _atomic_release_link(link: pathlib.Path, release: pathlib.Path) -> None:
+    temporary = link.parent / f".{link.name}.install"
+    if _path_exists(temporary):
+        temporary.unlink()
+    os.symlink(f"{INSTALL_RELEASES}/{release.name}", temporary)
+    os.replace(temporary, link)
+
+
+def _install_launcher(destination: pathlib.Path, name: str, data: bytes) -> None:
+    staged = destination / f".{name}.install"
+    _write_executable(staged, data)
+    os.replace(staged, destination / name)
+
+
+def _remove_install_temps(destination: pathlib.Path, state_dir: pathlib.Path) -> None:
+    for name in RUNTIME_NAMES:
+        staged = destination / f".{name}.install"
+        if _path_exists(staged):
+            try:
+                staged.unlink()
+            except OSError:
+                pass
+    for name in (INSTALL_CURRENT, INSTALL_PENDING):
+        staged = state_dir / f".{name}.install"
+        if _path_exists(staged):
+            try:
+                staged.unlink()
+            except OSError:
+                pass
 
 
 def install(destination_root: str | None) -> int:
@@ -412,82 +513,50 @@ def install(destination_root: str | None) -> int:
             return 2
         contents[name] = data
 
-    destination = pathlib.Path(os.path.expanduser(destination_root or "~/.local/bin")).resolve()
+    destination = pathlib.Path(
+        os.path.expanduser(destination_root or "~/.local/bin")
+    ).resolve()
     state_dir = destination / INSTALL_STATE_DIR
     current = state_dir / INSTALL_CURRENT
-    release: pathlib.Path | None = None
-    migration_backup: pathlib.Path | None = None
-    moved: list[str] = []
-    installed: list[str] = []
-    had_current = _path_exists(current)
-    old_current_target: str | None = None
-    current_switched = False
-    next_current = state_dir / ".current.install"
+    pending = state_dir / INSTALL_PENDING
+
+    try:
+        current_target, pending_target, mode = _preflight_install(destination)
+    except (InstallValidationError, OSError):
+        print("install validation failed", file=sys.stderr)
+        return 2
+
+    release: pathlib.Path | None = pending_target
     try:
         destination.mkdir(parents=True, exist_ok=True)
         state_dir.mkdir(parents=True, exist_ok=True)
         releases = state_dir / INSTALL_RELEASES
         releases.mkdir(parents=True, exist_ok=True)
-        if had_current:
-            if not current.is_symlink():
-                raise OSError("current switch is not a symlink")
-            old_current_target = os.readlink(current)
+        if release is None:
+            release = pathlib.Path(tempfile.mkdtemp(prefix="release-", dir=releases))
+            for name, data in contents.items():
+                _write_executable(release / name, data)
 
-        release = pathlib.Path(tempfile.mkdtemp(prefix="release-", dir=releases))
-        for name, data in contents.items():
-            _write_executable(release / name, data)
-
-        if not had_current:
-            migration_backup = pathlib.Path(tempfile.mkdtemp(prefix=".migration-", dir=state_dir))
+        if mode == "legacy" and current_target is None:
+            prior = pathlib.Path(tempfile.mkdtemp(prefix="prior-", dir=releases))
             for name in RUNTIME_NAMES:
-                target = destination / name
-                if _path_exists(target):
-                    os.replace(target, migration_backup / name)
-                    moved.append(name)
+                source = destination / name
+                _write_executable(prior / name, source.read_bytes())
+            _atomic_release_link(current, prior)
+            current_target = prior
+
+        if not _path_exists(pending):
+            _atomic_release_link(pending, release)
 
         for name in RUNTIME_NAMES:
-            target = destination / name
-            if _path_exists(target):
-                continue
-            staged = destination / f".{name}.install"
-            _write_executable(staged, _stable_launcher(name))
-            os.replace(staged, target)
-            installed.append(name)
+            _install_launcher(destination, name, _stable_launcher(name))
 
-        if _path_exists(next_current):
-            next_current.unlink()
-        os.symlink(f"{INSTALL_RELEASES}/{release.name}", next_current)
-        os.replace(next_current, current)
-        current_switched = True
+        os.replace(pending, current)
+        _remove_install_temps(destination, state_dir)
     except OSError:
-        for name in installed:
-            target = destination / name
-            if _path_exists(target):
-                target.unlink()
-        if migration_backup is not None:
-            for name in reversed(moved):
-                backup = migration_backup / name
-                if _path_exists(backup):
-                    os.replace(backup, destination / name)
-        if current_switched:
-            if _path_exists(current):
-                current.unlink()
-            if old_current_target is not None:
-                os.symlink(old_current_target, current)
-        if _path_exists(next_current):
-            next_current.unlink()
-        if release is not None:
-            shutil.rmtree(release, ignore_errors=True)
-        for name in RUNTIME_NAMES:
-            staged = destination / f".{name}.install"
-            if _path_exists(staged):
-                staged.unlink()
-        if migration_backup is not None:
-            shutil.rmtree(migration_backup, ignore_errors=True)
+        _remove_install_temps(destination, state_dir)
         print("install failed", file=sys.stderr)
         return 2
-    if migration_backup is not None:
-        shutil.rmtree(migration_backup, ignore_errors=True)
     return 0
 
 

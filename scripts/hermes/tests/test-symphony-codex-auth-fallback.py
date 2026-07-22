@@ -9,6 +9,7 @@ import pathlib
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import textwrap
 import threading
@@ -106,15 +107,64 @@ class FallbackTests(unittest.TestCase):
 
     def install_runtime(self, destination=None):
         destination = destination or self.home / ".local/bin"
-        result = subprocess.run(
-            ["python3", str(CONTROLLER), "install", "--destination-root", str(destination)],
-            capture_output=True,
-            text=True,
-            env=self.env(),
-            check=False,
-        )
+        result = self.run_install(destination)
         self.assertEqual(result.returncode, 0, result.stderr)
         return destination
+
+    def run_install(self, destination, **extra):
+        return subprocess.run(
+            [sys.executable, str(CONTROLLER), "install", "--destination-root", str(destination)],
+            capture_output=True,
+            text=True,
+            env=self.env(**extra),
+            check=False,
+        )
+
+    def run_install_with_crash(self, destination, replace_number):
+        startup = self.root / f"sitecustomize-{replace_number}"
+        startup.mkdir()
+        (startup / "sitecustomize.py").write_text(
+            "import os\n"
+            "import signal\n"
+            "real_replace = os.replace\n"
+            "replace_number = int(os.environ['INSTALL_CRASH_AFTER_REPLACE'])\n"
+            "replace_count = 0\n"
+            "def crash_at_boundary(source, target):\n"
+            "    global replace_count\n"
+            "    replace_count += 1\n"
+            "    if replace_count == replace_number:\n"
+            "        os.kill(os.getpid(), signal.SIGKILL)\n"
+            "    return real_replace(source, target)\n"
+            "os.replace = crash_at_boundary\n"
+        )
+        return self.run_install(
+            destination,
+            INSTALL_CRASH_AFTER_REPLACE=replace_number,
+            PYTHONPATH=startup,
+        )
+
+    def assert_completed_install(self, destination):
+        current = destination / ".symphony-codex-auth-fallback/current"
+        self.assertTrue(current.is_symlink())
+        release = current.resolve()
+        for name, source in (
+            ("symphony-codex-exhausted", WRAPPER),
+            ("symphony-codex-exhausted.py", CONTROLLER),
+            ("symphony-grok-sidecar", SIDECAR),
+        ):
+            self.assertEqual((release / name).read_bytes(), source.read_bytes())
+            self.assertTrue((destination / name).is_file())
+            self.assertNotEqual((destination / name).read_bytes(), source.read_bytes())
+
+    def write_legacy_trio(self, destination):
+        destination.mkdir(parents=True, exist_ok=True)
+        legacy = {}
+        for name in RUNTIME_NAMES:
+            target = destination / name
+            legacy[name] = f"#!/bin/sh\n# legacy {name}\nexit 0\n".encode()
+            target.write_bytes(legacy[name])
+            target.chmod(0o755)
+        return legacy
 
     def start_linear(self):
         LinearHandler.requests = []
@@ -148,7 +198,6 @@ class FallbackTests(unittest.TestCase):
     def test_test_environment_scrubs_controller_variables_before_overrides(self):
         ambient = {
             "GEM_CODEX_CANARY_TIMEOUT_SECONDS": "99",
-            "GEM_SYSTEM_CONTROL_TIMEOUT_SECONDS": "99",
             "SYMPHONY_GROK_MAX": "99",
             "LINEAR_API_KEY": "ambient-secret",
             "LINEAR_API_URL": "http://ambient.invalid",
@@ -156,10 +205,28 @@ class FallbackTests(unittest.TestCase):
         with mock.patch.dict(os.environ, ambient, clear=False):
             actual = self.env(GEM_CODEX_CANARY_TIMEOUT_SECONDS="0.5")
         self.assertEqual(actual["GEM_CODEX_CANARY_TIMEOUT_SECONDS"], "0.5")
-        self.assertNotIn("GEM_SYSTEM_CONTROL_TIMEOUT_SECONDS", actual)
         self.assertNotIn("SYMPHONY_GROK_MAX", actual)
         self.assertNotIn("LINEAR_API_KEY", actual)
         self.assertNotIn("LINEAR_API_URL", actual)
+
+    def test_canary_timeout_does_not_change_control_timeout(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "fallback_controller_timeout_isolation", CONTROLLER
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with mock.patch.dict(
+            module.os.environ, {"GEM_CODEX_CANARY_TIMEOUT_SECONDS": "0.01"}
+        ):
+            self.assertEqual(module._timeout_seconds(), 0.01)
+            self.assertEqual(
+                module._control_timeout_seconds(), module.CONTROL_TIMEOUT_SECONDS
+            )
+            self.assertEqual(module._control_timeout_seconds(), 10.0)
 
     def test_stale_expired_cooldown_does_not_mask_failed_live_canary(self):
         canary = self.write_command(
@@ -276,28 +343,6 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertIn("idle", result.stderr)
 
-    def test_system_control_timeout_is_independent_from_canary_timeout(self):
-        canary = self.write_command("codex-rotate", "echo GEM_MODEL_READY")
-        systemctl = self.write_command(
-            "systemctl",
-            "sleep 0.8; printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"; exit 0",
-        )
-        destination = self.install_runtime()
-        result = subprocess.run(
-            [str(destination / "symphony-grok-sidecar")],
-            capture_output=True,
-            text=True,
-            env=self.env(
-                GEM_CODEX_ROTATE_BIN=canary,
-                GEM_CODEX_CANARY_TIMEOUT_SECONDS="0.5",
-                GEM_SYSTEM_CONTROL_TIMEOUT_SECONDS="1.0",
-                GEM_EVENTS=self.events,
-            ),
-            check=False,
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("symphony-ui-pilot.service", self.events.read_text())
-
     def test_usable_recovery_defers_while_grok_ship_unit_is_active(self):
         canary = self.write_command("codex-rotate", "echo GEM_MODEL_READY")
         systemctl = self.write_command(
@@ -315,6 +360,36 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("recovery_deferred", result.stderr)
         self.assertNotIn(" start symphony-ui-pilot.service", self.events.read_text())
+
+    def test_grok_state_query_failure_is_not_idle(self):
+        canary = self.write_command("codex-rotate", "echo GEM_MODEL_READY")
+        self.write_command(
+            "systemctl",
+            "if [ \"$2\" = list-units ]; then exit 1; fi; exit 0",
+        )
+        destination = self.install_runtime()
+        result = subprocess.run(
+            [str(destination / "symphony-grok-sidecar")],
+            capture_output=True,
+            text=True,
+            env=self.env(GEM_CODEX_ROTATE_BIN=canary),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("grok_state_query_failed", result.stderr)
+
+    def test_grok_state_query_timeout_is_unknown(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "fallback_controller_timeout", CONTROLLER
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with mock.patch.object(module, "_captured", return_value=None):
+            self.assertIsNone(module._active_grok_units())
 
     def test_exhausted_sidecar_loads_linear_key_from_dotenv_without_leaking_it(self):
         canary = self.write_command("codex-rotate", "exit 1")
@@ -377,7 +452,7 @@ class FallbackTests(unittest.TestCase):
         self.assertTrue(any("grok-ship-JOV-1" in line for line in launches))
         self.assertTrue(any("grok-ship-JOV-3" in line for line in launches))
         self.assertIn(
-            f"systemd-run --user --unit=grok-ship-JOV-1 --collect -p Type=exec -p Environment=PATH={self.home}/.local/bin:/usr/bin:/bin /bin/bash {self.home}/.local/bin/grok-ship-one JOV-1",
+            f"systemd-run --user --unit=grok-ship-JOV-1 --collect -p Type=exec -p Environment=PATH={self.home}/.local/bin:/usr/bin:/bin {self.home}/.local/bin/grok-ship-one JOV-1",
             launches,
         )
         self.assertNotIn("linear-secret", result.stdout + result.stderr)
@@ -407,7 +482,7 @@ class FallbackTests(unittest.TestCase):
         sentinel = destination / "sentinel"
         sentinel.write_text("keep")
         result = subprocess.run(
-            ["python3", str(source_root / CONTROLLER.name), "install", "--destination-root", str(destination)],
+            [sys.executable, str(source_root / CONTROLLER.name), "install", "--destination-root", str(destination)],
             capture_output=True,
             text=True,
             env=self.env(),
@@ -417,15 +492,27 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(sentinel.read_text(), "keep")
         self.assertEqual(list(destination.iterdir()), [sentinel])
 
+    def test_installer_rejects_partial_or_invalid_legacy_before_mutation(self):
+        partial = self.root / "partial-legacy"
+        partial.mkdir()
+        (partial / RUNTIME_NAMES[0]).write_bytes(b"#!/bin/sh\nexit 0\n")
+        (partial / RUNTIME_NAMES[0]).chmod(0o755)
+        result = self.run_install(partial)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(sorted(path.name for path in partial.iterdir()), [RUNTIME_NAMES[0]])
+
+        invalid = self.root / "invalid-legacy"
+        self.write_legacy_trio(invalid)
+        (invalid / RUNTIME_NAMES[1]).write_text("not an executable legacy controller")
+        result = self.run_install(invalid)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(
+            sorted(path.name for path in invalid.iterdir()), sorted(RUNTIME_NAMES)
+        )
+
     def test_installer_rolls_back_induced_mid_migration_failure(self):
         destination = self.root / "legacy-bin"
-        destination.mkdir()
-        legacy = {}
-        for name in RUNTIME_NAMES:
-            target = destination / name
-            legacy[name] = f"legacy-{name}".encode()
-            target.write_bytes(legacy[name])
-            target.chmod(0o755)
+        self.write_legacy_trio(destination)
 
         import importlib.util
 
@@ -440,15 +527,79 @@ class FallbackTests(unittest.TestCase):
         def fail_once(source, target):
             nonlocal calls
             calls += 1
-            if calls == len(RUNTIME_NAMES) + 1:
+            if calls == 3:
                 raise OSError("induced install failure")
             return real_replace(source, target)
 
         with mock.patch.object(module.os, "replace", side_effect=fail_once):
             self.assertEqual(module.install(str(destination)), 2)
-        for name, contents in legacy.items():
-            self.assertEqual((destination / name).read_bytes(), contents)
-        self.assertFalse((destination / ".symphony-codex-auth-fallback/current").exists())
+        self.assertEqual(module.install(str(destination)), 0)
+        self.assert_completed_install(destination)
+
+    def test_executable_crash_points_recover_fresh_install(self):
+        for replace_number in range(1, 6):
+            destination = self.root / f"fresh-{replace_number}"
+            crashed = self.run_install_with_crash(destination, replace_number)
+            self.assertLess(crashed.returncode, 0)
+            self.assertEqual(self.run_install(destination).returncode, 0)
+            self.assert_completed_install(destination)
+
+    def test_executable_crash_points_recover_legacy_migration(self):
+        for replace_number in range(1, 7):
+            destination = self.root / f"legacy-{replace_number}"
+            self.write_legacy_trio(destination)
+            crashed = self.run_install_with_crash(destination, replace_number)
+            self.assertLess(crashed.returncode, 0)
+            self.assertEqual(self.run_install(destination).returncode, 0)
+            self.assert_completed_install(destination)
+
+    def test_old_wrapper_reaches_prior_controller_after_python_launcher_replace(self):
+        destination = self.root / "legacy-wrapper"
+        self.write_legacy_trio(destination)
+        legacy_controller = destination / "symphony-codex-exhausted.py"
+        legacy_controller.write_bytes(CONTROLLER.read_bytes())
+        legacy_controller.chmod(0o755)
+        legacy_wrapper = (
+            "#!/bin/sh\n"
+            f"exec python3 '{legacy_controller}' \"$@\"\n"
+        ).encode()
+        wrapper = destination / "symphony-codex-exhausted"
+        wrapper.write_bytes(legacy_wrapper)
+        wrapper.chmod(0o755)
+        old_wrapper = self.root / "old-symphony-codex-exhausted"
+        old_wrapper.write_bytes(legacy_wrapper)
+        old_wrapper.chmod(0o755)
+
+        crashed = self.run_install_with_crash(destination, 5)
+        self.assertLess(crashed.returncode, 0)
+        installed_controller = destination / "symphony-codex-exhausted.py"
+        installed_controller_contents = installed_controller.read_bytes()
+        self.assertNotEqual(installed_controller_contents, CONTROLLER.read_bytes())
+        self.assertIn(
+            b'release_link = state_dir / "current"', installed_controller_contents
+        )
+        self.assertIn(
+            b'controller = release_link / "symphony-codex-exhausted.py"',
+            installed_controller_contents,
+        )
+        canary = self.write_command("codex-rotate", "echo GEM_MODEL_READY")
+        result = subprocess.run(
+            [str(old_wrapper), "probe"],
+            capture_output=True,
+            text=True,
+            env=self.env(GEM_CODEX_ROTATE_BIN=canary),
+            check=False,
+        )
+        self.assertEqual((result.stdout, result.returncode), ("no\n", 1))
+
+    def test_executable_crash_points_recover_versioned_upgrade(self):
+        for replace_number in range(1, 6):
+            destination = self.root / f"versioned-{replace_number}"
+            self.assertEqual(self.run_install(destination).returncode, 0)
+            crashed = self.run_install_with_crash(destination, replace_number)
+            self.assertLess(crashed.returncode, 0)
+            self.assertEqual(self.run_install(destination).returncode, 0)
+            self.assert_completed_install(destination)
 
     def test_custom_destination_wrappers_use_sibling_bundle(self):
         destination = self.root / "custom-bin"
