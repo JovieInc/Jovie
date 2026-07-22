@@ -17,6 +17,7 @@ const {
   mockNormalizeEmail,
   mockCaptureError,
   mockCaptureCriticalError,
+  mockEq,
 } = vi.hoisted(() => ({
   mockGetSession: vi.fn(),
   mockGetCachedDevTestAuthSession: vi.fn(),
@@ -28,6 +29,7 @@ const {
   mockNormalizeEmail: vi.fn((e: string) => e?.toLowerCase().trim() ?? e),
   mockCaptureError: vi.fn().mockResolvedValue(undefined),
   mockCaptureCriticalError: vi.fn().mockResolvedValue(undefined),
+  mockEq: vi.fn((_column: unknown, value: unknown) => ({ eq: value })),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -114,7 +116,7 @@ vi.mock('@/lib/waitlist/settings', () => ({
 }));
 
 vi.mock('drizzle-orm', () => ({
-  eq: vi.fn((_col, val) => ({ eq: val })),
+  eq: mockEq,
   and: vi.fn((...args: unknown[]) => ({ and: args })),
   sql: Object.assign(
     (strings: TemplateStringsArray, ...values: unknown[]) => ({
@@ -218,6 +220,27 @@ describe('@critical gate.ts (Better Auth)', () => {
     expect(result.clerkUserId).toBe('ba_user_1');
     expect(result.dbUserId).toBe('db_user_1');
     expect(result.profileId).toBe('profile_1');
+  });
+
+  it('looks up a bypass actor by Better Auth id rather than app user id', async () => {
+    mockGetCachedDevTestAuthSession.mockResolvedValue({
+      dbUserId: '00000000-0000-4000-8000-000000000101',
+      clerkUserId: 'ba_user_1',
+      email: 'artist@example.com',
+    });
+    mockDbSelect.mockReturnValue(chainLimit([activeDbUser()]));
+
+    const result = await resolveUserState();
+
+    expect(result.state).toBe(CanonicalUserState.ACTIVE);
+    expect(result.clerkUserId).toBe('ba_user_1');
+    expect(result.dbUserId).toBe('db_user_1');
+    expect(mockEq).toHaveBeenCalledWith('users.betterAuthUserId', 'ba_user_1');
+    expect(mockEq).not.toHaveBeenCalledWith(
+      'users.betterAuthUserId',
+      '00000000-0000-4000-8000-000000000101'
+    );
+    expect(mockGetSession).not.toHaveBeenCalled();
   });
 
   it('returns NEEDS_ONBOARDING when profile is incomplete', async () => {
