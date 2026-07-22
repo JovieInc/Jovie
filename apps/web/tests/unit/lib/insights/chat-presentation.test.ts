@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildInsightPrompt,
+  dedupeChatInsightCards,
   sortInsightsForChat,
 } from '@/lib/insights/chat-presentation';
 import type { InsightResponse } from '@/types/insights';
@@ -62,5 +63,30 @@ describe('chat insight presentation', () => {
         })
       )
     ).toBe('Which release is getting traction right now?');
+  });
+
+  it('dedupes near-identical chat insight cards by title fingerprint', () => {
+    const deduped = dedupeChatInsightCards([
+      createInsight({
+        id: 'a',
+        insightType: 'subscriber_surge',
+        category: 'growth',
+        title: '3 New Subscribers in One Month',
+      }),
+      createInsight({
+        id: 'b',
+        insightType: 'subscriber_surge',
+        category: 'growth',
+        title: '3 New Subscribers in One Month (300% Growth)',
+      }),
+      createInsight({
+        id: 'c',
+        insightType: 'city_growth',
+        category: 'geographic',
+        title: 'Austin listeners grew this month',
+      }),
+    ]);
+
+    expect(deduped.map(insight => insight.id)).toEqual(['a', 'c']);
   });
 });

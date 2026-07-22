@@ -453,13 +453,31 @@ describe('merge_group workflow contract', () => {
     expect(resolve).toContain('.conclusion == "success"');
     // Resolves the landed canonical deployment, never a release candidate.
     expect(resolve).toContain('vercel inspect jov.ie');
-    expect(resolve).toContain('.meta.githubCommitSha // .gitSource.sha');
     expect(resolve).toContain('[ "$deployment_state" != "READY" ]');
     expect(resolve).toContain('[ "$deployment_target" != "production" ]');
     expect(resolve).toContain(
       '^https://jovie-[a-z0-9-]+-jovie\\.vercel\\.app$'
     );
+    expect(resolve).toContain('VERCEL_ALLOW_MISSING_COMMIT_SHA=true');
     expect(resolve).toContain('resolve-deployment');
+    expect(resolve).toContain('discover-build-identity');
+    expect(resolve).toContain(
+      'EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url"'
+    );
+    expect(resolve).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
+    expect(resolve).toContain(
+      'gh api "repos/$REPOSITORY/commits/$deployed_sha"'
+    );
+    expect(resolve).toContain(
+      'gh api "repos/$REPOSITORY/compare/$commit_sha...main"'
+    );
+    expect(resolve).toContain('.merge_base_commit.sha == $sha');
+    expect(resolve).toContain(
+      'Vercel list metadata disagrees with the exact origin build identity.'
+    );
+    expect(resolve).not.toContain(
+      'commit_sha="$(jq -r \'.meta.githubCommitSha // .gitSource.sha'
+    );
     expect(resolve).toContain('should_probe');
 
     for (const jobId of ['smoke', 'auth-smoke', 'lighthouse']) {

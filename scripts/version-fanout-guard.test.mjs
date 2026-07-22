@@ -40,6 +40,15 @@ test('allows version stamping on main and release/integration branches', () => {
   assert.equal(isStampAllowedBranch('integration/release-train'), true);
 });
 
+test('allows merge-queue synthetic heads (source branch already enforced)', () => {
+  assert.equal(
+    isStampAllowedBranch(
+      'gh-readonly-queue/main/pr-14658-21ed4be61ae4479d8a9bf209ce48f54a153e73b2'
+    ),
+    true
+  );
+});
+
 test('fails when a feature branch edits scalar version files', () => {
   const result = evaluate({ changedFiles: ['VERSION'] });
 

@@ -127,4 +127,46 @@ describe('ChatAnalyticsCard', () => {
       '/app/insights'
     );
   });
+
+  it('renders only one card for near-duplicate insight titles', () => {
+    render(
+      <ChatAnalyticsCard
+        result={createResult({
+          totalActive: 95,
+          insights: [
+            createInsight({
+              id: 'dup-1',
+              insightType: 'subscriber_surge',
+              category: 'growth',
+              title: '3 New Subscribers in One Month',
+              actionSuggestion: 'Thank new fans with a short note.',
+            }),
+            createInsight({
+              id: 'dup-2',
+              insightType: 'subscriber_surge',
+              category: 'growth',
+              title: '3 New Subscribers in One Month (300% Growth)',
+              actionSuggestion: 'Keep the welcome flow tight.',
+            }),
+            createInsight({
+              id: 'dup-3',
+              insightType: 'subscriber_surge',
+              category: 'growth',
+              title: '3 New Subscribers in One Month — 300% Growth',
+              actionSuggestion: 'Double down on the capture CTA.',
+            }),
+          ],
+        })}
+      />
+    );
+
+    expect(screen.getAllByTestId('chat-analytics-signal-card')).toHaveLength(1);
+    expect(screen.getByTestId('chat-analytics-signal-count')).toHaveTextContent(
+      'Showing 1 of 95 active signals'
+    );
+    expect(screen.getByText('3 New Subscribers in One Month')).toBeTruthy();
+    expect(screen.queryByText(/300% Growth/i)).toBeNull();
+    // Quiet category label — no colored growth chip.
+    expect(screen.getByText('growth')).toBeTruthy();
+  });
 });

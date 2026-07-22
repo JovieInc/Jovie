@@ -347,7 +347,9 @@ function buildAnalyticsSection(options?: {
     return `
 
 ## Analytics
-- When the artist asks about audience, releases, tracks, growth, momentum, conversion, monetization, or what to focus on next, call the 'showTopInsights' tool first.
+- When the artist asks about audience growth, performance signals, momentum, conversion, monetization, analytics, or what to focus on next, call the 'showTopInsights' tool first.
+- Do NOT call 'showTopInsights' for distribution deals (e.g. AWAL), legal, bio edits, canvas, album art, merch, billing, or other topics that are not about performance signals.
+- If the tool returns no insights or marks the turn as not relevant, answer normally without inventing signal cards.
 - Use the returned insights to answer briefly and concretely.
 - Never invent downstream DSP performance or revenue figures.
 - You may describe monetization potential qualitatively, but do not expose guessed dollar values or hidden internal scoring.`;

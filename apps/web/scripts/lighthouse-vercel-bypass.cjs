@@ -22,12 +22,13 @@ const {
   readVerifiedBuildInfo,
   safeRouteLabel,
   validateBuildInfo,
+  ZERO_DYNAMIC_SECRET_RECEIPT,
 } = require('./vercel-protected-origin.cjs');
 
 const COOKIE_SCOPE_PROBE_PATH = '/__jovie_cookie_scope_probe__';
 
 function recordSensitiveValues(path, values) {
-  const safeValues = maskSensitiveValues(values);
+  const safeValues = values.length === 0 ? [] : maskSensitiveValues(values);
   if (!path) return;
   let expectedIdentity;
   let flags = constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW;
@@ -54,7 +55,11 @@ function recordSensitiveValues(path, values) {
       );
     }
     fchmodSync(descriptor, 0o600);
-    writeSync(descriptor, `${safeValues.join('\n')}\n`, null, 'utf8');
+    const receipt =
+      safeValues.length === 0
+        ? ZERO_DYNAMIC_SECRET_RECEIPT
+        : safeValues.join('\n');
+    writeSync(descriptor, `${receipt}\n`, null, 'utf8');
   } finally {
     closeSync(descriptor);
   }

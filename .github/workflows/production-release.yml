@@ -565,7 +565,7 @@ jobs:
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           attempt=1
           max_attempts=3
-          until CI=true SMOKE_ONLY=1 \
+          until PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
               pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
                 --project=chromium --reporter=line; do

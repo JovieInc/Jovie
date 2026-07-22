@@ -25,6 +25,7 @@ import { pathToFileURL } from 'node:url';
 import {
   isExactVercelDeploymentUrl,
   parseProbeUrl,
+  ZERO_DYNAMIC_SECRET_RECEIPT,
 } from './vercel-protected-origin.cjs';
 
 interface ExactLighthouseConfig {
@@ -511,6 +512,12 @@ export function readSensitiveValues(
   const values = contents.split(/\r?\n/).filter(Boolean);
   if (values.length === 0) {
     throw new Error('Lighthouse sensitive-values receipt is empty.');
+  }
+  if (values.includes(ZERO_DYNAMIC_SECRET_RECEIPT)) {
+    if (values.length !== 1) {
+      throw new Error('Lighthouse sensitive-values receipt is malformed.');
+    }
+    return [];
   }
   return values;
 }

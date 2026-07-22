@@ -5,24 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.6.61] - 2026-06-28
-
-> Outbound SMS provider integration ships behind `OUTBOUND_SMS_ENABLED`. Release alerts and webhook auto-replies (STOP/HELP) now route through a single Twilio connector.
-
-### Added
-
-- **[notifications] Outbound SMS connector (JOV-3626)**: `providers/sms/outbound-sms.ts` gates live Twilio POSTs behind `OUTBOUND_SMS_ENABLED`; `sendNotification()` SMS channel and inbound webhook auto-replies both use it; unit-economics spike documented in `NOTIFICATION_GUIDELINES.md`.
-
 ## [Unreleased]
 - [internal] **App shell loading skeleton** matches `DESIGN_V1` so flag-on users no longer flash the legacy sidebar/header on first `/app` paint.
 
+- [internal] **Post-deploy probes now identify CLI-built production deployments (JOV-4366):** exact immutable build identity replaces optional Vercel source metadata while preserving project, deployment, origin, environment, and main-ancestry proofs.
 - **[internal] Staging Better Auth Google OAuth credentials now reach the Vercel build and runtime deploy (#14659):** the release workflow allowlists and forwards both Google client keys, failing closed when either is absent.
+
+## [26.7.0] - 2026-07-21
+
 - **Suggested DSP matches no longer flash a skeleton then collapse (JOV-4159):** when the Music drawer loads with no match suggestions (the common case), the section stays empty instead of flashing skeleton rows and shifting sibling content.
 - **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; build-info prefers the stamped release version (and falls back to bundled `version.json`), and both shell/legacy banners omit the version when unavailable.
 - **Chat audio player no longer doubles up (JOV-3511):** the full docked bottom bar and sidebar mini never show at once; the full bar sits flat under the canvas without elevated float chrome; right-rail release sections tighten spacing; audio thumbnails stay compact; icon actions are borderless at rest and circle on hover.
 - **Library Approval Status is first-class again (#10384):** every Library asset surfaces Draft / Needs Review / Approved / Archived as a badge on grid cards, a list column, and filter chips (rail + pill search), with Release Status kept as a separate labeled axis so the two never collapse into one bare “Draft”.
 - **Update banner shows the real release version (JOV-3459):** "New Version Available" no longer renders a bogus `(v0.0.0)` parenthetical; it uses the build-time release version from build-info, or omits the version when unavailable.
-- **[internal] Admin Features shows explicit flag state and raw keys:** each env cell labels `On`/`Off` and `Default`/`Override`, raw flag keys are copyable beside the name, and Reset appears only when an override exists (#14573).
+- **Chat Top signals cards no longer repeat the same insight (JOV-3522):** near-duplicate titles collapse to one card, the tool only surfaces on performance/growth turns, and the card chrome is quieter.
 - **Entity mention hover cards now use the same rich entity card as the chat rail:** hovering an inline release, artist, track, or event mention opens the canonical compact EntityCard instead of a one-off popover layout.
 - **Chat tool activity is quieter and indented:** agent tool-call rows sit one rhythm step in from assistant prose with secondary color and book weight, so narrative stays primary and consecutive steps form a quiet run.
 - **Artist profiles now adapt to release, touring, and live-support moments:** one music-native link brings listening, tickets, support, fan capture, setup guidance, and product truth into a clearer responsive journey.
@@ -135,6 +131,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **proxy.ts decomposed into lib/auth modules**: the 909-line middleware is now a ~280-line orchestrator; `handleProxyRequest` (routing, CSP nonce, state redirects, circuit breaker) moved to `lib/auth/proxy-request-handler.ts`, Clerk production/staging instance selection to `lib/auth/clerk-middleware-instances.ts`, and the thrice-repeated degraded-auth HTML/JSON block collapsed into `respondAuthDegraded()`. Behavior-preserving — no logic, status-code, or matcher changes; all 619 middleware/auth tests pass unchanged.
 - **Library right rail polish (JOV-3679)**: release status badges now use distinct colors — a released drop reads in accent purple instead of the same green as an approved one — buttons and icon buttons are pill-shaped with a clean hover circle, and streaming providers show their real brand icons (Spotify, Apple Music, …) in both the detail drawer and the filter rail. The approval control drops its redundant inline label.
 - **Homepage collapsed to hero + minimal footer**: the below-the-fold story stack (product statement, trust strip, go-live steps, workspace, artist-profiles carousel, Friday rhythm, bento/loop/stat sections, pricing, FAQ) and the final CTA are flagged off via the existing static marketing flags (`SHOW_HOMEPAGE_UNLOCKED_SECTIONS`, `SHOW_HOMEPAGE_V2_FINAL_CTA`). The header keeps the logo and sign-in but drops the center nav (its anchors pointed at the now-hidden sections), and the homepage footer renders the minimal variant. Fully reversible by flipping the flags back on. Pages stay fully static (`revalidate = false`).
+
+## [26.6.61] - 2026-06-28
+
+> Outbound SMS provider integration ships behind `OUTBOUND_SMS_ENABLED`. Release alerts and webhook auto-replies (STOP/HELP) now route through a single Twilio connector.
+
+### Added
+
+- **[notifications] Outbound SMS connector (JOV-3626)**: `providers/sms/outbound-sms.ts` gates live Twilio POSTs behind `OUTBOUND_SMS_ENABLED`; `sendNotification()` SMS channel and inbound webhook auto-replies both use it; unit-economics spike documented in `NOTIFICATION_GUIDELINES.md`.
 
 ## [26.6.60] - 2026-06-28
 

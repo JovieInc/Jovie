@@ -1,3 +1,4 @@
+import { normalizeInsightTitleForDedup } from '@/lib/insights/insight-dedup';
 import type {
   InsightCategory,
   InsightResponse,
@@ -51,32 +52,56 @@ export function sortInsightsForChat<T extends InsightResponse>(insights: T[]) {
   });
 }
 
+/**
+ * Client-side defensive dedupe for chat cards (no dataSnapshot available).
+ * Collapses near-identical titles within the same insight type family so
+ * already-persisted tool results cannot re-show the same signal 3×.
+ */
+export function dedupeChatInsightCards<T extends InsightResponse>(
+  insights: readonly T[]
+): T[] {
+  const seen = new Set<string>();
+  const deduped: T[] = [];
+
+  for (const insight of insights) {
+    const key = `${insight.category}|${insight.insightType}|${normalizeInsightTitleForDedup(insight.title)}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(insight);
+  }
+
+  return deduped;
+}
+
+const PROMPT_BY_TYPE: Partial<Record<InsightType, string>> = {
+  subscriber_surge:
+    'What should I focus on this week based on my audience and subscribers?',
+  subscriber_churn:
+    'What should I focus on this week based on my audience and subscribers?',
+  capture_rate_change:
+    'What should I focus on this week based on my audience and subscribers?',
+  release_momentum: 'Which release is getting traction right now?',
+  tip_hotspot: 'Where am I seeing the strongest monetization signals?',
+  city_growth: 'Which cities are heating up for me right now?',
+  new_market: 'Which cities are heating up for me right now?',
+  declining_market: 'Which cities are heating up for me right now?',
+  tour_gap: 'Which cities are heating up for me right now?',
+  tour_timing: 'Which cities are heating up for me right now?',
+  engagement_quality:
+    'What engagement signals should I pay attention to right now?',
+  peak_activity: 'What engagement signals should I pay attention to right now?',
+  device_shift: 'What engagement signals should I pay attention to right now?',
+  platform_preference: 'Which sources and platforms are working best for me?',
+  referrer_surge: 'Which sources and platforms are working best for me?',
+};
+
 export function buildInsightPrompt(
   insight: Pick<InsightResponse, 'insightType' | 'title'>
 ) {
-  switch (insight.insightType) {
-    case 'subscriber_surge':
-    case 'subscriber_churn':
-    case 'capture_rate_change':
-      return 'What should I focus on this week based on my audience and subscribers?';
-    case 'release_momentum':
-      return 'Which release is getting traction right now?';
-    case 'tip_hotspot':
-      return 'Where am I seeing the strongest monetization signals?';
-    case 'city_growth':
-    case 'new_market':
-    case 'declining_market':
-    case 'tour_gap':
-    case 'tour_timing':
-      return 'Which cities are heating up for me right now?';
-    case 'engagement_quality':
-    case 'peak_activity':
-    case 'device_shift':
-      return 'What engagement signals should I pay attention to right now?';
-    case 'platform_preference':
-    case 'referrer_surge':
-      return 'Which sources and platforms are working best for me?';
-    default:
-      return `Explain this insight: ${insight.title}`;
-  }
+  return (
+    PROMPT_BY_TYPE[insight.insightType] ??
+    `Explain this insight: ${insight.title}`
+  );
 }
