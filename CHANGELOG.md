@@ -7,7 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 - [internal] **JavaScript and Ruby dependency audits now report zero known findings (JOV-2569):** patched Better Auth OAuth audience binding, Sharp/libvips image processing, Vitest browser file access, request parsing, archive handling, and HTTP client vulnerabilities.
-
+- [internal] **Repository security hygiene (JOV-2569):** workflow test tooling and the autofix package manager are version-pinned, reusable lint runs with an explicit read-only token, and generated Python bytecode is ignored instead of committed.
 - [internal] **App shell loading skeleton** matches `DESIGN_V1` so flag-on users no longer flash the legacy sidebar/header on first `/app` paint.
 
 - [internal] **Post-deploy probes now identify CLI-built production deployments (JOV-4366):** exact immutable build identity replaces optional Vercel source metadata while preserving project, deployment, origin, environment, and main-ancestry proofs.
