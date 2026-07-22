@@ -443,6 +443,7 @@ export function PersistentAudioBar({
                 : undefined
             }
             onCollapse={() => setBarCollapsed(true)}
+            onDismiss={stop}
             currentTime={playbackState.currentTime}
             duration={playbackState.duration}
             onSeek={seek}

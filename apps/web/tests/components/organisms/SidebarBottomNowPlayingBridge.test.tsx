@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   resetAudioChromeSnapshot,
@@ -18,12 +18,14 @@ let _state: Record<string, unknown> = {
   artworkUrl: null,
 };
 
+const { stop } = vi.hoisted(() => ({ stop: vi.fn() }));
+
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
     playbackState: _state,
     toggleTrack: vi.fn(),
     seek: vi.fn(),
-    stop: vi.fn(),
+    stop,
     onError: vi.fn(() => () => undefined),
   }),
 }));
@@ -125,6 +127,26 @@ describe('SidebarBottomNowPlayingBridge', () => {
     expect(slot).toHaveAttribute('data-state', 'visible');
     expect(screen.getByText('Lost in the Light')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+  });
+
+  it('wires the compact dismiss control to stop exactly once', () => {
+    _state = {
+      ..._state,
+      activeTrackId: 'track-1',
+      trackTitle: 'Lost in the Light',
+      artistName: 'Bahamas',
+      isPlaying: true,
+    };
+    setAudioChromeSnapshot({
+      activeTrackId: 'track-1',
+      compactPlayerVisible: true,
+      fullPlayerVisible: false,
+    });
+
+    render(<SidebarBottomNowPlayingBridge />);
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
+
+    expect(stop).toHaveBeenCalledOnce();
   });
 
   it('still renders when full-player state belongs to a different track', () => {

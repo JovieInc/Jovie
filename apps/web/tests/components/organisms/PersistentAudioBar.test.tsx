@@ -322,6 +322,33 @@ describe('PersistentAudioBar', () => {
     );
   });
 
+  it('wires the shell V1 expanded dismiss control to stop exactly once', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
+    await user.click(
+      within(expandedSurface).getByRole('button', { name: 'Dismiss Player' })
+    );
+
+    expect(stop).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the shell V1 expanded height stable from idle to playing', () => {
+    setPlaying({ isPlaying: false, playbackStatus: 'idle' });
+    const { rerender } = render(<PersistentAudioBar variant='shellChatV1' />);
+    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
+    const reservedHeight = 'var(--app-shell-audio-bar-max-height)';
+    expect(expandedSurface.style.maxHeight).toBe(reservedHeight);
+
+    setPlaying();
+    rerender(<PersistentAudioBar variant='shellChatV1' />);
+
+    expect(expandedSurface.style.maxHeight).toBe(reservedHeight);
+  });
+
   it('wires shell V1 queue transport to the shared audio player', async () => {
     const user = userEvent.setup();
     setPlaying({
