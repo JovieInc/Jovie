@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 // API (cookies(), headers()) in this RSC tree.
 
 import type { PublicRelease } from '@/components/features/profile/releases/types';
+import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
@@ -19,6 +20,7 @@ import {
   supportsDirectProfileClaim,
 } from '@/lib/claim/visitor-state';
 import { toPublicContacts } from '@/lib/contacts/mapper';
+import { getCreditedArtistsWithProfiles } from '@/lib/discography/artist-queries';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
 import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
@@ -30,6 +32,10 @@ import {
 } from '@/lib/flags/profile-variant';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import { buildProfileAeoContent } from '@/lib/profile/aeo-content';
+import {
+  collectEntityMentions,
+  type EntityMentionContext,
+} from '@/lib/profile/entity-mentions';
 import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback-data';
 import {
   buildPublicProfileMetadata,
@@ -132,6 +138,27 @@ async function getPublicMerchCards(profileId: string) {
   }
 }
 
+/**
+ * Credited artists on this profile's catalog that have public Jovie profiles.
+ * Used to link bio/AEO mentions to their pages; failures degrade to no links.
+ */
+async function getCreditedArtistsForMentions(profileId: string) {
+  try {
+    return await getCreditedArtistsWithProfiles(profileId);
+  } catch (error) {
+    logger.error(
+      'Error fetching credited artists for entity mentions',
+      {
+        error,
+        profileId,
+        route: '/[username]',
+      },
+      'public-profile'
+    );
+    return [];
+  }
+}
+
 export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username } = await params;
   const initialMode = 'profile';
@@ -195,6 +222,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
   const releasesPromise = getPublicReleases(profile.id);
   const merchCardsPromise = getPublicMerchCards(profile.id);
   const entityLinksPromise = getEntityIdentityLinks(profile.id);
+  const creditedArtistsPromise = getCreditedArtistsForMentions(profile.id);
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
@@ -250,6 +278,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     alertOptInVariant,
     profilePacAssignment,
     entityLinks,
+    creditedArtists,
   ] = await Promise.all([
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
     releasesPromise,
@@ -260,6 +289,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     getProfileAlertOptInVariant(null).catch(() => 'button' as const),
     getProfilePacAssignment(null).catch(() => DEFAULT_PROFILE_PAC_ASSIGNMENT),
     entityLinksPromise.catch(() => []),
+    creditedArtistsPromise,
   ]);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
@@ -277,13 +307,29 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     previewUrl: null,
   }));
 
+  // Entity-linked bio/AEO context: own releases (→ /{handle}/{slug}) and
+  // credited artists with public Jovie profiles (→ /{handle}).
+  const entityMentionContext: EntityMentionContext = {
+    ownHandle: artist.handle,
+    releases: releases.map(release => ({
+      title: release.title,
+      slug: release.slug,
+    })),
+    artists: creditedArtists,
+  };
+
   // Generate structured data for SEO (after tour dates resolve)
   const structuredData = generateProfileStructuredData(
     profile,
     genres,
     links,
     tourDates,
-    entityLinks
+    entityLinks,
+    collectEntityMentions(entityMentionContext).map(mention => ({
+      kind: mention.kind,
+      name: mention.name,
+      url: new URL(mention.href, BASE_URL).toString(),
+    }))
   );
   const aeoContent = buildProfileAeoContent({
     artist,
@@ -293,6 +339,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     tourDates,
     merchCards,
     socialLinks: links,
+    entityMentions: entityMentionContext,
   });
 
   return (

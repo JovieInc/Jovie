@@ -19,11 +19,13 @@ vi.mock('next/link', () => ({
 vi.mock('@/components/atoms/ImageWithFallback', () => ({
   ImageWithFallback: ({
     alt,
+    className,
     src,
   }: {
     readonly alt: string;
+    readonly className?: string;
     readonly src: string;
-  }) => React.createElement('img', { alt, src }),
+  }) => React.createElement('img', { alt, className, src }),
 }));
 
 const merchModel: EntityCardModel = {
@@ -169,5 +171,66 @@ describe('EntityCard', () => {
     const button = screen.getByRole('button');
     expect(button).not.toHaveTextContent('');
     expect(button).toHaveTextContent('Action');
+  });
+
+  describe('unified anatomy (profile home carousel)', () => {
+    it('locks the art zone to a full-bleed square with cover-fitted artwork', () => {
+      render(
+        <EntityCard model={merchModel} treatment='detailed' anatomy='unified' />
+      );
+      const image = screen.getByRole('img');
+      expect(image.parentElement?.className).toContain('aspect-square');
+      expect(image.className).toContain('object-cover');
+      // Full-bleed: the card carries no padding around the art zone.
+      const card = screen.getByTestId('entity-card-merch');
+      expect(card.className).toContain('p-0');
+    });
+
+    it('fits music artwork with object-cover (no letterbox bands)', () => {
+      const music: EntityCardModel = {
+        id: 'r1',
+        kind: 'music',
+        href: '/tim/r1',
+        imageUrl: 'https://cdn.test/art.jpg',
+        imageAlt: 'Art',
+        title: 'Release',
+        cta: { label: 'Listen', href: '/tim/r1' },
+      };
+      render(
+        <EntityCard model={music} treatment='detailed' anatomy='unified' />
+      );
+      expect(screen.getByRole('img').className).toContain('object-cover');
+      expect(screen.getByRole('img').className).not.toContain('object-contain');
+    });
+
+    it('renders a full-width 36px CTA and folds the price into the meta line', () => {
+      render(
+        <EntityCard model={merchModel} treatment='detailed' anatomy='unified' />
+      );
+      const cta = screen.getByText('Buy');
+      expect(cta.className).toContain('h-9');
+      expect(cta.className).toContain('w-full');
+      // Price joins the single meta line; there is no separate price block.
+      expect(screen.getByText('Premium tee · $45.00')).toBeInTheDocument();
+      expect(screen.queryByText('Profit $11.87')).not.toBeInTheDocument();
+    });
+
+    it('renders a target-less CTA as plain muted meta text, not button chrome', () => {
+      const noTickets: EntityCardModel = {
+        id: 's9',
+        kind: 'show',
+        title: 'The Echo',
+        imageAlt: 'The Echo',
+        datePill: { month: 'Jul', day: '29' },
+        cta: { label: 'No Tickets', href: null, disabled: true },
+      };
+      render(
+        <EntityCard model={noTickets} treatment='detailed' anatomy='unified' />
+      );
+      const text = screen.getByText('No Tickets');
+      expect(text.className).toContain('text-tertiary-token');
+      expect(text.className).not.toContain('rounded-full');
+      expect(text.className).not.toContain('bg-btn-primary');
+    });
   });
 });

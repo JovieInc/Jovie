@@ -201,6 +201,69 @@ describe('generateProfileStructuredData', () => {
     const artist = findInGraph(data, 'MusicGroup');
     expect(artist?.sameAs).toBeUndefined();
   });
+
+  it('emits linked-entity mentions on the artist node', () => {
+    const data = generateProfileStructuredData(
+      BASE_PROFILE,
+      ['pop'],
+      MOCK_LINKS,
+      [],
+      [],
+      [
+        {
+          kind: 'release',
+          name: 'Neon Circuit',
+          url: 'https://jov.ie/testartist/neon-circuit',
+        },
+        {
+          kind: 'artist',
+          name: 'Guest Vocalist',
+          url: 'https://jov.ie/guestvocalist',
+        },
+      ]
+    );
+
+    const artist = findInGraph(data, 'MusicGroup');
+    expect(artist?.mentions).toEqual([
+      {
+        '@type': 'MusicRecording',
+        name: 'Neon Circuit',
+        url: 'https://jov.ie/testartist/neon-circuit',
+      },
+      {
+        '@type': 'MusicGroup',
+        name: 'Guest Vocalist',
+        url: 'https://jov.ie/guestvocalist',
+      },
+    ]);
+    expect(validateProfileRichResults(data)).toEqual([]);
+  });
+
+  it('caps mentions at 25 and omits the key when empty', () => {
+    const manyMentions = Array.from({ length: 40 }, (_, i) => ({
+      kind: 'release' as const,
+      name: `Release ${i}`,
+      url: `https://jov.ie/testartist/release-${i}`,
+    }));
+
+    const capped = generateProfileStructuredData(
+      BASE_PROFILE,
+      ['pop'],
+      MOCK_LINKS,
+      [],
+      [],
+      manyMentions
+    );
+    const cappedArtist = findInGraph(capped, 'MusicGroup');
+    expect(cappedArtist?.mentions).toHaveLength(25);
+
+    const without = generateProfileStructuredData(
+      BASE_PROFILE,
+      ['pop'],
+      MOCK_LINKS
+    );
+    expect(findInGraph(without, 'MusicGroup')?.mentions).toBeUndefined();
+  });
 });
 
 describe('generateMusicStructuredData', () => {

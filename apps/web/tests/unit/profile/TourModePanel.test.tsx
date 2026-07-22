@@ -145,7 +145,7 @@ describe('TourModePanel', () => {
     );
   });
 
-  it('renders the events empty state as a full-color gradient bento card', () => {
+  it('renders the events empty state with the standard surface-1 card treatment', () => {
     render(<TourModePanel artist={artist} tourDates={[]} />);
 
     expect(
@@ -156,7 +156,7 @@ describe('TourModePanel', () => {
     expect(heading.className).not.toMatch(/text-\(--color-text-tooltip\)/);
     const bentoCard = screen.getByTestId('profile-primary-tab-events-empty')
       .firstChild as HTMLElement;
-    expect(bentoCard.style.background).toContain('var(--color-accent-blue)');
+    expect(bentoCard.style.background).toContain('var(--color-bg-surface-1)');
   });
 
   it('renders the styled all-shows list when no geolocation is available', () => {

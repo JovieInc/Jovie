@@ -1,8 +1,8 @@
 'use client';
 
-import { Bell } from 'lucide-react';
-import { type MouseEvent, useMemo } from 'react';
+import { type MouseEvent, memo, useMemo } from 'react';
 import {
+  EntityCard,
   type EntityCardModel,
   merchToEntityCard,
   releaseToEntityCard,
@@ -10,7 +10,6 @@ import {
 } from '@/components/organisms/entity-card';
 import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
-import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import {
   startOfProfileSurfaceLocalDay as startOfLocalDay,
@@ -55,6 +54,11 @@ interface ProfileHomeRailProps {
   readonly merchCards?: readonly PublicMerchCard[];
   readonly releases?: readonly PublicRelease[];
   readonly hasTip?: boolean;
+  /**
+   * Set when the profile has no hero photo: the PAC card's artwork becomes
+   * the LCP image, so it must load with priority instead of lazy.
+   */
+  readonly pacArtPriority?: boolean;
 }
 
 function getUpcomingTourDates(
@@ -77,36 +81,19 @@ function getUpcomingTourDates(
     );
 }
 
-function HomeAlertsSwitch() {
-  return (
-    <span
-      className='relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-white/18 bg-white/18 p-1 shadow-sm transition-colors duration-subtle group-hover:bg-white/24'
-      aria-hidden='true'
-      data-testid='profile-home-alerts-switch'
-    >
-      <span className='block h-6 w-6 rounded-full bg-white shadow-[0_3px_10px_rgba(0,0,0,0.32)] dark:bg-white' />
-    </span>
-  );
-}
-
 function HomeAlertsCard({
   artist,
   onAlertsClick,
   renderMode,
-  prominent,
   sourceContext,
 }: Readonly<{
   artist: Artist;
   onAlertsClick?: (context: NotificationSourceContext) => void;
   renderMode: ProfileRenderMode;
-  prominent: boolean;
   sourceContext: NotificationSourceContext;
 }>) {
-  const title = 'Alerts';
-  const description = `${artist.name}: music, shows, merch.`;
   const isInteractive = renderMode === 'interactive';
   const subscribeHref = `/${artist.handle}?mode=subscribe`;
-  const ariaLabel = `Turn on alerts for ${artist.name}`;
   const handleClick = isInteractive
     ? (event: MouseEvent<HTMLElement>) => {
         if (!onAlertsClick) {
@@ -117,18 +104,33 @@ function HomeAlertsCard({
       }
     : undefined;
 
+  // The alerts card is a standard unified-anatomy card — icon art zone,
+  // context eyebrow, "Alerts" title, one-line body, full-width CTA — the
+  // same design as every other card in the home carousel.
+  const model: EntityCardModel = {
+    id: `alerts-${artist.id}`,
+    kind: 'alerts',
+    href: isInteractive ? subscribeHref : null,
+    imageUrl: null,
+    imageAlt: `Alerts for ${artist.name}`,
+    eyebrow: artist.name,
+    title: 'Alerts',
+    meta: 'Music, shows, merch — first.',
+    cta: {
+      label: 'Get Updates',
+      href: isInteractive ? subscribeHref : null,
+    },
+  };
+
   return (
-    <ProfileEmptyBentoCard
-      accent='alerts'
-      icon={Bell}
-      title={title}
-      body={description}
-      layout={prominent ? 'prominent' : 'inline'}
-      trailing={<HomeAlertsSwitch />}
-      href={isInteractive ? subscribeHref : undefined}
-      onClick={handleClick}
-      ariaLabel={ariaLabel}
+    <EntityCard
+      model={model}
+      treatment='detailed'
+      surface='pearl'
+      anatomy='unified'
+      className='h-full w-full overflow-hidden'
       dataTestId='profile-home-alerts-fallback-card'
+      onClick={handleClick}
     />
   );
 }
@@ -163,7 +165,7 @@ export const __profileHomeRailTestUtils = {
   getS2OrderedItems,
 };
 
-export function ProfileHomeRail({
+export const ProfileHomeRail = memo(function ProfileHomeRail({
   artist,
   latestRelease,
   profileSettings,
@@ -178,6 +180,7 @@ export function ProfileHomeRail({
   merchCards = [],
   releases = [],
   hasTip = false,
+  pacArtPriority = false,
 }: Readonly<ProfileHomeRailProps>) {
   // PAC instrumentation (spec §8): pac_exposure fires when the rail is ≥50%
   // visible, once per state per session, keyed to the visitor's variant.
@@ -211,41 +214,28 @@ export function ProfileHomeRail({
   );
   const nearbyTourDateId = nearbyDates[0]?.date?.id ?? null;
 
-  // One ordered card list — featured item first, then the rest. No stacked
-  // sections: a single carousel is the profile home surface.
+  // One ordered card list — back catalog, merch, and shows. The featured
+  // latest release is NOT an entity card here: it lives in the carousel's
+  // leading slot as the PAC card below, so it never renders twice.
   const carouselItems = useMemo<EntityCardModel[]>(() => {
     const featuredItems: EntityCardModel[] = [];
     const releaseItems: EntityCardModel[] = [];
     const merchItems: EntityCardModel[] = [];
     const showItems: EntityCardModel[] = [];
 
-    // Featured: the latest release when it's visible per profile settings.
+    // The PAC card hosts the visible latest release; only the slug is needed
+    // here to keep it out of the plain catalog list.
     const hasFeaturedRelease = Boolean(
       releaseVisibility?.show && latestRelease
     );
     const featuredReleaseSlug =
       hasFeaturedRelease && latestRelease ? latestRelease.slug : null;
-    const featuredReleaseId =
-      featuredReleaseSlug === null
-        ? null
-        : (releases.find(release => release.slug === featuredReleaseSlug)?.id ??
-          null);
 
-    if (hasFeaturedRelease && latestRelease) {
-      featuredItems.push(
-        releaseToEntityCard(
-          {
-            id: featuredReleaseId ?? undefined,
-            title: latestRelease.title,
-            slug: latestRelease.slug,
-            artworkUrl: latestRelease.artworkUrl,
-            releaseDate: latestRelease.releaseDate,
-            releaseType: latestRelease.releaseType,
-          },
-          { handle: artist.handle, now }
-        )
-      );
-    } else if (upcomingTourDates.length === 0 && featuredPlaylistFallback) {
+    if (
+      !hasFeaturedRelease &&
+      upcomingTourDates.length === 0 &&
+      featuredPlaylistFallback
+    ) {
       // Fallback feature when there's no release or upcoming show: the
       // artist's confirmed "This Is" playlist, as a music card.
       featuredItems.push({
@@ -293,6 +283,7 @@ export function ProfileHomeRail({
           city: show.city,
           startDate: show.startDate,
           ticketUrl: show.ticketUrl,
+          ticketStatus: show.ticketStatus,
         })
       );
     }
@@ -318,8 +309,6 @@ export function ProfileHomeRail({
     releaseVisibility?.show,
     upcomingTourDates,
   ]);
-
-  const isLowContentHome = carouselItems.length === 0;
 
   // Primary Action Card subject: the visible latest release (preferred) or
   // the newest catalog release. Preview URL comes from the lite releases
@@ -356,7 +345,6 @@ export function ProfileHomeRail({
       artist={artist}
       onAlertsClick={onAlertsClick}
       renderMode={renderMode}
-      prominent={isLowContentHome}
       sourceContext={{
         artistId: artist.id,
         profileId: artist.id,
@@ -368,29 +356,34 @@ export function ProfileHomeRail({
     />
   );
 
+  // One screen, one primary focus: the carousel IS the home surface. The PAC
+  // card is the featured first card; the alerts card is the last card. Both
+  // render inside the same fixed card geometry — no stacked sections.
   return (
     <div
       ref={exposureRef}
-      className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-80'
+      className='flex min-h-0 min-w-0 flex-1 flex-col md:mx-auto md:w-full md:max-w-80'
       data-testid='profile-home-rail'
     >
-      <ProfilePacCard
-        artist={artist}
-        release={pacRelease}
-        merchCard={merchCards[0] ?? null}
-        nextShow={pacNextShow}
-        hasTip={hasTip}
-        assignment={profilePacAssignment}
-        isSubscribed={isSubscribed}
-        renderMode={renderMode}
-      />
-      {alertsCard}
       <ReleaseCatalogCarousel
         items={carouselItems}
         artistHandle={artist.handle}
         artistId={artist.id}
         analyticsEnabled={renderMode !== 'preview'}
+        leading={
+          <ProfilePacCard
+            artist={artist}
+            release={pacRelease}
+            merchCard={merchCards[0] ?? null}
+            nextShow={pacNextShow}
+            hasTip={hasTip}
+            assignment={profilePacAssignment}
+            isSubscribed={isSubscribed}
+            renderMode={renderMode}
+          />
+        }
+        trailing={alertsCard}
       />
     </div>
   );
-}
+});

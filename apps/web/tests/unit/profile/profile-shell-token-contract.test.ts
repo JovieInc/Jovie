@@ -54,6 +54,12 @@ describe('profile shell token contract', () => {
       'utf8'
     );
     expect(compactSurfaceContents).toContain('--profile-content-bg');
-    expect(compactSurfaceContents).toContain('--profile-stage-bg');
+    // The hero legibility gradient lives in design-system.css
+    // (.profile-cover-home-gradient) and is the --profile-stage-bg consumer.
+    const designSystemContents = readFileSync(DESIGN_SYSTEM, 'utf8');
+    expect(designSystemContents).toContain('--profile-stage-bg');
+    expect(designSystemContents).toMatch(
+      /\.profile-cover-home-gradient[\s\S]{0,400}var\(--profile-stage-bg\)/
+    );
   });
 });

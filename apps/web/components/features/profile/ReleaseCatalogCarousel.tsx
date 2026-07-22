@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { type ReactNode, useCallback } from 'react';
 import { EntityCarousel } from '@/components/organisms/entity-card';
 import type { EntityCardModel } from '@/components/organisms/entity-card/types';
 import { track } from '@/lib/analytics';
@@ -11,6 +11,10 @@ interface ReleaseCatalogCarouselProps {
   readonly artistId: string;
   readonly analyticsEnabled?: boolean;
   readonly dataTestId?: string;
+  /** Featured first card (PAC) rendered in the same card geometry. */
+  readonly leading?: ReactNode;
+  /** Final card (alerts) rendered in the same card geometry. */
+  readonly trailing?: ReactNode;
 }
 
 function isCatalogReleaseCard(
@@ -29,6 +33,8 @@ export function ReleaseCatalogCarousel({
   artistId,
   analyticsEnabled = true,
   dataTestId = 'profile-home-carousel',
+  leading,
+  trailing,
 }: Readonly<ReleaseCatalogCarouselProps>) {
   const handleCardImpression = useCallback(
     (index: number, model: EntityCardModel) => {
@@ -78,10 +84,16 @@ export function ReleaseCatalogCarousel({
       items={items}
       surface='pearl'
       dataTestId={dataTestId}
-      // Edge-to-edge: cancel the surface's --page-pad with a negative margin,
-      // then re-inset the track so the first card aligns with the padded
-      // content above while later cards scroll off the true surface edge.
-      className='-mx-(--page-pad) scroll-px-(--page-pad) px-(--page-pad)'
+      leading={leading}
+      trailing={trailing}
+      // Edge-to-edge on mobile: cancel the surface's --page-pad with a
+      // negative margin, then re-inset the track so the first card aligns
+      // with the padded content above while later cards scroll off the true
+      // surface edge. On desktop the shell's rounded corner would clip the
+      // peek card mid-radius, so the track stays inside the padded gutter and
+      // its own straight clip edge crops the peek card instead.
+      // min-h-0 + flex-1 lets the track own all remaining viewport height.
+      className='-mx-(--page-pad) min-h-0 flex-1 scroll-px-(--page-pad) px-(--page-pad) md:mx-0 md:scroll-px-0 md:px-0'
       onCardImpression={handleCardImpression}
       onCardClick={handleCardClick}
     />

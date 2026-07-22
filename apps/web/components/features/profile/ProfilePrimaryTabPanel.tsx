@@ -577,11 +577,6 @@ export function ProfilePrimaryTabPanel({
           tourDates={[...tourDates]}
           emptyStateSourceContext={eventsEmptySourceContext}
           renderMode={renderMode}
-          className={
-            tourDates.length === 0
-              ? 'flex flex-1 flex-col justify-center'
-              : undefined
-          }
         />
       </div>
     );

@@ -1,27 +1,29 @@
 import { render, screen } from '@testing-library/react';
-import { Bell, Music2 } from 'lucide-react';
+import { Music2, Ticket } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
 
 describe('ProfileEmptyBentoCard', () => {
-  it('renders a prominent alerts bento with full-color gradient background', () => {
+  it('renders a prominent events bento with the standard surface-1 card treatment', () => {
     render(
       <ProfileEmptyBentoCard
-        accent='alerts'
-        icon={Bell}
-        title='Alerts'
-        body='Tim White: music, shows, merch.'
+        accent='events'
+        icon={Ticket}
+        title='No Events'
+        body='Get alerted when shows are announced.'
         layout='prominent'
-        dataTestId='profile-home-alerts-fallback-card'
-        trailing={<span data-testid='profile-home-alerts-switch'>switch</span>}
+        dataTestId='profile-events-empty-card'
+        trailing={<span data-testid='profile-events-empty-trailing'>slot</span>}
       />
     );
 
-    const card = screen.getByTestId('profile-home-alerts-fallback-card');
-    expect(card.style.background).toContain('var(--color-accent-purple)');
-    expect(screen.getByText('Alerts')).toBeVisible();
-    expect(screen.getByText('Tim White: music, shows, merch.')).toBeVisible();
-    expect(screen.getByTestId('profile-home-alerts-switch')).toBeVisible();
+    const card = screen.getByTestId('profile-events-empty-card');
+    expect(card.style.background).toContain('var(--color-bg-surface-1)');
+    expect(screen.getByText('No Events')).toBeVisible();
+    expect(
+      screen.getByText('Get alerted when shows are announced.')
+    ).toBeVisible();
+    expect(screen.getByTestId('profile-events-empty-trailing')).toBeVisible();
   });
 
   it('renders a compact music empty bento with CTA action', () => {

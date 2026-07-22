@@ -1,6 +1,6 @@
 import { getMerchPriceDisplay } from '@/lib/merch/pricing';
 import type { PublicMerchCard } from '@/lib/merch/types';
-import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import type { TicketStatus, TourDateViewModel } from '@/lib/tour-dates/types';
 import { formatLocationString } from '@/lib/utils/string-utils';
 import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 import { KIND_PRESETS } from './kind-presets';
@@ -10,24 +10,6 @@ import type {
   EntityCardStatus,
   EntityStatusTone,
 } from './types';
-
-const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
-const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
-const dayFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric' });
 
 function toDate(value: Date | string | null | undefined): Date | null {
   if (!value) {
@@ -151,6 +133,7 @@ export interface ShowEntityInput {
   readonly startDate?: Date | string | null;
   readonly ticketUrl?: string | null;
   readonly status?: EntityStatusTone | null;
+  readonly ticketStatus?: TicketStatus | null;
 }
 
 export interface ChatReleaseContextInput {
@@ -383,6 +366,18 @@ export function chatTourDateContextToEntityCard(
   };
 }
 
+// Show dates render in UTC everywhere on the profile (card date pills AND the
+// events list) so the two never disagree — local-time formatting split them
+// for evening shows (e.g. "JUL 28" on the card vs "Jul 29" in the list).
+const monthFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  timeZone: 'UTC',
+});
+const dayFormatter = new Intl.DateTimeFormat('en-US', {
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+
 function getTourEyebrow(
   isNearYou: boolean,
   distanceKm: number | null | undefined
@@ -537,11 +532,14 @@ export function showToEntityCard(show: ShowEntityInput): EntityCardModel {
   const date = toDate(show.startDate);
   const title = show.title?.trim() || show.venueName?.trim() || 'Show';
   const location = [show.venueName, show.city].filter(Boolean).join(' · ');
+  const isCancelled = show.ticketStatus === 'cancelled';
+  const isSoldOut = show.ticketStatus === 'sold_out';
+  const canBuyTickets = Boolean(show.ticketUrl) && !isCancelled && !isSoldOut;
 
   return {
     id: show.id,
     kind: 'show',
-    href: show.ticketUrl ?? null,
+    href: canBuyTickets ? show.ticketUrl : null,
     imageUrl: null,
     imageAlt: title,
     accent: preset.accent,
@@ -549,11 +547,21 @@ export function showToEntityCard(show: ShowEntityInput): EntityCardModel {
     title,
     meta: location || null,
     datePill: date
-      ? { month: MONTHS[date.getMonth()], day: String(date.getDate()) }
+      ? { month: monthFormatter.format(date), day: dayFormatter.format(date) }
       : null,
     status: null,
-    cta: show.ticketUrl
+    // A show that cannot sell tickets gets a target-less CTA — the card
+    // renders it as plain muted text, never a dead Tickets link.
+    cta: canBuyTickets
       ? { label: preset.ctaLabel, href: show.ticketUrl, external: true }
-      : null,
+      : {
+          label: isCancelled
+            ? 'Cancelled'
+            : isSoldOut
+              ? 'Sold Out'
+              : 'No Tickets',
+          href: null,
+          disabled: true,
+        },
   };
 }
