@@ -155,7 +155,8 @@ export function useAuthRouteConfig(): AuthRouteConfig {
       pathname.includes('/campaigns') ||
       pathname.includes('/people') ||
       pathname.includes('/growth') ||
-      pathname.includes('/releases'),
+      pathname.includes('/releases') ||
+      pathname === APP_ROUTES.TOUR_DATES,
     [isDemoRoute, pathname]
   );
 

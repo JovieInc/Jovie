@@ -72,8 +72,16 @@ export function EntityChipPopover({
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   const entityPanel = useOptionalChatEntityPanel();
   const previewPanel = useOptionalPreviewPanelState();
+  const entityPanelKind =
+    kind === 'release'
+      ? ('release' as const)
+      : kind === 'event'
+        ? ('tour-date' as const)
+        : null;
   const canOpenEntityPanel =
-    designV1ChatEntitiesEnabled && kind === 'release' && entityPanel !== null;
+    designV1ChatEntitiesEnabled &&
+    entityPanelKind !== null &&
+    entityPanel !== null;
   const canOpenProfilePreview =
     kind === 'artist' &&
     previewPanel !== null &&
@@ -141,16 +149,16 @@ export function EntityChipPopover({
   );
 
   const handleOpenEntityPanel = useCallback(() => {
-    if (!entityPanel) return;
+    if (!entityPanel || !entityPanelKind) return;
     entityPanel.open({
-      kind: 'release',
+      kind: entityPanelKind,
       id,
       label,
       source: 'manual',
       focusKey,
     });
     setOpen(false);
-  }, [entityPanel, id, label, focusKey]);
+  }, [entityPanel, entityPanelKind, id, label, focusKey]);
 
   const handleOpenProfilePreview = useCallback(() => {
     if (!previewPanel) return;

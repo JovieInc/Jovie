@@ -177,7 +177,7 @@ async function resolveTourDates(
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(buildAppShellSignInUrl(APP_ROUTES.SETTINGS_TOURING));
+    redirect(buildAppShellSignInUrl(APP_ROUTES.TOUR_DATES));
   }
 
   const profile = await requireProfile();
@@ -304,6 +304,7 @@ export async function saveBandsintownApiKey(params: {
       profileId: profile.id,
     });
 
+    revalidatePath(APP_ROUTES.TOUR_DATES);
     revalidatePath(APP_ROUTES.SETTINGS_TOURING);
 
     return {
@@ -353,6 +354,7 @@ export async function removeBandsintownApiKey(): Promise<{
       profileId: profile.id,
     });
 
+    revalidatePath(APP_ROUTES.TOUR_DATES);
     revalidatePath(APP_ROUTES.SETTINGS_TOURING);
 
     return { success: true };
@@ -422,6 +424,7 @@ export async function connectBandsintownArtist(params: {
     isInitialConnect: true,
   });
 
+  revalidatePath(APP_ROUTES.TOUR_DATES);
   revalidatePath(APP_ROUTES.SETTINGS_TOURING);
 
   // Load updated tour dates
@@ -725,6 +728,7 @@ export async function disconnectBandsintown(): Promise<{ success: boolean }> {
         )
       );
 
+    revalidatePath(APP_ROUTES.TOUR_DATES);
     revalidatePath(APP_ROUTES.SETTINGS_TOURING);
 
     return { success: true };

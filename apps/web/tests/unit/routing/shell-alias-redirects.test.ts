@@ -25,7 +25,6 @@ import DashboardTippingPage from '@/app/app/(shell)/dashboard/tipping/page';
 import DashboardTourDatesPage from '@/app/app/(shell)/dashboard/tour-dates/page';
 import CanonicalProfilePage from '@/app/app/(shell)/profile/page';
 import CanonicalTippingPage from '@/app/app/(shell)/tipping/page';
-import CanonicalTourDatesPage from '@/app/app/(shell)/tour-dates/page';
 
 beforeEach(() => {
   redirectMock.mockClear();
@@ -69,12 +68,12 @@ describe('shell alias redirects', () => {
     expect(redirectMock).toHaveBeenCalledTimes(3);
   });
 
-  it('routes tour aliases through shell pages to touring settings', () => {
-    for (const Page of [CanonicalTourDatesPage, DashboardTourDatesPage]) {
-      expect(() => Page()).toThrow(`REDIRECT:${APP_ROUTES.SETTINGS_TOURING}`);
-    }
+  it('routes the legacy dashboard tour alias to the canonical entity surface', () => {
+    expect(() => DashboardTourDatesPage()).toThrow(
+      `REDIRECT:${APP_ROUTES.TOUR_DATES}`
+    );
 
-    expect(redirectMock).toHaveBeenCalledTimes(2);
+    expect(redirectMock).toHaveBeenCalledTimes(1);
   });
 
   it('routes profile aliases through shell pages to the chat profile panel', () => {

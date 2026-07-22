@@ -1257,15 +1257,11 @@ const CREATOR_ALIAS_ROUTES = [
     path: APP_ROUTES.TOUR_DATES,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
-    measureMode: 'redirect',
+    measureMode: 'page-load',
     readySelectors: {
-      content: ['section#touring'],
-      redirectDestinations: [APP_ROUTES.SETTINGS_TOURING],
+      content: ['[data-testid="tour-dates-page"]'],
     },
-    timings: [
-      { metric: 'redirect-complete', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1200 },
-    ],
+    timings: [{ metric: 'time-to-first-byte', budget: 1200 }],
     resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,
     priority: 5,
     seedProfile: 'active-user',
@@ -1319,8 +1315,8 @@ const CREATOR_ALIAS_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['section#touring'],
-      redirectDestinations: [APP_ROUTES.SETTINGS_TOURING],
+      content: ['[data-testid="tour-dates-page"]'],
+      redirectDestinations: [APP_ROUTES.TOUR_DATES],
     },
     timings: [
       { metric: 'redirect-complete', budget: 100 },

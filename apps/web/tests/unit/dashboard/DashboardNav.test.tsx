@@ -37,7 +37,7 @@ describe('DashboardNav', () => {
       APP_ROUTES.PROFILES
     );
     expect(getByRole('link', { name: 'Touring' }).getAttribute('href')).toBe(
-      APP_ROUTES.SETTINGS_TOURING
+      APP_ROUTES.TOUR_DATES
     );
     expect(getByRole('link', { name: 'Tasks' }).getAttribute('href')).toBe(
       APP_ROUTES.TASKS
@@ -103,7 +103,7 @@ describe('DashboardNav', () => {
       'grid-cols-[22px_minmax(0,1fr)_34px]'
     );
     expect(getByRole('link', { name: 'Touring' }).getAttribute('href')).toBe(
-      APP_ROUTES.SETTINGS_TOURING
+      APP_ROUTES.TOUR_DATES
     );
     expect(queryByRole('link', { name: 'Calendar' })).toBeNull();
   });
@@ -271,7 +271,7 @@ describe('DashboardNav', () => {
     );
     expect(getByRole('link', { name: 'Touring' })).toHaveAttribute(
       'href',
-      APP_ROUTES.SETTINGS_TOURING
+      APP_ROUTES.TOUR_DATES
     );
     expect(getByRole('button', { name: 'Artist' })).toHaveAttribute(
       'aria-expanded',

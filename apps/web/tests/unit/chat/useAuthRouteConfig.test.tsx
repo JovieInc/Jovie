@@ -44,4 +44,16 @@ describe('useAuthRouteConfig', () => {
     ]);
     expect(result.current.section).toBe('library');
   });
+
+  it('treats the canonical tour dates route as a dashboard table surface', () => {
+    mockUsePathname.mockReturnValue('/app/tour-dates');
+
+    const { result } = renderHook(() => useAuthRouteConfig());
+
+    expect(result.current.section).toBe('dashboard');
+    expect(result.current.isTableRoute).toBe(true);
+    expect(result.current.breadcrumbs).toEqual([
+      { label: 'Tour dates', href: '/app/tour-dates' },
+    ]);
+  });
 });

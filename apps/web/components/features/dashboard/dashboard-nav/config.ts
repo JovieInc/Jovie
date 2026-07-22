@@ -110,10 +110,10 @@ export function filterProfilesWorkspaceNavigation(
 
 export const touringNavItem: NavItem = {
   name: 'Touring',
-  href: APP_ROUTES.SETTINGS_TOURING,
+  href: APP_ROUTES.TOUR_DATES,
   id: 'touring',
   icon: CalendarDays,
-  description: 'Manage tour dates and touring settings',
+  description: 'Manage tour dates and events',
 };
 
 export const primaryNavigation: NavItem[] = [

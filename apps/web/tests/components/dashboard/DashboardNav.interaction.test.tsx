@@ -65,7 +65,7 @@ describe('DashboardNav interactions', () => {
     expect(screen.queryByRole('link', { name: 'Profiles' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Touring' })).toHaveAttribute(
       'href',
-      APP_ROUTES.SETTINGS_TOURING
+      APP_ROUTES.TOUR_DATES
     );
     expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
       'href',
@@ -215,7 +215,7 @@ describe('DashboardNav interactions', () => {
     expect(screen.queryByRole('link', { name: 'Tim White' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Touring' })).toHaveAttribute(
       'href',
-      APP_ROUTES.SETTINGS_TOURING
+      APP_ROUTES.TOUR_DATES
     );
     expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
       'href',

@@ -92,6 +92,8 @@ function isItemActive(pathname: string, item: NavItem): boolean {
 
   if (item.id === 'touring') {
     return (
+      pathname === APP_ROUTES.TOUR_DATES ||
+      pathname.startsWith(`${APP_ROUTES.TOUR_DATES}/`) ||
       pathname === APP_ROUTES.SETTINGS_TOURING ||
       pathname.startsWith(`${APP_ROUTES.SETTINGS_TOURING}/`)
     );

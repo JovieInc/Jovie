@@ -179,6 +179,31 @@ describe('EntityChipPopover', () => {
     });
   });
 
+  it('opens an event chip in the typed tour-date rail', async () => {
+    const user = userEvent.setup();
+    const openEntityPanel = vi.fn();
+    mockEntityPanelState.designV1Enabled = true;
+    mockEntityPanelState.entityPanel = { open: openEntityPanel };
+
+    fastRender(
+      <EntityChipPopover kind='event' id='evt_1' label='Brooklyn Bowl'>
+        <span>Brooklyn Bowl</span>
+      </EntityChipPopover>
+    );
+    await user.click(screen.getByTestId('entity-chip-popover-trigger'));
+    await user.click(
+      await screen.findByRole('button', { name: /Open Event/i })
+    );
+
+    expect(openEntityPanel).toHaveBeenCalledWith({
+      kind: 'tour-date',
+      id: 'evt_1',
+      label: 'Brooklyn Bowl',
+      source: 'manual',
+      focusKey: 'event:evt_1:Brooklyn Bowl',
+    });
+  });
+
   it('degrades gracefully for unresolved entities without layout thrash', async () => {
     const user = userEvent.setup();
     fastRender(

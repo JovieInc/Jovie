@@ -207,7 +207,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'G then O',
     category: 'navigation',
     icon: CalendarDays,
-    href: APP_ROUTES.SETTINGS_TOURING,
+    href: APP_ROUTES.TOUR_DATES,
     isSequential: true,
     firstKey: 'g',
     secondKey: 'o',

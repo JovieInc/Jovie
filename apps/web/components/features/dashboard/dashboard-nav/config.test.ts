@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   artistProfileNavItem,
+  artistSettingsNavigation,
   filterProfilesWorkspaceNavigation,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
@@ -21,6 +23,13 @@ const CANONICAL_ITEM_IDS = new Set([
 ]);
 
 describe('mobile nav derivation', () => {
+  it('separates the primary events surface from Bandsintown settings', () => {
+    expect(touringNavItem.href).toBe(APP_ROUTES.TOUR_DATES);
+    expect(
+      artistSettingsNavigation.find(item => item.id === 'touring')?.href
+    ).toBe(APP_ROUTES.SETTINGS_TOURING);
+  });
+
   it('never defines a mobile-only NavItem — every id traces back to a canonical item', () => {
     for (const item of [
       ...mobilePrimaryNavigation,
