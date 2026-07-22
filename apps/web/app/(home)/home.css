@@ -3632,53 +3632,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-align: center;
 }
 
-/* The abyss: two hairline grids on a perspective floor, receding toward a
-   vanishing point below the fold. Cyan at whisper opacity — felt, not seen.
-   The plane is oversized so rotation and drift never expose an edge, and the
-   top mask lets the lines dissolve upward into the page. */
-.system-b-mounted-home-footer-cta-abyss {
-  position: absolute;
-  inset: auto 0 0;
-  z-index: 0;
-  height: 62%;
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(180deg, transparent, black 58%);
-  mask-image: linear-gradient(180deg, transparent, black 58%);
-  perspective: 720px;
-  pointer-events: none;
-}
-
-.system-b-mounted-home-footer-cta-abyss-plane {
-  position: absolute;
-  inset: -70% -25% 0;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--system-b-accent-cyan) 68%, transparent) 0 1px,
-      transparent 1px 96px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      color-mix(in oklab, var(--system-b-accent-cyan) 52%, transparent) 0 1px,
-      transparent 1px 64px
-    );
-  opacity: 0.22;
-  transform: rotateX(58deg);
-  transform-origin: center bottom;
-}
-
-@keyframes homepage-footer-cta-abyss-drift {
-  to {
-    transform: rotateX(58deg) translateY(64px);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .system-b-mounted-home-footer-cta-abyss-plane {
-    animation: homepage-footer-cta-abyss-drift 26s linear infinite;
-  }
-}
-
 /* Closing beat: hero-scale Satoshi display so the page ends on the same
    typographic register it opened with. */
 .system-b-mounted-home-footer-cta-heading {
@@ -3818,6 +3771,55 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /* SYSTEM B MOUNTED HOME FOOTER CTA PRIMITIVES END */
+
+/* FOOTER CTA ABYSS (decorative layer — lives outside the flat primitives
+   block by design, same contract as the hero stage gradients). Two hairline
+   grids on a perspective floor, receding toward a vanishing point below the
+   fold. Cyan at whisper opacity — felt, not seen. The plane is oversized so
+   rotation and drift never expose an edge, and the top mask lets the lines
+   dissolve upward into the page. */
+.system-b-mounted-home-footer-cta-abyss {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 0;
+  height: 62%;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, transparent, black 58%);
+  mask-image: linear-gradient(180deg, transparent, black 58%);
+  perspective: 720px;
+  pointer-events: none;
+}
+
+.system-b-mounted-home-footer-cta-abyss-plane {
+  position: absolute;
+  inset: -70% -25% 0;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--system-b-accent-cyan) 68%, transparent) 0 1px,
+      transparent 1px 96px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in oklab, var(--system-b-accent-cyan) 52%, transparent) 0 1px,
+      transparent 1px 64px
+    );
+  opacity: 0.22;
+  transform: rotateX(58deg);
+  transform-origin: center bottom;
+}
+
+@keyframes homepage-footer-cta-abyss-drift {
+  to {
+    transform: rotateX(58deg) translateY(64px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .system-b-mounted-home-footer-cta-abyss-plane {
+    animation: homepage-footer-cta-abyss-drift 26s linear infinite;
+  }
+}
 
 /* HOMEPAGE CLOSED LOOP SYSTEM B START */
 .homepage-closed-loop-section {
@@ -4138,8 +4140,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 /* HOMEPAGE CLOSED LOOP SYSTEM B END */
 
-/* HOMEPAGE ARTIST OUTCOMES SYSTEM B START */
-.homepage-artist-outcomes {
+/* HOMEPAGE MEET JOVIE SYSTEM B START */
+.homepage-meet-jovie {
   position: relative;
   overflow: clip;
   padding-block: var(--homepage-chapter-space);
@@ -4148,26 +4150,23 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-family: var(--font-sans);
 }
 
-.homepage-artist-outcomes__inner {
-  display: grid;
+.homepage-meet-jovie__header {
+  display: flex;
   width: min(
     var(--ds-public-content-max),
-    calc(100% - var(--homepage-grid-gutter) * 2)
+    calc(100% - var(--homepage-page-gutter) * 2)
   );
-  max-width: none;
   margin-inline: auto;
-  padding-inline: 0;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  column-gap: clamp(var(--space-4), 2vw, var(--space-6));
-  row-gap: clamp(var(--space-12), 6vw, var(--space-20));
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-6);
 }
 
-.homepage-artist-outcomes__copy {
-  grid-column: 1 / span 6;
+.homepage-meet-jovie__copy {
+  max-width: 44rem;
 }
 
-.homepage-artist-outcomes__copy h2 {
-  max-width: 16ch;
+.homepage-meet-jovie__heading {
   margin: 0;
   color: var(--color-text-primary-token);
   font-family:
@@ -4179,7 +4178,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-wrap: balance;
 }
 
-.homepage-artist-outcomes__copy p {
+.homepage-meet-jovie__intro {
   max-width: 34rem;
   margin: var(--space-5) 0 0;
   color: var(--color-text-secondary-token);
@@ -4189,16 +4188,55 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-wrap: pretty;
 }
 
-.homepage-artist-outcomes__list {
-  grid-column: 1 / -1;
-  display: grid;
-  margin: 0;
-  padding: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: clamp(var(--space-10), 6vw, var(--space-20));
-  list-style: none;
+.homepage-meet-jovie__carousel {
+  width: min(
+    var(--ds-public-content-max),
+    calc(100% - var(--homepage-page-gutter) * 2)
+  );
+  margin: var(--space-10) auto 0;
 }
 
+.homepage-meet-jovie__controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.homepage-meet-jovie__track {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  gap: clamp(var(--space-4), 2vw, var(--space-6));
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.homepage-meet-jovie__track::-webkit-scrollbar {
+  display: none;
+}
+
+.homepage-meet-jovie__card {
+  flex: 0 0 auto;
+  width: clamp(19rem, 30vw, 24rem);
+  scroll-snap-align: start;
+}
+
+@media (max-width: 767px) {
+  .homepage-meet-jovie__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .homepage-meet-jovie__card {
+    width: 78vw;
+  }
+}
+/* HOMEPAGE MEET JOVIE SYSTEM B END */
+
+/* HOMEPAGE ARTIST OUTCOMES SYSTEM B START */
 .homepage-artist-outcome {
   position: relative;
   display: grid;
@@ -4207,14 +4245,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
   padding: var(--space-5) 0 0;
 }
 
-/* Seam between cards, centered in the column gap, so every media frame keeps
-   an identical width (equal optical weight) while the first card still aligns
-   to the shared grid gutter. */
+/* Seam between cards, centered in the carousel gap, so every media frame
+   keeps an identical width (equal optical weight). */
 .homepage-artist-outcome + .homepage-artist-outcome::before {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(clamp(var(--space-10), 6vw, var(--space-20)) / -2);
+  left: calc(clamp(var(--space-4), 2vw, var(--space-6)) / -2);
   width: var(--space-px);
   background: var(--homepage-chapter-rule);
   content: "";
@@ -4306,14 +4343,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .homepage-artist-outcomes__copy h2,
-  .homepage-artist-outcomes__copy p,
+  .homepage-meet-jovie__heading,
+  .homepage-meet-jovie__intro,
   .homepage-artist-outcome {
     animation: homepage-artist-outcomes-rise var(--ds-motion-cinematic-duration)
       var(--ds-motion-cinematic-easing) both;
   }
 
-  .homepage-artist-outcomes__copy p {
+  .homepage-meet-jovie__intro {
     animation-delay: 70ms;
   }
 
@@ -4660,54 +4697,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 @media (max-width: 767px) {
-  .homepage-artist-outcomes__inner {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: var(--space-12);
-  }
-
-  .homepage-artist-outcomes__copy,
-  .homepage-artist-outcomes__list {
-    grid-column: 1;
-  }
-
-  .homepage-artist-outcomes__copy h2 {
-    max-width: 12ch;
-    font-size: clamp(var(--text-3xl), 10vw, var(--text-4xl));
-    line-height: var(--ds-marketing-title-leading);
-  }
-
-  /* Mobile: the card row becomes an edge-to-edge snap rail whose first card
-     and snap position align to the shared grid gutter. */
-  .homepage-artist-outcomes__list {
-    width: 100vw;
-    margin-inline: calc(50% - 50vw);
-    grid-auto-columns: min(76vw, 19rem);
-    grid-auto-flow: column;
-    grid-template-columns: none;
-    gap: var(--space-4);
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    scroll-padding-left: var(--homepage-grid-gutter);
-    scroll-snap-type: x mandatory;
-    padding-right: var(--homepage-grid-gutter);
-    padding-bottom: var(--space-3);
-    padding-left: var(--homepage-grid-gutter);
-    scrollbar-width: none;
-  }
-
-  .homepage-artist-outcomes__list::-webkit-scrollbar {
-    display: none;
-  }
-
-  .homepage-artist-outcome {
-    scroll-snap-align: start;
-  }
-
-  .homepage-artist-outcome + .homepage-artist-outcome::before {
-    content: none;
-  }
-
   .homepage-artist-outcome__media {
     aspect-ratio: 0.86;
   }

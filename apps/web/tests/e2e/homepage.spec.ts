@@ -253,7 +253,7 @@ test.describe('Homepage', () => {
     );
     const opportunity = page.getByTestId('homepage-opportunity-section');
     const workspace = page.getByTestId('homepage-workspace-section');
-    const outcomes = page.getByTestId('homepage-artist-outcomes');
+    const outcomes = page.getByTestId('homepage-meet-jovie');
     const closedLoop = page.getByTestId('homepage-closed-loop');
 
     await expect(opportunity).toBeVisible();
@@ -278,11 +278,10 @@ test.describe('Homepage', () => {
     await expect(page.getByTestId('homepage-ai-composer-demo')).toBeVisible();
     const sectionOrder = await page.evaluate(() => {
       const testIds = [
+        'homepage-meet-jovie',
         'homepage-opportunity-section',
         'homepage-workspace-section',
-        'homepage-artist-outcomes',
         'homepage-closed-loop',
-        'homepage-v2-pricing',
         'homepage-faq',
         'homepage-v2-final-cta',
       ];
@@ -321,7 +320,7 @@ test.describe('Homepage', () => {
       0
     );
     await expect(
-      outcomes.getByRole('heading', { name: 'Every fan has a next move.' })
+      outcomes.getByRole('heading', { name: 'Meet Jovie' })
     ).toBeVisible();
     for (const outcome of ['Drive Streams', 'Capture Fans', 'Get Paid']) {
       await expect(
@@ -331,7 +330,7 @@ test.describe('Homepage', () => {
     await outcomes.scrollIntoViewIfNeeded();
     await page.waitForFunction(() => {
       const section = document.querySelector(
-        '[data-testid="homepage-artist-outcomes"]'
+        '[data-testid="homepage-meet-jovie"]'
       );
       if (!section) return false;
       return Array.from(
@@ -369,7 +368,7 @@ test.describe('Homepage', () => {
       closedLoop.getByTestId('homepage-closed-loop-step')
     ).toHaveCount(5);
     // Spec wall section removed — JOV-2073
-    await expect(page.getByTestId('homepage-v2-pricing')).toBeVisible();
+    await expect(page.getByTestId('homepage-v2-pricing')).toHaveCount(0);
     await expect(page.getByTestId('homepage-faq')).toBeVisible();
     const finalCta = page.getByTestId('homepage-v2-final-cta');
     await finalCta.scrollIntoViewIfNeeded();
