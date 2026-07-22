@@ -20,6 +20,13 @@ export interface CollaboratorInfo {
   releaseCount: number;
 }
 
+export interface CreditedArtistWithProfile {
+  /** Display name (credit name when set, otherwise canonical artist name). */
+  name: string;
+  /** Normalized Jovie handle of the linked public creator profile. */
+  handle: string;
+}
+
 export interface FindOrCreateArtistInput {
   name: string;
   spotifyId?: string | null;
