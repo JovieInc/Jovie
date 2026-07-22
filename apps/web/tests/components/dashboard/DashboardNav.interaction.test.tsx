@@ -1,13 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useEffect, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
-import { OPEN_HEADER_SEARCH_EVENT } from '@/components/shell/header-search-events';
-import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
+import { APP_ROUTES } from '@/constants/routes';
 import {
-  mockClearPendingShell,
-  mockShowPendingShell,
+  mockOpenPreviewPanel,
+  mockRouterPush,
   mockToastInfo,
   mockUseChatConversationsQuery,
   mockUsePathname,
@@ -15,167 +13,59 @@ import {
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
 
-vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
-  useArtistSearchQuery: () => ({
-    clear: vi.fn(),
-    error: null,
-    isPending: false,
-    query: '',
-    results: [],
-    search: vi.fn(),
-    searchImmediate: vi.fn(),
-    state: 'idle',
-  }),
+const { prefetchForRouteMock } = vi.hoisted(() => ({
+  prefetchForRouteMock: vi.fn(),
 }));
 
-function HeaderSearchHarness() {
-  const [open, setOpen] = useState(false);
+vi.mock('@/lib/queries/prefetch-dashboard', () => ({
+  prefetchForRoute: prefetchForRouteMock,
+}));
 
-  useEffect(() => {
-    const openSearch = () => setOpen(true);
-    globalThis.addEventListener(OPEN_HEADER_SEARCH_EVENT, openSearch);
-    return () => {
-      globalThis.removeEventListener(OPEN_HEADER_SEARCH_EVENT, openSearch);
-    };
-  }, []);
-
-  return open ? <input aria-label='Search Jovie' /> : null;
-}
+const PRIMARY_LABELS = [
+  'Inbox',
+  'Chat',
+  'Library',
+  'Contacts',
+  'Calendar',
+  'Tasks',
+] as const;
 
 describe('DashboardNav interactions', () => {
   afterEach(() => {
+    vi.useRealTimers();
+    prefetchForRouteMock.mockReset();
     resetDashboardNavTestMocks();
   });
 
-  it('renders the full primary navigation config', () => {
+  it('exposes an icon and label for each canonical navigation item', () => {
     renderDashboardNav({ renderFn: render });
 
-    expect(screen.getByRole('link', { name: 'New Chat' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.CHAT
-    );
-    expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
-      'href',
-      buildLibraryViewRoute('releases')
-    );
-    // 'Artist Profile' was renamed to 'Profiles' and is gated behind
-    // PROFILES_WORKSPACE, which is disabled in the default flag snapshot.
-    expect(screen.queryByRole('button', { name: 'Artist Profile' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Artist Profile' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Profiles' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Touring' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.TOUR_DATES
-    );
-    expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.AUDIENCE
-    );
-    expect(screen.queryByRole('link', { name: 'Profile' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Library' })).toBeNull();
+    for (const label of PRIMARY_LABELS) {
+      const link = screen.getByRole('link', { name: label });
+      expect(link.querySelector('svg')).toBeTruthy();
+      expect(link.querySelector('span.truncate')).toHaveTextContent(label);
+    }
   });
 
-  it('keeps Releases in the grouped top navigation when the design flag is enabled', () => {
-    renderDashboardNav({
-      renderFn: render,
-      appFlags: { DESIGN_V1: true },
-    });
-
-    expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
-      'href',
-      buildLibraryViewRoute('releases')
-    );
-    expect(screen.getByRole('link', { name: 'New Chat' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.CHAT
-    );
-  });
-
-  it('keeps admin routes out of artist navigation for admin users', () => {
-    renderDashboardNav({
-      renderFn: render,
-      overrides: { isAdmin: true },
-    });
-
-    expect(screen.queryByRole('button', { name: 'Admin' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Growth' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'People' })).toBeNull();
-  });
-
-  it('highlights the active route based on pathname', () => {
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.LIBRARY);
-
+  it('does not duplicate sidebar Search or removed primary destinations', () => {
     renderDashboardNav({ renderFn: render });
 
-    expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
+    for (const label of [
+      'Search',
+      'Touring',
+      'Audience',
+      'Profiles',
+      'Releases',
+    ]) {
+      expect(screen.queryByRole('link', { name: label })).toBeNull();
+      expect(screen.queryByRole('button', { name: label })).toBeNull();
+    }
   });
 
-  it('highlights the canonical Audience nav item from the legacy dashboard path', () => {
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD_AUDIENCE);
-
-    renderDashboardNav({ renderFn: render });
-
-    expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.AUDIENCE
-    );
-    expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
-  });
-
-  it('exposes icon and label content for each navigation item', () => {
-    renderDashboardNav({ renderFn: render });
-
-    const releasesLink = screen.getByRole('link', { name: 'Releases' });
-    // In the new shell nav design (DESIGN_V1 on by default), the icon is rendered
-    // directly as an SVG element rather than inside a data-sidebar-icon wrapper span.
-    const iconNode = releasesLink.querySelector('svg');
-    const labelNode = releasesLink.querySelector('span.truncate');
-
-    expect(iconNode).toBeTruthy();
-    expect(labelNode).toHaveTextContent('Releases');
-    expect(labelNode).toHaveClass('group-data-[collapsible=icon]:hidden');
-  });
-
-  it('opens header search from the Design V1 sidebar search row', async () => {
+  it('opens the artist profile rail directly from chat', async () => {
     const user = userEvent.setup();
-    const listener = vi.fn();
-    globalThis.addEventListener(OPEN_HEADER_SEARCH_EVENT, listener);
-
     renderDashboardNav({
       renderFn: render,
-      appFlags: { DESIGN_V1: true },
-    });
-
-    await user.click(screen.getByRole('button', { name: 'Search' }));
-
-    expect(listener).toHaveBeenCalledTimes(1);
-    globalThis.removeEventListener(OPEN_HEADER_SEARCH_EVENT, listener);
-  });
-
-  it('opens the header input when clicking the Design V1 sidebar search row', async () => {
-    const user = userEvent.setup();
-
-    renderDashboardNav({
-      renderFn: render,
-      appFlags: { DESIGN_V1: true },
-      children: <HeaderSearchHarness />,
-    });
-
-    await user.click(screen.getByRole('button', { name: 'Search' }));
-
-    expect(screen.getByLabelText('Search Jovie')).toBeInTheDocument();
-  });
-
-  it('groups the Design V1 shell into top nav and artist sections without duplicate Settings', () => {
-    const { container } = renderDashboardNav({
-      renderFn: render,
-      appFlags: { DESIGN_V1: true },
       overrides: {
         selectedProfile: {
           id: 'profile_123',
@@ -186,47 +76,32 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    const primarySection = container.querySelector('[data-nav-section="true"]');
-    expect(primarySection).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Work' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Catalog' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Growth' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Releases' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Artist' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
+    await user.click(
+      screen.getByRole('button', { name: 'Open Tim White profile' })
     );
-    expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
-      'href',
-      buildLibraryViewRoute('releases')
-    );
-    // The artist-name profile rail entry was removed from the nav; the
-    // collapsible 'Artist' group label above is the only 'Artist' button.
-    expect(screen.queryByRole('button', { name: 'Tim White' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Tim White' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Touring' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.TOUR_DATES
-    );
-    expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.AUDIENCE
-    );
-    expect(container.querySelector('[data-nav-section="more"]')).toBeNull();
+
+    expect(mockRouterPush).not.toHaveBeenCalled();
+    expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
   });
 
-  it('renders recent chats in the Design V1 sidebar as App Router links', () => {
+  it('routes to Chat before opening the artist profile rail elsewhere', async () => {
+    const user = userEvent.setup();
+    mockUsePathname.mockReturnValue(APP_ROUTES.CALENDAR);
+    renderDashboardNav({ renderFn: render });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open Artist profile' })
+    );
+
+    expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.CHAT);
+    await waitFor(() => {
+      expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('renders recent chats as App Router links', () => {
     mockUseChatConversationsQuery.mockReturnValue({
       data: [
-        {
-          id: 'thread-older',
-          title: 'Release rollout',
-          createdAt: '2026-05-01T00:00:00.000Z',
-          updatedAt: '2026-05-10T00:00:00.000Z',
-        },
         {
           id: 'thread-newer',
           title: 'Pitch tasks',
@@ -242,41 +117,54 @@ describe('DashboardNav interactions', () => {
     });
 
     expect(screen.getByText('Chats')).toBeInTheDocument();
-    expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
-      limit: 10,
-      enabled: true,
-    });
-
     expect(screen.getByRole('link', { name: 'Pitch tasks' })).toHaveAttribute(
       'href',
       '/app/chat/thread-newer'
     );
-    expect(
-      screen.getByRole('button', {
-        name: 'Chat Actions for Pitch tasks',
-      })
-    ).toBeInTheDocument();
   });
 
-  it('renders compact chat loading without adding duplicate empty-state chat controls', () => {
+  it('keeps compact loading and empty thread states free of duplicate Chat controls', () => {
     mockUseChatConversationsQuery.mockReturnValue({
       data: undefined,
       isLoading: true,
     });
-
-    const { unmount } = renderDashboardNav({
+    const loading = renderDashboardNav({
       renderFn: render,
       appFlags: { DESIGN_V1: true },
     });
 
     expect(document.querySelector('.skeleton')).toBeInTheDocument();
     expect(screen.queryByText('Loading chats')).not.toBeInTheDocument();
-    unmount();
+    loading.unmount();
 
     mockUseChatConversationsQuery.mockReturnValue({
       data: [],
       isLoading: false,
       isError: false,
+    });
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    expect(screen.getAllByRole('link', { name: 'Chat' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Chat' })).toBeNull();
+  });
+
+  it('marks an active thread read without changing primary navigation', async () => {
+    mockUsePathname.mockReturnValue(`${APP_ROUTES.CHAT}/thread-1`);
+    mockUseChatConversationsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'thread-1',
+          title: 'Active thread',
+          createdAt: '2026-05-01T00:00:00.000Z',
+          updatedAt: '2026-05-12T00:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
     });
 
     renderDashboardNav({
@@ -284,61 +172,18 @@ describe('DashboardNav interactions', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
-    expect(screen.queryByRole('button', { name: 'New Chat' })).toBeNull();
-  });
-
-  it('shows the releases pending shell once for a pointer click', async () => {
-    const user = userEvent.setup();
-
-    renderDashboardNav({ renderFn: render });
-
-    const releasesLink = screen.getByRole('link', { name: 'Releases' });
-    releasesLink.addEventListener('click', event => event.preventDefault());
-
-    await user.click(releasesLink);
-
-    expect(mockShowPendingShell).toHaveBeenCalledTimes(1);
-    expect(mockShowPendingShell).toHaveBeenCalledWith('releases');
-  });
-
-  it('does not show the releases pending shell when releases is already active', async () => {
-    const user = userEvent.setup();
-
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.RELEASES);
-    renderDashboardNav({ renderFn: render });
-
-    const releasesLink = screen.getByRole('link', { name: 'Releases' });
-    releasesLink.addEventListener('click', event => event.preventDefault());
-
-    await user.click(releasesLink);
-
-    expect(mockShowPendingShell).not.toHaveBeenCalled();
-    expect(mockClearPendingShell).not.toHaveBeenCalled();
-  });
-
-  it('does not hijack modified releases link clicks', async () => {
-    renderDashboardNav({ renderFn: render });
-
-    const releasesLink = screen.getByRole('link', { name: 'Releases' });
-    releasesLink.addEventListener('click', event => event.preventDefault());
-    fireEvent.pointerDown(releasesLink, {
-      button: 0,
-      metaKey: true,
+    await waitFor(() => {
+      expect(
+        JSON.parse(localStorage.getItem('jovie:sidebar-thread-read-at')!)
+      ).toMatchObject({ 'thread-1': '2026-05-12T00:00:00.000Z' });
     });
-    fireEvent.click(releasesLink, {
-      button: 0,
-      metaKey: true,
-    });
-
-    expect(mockShowPendingShell).toHaveBeenCalledTimes(1);
-    expect(mockClearPendingShell).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('link', { name: 'Chat' })).not.toHaveAttribute(
+      'aria-current'
+    );
   });
 
-  it('keeps demo-disabled items as links on nested demo routes', async () => {
-    const user = userEvent.setup();
-
-    mockUsePathname.mockReturnValueOnce('/demo/showcase/settings');
+  it('debounces route prefetch on hover for canonical items', async () => {
+    vi.useFakeTimers();
     renderDashboardNav({
       renderFn: render,
       overrides: {
@@ -351,10 +196,24 @@ describe('DashboardNav interactions', () => {
       },
     });
 
+    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Tasks' }));
+    expect(prefetchForRouteMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(prefetchForRouteMock).toHaveBeenCalledWith(
+      'tasks',
+      expect.anything(),
+      'profile_123'
+    );
+  });
+
+  it('keeps demo-disabled rows as links while intercepting unavailable content', async () => {
+    const user = userEvent.setup();
+    mockUsePathname.mockReturnValueOnce('/demo/showcase/settings');
+    renderDashboardNav({ renderFn: render });
+
     const tasksLink = screen.getByRole('link', { name: 'Tasks' });
     expect(tasksLink).toHaveAttribute('href', APP_ROUTES.TASKS);
-    tasksLink.addEventListener('click', event => event.preventDefault());
-
     await user.click(tasksLink);
 
     expect(mockToastInfo).toHaveBeenCalledWith(

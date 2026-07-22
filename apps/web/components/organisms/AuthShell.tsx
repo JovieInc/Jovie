@@ -75,7 +75,9 @@ function AuthShellInner({
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;
-  const hasMobileBottomNav = section === 'ov' || showMobileTabs;
+  const showCustomerMobileTabs =
+    showMobileTabs && section !== 'ov' && section !== 'admin';
+  const hasMobileBottomNav = section === 'ov' || showCustomerMobileTabs;
 
   // Memoize the sidebar so it doesn't re-render on breadcrumb/header changes.
   // The sidebar only depends on `section` — it shouldn't remount when
@@ -95,10 +97,10 @@ function AuthShellInner({
     () =>
       section === 'ov' ? (
         <OperatorMobileNavigation />
-      ) : showMobileTabs ? (
+      ) : showCustomerMobileTabs ? (
         <DashboardMobileTabs />
       ) : null,
-    [section, showMobileTabs]
+    [section, showCustomerMobileTabs]
   );
   const searchSurface = useMemo(() => {
     return headerActionsState ? (
@@ -124,7 +126,9 @@ function AuthShellInner({
             searchSurface={searchSurface}
             isSearchActive={headerActionsState?.isSearchOpen ?? false}
             mobileProfileSlot={
-              <MobileProfileDrawer onOpen={previewPanelState.toggle} />
+              section === 'ov' || section === 'admin' ? null : (
+                <MobileProfileDrawer onOpen={previewPanelState.toggle} />
+              )
             }
             showDivider={isTableRoute}
             transparent={isChatRoute}

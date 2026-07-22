@@ -15,10 +15,9 @@ import {
   ShieldCheck,
   SquarePen,
   UserCircle,
-  Users,
 } from 'lucide-react';
 
-import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
+import { APP_ROUTES } from '@/constants/routes';
 
 import type { NavItem } from './types';
 
@@ -34,10 +33,7 @@ export const dashboardHome: NavItem = {
   description: 'Start a new chat',
 };
 
-/**
- * Named Inbox home (JOV-3931 / GH #13171). Points at `/app` which renders the
- * opportunity card stack. Only shown when the `INBOX_HOME` flag is on.
- */
+/** Named Inbox home. `/app` renders the opportunity card stack. */
 export const inboxNavItem: NavItem = {
   name: 'Inbox',
   href: APP_ROUTES.DASHBOARD,
@@ -46,90 +42,58 @@ export const inboxNavItem: NavItem = {
   description: 'Review pending opportunities',
 };
 
-export const newThreadNavItem: NavItem = {
-  name: 'New Chat',
+export const chatNavItem: NavItem = {
+  name: 'Chat',
   href: APP_ROUTES.CHAT,
   id: 'chat',
   icon: SquarePen,
   description: 'Start a new conversation',
 };
 
-export const profileNavItem: NavItem = {
-  name: 'Profile',
-  href: APP_ROUTES.CHAT_PROFILE_PANEL,
-  id: 'profile',
-  description: 'Open profile preview and links',
-  icon: UserCircle,
-};
-
-export const releasesNavItem: NavItem = {
-  name: 'Releases',
-  href: buildLibraryViewRoute('releases'),
-  id: 'releases',
+export const libraryNavItem: NavItem = {
+  name: 'Library',
+  href: APP_ROUTES.LIBRARY,
+  id: 'library',
   icon: Music,
-  description:
-    'Browse releases and link out every provider with one smart link',
+  description: 'Browse releases, audio, video, images, and files',
 };
 
-/** @deprecated Use releasesNavItem — Library is the canonical Releases surface. */
-export const libraryNavItem: NavItem = releasesNavItem;
-
-export const artistProfileNavItem: NavItem = {
-  name: 'Profiles',
-  href: APP_ROUTES.PROFILES,
-  id: 'profiles',
+export const contactsNavItem: NavItem = {
+  name: 'Contacts',
+  href: APP_ROUTES.CONTACTS,
+  id: 'contacts',
   icon: IdCard,
-  description: 'Monitor your artist profiles, sources, and connectors',
+  description: 'Manage artist contacts',
 };
 
-export function filterProfilesWorkspaceNavigation(
-  items: readonly NavItem[],
-  profilesWorkspaceEnabled: boolean
-): NavItem[] {
-  return profilesWorkspaceEnabled
-    ? [...items]
-    : items.filter(item => item.id !== artistProfileNavItem.id);
-}
-
-export const touringNavItem: NavItem = {
-  name: 'Touring',
-  href: APP_ROUTES.TOUR_DATES,
-  id: 'touring',
+export const calendarNavItem: NavItem = {
+  name: 'Calendar',
+  href: APP_ROUTES.CALENDAR,
+  id: 'calendar',
   icon: CalendarDays,
-  description: 'Manage tour dates and events',
+  description: 'See release dates, events, and calendar moments',
 };
 
-export const primaryNavigation: NavItem[] = [
-  newThreadNavItem,
-  releasesNavItem,
-  artistProfileNavItem,
-  touringNavItem,
-  {
-    name: 'Calendar',
-    href: APP_ROUTES.CALENDAR,
-    id: 'calendar',
-    icon: CalendarDays,
-    description: 'See release dates, events, and calendar moments',
-  },
-  {
-    name: 'Tasks',
-    href: APP_ROUTES.TASKS,
-    id: 'tasks',
-    icon: CheckSquare,
-    description: 'Track release work and general artist operations',
-  },
-  {
-    name: 'Audience',
-    href: APP_ROUTES.AUDIENCE,
-    id: 'audience',
-    icon: Users,
-    description: 'Understand your audience demographics',
-  },
-];
+export const tasksNavItem: NavItem = {
+  name: 'Tasks',
+  href: APP_ROUTES.TASKS,
+  id: 'tasks',
+  icon: CheckSquare,
+  description: 'Track release work and general artist operations',
+};
 
-export const calendarNavItem = primaryNavigation.find(
-  item => item.id === 'calendar'
-)!;
+/**
+ * Founder-approved customer shell IA. This ordered tuple is the only source
+ * consumed by desktop and mobile navigation (JOV-3763).
+ */
+export const primaryNavigation = [
+  inboxNavItem,
+  chatNavItem,
+  libraryNavItem,
+  contactsNavItem,
+  calendarNavItem,
+  tasksNavItem,
+] as const satisfies readonly NavItem[];
 
 export const settingsNavItem: NavItem = {
   name: 'Settings',
@@ -225,17 +189,7 @@ export const settingsNavigation: NavItem[] = [
  * NavItem here. A mobile-only nav item is a third source of truth that
  * drifts from desktop.
  */
-export const mobilePrimaryNavigation: NavItem[] = [
-  newThreadNavItem,
-  primaryNavigation.find(i => i.id === 'releases')!,
-  primaryNavigation.find(i => i.id === 'audience')!,
-];
+export const mobilePrimaryNavigation: NavItem[] = primaryNavigation.slice(0, 3);
 
 /** Items shown in the expanded "more" menu on mobile. */
-export const mobileExpandedNavigation: NavItem[] = [
-  artistProfileNavItem,
-  touringNavItem,
-  calendarNavItem,
-  primaryNavigation.find(i => i.id === 'tasks')!,
-  settingsNavItem,
-];
+export const mobileExpandedNavigation: NavItem[] = primaryNavigation.slice(3);

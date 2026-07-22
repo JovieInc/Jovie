@@ -1,0 +1,132 @@
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DashboardMobileTabs } from '@/components/features/dashboard/organisms/DashboardMobileTabs';
+import { APP_ROUTES } from '@/constants/routes';
+
+const { mockPathname, mockSignOut } = vi.hoisted(() => ({
+  mockPathname: vi.fn(() => APP_ROUTES.CHAT),
+  mockSignOut: vi.fn(),
+}));
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => mockPathname(),
+}));
+
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useAuthSafe: () => ({ signOut: mockSignOut }),
+}));
+
+const CANONICAL_LABELS = [
+  'Inbox',
+  'Chat',
+  'Library',
+  'Contacts',
+  'Calendar',
+  'Tasks',
+] as const;
+
+describe('DashboardMobileTabs', () => {
+  beforeEach(() => {
+    mockPathname.mockReset();
+    mockPathname.mockReturnValue(APP_ROUTES.CHAT);
+    mockSignOut.mockReset();
+  });
+
+  it('fits the first three canonical destinations behind primary plus More', () => {
+    render(<DashboardMobileTabs />);
+
+    const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
+    const directLinks = within(tabs).getAllByRole('link');
+
+    expect(directLinks.map(link => link.textContent?.trim())).toEqual([
+      'Inbox',
+      'Chat',
+      'Library',
+    ]);
+    expect(
+      within(tabs).getByRole('button', { name: 'More options' })
+    ).toHaveClass('min-w-16');
+    expect(directLinks.every(link => link.className.includes('min-w-16'))).toBe(
+      true
+    );
+  });
+
+  it('shows the exact six in order, with Settings separated as utility', async () => {
+    const user = userEvent.setup();
+    render(<DashboardMobileTabs />);
+
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    const menu = screen.getByRole('navigation', {
+      name: 'Expanded Navigation Menu',
+    });
+    const links = within(menu).getAllByRole('link');
+
+    expect(links.slice(0, 6).map(link => link.textContent?.trim())).toEqual(
+      CANONICAL_LABELS
+    );
+    expect(links.slice(0, 6).map(link => link.getAttribute('href'))).toEqual([
+      APP_ROUTES.DASHBOARD,
+      APP_ROUTES.CHAT,
+      APP_ROUTES.LIBRARY,
+      APP_ROUTES.CONTACTS,
+      APP_ROUTES.CALENDAR,
+      APP_ROUTES.TASKS,
+    ]);
+    expect(links.at(6)).toHaveTextContent('Settings');
+    expect(links.at(6)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
+
+    for (const label of [
+      'Search',
+      'Touring',
+      'Audience',
+      'Profiles',
+      'Releases',
+    ]) {
+      expect(within(menu).queryByRole('link', { name: label })).toBeNull();
+    }
+  });
+
+  it('supports keyboard open and Escape close without moving the tab row', async () => {
+    const user = userEvent.setup();
+    render(<DashboardMobileTabs />);
+
+    const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
+    const before = within(tabs)
+      .getAllByRole('link')
+      .map(link => link.getAttribute('href'));
+    const more = within(tabs).getByRole('button', { name: 'More options' });
+    more.focus();
+    await user.keyboard('{Enter}');
+    expect(more).toHaveAttribute('aria-expanded', 'true');
+
+    await user.keyboard('{Escape}');
+    expect(more).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      within(tabs)
+        .getAllByRole('link')
+        .map(link => link.getAttribute('href'))
+    ).toEqual(before);
+  });
+
+  it('marks Inbox active only at the shell root', () => {
+    const chat = render(<DashboardMobileTabs />);
+    const chatTabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
+    expect(
+      within(chatTabs).getByRole('link', { name: 'Inbox' })
+    ).not.toHaveAttribute('aria-current');
+    expect(
+      within(chatTabs).getByRole('link', { name: 'Chat' })
+    ).toHaveAttribute('aria-current', 'page');
+    chat.unmount();
+
+    mockPathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    render(<DashboardMobileTabs />);
+    const inboxTabs = screen.getByRole('navigation', {
+      name: 'Dashboard Tabs',
+    });
+    expect(
+      within(inboxTabs).getByRole('link', { name: 'Inbox' })
+    ).toHaveAttribute('aria-current', 'page');
+  });
+});

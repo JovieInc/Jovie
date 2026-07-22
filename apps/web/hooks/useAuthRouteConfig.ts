@@ -144,9 +144,8 @@ export function useAuthRouteConfig(
     ];
   }, [isDemoRoute, pathname, searchParams]);
 
-  // Customer tabs are exclusive to Jovie mode. OV mounts its own mobile
-  // navigation through OperatorMobileNavigation inside AuthShell.
-  const showMobileTabs = mode !== 'ov';
+  // Customer navigation never leaks into the dedicated OV shell.
+  const showMobileTabs = mode === 'customer';
 
   // Table routes that need different overflow behavior.
   // Memoized so downstream consumers don't re-render when navigating

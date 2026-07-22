@@ -1,6 +1,54 @@
-import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
 import { APP_ROUTES } from '@/constants/routes';
+import { ContactsManager } from '@/features/dashboard/organisms/ContactsManager';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { captureError } from '@/lib/error-tracking';
+import { loadAppShellRouteContext } from '../app-shell-route-context';
+import { getProfileContactsForOwner } from '../dashboard/contacts/actions';
 
-export default function ContactsPage() {
-  redirect(APP_ROUTES.SETTINGS_CONTACTS);
+export const runtime = 'nodejs';
+
+export const metadata: Metadata = {
+  title: 'Contacts | Jovie',
+  description: 'Manage bookings, management, and press contacts',
+};
+
+export default async function ContactsPage() {
+  const routeContext = await loadAppShellRouteContext({
+    route: APP_ROUTES.CONTACTS,
+    dashboardErrorLogMessage: 'Dashboard data load failed on contacts page',
+    dashboardErrorMessage: 'Failed to load contacts. Please refresh the page.',
+  });
+  if (!routeContext.ok) {
+    return routeContext.error;
+  }
+
+  const profile = routeContext.dashboardData.selectedProfile;
+  if (!profile) {
+    return (
+      <PageErrorState message='Unable to load your artist profile. Please refresh the page.' />
+    );
+  }
+
+  try {
+    const contacts = await getProfileContactsForOwner(profile.id);
+
+    return (
+      <ContactsManager
+        profileId={profile.id}
+        artistName={profile.displayName?.trim() || profile.username}
+        artistHandle={profile.usernameNormalized ?? profile.username}
+        initialContacts={contacts}
+      />
+    );
+  } catch (error) {
+    void captureError('Contacts load failed on contacts page', error, {
+      route: APP_ROUTES.CONTACTS,
+      profileId: profile.id,
+    });
+
+    return (
+      <PageErrorState message='Failed to load contacts. Please refresh the page.' />
+    );
+  }
 }

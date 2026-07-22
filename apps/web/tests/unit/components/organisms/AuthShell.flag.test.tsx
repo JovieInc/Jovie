@@ -93,7 +93,7 @@ vi.mock('@/components/organisms/OperatorMobileNavigation', () => ({
 }));
 
 vi.mock('@/features/dashboard/organisms/MobileProfileDrawer', () => ({
-  MobileProfileDrawer: () => null,
+  MobileProfileDrawer: () => <button type='button'>Mobile Profile</button>,
 }));
 
 function renderAuthShell(designV1: boolean, showMobileTabs = false) {
@@ -115,7 +115,7 @@ function renderAuthShell(designV1: boolean, showMobileTabs = false) {
 function renderOvAuthShell() {
   return render(
     <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-      <AuthShell section='ov' breadcrumbs={[]}>
+      <AuthShell section='ov' breadcrumbs={[]} showMobileTabs>
         <div>OV Content</div>
       </AuthShell>
     </AppFlagProvider>
@@ -156,6 +156,10 @@ describe('AuthShell DESIGN_V1 wiring', () => {
 
     expect(screen.getByText('Sidebar')).toHaveAttribute('data-section', 'ov');
     expect(screen.getByText('Sidebar')).toHaveAttribute('data-variant', 'ov');
+    expect(screen.queryByText('Mobile Tabs')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Mobile Profile' })
+    ).not.toBeInTheDocument();
   });
 
   it('keeps customer and OV mobile navigation mutually exclusive', () => {

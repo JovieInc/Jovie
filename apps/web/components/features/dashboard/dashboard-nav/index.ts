@@ -1,16 +1,17 @@
 export {
-  artistProfileNavItem,
   artistSettingsNavigation,
+  calendarNavItem,
+  chatNavItem,
+  contactsNavItem,
   dashboardHome,
-  filterProfilesWorkspaceNavigation,
   inboxNavItem,
+  libraryNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   primaryNavigation,
-  profileNavItem,
-  releasesNavItem,
+  settingsNavItem,
   settingsNavigation,
-  touringNavItem,
+  tasksNavItem,
   userSettingsNavigation,
 } from './config';
 export { DashboardNav } from './DashboardNav';

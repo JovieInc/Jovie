@@ -1,14 +1,12 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
 import {
-  filterProfilesWorkspaceNavigation,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
+  settingsNavItem,
 } from '@/features/dashboard/dashboard-nav';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 
 import { LiquidGlassMenu, type LiquidGlassMenuItem } from './LiquidGlassMenu';
@@ -18,6 +16,8 @@ function toMenuItem(item: NavItem): LiquidGlassMenuItem {
 }
 
 const PRIMARY_ITEMS = mobilePrimaryNavigation.map(toMenuItem);
+const EXPANDED_ITEMS = mobileExpandedNavigation.map(toMenuItem);
+const UTILITY_ITEMS = [settingsNavItem].map(toMenuItem);
 
 export interface DashboardMobileTabsProps {
   readonly className?: string;
@@ -26,25 +26,17 @@ export interface DashboardMobileTabsProps {
 export function DashboardMobileTabs({
   className,
 }: DashboardMobileTabsProps): React.JSX.Element {
-  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
   const { signOut } = useAuthSafe();
-  const expandedItems = useMemo(
-    () =>
-      filterProfilesWorkspaceNavigation(
-        mobileExpandedNavigation,
-        profilesWorkspaceEnabled
-      ).map(toMenuItem),
-    [profilesWorkspaceEnabled]
-  );
 
-  const handleSignOut = useCallback(async () => {
+  const handleSignOut = async () => {
     await signOut({ redirectUrl: '/' });
-  }, [signOut]);
+  };
 
   return (
     <LiquidGlassMenu
       primaryItems={PRIMARY_ITEMS}
-      expandedItems={expandedItems}
+      expandedItems={EXPANDED_ITEMS}
+      utilityItems={UTILITY_ITEMS}
       onSignOut={handleSignOut}
       className={cn('lg:hidden', className)}
     />

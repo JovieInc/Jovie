@@ -16,7 +16,6 @@ vi.mock('next/navigation', () => ({
 }));
 
 import ContactPage from '@/app/app/(shell)/contact/page';
-import CanonicalContactsPage from '@/app/app/(shell)/contacts/page';
 import DashboardChatPage from '@/app/app/(shell)/dashboard/chat/page';
 import DashboardContactsPage from '@/app/app/(shell)/dashboard/contacts/page';
 import DashboardLinksPage from '@/app/app/(shell)/dashboard/links/page';
@@ -56,16 +55,12 @@ describe('shell alias redirects', () => {
     ).toEqual([]);
   });
 
-  it('routes contact aliases through shell pages to contact settings', () => {
-    for (const Page of [
-      ContactPage,
-      CanonicalContactsPage,
-      DashboardContactsPage,
-    ]) {
+  it('routes legacy contact aliases through shell pages to contact settings', () => {
+    for (const Page of [ContactPage, DashboardContactsPage]) {
       expect(() => Page()).toThrow(`REDIRECT:${APP_ROUTES.SETTINGS_CONTACTS}`);
     }
 
-    expect(redirectMock).toHaveBeenCalledTimes(3);
+    expect(redirectMock).toHaveBeenCalledTimes(2);
   });
 
   it('routes the legacy dashboard tour alias to the canonical entity surface', () => {

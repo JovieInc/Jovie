@@ -19,6 +19,12 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/chat/[id]': 'Thread detail is reached from chat history',
   '/app/library':
     'Canonical library page for releases, merch, images, videos, and audio',
+  '/app/audience':
+    'Retained customer workspace reachable by direct links and shortcuts after primary navigation consolidation',
+  '/app/profiles':
+    'Retained customer workspace reachable by direct links after primary navigation consolidation',
+  '/app/tour-dates':
+    'Retained customer workspace reachable by direct links and Settings after primary navigation consolidation',
   '/app/threads': 'Legacy all threads route redirects to chats',
   '/app/ov/investors/links': 'Sub-tool reached from Investors workspace',
   '/app/ov/investors/settings':
@@ -141,6 +147,15 @@ describe('shell route coverage', () => {
     );
 
     expect(missingRoutes).toEqual([]);
+  });
+
+  it('keeps the canonical Contacts destination as a real workspace', () => {
+    const contactsPage = pageByRoute.get(APP_ROUTES.CONTACTS);
+
+    expect(contactsPage).toBeDefined();
+    expect(contactsPage?.source).not.toMatch(/\bredirect\(/);
+    expect(contactsPage?.source).toContain('ContactsManager');
+    expect(contactsPage?.source).toContain('getProfileContactsForOwner');
   });
 
   it('non-nav shell pages are either intentional internals or explicit redirects', () => {

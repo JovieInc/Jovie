@@ -32,12 +32,14 @@ describe('command palette search shell guard', () => {
     );
   });
 
-  it('keeps DashboardNav Search wired to the header search event', () => {
+  it('keeps Search exclusively in the shared header surface', () => {
     const source = readSource(
       'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
     );
 
-    expect(source).toContain('openHeaderSearch');
+    expect(source).not.toContain('openHeaderSearch');
+    expect(source).not.toContain("name: 'Search'");
+    expect(source).not.toContain("name='Search'");
     expect(source).not.toContain('openCommandPalette');
     expect(source).not.toContain('globalThis.dispatchEvent');
     expect(source).not.toMatch(

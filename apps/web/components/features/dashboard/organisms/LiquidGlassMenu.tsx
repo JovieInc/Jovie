@@ -28,6 +28,8 @@ export type LiquidGlassMenuItem = {
 export interface LiquidGlassMenuProps {
   readonly primaryItems: LiquidGlassMenuItem[];
   readonly expandedItems: LiquidGlassMenuItem[];
+  /** Non-primary account destinations rendered after the canonical app IA. */
+  readonly utilityItems?: LiquidGlassMenuItem[];
   /** Optional admin items - shown in a separate section with header */
   readonly adminItems?: LiquidGlassMenuItem[];
   readonly onSearchClick?: () => void;
@@ -209,6 +211,7 @@ function MenuItemLink({
 export function LiquidGlassMenu({
   primaryItems,
   expandedItems,
+  utilityItems = [],
   adminItems,
   onSearchClick,
   onSignOut,
@@ -255,8 +258,10 @@ export function LiquidGlassMenu({
     if (isExpanded) closeMenu();
   }, [closeMenu, isExpanded, pathname]);
 
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (href: string) => {
+    if (href === '/app') return pathname === href;
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
 
   const allMenuItems = [...primaryItems, ...expandedItems];
   const hasAdminItems = adminItems && adminItems.length > 0;
@@ -304,6 +309,19 @@ export function LiquidGlassMenu({
                     active={isActive(item.href)}
                   />
                 ))}
+
+                {utilityItems.length > 0 ? (
+                  <>
+                    <div className='my-2 mx-1 border-t border-default/30' />
+                    {utilityItems.map(item => (
+                      <MenuItemLink
+                        key={item.id}
+                        item={item}
+                        active={isActive(item.href)}
+                      />
+                    ))}
+                  </>
+                ) : null}
 
                 {/* Admin section */}
                 {hasAdminItems && (

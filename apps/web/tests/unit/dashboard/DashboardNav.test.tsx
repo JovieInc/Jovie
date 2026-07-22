@@ -1,12 +1,8 @@
-import { fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
-import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
-import { OPEN_HEADER_SEARCH_EVENT } from '@/components/shell/header-search-events';
-import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
+import { APP_ROUTES } from '@/constants/routes';
 import {
-  mockRouterPush,
   mockUseChatConversationsQuery,
   mockUsePathname,
   mockUsePlanGate,
@@ -20,69 +16,95 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
   ChatPageClient: () => null,
 }));
 
+const CANONICAL_NAV = [
+  ['Inbox', APP_ROUTES.DASHBOARD],
+  ['Chat', APP_ROUTES.CHAT],
+  ['Library', APP_ROUTES.LIBRARY],
+  ['Contacts', APP_ROUTES.CONTACTS],
+  ['Calendar', APP_ROUTES.CALENDAR],
+  ['Tasks', APP_ROUTES.TASKS],
+] as const;
+
+const FORBIDDEN_PRIMARY_LABELS = [
+  'Search',
+  'Touring',
+  'Audience',
+  'Profiles',
+  'Releases',
+] as const;
+
+function primaryLinks(container: HTMLElement) {
+  const section = container.querySelector('[data-nav-section]');
+  expect(section).toBeInTheDocument();
+  return [...section!.querySelectorAll<HTMLAnchorElement>('a')];
+}
+
 describe('DashboardNav', () => {
   afterEach(() => {
     resetDashboardNavTestMocks();
   });
 
-  it('renders primary navigation items', () => {
-    const { getByRole, queryByRole } = renderDashboardNav({
+  it('renders the canonical six in exact order and no forbidden primary rows', () => {
+    const { container, getByRole, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { PROFILES_WORKSPACE: true },
     });
 
-    expect(getByRole('link', { name: 'New Chat' }).getAttribute('href')).toBe(
-      APP_ROUTES.CHAT
-    );
-    expect(getByRole('button', { name: 'Search' })).toBeDefined();
-    expect(getByRole('link', { name: 'Releases' }).getAttribute('href')).toBe(
-      buildLibraryViewRoute('releases')
-    );
-    expect(getByRole('link', { name: 'Profiles' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.PROFILES
-    );
-    expect(getByRole('link', { name: 'Touring' }).getAttribute('href')).toBe(
-      APP_ROUTES.TOUR_DATES
-    );
-    expect(getByRole('link', { name: 'Tasks' }).getAttribute('href')).toBe(
-      APP_ROUTES.TASKS
-    );
-    expect(getByRole('link', { name: 'Audience' })).toBeDefined();
-    expect(queryByRole('link', { name: 'Calendar' })).toBeNull();
-    expect(queryByRole('link', { name: 'Library' })).toBeNull();
-    expect(queryByRole('link', { name: 'Earnings' })).toBeNull();
-  });
-
-  it('renders Releases in the grouped shell top nav', () => {
-    const { getByRole } = renderDashboardNav({
-      renderFn: fastRender,
-      appFlags: { DESIGN_V1: true, PROFILES_WORKSPACE: true },
-    });
-
-    expect(getByRole('link', { name: 'Releases' }).getAttribute('href')).toBe(
-      buildLibraryViewRoute('releases')
-    );
-  });
-
-  it('shows Profiles only when its rollout flag is enabled', () => {
-    const disabled = renderDashboardNav({ renderFn: fastRender });
-    expect(disabled.queryByRole('link', { name: 'Profiles' })).toBeNull();
-    disabled.unmount();
-
-    const enabled = renderDashboardNav({
-      renderFn: fastRender,
-      appFlags: { PROFILES_WORKSPACE: true },
-    });
     expect(
-      enabled.getByRole('link', { name: 'Profiles' }).getAttribute('href')
-    ).toBe(APP_ROUTES.PROFILES);
+      primaryLinks(container).map(link => [
+        link.textContent?.trim(),
+        link.getAttribute('href'),
+      ])
+    ).toEqual(CANONICAL_NAV);
+
+    for (const label of FORBIDDEN_PRIMARY_LABELS) {
+      expect(queryByRole('link', { name: label })).toBeNull();
+      expect(queryByRole('button', { name: label })).toBeNull();
+    }
+
+    expect(getByRole('button', { name: 'Open Artist profile' })).toBeDefined();
+    expect(queryByRole('link', { name: 'Settings' })).toBeNull();
   });
 
-  it('renders artist work under the artist group in Design V1', () => {
-    const { getByRole, queryByRole } = renderDashboardNav({
+  it('keeps the canonical six visible when DESIGN_V1 is disabled', () => {
+    const { container } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: true, PROFILES_WORKSPACE: true },
+      appFlags: { DESIGN_V1: false },
+    });
+
+    expect(
+      primaryLinks(container).map(link => [
+        link.textContent?.trim(),
+        link.getAttribute('href'),
+      ])
+    ).toEqual(CANONICAL_NAV);
+  });
+
+  it('keeps the exact customer IA invariant for admin users', () => {
+    const standard = renderDashboardNav({ renderFn: fastRender });
+    const standardContract = primaryLinks(standard.container).map(link => [
+      link.textContent?.trim(),
+      link.getAttribute('href'),
+    ]);
+    standard.unmount();
+
+    const admin = renderDashboardNav({
+      renderFn: fastRender,
+      overrides: { isAdmin: true },
+    });
+
+    expect(
+      primaryLinks(admin.container).map(link => [
+        link.textContent?.trim(),
+        link.getAttribute('href'),
+      ])
+    ).toEqual(standardContract);
+    expect(admin.queryByRole('button', { name: 'Admin' })).toBeNull();
+    expect(admin.queryByRole('link', { name: 'People' })).toBeNull();
+  });
+
+  it('renders the artist row separately from primary navigation', () => {
+    const { container, getByRole } = renderDashboardNav({
+      renderFn: fastRender,
       overrides: {
         selectedProfile: {
           id: 'profile_123',
@@ -93,36 +115,41 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(getByRole('button', { name: 'Artist' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
+    const primarySection = container.querySelector('[data-nav-section]');
+    const artistSection = container.querySelector(
+      '[data-nav-section="artist"]'
     );
-    expect(getByRole('link', { name: 'Profiles' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.PROFILES
-    );
-    const releasesLink = getByRole('link', { name: 'Releases' });
-    expect(releasesLink.getAttribute('href')).toBe(
-      buildLibraryViewRoute('releases')
-    );
-    expect(releasesLink.className).toContain(
-      'grid-cols-[22px_minmax(0,1fr)_34px]'
-    );
-    expect(getByRole('link', { name: 'Touring' }).getAttribute('href')).toBe(
-      APP_ROUTES.TOUR_DATES
-    );
-    expect(queryByRole('link', { name: 'Calendar' })).toBeNull();
+    const artistButton = getByRole('button', {
+      name: 'Open Tim White profile',
+    });
+
+    expect(primarySection).not.toContainElement(artistButton);
+    expect(artistSection).toContainElement(artistButton);
+    expect(artistSection?.textContent).toContain('Tim White');
   });
 
-  it('applies active state to current page', () => {
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.LIBRARY);
-    const { getByRole } = renderDashboardNav({ renderFn: fastRender });
-
-    const activeLink = getByRole('link', { name: 'Releases' });
-    expect(activeLink.getAttribute('aria-current')).toBe('page');
+  it('applies active state to the canonical library route and legacy aliases', () => {
+    for (const route of [
+      APP_ROUTES.LIBRARY,
+      APP_ROUTES.DASHBOARD_LIBRARY,
+      APP_ROUTES.DASHBOARD_RELEASES,
+      APP_ROUTES.RELEASES,
+    ]) {
+      mockUsePathname.mockReturnValueOnce(route);
+      const view = renderDashboardNav({ renderFn: fastRender });
+      expect(view.getByRole('link', { name: 'Library' })).toHaveAttribute(
+        'aria-current',
+        'page'
+      );
+      expect(view.getByRole('link', { name: 'Library' })).toHaveAttribute(
+        'href',
+        APP_ROUTES.LIBRARY
+      );
+      view.unmount();
+    }
   });
 
-  it('composes one current New Chat nav link with matching page heading and title', async () => {
+  it('uses Chat as the nav label while preserving the New Chat page title', async () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.CHAT);
     const { generateMetadata } = await import('@/app/app/(shell)/chat/page');
     const metadata = await generateMetadata();
@@ -130,7 +157,6 @@ describe('DashboardNav', () => {
 
     const { container, getAllByRole, getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
       children: (
         <DashboardHeader
           breadcrumbs={[{ label: title, href: APP_ROUTES.CHAT }]}
@@ -139,7 +165,7 @@ describe('DashboardNav', () => {
     });
 
     expect(title).toBe('New Chat');
-    expect(getByRole('link', { name: title })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Chat' })).toHaveAttribute(
       'aria-current',
       'page'
     );
@@ -149,79 +175,25 @@ describe('DashboardNav', () => {
     expect(getAllByRole('heading', { name: title, level: 1 })).toHaveLength(1);
   });
 
-  it('keeps the legacy releases dashboard alias active', () => {
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD_RELEASES);
+  it('does not mark Chat active on a chat thread', () => {
+    mockUsePathname.mockReturnValueOnce(`${APP_ROUTES.CHAT}/thread-123`);
     const { getByRole } = renderDashboardNav({ renderFn: fastRender });
 
-    const releasesLink = getByRole('link', { name: 'Releases' });
-    expect(releasesLink.getAttribute('href')).toBe(
-      buildLibraryViewRoute('releases')
-    );
-    expect(releasesLink.getAttribute('aria-current')).toBe('page');
-  });
-
-  it('does not mark New Chat active on a chat thread', () => {
-    mockUsePathname.mockReturnValueOnce(`${APP_ROUTES.CHAT}/thread-123`);
-
-    const { getByRole } = renderDashboardNav({
-      renderFn: fastRender,
-      appFlags: { DESIGN_V1: true, PROFILES_WORKSPACE: true },
-    });
-
     expect(
-      getByRole('link', { name: 'New Chat' }).getAttribute('aria-current')
+      getByRole('link', { name: 'Chat' }).getAttribute('aria-current')
     ).toBeNull();
   });
 
-  it('keeps New Chat on the default shell tone when it is inactive', () => {
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.RELEASES);
-
+  it('keeps inactive Chat on the default shell tone', () => {
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.CALENDAR);
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
       appFlags: { DESIGN_V1: true },
     });
 
-    const newThreadLink = getByRole('link', { name: 'New Chat' });
-    expect(newThreadLink.className).toContain('text-sidebar-item-foreground');
-    expect(newThreadLink.className).not.toContain('text-sidebar-muted/80');
-    expect(newThreadLink.className).not.toContain(
-      'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)]'
-    );
-  });
-
-  it('renders one canonical New Chat nav row in Design V1', () => {
-    const { getAllByRole } = renderDashboardNav({
-      renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
-    });
-
-    expect(getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
-  });
-
-  it('opens the shared header search from Search instead of navigating', () => {
-    const onOpenSearch = vi.fn();
-    const onOpenPalette = vi.fn();
-    globalThis.addEventListener(OPEN_HEADER_SEARCH_EVENT, onOpenSearch);
-    globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpenPalette);
-
-    try {
-      const { getByRole, queryByRole } = renderDashboardNav({
-        renderFn: fastRender,
-        appFlags: { DESIGN_V1: true },
-      });
-
-      const searchButton = getByRole('button', { name: 'Search' });
-      expect(queryByRole('link', { name: 'Search' })).toBeNull();
-
-      fireEvent.click(searchButton);
-
-      expect(onOpenSearch).toHaveBeenCalledTimes(1);
-      expect(onOpenPalette).not.toHaveBeenCalled();
-      expect(mockRouterPush).not.toHaveBeenCalled();
-    } finally {
-      globalThis.removeEventListener(OPEN_HEADER_SEARCH_EVENT, onOpenSearch);
-      globalThis.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpenPalette);
-    }
+    const chatLink = getByRole('link', { name: 'Chat' });
+    expect(chatLink).toHaveClass('text-sidebar-item-foreground');
+    expect(chatLink).not.toHaveAttribute('aria-current');
   });
 
   it('maps real conversation metadata into unread and running thread rows', () => {
@@ -271,15 +243,15 @@ describe('DashboardNav', () => {
     expect(container.querySelector('.anim-calm-breath')).toBeTruthy();
   });
 
-  it('handles collapsed state', () => {
-    const { getByRole } = renderDashboardNav({
+  it('handles collapsed state without changing the canonical rows', () => {
+    const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
       sidebarProps: { defaultOpen: false },
       appFlags: { DESIGN_V1: true },
     });
 
-    const newThreadLink = getByRole('link', { name: 'New Chat' });
-    expect(newThreadLink.className).toContain(
+    expect(primaryLinks(container)).toHaveLength(6);
+    expect(getByRole('link', { name: 'Chat' }).className).toContain(
       'group-data-[collapsible=icon]:justify-center'
     );
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
@@ -288,87 +260,10 @@ describe('DashboardNav', () => {
     });
   });
 
-  it('renders the grouped top nav and artist group without a duplicate Settings row', () => {
-    const { getByRole, queryByRole } = renderDashboardNav({
-      renderFn: fastRender,
-      appFlags: { DESIGN_V1: true, PROFILES_WORKSPACE: true },
-    });
-
-    expect(getByRole('link', { name: 'New Chat' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.CHAT
-    );
-    expect(getByRole('link', { name: 'Releases' })).toHaveAttribute(
-      'href',
-      buildLibraryViewRoute('releases')
-    );
-    expect(getByRole('link', { name: 'Profiles' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.PROFILES
-    );
-    expect(getByRole('link', { name: 'Touring' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.TOUR_DATES
-    );
-    expect(getByRole('button', { name: 'Artist' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
-    );
-    expect(queryByRole('button', { name: 'More' })).toBeNull();
-    expect(queryByRole('link', { name: 'Settings' })).toBeNull();
-    expect(queryByRole('button', { name: 'Work' })).toBeNull();
-    expect(queryByRole('button', { name: 'Catalog' })).toBeNull();
-    expect(queryByRole('button', { name: 'Growth' })).toBeNull();
-  });
-
-  it('keeps admin routes out of artist navigation for admin users', () => {
-    const { queryByRole } = renderDashboardNav({
-      renderFn: fastRender,
-      overrides: { isAdmin: true },
-    });
-
-    expect(queryByRole('button', { name: 'Admin' })).toBeNull();
-    expect(queryByRole('link', { name: 'People' })).toBeNull();
-    expect(queryByRole('link', { name: 'Growth' })).toBeNull();
-    expect(queryByRole('link', { name: 'Activity' })).toBeNull();
-  });
-
-  it('renders with different pathname', () => {
-    mockUsePathname.mockReturnValueOnce('/app/audience');
-
-    const { getByRole } = renderDashboardNav({ renderFn: fastRender });
-
-    const audienceLink = getByRole('link', { name: 'Audience' });
-    expect(audienceLink.getAttribute('aria-current')).toBe('page');
-  });
-
-  it('highlights Releases when the legacy library route is current', () => {
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD_LIBRARY);
-
-    const { getByRole } = renderDashboardNav({
-      renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
-    });
-
-    expect(getByRole('link', { name: 'Releases' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
-  });
-
-  it('renders settings groups with canonical Account and Artist labels', () => {
+  it('renders settings groups only while inside Settings', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.SETTINGS_ACCOUNT);
-
     const { getAllByText, getByRole, queryByText } = renderDashboardNav({
       renderFn: fastRender,
-      overrides: {
-        selectedProfile: {
-          id: 'profile_123',
-          displayName: 'Tim White',
-          username: 'tim',
-          usernameNormalized: 'tim',
-        } as DashboardData['selectedProfile'],
-      },
     });
 
     expect(getAllByText('Account').length).toBeGreaterThan(0);
@@ -381,7 +276,6 @@ describe('DashboardNav', () => {
 
   it('disables task stats query on nested demo routes', () => {
     mockUsePathname.mockReturnValueOnce('/demo/showcase/settings');
-
     renderDashboardNav({
       renderFn: fastRender,
       overrides: {
@@ -400,7 +294,7 @@ describe('DashboardNav', () => {
     });
   });
 
-  it('renders the tasks badge when active task count is non-zero', () => {
+  it('renders stable task count geometry and accessible metadata', () => {
     mockUseTaskStatsQuery.mockReturnValueOnce({
       data: {
         backlog: 1,
@@ -412,9 +306,15 @@ describe('DashboardNav', () => {
       },
     });
 
-    const { getByText } = renderDashboardNav({ renderFn: fastRender });
+    const { getByRole, getByText } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { DESIGN_V1: true },
+    });
+    const tasksLink = getByRole('link', { name: 'Tasks 7 active tasks' });
 
-    expect(getByText('7')).toBeDefined();
+    expect(tasksLink).toHaveClass('grid-cols-[22px_minmax(0,1fr)_34px]');
+    expect(getByText('7')).toHaveAttribute('data-nav-badge', 'count');
+    expect(getByText('7')).toHaveAttribute('aria-label', '7 active tasks');
   });
 
   it('uses the new task count after Tasks has been opened', () => {
@@ -451,78 +351,34 @@ describe('DashboardNav', () => {
     });
   });
 
-  it('separates the Tasks label and count metadata into stable grid columns', () => {
-    mockUseTaskStatsQuery.mockReturnValueOnce({
-      data: {
-        backlog: 1,
-        todo: 2,
-        inProgress: 4,
-        done: 0,
-        cancelled: 0,
-        activeTodoCount: 7,
-      },
-    });
-
-    const { getByRole, getByText } = renderDashboardNav({
-      renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
-    });
-
-    const tasksLink = getByRole('link', { name: 'Tasks 7 active tasks' });
-    expect(tasksLink.className).toContain('h-7');
-    expect(tasksLink.className).toContain(
-      'grid-cols-[22px_minmax(0,1fr)_34px]'
-    );
-    expect(tasksLink.className).toContain('text-xs');
-    const taskBadge = getByText('7');
-    const taskLabel = tasksLink.children.item(1);
-    const taskMetadata = tasksLink.children.item(2);
-
-    expect(taskLabel).toHaveTextContent('Tasks');
-    expect(taskLabel).toHaveClass('justify-self-start');
-    expect(taskMetadata).toHaveClass('justify-self-end', 'shrink-0');
-    expect(taskMetadata).toContainElement(taskBadge);
-    expect(taskBadge).toHaveAttribute('data-nav-badge', 'count');
-    expect(taskBadge).toHaveAttribute('aria-label', '7 active tasks');
-  });
-
-  it('keeps the Tasks row geometry and accessible name stable without a badge', () => {
+  it('reserves task metadata geometry when no badge is present', () => {
     const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
       appFlags: { DESIGN_V1: true },
     });
 
-    const tasksLink = getByRole('link', { name: 'Tasks' });
-    expect(tasksLink).toHaveClass('grid-cols-[22px_minmax(0,1fr)_34px]');
-    expect(tasksLink).not.toHaveAttribute('aria-current');
+    expect(getByRole('link', { name: 'Tasks' })).toHaveClass(
+      'grid-cols-[22px_minmax(0,1fr)_34px]'
+    );
     expect(
       container.querySelector('[data-nav-badge="count"]')
     ).not.toBeInTheDocument();
   });
 
-  it('renders the Pro badge when tasks are locked', () => {
+  it('renders the Pro badge only after task entitlements resolve as locked', () => {
     mockUsePlanGate.mockReturnValueOnce({
       canAccessTasksWorkspace: false,
       isLoading: false,
     });
+    const locked = renderDashboardNav({ renderFn: fastRender });
+    expect(locked.getByText('Pro')).toHaveAttribute('data-nav-badge', 'pro');
+    locked.unmount();
 
-    const { getByText } = renderDashboardNav({ renderFn: fastRender });
-
-    expect(getByText('Pro')).toHaveAttribute('data-nav-badge', 'pro');
-    expect(mockUseTaskStatsQuery).toHaveBeenCalledWith('', {
-      enabled: false,
-      seenAt: null,
-    });
-  });
-
-  it('does not render the Pro badge while task entitlements are loading', () => {
     mockUsePlanGate.mockReturnValueOnce({
       canAccessTasksWorkspace: false,
       isLoading: true,
     });
-
-    const { queryByText } = renderDashboardNav({ renderFn: fastRender });
-
-    expect(queryByText('Pro')).toBeNull();
+    const loading = renderDashboardNav({ renderFn: fastRender });
+    expect(loading.queryByText('Pro')).toBeNull();
   });
 });
