@@ -1347,6 +1347,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       '- name: Verify production domains are on canonical Vercel project'
     );
     const runtimeKeys = [
+      'BETTER_AUTH_URL',
       'NEXT_PUBLIC_BETTER_AUTH_URL',
       'BETTER_AUTH_SECRET',
       'DATABASE_URL',
@@ -1375,8 +1376,18 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(stageStep).toContain(
       '--no-fallback -- env -u DOPPLER_TOKEN bash -c production_stage'
     );
-    expect(stageStep).toContain('--target=prd --source=env');
-    expect(stageStep).not.toContain('--target=prd --source=vercel-file');
+    expect(stageStep).toContain('scripts/reconcile-vercel-build-env.ts');
+    expect(stageStep).toContain('--target=prd --source=vercel-file');
+    expect(stageStep).toContain('--file=.vercel/.env.production.local');
+    expect(
+      stageStep.indexOf('vercel pull --yes --environment=production')
+    ).toBeLessThan(stageStep.indexOf('scripts/reconcile-vercel-build-env.ts'));
+    expect(
+      stageStep.indexOf('scripts/reconcile-vercel-build-env.ts')
+    ).toBeLessThan(stageStep.indexOf('--target=prd --source=vercel-file'));
+    expect(stageStep.indexOf('--target=prd --source=vercel-file')).toBeLessThan(
+      stageStep.indexOf('vercel build --prod')
+    );
     expect(stageStep).toContain('required_runtime_env=(');
     expect(stageStep).toContain('Missing production runtime env:');
     expect(stageStep).toContain('runtime_env_args+=(--env "$key")');
@@ -2972,8 +2983,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(deployIndex).toBeGreaterThan(buildIndex);
     expect(inspectIndex).toBeGreaterThan(deployIndex);
     expect(canaryIndex).toBeGreaterThan(inspectIndex);
-    expect(stageStep).toContain('--target=prd --source=env');
-    expect(stageStep).not.toContain('--target=prd --source=vercel-file');
+    expect(stageStep).toContain('scripts/reconcile-vercel-build-env.ts');
+    expect(stageStep).toContain('--target=prd --source=vercel-file');
     expect(stageStep).toContain('VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"');
     expect(stageStep).toContain('NEXT_PUBLIC_BUILD_SHA="$expected"');
     expect(stageStep).toContain('--meta "githubCommitSha=${EXPECTED_SHA}"');
