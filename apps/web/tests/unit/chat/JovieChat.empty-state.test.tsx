@@ -180,8 +180,13 @@ describe('JovieChat empty state', () => {
   });
 
   it('renders logo, composer, and prompt rail scaffolding when empty (JOV-3547)', () => {
-    const { getByTestId, queryByTestId, queryByText, getAllByLabelText } =
-      renderWithQueryClient(<JovieChat profileId='profile-1' />);
+    const {
+      container,
+      getByTestId,
+      queryByTestId,
+      queryByText,
+      getAllByLabelText,
+    } = renderWithQueryClient(<JovieChat profileId='profile-1' />);
 
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
     expect(queryByTestId('chat-empty-thread-ornament')).toBeNull();
@@ -201,9 +206,14 @@ describe('JovieChat empty state', () => {
     expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
-      'Ask Jovie...'
+      'Ask Jovie to plan your next release...'
     );
     expect(getByTestId('chat-input').getAttribute('data-variant')).toBe('hero');
+    const fileInput =
+      container.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(fileInput).not.toBeNull();
+    expect(fileInput).toHaveClass('hidden');
+    expect(fileInput).toHaveAttribute('tabindex', '-1');
     // ≥3 profile-aware starters (rail pills use aria-label = suggestion label).
     expect(getAllByLabelText(/Plan A Release/i).length).toBeGreaterThan(0);
     expect(getAllByLabelText(/Generate Album Art/i).length).toBeGreaterThan(0);
@@ -365,7 +375,7 @@ describe('JovieChat empty state', () => {
     expect(getAllByTestId('chat-message')).toHaveLength(2);
     expect(
       screen.getByTestId('chat-input').getAttribute('data-placeholder')
-    ).toBe('Ask Jovie...');
+    ).toBe('Ask Jovie to plan your next release...');
     expect(screen.getByTestId('chat-input').getAttribute('data-variant')).toBe(
       'compact'
     );
