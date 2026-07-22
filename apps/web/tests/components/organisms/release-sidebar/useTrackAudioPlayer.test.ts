@@ -302,6 +302,88 @@ describe('useTrackAudioPlayer', () => {
     expect(mockAudio.src).toBe('https://cdn.example.com/first.mp3');
   });
 
+  it('clears playback state on stop and stays inactive after remount', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const firstMount = renderHook(() => useTrackAudioPlayer());
+    const queue = [
+      {
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        releaseTitle: 'Test Album',
+        artistName: 'Test Artist',
+        artworkUrl: 'https://cdn.example.com/art.jpg',
+        hasLyrics: true,
+      },
+      {
+        id: 'track-2',
+        title: 'Next Song',
+        audioUrl: 'https://cdn.example.com/next.mp3',
+      },
+    ];
+
+    await act(async () => {
+      await firstMount.result.current.toggleTrack(queue[0], { queue });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      mockAudio.currentTime = 42;
+      mockAudio.duration = 180;
+      fireAudioEvent('play');
+      fireAudioEvent('loadedmetadata');
+      fireAudioEvent('timeupdate');
+    });
+
+    expect(firstMount.result.current.playbackState).toMatchObject({
+      activeTrackId: 'track-1',
+      isPlaying: true,
+      playbackStatus: 'playing',
+      currentTime: 42,
+      duration: 180,
+      trackTitle: 'Test Song',
+      releaseTitle: 'Test Album',
+      artistName: 'Test Artist',
+      artworkUrl: 'https://cdn.example.com/art.jpg',
+      hasLyrics: true,
+      queueLength: 2,
+      queueIndex: 0,
+      hasNext: true,
+      hasPrevious: false,
+    });
+
+    const pauseCallsBeforeStop = mockAudio.pause.mock.calls.length;
+    act(() => {
+      firstMount.result.current.stop();
+    });
+
+    expect(mockAudio.pause).toHaveBeenCalledTimes(pauseCallsBeforeStop + 1);
+    expect(mockAudio.src).toBe('');
+    expect(firstMount.result.current.playbackState).toEqual({
+      activeTrackId: null,
+      isPlaying: false,
+      playbackStatus: 'idle',
+      lastErrorReason: null,
+      currentTime: 0,
+      duration: 0,
+      trackTitle: null,
+      releaseTitle: null,
+      artistName: null,
+      artworkUrl: null,
+      hasLyrics: false,
+      queueLength: 0,
+      queueIndex: -1,
+      hasNext: false,
+      hasPrevious: false,
+    });
+
+    firstMount.unmount();
+    const remount = renderHook(() => useTrackAudioPlayer());
+
+    expect(remount.result.current.playbackState.activeTrackId).toBeNull();
+    expect(remount.result.current.playbackState.playbackStatus).toBe('idle');
+    expect(mockAudio.src).toBe('');
+  });
+
   it('resets state and notifies listeners when play() rejects', async () => {
     nextPlayMock = vi.fn().mockRejectedValue(new Error('Playback blocked'));
 
