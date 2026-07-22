@@ -1,0 +1,178 @@
+/*
+ * ArtistProfileOutcomesCarousel — System B colocated styles (JOV-4355).
+ *
+ * Effects utilities cannot express (exact rem radii, ch-max-widths, letter/
+ * line spacing, alpha shadows, backdrop tints) live here, scoped to the
+ * ap-outcomes tree. Tokens preferred over literals; color-mix(in oklab,
+ * <token> N%, transparent) replaces hard-coded rgba under the forced-dark
+ * marketing theme.
+ */
+
+/* ---------- Section surface ---------- */
+
+.ap-outcomes {
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 1%,
+    transparent
+  );
+}
+
+/* ---------- Rail controls ---------- */
+
+.ap-outcomes__nav-btn {
+  border: 1px solid
+    color-mix(in oklab, var(--color-text-primary-token) 10%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--system-b-cinematic-black) 62%,
+    transparent
+  );
+  color: var(--color-text-primary-token);
+  box-shadow: 0 18px 44px
+    color-mix(in oklab, var(--system-b-cinematic-black) 28%, transparent);
+}
+
+.ap-outcomes__nav-btn:hover {
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-primary-token);
+}
+
+.ap-outcomes__nav-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--system-b-cinematic-black),
+    0 0 0 4px
+    color-mix(in oklab, var(--color-text-primary-token) 30%, transparent);
+}
+
+.ap-outcomes__rail-btn {
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-cinematic-black) 12%, transparent);
+  color: var(--color-text-primary-token);
+  box-shadow: 0 18px 42px
+    color-mix(in oklab, var(--system-b-cinematic-black) 16%, transparent);
+}
+
+.ap-outcomes__rail-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 18px 42px
+    color-mix(in oklab, var(--system-b-cinematic-black) 16%, transparent),
+    0 0 0 2px
+    color-mix(in oklab, var(--system-b-cinematic-black) 15%, transparent);
+}
+
+/* ---------- Outcome card ---------- */
+
+.ap-outcomes__card {
+  box-shadow: var(--shadow-lg);
+}
+
+.ap-outcomes__card-title {
+  max-width: 12ch;
+}
+
+.ap-outcomes__card-body {
+  max-width: 38ch;
+}
+
+/* ---------- Proof drawers ---------- */
+
+.ap-outcomes__drawer {
+  border-radius: 1.08rem;
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 2%,
+    transparent
+  );
+  box-shadow: inset 0 1px 0
+    color-mix(in oklab, var(--color-text-primary-token) 4%, transparent);
+}
+
+.ap-outcomes__drawer-title {
+  letter-spacing: -0.02em;
+}
+
+.ap-outcomes__drawer-label {
+  letter-spacing: -0.01em;
+}
+
+.ap-outcomes__drawer-subtitle {
+  letter-spacing: -0.03em;
+}
+
+.ap-outcomes__tour-month {
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.ap-outcomes__tour-day {
+  letter-spacing: -0.04em;
+}
+
+.ap-outcomes__amount {
+  border-radius: 0.82rem;
+  border: 1px solid
+    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 3%,
+    transparent
+  );
+  color: var(--color-text-primary-token);
+}
+
+.ap-outcomes__amount--featured {
+  border-color: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 18%,
+    transparent
+  );
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-primary-token);
+}
+
+.ap-outcomes__amount-value {
+  letter-spacing: -0.02em;
+}
+
+.ap-outcomes__shot {
+  border-radius: 1.08rem;
+  box-shadow: 0 14px 32px
+    color-mix(in oklab, var(--system-b-cinematic-black) 22%, transparent);
+}
+
+/* ---------- Share-anywhere QR card ---------- */
+
+.ap-outcomes__qr-card {
+  border-radius: 1.2rem;
+  box-shadow: 0 16px 32px
+    color-mix(in oklab, var(--system-b-cinematic-black) 14%, transparent);
+}
+
+.ap-outcomes__qr-title {
+  letter-spacing: 0.02em;
+}
+
+.ap-outcomes__qr-frame {
+  /* QR ink and paper are protocol colors, not theme colors. Keeping them
+     local prevents dark mode from reducing the code's contrast or changing
+     its meaning. */
+  --qr-preview-ink: #000;
+  --qr-preview-paper: #fff;
+  background: var(--qr-preview-paper);
+  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.06);
+}
+
+.ap-outcomes__qr-cell--filled {
+  background: var(--qr-preview-ink);
+}
+
+.ap-outcomes__qr-cell--empty {
+  background: var(--qr-preview-paper);
+}
+
+.ap-outcomes__qr-url {
+  letter-spacing: -0.02em;
+}

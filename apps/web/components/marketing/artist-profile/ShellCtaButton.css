@@ -1,0 +1,34 @@
+/*
+ * Artist-profile shell CTA button (System B).
+ *
+ * Only the on-dark tones live here: literal white/black fills, white-alpha
+ * borders, and the inset highlight are not expressible with surface tokens
+ * on a cinematic dark surface. The auto tones stay on token utilities in
+ * ShellCtaButton.tsx. Neutral surfaces only — no accent-filled CTAs.
+ *
+ * Scoped to the `ap-shell-cta` prefix.
+ */
+
+.ap-shell-cta {
+  letter-spacing: -0.011em;
+}
+
+.ap-shell-cta--primary-on-dark {
+  background-color: #fff;
+  color: var(--system-b-cinematic-black);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, #fff 6%, transparent);
+}
+
+.ap-shell-cta--primary-on-dark:hover {
+  background-color: color-mix(in oklab, #fff 90%, transparent);
+}
+
+.ap-shell-cta--secondary-on-dark {
+  border: 1px solid color-mix(in oklab, #fff 12%, transparent);
+  background-color: color-mix(in oklab, #fff 4%, transparent);
+  color: #fff;
+}
+
+.ap-shell-cta--secondary-on-dark:hover {
+  background-color: color-mix(in oklab, #fff 8%, transparent);
+}

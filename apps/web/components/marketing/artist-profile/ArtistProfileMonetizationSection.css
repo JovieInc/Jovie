@@ -1,0 +1,248 @@
+/*
+ * ArtistProfileMonetizationSection — System B colocated styles (JOV-4355).
+ *
+ * Effects utilities cannot express (exact rem radii and type sizes, the
+ * carousel's content-aligned gutter math, gradient sheens, alpha shadows)
+ * live here, scoped to the ap-monetization tree. Tokens preferred over
+ * literals; color-mix(in oklab, <token> N%, transparent) replaces hard-coded
+ * rgba under the forced-dark marketing theme.
+ *
+ * The carousel gutter previously referenced --linear-content-max (1200px =
+ * 75rem). The value is kept EXACTLY as 75rem so scroll padding and control
+ * positions do not shift; it is no longer read from the retired System A var.
+ */
+
+/* ---------- Content-aligned header + carousel gutter ---------- */
+
+.ap-monetization__header {
+  max-width: 75rem;
+}
+
+.ap-monetization__scroller {
+  --ap-monetization-content-max: 75rem;
+}
+
+@media (min-width: 640px) {
+  .ap-monetization__scroller {
+    padding-left: max(
+      1.5rem,
+      calc((100vw - var(--ap-monetization-content-max)) / 2 + 1.5rem)
+    );
+    padding-right: 10vw;
+    scroll-padding-left: max(
+      1.5rem,
+      calc((100vw - var(--ap-monetization-content-max)) / 2 + 1.5rem)
+    );
+  }
+}
+
+@media (min-width: 1024px) {
+  .ap-monetization__scroller {
+    padding-left: max(
+      1.5rem,
+      calc((100vw - var(--ap-monetization-content-max)) / 2)
+    );
+    padding-right: 12vw;
+    scroll-padding-left: max(
+      1.5rem,
+      calc((100vw - var(--ap-monetization-content-max)) / 2)
+    );
+  }
+}
+
+/* ---------- Rail controls ---------- */
+
+.ap-monetization__skip:focus {
+  left: max(
+    1.25rem,
+    calc((100vw - var(--ap-monetization-content-max, 75rem)) / 2 + 1.25rem)
+  );
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-cinematic-black) 12%, transparent);
+  border-radius: 9999px;
+  background: var(--color-cell-hover);
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary-token);
+  box-shadow: 0 18px 42px
+    color-mix(in oklab, var(--system-b-cinematic-black) 16%, transparent);
+}
+
+.ap-monetization__skip:focus-visible {
+  outline: none;
+  box-shadow:
+    0 18px 42px
+    color-mix(in oklab, var(--system-b-cinematic-black) 16%, transparent),
+    0 0 0 2px
+    color-mix(in oklab, var(--system-b-cinematic-black) 15%, transparent);
+}
+
+.ap-monetization__nav {
+  right: max(
+    1.25rem,
+    calc((100vw - var(--ap-monetization-content-max, 75rem)) / 2 + 1.25rem)
+  );
+}
+
+.ap-monetization__nav-btn {
+  border: 1px solid
+    color-mix(in oklab, var(--color-text-primary-token) 10%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--system-b-cinematic-black) 62%,
+    transparent
+  );
+  color: var(--color-text-primary-token);
+  box-shadow: 0 18px 44px
+    color-mix(in oklab, var(--system-b-cinematic-black) 28%, transparent);
+}
+
+.ap-monetization__nav-btn:hover:not(:disabled) {
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-primary-token);
+}
+
+/* ---------- Monetization card ---------- */
+
+/* Pure-black card on the cinematic page surface: #000 keeps the card darker
+   than the surrounding var(--color-bg-base), so it stays a literal. */
+.ap-monetization__card {
+  border-radius: 1.45rem;
+  background: #000;
+  color: var(--color-text-primary-token);
+  box-shadow: 0 22px 64px
+    color-mix(in oklab, var(--system-b-cinematic-black) 26%, transparent);
+}
+
+.ap-monetization__card-sheen {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 6rem;
+  border-radius: 1.45rem 1.45rem 0 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-text-primary-token) 70%, transparent),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.ap-monetization__card-title {
+  font-size: 1.4rem;
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+}
+
+.ap-monetization__card-body {
+  line-height: 1.58;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- IRL payments visual ---------- */
+
+.ap-monetization__pay-shot {
+  border-radius: 1.45rem 1.45rem 0 0;
+  box-shadow: 0 -20px 48px
+    color-mix(in oklab, var(--system-b-cinematic-black) 24%, transparent);
+}
+
+.ap-monetization__pay-shot-scrim {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 3rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--system-b-cinematic-black) 6%, transparent),
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* ---------- Capture fan visual ---------- */
+
+.ap-monetization__fan-card {
+  border-radius: 1.15rem;
+  box-shadow: 0 20px 40px
+    color-mix(in oklab, var(--system-b-cinematic-black) 18%, transparent);
+}
+
+.ap-monetization__fan-name {
+  letter-spacing: -0.03em;
+}
+
+.ap-monetization__fan-intent {
+  border-radius: 0.95rem;
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 6%,
+    transparent
+  );
+  letter-spacing: -0.02em;
+}
+
+.ap-monetization__fan-pill {
+  border: 1px solid
+    color-mix(in oklab, var(--color-text-primary-token) 10%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 4%,
+    transparent
+  );
+}
+
+/* ---------- Say thanks visual ---------- */
+
+.ap-monetization__thanks-card {
+  border-radius: 1.1rem;
+  box-shadow: 0 18px 34px
+    color-mix(in oklab, var(--system-b-cinematic-black) 16%, transparent);
+}
+
+.ap-monetization__thanks-icon {
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 8%,
+    transparent
+  );
+}
+
+.ap-monetization__thanks-app {
+  letter-spacing: -0.02em;
+}
+
+.ap-monetization__thanks-title {
+  line-height: 1.28;
+  letter-spacing: -0.03em;
+}
+
+.ap-monetization__thanks-preview {
+  line-height: 1.45;
+}
+
+/* ---------- Re-engage visual ---------- */
+
+.ap-monetization__output {
+  box-shadow: 0 14px 30px
+    color-mix(in oklab, var(--system-b-cinematic-black) 18%, transparent);
+}
+
+.ap-monetization__output-icon {
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 8%,
+    transparent
+  );
+}
+
+.ap-monetization__output-title {
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+
+.ap-monetization__output-detail {
+  line-height: 1.45;
+}

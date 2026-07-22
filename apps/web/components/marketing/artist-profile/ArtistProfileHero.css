@@ -1,0 +1,46 @@
+/*
+ * Artist-profile hero (System B).
+ *
+ * Cinematic dark surface and fluid display type for the /artist-profile
+ * hero. Only effects Tailwind utilities cannot express live here (svh
+ * minimums, the public-shell header offset, clamp() type sizes, exact
+ * tracking/leading); everything else stays on token utilities in the TSX.
+ *
+ * Scoped to the `ap-hero` prefix.
+ */
+
+.ap-hero {
+  background-color: var(--system-b-cinematic-black);
+}
+
+.ap-hero__inner {
+  min-height: 72svh;
+  padding-top: calc(var(--public-shell-header-offset) + 4rem);
+}
+
+@media (min-width: 40rem) {
+  .ap-hero__inner {
+    min-height: 76svh;
+  }
+}
+
+@media (min-width: 64rem) {
+  .ap-hero__inner {
+    min-height: 80svh;
+  }
+}
+
+.ap-hero__title {
+  max-width: 11ch;
+  font-size: clamp(3.125rem, 7.15vw, 5.625rem);
+  font-weight: 660;
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+}
+
+.ap-hero__subhead {
+  max-width: 37rem;
+  font-size: clamp(1rem, 1.65vw, 1.18rem);
+  line-height: 1.58;
+  letter-spacing: -0.02em;
+}
