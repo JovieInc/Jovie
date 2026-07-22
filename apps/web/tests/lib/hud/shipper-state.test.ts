@@ -1,9 +1,9 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-const hermesDir = join(homedir(), '.hermes');
+const testHome = `/tmp/jovie-hud-shipper-state-${process.pid}`;
+const hermesDir = join(testHome, '.hermes');
 const stateDir = join(hermesDir, 'state');
 const logsDir = join(hermesDir, 'logs');
 const jobsLogPath = join(logsDir, 'jobs.jsonl');
@@ -14,8 +14,13 @@ function writeJsonl(path: string, rows: readonly object[]): void {
   writeFileSync(path, rows.map(row => JSON.stringify(row)).join('\n'));
 }
 
+afterAll(() => {
+  rmSync(testHome, { recursive: true, force: true });
+});
+
 describe('getHudShipperStatus', () => {
   beforeEach(() => {
+    rmSync(testHome, { recursive: true, force: true });
     mkdirSync(stateDir, { recursive: true });
     mkdirSync(logsDir, { recursive: true });
   });
@@ -55,7 +60,7 @@ describe('getHudShipperStatus', () => {
     );
 
     const { getHudShipperStatus } = await import('@/lib/hud/shipper-state');
-    const payload = getHudShipperStatus();
+    const payload = getHudShipperStatus(hermesDir);
 
     expect(payload.availability).toBe('available');
     expect(payload.dispatchableCount).toBe(4);
@@ -67,6 +72,7 @@ describe('getHudShipperStatus', () => {
 
 describe('getHudWhatShipped', () => {
   beforeEach(() => {
+    rmSync(testHome, { recursive: true, force: true });
     mkdirSync(stateDir, { recursive: true });
   });
 
@@ -85,7 +91,7 @@ describe('getHudWhatShipped', () => {
     );
 
     const { getHudWhatShipped } = await import('@/lib/hud/shipper-state');
-    const payload = getHudWhatShipped();
+    const payload = getHudWhatShipped(hermesDir);
 
     expect(payload.availability).toBe('available');
     expect(payload.entries).toHaveLength(1);

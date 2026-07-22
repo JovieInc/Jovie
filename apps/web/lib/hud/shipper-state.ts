@@ -13,27 +13,6 @@ import type {
 } from '@/types/hud-shipper';
 
 const SHIPPER_JOB = 'codex-issue-shipper';
-const JOBS_LOG_PATH = join(homedir(), '.hermes', 'logs', 'jobs.jsonl');
-const PAUSE_SENTINEL_PATH = join(homedir(), '.hermes', 'shipping-paused');
-const INFLIGHT_JOURNAL_PATH = join(
-  homedir(),
-  '.hermes',
-  'state',
-  'inflight-ship-jobs.json'
-);
-const WHAT_SHIPPED_PATH = join(
-  homedir(),
-  '.hermes',
-  'state',
-  'what_shipped.json'
-);
-const SHIPPER_ERR_LOG_PATH = join(
-  homedir(),
-  '.hermes',
-  'logs',
-  'launchd',
-  'cron-codex-issue-shipper.err.log'
-);
 
 interface ShipperLogEvent {
   readonly job?: string;
@@ -48,8 +27,8 @@ interface ShipperLogEvent {
   readonly error?: string;
 }
 
-function hermesStateAvailable(): boolean {
-  return existsSync(join(homedir(), '.hermes'));
+function hermesStateAvailable(hermesRoot: string): boolean {
+  return existsSync(hermesRoot);
 }
 
 function tailLines(path: string, maxLines: number): string[] {
@@ -81,10 +60,10 @@ function parseShipperEvents(lines: readonly string[]): ShipperLogEvent[] {
   return events;
 }
 
-function readInflightJobs(): HudInflightJob[] {
-  if (!existsSync(INFLIGHT_JOURNAL_PATH)) return [];
+function readInflightJobs(inflightJournalPath: string): HudInflightJob[] {
+  if (!existsSync(inflightJournalPath)) return [];
   try {
-    const parsed = JSON.parse(readFileSync(INFLIGHT_JOURNAL_PATH, 'utf8'));
+    const parsed = JSON.parse(readFileSync(inflightJournalPath, 'utf8'));
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (entry): entry is HudInflightJob =>
@@ -140,15 +119,30 @@ function formatAgentLabel(
   return plans.map(plan => `#${plan.issue} → ${plan.branch}`);
 }
 
-function readRecentErrors(): string[] {
-  const lines = tailLines(SHIPPER_ERR_LOG_PATH, 40);
+function readRecentErrors(shipperErrorLogPath: string): string[] {
+  const lines = tailLines(shipperErrorLogPath, 40);
   return lines.slice(-5);
 }
 
-export function getHudShipperStatus(): HudShipperStatusPayload {
+export function getHudShipperStatus(
+  hermesRoot = join(homedir(), '.hermes')
+): HudShipperStatusPayload {
   const generatedAtIso = new Date().toISOString();
+  const jobsLogPath = join(hermesRoot, 'logs', 'jobs.jsonl');
+  const pauseSentinelPath = join(hermesRoot, 'shipping-paused');
+  const inflightJournalPath = join(
+    hermesRoot,
+    'state',
+    'inflight-ship-jobs.json'
+  );
+  const shipperErrorLogPath = join(
+    hermesRoot,
+    'logs',
+    'launchd',
+    'cron-codex-issue-shipper.err.log'
+  );
 
-  if (!hermesStateAvailable()) {
+  if (!hermesStateAvailable(hermesRoot)) {
     return {
       availability: 'unavailable',
       state: 'not_running',
@@ -167,9 +161,9 @@ export function getHudShipperStatus(): HudShipperStatusPayload {
     };
   }
 
-  const events = parseShipperEvents(tailLines(JOBS_LOG_PATH, 200));
-  const isPaused = existsSync(PAUSE_SENTINEL_PATH);
-  const inFlightJobs = readInflightJobs();
+  const events = parseShipperEvents(tailLines(jobsLogPath, 200));
+  const isPaused = existsSync(pauseSentinelPath);
+  const inFlightJobs = readInflightJobs(inflightJournalPath);
   const lastFinish = [...events]
     .reverse()
     .find(event => event.event === 'finish');
@@ -226,7 +220,7 @@ export function getHudShipperStatus(): HudShipperStatusPayload {
       ? formatAgentLabel(lastPlanned.plans)
       : [],
     lastError: lastFatal?.error ?? null,
-    recentErrors: readRecentErrors(),
+    recentErrors: readRecentErrors(shipperErrorLogPath),
     capacity: lastScanned?.capacity ?? null,
     generatedAtIso,
   };
@@ -263,10 +257,13 @@ function normalizeWhatShippedEntry(value: unknown): HudWhatShippedEntry | null {
   };
 }
 
-export function getHudWhatShipped(): HudWhatShippedPayload {
+export function getHudWhatShipped(
+  hermesRoot = join(homedir(), '.hermes')
+): HudWhatShippedPayload {
   const generatedAtIso = new Date().toISOString();
+  const whatShippedPath = join(hermesRoot, 'state', 'what_shipped.json');
 
-  if (!existsSync(WHAT_SHIPPED_PATH)) {
+  if (!existsSync(whatShippedPath)) {
     return {
       availability: 'unavailable',
       entries: [],
@@ -275,7 +272,7 @@ export function getHudWhatShipped(): HudWhatShippedPayload {
   }
 
   try {
-    const parsed = JSON.parse(readFileSync(WHAT_SHIPPED_PATH, 'utf8'));
+    const parsed = JSON.parse(readFileSync(whatShippedPath, 'utf8'));
     const rawEntries = Array.isArray(parsed)
       ? parsed
       : Array.isArray((parsed as { entries?: unknown }).entries)
