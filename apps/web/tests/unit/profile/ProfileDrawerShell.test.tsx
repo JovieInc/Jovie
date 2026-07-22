@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { cloneElement, isValidElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
+
+const DRAWER_EXIT_DURATION_MS = 420;
 
 vi.mock('vaul', () => ({
   Drawer: {
@@ -194,6 +196,30 @@ describe('ProfileDrawerShell', () => {
     );
   });
 
+  it('shrink-wraps short menus when content height mode is requested', () => {
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='Menu'
+        heightMode='content'
+        dataTestId='content-drawer'
+      >
+        <div data-testid='content-drawer-body'>Three actions</div>
+      </ProfileDrawerShell>
+    );
+
+    const dialog = screen.getByTestId('content-drawer');
+    const body = screen.getByTestId('content-drawer-body').parentElement;
+    expect(dialog).toHaveAttribute('data-height-mode', 'content');
+    expect(body?.className).toContain(
+      'max-h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))]'
+    );
+    expect(body?.className).not.toMatch(
+      /(?:^|\s)h-\[calc\(var\(--profile-drawer-height-max\)/
+    );
+  });
+
   // Regression: tapping the overlay must dismiss the standalone (vaul) drawer.
   // Mobile Safari does not reliably trigger Radix's onPointerDownOutside on
   // single-finger taps, so the shell adds an explicit onClick on Drawer.Overlay.
@@ -209,6 +235,24 @@ describe('ProfileDrawerShell', () => {
     fireEvent.click(screen.getByTestId('profile-drawer-overlay'));
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('uses cinematic sheet motion and disables it for reduced motion', () => {
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='Menu'
+        dataTestId='motion-drawer'
+      >
+        <div>Drawer body</div>
+      </ProfileDrawerShell>
+    );
+
+    const dialog = screen.getByTestId('motion-drawer');
+    expect(dialog.className).toContain('duration-cinematic');
+    expect(dialog.className).toContain('ease-cinematic');
+    expect(dialog.className).toContain('motion-reduce:transition-none');
   });
 
   it('anchors embedded drawers flush to the phone shell instead of floating them', () => {
@@ -227,5 +271,78 @@ describe('ProfileDrawerShell', () => {
     const dialog = screen.getByTestId('embedded-drawer');
     expect(dialog.className).toContain('inset-x-0');
     expect(dialog.className).toContain('bottom-0');
+  });
+
+  it('retains embedded drawers for the cinematic exit before unmounting', () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='Contact'
+        presentation='embedded'
+        dataTestId='embedded-drawer'
+      >
+        <div>Drawer body</div>
+      </ProfileDrawerShell>
+    );
+
+    rerender(
+      <ProfileDrawerShell
+        open={false}
+        onOpenChange={vi.fn()}
+        title='Contact'
+        presentation='embedded'
+        dataTestId='embedded-drawer'
+      >
+        <div>Drawer body</div>
+      </ProfileDrawerShell>
+    );
+
+    expect(screen.getByTestId('embedded-drawer')).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(DRAWER_EXIT_DURATION_MS);
+    });
+
+    expect(screen.queryByTestId('embedded-drawer')).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('unmounts manual drawers immediately when reduced motion is requested', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })
+    );
+    const { rerender } = render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='Contact'
+        presentation='embedded'
+        dataTestId='reduced-motion-drawer'
+      >
+        <div>Drawer body</div>
+      </ProfileDrawerShell>
+    );
+
+    rerender(
+      <ProfileDrawerShell
+        open={false}
+        onOpenChange={vi.fn()}
+        title='Contact'
+        presentation='embedded'
+        dataTestId='reduced-motion-drawer'
+      >
+        <div>Drawer body</div>
+      </ProfileDrawerShell>
+    );
+
+    expect(screen.queryByTestId('reduced-motion-drawer')).toBeNull();
+    vi.unstubAllGlobals();
   });
 });

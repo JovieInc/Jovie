@@ -3,15 +3,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EntityCardModel } from '@/components/organisms/entity-card/types';
 import { ReleaseCatalogCarousel } from '@/features/profile/ReleaseCatalogCarousel';
 
-const { trackMock } = vi.hoisted(() => ({
-  trackMock: vi.fn(),
-}));
+const { trackMock, intersectionThresholds, intersectionRatio } = vi.hoisted(
+  () => ({
+    trackMock: vi.fn(),
+    intersectionThresholds: [] as Array<number | number[] | undefined>,
+    intersectionRatio: { current: 1 },
+  })
+);
 
 class MockIntersectionObserver {
   private readonly callback: IntersectionObserverCallback;
 
-  constructor(callback: IntersectionObserverCallback) {
+  constructor(
+    callback: IntersectionObserverCallback,
+    options?: IntersectionObserverInit
+  ) {
     this.callback = callback;
+    intersectionThresholds.push(options?.threshold);
   }
 
   observe(target: Element) {
@@ -19,6 +27,7 @@ class MockIntersectionObserver {
       [
         {
           isIntersecting: true,
+          intersectionRatio: intersectionRatio.current,
           target,
         } as IntersectionObserverEntry,
       ],
@@ -106,6 +115,8 @@ const playlistFallback: EntityCardModel = {
 describe('ReleaseCatalogCarousel', () => {
   beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
+    intersectionThresholds.length = 0;
+    intersectionRatio.current = 1;
   });
 
   afterEach(() => {
@@ -140,6 +151,58 @@ describe('ReleaseCatalogCarousel', () => {
         is_featured: false,
       })
     );
+    expect(intersectionThresholds).toContain(0.5);
+  });
+
+  it('waits for half the card to be visible before recording an impression', () => {
+    intersectionRatio.current = 0.49;
+
+    render(
+      <ReleaseCatalogCarousel
+        items={[featuredRelease]}
+        artistHandle='tim'
+        artistId='artist-1'
+      />
+    );
+
+    expect(trackMock).not.toHaveBeenCalled();
+    expect(
+      screen
+        .getByTestId('profile-home-carousel')
+        .querySelector('[data-carousel-index="0"]')
+    ).toHaveAttribute('data-edge', 'true');
+  });
+
+  it('uses the profile landscape rail without changing release analytics geometry', () => {
+    render(
+      <ReleaseCatalogCarousel
+        items={[featuredRelease, catalogRelease]}
+        artistHandle='tim'
+        artistId='artist-1'
+      />
+    );
+
+    const carousel = screen.getByTestId('profile-home-carousel');
+    expect(carousel).toHaveAttribute('data-layout', 'profile-landscape');
+    expect(carousel.className).toContain('snap-mandatory');
+
+    const footprints = [...carousel.querySelectorAll(':scope > li')];
+    expect(footprints).toHaveLength(2);
+    expect(
+      footprints.every(
+        footprint =>
+          footprint.className.includes('w-full') &&
+          footprint.className.includes('snap-always')
+      )
+    ).toBe(true);
+
+    const artwork = screen.getByRole('img', {
+      name: 'The Deep End artwork',
+    });
+    expect(artwork.parentElement?.className).toContain('aspect-square');
+    expect(artwork.parentElement?.className).toMatch(/(?:^|\s)rounded(?:\s|$)/);
+    expect(artwork.parentElement?.className).not.toContain('border-r');
+    expect(screen.getAllByText('Listen')[0]?.className).toContain('h-8');
   });
 
   it('tracks listen CTA clicks with release context', () => {

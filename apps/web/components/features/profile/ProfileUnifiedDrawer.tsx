@@ -358,14 +358,12 @@ export function ProfileUnifiedDrawer({
       navigationLevel={isSubView ? 'secondary' : 'root'}
       dataTestId='profile-menu-drawer'
       presentation={presentation}
+      heightMode={renderedView === 'menu' ? 'content' : 'bounded'}
     >
       <AnimatePresence mode='wait' initial={false}>
         <motion.div
           key={renderedView}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.12, ease: 'linear' }}
+          className='animate-in fade-in duration-subtle ease-subtle motion-reduce:animate-none'
         >
           {renderedView === 'menu' && (
             <MenuView

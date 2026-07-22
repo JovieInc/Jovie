@@ -148,7 +148,7 @@ describe('ProfileHomeRail', () => {
     expect(screen.getAllByText('Never Say A Word')).toHaveLength(1);
   });
 
-  it('renders the alerts card as a standard unified-anatomy card (no gradient)', () => {
+  it('renders the alerts card as a full-content landscape card (no media placeholder)', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
@@ -163,14 +163,14 @@ describe('ProfileHomeRail', () => {
     );
 
     const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
-    // Standard card: pearl surface, no accent gradient, unified anatomy
-    // (square icon art zone + full-width "Get Updates" CTA).
+    // Standard card: pearl surface, no accent gradient or decorative media
+    // placeholder. The compact CTA stays within the full content area.
     expect(alertsCard.style.background).toBe('');
     expect(alertsCard.className).toContain('bg-(--profile-pearl-bg)');
     expect(alertsCard).toHaveTextContent('Alerts');
     const cta = screen.getByText('Get Updates');
-    expect(cta.className).toContain('h-9');
-    expect(cta.className).toContain('w-full');
+    expect(cta.className).toContain('h-8');
+    expect(cta.className).toContain('w-auto');
   });
 
   it('keeps the carousel shell with PAC and alerts cards even when the catalog is empty', () => {
@@ -190,9 +190,9 @@ describe('ProfileHomeRail', () => {
     const carousel = screen.getByTestId('profile-home-carousel');
     const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
     expect(alertsCard).toBeInTheDocument();
-    // The alerts card shares the unified entity-card anatomy (full-bleed
-    // square art zone, full-width CTA).
+    // Non-media cards use the complete content footprint.
     expect(alertsCard.className).toContain('p-0');
+    expect(alertsCard.querySelector('img')).toBeNull();
     expect(screen.getByText('Get Updates')).toBeInTheDocument();
     // No entity items → the carousel still hosts the slot cards.
     expect(carousel.querySelectorAll(':scope > li').length).toBeGreaterThan(0);

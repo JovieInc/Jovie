@@ -127,7 +127,7 @@ function HomeAlertsCard({
       model={model}
       treatment='detailed'
       surface='pearl'
-      anatomy='unified'
+      anatomy='profile-landscape'
       className='h-full w-full overflow-hidden'
       dataTestId='profile-home-alerts-fallback-card'
       onClick={handleClick}
@@ -206,7 +206,10 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     viewerLocation === undefined &&
     upcomingTourDates.length > 0 &&
     !releaseVisibility?.show;
-  const { location } = useUserLocation({ enabled: shouldResolveGeo });
+  const { location } = useUserLocation({
+    enabled: shouldResolveGeo,
+    permissionMode: 'granted-only',
+  });
   const effectiveLocation = viewerLocation ?? location;
   const { nearbyDates } = useTourDateProximity(
     upcomingTourDates,
@@ -362,7 +365,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   return (
     <div
       ref={exposureRef}
-      className='flex min-h-0 min-w-0 flex-1 flex-col md:mx-auto md:w-full md:max-w-80'
+      className='flex min-h-0 min-w-0 flex-1 flex-col md:mx-auto md:w-full'
       data-testid='profile-home-rail'
     >
       <ReleaseCatalogCarousel
@@ -380,6 +383,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
             assignment={profilePacAssignment}
             isSubscribed={isSubscribed}
             renderMode={renderMode}
+            layout='profile-landscape'
           />
         }
         trailing={alertsCard}

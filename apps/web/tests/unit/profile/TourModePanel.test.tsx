@@ -4,10 +4,13 @@ import { TourModePanel } from '@/features/profile/TourModePanel';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 
-const { replaceMock, ticketClickMock } = vi.hoisted(() => ({
-  replaceMock: vi.fn(),
-  ticketClickMock: vi.fn(),
-}));
+const { replaceMock, ticketClickMock, useUserLocationMock } = vi.hoisted(
+  () => ({
+    replaceMock: vi.fn(),
+    ticketClickMock: vi.fn(),
+    useUserLocationMock: vi.fn(),
+  })
+);
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: replaceMock }),
@@ -25,7 +28,10 @@ const locationMock = vi.hoisted(() => ({
 }));
 
 vi.mock('@/hooks/useUserLocation', () => ({
-  useUserLocation: () => locationMock,
+  useUserLocation: (options: unknown) => {
+    useUserLocationMock(options);
+    return locationMock;
+  },
 }));
 
 vi.mock('@/hooks/useTourDateTicketClick', () => ({
@@ -145,18 +151,29 @@ describe('TourModePanel', () => {
     );
   });
 
-  it('renders the events empty state with the standard surface-1 card treatment', () => {
+  it('renders the events empty state directly without a nested card', () => {
     render(<TourModePanel artist={artist} tourDates={[]} />);
 
     expect(
       screen.getByTestId('profile-primary-tab-events-empty')
     ).toBeInTheDocument();
-    const heading = screen.getByText('No Events');
-    expect(heading).toHaveClass('dark:text-white');
-    expect(heading.className).not.toMatch(/text-\(--color-text-tooltip\)/);
-    const bentoCard = screen.getByTestId('profile-primary-tab-events-empty')
-      .firstChild as HTMLElement;
-    expect(bentoCard.style.background).toContain('var(--color-bg-surface-1)');
+    const emptyState = screen.getByTestId('profile-primary-tab-events-empty');
+    expect(screen.getByText('No Events')).toHaveClass('text-primary-token');
+    expect(emptyState.className).not.toContain('rounded');
+    expect(emptyState.className).not.toContain('border');
+  });
+
+  it('uses granted-only location and preserves chronological order without it', () => {
+    render(<TourModePanel artist={artist} tourDates={[nycDate, londonDate]} />);
+
+    expect(useUserLocationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ permissionMode: 'granted-only' })
+    );
+    expect(
+      screen
+        .getByText('The O2')
+        .compareDocumentPosition(screen.getByText('Madison Square Garden'))
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('renders the styled all-shows list when no geolocation is available', () => {

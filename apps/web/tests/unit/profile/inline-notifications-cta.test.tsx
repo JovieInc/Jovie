@@ -204,7 +204,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
     await waitFor(() => {
       expect(handleSubscribe).toHaveBeenCalledTimes(1);
@@ -256,7 +256,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
     fireEvent.click(await screen.findByRole('button', { name: /^verify$/i }));
 
     expect(await screen.findByTestId('mobile-name-input')).toBeInTheDocument();
@@ -317,7 +317,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
     // Regression #13391: the primary action label color must not be
     // dark:-gated — it renders on the always-dark profile stage regardless of

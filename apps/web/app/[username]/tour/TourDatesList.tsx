@@ -20,7 +20,9 @@ export function TourDatesList({
   tourDates,
   handle,
 }: Readonly<TourDatesListProps>) {
-  const { location, isLoading, error } = useUserLocation();
+  const { location, isLoading, error } = useUserLocation({
+    permissionMode: 'granted-only',
+  });
   const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
 
   // On the public tour page, nearby dates sort to top (no duplication)

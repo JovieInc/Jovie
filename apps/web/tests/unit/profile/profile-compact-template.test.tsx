@@ -658,6 +658,38 @@ describe('ProfileCompactTemplate', () => {
     expect(window.location.search).toBe('?mode=listen');
   });
 
+  it('keeps a single semantic artist heading on compact sub-tabs', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?mode=listen');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        releases={mockReleases}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'listen'
+      );
+    });
+
+    expect(
+      screen.getAllByRole('heading', {
+        level: 1,
+        name: mockArtist.name,
+      })
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Music' })
+    ).toHaveAttribute('data-testid', 'profile-mode-title');
+  });
+
   it('prioritizes the ticket CTA without rendering tour metadata in the hero', async () => {
     render(
       <ProfileCompactTemplate

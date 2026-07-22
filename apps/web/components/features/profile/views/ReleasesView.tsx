@@ -120,7 +120,7 @@ export function ReleasesView({
 
   return (
     <div
-      className='border-y border-white/[0.075] [contain:layout_style]'
+      className='[contain:layout_style]'
       data-testid='profile-mode-drawer-releases'
     >
       {visibleReleases.map((release, index) => {
@@ -160,16 +160,16 @@ export function ReleasesView({
                   is_latest: index === 0,
                 })
               }
-              className='group flex min-h-16 items-center gap-3 border-t border-white/[0.075] px-4 py-2.5 first:border-t-0 transition-colors duration-subtle hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+              className='group flex min-h-16 items-center gap-3 border-t border-white/[0.055] px-4 py-2.5 first:border-t-0 transition-colors duration-subtle hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
               aria-label={getReleaseAriaLabel(release)}
             >
-              <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-white/[0.04]'>
+              <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded bg-white/[0.04]'>
                 <ImageWithFallback
                   src={release.artworkUrl}
                   alt={release.title}
                   fill
                   sizes='44px'
-                  className='object-cover grayscale contrast-[1.04]'
+                  className='object-cover'
                   fallbackVariant='release'
                 />
               </div>
@@ -190,12 +190,12 @@ export function ReleasesView({
                     </span>
                   ) : null}
                 </div>
-                <p className='truncate text-2xs font-medium tracking-tight text-white/42'>
+                <p className='truncate text-2xs font-medium tracking-tight text-white/56'>
                   {meta}
                 </p>
               </div>
 
-              <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white dark:bg-surface-1 text-black dark:text-white transition-opacity duration-subtle group-hover:opacity-90'>
+              <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.065] text-white/88 transition-[background-color,transform] duration-subtle group-hover:bg-white/[0.1] group-active:scale-[0.92] motion-reduce:transform-none'>
                 <Play className='ml-0.5 h-3 w-3 fill-current' />
               </span>
             </a>

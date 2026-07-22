@@ -392,11 +392,8 @@ function AlertsSettingsView({
       className={NATIVE_PANEL_CLASS_NAME}
       data-testid='profile-alerts-settings'
     >
-      <div className='flex items-baseline justify-between px-4 pb-2 pt-3'>
-        <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
-          Alerts
-        </h2>
-        <span className='text-app font-medium text-white/52'>
+      <div className='flex justify-end px-4 pb-2 pt-3'>
+        <span className='text-xs font-medium text-white/52'>
           {isSubscribed ? 'On' : 'Off'}
         </span>
       </div>
@@ -521,23 +518,13 @@ export function ProfilePrimaryTabPanel({
 
     if (visibleReleases.length > 0) {
       return (
-        <div
-          className='-mx-4 space-y-4 pb-2'
-          data-testid='profile-primary-tab-releases'
-        >
-          <div>
-            <div className='px-4 pb-2 pt-3'>
-              <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
-                Music
-              </h2>
-            </div>
-            <ReleasesView
-              releases={visibleReleases}
-              artistId={artist.id}
-              artistHandle={artist.handle}
-              artistName={artist.name}
-            />
-          </div>
+        <div className='-mx-4 pb-2' data-testid='profile-primary-tab-releases'>
+          <ReleasesView
+            releases={visibleReleases}
+            artistId={artist.id}
+            artistHandle={artist.handle}
+            artistName={artist.name}
+          />
         </div>
       );
     }
@@ -547,11 +534,6 @@ export function ProfilePrimaryTabPanel({
         className={cn(NATIVE_PANEL_CLASS_NAME, 'flex min-h-full flex-col')}
         data-testid='profile-primary-tab-listen'
       >
-        <div className='px-4 pb-2 pt-3'>
-          <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
-            Music
-          </h2>
-        </div>
         <ProfileMusicEmptyState
           artist={artist}
           renderMode={renderMode}
@@ -567,11 +549,6 @@ export function ProfilePrimaryTabPanel({
         className={cn(NATIVE_PANEL_CLASS_NAME, 'flex min-h-full flex-col')}
         data-testid='profile-primary-tab-tour'
       >
-        <div className='px-4 pb-2 pt-3'>
-          <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
-            Events
-          </h2>
-        </div>
         <TourDrawerContent
           artist={artist}
           tourDates={[...tourDates]}

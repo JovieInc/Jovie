@@ -1,12 +1,14 @@
 'use client';
 
 import { ChevronLeft, X } from 'lucide-react';
-import { useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Drawer } from 'vaul';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 
 type ProfileDrawerNavigationLevel = 'root' | 'secondary';
+type ProfileDrawerHeightMode = 'bounded' | 'content';
 
 interface ProfileDrawerShellProps {
   readonly open: boolean;
@@ -22,6 +24,50 @@ interface ProfileDrawerShellProps {
   readonly bodyClassName?: string;
   readonly dataTestId?: string;
   readonly presentation?: ProfileSurfacePresentation;
+  /** Content-sized for short root menus; bounded keeps scrollable subviews stable. */
+  readonly heightMode?: ProfileDrawerHeightMode;
+}
+
+const DRAWER_MOTION_MS = 420;
+
+function useManualDrawerPresence(open: boolean, enabled: boolean) {
+  const prefersReducedMotion = useReducedMotion();
+  const [isPresent, setIsPresent] = useState(open);
+  const [isActive, setIsActive] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    if (open) {
+      setIsPresent(true);
+      if (prefersReducedMotion) {
+        setIsActive(true);
+        return;
+      }
+
+      const frame = globalThis.requestAnimationFrame(() => setIsActive(true));
+      return () => globalThis.cancelAnimationFrame(frame);
+    }
+
+    setIsActive(false);
+    if (prefersReducedMotion) {
+      setIsPresent(false);
+      return;
+    }
+
+    const timeout = globalThis.setTimeout(
+      () => setIsPresent(false),
+      DRAWER_MOTION_MS
+    );
+    return () => globalThis.clearTimeout(timeout);
+  }, [enabled, open, prefersReducedMotion]);
+
+  return {
+    isPresent: enabled ? isPresent : open,
+    isActive: enabled ? isActive : open,
+  };
 }
 
 export function ProfileDrawerShell({
@@ -36,12 +82,16 @@ export function ProfileDrawerShell({
   bodyClassName, // NOSONAR -- deprecated prop kept for backward compat; used internally to apply caller overrides
   dataTestId,
   presentation = 'standalone',
+  heightMode = 'bounded',
 }: ProfileDrawerShellProps) {
   const titleId = useId();
   const subtitleId = useId();
   const accessibleDescriptionId = useId();
   const accessibleDescription = subtitle ?? 'Profile menu and actions.';
   const isSecondaryHeader = navigationLevel === 'secondary' && Boolean(onBack);
+  const isManualPresentation =
+    presentation === 'embedded' || presentation === 'modal';
+  const manualPresence = useManualDrawerPresence(open, isManualPresentation);
   // The drawer uses one capped envelope across releases, pay, tour, and
   // subscribe so desktop preview shells never jump when swapping views.
   // `--profile-drawer-height-max` is intentionally shorter than the full phone
@@ -50,10 +100,10 @@ export function ProfileDrawerShell({
     ['--profile-drawer-height-max' as string]: 'min(472px, 62dvh)',
     ['--profile-drawer-header' as string]: '72px',
   } as React.CSSProperties;
-  const contentClasses = `relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-mobile) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-(--profile-shell-max-width) md:rounded-t-(--profile-drawer-radius-desktop) before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`;
-  // Fixed height (not min-h) so overflow-y-auto activates on overflow; min-h
-  // lets the body grow past the parent's max-h and get clipped by overflow-hidden.
-  const bodyClasses = `relative z-10 h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))] overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] px-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] pt-3 ${bodyClassName ?? ''}`;
+  const contentClasses = `relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-mobile) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl transition-[transform,opacity] duration-cinematic ease-cinematic motion-reduce:transition-none md:max-w-(--profile-shell-max-width) md:rounded-t-(--profile-drawer-radius-desktop) before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`;
+  // Scrollable subviews keep a stable bounded body. The three-action root menu
+  // shrink-wraps its content so it does not present a mostly empty sheet.
+  const bodyClasses = `relative z-10 overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] px-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] pt-3 ${heightMode === 'bounded' ? 'h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))]' : 'max-h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))]'} ${bodyClassName ?? ''}`;
 
   const header = (
     <>
@@ -148,7 +198,7 @@ export function ProfileDrawerShell({
   const body = <div className={bodyClasses}>{children}</div>;
 
   if (presentation === 'embedded') {
-    if (!open) {
+    if (!manualPresence.isPresent) {
       return null;
     }
 
@@ -157,7 +207,7 @@ export function ProfileDrawerShell({
         <button
           type='button'
           aria-label='Close Drawer Overlay'
-          className={`fixed inset-0 ${PROFILE_Z.LOCAL_CONTENT} bg-black/48 backdrop-blur-sm`}
+          className={`fixed inset-0 ${PROFILE_Z.LOCAL_CONTENT} bg-black/48 backdrop-blur-sm transition-opacity duration-cinematic ease-cinematic motion-reduce:transition-none ${manualPresence.isActive ? 'opacity-100' : 'opacity-0'}`}
           onClick={() => onOpenChange(false)}
         />
         <dialog
@@ -166,10 +216,11 @@ export function ProfileDrawerShell({
           aria-describedby={accessibleDescriptionId}
           aria-labelledby={titleId}
           style={drawerHeightStyle}
+          data-height-mode={heightMode}
           open
         >
           <div
-            className={`relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-desktop) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-16px_52px_rgba(0,0,0,0.5)] backdrop-blur-2xl before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`}
+            className={`relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-desktop) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-16px_52px_rgba(0,0,0,0.5)] backdrop-blur-2xl transition-[transform,opacity] duration-cinematic ease-cinematic motion-reduce:transform-none motion-reduce:transition-none before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${manualPresence.isActive ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} ${contentClassName ?? ''}`}
           >
             <span id={accessibleDescriptionId} className='sr-only'>
               {accessibleDescription}
@@ -183,13 +234,13 @@ export function ProfileDrawerShell({
   }
 
   if (presentation === 'modal') {
-    if (!open) {
+    if (!manualPresence.isPresent) {
       return null;
     }
 
     return (
       <div
-        className={`absolute inset-0 ${PROFILE_Z.EMBEDDED_MODAL} flex items-center justify-center bg-black/52 p-6 backdrop-blur-sm`}
+        className={`absolute inset-0 ${PROFILE_Z.EMBEDDED_MODAL} flex items-center justify-center bg-black/52 p-6 backdrop-blur-sm transition-opacity duration-cinematic ease-cinematic motion-reduce:transition-none ${manualPresence.isActive ? 'opacity-100' : 'opacity-0'}`}
       >
         <button
           type='button'
@@ -198,8 +249,9 @@ export function ProfileDrawerShell({
           onClick={() => onOpenChange(false)}
         />
         <div
-          className='relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-108 flex-col overflow-hidden rounded-(--profile-card-radius) border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)] backdrop-blur-2xl'
+          className={`relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-108 flex-col overflow-hidden rounded-(--profile-card-radius) border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)] backdrop-blur-2xl transition-[transform,opacity] duration-cinematic ease-cinematic motion-reduce:transform-none motion-reduce:transition-none ${manualPresence.isActive ? 'scale-100 opacity-100' : 'scale-[0.985] opacity-0'}`}
           data-testid={dataTestId}
+          data-height-mode={heightMode}
           role='dialog'
           aria-describedby={accessibleDescriptionId}
           aria-labelledby={titleId}
@@ -234,6 +286,7 @@ export function ProfileDrawerShell({
             className={contentClasses}
             style={drawerHeightStyle}
             data-testid={dataTestId}
+            data-height-mode={heightMode}
             aria-labelledby={titleId}
           >
             <Drawer.Title asChild>

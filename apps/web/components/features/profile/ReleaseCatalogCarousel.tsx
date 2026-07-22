@@ -83,16 +83,12 @@ export function ReleaseCatalogCarousel({
     <EntityCarousel
       items={items}
       surface='pearl'
+      layout='profile-landscape'
       dataTestId={dataTestId}
       leading={leading}
       trailing={trailing}
-      // Edge-to-edge on mobile: cancel the surface's --page-pad with a
-      // negative margin, then re-inset the track so the first card aligns
-      // with the padded content above while later cards scroll off the true
-      // surface edge. On desktop the shell's rounded corner would clip the
-      // peek card mid-radius, so the track stays inside the padded gutter and
-      // its own straight clip edge crops the peek card instead.
-      // min-h-0 + flex-1 lets the track own all remaining viewport height.
+      // One full-content-width card per snap. The track reaches the shell edge
+      // while its padding preserves the profile safe gutter at rest.
       className='-mx-(--page-pad) min-h-0 flex-1 scroll-px-(--page-pad) px-(--page-pad) md:mx-0 md:scroll-px-0 md:px-0'
       onCardImpression={handleCardImpression}
       onCardClick={handleCardClick}

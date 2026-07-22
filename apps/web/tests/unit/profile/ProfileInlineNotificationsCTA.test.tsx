@@ -332,7 +332,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Submit' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
     expect(await screen.findByText('Enter the code')).toBeInTheDocument();
 
     mockUseSubscriptionForm.mockReturnValue(
@@ -383,7 +383,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Submit' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
     expect(await screen.findByText('Enter the code')).toBeInTheDocument();
 
     mockUseSubscriptionForm.mockReturnValue(
