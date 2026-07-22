@@ -8,25 +8,16 @@ import { describe, expect, it } from 'vitest';
  * Part of the founder-directed System A -> System B marketing migration
  * (DESIGN.md 2026-06-18). Mirrors the shipped about/support/download guards.
  *
- * Two tiers:
- *
- *   1. The route file and the CTA/pricing components carry the full strict
- *      contract: no hex/rgba/gradient colors, no raw color scales, no literal
- *      white/black utilities, no arbitrary values, no inline styles, and no
- *      System A editorial type classes (marketing-*-linear / marketing-kicker).
- *
- *   2. HomepageV2Route.tsx still owns System A debt in its hero composition
- *      (inline rgba radial-gradient glow, drop-shadow arbitrary values,
- *      white-alpha overlay utilities, marketing-h1-linear editorial classes,
- *      animation style props). Restyling that composition is tracked for the
- *      homepage-v2 migration wave; until then this guard pins the invariants
- *      that must not regress: no hex literals, no raw numbered palette
- *      scales, and the System B anchors the page already ships (System B
- *      shell/container, token text classes, public-action CTAs).
+ * The route file and the CTA/pricing components carry the full strict
+ * contract: no hex/rgba/gradient colors, no raw color scales, no literal
+ * white/black utilities, no arbitrary values, no inline styles, and no
+ * System A editorial type classes (marketing-*-linear / marketing-kicker).
+ * Hero composition effects live in the colocated HomepageV2Route.css.
  */
 
 const strictSources = [
   'app/(marketing)/new/page.tsx',
+  'components/marketing/homepage-v2/HomepageV2Route.tsx',
   'components/marketing/homepage-v2/HomepageV2Ctas.tsx',
 ] as const;
 
@@ -49,11 +40,6 @@ const forbiddenVisualPatterns = [
   /\bmarketing-(?:h[1-6]|kicker|lead|body)-?linear\b|\bmarketing-kicker\b/,
 ] as const;
 
-const forbiddenHeroRoutePatterns = [
-  /#[0-9a-fA-F]{3,8}/,
-  /\b(?:emerald|fuchsia|amber|sky|indigo|orange|rose|cyan|violet|red|blue|green|purple|pink|yellow|teal|lime|slate|gray|zinc|neutral|stone)-(?:[0-9]|\[|\/)/,
-] as const;
-
 describe('homepage v2 (/new) System B source contract', () => {
   it('keeps the route and CTA visuals on named System B primitives', () => {
     for (const sourcePath of strictSources) {
@@ -61,18 +47,6 @@ describe('homepage v2 (/new) System B source contract', () => {
       for (const pattern of forbiddenVisualPatterns) {
         expect(source, `${sourcePath} matched ${pattern}`).not.toMatch(pattern);
       }
-    }
-  });
-
-  it('keeps the hero route free of hex literals and raw palette scales', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), heroRouteSource),
-      'utf8'
-    );
-    for (const pattern of forbiddenHeroRoutePatterns) {
-      expect(source, `${heroRouteSource} matched ${pattern}`).not.toMatch(
-        pattern
-      );
     }
   });
 

@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import './ArtistProfileSectionHeader.css';
 
 interface ArtistProfileSectionHeaderProps {
   readonly headline: string;
@@ -12,13 +13,13 @@ interface ArtistProfileSectionHeaderProps {
 }
 
 export const SHELL_H2_CLASS =
-  'text-[clamp(2.25rem,4.8vw,3.5rem)] font-bold leading-[1.02] tracking-[-0.04em] text-primary-token text-balance';
+  'ap-shell-h2 font-bold text-primary-token text-balance';
 
 export const SHELL_EYEBROW_CLASS =
-  'text-xs font-medium uppercase tracking-[0.06em] text-secondary-token';
+  'ap-shell-eyebrow text-xs font-medium uppercase text-secondary-token';
 
 export const SHELL_LEAD_CLASS =
-  'text-[clamp(1.0625rem,1.4vw,1.25rem)] leading-[1.45] text-secondary-token text-pretty';
+  'ap-shell-lead text-secondary-token text-pretty';
 
 export function ArtistProfileSectionHeader({
   headline,
@@ -35,7 +36,9 @@ export function ArtistProfileSectionHeader({
   return (
     <div
       className={cn(
-        isCentered ? 'mx-auto max-w-[46rem] text-center' : 'max-w-2xl',
+        isCentered
+          ? 'ap-shell-header--centered mx-auto text-center'
+          : 'max-w-2xl',
         className
       )}
     >
@@ -44,13 +47,16 @@ export function ArtistProfileSectionHeader({
           {eyebrow}
         </p>
       ) : null}
+      {/* ui-casing-allow: marketing display headline */}
       <h2 className={cn(SHELL_H2_CLASS, headlineClassName)}>{headline}</h2>
       {body ? (
         <p
           className={cn(
             SHELL_LEAD_CLASS,
             'mt-5 sm:mt-6',
-            isCentered ? 'mx-auto max-w-[38rem]' : 'max-w-2xl',
+            isCentered
+              ? 'ap-shell-header__body--centered mx-auto'
+              : 'max-w-2xl',
             bodyClassName
           )}
         >

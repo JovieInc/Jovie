@@ -9,6 +9,7 @@ import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
 import { SHELL_H2_CLASS, SHELL_LEAD_CLASS } from './ArtistProfileSectionHeader';
+import './ArtistProfileModeSwitcher.css';
 
 interface ArtistProfileModeSwitcherProps {
   readonly adaptive: ArtistProfileLandingCopy['adaptive'];
@@ -145,7 +146,9 @@ export function ArtistProfileModeSwitcher({
       <div
         className={cn(
           'max-w-2xl',
-          showIntroHeading ? null : 'order-2 w-full max-w-[29rem] text-center'
+          showIntroHeading
+            ? null
+            : 'ap-mode-switcher__copy--compact order-2 w-full text-center'
         )}
       >
         {showIntroHeading ? (
@@ -153,7 +156,10 @@ export function ArtistProfileModeSwitcher({
             <p className='text-xs font-medium tracking-wide text-secondary-token'>
               {adaptive.eyebrow}
             </p>
-            <h2 className={cn(SHELL_H2_CLASS, 'mt-5 max-w-[13ch]')}>
+            {/* ui-casing-allow: marketing display headline */}
+            <h2
+              className={cn(SHELL_H2_CLASS, 'ap-mode-switcher__headline mt-5')}
+            >
               {adaptive.headline}
             </h2>
             <p className={cn(SHELL_LEAD_CLASS, 'mt-6 max-w-xl')}>
@@ -194,7 +200,7 @@ export function ArtistProfileModeSwitcher({
                     <motion.span
                       aria-hidden='true'
                       className={cn(
-                        'absolute inset-0 border border-subtle bg-surface-2 shadow-sm',
+                        'ap-mode-switcher__active-tab absolute inset-0 border border-subtle bg-surface-2',
                         showIntroHeading ? 'rounded-lg' : 'rounded-full'
                       )}
                       layoutId='artist-profile-mode-active-tab'
@@ -281,7 +287,7 @@ export function ArtistProfileModeSwitcher({
           'relative mx-auto w-full',
           showIntroHeading
             ? 'max-w-lg rounded-3xl border border-subtle bg-surface-0 p-6 sm:p-8'
-            : 'order-1 mb-4 max-w-[15.75rem] sm:max-w-[16.75rem]'
+            : 'ap-mode-switcher__phone--compact order-1 mb-4'
         )}
       >
         {showIntroHeading ? (

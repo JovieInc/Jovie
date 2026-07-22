@@ -3,6 +3,7 @@ import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
 import { ArtistProfileHero } from './ArtistProfileHero';
 import { ArtistProfileModeSwitcher } from './ArtistProfileModeSwitcher';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
+import './ArtistProfileHeroAdaptiveIntro.css';
 
 interface ArtistProfileHeroAdaptiveIntroProps {
   readonly hero: ArtistProfileLandingCopy['hero'];
@@ -14,14 +15,14 @@ export function ArtistProfileHeroAdaptiveIntro({
   adaptive,
 }: Readonly<ArtistProfileHeroAdaptiveIntroProps>) {
   return (
-    <div className='relative overflow-x-clip bg-black dark:bg-black'>
+    <div className='ap-hero-intro relative overflow-x-clip'>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.hero}>
         <ArtistProfileHero hero={hero} />
       </div>
 
       <div
         data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.adaptive}
-        className='relative bg-black dark:bg-black'
+        className='ap-hero-intro__adaptive relative'
       >
         <ArtistProfileSectionShell
           className='border-b border-subtle'

@@ -3,6 +3,7 @@ import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { cn } from '@/lib/utils';
 import { SHELL_H2_CLASS, SHELL_LEAD_CLASS } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
+import './ArtistProfileOpinionatedSection.css';
 
 interface ArtistProfileOpinionatedSectionProps {
   readonly opinionated: ArtistProfileLandingCopy['opinionated'];
@@ -24,7 +25,8 @@ export function ArtistProfileOpinionatedSection({
           <p className='text-xs font-medium tracking-wide text-secondary-token'>
             {opinionated.eyebrow}
           </p>
-          <h2 className={cn(SHELL_H2_CLASS, 'mt-5 max-w-[12ch]')}>
+          {/* ui-casing-allow: marketing display headline */}
+          <h2 className={cn(SHELL_H2_CLASS, 'ap-opinionated__headline mt-5')}>
             {opinionated.headline}
           </h2>
           <p className={cn(SHELL_LEAD_CLASS, 'mt-6')}>{opinionated.body}</p>
