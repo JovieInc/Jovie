@@ -26,7 +26,9 @@ describe('performance interaction manifest', () => {
 
     expect(firstSlice.length).toBeGreaterThanOrEqual(3);
     expect(firstSlice.length).toBeLessThanOrEqual(5);
-    expect(firstSlice.every(scenario => scenario.tier !== 'P2')).toBe(true);
+    expect(firstSlice.map(scenario => String(scenario.tier))).not.toContain(
+      'P2'
+    );
     expect(firstSlice.every(scenario => scenario.ia.trigger)).toBe(true);
     expect(firstSlice.every(scenario => scenario.ia.usableState)).toBe(true);
   });
@@ -54,6 +56,26 @@ describe('performance interaction manifest', () => {
     expect(
       getInteractionHotPathById('lyrics-cue-seek')?.budget.firstFeedbackP95Ms
     ).toBe(50);
+    expect(
+      getInteractionHotPathById('audio-play-to-audible')?.budget
+        .firstFeedbackP95Ms
+    ).toBe(250);
+    expect(
+      getInteractionHotPathById('audio-timeline-scrub-settle')?.budget
+        .firstFeedbackP95Ms
+    ).toBe(250);
+    expect(
+      getInteractionHotPathById('audio-cue-jump-settle')?.budget
+        .firstFeedbackP95Ms
+    ).toBe(250);
+    expect(
+      getInteractionHotPathById('audio-buffer-recovery')?.budget
+        .firstFeedbackP95Ms
+    ).toBe(1_000);
+    expect(
+      getInteractionHotPathById('audio-shell-transition-continuity')?.budget
+        .firstFeedbackP95Ms
+    ).toBe(100);
   });
 });
 
