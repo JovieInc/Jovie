@@ -144,7 +144,6 @@ def gbrain_alive(hermes_home: Path) -> bool:
             text=True,
             timeout=30,
             check=False,
-            timeout=30,
         )
         if proc.returncode != 0 or not proc.stdout.strip():
             return False
