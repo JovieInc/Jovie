@@ -100,11 +100,18 @@ runs:
 
         echo "Baseline window: $START_ISO to $END_ISO ($WINDOW_MINUTES min)"
 
-        # Count total events across all issues in the window
-        # Use the stats endpoint for more accurate event counts
-        STATS_RESPONSE=$(curl --fail --silent --show-error \
+        # Count only production error events. Sentry's Discover dataset also
+        # contains transactions and preview traffic; without this filter normal
+        # request volume or preview failures can trigger a false rollback.
+        STATS_RESPONSE=$(curl --fail --silent --show-error --get \
           -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
-          "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/?project=$SENTRY_PROJECT_ID&field=count()&start=$START_ISO&end=$END_ISO&interval=1m")
+          --data-urlencode "project=$SENTRY_PROJECT_ID" \
+          --data-urlencode "field=count()" \
+          --data-urlencode "query=event.type:error environment:vercel-production" \
+          --data-urlencode "start=$START_ISO" \
+          --data-urlencode "end=$END_ISO" \
+          --data-urlencode "interval=1m" \
+          "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/")
 
         jq -e '
           type == "object" and
@@ -151,9 +158,15 @@ runs:
 
         echo "Post-deploy window: $START_ISO to $END_ISO ($SOAK_MINUTES min)"
 
-        STATS_RESPONSE=$(curl --fail --silent --show-error \
+        STATS_RESPONSE=$(curl --fail --silent --show-error --get \
           -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
-          "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/?project=$SENTRY_PROJECT_ID&field=count()&start=$START_ISO&end=$END_ISO&interval=1m")
+          --data-urlencode "project=$SENTRY_PROJECT_ID" \
+          --data-urlencode "field=count()" \
+          --data-urlencode "query=event.type:error environment:vercel-production" \
+          --data-urlencode "start=$START_ISO" \
+          --data-urlencode "end=$END_ISO" \
+          --data-urlencode "interval=1m" \
+          "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/")
 
         jq -e '
           type == "object" and
