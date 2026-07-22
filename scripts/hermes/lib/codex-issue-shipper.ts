@@ -172,10 +172,13 @@ const TERMINAL_TASK_FAILURE_PATTERN =
   /human[- ]review[- ]required|requires? human (?:review|decision|approval)|security (?:review|blocker)|policy (?:violation|blocker)|destructive operation requires approval|credential (?:change|rotation) requires approval/i;
 
 const SYSTEM_FAILURE_PATTERN =
-  /gbrain.*(?:failed|unavailable|timeout|refused)|github.*(?:rate limit|5\d\d|timeout|unavailable)|spawn(?:sync)?.*(?:ENOENT|EAGAIN|ETIMEDOUT)|\b(?:ENOENT|EAGAIN|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH)\b|command not found|executable.*(?:missing|not found)|no such file or directory|network (?:error|timeout|unreachable)|internet.*(?:offline|unavailable)/i;
+  /gbrain.*(?:failed|unavailable|timeout|refused)|(?:github|gh|graphql).*rate limit|github.*(?:5\d\d|timeout|unavailable)|spawn(?:sync)?.*(?:ENOENT|EAGAIN|ETIMEDOUT)|\b(?:ENOENT|EAGAIN|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH)\b|command not found|executable.*(?:missing|not found)|no such file or directory|error connecting to agent|transport (?:closed|error)|network (?:error|timeout|unreachable)|internet.*(?:offline|unavailable)/i;
+
+const DETERMINISTIC_TASK_FAILURE_PATTERN =
+  /AssertionError|Test Files?\s+\d+ failed|Tests?\s+\d+ failed|typecheck.*(?:failed|error)|biome.*(?:failed|error)|lint.*(?:failed|error)|\berror TS\d{4}\b/i;
 
 const PROVIDER_FAILURE_PATTERN =
-  /(?:http|status)?\s*(?:402|429)\b|too many requests|rate limit|weekly limit|(?:5|five)[- ]hour limit|usage limit|quota (?:exceeded|exhausted)|insufficient (?:funds|credits?)|cannot afford|max_tokens.*afford|oauth.*(?:expired|refresh failed)|failed to authenticate|(?:disabled.*subscription|subscription.*(?:disabled|exhausted|limit))|login required|not logged in|unknown model|model.*(?:not found|retired|deprecated)|provider.*(?:outage|unavailable)/i;
+  /(?:http|status)\s*(?:402|429)\b|too many requests|rate limit|weekly limit|(?:5|five)[- ]hour limit|usage limit|quota (?:exceeded|exhausted)|(?:insufficient|low) (?:funds|credits?|balance)|credit balance.*(?:low|exhausted)|cannot afford|max_tokens.*afford|oauth.*(?:expired|refresh failed)|failed to authenticate|(?:disabled.*subscription|subscription.*(?:disabled|exhausted|limit))|login required|not logged in|unknown model|model.*(?:not found|retired|deprecated)|provider.*(?:outage|unavailable)/i;
 
 /**
  * Classify a failed agent attempt without mutating issue or controller state.
@@ -203,6 +206,9 @@ export function classifyAgentFailure(
   }
   if (TERMINAL_TASK_FAILURE_PATTERN.test(evidence)) return 'task_terminal';
   if (SYSTEM_FAILURE_PATTERN.test(evidence)) return 'system_retryable';
+  if (DETERMINISTIC_TASK_FAILURE_PATTERN.test(evidence)) {
+    return 'task_retryable';
+  }
   if (PROVIDER_FAILURE_PATTERN.test(evidence)) return 'provider_cooldown';
   return 'task_retryable';
 }

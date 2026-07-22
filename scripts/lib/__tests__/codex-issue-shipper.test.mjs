@@ -359,15 +359,18 @@ describe('codex issue shipper prompt', () => {
     expect(query).toContain('area:ops');
   });
 
-  it('blocks agent launch when gbrain context collection failed', () => {
-    expect(
-      gbrainContextBlocker({
-        captureSlug: 'ops/codex-issue-shipper/github-12962 (capture failed)',
-        queryText: 'Jovie implementation context',
-        queryResult:
-          'gbrain query failed: connect ECONNREFUSED 127.0.0.1:7801\n\ngbrain capture failed: Page not found',
-      })
-    ).toContain('system-blocker');
+  it('fails closed without a task blocker when gbrain context collection failed', () => {
+    const blocker = gbrainContextBlocker({
+      captureSlug: 'ops/codex-issue-shipper/github-12962 (capture failed)',
+      queryText: 'Jovie implementation context',
+      queryResult:
+        'gbrain query failed: connect ECONNREFUSED 127.0.0.1:7801\n\ngbrain capture failed: Page not found',
+    });
+    expect(blocker).toContain('system-blocker');
+    const disposition = classifyAgentFailure(1, null, blocker ?? '');
+    expect(disposition).toBe('system_retryable');
+    expect(consumesTaskRetryBudget(disposition)).toBe(false);
+    expect(actionForAgentFailure(disposition, false)).toBe('release_incident');
 
     expect(
       gbrainContextBlocker({
@@ -957,6 +960,13 @@ describe('agent failure disposition', () => {
       'system_retryable',
     ],
     [
+      'GitHub GraphQL rate limit',
+      1,
+      null,
+      'GraphQL: API rate limit exceeded',
+      'system_retryable',
+    ],
+    [
       'GitHub outage',
       1,
       null,
@@ -982,6 +992,13 @@ describe('agent failure disposition', () => {
       'task_retryable',
     ],
     [
+      'deterministic HTTP assertion',
+      1,
+      null,
+      'AssertionError: expected HTTP 429 to equal 200',
+      'task_retryable',
+    ],
+    [
       'explicit human boundary',
       1,
       null,
@@ -997,7 +1014,7 @@ describe('agent failure disposition', () => {
     ],
   ];
 
-  it.each(cases)('%s -> %s', (_name, status, signal, output, expected) => {
+  it.each(cases)('%s', (_name, status, signal, output, expected) => {
     expect(classifyAgentFailure(status, signal, output)).toBe(expected);
   });
 
