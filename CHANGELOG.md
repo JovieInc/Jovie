@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **Repository dependency security updates (JOV-2569):** patched JavaScript and Ruby packages remove all currently known dependency audit findings, including Better Auth OAuth audience binding, Sharp/libvips image processing, Vitest browser file access, request parsing, archive handling, and HTTP client vulnerabilities.
+
 - [internal] **App shell loading skeleton** matches `DESIGN_V1` so flag-on users no longer flash the legacy sidebar/header on first `/app` paint.
 
 - [internal] **Post-deploy probes now identify CLI-built production deployments (JOV-4366):** exact immutable build identity replaces optional Vercel source metadata while preserving project, deployment, origin, environment, and main-ancestry proofs.
