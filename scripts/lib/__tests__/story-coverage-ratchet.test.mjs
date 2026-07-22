@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -36,7 +36,7 @@ describe('story-coverage-ratchet', () => {
       'input.tsx': '',
       'input.test.tsx': '',
       'common-dropdown-utils.ts': '',
-      index.ts: '',
+      'index.ts': '',
     });
     // .ts helpers excluded by SOURCE_RE (.tsx only); index excluded
     const list = listAtomComponents(dir);
