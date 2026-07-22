@@ -1012,13 +1012,30 @@ jobs:
         continue-on-error: true
         env:
           BASE_URL: https://jov.ie
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
         run: |
           set -euo pipefail
+          : >> "$GITHUB_OUTPUT"
           # The browser must issue the same-origin POST
           # /api/auth/sign-in/social before either provider navigation exists.
           cd apps/web
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          oauth_retry_root="$RUNNER_TEMP/production-oauth-retries"
+          mkdir -m 700 "$oauth_retry_root"
+
+          quarantine_oauth_artifacts() {
+            destination="$1"
+            for artifact_path in test-results playwright-report; do
+              if [ -e "$artifact_path" ] || [ -L "$artifact_path" ]; then
+                if [ ! -d "$destination" ]; then
+                  mkdir -m 700 "$destination"
+                fi
+                mv -- "$artifact_path" "$destination/"
+              fi
+            done
+          }
+
           attempt=1
           max_attempts=3
           confirmed_attempts=0
@@ -1046,6 +1063,15 @@ jobs:
               exit 0
             fi
 
+            attempt_artifact_root="$oauth_retry_root/attempt-${attempt}"
+            mkdir -m 700 "$attempt_artifact_root"
+            if [ -f "$report" ]; then
+              mkdir -m 700 "$attempt_artifact_root/failed-artifacts"
+              mv -- "$report" "$attempt_artifact_root/failed-artifacts/oauth-provider-report.json"
+              report="$attempt_artifact_root/failed-artifacts/oauth-provider-report.json"
+            fi
+            quarantine_oauth_artifacts "$attempt_artifact_root/failed-artifacts"
+
             # Only explicit runtime-contract assertions in a valid Playwright
             # report confirm a regression. Browser/tool/network/report failures
             # remain uncertainty and can never request rollback.
@@ -1066,6 +1092,10 @@ jobs:
             else
               uncertain=true
               echo "OAuth attempt ${attempt}/${max_attempts} lacked exact structured runtime-contract evidence."
+            fi
+            if [ -f "$RUNNER_TEMP/safe-playwright-producer/blocked" ]; then
+              echo "::error::Playwright artifact guard blocked production OAuth output; refusing an unsafe retry."
+              exit 1
             fi
             if [ "$attempt" -lt "$max_attempts" ]; then
               sleep_seconds=$((attempt * 15))
