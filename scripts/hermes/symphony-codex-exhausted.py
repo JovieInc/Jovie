@@ -466,10 +466,10 @@ def _preflight_install(
     releases = state_dir / INSTALL_RELEASES
     current = _validated_release_link(state_dir / INSTALL_CURRENT, releases)
     pending = _validated_release_link(state_dir / INSTALL_PENDING, releases)
-    if pending is not None and not all(
+    pending_matches = pending is not None and all(
         (pending / name).read_bytes() == contents[name] for name in RUNTIME_NAMES
-    ):
-        pending = None
+    )
+    pending_target = pending if pending_matches else None
     top_level = _existing_top_level(destination)
     stable = {name: _stable_launcher(name) for name in RUNTIME_NAMES}
 
@@ -485,7 +485,7 @@ def _preflight_install(
     if current is None:
         if any(path.read_bytes() != stable[name] for name, path in top_level.items()):
             raise InstallValidationError("pending install has an invalid launcher")
-        return None, pending, "fresh"
+        return None, pending_target, "fresh"
 
     current_contents = {name: (current / name).read_bytes() for name in RUNTIME_NAMES}
     for name, path in top_level.items():
@@ -493,7 +493,7 @@ def _preflight_install(
             raise InstallValidationError("installed launcher is invalid")
         if path.read_bytes() not in (stable[name], current_contents[name]):
             raise InstallValidationError("installed launcher has unexpected contents")
-    return current, pending, "versioned"
+    return current, pending_target, "versioned"
 
 
 def _atomic_release_link(link: pathlib.Path, release: pathlib.Path) -> None:

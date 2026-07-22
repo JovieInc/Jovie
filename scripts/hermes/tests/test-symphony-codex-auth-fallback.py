@@ -121,8 +121,9 @@ class FallbackTests(unittest.TestCase):
         )
 
     def run_install_with_crash(self, destination, replace_number, controller=CONTROLLER):
-        startup = self.root / f"sitecustomize-{replace_number}"
-        startup.mkdir()
+        startup = pathlib.Path(
+            tempfile.mkdtemp(prefix=f"sitecustomize-{replace_number}-", dir=self.root)
+        )
         (startup / "sitecustomize.py").write_text(
             "import os\n"
             "import signal\n"
@@ -611,6 +612,71 @@ class FallbackTests(unittest.TestCase):
         for name in RUNTIME_NAMES:
             self.assertEqual((current_c / name).read_bytes(), (source_c.parent / name).read_bytes())
             self.assertNotEqual((current_c / name).read_bytes(), (pending_b / name).read_bytes())
+
+    def test_executable_fresh_distinct_reentry_crash_points_avoid_recursive_current(self):
+        source_b = self.write_distinct_source("fresh-B")
+        source_c = self.write_distinct_source("fresh-C")
+        canary = self.write_command("codex-rotate", "echo GEM_MODEL_READY")
+
+        # After pending is durable and before the final pending -> current
+        # cutover, every boundary must remain recoverable as a fresh install,
+        # including a distinct reentry.
+        for b_replace_number in range(2, 6):
+            for c_replace_number in range(1, 6):
+                destination = self.root / f"fresh-reentry-{b_replace_number}-{c_replace_number}"
+                current = destination / ".symphony-codex-auth-fallback/current"
+                pending = destination / ".symphony-codex-auth-fallback/pending"
+
+                crashed_b = self.run_install_with_crash(
+                    destination, b_replace_number, controller=source_b
+                )
+                self.assertLess(crashed_b.returncode, 0)
+                self.assertFalse(os.path.lexists(current))
+                self.assertTrue(pending.is_symlink())
+                pending_b = pending.resolve()
+                self.assertEqual(
+                    (pending_b / "symphony-codex-exhausted.py").read_bytes(),
+                    (source_b.parent / "symphony-codex-exhausted.py").read_bytes(),
+                )
+
+                crashed_c = self.run_install_with_crash(
+                    destination, c_replace_number, controller=source_c
+                )
+                self.assertLess(crashed_c.returncode, 0)
+                self.assertFalse(os.path.lexists(current))
+                self.assertTrue(pending.is_symlink())
+                pending_c = pending.resolve()
+                expected_pending = (
+                    source_b.parent if c_replace_number == 1 else source_c.parent
+                ) / "symphony-codex-exhausted.py"
+                self.assertEqual(
+                    (pending_c / "symphony-codex-exhausted.py").read_bytes(),
+                    expected_pending.read_bytes(),
+                )
+
+                executable = destination / RUNTIME_NAMES[0]
+                if executable.is_file():
+                    result = subprocess.run(
+                        [str(executable)],
+                        capture_output=True,
+                        text=True,
+                        env=self.env(GEM_CODEX_ROTATE_BIN=canary),
+                        timeout=2,
+                        check=False,
+                    )
+                    self.assertEqual((result.stdout, result.returncode), ("no\n", 1))
+
+                recovered = self.run_install(destination, controller=source_c)
+                self.assertEqual(recovered.returncode, 0, recovered.stderr)
+                current_c = current.resolve()
+                self.assertEqual(current_c.parent, pending_c.parent)
+                self.assertFalse(current_c.name.startswith("prior-"))
+                self.assertFalse(os.path.lexists(pending))
+                for name in RUNTIME_NAMES:
+                    self.assertEqual(
+                        (current_c / name).read_bytes(),
+                        (source_c.parent / name).read_bytes(),
+                    )
 
     def test_installer_rolls_back_induced_mid_migration_failure(self):
         destination = self.root / "legacy-bin"
