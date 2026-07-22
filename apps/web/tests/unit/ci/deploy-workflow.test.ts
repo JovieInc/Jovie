@@ -891,6 +891,10 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(oauthStep).toContain(
       'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run --'
     );
+    expect(oauthStep).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(
+      workflow.match(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/g)
+    ).toHaveLength(1);
     expect(oauthStep).toContain(
       'pnpm exec playwright test tests/e2e/oauth-providers.spec.ts'
     );
@@ -1986,6 +1990,7 @@ describe('canary health gate workflow', () => {
         resolve(fakeBin, 'node'),
         `#!/usr/bin/env bash
 set -euo pipefail
+[ "\${PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN:-}" = "true" ] || exit 43
 attempt=0
 if [ -f "$OAUTH_TEST_COUNTER" ]; then
   attempt="$(cat "$OAUTH_TEST_COUNTER")"
@@ -1997,7 +2002,7 @@ if [ -e test-results ] || [ -L test-results ] || [ -e playwright-report ] || [ -
 fi
 if [ "$attempt" -eq 1 ]; then
   mkdir -p test-results
-  printf '{"source":"failed-attempt"}' > test-results/attempt-one.json
+  printf '# Error context\n\nSafe retry diagnostics.\n' > test-results/error-context.md
   exit 1
 fi
 `,
@@ -2021,6 +2026,7 @@ fi
             GITHUB_WORKSPACE: workspace,
             OAUTH_TEST_COUNTER: counter,
             PATH: `${fakeBin}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
             RUNNER_TEMP: runnerTemp,
           },
           encoding: 'utf8',
@@ -2035,10 +2041,10 @@ fi
       );
       expect(
         readFileSync(
-          resolve(attemptOne, 'failed-artifacts/test-results/attempt-one.json'),
+          resolve(attemptOne, 'failed-artifacts/test-results/error-context.md'),
           'utf8'
         )
-      ).toContain('failed-attempt');
+      ).toContain('Safe retry diagnostics.');
     } finally {
       rmSync(root, { force: true, recursive: true });
     }
