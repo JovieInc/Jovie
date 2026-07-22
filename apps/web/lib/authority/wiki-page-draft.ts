@@ -118,19 +118,63 @@ function introParagraph(context: ClaimedGraphContext): string {
   return `**${name}** is a musician${genreClause}.`;
 }
 
+type DraftSectionHeadings = {
+  readonly collabs: string;
+  readonly releases: string;
+  readonly press: string;
+};
+
+function extractDraftFacts(context: ClaimedGraphContext): {
+  readonly name: string;
+  readonly aliases: string[];
+  readonly releases: readonly AuthorityReleaseFact[];
+  readonly collabs: readonly AuthorityCollabFact[];
+  readonly press: readonly AuthorityPressFact[];
+} {
+  return {
+    name: context.artistName.trim(),
+    aliases: uniqueNonEmpty(context.aliases ?? []),
+    releases: context.releases ?? [],
+    collabs: context.collabs ?? [],
+    press: (context.confirmedPress ?? []).filter(p => p.confirmed !== false),
+  };
+}
+
+function appendFactSections(
+  lines: string[],
+  facts: ReturnType<typeof extractDraftFacts>,
+  headings: DraftSectionHeadings
+): void {
+  if (facts.collabs.length > 0) {
+    lines.push(headings.collabs, '');
+    for (const collab of facts.collabs) {
+      lines.push(formatCollabLine(collab));
+    }
+    lines.push('');
+  }
+  if (facts.releases.length > 0) {
+    lines.push(headings.releases, '');
+    for (const release of facts.releases) {
+      lines.push(formatReleaseLine(release));
+    }
+    lines.push('');
+  }
+  if (facts.press.length > 0) {
+    lines.push(headings.press, '');
+    for (const item of facts.press) {
+      lines.push(formatPressLine(item));
+    }
+    lines.push('');
+  }
+}
+
 function buildFandomBody(context: ClaimedGraphContext): string {
-  const name = context.artistName.trim();
-  const aliases = uniqueNonEmpty(context.aliases ?? []);
-  const releases = context.releases ?? [];
-  const collabs = context.collabs ?? [];
-  const press = (context.confirmedPress ?? []).filter(
-    p => p.confirmed !== false
-  );
+  const facts = extractDraftFacts(context);
 
   const lines: string[] = [
     `{{Infobox artist`,
-    `| name = ${name}`,
-    aliases.length > 0 ? `| aliases = ${aliases.join(', ')}` : null,
+    `| name = ${facts.name}`,
+    facts.aliases.length > 0 ? `| aliases = ${facts.aliases.join(', ')}` : null,
     context.genres && context.genres.length > 0
       ? `| genre = ${context.genres.join(', ')}`
       : null,
@@ -140,29 +184,11 @@ function buildFandomBody(context: ClaimedGraphContext): string {
     ``,
   ].filter((line): line is string => line !== null);
 
-  if (collabs.length > 0) {
-    lines.push('== Associated artists ==', '');
-    for (const collab of collabs) {
-      lines.push(formatCollabLine(collab));
-    }
-    lines.push('');
-  }
-
-  if (releases.length > 0) {
-    lines.push('== Discography ==', '');
-    for (const release of releases) {
-      lines.push(formatReleaseLine(release));
-    }
-    lines.push('');
-  }
-
-  if (press.length > 0) {
-    lines.push('== References ==', '');
-    for (const item of press) {
-      lines.push(formatPressLine(item));
-    }
-    lines.push('');
-  }
+  appendFactSections(lines, facts, {
+    collabs: '== Associated artists ==',
+    releases: '== Discography ==',
+    press: '== References ==',
+  });
 
   lines.push(
     '<!-- Draft generated from claimed Jovie graph context. Verify every fact before publishing. -->'
@@ -172,43 +198,19 @@ function buildFandomBody(context: ClaimedGraphContext): string {
 }
 
 function buildGeniusBody(context: ClaimedGraphContext): string {
-  const name = context.artistName.trim();
-  const aliases = uniqueNonEmpty(context.aliases ?? []);
-  const releases = context.releases ?? [];
-  const collabs = context.collabs ?? [];
-  const press = (context.confirmedPress ?? []).filter(
-    p => p.confirmed !== false
-  );
+  const facts = extractDraftFacts(context);
 
-  const lines: string[] = [`# ${name}`, ``, introParagraph(context), ``];
+  const lines: string[] = [`# ${facts.name}`, ``, introParagraph(context), ``];
 
-  if (aliases.length > 0) {
-    lines.push(`**Also known as:** ${aliases.join(', ')}`, ``);
+  if (facts.aliases.length > 0) {
+    lines.push(`**Also known as:** ${facts.aliases.join(', ')}`, ``);
   }
 
-  if (collabs.length > 0) {
-    lines.push(`## Associated artists`, ``);
-    for (const collab of collabs) {
-      lines.push(formatCollabLine(collab));
-    }
-    lines.push(``);
-  }
-
-  if (releases.length > 0) {
-    lines.push(`## Notable releases`, ``);
-    for (const release of releases) {
-      lines.push(formatReleaseLine(release));
-    }
-    lines.push(``);
-  }
-
-  if (press.length > 0) {
-    lines.push(`## Sources`, ``);
-    for (const item of press) {
-      lines.push(formatPressLine(item));
-    }
-    lines.push(``);
-  }
+  appendFactSections(lines, facts, {
+    collabs: '## Associated artists',
+    releases: '## Notable releases',
+    press: '## Sources',
+  });
 
   lines.push(
     `_Draft from Jovie claimed-profile context. Do not invent credits or chart stats._`
@@ -218,13 +220,7 @@ function buildGeniusBody(context: ClaimedGraphContext): string {
 }
 
 function buildWikipediaBody(context: ClaimedGraphContext): string {
-  const name = context.artistName.trim();
-  const aliases = uniqueNonEmpty(context.aliases ?? []);
-  const releases = context.releases ?? [];
-  const collabs = context.collabs ?? [];
-  const press = (context.confirmedPress ?? []).filter(
-    p => p.confirmed !== false
-  );
+  const facts = extractDraftFacts(context);
 
   const genreWikilinks =
     context.genres && context.genres.length > 0
@@ -237,39 +233,22 @@ function buildWikipediaBody(context: ClaimedGraphContext): string {
     `> Only include claims with reliable secondary sources. Prefer confirmed press below.`,
     ``,
     `{{Infobox musical artist`,
-    `| name = ${name}`,
-    aliases.length > 0 ? `| alias = ${aliases.join(', ')}` : null,
+    `| name = ${facts.name}`,
+    facts.aliases.length > 0 ? `| alias = ${facts.aliases.join(', ')}` : null,
     genreWikilinks ? `| genre = ${genreWikilinks}` : null,
     `| occupation = Musician`,
     `}}`,
     ``,
-    `'''${name}''' is a musician.${bioSuffix}`,
+    `'''${facts.name}''' is a musician.${bioSuffix}`,
     ``,
   ].filter((line): line is string => line !== null);
 
-  if (collabs.length > 0) {
-    lines.push('== Collaborations ==', '');
-    for (const collab of collabs) {
-      lines.push(formatCollabLine(collab));
-    }
-    lines.push('');
-  }
-
-  if (releases.length > 0) {
-    lines.push('== Discography ==', '');
-    for (const release of releases) {
-      lines.push(formatReleaseLine(release));
-    }
-    lines.push('');
-  }
-
-  if (press.length > 0) {
-    lines.push('== References ==', '');
-    for (const item of press) {
-      lines.push(formatPressLine(item));
-    }
-    lines.push('');
-  } else {
+  appendFactSections(lines, facts, {
+    collabs: '== Collaborations ==',
+    releases: '== Discography ==',
+    press: '== References ==',
+  });
+  if (facts.press.length === 0) {
     lines.push(
       '== References ==',
       '',
