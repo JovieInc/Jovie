@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
 type RedirectRule = {
+  readonly destination: string;
+  readonly permanent: boolean;
   readonly source: string;
 };
 
@@ -30,6 +32,20 @@ beforeEach(() => {
 });
 
 describe('shell alias redirects', () => {
+  it('redirects the releases alias before rendering the authenticated shell', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const redirects = (await nextConfig.redirects()) as RedirectRule[];
+
+    expect(
+      redirects.find(redirect => redirect.source === APP_ROUTES.RELEASES)
+    ).toEqual({
+      source: APP_ROUTES.RELEASES,
+      destination: `${APP_ROUTES.LIBRARY}?view=releases`,
+      permanent: false,
+    });
+  });
+
   it('keeps contacts and tour aliases out of static redirects', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;

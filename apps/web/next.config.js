@@ -264,6 +264,10 @@ const nextConfig = {
       { source: '/account', destination: '/app/settings/account' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
+      {
+        source: '/app/releases',
+        destination: '/app/library?view=releases',
+      },
       // NOTE: shell-owned aliases such as /app/profile, /app/tipping,
       // /app/earnings, /app/contacts, /app/tour-dates, and dashboard profile
       // aliases are intentionally omitted here. App Router pages handle their

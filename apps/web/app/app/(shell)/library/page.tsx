@@ -10,7 +10,7 @@ import { getLibraryMerchCardsForProfile } from '@/lib/merch/service';
 import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
-import { loadReleaseMatrix } from '@/lib/releases/release-matrix-loader';
+import { loadReleaseMatrixForProfile } from '@/lib/releases/release-matrix-loader';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { LibraryPageClient } from './LibraryPageClient';
 
@@ -28,26 +28,40 @@ export default async function LibraryPage() {
     return routeContext.error;
   }
 
-  const profileId = routeContext.profileId;
+  const selectedProfile = routeContext.dashboardData.selectedProfile;
+  const profileId = selectedProfile?.id ?? null;
   let merchCards: Awaited<ReturnType<typeof getLibraryMerchCardsForProfile>> =
     [];
   let approvalStatusByAssetId: Record<string, string> = {};
   let assetShareByAssetId: Record<string, LibraryAssetShareViewModel> = {};
-  if (profileId) {
+  if (profileId && selectedProfile) {
     const queryClient = getQueryClient();
     try {
-      const artistHandle = await loadArtistHandleForProfile(profileId);
+      const assetSharesPromise = loadArtistHandleForProfile(profileId).then(
+        artistHandle =>
+          artistHandle
+            ? getLibraryAssetShareMapForProfile(profileId, artistHandle)
+            : new Map()
+      );
       const [_releases, merch, approvalStatuses, assetShares] =
         await Promise.all([
           queryClient.fetchQuery({
             queryKey: queryKeys.releases.matrix(profileId),
-            queryFn: () => loadReleaseMatrix(profileId),
+            queryFn: () =>
+              loadReleaseMatrixForProfile({
+                userId: routeContext.userId,
+                profileId,
+                profileHandle:
+                  selectedProfile.usernameNormalized ??
+                  selectedProfile.username,
+                spotifyId: selectedProfile.spotifyId ?? null,
+                appleMusicId: selectedProfile.appleMusicId ?? null,
+                settings: selectedProfile.settings ?? null,
+              }),
           }),
           getLibraryMerchCardsForProfile(profileId),
           getLibraryApprovalStatusMapForProfile(profileId),
-          artistHandle
-            ? getLibraryAssetShareMapForProfile(profileId, artistHandle)
-            : Promise.resolve(new Map()),
+          assetSharesPromise,
         ]);
       merchCards = merch;
       approvalStatusByAssetId = Object.fromEntries(approvalStatuses);

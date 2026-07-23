@@ -79,6 +79,11 @@ function readBetterAuthUserId(filePath: string) {
   );
 }
 
+function resolvePerformanceDatabaseOverride(runtimeEnv: NodeJS.ProcessEnv) {
+  const databaseUrl = runtimeEnv.DATABASE_URL?.trim();
+  return databaseUrl ? { DATABASE_URL: databaseUrl } : {};
+}
+
 function buildProject() {
   const result = runCommand(
     'doppler',
@@ -203,8 +208,16 @@ async function waitForServer(baseUrl: string, child: ReturnType<typeof spawn>) {
   throw new Error('Timed out waiting for the launch perf server to start.');
 }
 
-export function buildStandaloneServerLaunch(baseUrl: string) {
+export function buildStandaloneServerLaunch(
+  baseUrl: string,
+  runtimeEnv: NodeJS.ProcessEnv = process.env
+) {
   const parsedBaseUrl = new URL(baseUrl);
+  const databaseOverride = resolvePerformanceDatabaseOverride(runtimeEnv);
+  const preservedEnv = [
+    'BETTER_AUTH_URL',
+    ...(databaseOverride.DATABASE_URL === undefined ? [] : ['DATABASE_URL']),
+  ];
   return {
     args: [
       'run',
@@ -212,13 +225,14 @@ export function buildStandaloneServerLaunch(baseUrl: string) {
       'jovie-web',
       '--config',
       'dev',
-      '--preserve-env=BETTER_AUTH_URL',
+      `--preserve-env=${preservedEnv.join(',')}`,
       '--',
       'node',
       standaloneServerPath,
     ],
     env: {
-      ...process.env,
+      ...runtimeEnv,
+      ...databaseOverride,
       HOSTNAME: parsedBaseUrl.hostname,
       PORT: parsedBaseUrl.port,
       NODE_ENV: 'production',
