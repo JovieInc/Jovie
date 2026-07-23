@@ -96,7 +96,7 @@ HOSTED_BACKGROUND_CONTROLLER_JOBS = (
     ("github-ai-dispatcher.yml", "dispatch"),
     ("github-ai-orchestrator.yml", "guard"),
     ("github-ai-orchestrator.yml", "claim_issue"),
-    ("github-ai-orchestrator.yml", "sync_in_review"),
+    ("github-ai-orchestrator.yml", "finalize_claim"),
     ("neon-scheduled-cleanup.yml", "scheduled-cleanup"),
     ("observability-issue.yml", "sync-issue"),
     ("reusable-ci-lint.yml", "lint"),
@@ -222,7 +222,11 @@ def test_workflow_test_tooling_is_hash_pinned() -> None:
     requirements = requirements_path.read_text(encoding="utf-8")
     logical_requirements = requirements.replace("\\\n", " ").splitlines()
 
-    assert "pytest==8.4.2" in requirements
+    assert any(
+        requirement.split(maxsplit=1)[0] == "pytest==9.0.3"
+        for requirement in logical_requirements
+        if requirement and not requirement.startswith("#")
+    )
     for requirement in logical_requirements:
         if not requirement or requirement.startswith("#"):
             continue
@@ -586,6 +590,25 @@ def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:
     assert workflow.index("Send Slack Alert on Failure") < workflow.index(
         "Fail job if tests failed"
     )
+
+
+def test_github_ai_orchestrator_always_finalizes_exact_owned_claim() -> None:
+    """Every claimed run must release for retry or transition its PR to review."""
+    block = _job_block("github-ai-orchestrator.yml", "finalize_claim")
+    claim = _job_block("github-ai-orchestrator.yml", "claim_issue")
+
+    assert "needs: [guard, claim_issue, implement_and_open_pr]" in block
+    assert "if: ${{ always() && needs.guard.outputs.should_run == 'true' }}" in block
+    assert "IMPLEMENT_RESULT: ${{ needs.implement_and_open_pr.result }}" in block
+    assert 'OUTCOME="retryable"' in block
+    assert 'OUTCOME="in-review"' in block
+    assert "github-finalize-issue-claim.mjs" in block
+    owner_token = (
+        "github-ai:${{ github.repository }}:${{ github.run_id }}:"
+        "${{ github.run_attempt }}"
+    )
+    assert owner_token in block
+    assert owner_token in claim
 
 
 def test_live_model_work_never_fans_out_from_pull_requests() -> None:
