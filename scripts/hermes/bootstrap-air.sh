@@ -32,6 +32,10 @@ HERMES_HOME="${HOME}/.hermes"
 LAUNCH_AGENTS="${HOME}/Library/LaunchAgents"
 DOPPLER_PROJECT="jovie-web"
 DOPPLER_CONFIG="dev"
+INSTALL_HELPER="${REPO_ROOT}/scripts/hermes/lib/install-launchd-artifacts.sh"
+
+# shellcheck source=scripts/hermes/lib/install-launchd-artifacts.sh
+source "$INSTALL_HELPER"
 
 REQUIRED_SECRETS=(
   HERMES_TELEGRAM_BOT_TOKEN
@@ -137,6 +141,9 @@ require_cmd jq
 require_cmd sqlite3
 require_cmd curl
 require_cmd node
+require_cmd python3
+require_cmd plutil
+require_cmd shasum
 
 NODE_VERSION="$(node --version)"
 if [[ ! "$NODE_VERSION" =~ ^v22\.([0-9]+)\.([0-9]+) ]]; then
@@ -263,10 +270,8 @@ mkdir -p \
   "$HERMES_HOME/logs/launchd" \
   "$HERMES_HOME/state"
 chmod 700 "$HERMES_HOME"
-install -m 755 "${REPO_ROOT}/scripts/hermes/shipper-gated-entrypoint.py" \
-  "${HERMES_HOME}/scripts/shipper-gated-entrypoint.py"
 ln -sf "$TSX_BIN" "${HERMES_HOME}/bin/tsx"
-ok "Hermes home: $HERMES_HOME (shipper-gated-entrypoint installed)"
+ok "Hermes home: $HERMES_HOME"
 
 # 10. Render ~/.hermes/.env from Doppler
 log "Rendering ~/.hermes/.env"
@@ -322,20 +327,27 @@ PYEOF
 chmod 600 "${HERMES_HOME}/config.yaml"
 ok "Hermes config rendered (secrets stay as env refs)"
 
-# 12. Install shipper entrypoint to ~/.hermes/scripts (launchd ProgramArguments)
-log "Installing shipper-gated-entrypoint.py"
-mkdir -p "${HERMES_HOME}/scripts"
-install -m 755 "${REPO_ROOT}/scripts/hermes/shipper-gated-entrypoint.py" \
-  "${HERMES_HOME}/scripts/shipper-gated-entrypoint.py"
-ok "shipper-gated-entrypoint.py installed"
-
-# 13. Render launchd plists
-log "Rendering launchd plists"
+# 12. Stage and validate launchd artifacts before replacing installed copies.
+log "Staging launchd artifacts"
 mkdir -p "$LAUNCH_AGENTS"
+LAUNCHD_STAGE="$(hermes_create_launchd_stage)"
+trap 'hermes_remove_launchd_stage "$LAUNCHD_STAGE"' EXIT
+INSTALL_ARGS=()
+hermes_stage_artifact \
+  "${REPO_ROOT}/scripts/hermes/shipper-gated-entrypoint.py" \
+  "${LAUNCHD_STAGE}/shipper-gated-entrypoint.py" \
+  755
+INSTALL_ARGS+=(
+  "${LAUNCHD_STAGE}/shipper-gated-entrypoint.py"
+  "${HERMES_HOME}/scripts/shipper-gated-entrypoint.py"
+  755
+)
+
+# 13. Render launchd plists into the same validated stage.
 for tmpl in "${REPO_ROOT}/scripts/hermes/launchd/"*.plist.template; do
   [[ -f "$tmpl" ]] || continue
   label="$(basename "$tmpl" .plist.template)"
-  out="${LAUNCH_AGENTS}/${label}.plist"
+  out="${LAUNCHD_STAGE}/${label}.plist"
   # Python substitution is safer than sed for paths that may contain |, &, /, etc.
   HOME_V="$HOME" REPO_V="$REPO_ROOT" HERMES_V="$HERMES_BIN" \
   GBRAIN_V="$GBRAIN_BIN" TSX_V="$TSX_BIN" NODE_BIN_V="$NODE_BIN_DIR" TS_IP_V="$TAILSCALE_IP" \
@@ -358,8 +370,12 @@ for k, v in mapping.items():
 with open(dst, "w") as f:
     f.write(content)
 PYEOF
-  ok "rendered $label"
+  INSTALL_ARGS+=("$out" "${LAUNCH_AGENTS}/${label}.plist" 644)
+  ok "staged $label"
 done
+
+hermes_install_validated_launchd_artifacts "$LAUNCHD_STAGE" "${INSTALL_ARGS[@]}"
+ok "validated and installed launchd artifacts"
 
 if [[ "$MODE" == "reconfigure" ]]; then
   log "Reconfigure complete. Restart services with:"

@@ -96,7 +96,7 @@ HOSTED_BACKGROUND_CONTROLLER_JOBS = (
     ("github-ai-dispatcher.yml", "dispatch"),
     ("github-ai-orchestrator.yml", "guard"),
     ("github-ai-orchestrator.yml", "claim_issue"),
-    ("github-ai-orchestrator.yml", "sync_in_review"),
+    ("github-ai-orchestrator.yml", "finalize_claim"),
     ("neon-scheduled-cleanup.yml", "scheduled-cleanup"),
     ("observability-issue.yml", "sync-issue"),
     ("reusable-ci-lint.yml", "lint"),
@@ -214,6 +214,48 @@ def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
     ):
         content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
         assert "run: corepack enable" not in content, workflow_name
+
+
+def test_workflow_test_tooling_is_hash_pinned() -> None:
+    """Security tooling installs must keep package integrity evidence in-repo."""
+    requirements_path = REPO_ROOT / ".github" / "requirements" / "pytest.txt"
+    requirements = requirements_path.read_text(encoding="utf-8")
+    logical_requirements = requirements.replace("\\\n", " ").splitlines()
+
+    assert any(
+        requirement.split(maxsplit=1)[0] == "pytest==9.0.3"
+        for requirement in logical_requirements
+        if requirement and not requirement.startswith("#")
+    )
+    for requirement in logical_requirements:
+        if not requirement or requirement.startswith("#"):
+            continue
+        assert "==" in requirement, requirement
+        assert "--hash=sha256:" in requirement, requirement
+
+    install_command = (
+        "python -m pip install --quiet --require-hashes "
+        "-r .github/requirements/pytest.txt"
+    )
+    for workflow_name in (
+        "actionlint.yml",
+        "brand-scrub.yml",
+        "ci.yml",
+        "slop-gate.yml",
+    ):
+        workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
+        assert install_command in workflow, workflow_name
+        assert "pip install pytest" not in workflow, workflow_name
+
+
+def test_autofix_uses_corepack_for_pnpm_distribution() -> None:
+    """Avoid an unhashed npm global install on the automated repair path."""
+    script = (REPO_ROOT / "scripts" / "auto-fix-lint-agent-drafts.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "npm install -g pnpm@" not in script
+    assert "corepack prepare pnpm@9.15.4 --activate" in script
 
 
 def test_trigger_guard_materializes_systemic_detector_import_closure() -> None:
@@ -562,6 +604,25 @@ def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:
     assert workflow.index("Send Slack Alert on Failure") < workflow.index(
         "Fail job if tests failed"
     )
+
+
+def test_github_ai_orchestrator_always_finalizes_exact_owned_claim() -> None:
+    """Every claimed run must release for retry or transition its PR to review."""
+    block = _job_block("github-ai-orchestrator.yml", "finalize_claim")
+    claim = _job_block("github-ai-orchestrator.yml", "claim_issue")
+
+    assert "needs: [guard, claim_issue, implement_and_open_pr]" in block
+    assert "if: ${{ always() && needs.guard.outputs.should_run == 'true' }}" in block
+    assert "IMPLEMENT_RESULT: ${{ needs.implement_and_open_pr.result }}" in block
+    assert 'OUTCOME="retryable"' in block
+    assert 'OUTCOME="in-review"' in block
+    assert "github-finalize-issue-claim.mjs" in block
+    owner_token = (
+        "github-ai:${{ github.repository }}:${{ github.run_id }}:"
+        "${{ github.run_attempt }}"
+    )
+    assert owner_token in block
+    assert owner_token in claim
 
 
 def test_live_model_work_never_fans_out_from_pull_requests() -> None:

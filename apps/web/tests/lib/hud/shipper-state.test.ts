@@ -1,14 +1,43 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
-const hermesDir = join(homedir(), '.hermes');
-const stateDir = join(hermesDir, 'state');
-const logsDir = join(hermesDir, 'logs');
-const jobsLogPath = join(logsDir, 'jobs.jsonl');
-const inflightPath = join(stateDir, 'inflight-ship-jobs.json');
-const whatShippedPath = join(stateDir, 'what_shipped.json');
+const mockedOs = vi.hoisted(() => ({ home: '' }));
+
+vi.mock('node:os', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  const mocked = { ...actual, homedir: () => mockedOs.home };
+  return { ...mocked, default: mocked };
+});
+
+let hermesDir = '';
+let stateDir = '';
+let logsDir = '';
+let jobsLogPath = '';
+let inflightPath = '';
+let whatShippedPath = '';
+
+beforeAll(() => {
+  mockedOs.home = mkdtempSync(join('/tmp', 'jovie-shipper-state-test-'));
+  hermesDir = join(mockedOs.home, '.hermes');
+  stateDir = join(hermesDir, 'state');
+  logsDir = join(hermesDir, 'logs');
+  jobsLogPath = join(logsDir, 'jobs.jsonl');
+  inflightPath = join(stateDir, 'inflight-ship-jobs.json');
+  whatShippedPath = join(stateDir, 'what_shipped.json');
+});
+
+afterAll(() => {
+  rmSync(mockedOs.home, { force: true, recursive: true });
+});
 
 function writeJsonl(path: string, rows: readonly object[]): void {
   writeFileSync(path, rows.map(row => JSON.stringify(row)).join('\n'));
@@ -20,7 +49,7 @@ describe('getHudShipperStatus', () => {
     mkdirSync(logsDir, { recursive: true });
   });
 
-  it('parses in-flight jobs and recent shipper events', async () => {
+  it('reports idle from hermetic state without the operator pause sentinel', async () => {
     writeJsonl(jobsLogPath, [
       {
         job: 'codex-issue-shipper',
