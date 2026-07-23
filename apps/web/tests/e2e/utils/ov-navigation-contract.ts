@@ -29,6 +29,8 @@ export interface RawNavigationContract {
   readonly accessibility: readonly RawNavigationAccessibilityItem[];
 }
 
+export const NAVIGATION_STYLE_PROBE_SELECTOR = 'a[href], button';
+
 function normalizeWhitespace(value: string | null): string | null {
   if (value === null) return null;
   const normalized = value.replace(/\s+/g, ' ').trim();

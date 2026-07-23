@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  NAVIGATION_STYLE_PROBE_SELECTOR,
   normalizeNavigationContract,
   type RawNavigationContract,
 } from '../../e2e/utils/ov-navigation-contract';
@@ -39,6 +40,31 @@ const baseContract: RawNavigationContract = {
 };
 
 describe('normalizeNavigationContract', () => {
+  it('keeps probe membership stable when transient inline styles change', () => {
+    document.body.innerHTML = `
+      <nav>
+        <div data-transient></div>
+        <a href="/app">Inbox</a>
+        <button type="button">More</button>
+      </nav>
+    `;
+    const navigation = document.querySelector('nav');
+    const transient = document.querySelector<HTMLElement>('[data-transient]');
+    expect(navigation).not.toBeNull();
+    expect(transient).not.toBeNull();
+
+    const probeTags = () =>
+      Array.from(
+        navigation?.querySelectorAll(NAVIGATION_STYLE_PROBE_SELECTOR) ?? []
+      ).map(element => element.tagName.toLowerCase());
+
+    expect(probeTags()).toEqual(['a', 'button']);
+    transient?.setAttribute('style', 'transform: translateX(2px)');
+    expect(probeTags()).toEqual(['a', 'button']);
+    transient?.removeAttribute('style');
+    expect(probeTags()).toEqual(['a', 'button']);
+  });
+
   it('ignores ordering and serialization whitespace without dropping invariants', () => {
     const equivalent: RawNavigationContract = {
       nodes: [

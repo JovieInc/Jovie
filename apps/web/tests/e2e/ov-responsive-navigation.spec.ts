@@ -2,6 +2,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  NAVIGATION_STYLE_PROBE_SELECTOR,
   normalizeNavigationContract,
   type RawNavigationContract,
 } from './utils/ov-navigation-contract';
@@ -47,7 +48,13 @@ async function customerNavigationContract(
   mobile: boolean
 ) {
   const rawContract = await navigation.evaluate(
-    (element, isMobile): RawNavigationContract => {
+    (
+      element,
+      {
+        isMobile,
+        styleProbeSelector,
+      }: { isMobile: boolean; styleProbeSelector: string }
+    ): RawNavigationContract => {
       const roots = isMobile
         ? [element]
         : Array.from(element.querySelectorAll('[data-nav-section]'));
@@ -77,7 +84,11 @@ async function customerNavigationContract(
       const styleInvariants = roots.flatMap((root, rootIndex) =>
         [
           root,
-          ...Array.from(root.querySelectorAll<HTMLElement>('[style]')),
+          ...Array.from(
+            root.querySelectorAll<HTMLAnchorElement | HTMLButtonElement>(
+              styleProbeSelector
+            )
+          ),
         ].map(node => {
           const nodeIndex = [
             root,
@@ -116,7 +127,10 @@ async function customerNavigationContract(
 
       return { nodes, styleInvariants, accessibility };
     },
-    mobile
+    {
+      isMobile: mobile,
+      styleProbeSelector: NAVIGATION_STYLE_PROBE_SELECTOR,
+    }
   );
 
   return normalizeNavigationContract(rawContract);
