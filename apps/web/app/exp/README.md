@@ -12,7 +12,7 @@ as a reference fixture until an owner confirms deletion.
 | Area | Canonical Source | Notes |
 | --- | --- | --- |
 | Production shell primitives | `apps/web/components/shell/*` | Import from here. Do not import production UI from `/app/exp`. |
-| Shell visual reference | `apps/web/app/exp/shell-v1/page.tsx` | Still the broad reference for unextracted shell behavior and layout vocabulary. |
+| Shell visual reference | `apps/web/app/exp/shell-v1/ShellV1ExperimentClient.tsx` | Still the broad reference for unextracted shell behavior and layout vocabulary; `page.tsx` is the thin route entry. |
 | Shell audio state | `apps/web/components/organisms/release-sidebar/useTrackAudioPlayer.ts` | Owns playback state shape and transport behavior. |
 | Marketing/page composition experiments | `apps/web/app/exp/page-builder/*`, `apps/web/app/exp/component-checker/*` | Static noindex preview routes only. |
 | Library experiment | `apps/web/app/exp/library-v1/page.tsx` | Currently imported by `shell-v1`; treat as blocked from deletion. |

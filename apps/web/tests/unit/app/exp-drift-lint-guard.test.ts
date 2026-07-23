@@ -16,6 +16,7 @@ const EXP_DRIFT_TARGETS = [
   'apps/web/app/exp/home-v1/page.tsx',
   'apps/web/app/exp/library-v1/page.tsx',
   'apps/web/app/exp/shell-v1/page.tsx',
+  'apps/web/app/exp/shell-v1/ShellV1ExperimentClient.tsx',
 ] as const;
 
 /**
@@ -86,12 +87,12 @@ function canonicalLabelErrors(targets: readonly string[]) {
 }
 
 describe('exp drift lint guard (#11224 follow-up)', () => {
-  it('keeps the three exp pages Biome-clean so pre-push hooks do not fail on unrelated work', () => {
+  it('keeps the exp route sources Biome-clean so pre-push hooks do not fail on unrelated work', () => {
     const files = EXP_DRIFT_TARGETS.join(' ');
     expect(() => run(`pnpm biome check ${files}`)).not.toThrow();
   });
 
-  it('keeps canonical UI label casing clean on the three exp pages', () => {
+  it('keeps canonical UI label casing clean on the exp route sources', () => {
     expect(canonicalLabelErrors(EXP_DRIFT_TARGETS)).toEqual([]);
   });
 });

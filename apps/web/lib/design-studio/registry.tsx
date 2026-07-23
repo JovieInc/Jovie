@@ -616,7 +616,7 @@ const PRODUCT_SHOWCASE_ITEMS: readonly DesignStudioItem[] = [
       'apps/web/components/shell/DrawerHero.tsx',
       'apps/web/components/shell/AudioBar.tsx',
       'apps/web/components/features/dashboard/organisms/release-provider-matrix/components/TrackRow.tsx',
-      'apps/web/app/exp/shell-v1/page.tsx',
+      'apps/web/app/exp/shell-v1/ShellV1ExperimentClient.tsx',
     ],
     screenshotScenarioIds: ['design-studio-shell-track-desktop'],
     marketingPrompt:
