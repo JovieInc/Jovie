@@ -1,5 +1,5 @@
 {
-  "id": "231144f3-ed14-4e19-bace-c85c3ce71d11",
+  "id": "488e3210-ca5a-44d0-be12-14932562963b",
   "prevId": "634dc17e-c12d-4042-80e5-f90817a28f68",
   "version": "7",
   "dialect": "postgresql",
@@ -8224,6 +8224,27 @@
         }
       },
       "indexes": {
+        "idx_creator_profiles_user_edit_version": {
+          "name": "idx_creator_profiles_user_edit_version",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "profile_edit_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "idx_creator_profiles_featured_query": {
           "name": "idx_creator_profiles_featured_query",
           "columns": [

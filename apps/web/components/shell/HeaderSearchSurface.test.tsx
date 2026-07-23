@@ -83,7 +83,7 @@ describe('HeaderSearchSurface', () => {
     await waitFor(() => expect(input).toHaveFocus());
 
     expect(container.firstElementChild).toHaveClass(
-      'focus-within:border-(--linear-border-focus)',
+      'focus-within:border-focus',
       'focus-within:ring-2',
       'focus-within:ring-ring/14'
     );

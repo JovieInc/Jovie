@@ -361,8 +361,9 @@ function assertPipelineSucceeded(results: unknown[]): void {
 }
 
 /**
- * Aggregate-first write. No raw event row exists. The only transient key is a
- * SHA-256 prefix of the opaque event id, retained for retry deduplication.
+ * Aggregate-first write. No raw event row exists. Expiring Redis state is
+ * limited to SHA-256 event-id dedupe keys, keyed lifecycle hashes, and keyed
+ * contributor HyperLogLogs used for distinct-contributor suppression.
  */
 export async function recordNavigationTelemetry(
   payload: NavigationTelemetryPayload,

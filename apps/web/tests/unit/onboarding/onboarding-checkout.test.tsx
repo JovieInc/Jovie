@@ -128,7 +128,7 @@ describe('OnboardingCheckoutClient', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
 
     expect(
-      screen.getByRole('heading', { name: 'Upgrade to Pro' })
+      screen.getByRole('heading', { name: 'Upgrade To Pro' })
     ).toBeInTheDocument();
     expect(screen.getByText('Tim White')).toBeInTheDocument();
     expect(screen.getByText('@timwhite')).toBeInTheDocument();

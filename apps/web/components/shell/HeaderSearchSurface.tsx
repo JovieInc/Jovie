@@ -53,7 +53,7 @@ const HEADER_SEARCH_DEBOUNCE_MS = 250;
 const MIN_REMOTE_QUERY_LENGTH = 2;
 
 const headerSearchSurfaceChrome =
-  'rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_18%,transparent)]';
+  'rounded-xl border border-subtle bg-surface-0 shadow-[0_0_0_1px_color-mix(in_oklab,var(--color-border-subtle)_18%,transparent)]';
 
 function flattenGroups(groups: readonly HeaderSearchResultGroup[]) {
   return groups.flatMap(group => group.items);
@@ -355,7 +355,7 @@ function HeaderGlobalSearch({
           id={listboxId}
           role='listbox'
           aria-label='Search Results'
-          className='absolute inset-x-0 top-full z-50 mt-1.5 max-h-80 overflow-y-auto rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1.5 shadow-popover'
+          className='absolute inset-x-0 top-full z-50 mt-1.5 max-h-80 overflow-y-auto rounded-xl border border-subtle bg-surface-0 p-1.5 shadow-popover'
         >
           {indexedGroups.map(({ group, startIndex }) => (
             <fieldset
@@ -508,7 +508,7 @@ export function HeaderSearchSurface({
     <div
       className={cn(
         headerSearchSurfaceChrome,
-        'relative flex h-7 min-h-7 w-full max-w-[min(560px,calc(100vw-2rem))] items-center justify-start px-2 py-0 text-left shadow-popover transition-[border-color,box-shadow,background-color] duration-subtle focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-ring/14 sm:w-110 lg:w-130',
+        'relative flex h-7 min-h-7 w-full max-w-[min(560px,calc(100vw-2rem))] items-center justify-start px-2 py-0 text-left shadow-popover transition-[border-color,box-shadow,background-color] duration-subtle focus-within:border-focus focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-ring/14 sm:w-110 lg:w-130',
         className
       )}
     >

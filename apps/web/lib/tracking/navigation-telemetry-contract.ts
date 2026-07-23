@@ -79,6 +79,21 @@ export const NAVIGATION_LATENCY_BUCKETS = [
 export type NavigationLatencyBucket =
   (typeof NAVIGATION_LATENCY_BUCKETS)[number];
 
+const NAVIGATION_LATENCY_BUCKET_DEFINITIONS = [
+  { bucket: 'na', upperBoundMs: null },
+  { bucket: 'le_100ms', upperBoundMs: 100 },
+  { bucket: 'le_250ms', upperBoundMs: 250 },
+  { bucket: 'le_500ms', upperBoundMs: 500 },
+  { bucket: 'le_1s', upperBoundMs: 1000 },
+  { bucket: 'le_2_5s', upperBoundMs: 2500 },
+  { bucket: 'le_5s', upperBoundMs: 5000 },
+  { bucket: 'le_10s', upperBoundMs: 10_000 },
+  { bucket: 'gt_10s', upperBoundMs: 10_001 },
+] as const satisfies ReadonlyArray<{
+  bucket: NavigationLatencyBucket;
+  upperBoundMs: number | null;
+}>;
+
 /** Opaque request key only. It is hashed before entering Redis key-space. */
 const eventIdSchema = z
   .string()
@@ -266,29 +281,23 @@ export function bucketNavigationLatency(
   durationMs: number
 ): NavigationLatencyBucket {
   if (!Number.isFinite(durationMs) || durationMs < 0) return 'na';
-  if (durationMs <= 100) return 'le_100ms';
-  if (durationMs <= 250) return 'le_250ms';
-  if (durationMs <= 500) return 'le_500ms';
-  if (durationMs <= 1000) return 'le_1s';
-  if (durationMs <= 2500) return 'le_2_5s';
-  if (durationMs <= 5000) return 'le_5s';
-  if (durationMs <= 10_000) return 'le_10s';
-  return 'gt_10s';
+
+  const boundedBucket = NAVIGATION_LATENCY_BUCKET_DEFINITIONS.find(
+    definition =>
+      definition.bucket !== 'na' &&
+      definition.bucket !== 'gt_10s' &&
+      definition.upperBoundMs !== null &&
+      durationMs <= definition.upperBoundMs
+  );
+  return boundedBucket?.bucket ?? 'gt_10s';
 }
 
 export function navigationLatencyBucketUpperBoundMs(
   bucket: NavigationLatencyBucket
 ): number | null {
-  const upperBounds: Record<NavigationLatencyBucket, number | null> = {
-    na: null,
-    le_100ms: 100,
-    le_250ms: 250,
-    le_500ms: 500,
-    le_1s: 1000,
-    le_2_5s: 2500,
-    le_5s: 5000,
-    le_10s: 10_000,
-    gt_10s: 10_001,
-  };
-  return upperBounds[bucket];
+  return (
+    NAVIGATION_LATENCY_BUCKET_DEFINITIONS.find(
+      definition => definition.bucket === bucket
+    )?.upperBoundMs ?? null
+  );
 }

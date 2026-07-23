@@ -25,6 +25,7 @@ import {
 } from './navigation-telemetry';
 import {
   NAVIGATION_TELEMETRY_ENDPOINT,
+  NAVIGATION_TELEMETRY_MAX_BATCH_SIZE,
   type NavigationTelemetryBatch,
   type NavigationTelemetryPayload,
 } from './navigation-telemetry-contract';
@@ -135,6 +136,28 @@ describe('navigation telemetry client', () => {
     );
 
     expect(emitted).toHaveLength(7);
+    expect(mockPostJsonBeacon).toHaveBeenCalledTimes(1);
+    expect(mockPostJsonBeacon).toHaveBeenCalledWith(
+      NAVIGATION_TELEMETRY_ENDPOINT,
+      {
+        schema_version: 1,
+        events: emitted,
+      }
+    );
+  });
+
+  it('caps an oversized impression input at the contract batch maximum', () => {
+    const emitted = trackNavigationImpressions(
+      Array.from(
+        { length: NAVIGATION_TELEMETRY_MAX_BATCH_SIZE + 3 },
+        (_, index) => `oversized-item-${index}`
+      ),
+      '/app',
+      CONTEXT,
+      100
+    );
+
+    expect(emitted).toHaveLength(NAVIGATION_TELEMETRY_MAX_BATCH_SIZE);
     expect(mockPostJsonBeacon).toHaveBeenCalledTimes(1);
     expect(mockPostJsonBeacon).toHaveBeenCalledWith(
       NAVIGATION_TELEMETRY_ENDPOINT,
