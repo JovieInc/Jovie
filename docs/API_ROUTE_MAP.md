@@ -372,6 +372,12 @@
 |-------|---------|------|-------------|
 | `/api/revalidate/featured-creators` | POST | `cron` | Revalidate featured creators cache |
 
+### Search
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/search/header` | GET | `auth` | Search the active profile's releases with validated input, a five-result cap, and a minimal result shape |
+
 ### Sentry
 
 | Route | Methods | Auth | Description |

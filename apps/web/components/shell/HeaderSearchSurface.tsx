@@ -17,6 +17,7 @@ import {
   buildHeaderSearchGroups,
   type HeaderSearchCatalog,
   type HeaderSearchResultGroup,
+  type SearchableRelease,
 } from './header-search-results';
 import { PillSearch } from './PillSearch';
 import {
@@ -30,6 +31,10 @@ interface HeaderSearchSurfaceProps {
   readonly adapter?: HeaderSearchAdapter | null;
   readonly catalog?: HeaderSearchCatalog;
   readonly isLoading?: boolean;
+  readonly searchLibraryAssets?: (
+    query: string,
+    signal: AbortSignal
+  ) => Promise<readonly SearchableRelease[]>;
   readonly isOpen: boolean;
   readonly onOpen: () => void;
   readonly onClose: () => void;
@@ -41,6 +46,9 @@ const EMPTY_CATALOG: HeaderSearchCatalog = {
   profiles: [],
   releases: [],
 };
+
+const HEADER_SEARCH_DEBOUNCE_MS = 250;
+const MIN_REMOTE_QUERY_LENGTH = 2;
 
 const headerSearchSurfaceChrome =
   'rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_18%,transparent)]';
@@ -86,22 +94,55 @@ function HeaderGlobalSearch({
   catalog,
   adapter,
   isLoading,
+  searchLibraryAssets,
   onClose,
   onOpenFilters,
 }: {
   readonly catalog: HeaderSearchCatalog;
   readonly adapter: HeaderSearchAdapter | null;
   readonly isLoading: boolean;
+  readonly searchLibraryAssets?: (
+    query: string,
+    signal: AbortSignal
+  ) => Promise<readonly SearchableRelease[]>;
   readonly onClose: () => void;
   readonly onOpenFilters?: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [remoteSearch, setRemoteSearch] = useState<{
+    readonly query: string;
+    readonly releases: readonly SearchableRelease[];
+    readonly status: 'idle' | 'loading' | 'success' | 'error';
+  }>({ query: '', releases: [], status: 'idle' });
   const inputRef = useRef<HTMLInputElement>(null);
   const listboxId = useId();
+  const normalizedQuery = query.trim();
+  const canSearchRemotely =
+    Boolean(searchLibraryAssets) &&
+    normalizedQuery.length >= MIN_REMOTE_QUERY_LENGTH;
+  const remoteSearchPending =
+    canSearchRemotely &&
+    (remoteSearch.query !== normalizedQuery ||
+      remoteSearch.status === 'loading');
+  const remoteSearchFailed =
+    canSearchRemotely &&
+    remoteSearch.query === normalizedQuery &&
+    remoteSearch.status === 'error';
+  const effectiveCatalog = useMemo<HeaderSearchCatalog>(
+    () => ({
+      ...catalog,
+      releases: searchLibraryAssets
+        ? remoteSearch.query === normalizedQuery
+          ? remoteSearch.releases
+          : []
+        : catalog.releases,
+    }),
+    [catalog, normalizedQuery, remoteSearch, searchLibraryAssets]
+  );
   const groups = useMemo(
-    () => buildHeaderSearchGroups(query, catalog),
-    [catalog, query]
+    () => buildHeaderSearchGroups(query, effectiveCatalog),
+    [effectiveCatalog, query]
   );
   const items = useMemo(() => flattenGroups(groups), [groups]);
   const contextualSuggestions = useMemo(
@@ -122,6 +163,53 @@ function HeaderGlobalSearch({
   useEffect(() => {
     setSelectedIndex(0);
   }, [query]);
+
+  useEffect(() => {
+    if (!searchLibraryAssets || !canSearchRemotely) {
+      setRemoteSearch({
+        query: normalizedQuery,
+        releases: [],
+        status: 'idle',
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    let active = true;
+    setRemoteSearch({
+      query: normalizedQuery,
+      releases: [],
+      status: 'loading',
+    });
+
+    const timeout = globalThis.setTimeout(async () => {
+      try {
+        const releases = await searchLibraryAssets(
+          normalizedQuery,
+          controller.signal
+        );
+        if (!active) return;
+        setRemoteSearch({
+          query: normalizedQuery,
+          releases,
+          status: 'success',
+        });
+      } catch {
+        if (!active || controller.signal.aborted) return;
+        setRemoteSearch({
+          query: normalizedQuery,
+          releases: [],
+          status: 'error',
+        });
+      }
+    }, HEADER_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      active = false;
+      globalThis.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [canSearchRemotely, normalizedQuery, searchLibraryAssets]);
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (event.nativeEvent.isComposing) return;
@@ -334,9 +422,14 @@ function HeaderGlobalSearch({
           {groups.length === 0 && contextualSuggestions.length === 0 ? (
             <div
               role='status'
-              className='px-2 py-3 text-xs text-tertiary-token'
+              aria-live='polite'
+              className='min-h-10 px-2 py-3 text-xs text-tertiary-token'
             >
-              {isLoading ? 'Searching…' : 'No matching results'}
+              {isLoading || remoteSearchPending
+                ? 'Searching…'
+                : remoteSearchFailed
+                  ? 'Search unavailable'
+                  : 'No matching results'}
             </div>
           ) : null}
         </div>
@@ -353,6 +446,7 @@ export function HeaderSearchSurface({
   adapter = null,
   catalog = EMPTY_CATALOG,
   isLoading = false,
+  searchLibraryAssets,
   isOpen,
   onOpen,
   onClose,
@@ -389,7 +483,7 @@ export function HeaderSearchSurface({
     <div
       className={cn(
         headerSearchSurfaceChrome,
-        'relative flex h-7 min-h-7 w-full max-w-[min(560px,calc(100vw-2rem))] items-center justify-start px-2 py-0 text-left shadow-popover sm:w-110 lg:w-130',
+        'relative flex h-7 min-h-7 w-full max-w-[min(560px,calc(100vw-2rem))] items-center justify-start px-2 py-0 text-left shadow-popover transition-[border-color,box-shadow,background-color] duration-subtle focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-ring/14 sm:w-110 lg:w-130',
         className
       )}
     >
@@ -414,6 +508,7 @@ export function HeaderSearchSurface({
           catalog={catalog}
           adapter={adapter}
           isLoading={isLoading}
+          searchLibraryAssets={searchLibraryAssets}
           onClose={onClose}
           onOpenFilters={adapter ? () => setShowFilters(true) : undefined}
         />

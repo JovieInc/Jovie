@@ -1,7 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
 import { HeaderSearchSurface } from './HeaderSearchSurface';
+import type { SearchableRelease } from './header-search-results';
 
 function createAdapter(
   overrides: Partial<HeaderSearchAdapter> = {}
@@ -21,6 +28,10 @@ function createAdapter(
 }
 
 describe('HeaderSearchSurface', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('keeps the closed trigger on the compact header height', () => {
     render(
       <HeaderSearchSurface
@@ -61,6 +72,21 @@ describe('HeaderSearchSurface', () => {
     expect(
       screen.getByRole('button', { name: 'Filter Current View' })
     ).toBeVisible();
+  });
+
+  it('focuses the search field inside a tokenized focus-within ring', async () => {
+    const { container } = render(
+      <HeaderSearchSurface isOpen onOpen={vi.fn()} onClose={vi.fn()} />
+    );
+
+    const input = screen.getByRole('combobox', { name: 'Search Jovie' });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    expect(container.firstElementChild).toHaveClass(
+      'focus-within:border-(--linear-border-focus)',
+      'focus-within:ring-2',
+      'focus-within:ring-ring/14'
+    );
   });
 
   it('keeps contextual pill filters available inside the shared surface', () => {
@@ -178,5 +204,100 @@ describe('HeaderSearchSurface', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('debounces library search and aborts superseded requests', async () => {
+    vi.useFakeTimers();
+    const pending: Array<{
+      readonly query: string;
+      readonly signal: AbortSignal;
+      readonly resolve: (releases: readonly SearchableRelease[]) => void;
+    }> = [];
+    const searchLibraryAssets = vi.fn(
+      (query: string, signal: AbortSignal) =>
+        new Promise<readonly SearchableRelease[]>(resolve => {
+          pending.push({ query, signal, resolve });
+        })
+    );
+    render(
+      <HeaderSearchSurface
+        isOpen
+        onOpen={vi.fn()}
+        onClose={vi.fn()}
+        searchLibraryAssets={searchLibraryAssets}
+      />
+    );
+
+    const input = screen.getByRole('combobox', { name: 'Search Jovie' });
+    fireEvent.change(input, { target: { value: 'm' } });
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    expect(searchLibraryAssets).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: 'mi' } });
+    await act(() => vi.advanceTimersByTimeAsync(249));
+    expect(searchLibraryAssets).not.toHaveBeenCalled();
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(searchLibraryAssets).toHaveBeenCalledTimes(1);
+    expect(pending[0]?.query).toBe('mi');
+    expect(pending[0]?.signal.aborted).toBe(false);
+
+    fireEvent.change(input, { target: { value: 'mid' } });
+    expect(pending[0]?.signal.aborted).toBe(true);
+    pending[0]?.resolve([
+      {
+        id: 'stale-release',
+        title: 'Stale Result',
+        artistNames: ['Old Artist'],
+        smartLinkPath: '/old/stale-result',
+      },
+    ]);
+    await act(async () => Promise.resolve());
+    expect(screen.queryByText('Stale Result')).not.toBeInTheDocument();
+
+    await act(() => vi.advanceTimersByTimeAsync(250));
+    expect(searchLibraryAssets).toHaveBeenCalledTimes(2);
+    pending[1]?.resolve([
+      {
+        id: 'fresh-release',
+        title: 'Midnight Drive',
+        artistNames: ['Midnight Artist'],
+        smartLinkPath: '/midnight-artist/midnight-drive',
+      },
+    ]);
+    await act(async () => Promise.resolve());
+
+    expect(screen.getByText('Midnight Drive')).toBeVisible();
+  });
+
+  it('renders stable loading, empty, and error feedback', async () => {
+    vi.useFakeTimers();
+    const searchLibraryAssets = vi
+      .fn<
+        (query: string, signal: AbortSignal) => Promise<SearchableRelease[]>
+      >()
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('network unavailable'));
+    render(
+      <HeaderSearchSurface
+        isOpen
+        onOpen={vi.fn()}
+        onClose={vi.fn()}
+        searchLibraryAssets={searchLibraryAssets}
+      />
+    );
+
+    const input = screen.getByRole('combobox', { name: 'Search Jovie' });
+    fireEvent.change(input, { target: { value: 'empty' } });
+    expect(screen.getByRole('status')).toHaveTextContent('Searching…');
+    await act(() => vi.advanceTimersByTimeAsync(250));
+    await act(async () => Promise.resolve());
+    expect(screen.getByRole('status')).toHaveTextContent('No matching results');
+
+    fireEvent.change(input, { target: { value: 'error' } });
+    expect(screen.getByRole('status')).toHaveTextContent('Searching…');
+    await act(() => vi.advanceTimersByTimeAsync(250));
+    await act(async () => Promise.resolve());
+    expect(screen.getByRole('status')).toHaveTextContent('Search unavailable');
+    expect(screen.getByRole('status')).toHaveClass('min-h-10');
   });
 });

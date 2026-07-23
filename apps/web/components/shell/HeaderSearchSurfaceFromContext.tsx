@@ -8,8 +8,8 @@ import {
   useHeaderActions,
 } from '@/contexts/HeaderActionsContext';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
-import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { HeaderSearchSurface } from './HeaderSearchSurface';
+import { searchHeaderLibraryAssets } from './header-search-client';
 import type { HeaderSearchCatalog } from './header-search-results';
 
 /** Pulls the global catalogs and route adapter into the single shell surface. */
@@ -35,6 +35,7 @@ export function HeaderSearchSurfaceFromContext({
         isOpen={isSearchOpen}
         onOpen={openSearch}
         onClose={closeSearch}
+        searchLibraryAssets={searchHeaderLibraryAssets}
         className={className}
       />
     );
@@ -67,35 +68,28 @@ function HeaderSearchSurfaceWithQueries({
   readonly onClose: () => void;
   readonly className?: string;
 }) {
-  const profileId = dashboardData?.selectedProfile?.id ?? '';
   const conversationsQuery = useChatConversationsQuery({
     limit: 50,
-    enabled: isOpen,
-  });
-  const releasesQuery = useReleasesQuery(profileId, {
     enabled: isOpen,
   });
   const catalog = useMemo<HeaderSearchCatalog>(
     () => ({
       conversations: conversationsQuery.data ?? [],
       profiles: dashboardData?.creatorProfiles ?? [],
-      releases: releasesQuery.data ?? [],
+      releases: [],
     }),
-    [
-      conversationsQuery.data,
-      dashboardData?.creatorProfiles,
-      releasesQuery.data,
-    ]
+    [conversationsQuery.data, dashboardData?.creatorProfiles]
   );
 
   return (
     <HeaderSearchSurface
       adapter={adapter}
       catalog={catalog}
-      isLoading={conversationsQuery.isLoading || releasesQuery.isLoading}
+      isLoading={conversationsQuery.isLoading}
       isOpen={isOpen}
       onOpen={onOpen}
       onClose={onClose}
+      searchLibraryAssets={searchHeaderLibraryAssets}
       className={className}
     />
   );

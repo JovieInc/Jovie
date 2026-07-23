@@ -23,7 +23,7 @@ interface SearchableProfile {
   readonly usernameNormalized: string;
 }
 
-interface SearchableRelease {
+export interface SearchableRelease {
   readonly id: string;
   readonly title: string;
   readonly artistNames?: readonly string[];

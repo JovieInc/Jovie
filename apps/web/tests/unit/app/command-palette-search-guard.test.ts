@@ -46,4 +46,16 @@ describe('command palette search shell guard', () => {
       /new\s+Event\(\s*OPEN_COMMAND_PALETTE_EVENT\s*\)/
     );
   });
+
+  it('keeps header search off the full release matrix transport', () => {
+    const connectorSource = readSource(
+      'components/shell/HeaderSearchSurfaceFromContext.tsx'
+    );
+    const clientSource = readSource('components/shell/header-search-client.ts');
+
+    expect(connectorSource).not.toContain('useReleasesQuery');
+    expect(connectorSource).not.toContain('loadReleaseMatrix');
+    expect(clientSource).toContain('/api/search/header');
+    expect(clientSource).toContain('signal');
+  });
 });
