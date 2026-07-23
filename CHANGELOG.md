@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **Next.js security update (JOV-2569):** upgraded every application to Next.js 16.2.11, patching middleware authorization bypass, SSRF, Server Action disclosure and denial-of-service, cache-confusion, and image-optimization vulnerabilities.
 - [internal] **JavaScript, Ruby, and Python dependency audits now report zero known findings (JOV-2569):** patched Better Auth OAuth audience binding, Sharp/libvips image processing, Vitest browser file access, request parsing, archive handling, HTTP client, and Pytest vulnerabilities; CI Python tooling installs from a fully hashed lockfile, and automated lint repair bootstraps pnpm through Corepack.
 - [internal] **Repository security hygiene (JOV-2569):** workflow test tooling and the autofix package manager are version-pinned, reusable lint runs with an explicit read-only token, and generated Python bytecode is ignored instead of committed.
 - [internal] **App shell loading skeleton** matches `DESIGN_V1` so flag-on users no longer flash the legacy sidebar/header on first `/app` paint.
