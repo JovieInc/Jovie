@@ -355,6 +355,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           HEARTBEAT_MAX_AGE_SECONDS: '900'
           HEARTBEAT_API_TIMEOUT_SECONDS: '5'
+          HEARTBEAT_JOB_POLL_ATTEMPTS: '3'
+          HEARTBEAT_JOB_POLL_INTERVAL_SECONDS: '2'
           HEARTBEAT_EXPECTED_EVENT: ''
           HEARTBEAT_EXPECTED_SHA: ''
           HEARTBEAT_POLL_ATTEMPTS: '10'

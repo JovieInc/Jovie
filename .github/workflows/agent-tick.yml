@@ -421,6 +421,8 @@ jobs:
     env:
       HEARTBEAT_MAX_AGE_SECONDS: '1500'
       HEARTBEAT_API_TIMEOUT_SECONDS: '20'
+      HEARTBEAT_JOB_POLL_ATTEMPTS: '3'
+      HEARTBEAT_JOB_POLL_INTERVAL_SECONDS: '2'
 
     steps:
       - name: Checkout main policy code
