@@ -90,6 +90,7 @@ export {
   generalLimiter,
   getAllLimiters,
   handleCheckLimiter,
+  headerSearchLimiter,
   healthLimiter,
   isrcRescanLimiter,
   merchCheckoutLimiter,

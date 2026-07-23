@@ -10,6 +10,7 @@ import { discogReleases } from '@/lib/db/schema/content';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { createRateLimitHeaders, headerSearchLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
 const MAX_RESULTS = 5;
@@ -27,8 +28,10 @@ function escapeLikePattern(value: string): string {
 }
 
 export async function GET(request: Request) {
+  let responseHeaders: HeadersInit = NO_STORE_HEADERS;
+
   try {
-    const { profile } = await getSessionContext({ requireProfile: true });
+    const { profile, user } = await getSessionContext({ requireProfile: true });
     if (!profile) {
       return NextResponse.json(
         { error: 'Profile not found' },
@@ -41,6 +44,18 @@ export async function GET(request: Request) {
       throw new TypeError('Authenticated profile handle is unavailable');
     }
 
+    const rateLimitResult = await headerSearchLimiter.limit(user.id);
+    responseHeaders = {
+      ...NO_STORE_HEADERS,
+      ...createRateLimitHeaders(rateLimitResult),
+    };
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many requests', code: 'RATE_LIMITED' },
+        { status: 429, headers: responseHeaders }
+      );
+    }
+
     const url = new URL(request.url);
     const parsed = searchParamsSchema.safeParse({
       q: url.searchParams.get('q') ?? undefined,
@@ -49,7 +64,7 @@ export async function GET(request: Request) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invalid search parameters' },
-        { status: 400, headers: NO_STORE_HEADERS }
+        { status: 400, headers: responseHeaders }
       );
     }
 
@@ -95,7 +110,7 @@ export async function GET(request: Request) {
           smartLinkPath: buildSmartLinkPath(profileHandle, release.slug),
         })),
       },
-      { headers: NO_STORE_HEADERS }
+      { headers: responseHeaders }
     );
   } catch (error) {
     if (isUnauthorizedSessionError(error)) {
@@ -112,7 +127,7 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(
       { error: 'Search unavailable' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      { status: 500, headers: responseHeaders }
     );
   }
 }

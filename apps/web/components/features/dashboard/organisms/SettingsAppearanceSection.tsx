@@ -3,6 +3,7 @@
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Check, Laptop, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
 import { useHighContrast } from '@/lib/hooks/useHighContrast';
@@ -33,19 +34,26 @@ const THEME_OPTIONS = [
 ] as const;
 
 export function SettingsAppearanceSection() {
+  const { selectedProfile } = useDashboardData();
+  const selectedProfileId = selectedProfile?.id;
   const { theme, resolvedTheme, setTheme } = useTheme();
-  const { updateTheme, isPending: isThemePending } = useThemeMutation();
+  const { updateTheme, isPending: isThemePending } =
+    useThemeMutation(selectedProfileId);
   const { isHighContrast, setHighContrast } = useHighContrast();
   const { setHighContrast: saveHighContrast, isPending: isContrastPending } =
-    useHighContrastMutation();
+    useHighContrastMutation(selectedProfileId);
 
   const handleThemeChange = (newTheme: string) => {
+    if (!selectedProfileId) return;
+
     const validTheme = newTheme as ThemeValue;
     setTheme(validTheme);
     updateTheme(validTheme, isHighContrast);
   };
 
   const handleHighContrastChange = (enabled: boolean) => {
+    if (!selectedProfileId) return;
+
     setHighContrast(enabled);
     const currentTheme = (theme ?? 'system') as ThemeValue;
     saveHighContrast(enabled, currentTheme);
@@ -73,7 +81,7 @@ export function SettingsAppearanceSection() {
                 type='button'
                 variant='ghost'
                 onClick={() => handleThemeChange(option.value)}
-                disabled={isThemePending}
+                disabled={isThemePending || !selectedProfileId}
                 className={cn(
                   'h-auto justify-start rounded-lg border px-3 py-2.5 text-left',
                   'focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-0',
@@ -99,6 +107,7 @@ export function SettingsAppearanceSection() {
                             </span>
                           </TooltipTrigger>
                           <TooltipContent side='top'>
+                            {/* ui-casing-allow: System is a theme option label */}
                             Your device currently resolves System to{' '}
                             {resolvedThemeLabel}.
                           </TooltipContent>
@@ -126,7 +135,7 @@ export function SettingsAppearanceSection() {
             description='Increase contrast for text, borders, and surfaces.'
             checked={isHighContrast}
             onCheckedChange={handleHighContrastChange}
-            disabled={isContrastPending}
+            disabled={isContrastPending || !selectedProfileId}
             ariaLabel='Toggle high contrast mode'
           />
         </div>

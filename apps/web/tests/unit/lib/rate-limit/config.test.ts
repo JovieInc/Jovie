@@ -145,6 +145,12 @@ describe('Rate Limit Config', () => {
         expect(RATE_LIMITERS.paymentIntent.window).toContain('h');
       });
 
+      it('should bound authenticated header search fanout', () => {
+        expect(RATE_LIMITERS.headerSearch.limit).toBe(60);
+        expect(RATE_LIMITERS.headerSearch.window).toBe('1 m');
+        expect(RATE_LIMITERS.headerSearch.prefix).toBe('header_search');
+      });
+
       it('should have strict Spotify claim limits', () => {
         expect(RATE_LIMITERS.spotifyClaim.limit).toBeLessThanOrEqual(10);
         expect(RATE_LIMITERS.spotifyClaim.window).toContain('h');

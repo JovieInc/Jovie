@@ -114,6 +114,11 @@ export const dashboardLinksLimiter = createRateLimiter(
   RATE_LIMITERS.dashboardLinks
 );
 
+/** Rate limiter for keystroke-driven header search, keyed by authenticated user. */
+export const headerSearchLimiter = createRateLimiter(
+  RATE_LIMITERS.headerSearch
+);
+
 /**
  * Rate limiter for the bio-import-from-URL chat tool.
  * Limit: 5 imports per minute per user (fan-out cap inside a chat turn).
@@ -1070,6 +1075,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     anonymousOnboardingChatAsn: anonymousOnboardingChatAsnLimiter,
     anonymousOnboardingChatSession: anonymousOnboardingChatSessionLimiter,
     dashboardLinks: dashboardLinksLimiter,
+    headerSearch: headerSearchLimiter,
     paymentIntent: paymentIntentLimiter,
     tipCheckout: tipCheckoutLimiter,
     merchCheckout: merchCheckoutLimiter,

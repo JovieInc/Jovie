@@ -66,6 +66,12 @@ vi.mock('@/lib/rate-limit/config', () => ({
       requireRedis: true,
     },
     api: { name: 'API', limit: 100, window: '1 m', prefix: 'api_calls' },
+    headerSearch: {
+      name: 'Header Search',
+      limit: 60,
+      window: '1 m',
+      prefix: 'header_search',
+    },
     navigationTelemetry: {
       name: 'Navigation Telemetry',
       limit: 600,
@@ -333,6 +339,7 @@ describe('limiters.ts', () => {
         'onboarding',
         'handleCheck',
         'dashboardLinks',
+        'headerSearch',
         'paymentIntent',
         'adminImpersonate',
         'adminFitScores',

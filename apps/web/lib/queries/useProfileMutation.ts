@@ -205,7 +205,7 @@ export function useProfileMutation(options: UseProfileMutationOptions = {}) {
 // ============================================================================
 
 export interface UseAvatarMutationOptions {
-  profileId?: string;
+  profileId: string | undefined;
   /** Called on successful upload with the new avatar URL */
   onSuccess?: (avatarUrl: string) => void;
   /** Called on error */
@@ -222,6 +222,7 @@ export interface UseAvatarMutationOptions {
  * @example
  * ```tsx
  * const { mutate: uploadAvatar, isPending } = useAvatarMutation({
+ *   profileId: selectedProfile?.id,
  *   onSuccess: (url) => console.log('New avatar:', url),
  * });
  *
@@ -229,45 +230,47 @@ export interface UseAvatarMutationOptions {
  * uploadAvatar(file);
  * ```
  */
-export function useAvatarMutation(options: UseAvatarMutationOptions = {}) {
+export function useAvatarMutation(options: UseAvatarMutationOptions) {
   const queryClient = useQueryClient();
   const { onSuccess, onError } = options;
 
   return useMutation({
     mutationFn: async (file: File): Promise<string> => {
+      const profileId = options.profileId;
+      if (!profileId) {
+        throw new Error('Missing profile id; please refresh and try again.');
+      }
+
       // Step 1: Upload to blob storage
       const blobUrl = await uploadAvatarToBlob(file);
 
       // Step 2: Update profile with new URL
-      const profileId =
-        options.profileId ??
-        queryClient.getQueryData<ProfileData>(queryKeys.user.profile())?.id;
-      if (!profileId) {
-        throw new Error('Missing profile id; please refresh and try again.');
-      }
       await updateProfileApi({ profileId, updates: { avatarUrl: blobUrl } });
 
       return blobUrl;
     },
 
     onMutate: async () => {
+      const profileId = options.profileId;
+
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: queryKeys.user.profile() });
 
       // Snapshot for rollback
-      const previousProfile = queryClient.getQueryData(
+      const previousProfile = queryClient.getQueryData<ProfileData>(
         queryKeys.user.profile()
       );
 
-      return { previousProfile };
+      return { previousProfile, profileId };
     },
 
-    onSuccess: avatarUrl => {
-      // Update cache with new avatar
+    onSuccess: (avatarUrl, _file, context) => {
+      // Only update the profile that owned this upload. The selected profile
+      // may have changed while the blob and profile requests were in flight.
       queryClient.setQueryData(
         queryKeys.user.profile(),
         (old: ProfileData | undefined) => {
-          if (!old) return old;
+          if (!old || old.id !== context.profileId) return old;
           return { ...old, avatarUrl };
         }
       );
@@ -279,8 +282,14 @@ export function useAvatarMutation(options: UseAvatarMutationOptions = {}) {
     },
 
     onError: (error, _variables, context) => {
-      // Rollback to previous state
-      if (context?.previousProfile) {
+      // Roll back only if this upload still owns the selected profile cache.
+      const currentProfile = queryClient.getQueryData<ProfileData>(
+        queryKeys.user.profile()
+      );
+      if (
+        context?.previousProfile &&
+        currentProfile?.id === context.profileId
+      ) {
         queryClient.setQueryData(
           queryKeys.user.profile(),
           context.previousProfile

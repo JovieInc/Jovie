@@ -36,6 +36,7 @@ const hoisted = vi.hoisted(() => {
     limit,
     ne,
     orderBy,
+    rateLimit: vi.fn(),
     select,
   };
 });
@@ -79,6 +80,21 @@ vi.mock('@/lib/http/headers', () => ({
   NO_STORE_HEADERS: { 'Cache-Control': 'no-store' },
 }));
 
+vi.mock('@/lib/rate-limit', () => ({
+  createRateLimitHeaders: (result: {
+    limit: number;
+    remaining: number;
+    reset: Date;
+    success: boolean;
+  }) => ({
+    'X-RateLimit-Limit': String(result.limit),
+    'X-RateLimit-Remaining': String(result.remaining),
+    'X-RateLimit-Reset': String(Math.floor(result.reset.getTime() / 1000)),
+    ...(result.success ? {} : { 'Retry-After': '0' }),
+  }),
+  headerSearchLimiter: { limit: hoisted.rateLimit },
+}));
+
 vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn() },
 }));
@@ -89,12 +105,19 @@ describe('GET /api/search/header', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.getSessionContext.mockResolvedValue({
+      user: { id: 'user-1' },
       profile: {
         id: 'profile-1',
         displayName: 'Midnight Artist',
         username: 'midnight-artist',
         usernameNormalized: 'midnight-artist',
       },
+    });
+    hoisted.rateLimit.mockResolvedValue({
+      success: true,
+      limit: 60,
+      remaining: 59,
+      reset: new Date('2026-07-23T00:00:00.000Z'),
     });
     hoisted.limit.mockResolvedValue([]);
   });
@@ -124,6 +147,31 @@ describe('GET /api/search/header', () => {
 
     expect(response.status).toBe(400);
     expect(hoisted.select).not.toHaveBeenCalled();
+  });
+
+  it('rate limits by authenticated user before querying releases', async () => {
+    hoisted.rateLimit.mockResolvedValue({
+      success: false,
+      limit: 60,
+      remaining: 0,
+      reset: new Date('2026-07-23T00:00:00.000Z'),
+    });
+
+    const response = await GET(
+      new Request('http://localhost/api/search/header?q=midnight')
+    );
+
+    expect(hoisted.rateLimit).toHaveBeenCalledExactlyOnceWith('user-1');
+    expect(response.status).toBe(429);
+    expect(response.headers.get('x-ratelimit-limit')).toBe('60');
+    expect(response.headers.get('x-ratelimit-remaining')).toBe('0');
+    expect(response.headers.get('x-ratelimit-reset')).toBe('1784764800');
+    expect(response.headers.get('retry-after')).toBe('0');
+    expect(hoisted.select).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toEqual({
+      error: 'Too many requests',
+      code: 'RATE_LIMITED',
+    });
   });
 
   it('caps the database query at five results', async () => {
@@ -179,6 +227,7 @@ describe('GET /api/search/header', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('x-ratelimit-remaining')).toBe('59');
     expect(hoisted.select).toHaveBeenCalledWith({
       id: 'id',
       slug: 'slug',

@@ -183,6 +183,15 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Authenticated header search: 60 requests per minute per user */
+  headerSearch: {
+    name: 'Header Search',
+    limit: 60,
+    window: '1 m',
+    prefix: 'header_search',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // Payment Operations
   // ---------------------------------------------------------------------------

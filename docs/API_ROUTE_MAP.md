@@ -206,7 +206,7 @@
 | `/api/dashboard/pixels` | GET, POST | `auth` | Pixel management |
 | `/api/dashboard/pixels/health` | GET | `auth` | Pixel health check |
 | `/api/dashboard/pixels/test-event` | POST | `auth` | Send test pixel event |
-| `/api/dashboard/profile` | GET, PUT | `auth` | Profile data; PUT accepts optional integer `expectedVersion`, success returns `profile.profileEditVersion`, stale writes return 409 `VERSION_CONFLICT` |
+| `/api/dashboard/profile` | GET, PUT | `auth` | GET returns `{ profile }` (the web query adapter also accepts the legacy raw-profile response and normalizes its cache); PUT requires canonical `profileId` with no active-profile fallback, accepts optional integer `expectedVersion`, returns `profile.profileEditVersion`, and returns 409 `VERSION_CONFLICT` for stale writes |
 | `/api/dashboard/releases/artwork-downloads` | POST | `auth` | Toggle allow-artwork-downloads for the active profile |
 | `/api/dashboard/releases/[releaseId]/analytics` | GET | `auth` | Release analytics |
 | `/api/dashboard/releases/[releaseId]/pitch` | POST | `auth` | Generate release pitch |
@@ -376,7 +376,7 @@
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
-| `/api/search/header` | GET | `auth` | Search the active profile's releases with validated input, a five-result cap, and a minimal result shape |
+| `/api/search/header` | GET | `auth` | Per-user rate-limited search of the active profile's releases with standard rate-limit headers/429, validated input, a five-result cap, and a minimal result shape |
 
 ### Sentry
 
