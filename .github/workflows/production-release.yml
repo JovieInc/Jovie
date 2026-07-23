@@ -67,10 +67,105 @@ jobs:
             echo "is_current=false" >> "$GITHUB_OUTPUT"
           fi
 
-  deploy-staging:
+  migrate-production:
+    name: Migrate production database
     needs: [release-head]
-    # The caller owns the single release lease. A superseded SHA is neutral.
     if: ${{ always() && needs.release-head.result == 'success' && needs.release-head.outputs.is_current == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      is_current: ${{ steps.post-migration-head.outputs.is_current || steps.migration-head.outputs.is_current }}
+      schema_drift: ${{ steps.verify-production-schema.outcome == 'failure' }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-doppler
+      - name: Require production migration credential
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DOPPLER_TOKEN:-}" ]; then
+            echo "::error::DOPPLER_TOKEN_PRD is required for production database migration."
+            exit 1
+          fi
+      - name: Recheck main immediately before production DB mutation
+        id: migration-head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::GitHub returned an invalid main HEAD at production DB mutation."
+            exit 1
+          }
+          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha before production DB mutation."
+            echo "is_current=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: DB safety check (production preflight)
+        if: ${{ steps.migration-head.outputs.is_current == 'true' }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          GIT_BRANCH: main
+          ALLOW_PROD_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config prd
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web exec tsx
+          scripts/drizzle-migrate-preflight.ts
+      - name: DB migrate (production - Drizzle)
+        if: ${{ steps.migration-head.outputs.is_current == 'true' }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          GIT_BRANCH: main
+          ALLOW_PROD_MIGRATIONS: 'true'
+        run: >-
+          doppler run --project jovie-web --config prd
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:migrate:ci
+      - name: DB verify (production schema check)
+        id: verify-production-schema
+        if: ${{ steps.migration-head.outputs.is_current == 'true' }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: >-
+          doppler run --project jovie-web --config prd
+          --only-secrets=DATABASE_URL --no-fallback --
+          env -u DOPPLER_TOKEN pnpm --filter=@jovie/web run drizzle:verify:ci
+      - name: Recheck main after production DB migration
+        id: post-migration-head
+        if: ${{ steps.migration-head.outputs.is_current == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::GitHub returned an invalid main HEAD after production DB migration."
+            exit 1
+          }
+          if [ "$current_sha" = "$EXPECTED_SHA" ]; then
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Release $EXPECTED_SHA was superseded by $current_sha after production DB migration."
+            echo "is_current=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy-staging:
+    needs: [release-head, migrate-production]
+    # The caller owns the single release lease. A superseded SHA is neutral.
+    if: ${{ always() && needs.release-head.result == 'success' && needs.release-head.outputs.is_current == 'true' && needs.migrate-production.result == 'success' && needs.migrate-production.outputs.is_current == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
@@ -1314,6 +1409,7 @@ jobs:
     needs:
       [
         release-head,
+        migrate-production,
         deploy-staging,
         attest-staging-build,
         canary-health-gate,
@@ -1355,7 +1451,7 @@ jobs:
             echo "production_deployment_id=$PRODUCTION_DEPLOYMENT_ID"
             echo "production_deployment_url_b64=$PRODUCTION_DEPLOYMENT_URL_B64"
             echo "previous_production_deployment_id=$PREVIOUS_PRODUCTION_DEPLOYMENT_ID"
-            echo "schema_drift=${{ needs.deploy-staging.outputs.schema_drift }}"
+            echo "schema_drift=${{ needs.migrate-production.outputs.schema_drift == 'true' || needs.deploy-staging.outputs.schema_drift == 'true' }}"
             echo "failure_subtype=${{ needs.promote-production.outputs.failure_subtype }}"
             echo "sentry_gate_status=${{ needs.sentry-error-gate.outputs.gate_status }}"
             echo "oauth_gate_status=${{ needs.production-oauth-gate.outputs.gate_status }}"
@@ -1367,6 +1463,11 @@ jobs:
           fi
           if [ "${{ needs.release-head.outputs.is_current }}" != "true" ]; then
             echo "Superseded before release work; neutral."
+            exit 0
+          fi
+          if [ "${{ needs.migrate-production.result }}" = "success" ] &&
+            [ "${{ needs.migrate-production.outputs.is_current }}" != "true" ]; then
+            echo "Superseded during production DB migration; neutral."
             exit 0
           fi
           if [ "${{ needs.staging-head.result }}" = "success" ] &&
@@ -1423,6 +1524,7 @@ jobs:
           fi
 
           for gate in \
+            "migrate-production:${{ needs.migrate-production.result }}" \
             "deploy-staging:${{ needs.deploy-staging.result }}" \
             "attest-staging-build:${{ needs.attest-staging-build.result }}" \
             "canary-health-gate:${{ needs.canary-health-gate.result }}" \

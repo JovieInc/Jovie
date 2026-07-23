@@ -12,6 +12,7 @@ const {
   mockDbInsert,
   mockRevalidatePath,
   mockInvalidateProfileCache,
+  mockInvalidateProxyUserStateCache,
   mockEnqueueMusicFetchEnrichmentJob,
   mockEnqueueDspArtistDiscoveryJob,
 } = vi.hoisted(() => ({
@@ -23,6 +24,7 @@ const {
   mockDbInsert: vi.fn(),
   mockRevalidatePath: vi.fn(),
   mockInvalidateProfileCache: vi.fn(),
+  mockInvalidateProxyUserStateCache: vi.fn(),
   mockEnqueueMusicFetchEnrichmentJob: vi.fn(),
   mockEnqueueDspArtistDiscoveryJob: vi.fn(),
 }));
@@ -83,12 +85,8 @@ vi.mock('@/lib/auth/clerk-sync', () => ({
   syncAllClerkMetadata: vi.fn().mockResolvedValue({ success: true }),
 }));
 
-vi.mock('@/lib/auth/ban-check', () => ({
-  invalidateBanStatusCache: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('@/lib/auth/proxy-state', () => ({
-  invalidateProxyUserStateCache: vi.fn().mockResolvedValue(undefined),
+  invalidateProxyUserStateCache: mockInvalidateProxyUserStateCache,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -196,8 +194,16 @@ vi.mock('@/lib/db/schema/auth', () => ({
   users: {
     id: 'users.id',
     clerkId: 'users.clerkId',
+    betterAuthUserId: 'users.betterAuthUserId',
     userStatus: 'users.userStatus',
     deletedAt: 'users.deletedAt',
+  },
+}));
+
+vi.mock('@/lib/db/schema/better-auth', () => ({
+  baSessions: {
+    table: 'baSessions',
+    userId: 'baSessions.userId',
   },
 }));
 
@@ -235,6 +241,7 @@ describe('admin/actions.ts', () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'admin_123' });
     mockIsAdmin.mockResolvedValue(true);
     mockInvalidateProfileCache.mockResolvedValue(undefined);
+    mockInvalidateProxyUserStateCache.mockResolvedValue(undefined);
     // requireAdmin() now does a db.select() to check admin's ban status.
     // Default: return an active admin user. Tests that need different select
     // results should call createSelectChain/createMultiSelectChain after this.
@@ -801,15 +808,22 @@ describe('admin/actions.ts', () => {
   });
 
   describe('post-Better Auth user moderation', () => {
-    it('uses the authenticated app user ID directly when banning a user', async () => {
+    it('revokes every live Better Auth session and app-UUID cache when banning a post-cutover user', async () => {
       mockGetCachedAuth.mockResolvedValue({
         userId: '7b4b948f-9720-4c5f-98da-8a7335015da9',
       });
       createMultiSelectChain([
         [{ userStatus: 'active', deletedAt: null }],
-        [{ userStatus: 'active', clerkId: null }],
+        [
+          {
+            userStatus: 'active',
+            clerkId: null,
+            betterAuthUserId: 'ba-user-live-session-owner',
+          },
+        ],
       ]);
       createUpdateChain();
+      const { where: deleteWhere } = createDeleteChain();
 
       const { banUserAction } = await import('@/app/app/(shell)/admin/actions');
 
@@ -821,11 +835,20 @@ describe('admin/actions.ts', () => {
       );
 
       expect(mockDbSelect).toHaveBeenCalledTimes(2);
+      expect(mockDbDelete).toHaveBeenCalledWith(
+        expect.objectContaining({ table: 'baSessions' })
+      );
+      expect(deleteWhere).toHaveBeenCalledWith({
+        eq: 'ba-user-live-session-owner',
+      });
       expect(mockDbInsert.mock.results[0]?.value.values).toHaveBeenCalledWith(
         expect.objectContaining({
           adminUserId: '7b4b948f-9720-4c5f-98da-8a7335015da9',
           targetUserId: 'f95ad825-cd83-4827-b9b9-1f004119884e',
         })
+      );
+      expect(mockInvalidateProxyUserStateCache).toHaveBeenCalledWith(
+        'f95ad825-cd83-4827-b9b9-1f004119884e'
       );
     });
 
@@ -856,6 +879,9 @@ describe('admin/actions.ts', () => {
           adminUserId: '7b4b948f-9720-4c5f-98da-8a7335015da9',
           targetUserId: 'f95ad825-cd83-4827-b9b9-1f004119884e',
         })
+      );
+      expect(mockInvalidateProxyUserStateCache).toHaveBeenCalledWith(
+        'f95ad825-cd83-4827-b9b9-1f004119884e'
       );
     });
   });

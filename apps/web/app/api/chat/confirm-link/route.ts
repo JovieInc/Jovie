@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
 import { chatAuditLog } from '@/lib/db/schema/chat';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -74,15 +73,14 @@ export async function POST(req: Request) {
     parseResult.data;
 
   try {
-    // Verify profile ownership by joining users table to compare Clerk IDs
+    // Better Auth resolves the app `users.id`; profile ownership uses the same
+    // stable UUID and does not depend on the nullable legacy Clerk identity.
     const [profile] = await db
       .select({
         id: creatorProfiles.id,
         internalUserId: creatorProfiles.userId,
-        clerkId: users.clerkId,
       })
       .from(creatorProfiles)
-      .leftJoin(users, eq(users.id, creatorProfiles.userId))
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
 
@@ -93,7 +91,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (profile.clerkId !== userId) {
+    if (profile.internalUserId !== userId) {
       return NextResponse.json(
         { error: 'Unauthorized - not your profile' },
         { status: 403, headers: NO_CACHE_HEADERS }
@@ -176,6 +174,10 @@ export async function POST(req: Request) {
       linkVersion = rows[0].version;
       outcome = 'updated';
     } else {
+      if (expectedVersion !== undefined) {
+        return linkVersionConflict(expectedVersion);
+      }
+
       // Insert new social link
       const rows = await db
         .insert(socialLinks)
@@ -192,9 +194,20 @@ export async function POST(req: Request) {
           sourceType: 'manual',
           version: 1,
         })
+        .onConflictDoNothing()
         .returning({ id: socialLinks.id });
       if (!rows[0]) {
-        throw new Error('Insert returned no rows');
+        const [currentLink] = await db
+          .select({ version: socialLinks.version })
+          .from(socialLinks)
+          .where(
+            and(
+              eq(socialLinks.creatorProfileId, profileId),
+              eq(socialLinks.platform, detected.platform.id)
+            )
+          )
+          .limit(1);
+        return linkVersionConflict(0, currentLink?.version);
       }
       linkId = rows[0].id;
       linkVersion = 1;
@@ -208,7 +221,7 @@ export async function POST(req: Request) {
     const userAgent = req.headers.get('user-agent');
 
     await db.insert(chatAuditLog).values({
-      userId: profile.internalUserId!,
+      userId: profile.internalUserId,
       creatorProfileId: profileId,
       action: outcome === 'created' ? 'add_social_link' : 'update_social_link',
       field: 'social_links',

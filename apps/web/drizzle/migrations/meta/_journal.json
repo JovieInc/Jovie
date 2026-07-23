@@ -589,6 +589,13 @@
       "when": 1784747331964,
       "tag": "0083_first_molly_hayes",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1784781324805,
+      "tag": "0084_stiff_tigra",
+      "breakpoints": true
     }
   ]
 }

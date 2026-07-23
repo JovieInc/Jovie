@@ -872,6 +872,7 @@ describe('deploy workflow Vercel env resolution', () => {
 
     for (const job of [
       'release-head',
+      'migrate-production',
       'deploy-staging',
       'staging-head',
       'alias-staging',
@@ -883,6 +884,103 @@ describe('deploy workflow Vercel env resolution', () => {
     }
     expect(readFileSync(canaryWorkflowPath, 'utf8')).toContain(
       'runs-on: ubuntu-latest'
+    );
+  });
+
+  it('migrates the production database fail closed before staging under the exact-main lease', () => {
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const controllerHeader = controller.slice(0, controller.indexOf('\njobs:'));
+    const migrationJob = getJobBlock(workflow, 'migrate-production');
+    const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const resultJob = getJobBlock(workflow, 'release-result');
+    const headStep = getStepBlock(
+      migrationJob,
+      'Recheck main immediately before production DB mutation'
+    );
+    const credentialStep = getStepBlock(
+      migrationJob,
+      'Require production migration credential'
+    );
+    const preflightStep = getStepBlock(
+      migrationJob,
+      'DB safety check (production preflight)'
+    );
+    const migrateStep = getStepBlock(
+      migrationJob,
+      'DB migrate (production - Drizzle)'
+    );
+    const verifyStep = getStepBlock(
+      migrationJob,
+      'DB verify (production schema check)'
+    );
+    const postMigrationHead = getStepBlock(
+      migrationJob,
+      'Recheck main after production DB migration'
+    );
+    const migrationIndex = workflow.indexOf('\n  migrate-production:');
+    const stagingIndex = workflow.indexOf('\n  deploy-staging:');
+
+    expect(controllerHeader).toContain('group: production-mutation');
+    expect(controllerHeader).toContain('queue: max');
+    expect(controllerHeader).toContain('cancel-in-progress: false');
+    expect(migrationJob).toContain('needs: [release-head]');
+    expect(migrationJob).toContain(
+      "needs.release-head.outputs.is_current == 'true'"
+    );
+    expect(migrationJob).toContain('ref: ${{ inputs.expected_sha }}');
+    expect(migrationJob).toContain(
+      'is_current: ${{ steps.post-migration-head.outputs.is_current || steps.migration-head.outputs.is_current }}'
+    );
+    expect(credentialStep).toContain(
+      'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}'
+    );
+    expect(credentialStep).toContain('if [ -z "${DOPPLER_TOKEN:-}" ]');
+    expect(credentialStep).toContain('exit 1');
+    expect(credentialStep).not.toContain('continue-on-error');
+    expect(headStep).toContain('EXPECTED_SHA: ${{ inputs.expected_sha }}');
+    expect(headStep).toContain('/commits/main');
+    expect(headStep).toContain('[ "$current_sha" = "$EXPECTED_SHA" ]');
+    expect(postMigrationHead).toContain(
+      'EXPECTED_SHA: ${{ inputs.expected_sha }}'
+    );
+    expect(postMigrationHead).toContain('/commits/main');
+    expect(migrationIndex).toBeGreaterThanOrEqual(0);
+    expect(stagingIndex).toBeGreaterThan(migrationIndex);
+    expect(stagingJob).toContain('needs: [release-head, migrate-production]');
+    expect(stagingJob).toContain(
+      "needs.migrate-production.result == 'success'"
+    );
+    expect(stagingJob).toContain(
+      "needs.migrate-production.outputs.is_current == 'true'"
+    );
+
+    for (const step of [preflightStep, migrateStep, verifyStep]) {
+      expect(step).toContain('DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}');
+      expect(step).toContain(
+        "if: ${{ steps.migration-head.outputs.is_current == 'true' }}"
+      );
+      expect(step).toContain('doppler run --project jovie-web --config prd');
+      expect(step).toContain('--only-secrets=DATABASE_URL --no-fallback --');
+      expect(step).toContain('env -u DOPPLER_TOKEN');
+      expect(step).not.toContain('continue-on-error');
+      expect(step).not.toContain('DOPPLER_TOKEN_STG');
+      expect(step).not.toContain('--config stg');
+    }
+    expect(preflightStep).toContain('scripts/drizzle-migrate-preflight.ts');
+    expect(migrateStep).toContain('drizzle:migrate:ci');
+    expect(verifyStep).toContain('drizzle:verify:ci');
+    expect(migrationJob.indexOf('production preflight')).toBeLessThan(
+      migrationJob.indexOf('production - Drizzle')
+    );
+    expect(migrationJob.indexOf('production - Drizzle')).toBeLessThan(
+      migrationJob.indexOf('production schema check')
+    );
+    expect(resultJob).toContain(
+      'migrate-production:${{ needs.migrate-production.result }}'
+    );
+    expect(resultJob).toContain(
+      'Superseded during production DB migration; neutral.'
     );
   });
 
@@ -3819,10 +3917,10 @@ describe('production promotion exact-artifact contract', () => {
         'ref: ${{ needs.authorize-production.outputs.expected_sha }}'
       );
     }
-    expect(reusable.match(/actions\/checkout/g)).toHaveLength(6);
+    expect(reusable.match(/actions\/checkout/g)).toHaveLength(7);
     expect(
       reusable.match(/ref: \$\{\{ inputs\.expected_sha \}\}/g)
-    ).toHaveLength(6);
+    ).toHaveLength(7);
   });
 
   it('keeps rollback centralized behind confirmed structured gate failures', () => {

@@ -6,7 +6,6 @@ import { APP_ROUTES } from '@/constants/routes';
 
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
-import { invalidateBanStatusCache } from '@/lib/auth/ban-check';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
@@ -16,6 +15,7 @@ import { db } from '@/lib/db';
 import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { adminAuditLog } from '@/lib/db/schema/admin';
 import { users } from '@/lib/db/schema/auth';
+import { baSessions } from '@/lib/db/schema/better-auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
@@ -510,7 +510,11 @@ export async function banUserAction(formData: FormData): Promise<void> {
   const result = await runLegacyDbTransaction(async tx => {
     // Read current status before updating
     const [current] = await tx
-      .select({ userStatus: users.userStatus, clerkId: users.clerkId })
+      .select({
+        userStatus: users.userStatus,
+        clerkId: users.clerkId,
+        betterAuthUserId: users.betterAuthUserId,
+      })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
@@ -528,6 +532,12 @@ export async function banUserAction(formData: FormData): Promise<void> {
       .set({ userStatus: 'banned' })
       .where(eq(users.id, userId));
 
+    if (current.betterAuthUserId) {
+      await tx
+        .delete(baSessions)
+        .where(eq(baSessions.userId, current.betterAuthUserId));
+    }
+
     await tx.insert(adminAuditLog).values({
       adminUserId,
       targetUserId: userId,
@@ -538,13 +548,13 @@ export async function banUserAction(formData: FormData): Promise<void> {
       },
     });
 
-    return { clerkId: current.clerkId };
+    return {
+      clerkId: current.clerkId,
+      betterAuthUserId: current.betterAuthUserId,
+    };
   });
 
-  // Post-commit side effects (best-effort). clerk_id may be null for users
-  // provisioned post-cutover (migration 0073); Clerk-keyed side effects are
-  // skipped in that case — the live auth path resolves them via
-  // better_auth_user_id, so there is no Clerk metadata to sync.
+  // Clerk metadata is a legacy side effect and may be absent post-cutover.
   if (result.clerkId) {
     try {
       await syncAllClerkMetadata(result.clerkId);
@@ -554,18 +564,15 @@ export async function banUserAction(formData: FormData): Promise<void> {
         clerkId: result.clerkId,
       });
     }
+  }
 
-    try {
-      await Promise.all([
-        invalidateProxyUserStateCache(result.clerkId),
-        invalidateBanStatusCache(result.clerkId),
-      ]);
-    } catch (error) {
-      captureError('Failed to invalidate auth caches after ban', error, {
-        userId,
-        clerkId: result.clerkId,
-      });
-    }
+  try {
+    await invalidateProxyUserStateCache(userId);
+  } catch (error) {
+    captureError('Failed to invalidate auth caches after ban', error, {
+      userId,
+      betterAuthUserId: result.betterAuthUserId,
+    });
   }
 
   revalidatePath(APP_ROUTES.ADMIN);
@@ -668,8 +675,7 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
     return { clerkId: user.clerkId };
   });
 
-  // Post-commit side effects (best-effort). See note in banUser: clerk_id may
-  // be null for users provisioned post-cutover (migration 0073).
+  // Clerk metadata is a legacy side effect and may be absent post-cutover.
   if (result.clerkId) {
     try {
       await syncAllClerkMetadata(result.clerkId);
@@ -679,18 +685,14 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
         clerkId: result.clerkId,
       });
     }
+  }
 
-    try {
-      await Promise.all([
-        invalidateProxyUserStateCache(result.clerkId),
-        invalidateBanStatusCache(result.clerkId),
-      ]);
-    } catch (error) {
-      captureError('Failed to invalidate auth caches after unban', error, {
-        userId,
-        clerkId: result.clerkId,
-      });
-    }
+  try {
+    await invalidateProxyUserStateCache(userId);
+  } catch (error) {
+    captureError('Failed to invalidate auth caches after unban', error, {
+      userId,
+    });
   }
 
   revalidatePath(APP_ROUTES.ADMIN);

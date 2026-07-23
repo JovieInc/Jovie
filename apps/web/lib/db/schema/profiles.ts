@@ -232,6 +232,10 @@ export const creatorProfiles = pgTable(
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   table => ({
+    profileEditVersionIndex: index('idx_creator_profiles_user_edit_version').on(
+      table.userId,
+      table.profileEditVersion
+    ),
     featuredCreatorsQueryIndex: index('idx_creator_profiles_featured_query')
       .on(
         table.isPublic,

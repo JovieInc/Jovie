@@ -4,10 +4,23 @@ import { socialLinks } from '@/lib/db/schema/links';
 const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
 const LINK_ID = '00000000-0000-4000-8000-000000000002';
 
+interface LinkState {
+  id: string;
+  creatorProfileId: string;
+  platform: string;
+  url: string;
+  isActive: boolean;
+  state: string;
+  version: number;
+}
+
 const mocks = vi.hoisted(() => ({
   captureError: vi.fn(),
   invalidateSocialLinksCache: vi.fn().mockResolvedValue(undefined),
   syncPrimaryMusicUrls: vi.fn().mockResolvedValue(undefined),
+  getCachedAuth: vi.fn(),
+  profileLeftJoin: vi.fn(),
+  selections: [] as Record<string, unknown>[],
   eq: vi.fn((left, right) => ({ left, right })),
   and: vi.fn((...conditions: unknown[]) => ({ conditions })),
   state: {
@@ -18,7 +31,8 @@ const mocks = vi.hoisted(() => ({
     isActive: true,
     state: 'active',
     version: 1,
-  },
+  } as LinkState | null,
+  concurrentCreateWins: false,
   deleteUpdateReached: Promise.resolve(),
   resolveDeleteUpdateReached: undefined as (() => void) | undefined,
   releaseDeleteUpdate: undefined as (() => void) | undefined,
@@ -44,21 +58,21 @@ function versionFromPredicate(predicate: {
 
 const mockDb = vi.hoisted(() => ({
   select: vi.fn((selection: Record<string, unknown>) => {
+    mocks.selections.push(selection);
     const chain = {
       from: vi.fn().mockReturnThis(),
-      leftJoin: vi.fn().mockReturnThis(),
+      leftJoin: mocks.profileLeftJoin.mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn(async () => {
-        if ('clerkId' in selection) {
+        if ('internalUserId' in selection) {
           return [
             {
               id: PROFILE_ID,
               internalUserId: 'internal-user-1',
-              clerkId: 'clerk-user-1',
             },
           ];
         }
-        return [{ ...mocks.state }];
+        return mocks.state ? [{ ...mocks.state }] : [];
       }),
     };
     return chain;
@@ -82,6 +96,7 @@ const mockDb = vi.hoisted(() => ({
           mocks.resolveDeleteUpdateReached?.();
           await mocks.deleteUpdateGate;
         }
+        if (!mocks.state) return [];
         if (versionFromPredicate(predicate) !== mocks.state.version) return [];
         mocks.state = {
           ...mocks.state,
@@ -93,9 +108,48 @@ const mockDb = vi.hoisted(() => ({
     };
     return chain;
   }),
-  insert: vi.fn(() => ({
-    values: vi.fn().mockResolvedValue([]),
-  })),
+  insert: vi.fn((table: unknown) => {
+    if (table !== socialLinks) {
+      return {
+        values: vi.fn().mockResolvedValue([]),
+      };
+    }
+
+    let values: Record<string, unknown> = {};
+    const chain = {
+      values(nextValues: Record<string, unknown>) {
+        values = nextValues;
+        return chain;
+      },
+      onConflictDoNothing: vi.fn(() => chain),
+      async returning() {
+        if (mocks.concurrentCreateWins) {
+          mocks.state = {
+            id: LINK_ID,
+            creatorProfileId: PROFILE_ID,
+            platform: String(values.platform),
+            url: String(values.url),
+            isActive: true,
+            state: 'active',
+            version: 1,
+          };
+          return [];
+        }
+
+        mocks.state = {
+          id: LINK_ID,
+          creatorProfileId: PROFILE_ID,
+          platform: String(values.platform),
+          url: String(values.url),
+          isActive: true,
+          state: 'active',
+          version: 1,
+        };
+        return [{ id: LINK_ID }];
+      },
+    };
+    return chain;
+  }),
 }));
 
 vi.mock('drizzle-orm', async () => {
@@ -106,7 +160,7 @@ vi.mock('drizzle-orm', async () => {
 
 vi.mock('@/lib/db', () => ({ db: mockDb }));
 vi.mock('@/lib/auth/cached', () => ({
-  getCachedAuth: vi.fn().mockResolvedValue({ userId: 'clerk-user-1' }),
+  getCachedAuth: mocks.getCachedAuth,
 }));
 vi.mock('@/lib/auth/session', () => ({
   withDbSessionTx: vi.fn(async callback => callback(mockDb, 'clerk-user-1')),
@@ -155,7 +209,111 @@ describe('social link compare-and-swap routes', () => {
       state: 'active',
       version: 1,
     };
+    mocks.getCachedAuth.mockResolvedValue({ userId: 'internal-user-1' });
+    mocks.selections = [];
+    mocks.concurrentCreateWins = false;
     resetBarriers();
+  });
+
+  it('authorizes a post-cutover profile by app user UUID without joining legacy Clerk identity', async () => {
+    const { POST } = await import('@/app/api/chat/confirm-link/route');
+
+    const response = await POST(
+      new Request('http://localhost/api/chat/confirm-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: PROFILE_ID,
+          platform: 'instagram',
+          url: 'https://instagram.com/newer',
+          normalizedUrl: 'https://instagram.com/newer',
+          expectedVersion: 1,
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.selections[0]).toEqual({
+      id: expect.anything(),
+      internalUserId: expect.anything(),
+    });
+    expect(mocks.selections[0]).not.toHaveProperty('clerkId');
+    expect(mocks.profileLeftJoin).not.toHaveBeenCalled();
+  });
+
+  it('denies a different app user even when legacy Clerk identity is unavailable', async () => {
+    mocks.getCachedAuth.mockResolvedValue({ userId: 'different-app-user' });
+    const { POST } = await import('@/app/api/chat/confirm-link/route');
+
+    const response = await POST(
+      new Request('http://localhost/api/chat/confirm-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: PROFILE_ID,
+          platform: 'instagram',
+          url: 'https://instagram.com/newer',
+          normalizedUrl: 'https://instagram.com/newer',
+        }),
+      })
+    );
+
+    expect(response.status).toBe(403);
+    expect(mocks.profileLeftJoin).not.toHaveBeenCalled();
+  });
+
+  it('returns a version conflict when deletion wins before a stale update reaches the server', async () => {
+    mocks.state = null;
+    const { POST } = await import('@/app/api/chat/confirm-link/route');
+
+    const response = await POST(
+      new Request('http://localhost/api/chat/confirm-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: PROFILE_ID,
+          platform: 'instagram',
+          url: 'https://instagram.com/newer',
+          normalizedUrl: 'https://instagram.com/newer',
+          expectedVersion: 1,
+        }),
+      })
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: 'VERSION_CONFLICT',
+      expectedVersion: 1,
+    });
+    expect(mockDb.insert).not.toHaveBeenCalledWith(socialLinks);
+    expect(mocks.state).toBeNull();
+  });
+
+  it('returns a version conflict when an identical concurrent create wins the unique insert', async () => {
+    mocks.state = null;
+    mocks.concurrentCreateWins = true;
+    const { POST } = await import('@/app/api/chat/confirm-link/route');
+
+    const response = await POST(
+      new Request('http://localhost/api/chat/confirm-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: PROFILE_ID,
+          platform: 'instagram',
+          url: 'https://instagram.com/concurrent',
+          normalizedUrl: 'https://instagram.com/concurrent',
+        }),
+      })
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: 'VERSION_CONFLICT',
+      expectedVersion: 0,
+      currentVersion: 1,
+    });
+    expect(mocks.syncPrimaryMusicUrls).not.toHaveBeenCalled();
   });
 
   it('rejects an older delete after a newer re-add wins the same link version', async () => {
