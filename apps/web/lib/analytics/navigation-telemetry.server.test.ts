@@ -6,11 +6,13 @@ vi.mock('@/lib/redis', () => ({ getRedis: mockGetRedis }));
 
 import type { NavigationTelemetryPayload } from '../tracking/navigation-telemetry-contract';
 import {
+  getNavigationTelemetryBaseline,
   NAVIGATION_TELEMETRY_DEDUP_TTL_SECONDS,
   NAVIGATION_TELEMETRY_MINIMUM_SAMPLE,
   NAVIGATION_TELEMETRY_RETENTION_DAYS,
   navigationTelemetryTestUtils,
   recordNavigationTelemetry,
+  recordNavigationTelemetryBatch,
 } from './navigation-telemetry.server';
 
 const PAYLOAD: NavigationTelemetryPayload = {
@@ -34,6 +36,7 @@ function createRedis(options?: { readonly loseFirstResponse?: boolean }) {
     readonly args: string[];
   }> = [];
   const dedupeKeys = new Set<string>();
+  const contributionKeys = new Set<string>();
   const hash = new Map<string, number>();
   let loseNextResponse = options?.loseFirstResponse === true;
 
@@ -43,29 +46,46 @@ function createRedis(options?: { readonly loseFirstResponse?: boolean }) {
 
   const evalScript = vi.fn(async (keys: string[], args: string[]) => {
     evalCalls.push({ keys, args });
-    const [dedupeKey] = keys;
-    if (!dedupeKey) throw new Error('Missing dedupe key');
+    const results: number[] = [];
+    const eventCount = (keys.length - 1) / 2;
+    for (let index = 0; index < eventCount; index += 1) {
+      const dedupeKey = keys[1 + index * 2];
+      const contributionKey = keys[2 + index * 2];
+      const argumentIndex = 3 + index * 3;
+      const aggregateField = args[argumentIndex] ?? '';
+      const unknownItem = args[argumentIndex + 1] === '1';
+      const contributionCapped = args[argumentIndex + 2] === '1';
+      if (!dedupeKey || !contributionKey) {
+        throw new Error('Missing telemetry script key');
+      }
 
-    if (dedupeKeys.has(dedupeKey)) {
-      increment(args[3] ?? '');
-      increment(args[5] ?? '');
-      return 0 as const;
+      increment('health|attempts');
+      if (
+        dedupeKeys.has(dedupeKey) ||
+        (contributionCapped && contributionKeys.has(contributionKey))
+      ) {
+        increment('health|duplicates');
+        results.push(0);
+        continue;
+      }
+
+      dedupeKeys.add(dedupeKey);
+      if (contributionCapped) contributionKeys.add(contributionKey);
+      increment(aggregateField);
+      increment('health|accepted');
+      if (unknownItem) increment('health|unknown_items');
+      results.push(1);
     }
-
-    dedupeKeys.add(dedupeKey);
-    increment(args[2] ?? '');
-    increment(args[3] ?? '');
-    increment(args[4] ?? '');
-    if (args[7] === '1') increment(args[6] ?? '');
 
     if (loseNextResponse) {
       loseNextResponse = false;
       throw new Error('Simulated response loss after atomic commit');
     }
-    return 1 as const;
+    return results;
   });
 
   return {
+    contributionKeys,
     dedupeKeys,
     evalCalls,
     hash,
@@ -90,10 +110,11 @@ describe('navigation telemetry aggregate sink', () => {
     ).resolves.toEqual({ status: 'accepted' });
 
     const [{ keys, args }] = evalCalls;
-    const [dedupeKey, dailyKey] = keys ?? [];
+    const [dailyKey, dedupeKey, contributionKey] = keys ?? [];
     expect(dedupeKey).toMatch(/^navigation-telemetry:v1:dedupe:[a-f0-9]{24}$/);
     expect(dedupeKey).not.toContain(PAYLOAD.event_id);
     expect(dailyKey).toBe('navigation-telemetry:v1:day:2026-07-22');
+    expect(contributionKey).toBe(`${dedupeKey}:uncapped`);
     expect(args?.[0]).toBe(String(NAVIGATION_TELEMETRY_DEDUP_TTL_SECONDS));
     expect(args?.[1]).toBe(
       String(NAVIGATION_TELEMETRY_RETENTION_DAYS * 24 * 60 * 60)
@@ -147,10 +168,95 @@ describe('navigation telemetry aggregate sink', () => {
     expect(hash.get('health|duplicates')).toBe(1);
   });
 
+  it('records a bounded batch in one Redis script call', async () => {
+    const { redis, evalCalls, hash } = createRedis();
+    mockGetRedis.mockReturnValue(redis);
+    const ready: NavigationTelemetryPayload = {
+      ...PAYLOAD,
+      event_id: 'opaque-navigation-id:destination_ready',
+      event: 'destination_ready',
+      latency_bucket: 'le_500ms',
+      success: true,
+    };
+
+    await expect(
+      recordNavigationTelemetryBatch([PAYLOAD, ready])
+    ).resolves.toEqual({
+      results: [{ status: 'accepted' }, { status: 'accepted' }],
+    });
+    expect(evalCalls).toHaveLength(1);
+    expect(evalCalls[0]?.keys).toHaveLength(5);
+    expect(hash.get(navigationTelemetryTestUtils.aggregateField(PAYLOAD))).toBe(
+      1
+    );
+    expect(hash.get(navigationTelemetryTestUtils.aggregateField(ready))).toBe(
+      1
+    );
+    expect(hash.get('health|attempts')).toBe(2);
+  });
+
+  it('rejects an internal batch over the shared maximum before Redis mutation', async () => {
+    const { redis, evalCalls } = createRedis();
+    mockGetRedis.mockReturnValue(redis);
+
+    await expect(
+      recordNavigationTelemetryBatch(
+        Array.from({ length: 9 }, (_, index) => ({
+          ...PAYLOAD,
+          event_id: `opaque-navigation-${index}:activation`,
+        }))
+      )
+    ).rejects.toThrow('batch exceeds the bounded maximum');
+    expect(evalCalls).toEqual([]);
+  });
+
+  it('caps one account to one impression contribution per item and UTC day', async () => {
+    const { redis, contributionKeys, evalCalls, hash } = createRedis();
+    mockGetRedis.mockReturnValue(redis);
+    const impression: NavigationTelemetryPayload = {
+      ...PAYLOAD,
+      event_id: 'opaque-impression-id-0001:impression',
+      event: 'impression',
+      item_id: 'library',
+      source_route: 'library',
+      destination_route: 'library',
+      input_method: 'none',
+      latency_bucket: 'na',
+      success: true,
+    };
+
+    for (let index = 0; index < 50; index += 1) {
+      await recordNavigationTelemetryBatch(
+        [
+          {
+            ...impression,
+            event_id: `opaque-impression-${String(index).padStart(4, '0')}:impression`,
+          },
+        ],
+        {
+          contributorId: 'one-account',
+          recordedAt: new Date('2026-07-22T12:00:00Z'),
+        }
+      );
+    }
+
+    expect(contributionKeys.size).toBe(1);
+    expect(
+      hash.get(navigationTelemetryTestUtils.aggregateField(impression))
+    ).toBe(1);
+    expect(hash.get('health|attempts')).toBe(50);
+    expect(hash.get('health|accepted')).toBe(1);
+    expect(hash.get('health|duplicates')).toBe(49);
+    expect(JSON.stringify(evalCalls)).not.toContain('one-account');
+    expect([...contributionKeys][0]).toMatch(
+      /^navigation-telemetry:v1:contribution:[a-f0-9]{24}:/
+    );
+  });
+
   it('fails closed on an unexpected script response', async () => {
     mockGetRedis.mockReturnValue({
       createScript: vi.fn(() => ({
-        eval: vi.fn(async () => 2),
+        eval: vi.fn(async () => [2]),
       })),
     });
 
@@ -258,6 +364,67 @@ describe('navigation telemetry baseline privacy', () => {
       destinationReadyCount: 38,
       activationToReadyP50Bucket: 'le_250ms',
       activationToReadyP95Bucket: 'le_1s',
+    });
+  });
+
+  it('loads exactly the bounded 30-day baseline from Redis', async () => {
+    const impression = aggregate({ event: 'impression' }, 1);
+    const hgetall = vi.fn();
+    const exec = vi.fn().mockResolvedValue([
+      {
+        [impression[0]]: impression[1],
+        'health|attempts': 1,
+        'health|accepted': 1,
+      },
+      ...Array.from({ length: 29 }, () => null),
+    ]);
+    mockGetRedis.mockReturnValue({
+      pipeline: vi.fn(() => ({
+        hgetall,
+        exec,
+      })),
+    });
+
+    const baseline = await getNavigationTelemetryBaseline(
+      new Date('2026-07-22T18:00:00Z')
+    );
+
+    expect(hgetall).toHaveBeenCalledTimes(30);
+    expect(hgetall).toHaveBeenNthCalledWith(
+      1,
+      'navigation-telemetry:v1:day:2026-06-23'
+    );
+    expect(hgetall).toHaveBeenNthCalledWith(
+      30,
+      'navigation-telemetry:v1:day:2026-07-22'
+    );
+    expect(baseline).toMatchObject({
+      startDate: '2026-06-23',
+      endDate: '2026-07-22',
+      published: false,
+    });
+  });
+
+  it('one account cannot unsuppress a 30-day cohort', () => {
+    const [field] = aggregate({ event: 'impression' }, 1);
+    const hashes = Array.from({ length: 30 }, () => ({
+      [field]: 1,
+      'health|attempts': 50,
+      'health|accepted': 1,
+      'health|duplicates': 49,
+    }));
+
+    const result = navigationTelemetryTestUtils.readDailyHashes({
+      hashes,
+      startDate: '2026-06-23',
+      endDate: '2026-07-22',
+    });
+
+    expect(result.published).toBe(false);
+    expect(result.health).toBeNull();
+    expect(result.segments[0]).toMatchObject({
+      suppressed: true,
+      minimumSample: NAVIGATION_TELEMETRY_MINIMUM_SAMPLE,
     });
   });
 });

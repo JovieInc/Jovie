@@ -6,6 +6,7 @@ export const NAVIGATION_TELEMETRY_SCHEMA_VERSION = 1 as const;
 export const NAVIGATION_TELEMETRY_ENDPOINT =
   '/api/analytics/navigation' as const;
 export const NAVIGATION_TELEMETRY_OWNER = '@itstimwhite' as const;
+export const NAVIGATION_TELEMETRY_MAX_BATCH_SIZE = 8;
 
 export const NAVIGATION_TELEMETRY_EVENTS = [
   'impression',
@@ -187,6 +188,20 @@ export const navigationTelemetryPayloadSchema = z
 
 export type NavigationTelemetryPayload = z.infer<
   typeof navigationTelemetryPayloadSchema
+>;
+
+export const navigationTelemetryBatchSchema = z
+  .object({
+    schema_version: z.literal(NAVIGATION_TELEMETRY_SCHEMA_VERSION),
+    events: z
+      .array(navigationTelemetryPayloadSchema)
+      .min(1)
+      .max(NAVIGATION_TELEMETRY_MAX_BATCH_SIZE),
+  })
+  .strict();
+
+export type NavigationTelemetryBatch = z.infer<
+  typeof navigationTelemetryBatchSchema
 >;
 
 function stripQueryAndFragment(value: string): string {

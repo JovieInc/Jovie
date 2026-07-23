@@ -3,7 +3,7 @@ import { requireAdmin } from '@/lib/admin';
 import {
   getNavigationTelemetryBaseline,
   NavigationTelemetryStoreUnavailableError,
-  recordNavigationTelemetry,
+  recordNavigationTelemetryBatch,
 } from '@/lib/analytics/navigation-telemetry.server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
@@ -12,10 +12,13 @@ import {
   createRateLimitHeaders,
   navigationTelemetryLimiter,
 } from '@/lib/rate-limit';
-import { navigationTelemetryPayloadSchema } from '@/lib/tracking/navigation-telemetry-contract';
+import {
+  navigationTelemetryBatchSchema,
+  navigationTelemetryPayloadSchema,
+} from '@/lib/tracking/navigation-telemetry-contract';
 
 const ROUTE = '/api/analytics/navigation';
-const MAX_BODY_BYTES = 2048;
+const MAX_BODY_BYTES = 8192;
 
 function unavailableResponse() {
   return NextResponse.json(
@@ -44,18 +47,25 @@ export async function POST(request: Request): Promise<NextResponse> {
   });
   if (!body.ok) return body.response;
 
-  const parsed = navigationTelemetryPayloadSchema.safeParse(body.data);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Invalid telemetry event' },
-      { status: 400 }
-    );
+  const batch = navigationTelemetryBatchSchema.safeParse(body.data);
+  let events;
+  if (batch.success) {
+    events = batch.data.events;
+  } else {
+    const legacyEvent = navigationTelemetryPayloadSchema.safeParse(body.data);
+    if (!legacyEvent.success) {
+      return NextResponse.json(
+        { error: 'Invalid telemetry event' },
+        { status: 400 }
+      );
+    }
+    events = [legacyEvent.data];
   }
 
   try {
-    // Authentication is an abuse boundary only. Identity is deliberately not
-    // passed into the aggregate sink or retained with the measurement.
-    await recordNavigationTelemetry(parsed.data);
+    // Authentication is an abuse boundary and a contribution cap only. The
+    // sink stores a rotating daily hash, never the account identity.
+    await recordNavigationTelemetryBatch(events, { contributorId: userId });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     if (error instanceof NavigationTelemetryStoreUnavailableError) {

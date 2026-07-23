@@ -25,15 +25,16 @@ import {
 } from './navigation-telemetry';
 import {
   NAVIGATION_TELEMETRY_ENDPOINT,
+  type NavigationTelemetryBatch,
   type NavigationTelemetryPayload,
 } from './navigation-telemetry-contract';
 
 function emittedPayloads(): NavigationTelemetryPayload[] {
   return (
     mockPostJsonBeacon.mock.calls as unknown as Array<
-      [string, NavigationTelemetryPayload]
+      [string, NavigationTelemetryBatch]
     >
-  ).map(([, payload]) => payload);
+  ).flatMap(([, batch]) => batch.events);
 }
 
 const CONTEXT = {
@@ -105,7 +106,10 @@ describe('navigation telemetry client', () => {
     expect(mockPostJsonBeacon).toHaveBeenNthCalledWith(
       1,
       NAVIGATION_TELEMETRY_ENDPOINT,
-      activation
+      {
+        schema_version: 1,
+        events: [activation],
+      }
     );
     expect(JSON.stringify([activation, ready])).not.toContain('private');
   });
@@ -120,6 +124,25 @@ describe('navigation telemetry client', () => {
     expect(
       trackNavigationImpressions(['inbox'], '/app', CONTEXT, 1100)
     ).toHaveLength(1);
+  });
+
+  it('emits visible impressions as one bounded batch', () => {
+    const emitted = trackNavigationImpressions(
+      ['inbox', 'chat', 'library', 'contacts', 'calendar', 'tasks', 'settings'],
+      '/app',
+      CONTEXT,
+      100
+    );
+
+    expect(emitted).toHaveLength(7);
+    expect(mockPostJsonBeacon).toHaveBeenCalledTimes(1);
+    expect(mockPostJsonBeacon).toHaveBeenCalledWith(
+      NAVIGATION_TELEMETRY_ENDPOINT,
+      {
+        schema_version: 1,
+        events: emitted,
+      }
+    );
   });
 
   it('does not start telemetry for an already-active destination', () => {
@@ -185,6 +208,7 @@ describe('navigation telemetry client', () => {
       'short_return',
       'activation',
     ]);
+    expect(mockPostJsonBeacon).toHaveBeenCalledTimes(3);
   });
 
   it('classifies keyboard and pointer clicks without inspecting content', () => {

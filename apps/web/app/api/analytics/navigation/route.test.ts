@@ -27,7 +27,7 @@ vi.mock('@/lib/rate-limit', () => ({
 }));
 vi.mock('@/lib/analytics/navigation-telemetry.server', () => ({
   NavigationTelemetryStoreUnavailableError: class extends Error {},
-  recordNavigationTelemetry: mockRecord,
+  recordNavigationTelemetryBatch: mockRecord,
   getNavigationTelemetryBaseline: mockGetBaseline,
 }));
 
@@ -143,14 +143,63 @@ describe('/api/analytics/navigation', () => {
     expect(mockRecord).not.toHaveBeenCalled();
   });
 
-  it('discards authentication identity before the aggregate sink', async () => {
+  it('passes authentication identity only as the transient contribution-cap input', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'discarded-auth-id' });
     expect((await POST(post(VALID_PAYLOAD))).status).toBe(204);
     expect(mockRateLimit).toHaveBeenCalledExactlyOnceWith('discarded-auth-id');
-    expect(mockRecord).toHaveBeenCalledExactlyOnceWith(VALID_PAYLOAD);
-    expect(JSON.stringify(mockRecord.mock.calls)).not.toContain(
-      'discarded-auth-id'
+    expect(mockRecord).toHaveBeenCalledExactlyOnceWith([VALID_PAYLOAD], {
+      contributorId: 'discarded-auth-id',
+    });
+  });
+
+  it('accepts a bounded batch and rate limits it once', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'batch-user-id' });
+    const ready = {
+      ...VALID_PAYLOAD,
+      event_id: 'opaque-navigation-id:destination_ready',
+      event: 'destination_ready',
+      latency_bucket: 'le_500ms',
+      success: true,
+    };
+
+    const response = await POST(
+      post({ schema_version: 1, events: [VALID_PAYLOAD, ready] })
     );
+
+    expect(response.status).toBe(204);
+    expect(mockRateLimit).toHaveBeenCalledTimes(1);
+    expect(mockRecord).toHaveBeenCalledExactlyOnceWith([VALID_PAYLOAD, ready], {
+      contributorId: 'batch-user-id',
+    });
+  });
+
+  it('rejects an oversized batch', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'batch-user-id' });
+    const events = Array.from({ length: 9 }, (_, index) => ({
+      ...VALID_PAYLOAD,
+      event_id: `opaque-navigation-${index}:activation`,
+    }));
+
+    expect((await POST(post({ schema_version: 1, events }))).status).toBe(400);
+    expect(mockRecord).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed JSON and bodies over the byte limit', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'batch-user-id' });
+    const malformed = new Request('https://jov.ie/api/analytics/navigation', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{"schema_version":1,"events":[',
+    });
+    const oversized = new Request('https://jov.ie/api/analytics/navigation', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ padding: 'x'.repeat(8192) }),
+    });
+
+    expect((await POST(malformed)).status).toBe(400);
+    expect((await POST(oversized)).status).toBe(413);
+    expect(mockRecord).not.toHaveBeenCalled();
   });
 
   it('fails closed without error capture when the aggregate store is unavailable', async () => {

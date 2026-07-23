@@ -4,6 +4,7 @@ import { getRedis } from '@/lib/redis';
 import {
   NAVIGATION_ITEM_IDS,
   NAVIGATION_LATENCY_BUCKETS,
+  NAVIGATION_TELEMETRY_MAX_BATCH_SIZE,
   NAVIGATION_TELEMETRY_OWNER,
   NAVIGATION_TELEMETRY_SCHEMA_VERSION,
   type NavigationItemId,
@@ -32,23 +33,44 @@ const HEALTH_UNKNOWN_ITEMS_FIELD = 'health|unknown_items';
  * HTTP response is lost after Redis commits, a retry observes the dedupe key
  * and cannot increment the event aggregate twice.
  */
-const RECORD_NAVIGATION_TELEMETRY_SCRIPT = `
-if redis.call('EXISTS', KEYS[1]) == 1 then
-  redis.call('HINCRBY', KEYS[2], ARGV[4], 1)
-  redis.call('HINCRBY', KEYS[2], ARGV[6], 1)
-  redis.call('EXPIRE', KEYS[2], ARGV[2])
-  return 0
+const RECORD_NAVIGATION_TELEMETRY_BATCH_SCRIPT = `
+local results = {}
+local eventIndex = 0
+
+for keyIndex = 2, #KEYS, 2 do
+  local argumentIndex = 4 + (eventIndex * 3)
+  local dedupeKey = KEYS[keyIndex]
+  local contributionKey = KEYS[keyIndex + 1]
+  local aggregateField = ARGV[argumentIndex]
+  local unknownItem = ARGV[argumentIndex + 1]
+  local contributionCapped = ARGV[argumentIndex + 2] == '1'
+  local duplicate = redis.call('EXISTS', dedupeKey) == 1
+  local contributionAlreadyCounted =
+    contributionCapped and redis.call('EXISTS', contributionKey) == 1
+
+  redis.call('HINCRBY', KEYS[1], '${HEALTH_ATTEMPTS_FIELD}', 1)
+
+  if duplicate or contributionAlreadyCounted then
+    redis.call('HINCRBY', KEYS[1], '${HEALTH_DUPLICATES_FIELD}', 1)
+    results[#results + 1] = 0
+  else
+    redis.call('SET', dedupeKey, '1', 'EX', ARGV[1])
+    if contributionCapped then
+      redis.call('SET', contributionKey, '1', 'EX', ARGV[3])
+    end
+    redis.call('HINCRBY', KEYS[1], aggregateField, 1)
+    redis.call('HINCRBY', KEYS[1], '${HEALTH_ACCEPTED_FIELD}', 1)
+    if unknownItem == '1' then
+      redis.call('HINCRBY', KEYS[1], '${HEALTH_UNKNOWN_ITEMS_FIELD}', 1)
+    end
+    results[#results + 1] = 1
+  end
+
+  eventIndex = eventIndex + 1
 end
 
-redis.call('SET', KEYS[1], '1', 'EX', ARGV[1])
-redis.call('HINCRBY', KEYS[2], ARGV[3], 1)
-redis.call('HINCRBY', KEYS[2], ARGV[4], 1)
-redis.call('HINCRBY', KEYS[2], ARGV[5], 1)
-if ARGV[8] == '1' then
-  redis.call('HINCRBY', KEYS[2], ARGV[7], 1)
-end
-redis.call('EXPIRE', KEYS[2], ARGV[2])
-return 1
+redis.call('EXPIRE', KEYS[1], ARGV[2])
+return results
 `;
 
 export class NavigationTelemetryStoreUnavailableError extends Error {
@@ -60,6 +82,10 @@ export class NavigationTelemetryStoreUnavailableError extends Error {
 
 export interface NavigationTelemetryRecordResult {
   readonly status: 'accepted' | 'duplicate';
+}
+
+export interface NavigationTelemetryBatchRecordResult {
+  readonly results: readonly NavigationTelemetryRecordResult[];
 }
 
 interface AggregateRecord {
@@ -177,6 +203,15 @@ async function hashEventId(eventId: string): Promise<string> {
     .slice(0, 24);
 }
 
+async function hashContributorId(
+  contributorId: string,
+  recordedAt: Date
+): Promise<string> {
+  return hashEventId(
+    `${NAVIGATION_TELEMETRY_SCHEMA_VERSION}:${utcDay(recordedAt)}:${contributorId}`
+  );
+}
+
 function aggregateField(payload: NavigationTelemetryPayload): string {
   return [
     'event',
@@ -193,6 +228,15 @@ function aggregateField(payload: NavigationTelemetryPayload): string {
   ].join('|');
 }
 
+function contributionField(payload: NavigationTelemetryPayload): string {
+  return [
+    payload.nav_variant,
+    payload.platform,
+    payload.item_id,
+    payload.event,
+  ].join('|');
+}
+
 function assertPipelineSucceeded(results: unknown[]): void {
   const error = results.find(result => result instanceof Error);
   if (error instanceof Error) throw error;
@@ -206,32 +250,81 @@ export async function recordNavigationTelemetry(
   payload: NavigationTelemetryPayload,
   recordedAt = new Date()
 ): Promise<NavigationTelemetryRecordResult> {
+  const result = await recordNavigationTelemetryBatch([payload], {
+    recordedAt,
+  });
+  const first = result.results[0];
+  if (!first)
+    throw new Error('Unexpected navigation telemetry aggregate result');
+  return first;
+}
+
+/**
+ * Records a bounded request in one Redis script. Impression contribution keys
+ * cap one authenticated account to one item/segment contribution per UTC day,
+ * so a single account cannot cross the 30-day k=50 publication threshold.
+ */
+export async function recordNavigationTelemetryBatch(
+  payloads: readonly NavigationTelemetryPayload[],
+  options: {
+    readonly recordedAt?: Date;
+    readonly contributorId?: string;
+  } = {}
+): Promise<NavigationTelemetryBatchRecordResult> {
   const redis = getRedis();
   if (!redis) throw new NavigationTelemetryStoreUnavailableError();
 
-  const key = dailyKey(recordedAt);
-  const eventHash = await hashEventId(payload.event_id);
-  const dedupeKey = `${KEY_PREFIX}:dedupe:${eventHash}`;
-  const result = await redis
-    .createScript<0 | 1>(RECORD_NAVIGATION_TELEMETRY_SCRIPT)
-    .eval(
-      [dedupeKey, key],
-      [
-        String(NAVIGATION_TELEMETRY_DEDUP_TTL_SECONDS),
-        String(RETENTION_SECONDS),
-        aggregateField(payload),
-        HEALTH_ATTEMPTS_FIELD,
-        HEALTH_ACCEPTED_FIELD,
-        HEALTH_DUPLICATES_FIELD,
-        HEALTH_UNKNOWN_ITEMS_FIELD,
-        payload.item_id === 'unknown' ? '1' : '0',
-      ]
-    );
+  if (payloads.length === 0) return { results: [] };
+  if (payloads.length > NAVIGATION_TELEMETRY_MAX_BATCH_SIZE) {
+    throw new Error('Navigation telemetry batch exceeds the bounded maximum');
+  }
 
-  if (result !== 0 && result !== 1) {
+  const recordedAt = options.recordedAt ?? new Date();
+  const key = dailyKey(recordedAt);
+  const contributorHash = options.contributorId
+    ? await hashContributorId(options.contributorId, recordedAt)
+    : null;
+  const eventHashes = await Promise.all(
+    payloads.map(payload => hashEventId(payload.event_id))
+  );
+  const keys = [key];
+  const args = [
+    String(NAVIGATION_TELEMETRY_DEDUP_TTL_SECONDS),
+    String(RETENTION_SECONDS),
+    String(RETENTION_SECONDS),
+  ];
+
+  payloads.forEach((payload, index) => {
+    const dedupeKey = `${KEY_PREFIX}:dedupe:${eventHashes[index]}`;
+    const shouldCapContribution =
+      payload.event === 'impression' && contributorHash !== null;
+    const contributionKey = shouldCapContribution
+      ? `${KEY_PREFIX}:contribution:${contributorHash}:${contributionField(payload)}`
+      : `${dedupeKey}:uncapped`;
+    keys.push(dedupeKey, contributionKey);
+    args.push(
+      aggregateField(payload),
+      payload.item_id === 'unknown' ? '1' : '0',
+      shouldCapContribution ? '1' : '0'
+    );
+  });
+
+  const result = await redis
+    .createScript<readonly number[]>(RECORD_NAVIGATION_TELEMETRY_BATCH_SCRIPT)
+    .eval(keys, args);
+
+  if (
+    !Array.isArray(result) ||
+    result.length !== payloads.length ||
+    result.some(value => value !== 0 && value !== 1)
+  ) {
     throw new Error('Unexpected navigation telemetry aggregate result');
   }
-  return { status: result === 1 ? 'accepted' : 'duplicate' };
+  return {
+    results: result.map(value => ({
+      status: value === 1 ? 'accepted' : 'duplicate',
+    })),
+  };
 }
 
 function parseCount(value: unknown): number {

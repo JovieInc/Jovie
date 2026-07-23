@@ -3,7 +3,11 @@ import {
   allowlistNavigationItemId,
   bucketNavigationLatency,
   bucketNavigationRoute,
+  NAVIGATION_LATENCY_BUCKETS,
+  NAVIGATION_TELEMETRY_MAX_BATCH_SIZE,
   NAVIGATION_TELEMETRY_SCHEMA_VERSION,
+  navigationLatencyBucketUpperBoundMs,
+  navigationTelemetryBatchSchema,
   navigationTelemetryPayloadSchema,
 } from './navigation-telemetry-contract';
 
@@ -45,12 +49,77 @@ describe('navigation telemetry contract', () => {
     expect(allowlistNavigationItemId('artist-123-secret')).toBe('unknown');
   });
 
-  it('uses bounded latency buckets', () => {
-    expect(bucketNavigationLatency(100)).toBe('le_100ms');
-    expect(bucketNavigationLatency(101)).toBe('le_250ms');
-    expect(bucketNavigationLatency(2501)).toBe('le_5s');
-    expect(bucketNavigationLatency(10_001)).toBe('gt_10s');
-    expect(bucketNavigationLatency(Number.NaN)).toBe('na');
+  it('uses inclusive bounded latency thresholds and published upper bounds', () => {
+    const cases = [
+      [-1, 'na'],
+      [Number.NaN, 'na'],
+      [0, 'le_100ms'],
+      [100, 'le_100ms'],
+      [101, 'le_250ms'],
+      [250, 'le_250ms'],
+      [251, 'le_500ms'],
+      [500, 'le_500ms'],
+      [501, 'le_1s'],
+      [1000, 'le_1s'],
+      [1001, 'le_2_5s'],
+      [2500, 'le_2_5s'],
+      [2501, 'le_5s'],
+      [5000, 'le_5s'],
+      [5001, 'le_10s'],
+      [10_000, 'le_10s'],
+      [10_001, 'gt_10s'],
+    ] as const;
+
+    for (const [duration, bucket] of cases) {
+      expect(bucketNavigationLatency(duration)).toBe(bucket);
+    }
+
+    expect(
+      NAVIGATION_LATENCY_BUCKETS.map(bucket =>
+        navigationLatencyBucketUpperBoundMs(bucket)
+      )
+    ).toEqual([null, 100, 250, 500, 1000, 2500, 5000, 10_000, 10_001]);
+  });
+
+  it('accepts only strict non-empty batches of at most eight events', () => {
+    const maxBatch = {
+      schema_version: 1,
+      events: Array.from(
+        { length: NAVIGATION_TELEMETRY_MAX_BATCH_SIZE },
+        (_, index) => ({
+          ...VALID_PAYLOAD,
+          event_id: `navigation-${index}-123456:activation`,
+        })
+      ),
+    };
+
+    expect(navigationTelemetryBatchSchema.safeParse(maxBatch).success).toBe(
+      true
+    );
+    expect(
+      navigationTelemetryBatchSchema.safeParse({
+        ...maxBatch,
+        events: [],
+      }).success
+    ).toBe(false);
+    expect(
+      navigationTelemetryBatchSchema.safeParse({
+        ...maxBatch,
+        events: [
+          ...maxBatch.events,
+          {
+            ...VALID_PAYLOAD,
+            event_id: 'navigation-overflow-123456:activation',
+          },
+        ],
+      }).success
+    ).toBe(false);
+    expect(
+      navigationTelemetryBatchSchema.safeParse({
+        ...maxBatch,
+        raw_path: '/private',
+      }).success
+    ).toBe(false);
   });
 
   it('accepts only the versioned low-cardinality payload', () => {

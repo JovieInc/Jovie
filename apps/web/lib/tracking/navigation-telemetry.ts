@@ -5,12 +5,14 @@ import {
   bucketNavigationLatency,
   bucketNavigationRoute,
   NAVIGATION_TELEMETRY_ENDPOINT,
+  NAVIGATION_TELEMETRY_MAX_BATCH_SIZE,
   NAVIGATION_TELEMETRY_SCHEMA_VERSION,
   type NavigationConsentMode,
   type NavigationInputMethod,
   type NavigationItemId,
   type NavigationPlatform,
   type NavigationRouteBucket,
+  type NavigationTelemetryBatch,
   type NavigationTelemetryEvent,
   type NavigationTelemetryPayload,
   type NavigationVariant,
@@ -93,7 +95,7 @@ function resolvePlatform(
   return context.isMobile ? 'web_mobile' : 'web_desktop';
 }
 
-function emitNavigationEvent(input: {
+interface NavigationEventInput {
   readonly eventId: string;
   readonly event: NavigationTelemetryEvent;
   readonly itemId: NavigationItemId;
@@ -103,11 +105,13 @@ function emitNavigationEvent(input: {
   readonly context: NavigationTelemetryContext;
   readonly latencyMs?: number;
   readonly success: boolean;
-}): NavigationTelemetryPayload | null {
-  const consentMode = getAllowedConsentMode();
-  if (!consentMode) return null;
+}
 
-  const payload: NavigationTelemetryPayload = {
+function buildNavigationEvent(
+  input: NavigationEventInput,
+  consentMode: NavigationConsentMode
+): NavigationTelemetryPayload {
+  return {
     schema_version: NAVIGATION_TELEMETRY_SCHEMA_VERSION,
     event_id: input.eventId,
     event: input.event,
@@ -124,9 +128,27 @@ function emitNavigationEvent(input: {
         : bucketNavigationLatency(input.latencyMs),
     success: input.success,
   };
+}
 
-  postJsonBeacon(NAVIGATION_TELEMETRY_ENDPOINT, payload);
-  return payload;
+function emitNavigationEvents(
+  inputs: readonly NavigationEventInput[]
+): readonly NavigationTelemetryPayload[] {
+  const consentMode = getAllowedConsentMode();
+  if (!consentMode || inputs.length === 0) return [];
+
+  const events = inputs.map(input => buildNavigationEvent(input, consentMode));
+  const batch: NavigationTelemetryBatch = {
+    schema_version: NAVIGATION_TELEMETRY_SCHEMA_VERSION,
+    events,
+  };
+  postJsonBeacon(NAVIGATION_TELEMETRY_ENDPOINT, batch);
+  return events;
+}
+
+function emitNavigationEvent(
+  input: NavigationEventInput
+): NavigationTelemetryPayload | null {
+  return emitNavigationEvents([input])[0] ?? null;
 }
 
 export function navigationInputMethodFromClick(detail: number) {
@@ -150,15 +172,19 @@ export function trackNavigationImpressions(
 ): readonly NavigationTelemetryPayload[] {
   const route = bucketNavigationRoute(pathname);
   const platform = resolvePlatform(context);
-  const emitted: NavigationTelemetryPayload[] = [];
+  const inputs: NavigationEventInput[] = [];
+  const acceptedDedupeKeys: string[] = [];
 
-  for (const rawItemId of itemIds) {
+  for (const rawItemId of itemIds.slice(
+    0,
+    NAVIGATION_TELEMETRY_MAX_BATCH_SIZE
+  )) {
     const itemId = allowlistNavigationItemId(rawItemId);
     const dedupeKey = `${platform}:${context.navVariant}:${route}:${itemId}`;
     const recent = recentImpressions.get(dedupeKey);
     if (recent && recordedAt - recent.recordedAt < 1000) continue;
 
-    const payload = emitNavigationEvent({
+    inputs.push({
       eventId: `${createOpaqueId()}:impression`,
       event: 'impression',
       itemId,
@@ -168,20 +194,23 @@ export function trackNavigationImpressions(
       context,
       success: true,
     });
-    if (!payload) continue;
-
-    recentImpressions.set(dedupeKey, { recordedAt });
-    emitted.push(payload);
+    acceptedDedupeKeys.push(dedupeKey);
   }
 
+  const emitted = emitNavigationEvents(inputs);
+  if (emitted.length > 0) {
+    for (const dedupeKey of acceptedDedupeKeys) {
+      recentImpressions.set(dedupeKey, { recordedAt });
+    }
+  }
   return emitted;
 }
 
-function recordPendingDropOff(
+function pendingDropOffInput(
   navigation: PendingNavigation,
   recordedAt: number
-): NavigationTelemetryPayload | null {
-  return emitNavigationEvent({
+): NavigationEventInput {
+  return {
     eventId: `${navigation.navigationId}:drop_off`,
     event: 'drop_off',
     itemId: navigation.itemId,
@@ -191,7 +220,14 @@ function recordPendingDropOff(
     context: navigation.context,
     latencyMs: recordedAt - navigation.startedAt,
     success: false,
-  });
+  };
+}
+
+function recordPendingDropOff(
+  navigation: PendingNavigation,
+  recordedAt: number
+): NavigationTelemetryPayload | null {
+  return emitNavigationEvent(pendingDropOffInput(navigation, recordedAt));
 }
 
 export function startNavigationTelemetry(input: {
@@ -217,9 +253,10 @@ export function startNavigationTelemetry(input: {
 
   if (!getAllowedConsentMode()) return null;
 
+  const pendingInputs: NavigationEventInput[] = [];
   if (pendingNavigation) {
     clearTimeout(pendingNavigation.timeoutId);
-    recordPendingDropOff(pendingNavigation, startedAt);
+    pendingInputs.push(pendingDropOffInput(pendingNavigation, startedAt));
     pendingNavigation = null;
   }
 
@@ -228,7 +265,7 @@ export function startNavigationTelemetry(input: {
     destinationRoute === lastReadyNavigation.sourceRoute &&
     startedAt - lastReadyNavigation.readyAt <= NAVIGATION_SHORT_RETURN_MS
   ) {
-    emitNavigationEvent({
+    pendingInputs.push({
       eventId: `${navigationId}:short_return`,
       event: 'short_return',
       itemId,
@@ -241,7 +278,7 @@ export function startNavigationTelemetry(input: {
     });
   }
 
-  const activation = emitNavigationEvent({
+  pendingInputs.push({
     eventId: `${navigationId}:activation`,
     event: 'activation',
     itemId,
@@ -251,6 +288,9 @@ export function startNavigationTelemetry(input: {
     context: input.context,
     success: false,
   });
+  const activation = emitNavigationEvents(pendingInputs).find(
+    payload => payload.event === 'activation'
+  );
   if (!activation) return null;
 
   const timeoutId = setTimeout(() => {
