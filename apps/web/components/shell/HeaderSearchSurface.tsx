@@ -35,6 +35,8 @@ interface HeaderSearchSurfaceProps {
     query: string,
     signal: AbortSignal
   ) => Promise<readonly SearchableRelease[]>;
+  /** Invalidates remote release results when the active artist changes. */
+  readonly remoteSearchScopeKey?: string | null;
   readonly isOpen: boolean;
   readonly onOpen: () => void;
   readonly onClose: () => void;
@@ -95,6 +97,7 @@ function HeaderGlobalSearch({
   adapter,
   isLoading,
   searchLibraryAssets,
+  remoteSearchScopeKey,
   onClose,
   onOpenFilters,
 }: {
@@ -105,40 +108,57 @@ function HeaderGlobalSearch({
     query: string,
     signal: AbortSignal
   ) => Promise<readonly SearchableRelease[]>;
+  readonly remoteSearchScopeKey?: string | null;
   readonly onClose: () => void;
   readonly onOpenFilters?: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [remoteSearch, setRemoteSearch] = useState<{
+    readonly scopeKey: string;
     readonly query: string;
     readonly releases: readonly SearchableRelease[];
     readonly status: 'idle' | 'loading' | 'success' | 'error';
-  }>({ query: '', releases: [], status: 'idle' });
+  }>({
+    scopeKey: remoteSearchScopeKey ?? '',
+    query: '',
+    releases: [],
+    status: 'idle',
+  });
   const inputRef = useRef<HTMLInputElement>(null);
   const listboxId = useId();
   const normalizedQuery = query.trim();
+  const remoteScopeKey = remoteSearchScopeKey ?? '';
   const canSearchRemotely =
     Boolean(searchLibraryAssets) &&
     normalizedQuery.length >= MIN_REMOTE_QUERY_LENGTH;
   const remoteSearchPending =
     canSearchRemotely &&
-    (remoteSearch.query !== normalizedQuery ||
+    (remoteSearch.scopeKey !== remoteScopeKey ||
+      remoteSearch.query !== normalizedQuery ||
       remoteSearch.status === 'loading');
   const remoteSearchFailed =
     canSearchRemotely &&
+    remoteSearch.scopeKey === remoteScopeKey &&
     remoteSearch.query === normalizedQuery &&
     remoteSearch.status === 'error';
   const effectiveCatalog = useMemo<HeaderSearchCatalog>(
     () => ({
       ...catalog,
       releases: searchLibraryAssets
-        ? remoteSearch.query === normalizedQuery
+        ? remoteSearch.scopeKey === remoteScopeKey &&
+          remoteSearch.query === normalizedQuery
           ? remoteSearch.releases
           : []
         : catalog.releases,
     }),
-    [catalog, normalizedQuery, remoteSearch, searchLibraryAssets]
+    [
+      catalog,
+      normalizedQuery,
+      remoteScopeKey,
+      remoteSearch,
+      searchLibraryAssets,
+    ]
   );
   const groups = useMemo(
     () => buildHeaderSearchGroups(query, effectiveCatalog),
@@ -167,6 +187,7 @@ function HeaderGlobalSearch({
   useEffect(() => {
     if (!searchLibraryAssets || !canSearchRemotely) {
       setRemoteSearch({
+        scopeKey: remoteScopeKey,
         query: normalizedQuery,
         releases: [],
         status: 'idle',
@@ -177,6 +198,7 @@ function HeaderGlobalSearch({
     const controller = new AbortController();
     let active = true;
     setRemoteSearch({
+      scopeKey: remoteScopeKey,
       query: normalizedQuery,
       releases: [],
       status: 'loading',
@@ -190,6 +212,7 @@ function HeaderGlobalSearch({
         );
         if (!active) return;
         setRemoteSearch({
+          scopeKey: remoteScopeKey,
           query: normalizedQuery,
           releases,
           status: 'success',
@@ -197,6 +220,7 @@ function HeaderGlobalSearch({
       } catch {
         if (!active || controller.signal.aborted) return;
         setRemoteSearch({
+          scopeKey: remoteScopeKey,
           query: normalizedQuery,
           releases: [],
           status: 'error',
@@ -209,7 +233,7 @@ function HeaderGlobalSearch({
       globalThis.clearTimeout(timeout);
       controller.abort();
     };
-  }, [canSearchRemotely, normalizedQuery, searchLibraryAssets]);
+  }, [canSearchRemotely, normalizedQuery, remoteScopeKey, searchLibraryAssets]);
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (event.nativeEvent.isComposing) return;
@@ -447,6 +471,7 @@ export function HeaderSearchSurface({
   catalog = EMPTY_CATALOG,
   isLoading = false,
   searchLibraryAssets,
+  remoteSearchScopeKey,
   isOpen,
   onOpen,
   onClose,
@@ -509,6 +534,7 @@ export function HeaderSearchSurface({
           adapter={adapter}
           isLoading={isLoading}
           searchLibraryAssets={searchLibraryAssets}
+          remoteSearchScopeKey={remoteSearchScopeKey}
           onClose={onClose}
           onOpenFilters={adapter ? () => setShowFilters(true) : undefined}
         />

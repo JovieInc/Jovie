@@ -134,15 +134,16 @@ describe('canonical tour dates page', () => {
     expect(loadTourDatesMock).not.toHaveBeenCalled();
   });
 
-  it('fails soft into a stable empty surface when prefetching fails', async () => {
+  it('renders the canonical error state when tour-date loading fails', async () => {
     const error = new Error('upstream unavailable');
     loadTourDatesMock.mockRejectedValueOnce(error);
 
     render(await TourDatesPage());
 
-    expect(screen.getByTestId('tour-dates-page-client')).toHaveTextContent(
-      'profile-1:'
+    expect(screen.getByTestId('page-error')).toHaveTextContent(
+      'Failed to load tour dates. Please refresh the page.'
     );
+    expect(screen.queryByTestId('tour-dates-page-client')).toBeNull();
     expect(captureErrorMock).toHaveBeenCalledWith(
       'Tour dates page load failed',
       error,

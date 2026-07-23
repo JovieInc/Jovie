@@ -68,8 +68,8 @@ describe('DashboardMobileTabs', () => {
     ]);
     expect(
       within(tabs).getByRole('button', { name: 'More options' })
-    ).toHaveClass('min-w-16');
-    expect(directLinks.every(link => link.className.includes('min-w-16'))).toBe(
+    ).toHaveClass('min-w-11', 'flex-1');
+    expect(directLinks.every(link => link.className.includes('min-w-11'))).toBe(
       true
     );
   });
@@ -178,5 +178,16 @@ describe('DashboardMobileTabs', () => {
     expect(
       within(inboxTabs).getByRole('link', { name: 'Inbox' })
     ).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('keeps Library active throughout a canonical release workspace', () => {
+    mockPathname.mockReturnValue('/app/releases/release-123/tasks');
+    render(<DashboardMobileTabs />);
+
+    const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
+    expect(within(tabs).getByRole('link', { name: 'Library' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 });

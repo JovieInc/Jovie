@@ -68,6 +68,9 @@ export default async function TourDatesPage() {
       route: APP_ROUTES.TOUR_DATES,
       profileId,
     });
+    return (
+      <PageErrorState message='Failed to load tour dates. Please refresh the page.' />
+    );
   }
 
   return (

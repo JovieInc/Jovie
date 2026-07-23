@@ -106,7 +106,7 @@ describe('DashboardNav interactions', () => {
     expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
   });
 
-  it('routes to Chat before opening the artist profile rail elsewhere', async () => {
+  it('routes directly to the Chat profile panel from other shells', async () => {
     const user = userEvent.setup();
     mockUsePathname.mockReturnValue(APP_ROUTES.CALENDAR);
     renderDashboardNav({ renderFn: render });
@@ -115,10 +115,18 @@ describe('DashboardNav interactions', () => {
       screen.getByRole('button', { name: 'Open Artist profile' })
     );
 
-    expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.CHAT);
-    await waitFor(() => {
-      expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
-    });
+    expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.CHAT_PROFILE_PANEL);
+    expect(mockOpenPreviewPanel).not.toHaveBeenCalled();
+  });
+
+  it('keeps Library active throughout a canonical release workspace', () => {
+    mockUsePathname.mockReturnValue('/app/releases/release-123/tasks');
+    renderDashboardNav({ renderFn: render });
+
+    expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   it('renders recent chats as App Router links', () => {

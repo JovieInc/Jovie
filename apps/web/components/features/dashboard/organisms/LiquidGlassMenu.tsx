@@ -442,7 +442,7 @@ export function LiquidGlassMenu({
                 }}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'relative flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
+                  'relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
                   active
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'
@@ -480,7 +480,7 @@ export function LiquidGlassMenu({
             aria-label={isExpanded ? 'Close menu' : 'More options'}
             aria-expanded={isExpanded}
             className={cn(
-              'relative flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
+              'relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
               isExpanded
                 ? 'text-primary-token'
                 : 'text-tertiary-token hover:text-secondary-token'
@@ -503,7 +503,7 @@ export function LiquidGlassMenu({
               type='button'
               onClick={onSearchClick}
               aria-label='Search'
-              className='relative flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-secondary-token active:text-primary-token'
+              className='relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-secondary-token active:text-primary-token'
             >
               <Search className='h-5 w-5' aria-hidden='true' />
               <span className='sr-only'>Search</span>

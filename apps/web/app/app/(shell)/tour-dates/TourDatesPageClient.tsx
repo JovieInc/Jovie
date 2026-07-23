@@ -27,6 +27,7 @@ export function TourDatesPageClient({
       >
         <h1 className='sr-only'>Tour Dates</h1>
         <TourDatesManager
+          key={profileId}
           profileId={profileId}
           initialTourDates={initialTourDates}
           connectionStatus={connectionStatus}

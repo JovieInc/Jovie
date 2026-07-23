@@ -269,6 +269,65 @@ describe('HeaderSearchSurface', () => {
     expect(screen.getByText('Midnight Drive')).toBeVisible();
   });
 
+  it('invalidates remote release results when the active profile changes', async () => {
+    vi.useFakeTimers();
+    const pending: Array<{
+      readonly signal: AbortSignal;
+      readonly resolve: (releases: readonly SearchableRelease[]) => void;
+    }> = [];
+    const searchLibraryAssets = vi.fn(
+      (_query: string, signal: AbortSignal) =>
+        new Promise<readonly SearchableRelease[]>(resolve => {
+          pending.push({ signal, resolve });
+        })
+    );
+    const props = {
+      isOpen: true,
+      onOpen: vi.fn(),
+      onClose: vi.fn(),
+      searchLibraryAssets,
+    };
+    const { rerender } = render(
+      <HeaderSearchSurface {...props} remoteSearchScopeKey='profile-a' />
+    );
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search Jovie' }), {
+      target: { value: 'midnight' },
+    });
+    await act(() => vi.advanceTimersByTimeAsync(250));
+    pending[0]?.resolve([
+      {
+        id: 'profile-a-release',
+        title: 'Midnight Profile A',
+        artistNames: ['Profile A'],
+        smartLinkPath: '/profile-a/release',
+      },
+    ]);
+    await act(async () => Promise.resolve());
+    expect(screen.getByText('Midnight Profile A')).toBeVisible();
+
+    rerender(
+      <HeaderSearchSurface {...props} remoteSearchScopeKey='profile-b' />
+    );
+    expect(screen.queryByText('Midnight Profile A')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Searching…');
+
+    await act(() => vi.advanceTimersByTimeAsync(250));
+    expect(searchLibraryAssets).toHaveBeenCalledTimes(2);
+    pending[1]?.resolve([
+      {
+        id: 'profile-b-release',
+        title: 'Midnight Profile B',
+        artistNames: ['Profile B'],
+        smartLinkPath: '/profile-b/release',
+      },
+    ]);
+    await act(async () => Promise.resolve());
+
+    expect(screen.getByText('Midnight Profile B')).toBeVisible();
+    expect(screen.queryByText('Midnight Profile A')).not.toBeInTheDocument();
+  });
+
   it('renders stable loading, empty, and error feedback', async () => {
     vi.useFakeTimers();
     const searchLibraryAssets = vi

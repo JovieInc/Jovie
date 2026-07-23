@@ -38,6 +38,7 @@ import {
   userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
+import { isLibraryNavigationRoute } from './navigation-state';
 import { SidebarProfileButton } from './SidebarProfileButton';
 import type { DashboardNavProps, NavItem } from './types';
 
@@ -51,16 +52,6 @@ function navItemPathname(href: string): string {
   return new URL(href, 'https://jovie.local').pathname;
 }
 
-function isLibraryRoute(pathname: string): boolean {
-  return (
-    pathname === APP_ROUTES.LIBRARY ||
-    pathname === APP_ROUTES.DASHBOARD_LIBRARY ||
-    pathname === APP_ROUTES.LEGACY_DASHBOARD_LIBRARY ||
-    pathname === APP_ROUTES.RELEASES ||
-    pathname === APP_ROUTES.DASHBOARD_RELEASES
-  );
-}
-
 function isItemActive(pathname: string, item: NavItem): boolean {
   // Inbox owns only the shell root. Prefix matching `/app` would otherwise
   // mark it active on every customer route.
@@ -69,11 +60,11 @@ function isItemActive(pathname: string, item: NavItem): boolean {
   }
 
   if (item.id === 'library') {
-    return isLibraryRoute(pathname);
+    return isLibraryNavigationRoute(pathname);
   }
 
   const normalizedPathname = (() => {
-    if (isLibraryRoute(pathname)) {
+    if (isLibraryNavigationRoute(pathname)) {
       return APP_ROUTES.LIBRARY;
     }
     if (
@@ -294,7 +285,7 @@ export function DashboardNav(_: DashboardNavProps) {
       isDemo ||
       !profileId ||
       libraryWarmReadyProfileIdRef.current === profileId ||
-      isLibraryRoute(pathname)
+      isLibraryNavigationRoute(pathname)
     ) {
       return;
     }

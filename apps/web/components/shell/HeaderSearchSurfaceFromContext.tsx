@@ -36,6 +36,7 @@ export function HeaderSearchSurfaceFromContext({
         onOpen={openSearch}
         onClose={closeSearch}
         searchLibraryAssets={searchHeaderLibraryAssets}
+        remoteSearchScopeKey={dashboardData?.selectedProfile?.id}
         className={className}
       />
     );
@@ -90,6 +91,7 @@ function HeaderSearchSurfaceWithQueries({
       onOpen={onOpen}
       onClose={onClose}
       searchLibraryAssets={searchHeaderLibraryAssets}
+      remoteSearchScopeKey={dashboardData?.selectedProfile?.id}
       className={className}
     />
   );

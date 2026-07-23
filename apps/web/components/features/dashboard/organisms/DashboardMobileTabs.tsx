@@ -2,7 +2,9 @@
 
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import {
+  isLibraryNavigationRoute,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   settingsNavItem,
@@ -96,6 +98,18 @@ export function DashboardMobileTabs({
       onItemActivate={handleItemActivate}
       onExpandedItemsVisible={handleExpandedItemsVisible}
       onSignOut={handleSignOut}
+      isItemActive={(item, currentPathname) => {
+        if (item.id === 'library') {
+          return isLibraryNavigationRoute(currentPathname);
+        }
+        if (item.href === APP_ROUTES.DASHBOARD) {
+          return currentPathname === item.href;
+        }
+        return (
+          currentPathname === item.href ||
+          currentPathname.startsWith(`${item.href}/`)
+        );
+      }}
       className={cn('lg:hidden', className)}
     />
   );

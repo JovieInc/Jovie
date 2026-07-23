@@ -175,7 +175,7 @@ describe('OperatorMobileNavigation', () => {
     ).toHaveLength(1);
   });
 
-  it('keeps five 44px bottom-bar targets within the 375px contract', () => {
+  it('keeps five 44px bottom-bar targets within the 320px contract', () => {
     render(<OperatorMobileNavigation />);
 
     const tabs = screen.getByRole('navigation', {
@@ -188,8 +188,8 @@ describe('OperatorMobileNavigation', () => {
 
     expect(controls).toHaveLength(5);
     for (const control of controls) {
-      expect(control).toHaveClass('min-h-11', 'min-w-16');
+      expect(control).toHaveClass('min-h-11', 'min-w-11', 'flex-1');
     }
-    expect(5 * 64 + 2 * 8).toBeLessThanOrEqual(375);
+    expect(5 * 44 + 2 * 8).toBeLessThanOrEqual(320);
   });
 });
