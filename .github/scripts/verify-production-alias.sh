@@ -10,6 +10,7 @@ max_attempts="${PRODUCTION_ALIAS_MAX_ATTEMPTS:-15}"
 retry_seconds="${PRODUCTION_ALIAS_RETRY_SECONDS:-10}"
 required_rounds="${PRODUCTION_ALIAS_REQUIRED_ROUNDS:-3}"
 max_transient_failures="${PRODUCTION_ALIAS_MAX_TRANSIENT_FAILURES:-2}"
+route_retries="${PRODUCTION_ALIAS_ROUTE_RETRIES:-1}"
 
 write_failure() {
   if [ -n "${GITHUB_OUTPUT:-}" ]; then
@@ -30,6 +31,7 @@ if [[ "$expected_deploy_id" != dpl_* ]] ||
   ! [[ "$retry_seconds" =~ ^[0-9]+$ ]] ||
   ! [[ "$required_rounds" =~ ^[1-9][0-9]*$ ]] ||
   ! [[ "$max_transient_failures" =~ ^[0-9]+$ ]] ||
+  ! [[ "$route_retries" =~ ^[0-9]+$ ]] ||
   [ "$required_rounds" -gt "$max_attempts" ]; then
   echo "Production alias verifier inputs are invalid." >&2
   write_failure
@@ -46,7 +48,7 @@ curl_args=(
   -sS
   -L
   --connect-timeout 3
-  --max-time 5
+  --max-time 3
   -A "Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
   -H "Cache-Control: no-cache, no-store, must-revalidate"
   -H "Pragma: no-cache"
@@ -134,18 +136,33 @@ for attempt in $(seq 1 "$max_attempts"); do
     last_status="000"
     last_sha=""
     environment=""
-    if response="$(curl "${curl_args[@]}" -w "\n%{http_code}" "$probe_url" 2>/dev/null)"; then
-      last_status="${response##*$'\n'}"
-      body="${response%$'\n'*}"
-      last_sha="$(printf '%s' "$body" | jq -r '.commitSha // ""' 2>/dev/null || echo "")"
-      environment="$(printf '%s' "$body" | jq -r '.environment // ""' 2>/dev/null || echo "")"
-      route_observation="match"
-      if [ "$last_status" != "200" ] ||
-        [ "$last_sha" != "$expected_sha" ] ||
-        [ "$environment" != "production" ]; then
-        route_observation="mismatch"
+    route_attempt=0
+    while [ "$route_attempt" -le "$route_retries" ]; do
+      route_attempt=$((route_attempt + 1))
+      response=""
+      last_status="000"
+      last_sha=""
+      environment=""
+      if response="$(curl "${curl_args[@]}" -w "\n%{http_code}" "$probe_url" 2>/dev/null)"; then
+        last_status="${response##*$'\n'}"
+        body="${response%$'\n'*}"
+        if [ "$last_status" != "000" ]; then
+          last_sha="$(printf '%s' "$body" | jq -r '.commitSha // ""' 2>/dev/null || echo "")"
+          environment="$(printf '%s' "$body" | jq -r '.environment // ""' 2>/dev/null || echo "")"
+          route_observation="match"
+          if [ "$last_status" != "200" ] ||
+            [ "$last_sha" != "$expected_sha" ] ||
+            [ "$environment" != "production" ]; then
+            route_observation="mismatch"
+          fi
+          break
+        fi
       fi
-    fi
+
+      if [ "$route_attempt" -le "$route_retries" ]; then
+        echo "  attempt ${attempt}/${max_attempts} production-alias/${routing}: transport unknown (HTTP 000), retry ${route_attempt}/${route_retries} within logical route observation"
+      fi
+    done
 
     case "$route_observation" in
       match)
