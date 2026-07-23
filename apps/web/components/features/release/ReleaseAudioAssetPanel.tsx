@@ -14,6 +14,7 @@ import { toast } from '@/components/feedback';
 import {
   AUDIO_ACCEPT,
   type AudioUploadRejection,
+  canonicalizeAudioFileForUpload,
   SUPPORTED_AUDIO_FORMAT_LABELS,
   validateAudioUpload,
 } from '@/lib/audio/constants';
@@ -136,7 +137,8 @@ export function ReleaseAudioAssetPanel({
       setUploadRejection(null);
 
       try {
-        const blob = await upload(file.name, file, {
+        const uploadFile = canonicalizeAudioFileForUpload(file);
+        const blob = await upload(uploadFile.name, uploadFile, {
           access: 'public',
           handleUploadUrl: '/api/library/audio/upload-token',
         });
@@ -148,9 +150,9 @@ export function ReleaseAudioAssetPanel({
             releaseId,
             blobUrl: blob.url,
             blobPathname: blob.pathname,
-            fileName: file.name,
-            fileMimeType: file.type,
-            fileSizeBytes: file.size,
+            fileName: uploadFile.name,
+            fileMimeType: uploadFile.type,
+            fileSizeBytes: uploadFile.size,
           }),
         });
 

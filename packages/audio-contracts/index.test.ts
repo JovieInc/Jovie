@@ -11,6 +11,7 @@ import {
   getAudioFormatByMimeType,
   getAudioFormatLabel,
   getCanonicalAudioMimeType,
+  getCanonicalAudioUploadMimeType,
   isSupportedAudioFile,
   isSupportedAudioMimeType,
   milliseconds,
@@ -127,6 +128,21 @@ describe('audio format registry', () => {
     expect(getAudioFormatByFileName('track.mp3.exe')).toBeNull();
     expect(getAudioFormatByFileName('track')).toBeNull();
     expect(getCanonicalAudioMimeType('track')).toBeNull();
+    expect(
+      getCanonicalAudioUploadMimeType({ name: 'master.M4A', type: '' })
+    ).toBe('audio/mp4');
+    expect(
+      getCanonicalAudioUploadMimeType({
+        name: 'master.wav',
+        type: 'audio/x-wav',
+      })
+    ).toBe('audio/wav');
+    expect(
+      getCanonicalAudioUploadMimeType({
+        name: 'fake.mp3',
+        type: 'text/plain',
+      })
+    ).toBeNull();
     expect(
       isSupportedAudioFile({ name: 'notes.txt', type: 'text/plain' })
     ).toBe(false);

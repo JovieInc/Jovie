@@ -1,6 +1,7 @@
 import {
   AUDIO_FILE_ACCEPT,
   AUDIO_MAX_FILE_SIZE_BYTES,
+  getCanonicalAudioUploadMimeType,
   isSupportedAudioFile,
   SUPPORTED_AUDIO_FORMAT_LABELS,
   SUPPORTED_AUDIO_MIME_TYPES_SET,
@@ -28,6 +29,7 @@ export {
   getAudioFormatByMimeType,
   getAudioFormatLabel,
   getCanonicalAudioMimeType,
+  getCanonicalAudioUploadMimeType,
   isSupportedAudioFile,
   isSupportedAudioMimeType,
   SUPPORTED_AUDIO_EXTENSIONS,
@@ -41,6 +43,17 @@ export const AUDIO_ACCEPT = AUDIO_FILE_ACCEPT;
 
 /** @deprecated Prefer SUPPORTED_AUDIO_MIME_TYPES_SET */
 export const ALLOWED_AUDIO_MIME_TYPES = SUPPORTED_AUDIO_MIME_TYPES_SET;
+
+/** Gives Blob uploads a canonical MIME when browsers omit or alias it. */
+export function canonicalizeAudioFileForUpload(file: File): File {
+  const canonicalMimeType = getCanonicalAudioUploadMimeType(file);
+  if (!canonicalMimeType || file.type === canonicalMimeType) return file;
+
+  return new File([file], file.name, {
+    type: canonicalMimeType,
+    lastModified: file.lastModified,
+  });
+}
 
 /** Named-rule codes for rejected audio uploads (JOV-3688). */
 export type AudioUploadRuleCode =

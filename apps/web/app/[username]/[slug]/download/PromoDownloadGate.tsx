@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
+import { getAudioFormatLabel } from '@/lib/audio/constants';
 
 const STORAGE_KEY = 'jv_promo_email';
 
@@ -41,15 +42,7 @@ function formatFileSize(bytes: number | null): string {
 }
 
 function formatExtension(mimeType: string): string {
-  const map: Record<string, string> = {
-    'audio/mpeg': 'MP3',
-    'audio/wav': 'WAV',
-    'audio/flac': 'FLAC',
-    'audio/aiff': 'AIFF',
-    'audio/mp4': 'M4A',
-    'audio/x-m4a': 'M4A',
-  };
-  return map[mimeType] ?? '???';
+  return getAudioFormatLabel(mimeType);
 }
 
 export function PromoDownloadGate({

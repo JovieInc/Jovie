@@ -15,22 +15,19 @@ import { Icon } from '@/components/atoms/Icon';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import {
+  AUDIO_FILE_ACCEPT,
+  AUDIO_UPLOAD_POLICIES,
+  canonicalizeAudioFileForUpload,
+  isSupportedAudioFile,
+  SUPPORTED_AUDIO_FORMAT_LABELS,
+} from '@/lib/audio/constants';
+import { getPromoDownloadAudioUploadPath } from '@/lib/audio/upload-paths';
 import { cn } from '@/lib/utils';
 import {
   type PromoDownloadFile,
   PromoDownloadsTable,
 } from './PromoDownloadsTable';
-
-const MAX_FILE_SIZE = 150 * 1024 * 1024; // 150MB
-
-const ALLOWED_TYPES = new Set<PromoDownloadFile['fileMimeType']>([
-  'audio/mpeg',
-  'audio/wav',
-  'audio/flac',
-  'audio/aiff',
-  'audio/mp4',
-  'audio/x-m4a',
-]);
 
 export default function PromoDownloadsPage() {
   const { releaseId } = useParams<{ releaseId: string }>();
@@ -75,14 +72,14 @@ export default function PromoDownloadsPage() {
 
   const uploadFile = useCallback(
     async (file: File) => {
-      if (!ALLOWED_TYPES.has(file.type)) {
+      if (!isSupportedAudioFile(file)) {
         setUploadError(
-          'Invalid file type. Supported: MP3, WAV, FLAC, AIFF, M4A.'
+          `Invalid file type. Supported: ${SUPPORTED_AUDIO_FORMAT_LABELS.join(', ')}.`
         );
         return;
       }
 
-      if (file.size > MAX_FILE_SIZE) {
+      if (file.size > AUDIO_UPLOAD_POLICIES.promo_download.maxFileSizeBytes) {
         setUploadError('File too large. Maximum size is 150 MB.');
         return;
       }
@@ -92,11 +89,17 @@ export default function PromoDownloadsPage() {
       setOperationError(null);
 
       try {
+        const uploadFile = canonicalizeAudioFileForUpload(file);
         // Client-side upload to Vercel Blob
-        const blob = await upload(file.name, file, {
-          access: 'public',
-          handleUploadUrl: '/api/promo-downloads/upload-token',
-        });
+        const blob = await upload(
+          getPromoDownloadAudioUploadPath(releaseId, uploadFile.name),
+          uploadFile,
+          {
+            access: 'public',
+            handleUploadUrl: '/api/promo-downloads/upload-token',
+            clientPayload: JSON.stringify({ releaseId }),
+          }
+        );
 
         // Confirm upload and create DB record
         const title = file.name.replace(/\.[^.]+$/, ''); // Strip extension
@@ -108,9 +111,9 @@ export default function PromoDownloadsPage() {
             title,
             blobUrl: blob.url,
             blobPathname: blob.pathname,
-            fileName: file.name,
-            fileMimeType: file.type,
-            fileSizeBytes: file.size,
+            fileName: uploadFile.name,
+            fileMimeType: uploadFile.type,
+            fileSizeBytes: uploadFile.size,
           }),
         });
 
@@ -198,7 +201,7 @@ export default function PromoDownloadsPage() {
 
   return (
     <PageShell
-      aria-label='Promo downloads'
+      aria-label='Promo Downloads'
       data-testid='release-downloads-shell'
     >
       <PageContent>
@@ -213,7 +216,7 @@ export default function PromoDownloadsPage() {
               <button
                 type='button'
                 aria-disabled={uploading || undefined}
-                aria-label='Drop or choose a promo download audio file'
+                aria-label='Drop Or Choose A Promo Download Audio File'
                 onClick={() => {
                   if (!uploading) {
                     fileInputRef.current?.click();
@@ -247,7 +250,7 @@ export default function PromoDownloadsPage() {
                   {uploading ? 'Uploading audio...' : 'Drop an audio file here'}
                 </p>
                 <p className='mt-1 text-2xs text-tertiary-token'>
-                  MP3, WAV, FLAC, AIFF, M4A. Max 150 MB.
+                  {SUPPORTED_AUDIO_FORMAT_LABELS.join(', ')}. Max 150 MB.
                 </p>
                 <span
                   className={buttonVariants({
@@ -263,11 +266,11 @@ export default function PromoDownloadsPage() {
             <input
               ref={fileInputRef}
               type='file'
-              accept='audio/mpeg,audio/wav,audio/flac,audio/aiff,audio/mp4,audio/x-m4a'
+              accept={AUDIO_FILE_ACCEPT}
               onChange={handleFileSelect}
               disabled={uploading}
               className='sr-only'
-              aria-label='Upload promo download audio file'
+              aria-label='Upload Promo Download Audio File'
             />
             <output
               className='block min-h-9 border-t border-transparent px-3 py-2.5 text-xs sm:px-4'

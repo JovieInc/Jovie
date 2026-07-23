@@ -3,7 +3,11 @@
 import { upload } from '@vercel/blob/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { AUDIO_FILE_ACCEPT, validateAudioFile } from '@/lib/audio/constants';
+import {
+  AUDIO_FILE_ACCEPT,
+  canonicalizeAudioFileForUpload,
+  validateAudioFile,
+} from '@/lib/audio/constants';
 import type { AudioEntityInference } from '@/lib/chat/infer-audio-entity';
 
 export type PendingAudioStatus = 'uploading' | 'ready' | 'error';
@@ -86,7 +90,8 @@ export function useChatAudioAttachments({
       });
 
       try {
-        const blob = await upload(file.name, file, {
+        const uploadFile = canonicalizeAudioFileForUpload(file);
+        const blob = await upload(uploadFile.name, uploadFile, {
           access: 'public',
           handleUploadUrl: '/api/library/audio/upload-token',
         });
@@ -97,9 +102,9 @@ export function useChatAudioAttachments({
           body: JSON.stringify({
             blobUrl: blob.url,
             blobPathname: blob.pathname,
-            fileName: file.name,
-            fileMimeType: file.type,
-            fileSizeBytes: file.size,
+            fileName: uploadFile.name,
+            fileMimeType: uploadFile.type,
+            fileSizeBytes: uploadFile.size,
           }),
         });
 

@@ -7,23 +7,23 @@
  */
 
 import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
+import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import {
+  AUDIO_UPLOAD_POLICIES,
+  SUPPORTED_AUDIO_MIME_TYPES,
+} from '@/lib/audio/constants';
+import { isPromoDownloadAudioUploadPath } from '@/lib/audio/upload-paths';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
+import { db } from '@/lib/db';
+import { discogReleases } from '@/lib/db/schema/content';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
 
-const MAX_FILE_SIZE_BYTES = 150 * 1024 * 1024; // 150MB
-
-const ALLOWED_MIME_TYPES = new Set([
-  'audio/mpeg',
-  'audio/wav',
-  'audio/flac',
-  'audio/aiff',
-  'audio/mp4',
-  'audio/x-m4a',
-]);
+const uploadPayloadSchema = z.object({ releaseId: z.string().uuid() });
 
 export async function POST(request: NextRequest) {
   const { userId: clerkUserId, error } = await requireAuth();
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     const jsonResponse = await handleUpload({
       body,
       request,
-      onBeforeGenerateToken: async _pathname => {
+      onBeforeGenerateToken: async (pathname, clientPayload) => {
         if (!profile) {
           throw new Error('Creator profile not found');
         }
@@ -49,11 +49,37 @@ export async function POST(request: NextRequest) {
           throw new Error('Pro plan required for promo downloads');
         }
 
+        const payload = uploadPayloadSchema.safeParse(
+          clientPayload ? JSON.parse(clientPayload) : null
+        );
+        if (
+          !payload.success ||
+          !isPromoDownloadAudioUploadPath(payload.data.releaseId, pathname)
+        ) {
+          throw new Error('Invalid promo audio upload path');
+        }
+
+        const [release] = await db
+          .select({ id: discogReleases.id })
+          .from(discogReleases)
+          .where(
+            and(
+              eq(discogReleases.id, payload.data.releaseId),
+              eq(discogReleases.creatorProfileId, profile.id)
+            )
+          )
+          .limit(1);
+        if (!release) {
+          throw new Error('Release not found or not yours');
+        }
+
         return {
-          allowedContentTypes: [...ALLOWED_MIME_TYPES],
-          maximumSizeInBytes: MAX_FILE_SIZE_BYTES,
+          allowedContentTypes: [...SUPPORTED_AUDIO_MIME_TYPES],
+          maximumSizeInBytes:
+            AUDIO_UPLOAD_POLICIES.promo_download.maxFileSizeBytes,
           tokenPayload: JSON.stringify({
             creatorProfileId: profile.id,
+            releaseId: payload.data.releaseId,
             userId: clerkUserId,
           }),
         };

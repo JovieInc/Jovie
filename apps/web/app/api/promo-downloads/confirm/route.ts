@@ -6,9 +6,18 @@
  * is stored so download URLs are generated server-side with expiry.
  */
 
+import { createHash } from 'node:crypto';
+import { head } from '@vercel/blob';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  AUDIO_UPLOAD_POLICIES,
+  getAudioFormatByMimeType,
+  isSupportedAudioMimeType,
+  SUPPORTED_AUDIO_FORMAT_LABELS,
+} from '@/lib/audio/constants';
+import { isPromoDownloadAudioUploadPath } from '@/lib/audio/upload-paths';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -19,6 +28,8 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
 
+const BLOB_METADATA_TIMEOUT_MS = 5_000;
+
 const confirmSchema = z.object({
   releaseId: z.string().uuid(),
   title: z.string().min(1).max(200),
@@ -26,7 +37,7 @@ const confirmSchema = z.object({
   blobPathname: z.string().min(1),
   fileName: z.string().min(1),
   fileMimeType: z.string().min(1),
-  fileSizeBytes: z.number().int().positive().optional(),
+  fileSizeBytes: z.number().int().positive(),
 });
 
 function slugify(title: string): string {
@@ -63,6 +74,16 @@ function slugify(title: string): string {
   return slug;
 }
 
+function createBlobSlug(blobPathname: string): string {
+  const fileName = blobPathname.split('/').at(-1) ?? 'download';
+  const base = slugify(fileName) || 'download';
+  const digest = createHash('sha256')
+    .update(blobPathname)
+    .digest('hex')
+    .slice(0, 12);
+  return `${base.slice(0, 67)}-${digest}`;
+}
+
 export async function POST(request: NextRequest) {
   const { userId: clerkUserId, error } = await requireAuth();
   if (error) return error;
@@ -81,11 +102,28 @@ export async function POST(request: NextRequest) {
     const {
       releaseId,
       title,
+      blobUrl,
       blobPathname,
       fileName,
       fileMimeType,
       fileSizeBytes,
     } = parsed.data;
+
+    if (!isSupportedAudioMimeType(fileMimeType)) {
+      return NextResponse.json(
+        {
+          error: `Unsupported audio type. Use ${SUPPORTED_AUDIO_FORMAT_LABELS.join(', ')}.`,
+        },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (fileSizeBytes > AUDIO_UPLOAD_POLICIES.promo_download.maxFileSizeBytes) {
+      return NextResponse.json(
+        { error: 'Audio must be 150 MB or smaller.' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
     // Verify user owns this release via their creator profile and has Pro
     const { user, profile } = await getSessionContext({
@@ -127,6 +165,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!isPromoDownloadAudioUploadPath(releaseId, blobPathname)) {
+      return NextResponse.json(
+        { error: 'Uploaded audio does not belong to this release.' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    let blob;
+    try {
+      blob = await head(blobUrl, {
+        abortSignal: AbortSignal.timeout(BLOB_METADATA_TIMEOUT_MS),
+      });
+    } catch {
+      return NextResponse.json(
+        { error: 'Uploaded audio could not be verified.' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const blobFormat = getAudioFormatByMimeType(blob.contentType);
+    if (
+      blob.url !== blobUrl ||
+      blob.pathname !== blobPathname ||
+      blob.size !== fileSizeBytes ||
+      !blobFormat ||
+      blob.size > AUDIO_UPLOAD_POLICIES.promo_download.maxFileSizeBytes
+    ) {
+      return NextResponse.json(
+        { error: 'Uploaded audio metadata does not match the stored file.' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
     // Get next position for this release
     const [maxPos] = await db
       .select({
@@ -137,12 +208,12 @@ export async function POST(request: NextRequest) {
 
     const nextPosition = (maxPos?.max ?? -1) + 1;
 
-    // Generate unique slug
-    let slug = slugify(title);
-    if (!slug) slug = 'download';
+    // The Blob-derived slug makes replay confirmation idempotent under the
+    // existing (release_id, slug) unique index, including concurrent requests.
+    const slug = createBlobSlug(blob.pathname);
 
     // Insert promo download record (store pathname, NOT public URL)
-    const [record] = await db
+    const [insertedRecord] = await db
       .insert(promoDownloads)
       .values({
         creatorProfileId: profile.id,
@@ -151,14 +222,39 @@ export async function POST(request: NextRequest) {
         slug,
         fileUrl: blobPathname,
         fileName,
-        fileSizeBytes: fileSizeBytes ?? null,
-        fileMimeType,
+        fileSizeBytes: blob.size,
+        fileMimeType: blobFormat.canonicalMimeType,
         position: nextPosition,
+      })
+      .onConflictDoNothing({
+        target: [promoDownloads.releaseId, promoDownloads.slug],
       })
       .returning();
 
+    if (!insertedRecord) {
+      const [existingRecord] = await db
+        .select()
+        .from(promoDownloads)
+        .where(
+          and(
+            eq(promoDownloads.releaseId, releaseId),
+            eq(promoDownloads.slug, slug)
+          )
+        )
+        .limit(1);
+
+      if (existingRecord) {
+        return NextResponse.json(
+          { success: true, promoDownload: existingRecord },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      throw new Error('Promo download conflict could not be resolved');
+    }
+
     return NextResponse.json(
-      { success: true, promoDownload: record },
+      { success: true, promoDownload: insertedRecord },
       { status: 201, headers: NO_STORE_HEADERS }
     );
   } catch (err) {
