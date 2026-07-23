@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Codex readiness probe and the reversible Symphony/Grok sidecar."""
+"""Fail-closed Codex readiness probe and reversible Symphony/Grok fallback."""
 
 from __future__ import annotations
 
@@ -21,18 +21,15 @@ DEFAULT_ROTATE_BIN = "/home/timwhite/.local/bin/codex-rotate"
 DEFAULT_STATE = "~/.codex-accounts/state.json"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 MAX_TIMEOUT_SECONDS = 30.0
+CONTROL_TIMEOUT_SECONDS = 10.0
 DEFAULT_GROK_MAX = 2
 MAX_GROK_MAX = 10
-CONTROL_TIMEOUT_SECONDS = 10.0
 SERVICE = "symphony-ui-pilot.service"
 LINEAR_API = "https://api.linear.app/graphql"
-IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 LINEAR_ENV_PATH = "~/.config/symphony/linear.env"
+IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 DOTENV_ASSIGNMENT = re.compile(r"^(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
-INSTALL_STATE_DIR = ".symphony-codex-auth-fallback"
-INSTALL_CURRENT = "current"
-INSTALL_PENDING = "pending"
-INSTALL_RELEASES = "releases"
+STATE_DIR_NAME = ".symphony-codex-auth-fallback"
 RUNTIME_NAMES = (
     "symphony-codex-exhausted",
     "symphony-codex-exhausted.py",
@@ -47,49 +44,34 @@ query {
       labels: { name: { eq: "symphony" } }
       state: { name: { in: ["Todo", "In Progress"] } }
     }
-  ) {
-    nodes { identifier }
-  }
+  ) { nodes { identifier } }
 }
 """
 
 
 def _state_path() -> pathlib.Path:
-    value = os.environ.get("GEM_CODEX_ACCOUNTS_STATE", DEFAULT_STATE)
-    return pathlib.Path(os.path.expanduser(value))
+    return pathlib.Path(os.path.expanduser(os.environ.get("GEM_CODEX_ACCOUNTS_STATE", DEFAULT_STATE)))
 
 
 def _known_account_state() -> bool:
-    """Validate the observed schema without treating any field as readiness."""
-
     try:
         state = json.loads(_state_path().read_text(encoding="utf-8"))
     except (OSError, TypeError, ValueError):
         return False
-    if not isinstance(state, dict):
-        return False
-    required = ("active", "cooldowns", "last_error")
-    if any(key not in state for key in required):
-        return False
     return (
-        (state["active"] is None or isinstance(state["active"], str))
-        and isinstance(state["cooldowns"], dict)
-        and isinstance(state["last_error"], dict)
+        isinstance(state, dict)
+        and isinstance(state.get("cooldowns"), dict)
+        and isinstance(state.get("last_error"), dict)
+        and (state.get("active") is None or isinstance(state.get("active"), str))
     )
 
 
 def _timeout_seconds() -> float:
     try:
-        value = float(
-            os.environ.get(
-                "GEM_CODEX_CANARY_TIMEOUT_SECONDS", str(DEFAULT_TIMEOUT_SECONDS)
-            )
-        )
+        value = float(os.environ.get("GEM_CODEX_CANARY_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS))
     except (TypeError, ValueError):
         return DEFAULT_TIMEOUT_SECONDS
-    if value <= 0:
-        return DEFAULT_TIMEOUT_SECONDS
-    return min(value, MAX_TIMEOUT_SECONDS)
+    return DEFAULT_TIMEOUT_SECONDS if value <= 0 else min(value, MAX_TIMEOUT_SECONDS)
 
 
 def _rotate_executable() -> str | None:
@@ -99,22 +81,10 @@ def _rotate_executable() -> str | None:
     return shutil.which(configured)
 
 
-def _grok_ship_one_executable() -> str | None:
-    executable = pathlib.Path.home() / ".local/bin/grok-ship-one"
-    return str(executable) if executable.is_file() and os.access(executable, os.X_OK) else None
-
-
 def _captured(command: list[str], timeout: float) -> subprocess.CompletedProcess[bytes] | None:
-    """Run a child with all output captured and never returned to the caller."""
-
+    """Capture child output so auth payloads never reach durable or caller output."""
     try:
-        return subprocess.run(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            timeout=timeout,
-        )
+        return subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired, ValueError):
         return None
 
@@ -126,27 +96,20 @@ def _exact_marker(output: bytes) -> bool:
 def codex_canary_ready() -> tuple[bool, str]:
     if not _known_account_state():
         return False, "unknown_state"
-
     executable = _rotate_executable()
     if executable is None:
         return False, "executable_missing"
-
-    command = [
-        executable,
-        "--config",
-        "shell_environment_policy.inherit=none",
-        "--config",
-        "model=gpt-5.6-luna",
-        "exec",
-        "--sandbox",
-        "read-only",
-        "--skip-git-repo-check",
-        f"Reply with exactly: {READY_MARKER}",
-    ]
-    result = _captured(command, _timeout_seconds())
-    if result is None:
-        return False, "probe_failed"
-    if result.returncode != 0:
+    result = _captured(
+        [
+            executable,
+            "--config", "shell_environment_policy.inherit=none",
+            "--config", "model=gpt-5.6-luna",
+            "exec", "--sandbox", "read-only", "--skip-git-repo-check",
+            f"Reply with exactly: {READY_MARKER}",
+        ],
+        _timeout_seconds(),
+    )
+    if result is None or result.returncode != 0:
         return False, "probe_failed"
     if not _exact_marker(result.stdout):
         return False, "missing_ready_evidence"
@@ -157,35 +120,29 @@ def _systemctl(*args: str) -> list[str]:
     return ["systemctl", "--user", *args]
 
 
-def _control_timeout_seconds() -> float:
-    return CONTROL_TIMEOUT_SECONDS
-
-
 def _control(command: list[str]) -> bool:
-    result = _captured(command, _control_timeout_seconds())
+    result = _captured(command, CONTROL_TIMEOUT_SECONDS)
     return result is not None and result.returncode == 0
 
 
 def _active_grok_units() -> bool | None:
     result = _captured(
-        _systemctl(
-            "list-units",
-            "--type=service",
-            "--state=active",
-            "grok-ship-*.service",
-            "--no-legend",
-            "--no-pager",
-        ),
-        _control_timeout_seconds(),
+        _systemctl("list-units", "--type=service", "--state=active", "grok-ship-*.service", "--no-legend", "--no-pager"),
+        CONTROL_TIMEOUT_SECONDS,
     )
     if result is None or result.returncode != 0:
         return None
     return bool(result.stdout.strip())
 
 
+def _grok_ship_one_executable() -> str | None:
+    executable = pathlib.Path.home() / ".local/bin/grok-ship-one"
+    return str(executable) if executable.is_file() and os.access(executable, os.X_OK) else None
+
+
 def _grok_limit() -> int:
     try:
-        value = int(os.environ.get("SYMPHONY_GROK_MAX", str(DEFAULT_GROK_MAX)))
+        value = int(os.environ.get("SYMPHONY_GROK_MAX", DEFAULT_GROK_MAX))
     except (TypeError, ValueError):
         return DEFAULT_GROK_MAX
     return max(0, min(value, MAX_GROK_MAX))
@@ -196,30 +153,20 @@ def _dotenv_value(raw: str) -> str | None:
         return None
     if raw[0] in "'\"":
         quote = raw[0]
-        if len(raw) < 2 or raw[-1] != quote:
+        if len(raw) < 2 or raw[-1] != quote or quote in raw[1:-1] or any(c in raw for c in "\\$`"):
             return None
-        value = raw[1:-1]
-        if quote in value or any(character in value for character in "\\$`"):
-            return None
-        return value or None
-    if any(character.isspace() for character in raw):
-        return None
-    if any(character in raw for character in "'\"\\$`;|&<>(){}"):
-        return None
-    return raw
+        return raw[1:-1] or None
+    return None if any(c.isspace() or c in "'\"\\$`;|&<>(){}" for c in raw) else raw
 
 
 def _linear_api_key_from_file() -> str | None:
     try:
-        lines = pathlib.Path(os.path.expanduser(LINEAR_ENV_PATH)).read_text(
-            encoding="utf-8"
-        ).splitlines()
+        lines = pathlib.Path(os.path.expanduser(LINEAR_ENV_PATH)).read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeError):
         return None
-
     key: str | None = None
-    for raw_line in lines:
-        line = raw_line.strip()
+    for raw in lines:
+        line = raw.strip()
         if not line or line.startswith("#"):
             continue
         match = DOTENV_ASSIGNMENT.fullmatch(line)
@@ -232,71 +179,51 @@ def _linear_api_key_from_file() -> str | None:
 
 
 def _linear_identifiers() -> list[str] | None:
-    key = (
-        os.environ["LINEAR_API_KEY"]
-        if "LINEAR_API_KEY" in os.environ
-        else _linear_api_key_from_file()
-    )
+    key = os.environ.get("LINEAR_API_KEY") or _linear_api_key_from_file()
     if not key:
         return None
-    body = json.dumps({"query": LINEAR_QUERY}).encode()
     request = urllib.request.Request(
         os.environ.get("LINEAR_API_URL", LINEAR_API),
-        data=body,
+        data=json.dumps({"query": LINEAR_QUERY}).encode(),
         headers={"Authorization": key, "Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=_control_timeout_seconds()) as response:
+        with urllib.request.urlopen(request, timeout=CONTROL_TIMEOUT_SECONDS) as response:
             payload = json.load(response)
     except (OSError, ValueError, TypeError, urllib.error.URLError):
-        return None
-    if not isinstance(payload, dict) or payload.get("errors"):
         return None
     try:
         nodes = payload["data"]["issues"]["nodes"]
     except (KeyError, TypeError):
         return None
-    if not isinstance(nodes, list):
+    if not isinstance(nodes, list) or payload.get("errors"):
         return None
-    identifiers = []
+    identifiers: list[str] = []
     for node in nodes:
         if not isinstance(node, dict) or not isinstance(node.get("identifier"), str):
             return None
-        identifier = node["identifier"]
-        if IDENTIFIER.fullmatch(identifier):
-            identifiers.append(identifier)
+        if IDENTIFIER.fullmatch(node["identifier"]):
+            identifiers.append(node["identifier"])
     return identifiers
 
 
 def _grok_command(identifier: str, executable: str) -> list[str]:
-    unit = f"grok-ship-{identifier}"
-    path = f"{pathlib.Path.home()}/.local/bin:/usr/bin:/bin"
     return [
-        "systemd-run",
-        "--user",
-        f"--unit={unit}",
-        "--collect",
-        "-p",
-        "Type=exec",
-        "-p",
-        f"Environment=PATH={path}",
-        executable,
-        identifier,
+        "systemd-run", "--user", f"--unit=grok-ship-{identifier}", "--collect",
+        "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:/usr/bin:/bin",
+        executable, identifier,
     ]
 
 
 def reconcile() -> int:
     ready, reason = codex_canary_ready()
     if ready:
-        active_grok_units = _active_grok_units()
-        if active_grok_units is None:
+        active = _active_grok_units()
+        if active is None:
             print("codex_not_exhausted grok_state_query_failed", file=sys.stderr)
             return 2
-        if active_grok_units:
-            print(
-                "codex_not_exhausted recovery_deferred grok_ship_active",
-                file=sys.stderr,
-            )
+        if active:
+            print("codex_not_exhausted recovery_deferred grok_ship_active", file=sys.stderr)
             return 0
         if not _control(_systemctl("start", SERVICE)):
             print("codex_not_exhausted symphony_start_failed", file=sys.stderr)
@@ -311,21 +238,18 @@ def reconcile() -> int:
         print("codex_exhausted symphony_stop_failed", file=sys.stderr)
         return 2
     executable = _grok_ship_one_executable()
+    identifiers = _linear_identifiers() if executable else None
     if executable is None:
         print("codex_exhausted grok_executable_missing", file=sys.stderr)
         return 2
-    identifiers = _linear_identifiers()
     if identifiers is None:
         print("codex_exhausted linear_query_failed", file=sys.stderr)
         return 2
-
     started = 0
-    limit = _grok_limit()
     for identifier in identifiers:
-        if started >= limit:
+        if started >= _grok_limit():
             break
-        unit = f"grok-ship-{identifier}"
-        if _control(_systemctl("is-active", "--quiet", unit)):
+        if _control(_systemctl("is-active", "--quiet", f"grok-ship-{identifier}")):
             continue
         if not _control(_grok_command(identifier, executable)):
             print("codex_exhausted grok_launch_failed", file=sys.stderr)
@@ -335,44 +259,33 @@ def reconcile() -> int:
     return 0
 
 
+class InstallValidationError(Exception):
+    pass
+
+
 def _artifacts() -> dict[str, pathlib.Path]:
     root = pathlib.Path(__file__).resolve().parent
-    return {
-        "symphony-codex-exhausted": root / "symphony-codex-exhausted",
-        "symphony-codex-exhausted.py": root / "symphony-codex-exhausted.py",
-        "symphony-grok-sidecar": root / "symphony-grok-sidecar",
-    }
+    return {name: root / name for name in RUNTIME_NAMES}
 
 
 def _stable_launcher(name: str) -> bytes:
     if name == "symphony-codex-exhausted.py":
-        return b'''#!/usr/bin/env python3
+        return f'''#!/usr/bin/env python3
 from __future__ import annotations
-
 import os
 import pathlib
 import sys
-
-
-state_dir = pathlib.Path(__file__).resolve().parent / ".symphony-codex-auth-fallback"
-release_link = state_dir / "current"
-if not release_link.exists():
-    release_link = state_dir / "pending"
-controller = release_link / "symphony-codex-exhausted.py"
+state = pathlib.Path(__file__).resolve().parent / "{STATE_DIR_NAME}"
+controller = state / "current" / "symphony-codex-exhausted.py"
 if not controller.is_file():
     raise SystemExit("symphony-codex-auth-fallback is not installed")
 os.execv(sys.executable, [sys.executable, str(controller), *sys.argv[1:]])
-'''
+'''.encode()
     command = 'reconcile "$@"' if name == "symphony-grok-sidecar" else '"$@"'
     return f'''#!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${{BASH_SOURCE[0]}}")" && pwd)"
-STATE_DIR="$SCRIPT_DIR/{INSTALL_STATE_DIR}"
-RELEASE_LINK="$STATE_DIR/{INSTALL_CURRENT}"
-if [[ ! -e "$RELEASE_LINK" ]]; then
-  RELEASE_LINK="$STATE_DIR/{INSTALL_PENDING}"
-fi
-exec python3 "$RELEASE_LINK/symphony-codex-exhausted.py" {command}
+exec python3 "$SCRIPT_DIR/{STATE_DIR_NAME}/current/symphony-codex-exhausted.py" {command}
 '''.encode()
 
 
@@ -380,237 +293,115 @@ def _path_exists(path: pathlib.Path) -> bool:
     return os.path.lexists(path)
 
 
-def _write_executable(path: pathlib.Path, data: bytes) -> None:
-    with path.open("wb") as handle:
-        handle.write(data)
-        handle.flush()
-        path.chmod(0o755)
-        os.fsync(handle.fileno())
-
-
 def _fsync_directory(path: pathlib.Path) -> None:
-    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-    descriptor = os.open(path, flags)
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
     try:
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
 
 
-def _mkdir_durable(path: pathlib.Path) -> None:
-    missing: list[pathlib.Path] = []
-    cursor = path
-    while not cursor.is_dir():
-        if _path_exists(cursor):
-            raise OSError(f"install path is not a directory: {cursor}")
-        missing.append(cursor)
-        parent = cursor.parent
-        if parent == cursor:
-            raise OSError(f"cannot create install path: {path}")
-        cursor = parent
-    for directory in reversed(missing):
-        directory.mkdir()
-        _fsync_directory(directory.parent)
-
-
-class InstallValidationError(Exception):
-    pass
+def _write_executable(path: pathlib.Path, data: bytes) -> None:
+    with path.open("wb") as handle:
+        handle.write(data)
+        path.chmod(0o755)
+        handle.flush()
+        os.fsync(handle.fileno())
 
 
 def _valid_runtime_file(path: pathlib.Path) -> bool:
-    if path.is_symlink() or not path.is_file():
-        return False
     try:
-        mode = path.stat().st_mode
-        data = path.read_bytes()
+        return not path.is_symlink() and path.is_file() and bool(path.stat().st_mode & 0o111) and path.read_bytes().startswith(b"#!")
     except OSError:
         return False
-    return bool(data.startswith(b"#!") and mode & 0o111)
 
 
-def _validated_release_link(
-    link: pathlib.Path, releases: pathlib.Path
-) -> pathlib.Path | None:
+def _current_release(state: pathlib.Path, releases: pathlib.Path) -> pathlib.Path | None:
+    link = state / "current"
     if not _path_exists(link):
         return None
     if not link.is_symlink():
-        raise InstallValidationError("release link is not a symlink")
-    raw_target = os.readlink(link)
-    target_parts = pathlib.PurePath(raw_target).parts
-    if (
-        pathlib.PurePath(raw_target).is_absolute()
-        or len(target_parts) != 2
-        or target_parts[0] != INSTALL_RELEASES
-    ):
-        raise InstallValidationError("release link target is invalid")
-    release = releases / target_parts[1]
-    if release.parent != releases or not release.is_dir():
-        raise InstallValidationError("release link target is missing")
-    if not all(_valid_runtime_file(release / name) for name in RUNTIME_NAMES):
-        raise InstallValidationError("release link target is incomplete")
+        raise InstallValidationError("current is not a symlink")
+    raw = os.readlink(link)
+    parts = pathlib.PurePath(raw).parts
+    if pathlib.PurePath(raw).is_absolute() or len(parts) != 2 or parts[0] != "releases":
+        raise InstallValidationError("current target is invalid")
+    release = releases / parts[1]
+    if release.parent != releases or not release.is_dir() or not all(_valid_runtime_file(release / n) for n in RUNTIME_NAMES):
+        raise InstallValidationError("current release is incomplete")
     return release
 
 
-def _existing_top_level(destination: pathlib.Path) -> dict[str, pathlib.Path]:
-    return {
-        name: destination / name
-        for name in RUNTIME_NAMES
-        if _path_exists(destination / name)
-    }
+def _preflight_install(destination: pathlib.Path, contents: dict[str, bytes]) -> None:
+    state = destination / STATE_DIR_NAME
+    releases = state / "releases"
+    current = _current_release(state, releases)
+    installed = {n: destination / n for n in RUNTIME_NAMES if _path_exists(destination / n)}
+    if current is None and installed and len(installed) != len(RUNTIME_NAMES):
+        raise InstallValidationError("legacy launcher set is partial")
+    if any(not _valid_runtime_file(path) for path in installed.values()):
+        raise InstallValidationError("installed launcher is invalid")
+    if current is not None and any(not _valid_runtime_file(current / n) for n in contents):
+        raise InstallValidationError("current release is invalid")
 
 
-def _preflight_install(
-    destination: pathlib.Path, contents: dict[str, bytes]
-) -> tuple[pathlib.Path | None, pathlib.Path | None, str]:
-    state_dir = destination / INSTALL_STATE_DIR
-    releases = state_dir / INSTALL_RELEASES
-    current = _validated_release_link(state_dir / INSTALL_CURRENT, releases)
-    pending = _validated_release_link(state_dir / INSTALL_PENDING, releases)
-    pending_matches = pending is not None and all(
-        (pending / name).read_bytes() == contents[name] for name in RUNTIME_NAMES
-    )
-    pending_target = pending if pending_matches else None
-    top_level = _existing_top_level(destination)
-    stable = {name: _stable_launcher(name) for name in RUNTIME_NAMES}
-
-    if current is None and pending is None:
-        if not top_level:
-            return None, None, "fresh"
-        if len(top_level) != len(RUNTIME_NAMES) or not all(
-            _valid_runtime_file(path) for path in top_level.values()
-        ):
-            raise InstallValidationError("legacy launcher set is partial or invalid")
-        return None, None, "legacy"
-
-    if current is None:
-        if any(path.read_bytes() != stable[name] for name, path in top_level.items()):
-            raise InstallValidationError("pending install has an invalid launcher")
-        return None, pending_target, "fresh"
-
-    current_contents = {name: (current / name).read_bytes() for name in RUNTIME_NAMES}
-    for name, path in top_level.items():
-        if not _valid_runtime_file(path):
-            raise InstallValidationError("installed launcher is invalid")
-        if path.read_bytes() not in (stable[name], current_contents[name]):
-            raise InstallValidationError("installed launcher has unexpected contents")
-    return current, pending_target, "versioned"
-
-
-def _atomic_release_link(link: pathlib.Path, release: pathlib.Path) -> None:
-    temporary = link.parent / f".{link.name}.install"
+def _atomic_current(state: pathlib.Path, release: pathlib.Path) -> None:
+    temporary = state / f".current.{release.name}"
     if _path_exists(temporary):
         temporary.unlink()
-    os.symlink(f"{INSTALL_RELEASES}/{release.name}", temporary)
-    os.replace(temporary, link)
-    _fsync_directory(link.parent)
+    os.symlink(f"releases/{release.name}", temporary)
+    os.replace(temporary, state / "current")
+    _fsync_directory(state)
 
 
 def _install_launcher(destination: pathlib.Path, name: str, data: bytes) -> None:
-    staged = destination / f".{name}.install"
-    _write_executable(staged, data)
-    os.replace(staged, destination / name)
-    _fsync_directory(destination)
-
-
-def _remove_install_temps(destination: pathlib.Path, state_dir: pathlib.Path) -> None:
-    destination_changed = False
-    for name in RUNTIME_NAMES:
-        staged = destination / f".{name}.install"
-        if _path_exists(staged):
-            try:
-                staged.unlink()
-                destination_changed = True
-            except OSError:
-                pass
-    if destination_changed:
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{name}.", dir=destination)
+    os.close(descriptor)
+    temporary = pathlib.Path(temporary_name)
+    try:
+        _write_executable(temporary, data)
+        os.replace(temporary, destination / name)
         _fsync_directory(destination)
-    state_changed = False
-    for name in (INSTALL_CURRENT, INSTALL_PENDING):
-        staged = state_dir / f".{name}.install"
-        if _path_exists(staged):
-            try:
-                staged.unlink()
-                state_changed = True
-            except OSError:
-                pass
-    if state_changed:
-        _fsync_directory(state_dir)
+    finally:
+        if _path_exists(temporary):
+            temporary.unlink()
 
 
 def install(destination_root: str | None) -> int:
     artifacts = _artifacts()
-    contents: dict[str, bytes] = {}
-    for name, source in artifacts.items():
-        try:
-            mode = source.stat().st_mode
-            data = source.read_bytes()
-        except OSError:
-            print("install validation failed", file=sys.stderr)
-            return 2
-        if not source.is_file() or not data.startswith(b"#!") or not (mode & 0o111):
-            print("install validation failed", file=sys.stderr)
-            return 2
-        contents[name] = data
-
-    destination = pathlib.Path(
-        os.path.expanduser(destination_root or "~/.local/bin")
-    ).resolve()
-    state_dir = destination / INSTALL_STATE_DIR
-    current = state_dir / INSTALL_CURRENT
-    pending = state_dir / INSTALL_PENDING
-
     try:
-        current_target, pending_target, mode = _preflight_install(destination, contents)
-    except (InstallValidationError, OSError):
-        print("install validation failed", file=sys.stderr)
-        return 2
-
-    release: pathlib.Path | None = pending_target
-    try:
-        _mkdir_durable(destination)
-        _mkdir_durable(state_dir)
-        releases = state_dir / INSTALL_RELEASES
-        _mkdir_durable(releases)
-        if release is None:
-            release = pathlib.Path(tempfile.mkdtemp(prefix="release-", dir=releases))
-            _fsync_directory(releases)
-            for name, data in contents.items():
-                _write_executable(release / name, data)
-            _fsync_directory(release)
-
-        if mode == "legacy" and current_target is None:
-            prior = pathlib.Path(tempfile.mkdtemp(prefix="prior-", dir=releases))
-            _fsync_directory(releases)
-            for name in RUNTIME_NAMES:
-                source = destination / name
-                _write_executable(prior / name, source.read_bytes())
-            _fsync_directory(prior)
-            _atomic_release_link(current, prior)
-            current_target = prior
-
-        if pending_target is None:
-            _atomic_release_link(pending, release)
-
+        contents = {}
+        for name, source in artifacts.items():
+            if source.is_symlink() or not source.is_file() or not (source.stat().st_mode & 0o111):
+                raise InstallValidationError("source is not executable")
+            contents[name] = source.read_bytes()
+            if not contents[name].startswith(b"#!"):
+                raise InstallValidationError("source is not executable")
+        destination = pathlib.Path(os.path.expanduser(destination_root or "~/.local/bin")).resolve()
+        _preflight_install(destination, contents)
+        destination.mkdir(parents=True, exist_ok=True)
+        state = destination / STATE_DIR_NAME
+        releases = state / "releases"
+        state.mkdir(exist_ok=True)
+        releases.mkdir(exist_ok=True)
+        _fsync_directory(destination)
+        _fsync_directory(state)
+        release = pathlib.Path(tempfile.mkdtemp(prefix=".install-", dir=releases))
+        for name, data in contents.items():
+            _write_executable(release / name, data)
+        _fsync_directory(release)
+        _fsync_directory(releases)
+        _atomic_current(state, release)
         for name in RUNTIME_NAMES:
             _install_launcher(destination, name, _stable_launcher(name))
-
-        os.replace(pending, current)
-        _fsync_directory(state_dir)
-        _remove_install_temps(destination, state_dir)
-    except OSError:
-        try:
-            _remove_install_temps(destination, state_dir)
-        except OSError:
-            pass
-        print("install failed", file=sys.stderr)
+    except (InstallValidationError, OSError, ValueError):
+        print("install validation failed" if "contents" not in locals() else "install failed", file=sys.stderr)
         return 2
     return 0
 
 
 def main() -> int:
-    default = "probe"
-    if pathlib.Path(sys.argv[0]).name == "symphony-grok-sidecar":
-        default = "reconcile"
+    default = "reconcile" if pathlib.Path(sys.argv[0]).name == "symphony-grok-sidecar" else "probe"
     parser = argparse.ArgumentParser()
     parser.add_argument("command", nargs="?", choices=("probe", "reconcile", "install"), default=default)
     parser.add_argument("--destination-root")
