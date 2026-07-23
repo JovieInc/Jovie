@@ -2,6 +2,7 @@
 
 import { and, eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
+import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
@@ -39,7 +40,7 @@ export async function switchActiveProfile(
     const [user] = await db
       .select({ id: users.id, activeProfileId: users.activeProfileId })
       .from(users)
-      .where(eq(users.id, appUserId))
+      .where(appUserIdFilter(appUserId))
       .limit(1);
 
     if (!user) {
@@ -159,7 +160,7 @@ export async function createAdditionalProfile(input: {
     const [user] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.id, appUserId))
+      .where(appUserIdFilter(appUserId))
       .limit(1);
 
     if (!user) {

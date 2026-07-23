@@ -7,12 +7,12 @@
  * dashboard settings like sidebar collapse state.
  */
 
-import { eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidateTag,
   updateTag,
 } from 'next/cache';
+import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { CACHE_TAGS } from '@/lib/cache/tags';
@@ -43,7 +43,7 @@ export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
       const [user] = await db
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.id, appUserId))
+        .where(appUserIdFilter(appUserId))
         .limit(1);
 
       if (!user?.id) throw new TypeError('User not found');

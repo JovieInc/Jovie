@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
 
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
+import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { invalidateBanStatusCache } from '@/lib/auth/ban-check';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
@@ -87,7 +88,7 @@ async function requireAdmin(): Promise<string> {
       deletedAt: users.deletedAt,
     })
     .from(users)
-    .where(eq(users.id, userId))
+    .where(appUserIdFilter(userId))
     .limit(1);
 
   if (!adminUser) {

@@ -12,6 +12,7 @@ import {
 } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { z } from 'zod';
+import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL, createAudienceDataTag } from '@/lib/cache/tags';
 import { doesColumnExist } from '@/lib/db';
@@ -144,7 +145,7 @@ async function getAudienceMemberColumnAvailability(): Promise<AudienceMemberColu
  * Build ownership filter based on the authenticated app user ID.
  */
 function buildOwnershipFilter(appUserId: string | null) {
-  return appUserId ? eq(users.id, appUserId) : drizzleSql<boolean>`true`;
+  return appUserId ? appUserIdFilter(appUserId) : drizzleSql<boolean>`true`;
 }
 
 /**

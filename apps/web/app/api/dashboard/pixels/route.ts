@@ -1,6 +1,7 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { users } from '@/lib/db/schema/auth';
 import { creatorPixels } from '@/lib/db/schema/pixels';
@@ -57,7 +58,7 @@ export async function GET() {
         })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(eq(users.id, appUserId))
+        .where(appUserIdFilter(appUserId))
         .limit(1);
 
       if (!userProfile) {
@@ -205,7 +206,7 @@ export async function PUT(req: Request) {
         })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(eq(users.id, appUserId))
+        .where(appUserIdFilter(appUserId))
         .limit(1);
 
       if (!userProfile) {
@@ -336,7 +337,7 @@ export async function DELETE() {
         })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(eq(users.id, appUserId))
+        .where(appUserIdFilter(appUserId))
         .limit(1);
 
       if (!userProfile) {
