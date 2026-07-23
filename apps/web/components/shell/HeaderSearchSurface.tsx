@@ -366,7 +366,7 @@ function HeaderGlobalSearch({
             >
               <div
                 aria-hidden='true'
-                className='px-2 pb-1 pt-1.5 text-2xs font-medium uppercase tracking-wide text-tertiary-token'
+                className='px-2 pb-1 pt-1.5 text-2xs font-medium text-tertiary-token'
               >
                 {group.label}
               </div>
@@ -409,7 +409,7 @@ function HeaderGlobalSearch({
             >
               <div
                 aria-hidden='true'
-                className='px-2 pb-1 pt-1.5 text-2xs font-medium uppercase tracking-wide text-tertiary-token'
+                className='px-2 pb-1 pt-1.5 text-2xs font-medium text-tertiary-token'
               >
                 Current view
               </div>
@@ -492,7 +492,7 @@ export function HeaderSearchSurface({
         onClick={onOpen}
         className={cn(
           headerSearchSurfaceChrome,
-          'inline-flex h-7 min-h-7 min-w-0 items-center justify-start gap-1.5 px-2.5 text-left text-xs text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-cinematic ease-cinematic hover:border-default hover:bg-surface-1 hover:text-primary-token focus-ring-themed',
+          'inline-flex h-7 min-h-7 min-w-0 items-center justify-start gap-1.5 px-2.5 text-left text-xs text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle ease-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-ring-themed',
           className
         )}
         aria-label='Search'

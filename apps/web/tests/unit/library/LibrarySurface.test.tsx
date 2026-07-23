@@ -260,6 +260,10 @@ describe('LibrarySurface', () => {
     expect(source).toContain('system-b-library-table-row-selected');
     expect(source).toContain('ReleaseAudioAssetPanel');
     expect(source).toContain('function LibraryFilterPanel');
+    expect(source).toContain("data-testid='library-filter-count-slot'");
+    expect(source).toContain(
+      "className='inline-block w-8 shrink-0 text-right tabular-nums'"
+    );
     expect(source).not.toContain('useRegisterShellSidebarOverride');
     expect(source).not.toContain('max-h-[45svh]');
   });
@@ -1243,6 +1247,15 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
+    const filterCountSlot = screen.getByTestId('library-filter-count-slot');
+    expect(filterCountSlot).toHaveClass(
+      'w-8',
+      'shrink-0',
+      'text-right',
+      'tabular-nums'
+    );
+    expect(filterCountSlot).toBeEmptyDOMElement();
+
     await user.click(screen.getByRole('button', { name: 'Show filters' }));
     const panel = screen.getByTestId('library-filter-panel');
     const savedViews = within(panel).getByTestId('library-saved-filter-views');
@@ -1287,6 +1300,15 @@ describe('LibrarySurface', () => {
     expect(
       within(panel).getByRole('button', { name: /Apple Music/u })
     ).toBeInTheDocument();
+
+    await user.click(
+      within(panel).getByRole('button', { name: /Needs Review/u })
+    );
+    expect(screen.getByTestId('library-filter-count-slot')).toBe(
+      filterCountSlot
+    );
+    expect(filterCountSlot).toHaveTextContent('(1)');
+    expect(filterCountSlot).toHaveClass('w-8');
   });
 
   it('restores URL presets and persisted smart filters without changing their contracts', async () => {

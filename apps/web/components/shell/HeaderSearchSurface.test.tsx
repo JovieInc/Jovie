@@ -47,6 +47,9 @@ describe('HeaderSearchSurface', () => {
     expect(trigger.className).toContain('min-h-7');
     expect(trigger.className).toContain('justify-start');
     expect(trigger.className).toContain('text-left');
+    expect(trigger.className).toContain('duration-subtle');
+    expect(trigger.className).toContain('ease-subtle');
+    expect(trigger.className).not.toContain('duration-cinematic');
   });
 
   it('keeps the open search surface on the same compact header height', () => {
@@ -157,6 +160,15 @@ describe('HeaderSearchSurface', () => {
     expect(screen.getByRole('group', { name: 'Entities' })).toBeVisible();
     expect(screen.getByRole('group', { name: 'Library Assets' })).toBeVisible();
     expect(screen.getByRole('group', { name: 'Current View' })).toBeVisible();
+    for (const heading of [
+      screen.getByText('Threads'),
+      screen.getByText('Entities'),
+      screen.getByText('Library Assets'),
+      screen.getByText('Current view'),
+    ]) {
+      expect(heading.className).not.toContain('uppercase');
+      expect(heading.className).not.toContain('tracking-wide');
+    }
     const options = screen.getAllByRole('option');
     expect(
       options

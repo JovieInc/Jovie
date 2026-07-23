@@ -124,9 +124,13 @@ vi.mock('@/components/atoms/AppIconButton', () => ({
 }));
 
 vi.mock('@/components/molecules/drawer', () => ({
-  EntitySidebarShell: ({ children }: { children: React.ReactNode }) => (
-    <aside>{children}</aside>
-  ),
+  EntitySidebarShell: ({
+    children,
+    'data-testid': testId,
+  }: {
+    children: React.ReactNode;
+    'data-testid'?: string;
+  }) => <aside data-testid={testId}>{children}</aside>,
   DrawerTabbedCard: ({
     children,
     tabs,
@@ -397,6 +401,12 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     mockState.useRealProfileMutation = false;
     mockState.selectedProfileId = 'profile-1';
     vi.unstubAllGlobals();
+  });
+
+  it('exposes a deterministic readiness marker for the open profile rail', () => {
+    renderEditingSidebar();
+
+    expect(screen.getByTestId('profile-contact-sidebar')).toBeInTheDocument();
   });
 
   it('paints a deferred bio save immediately and exposes a stable live status slot', async () => {

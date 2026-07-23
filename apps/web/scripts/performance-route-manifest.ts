@@ -61,6 +61,7 @@ export type PerfMeasureMode =
   | 'page-load'
   | 'interactive-shell'
   | 'redirect'
+  | 'same-route-interaction'
   | 'warm-navigation';
 
 export interface PerfTimingBudget {
@@ -99,6 +100,7 @@ export interface PerfRouteDefinition {
   readonly surface: PerfRouteSurface;
   readonly path: string;
   readonly navigationItemId?: string;
+  readonly interactionStartPath?: string;
   readonly warmNavigationStartPath?: string;
   readonly resolvePath?: (
     route: PerfRouteDefinition,
@@ -202,6 +204,34 @@ export function assertValidPerfRouteDefinition(route: PerfRouteDefinition) {
     if (route.warmNavigationStartPath === route.path) {
       throw new TypeError(
         `Warm-navigation route "${route.id}" cannot start from its destination path "${route.path}".`
+      );
+    }
+  }
+
+  if (route.measureMode === 'same-route-interaction') {
+    if (!route.readySelectors.shell?.length) {
+      throw new TypeError(
+        `Same-route interaction "${route.id}" must define interaction response readiness.`
+      );
+    }
+    if (!route.readySelectors.content?.length) {
+      throw new TypeError(
+        `Same-route interaction "${route.id}" must define content readiness.`
+      );
+    }
+    if (!route.readySelectors.navTrigger?.length) {
+      throw new TypeError(
+        `Same-route interaction "${route.id}" must define at least one navTrigger selector.`
+      );
+    }
+    if (!route.interactionStartPath?.startsWith('/')) {
+      throw new TypeError(
+        `Same-route interaction "${route.id}" must define interactionStartPath as an absolute app path.`
+      );
+    }
+    if (route.interactionStartPath !== route.path) {
+      throw new TypeError(
+        `Same-route interaction "${route.id}" must start and finish on its configured path "${route.path}".`
       );
     }
   }
@@ -1365,17 +1395,18 @@ const CREATOR_SHELL_ROUTES = [
     id: 'creator-profile-rail',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.CHAT,
+    path: APP_ROUTES.DASHBOARD,
     navigationItemId: 'profile',
-    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
+    interactionStartPath: APP_ROUTES.DASHBOARD,
     requiresAuth: true,
     warmupStrategy: 'authenticated-shell',
-    measureMode: 'warm-navigation',
+    measureMode: 'same-route-interaction',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"]'],
-      content: ['[data-testid="chat-profile-preview-rail"]'],
-      loading: ['[data-testid="chat-loading"]'],
-      navTrigger: ['button[aria-label^="Open "][aria-label$=" profile"]'],
+      shell: [
+        '[data-testid="artist-profile-rail-toggle"][aria-pressed="true"]',
+      ],
+      content: ['[data-testid="profile-contact-sidebar"]'],
+      navTrigger: ['[data-testid="artist-profile-rail-toggle"]'],
     },
     timings: [
       { metric: 'warm-shell-response', budget: 100 },

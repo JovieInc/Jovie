@@ -1098,6 +1098,7 @@ export function ProfileContactSidebar() {
       <EntitySidebarShell
         isOpen={isOpen}
         ariaLabel='Profile Contact'
+        data-testid='profile-contact-sidebar'
         headerMode='minimal'
         hideMinimalHeaderBar
         contentBleed
@@ -1163,6 +1164,7 @@ export function ProfileContactSidebar() {
       <EntitySidebarShell
         isOpen={isOpen}
         ariaLabel='Profile Preview'
+        data-testid='profile-contact-sidebar'
         headerMode='minimal'
         hideMinimalHeaderBar
         contentBleed
@@ -1182,6 +1184,7 @@ export function ProfileContactSidebar() {
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Profile Contact'
+      data-testid='profile-contact-sidebar'
       headerMode='minimal'
       hideMinimalHeaderBar
       entityHeaderSurface='flat'

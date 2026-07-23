@@ -141,14 +141,18 @@ describe('performance route manifest', () => {
       route => route.navigationItemId === 'profile'
     );
 
-    expect(profile?.path).toBe(APP_ROUTES.CHAT);
-    expect(profile?.measureMode).toBe('warm-navigation');
+    expect(profile?.path).toBe(APP_ROUTES.DASHBOARD);
+    expect(profile?.interactionStartPath).toBe(APP_ROUTES.DASHBOARD);
+    expect(profile?.measureMode).toBe('same-route-interaction');
     expect(profile?.readySelectors.navTrigger).toEqual([
-      'button[aria-label^="Open "][aria-label$=" profile"]',
+      '[data-testid="artist-profile-rail-toggle"]',
     ]);
-    expect(profile?.readySelectors.content).toContain(
-      '[data-testid="chat-profile-preview-rail"]'
-    );
+    expect(profile?.readySelectors.shell).toEqual([
+      '[data-testid="artist-profile-rail-toggle"][aria-pressed="true"]',
+    ]);
+    expect(profile?.readySelectors.content).toEqual([
+      '[data-testid="profile-contact-sidebar"]',
+    ]);
   });
 
   it('measures canonical chat onboarding at /start, not the legacy form shim', () => {

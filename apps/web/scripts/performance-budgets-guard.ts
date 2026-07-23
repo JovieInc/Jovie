@@ -647,7 +647,7 @@ async function readWarmNavigationElapsed(page: Page) {
   });
 }
 
-async function measureWarmNavigationRoute(
+export async function measureWarmNavigationRoute(
   page: Page,
   route: PerfRouteDefinition,
   baseUrl: string,
@@ -687,12 +687,59 @@ async function measureWarmNavigationRoute(
   await visibleTrigger.click({ noWaitAfter: true });
 
   await routeReadyPromise;
-  const warmShellResponse = await waitForWarmDestinationReady(
-    page,
-    route,
-    startedAt,
-    true
-  );
+  const warmShellResponse = await readWarmNavigationElapsed(page);
+  const skeletonToContent = hasTimingBudget(route, 'skeleton-to-content')
+    ? await waitForContentReady(page, route, startedAt, true)
+    : 0;
+
+  return {
+    skeletonToContent,
+    warmShellResponse,
+  };
+}
+
+export async function measureSameRouteInteraction(
+  page: Page,
+  route: PerfRouteDefinition,
+  baseUrl: string
+) {
+  const startPath = route.interactionStartPath;
+  if (!startPath) {
+    throw new TypeError(
+      `Same-route interaction "${route.id}" is missing interactionStartPath.`
+    );
+  }
+
+  await page.goto(resolveRouteUrl(baseUrl, startPath), {
+    timeout: NAVIGATION_TIMEOUT_MS,
+    waitUntil: 'domcontentloaded',
+  });
+  await page
+    .waitForLoadState('networkidle', { timeout: 5_000 })
+    .catch(() => undefined);
+  await page.waitForTimeout(250);
+
+  const triggerSelectors = route.readySelectors.navTrigger ?? [];
+  const visibleTrigger = await waitForVisibleTrigger(page, triggerSelectors);
+  if (!visibleTrigger) {
+    throw new Error(
+      `Same-route interaction "${route.id}" could not find a visible trigger on "${startPath}". Selectors: ${triggerSelectors.join(', ')}.`
+    );
+  }
+
+  const startedAt = Date.now();
+  await armWarmNavigationStart(visibleTrigger);
+  await visibleTrigger.click({ noWaitAfter: true });
+  await waitForAnyVisible(page, route.readySelectors.shell);
+  const warmShellResponse = await readWarmNavigationElapsed(page);
+
+  const currentUrl = new URL(page.url());
+  if (!matchesExpectedPath(currentUrl, route.path)) {
+    throw new Error(
+      `Same-route interaction "${route.id}" navigated to "${currentUrl.pathname}${currentUrl.search}" instead of remaining on "${route.path}".`
+    );
+  }
+
   const skeletonToContent = hasTimingBudget(route, 'skeleton-to-content')
     ? await waitForContentReady(page, route, startedAt, true)
     : 0;
@@ -877,17 +924,19 @@ async function warmRoute(
   try {
     const page = await context.newPage();
     if (route.warmupStrategy === 'authenticated-shell') {
-      await measureWarmNavigationRoute(page, route, baseUrl, url).catch(
-        async () => {
-          await page.goto(url, {
-            timeout: NAVIGATION_TIMEOUT_MS,
-            waitUntil: 'domcontentloaded',
-          });
-          await waitForAnyVisible(page, route.readySelectors.content).catch(
-            () => undefined
-          );
-        }
-      );
+      const measureAuthenticatedShell =
+        route.measureMode === 'same-route-interaction'
+          ? measureSameRouteInteraction(page, route, baseUrl)
+          : measureWarmNavigationRoute(page, route, baseUrl, url);
+      await measureAuthenticatedShell.catch(async () => {
+        await page.goto(url, {
+          timeout: NAVIGATION_TIMEOUT_MS,
+          waitUntil: 'domcontentloaded',
+        });
+        await waitForAnyVisible(page, route.readySelectors.content).catch(
+          () => undefined
+        );
+      });
       return;
     }
 
@@ -929,15 +978,16 @@ async function measureRouteSample(
       'warm-shell-response': 0,
     };
 
-    if (route.measureMode === 'warm-navigation') {
-      const warmNavigation = await measureWarmNavigationRoute(
-        page,
-        route,
-        baseUrl,
-        url
-      );
-      timingValues['warm-shell-response'] = warmNavigation.warmShellResponse;
-      timingValues['skeleton-to-content'] = warmNavigation.skeletonToContent;
+    if (
+      route.measureMode === 'warm-navigation' ||
+      route.measureMode === 'same-route-interaction'
+    ) {
+      const interaction =
+        route.measureMode === 'warm-navigation'
+          ? await measureWarmNavigationRoute(page, route, baseUrl, url)
+          : await measureSameRouteInteraction(page, route, baseUrl);
+      timingValues['warm-shell-response'] = interaction.warmShellResponse;
+      timingValues['skeleton-to-content'] = interaction.skeletonToContent;
     } else {
       const startedAt = Date.now();
       await page.goto(url, {

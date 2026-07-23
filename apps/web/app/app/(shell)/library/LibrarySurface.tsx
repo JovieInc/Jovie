@@ -1197,10 +1197,18 @@ function LibraryFiltersControl({
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }) {
-  const label =
-    activeFilterCount > 0
-      ? `Show Filters (${activeFilterCount})`
-      : 'Show Filters';
+  const label = (
+    <>
+      <span>Show Filters</span>
+      <span
+        data-testid='library-filter-count-slot'
+        aria-hidden='true'
+        className='inline-block w-8 shrink-0 text-right tabular-nums'
+      >
+        {activeFilterCount > 0 ? `(${activeFilterCount})` : null}
+      </span>
+    </>
+  );
   const ariaLabel =
     activeFilterCount > 0
       ? `Show filters (${activeFilterCount})`
