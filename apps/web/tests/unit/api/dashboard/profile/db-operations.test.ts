@@ -106,6 +106,7 @@ describe('updateProfileRecords exact-profile CAS', () => {
       displayNameForUserUpdate: undefined,
       usernameUpdate: undefined,
       expectedVersion: 1,
+      precomputedAvatarTheme: undefined,
     });
 
     expect(result).not.toBeInstanceOf(NextResponse);
@@ -118,6 +119,45 @@ describe('updateProfileRecords exact-profile CAS', () => {
         { left: creatorProfiles.id, right: 'profile-a' },
         { left: creatorProfiles.profileEditVersion, right: 1 },
       ],
+    });
+  });
+
+  it('merges a precomputed avatar accent without external work', async () => {
+    const avatarUrl = 'https://example.com/new-avatar.png';
+    const profileAccent = {
+      version: 1 as const,
+      primaryHex: '#123456',
+      sourceUrl: avatarUrl,
+    };
+    const { tx, updates } = createTx({
+      existing: {
+        id: 'profile-a',
+        usernameNormalized: 'oldname',
+        settings: {},
+        theme: { mode: 'dark' },
+        avatarUrl: 'https://example.com/old-avatar.png',
+        profileEditVersion: 1,
+      },
+    });
+    const { updateProfileRecords } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await updateProfileRecords({
+      tx: tx as never,
+      appUserId: 'user-a',
+      profileId: 'profile-a',
+      dbProfileUpdates: { avatarUrl },
+      displayNameForUserUpdate: undefined,
+      usernameUpdate: undefined,
+      expectedVersion: 1,
+      precomputedAvatarTheme: { profileAccent },
+    });
+
+    expect(result).not.toBeInstanceOf(NextResponse);
+    expect(updates[0]?.values).toMatchObject({
+      avatarUrl,
+      theme: { mode: 'dark', profileAccent },
     });
   });
 
@@ -135,6 +175,7 @@ describe('updateProfileRecords exact-profile CAS', () => {
       displayNameForUserUpdate: 'New Name',
       usernameUpdate: 'newname',
       expectedVersion: 1,
+      precomputedAvatarTheme: undefined,
     });
 
     expect(result).not.toBeInstanceOf(NextResponse);
@@ -169,6 +210,7 @@ describe('updateProfileRecords exact-profile CAS', () => {
       displayNameForUserUpdate: 'Artist Name',
       usernameUpdate: undefined,
       expectedVersion: 1,
+      precomputedAvatarTheme: undefined,
     });
 
     expect(result).not.toBeInstanceOf(NextResponse);
@@ -196,6 +238,7 @@ describe('updateProfileRecords exact-profile CAS', () => {
       displayNameForUserUpdate: 'Must Roll Back',
       usernameUpdate: undefined,
       expectedVersion: 1,
+      precomputedAvatarTheme: undefined,
     });
 
     expect(result).toBeInstanceOf(NextResponse);
@@ -220,6 +263,7 @@ describe('updateProfileRecords exact-profile CAS', () => {
       displayNameForUserUpdate: undefined,
       usernameUpdate: 'taken',
       expectedVersion: 1,
+      precomputedAvatarTheme: undefined,
     });
 
     expect(result).toBeInstanceOf(NextResponse);

@@ -18,6 +18,12 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## Testing
 
+### Route-level ordering tests must cover the real transaction entry point
+
+**Mistake:** Avatar theme extraction was moved outside one onboarding transaction, but the dashboard profile PUT path still performed retried image download and Sharp work inside `withDbSessionTx`.
+
+**Rule:** For external work adjacent to a database transaction, test the production route's exact event order. Authentication and external derivation must finish before transaction entry, and the transaction helper must accept only the precomputed value.
+
 ### Repeated review comments must become durable guardrails
 
 **Mistake:** PR review findings about the same agent failure class were fixed one PR at a time, then the next agent repeated the pattern because no test, rule, doc, or skill changed.

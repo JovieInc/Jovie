@@ -12,8 +12,10 @@ import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { mergeProfileTheme } from '@/lib/profile/profile-theme';
-import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
+import {
+  mergeProfileTheme,
+  type ProfileThemeRecord,
+} from '@/lib/profile/profile-theme';
 import { NO_STORE_HEADERS } from './constants';
 
 export interface UpdateProfileRecordsParams {
@@ -24,6 +26,7 @@ export interface UpdateProfileRecordsParams {
   displayNameForUserUpdate: string | undefined;
   usernameUpdate: string | undefined;
   expectedVersion?: number;
+  precomputedAvatarTheme: ProfileThemeRecord | undefined;
 }
 
 export interface UpdateProfileRecordsResult {
@@ -39,6 +42,7 @@ export async function updateProfileRecords({
   displayNameForUserUpdate,
   usernameUpdate,
   expectedVersion,
+  precomputedAvatarTheme,
 }: UpdateProfileRecordsParams): Promise<
   UpdateProfileRecordsResult | NextResponse
 > {
@@ -117,18 +121,17 @@ export async function updateProfileRecords({
       ? dbProfileUpdates.avatarUrl
       : null;
 
-  const finalTheme =
-    nextAvatarUrl === null
-      ? mergedTheme
-      : await buildThemeWithProfileAccent({
-          existingTheme:
-            mergedTheme ??
-            (existingProfile?.theme as
-              | Record<string, unknown>
-              | null
-              | undefined),
-          sourceUrl: nextAvatarUrl,
-        });
+  let finalTheme = mergedTheme;
+  if (nextAvatarUrl !== null) {
+    if (precomputedAvatarTheme === undefined) {
+      throw new Error('Changed avatar requires a precomputed profile theme');
+    }
+    finalTheme = mergeProfileTheme(
+      mergedTheme ??
+        (existingProfile?.theme as Record<string, unknown> | null | undefined),
+      precomputedAvatarTheme
+    );
+  }
 
   const finalProfileUpdates = {
     ...dbProfileUpdates,

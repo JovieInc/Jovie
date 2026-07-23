@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server';
 import { isCanonicalUuid } from '@/lib/auth/profile-access';
-import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
+import {
+  requireAuth,
+  withDbSession,
+  withDbSessionTx,
+} from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { syncSocialLinksFromPrimaryMusicUrls } from '@/lib/db/social-links-sync';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import { logger } from '@/lib/utils/logger';
 import { refreshAppleWalletProfilePassForProfileId } from '@/lib/wallet/apple/profile-pass';
 import type { ProfileUpdateInput } from './lib';
@@ -119,47 +124,44 @@ export async function GET() {
 
 export async function PUT(req: Request) {
   try {
-    const result = await withDbSessionTx(async (tx, appUserId) => {
-      const parsedRequest = await parseProfileUpdateRequest(req);
-      if (parsedRequest instanceof NextResponse) return parsedRequest;
+    const appUserId = await requireAuth();
+    const parsedRequest = await parseProfileUpdateRequest(req);
+    if (parsedRequest instanceof NextResponse) return parsedRequest;
 
-      const {
-        dbProfileUpdates,
-        displayNameForUserUpdate,
-        avatarUrl,
-        usernameUpdate,
-        expectedVersion,
-        profileId,
-      } = parsedRequest;
-      const updateResult = await updateProfileRecords({
-        tx,
-        appUserId,
-        profileId,
-        dbProfileUpdates,
-        displayNameForUserUpdate,
-        usernameUpdate,
-        expectedVersion,
-      });
-      if (updateResult instanceof NextResponse) {
-        return updateResult;
-      }
+    const {
+      dbProfileUpdates,
+      displayNameForUserUpdate,
+      avatarUrl,
+      usernameUpdate,
+      expectedVersion,
+      profileId,
+    } = parsedRequest;
+    const precomputedAvatarTheme =
+      avatarUrl === undefined
+        ? undefined
+        : await buildThemeWithProfileAccent({
+            existingTheme: null,
+            sourceUrl: avatarUrl,
+          });
 
-      return {
-        ...updateResult,
-        avatarUrl,
-        appUserId,
-        dbProfileUpdates,
-      };
-    });
+    const result = await withDbSessionTx(
+      tx =>
+        updateProfileRecords({
+          tx,
+          appUserId,
+          profileId,
+          dbProfileUpdates,
+          displayNameForUserUpdate,
+          usernameUpdate,
+          expectedVersion,
+          precomputedAvatarTheme,
+        }),
+      { clerkUserId: appUserId }
+    );
 
     if (result instanceof NextResponse) return result;
 
-    const {
-      updatedProfile,
-      oldUsernameNormalized,
-      appUserId,
-      dbProfileUpdates,
-    } = result;
+    const { updatedProfile, oldUsernameNormalized } = result;
     await Promise.all([
       syncSocialLinksFromPrimaryMusicUrls(db, updatedProfile.id, {
         spotifyUrl: dbProfileUpdates.spotifyUrl as string | null | undefined,

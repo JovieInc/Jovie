@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  requireAuth: vi.fn(),
   withDbSessionTx: vi.fn(),
+  buildThemeWithProfileAccent: vi.fn(),
   parseJsonBody: vi.fn(),
   validateUpdatesPayload: vi.fn(),
   parseProfileUpdates: vi.fn(),
@@ -12,8 +14,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/auth/session', () => ({
+  requireAuth: mocks.requireAuth,
   withDbSession: vi.fn(),
   withDbSessionTx: mocks.withDbSessionTx,
+}));
+vi.mock('@/lib/profile/profile-theme.server', () => ({
+  buildThemeWithProfileAccent: mocks.buildThemeWithProfileAccent,
 }));
 vi.mock('@/lib/http/parse-json', () => ({
   parseJsonBody: mocks.parseJsonBody,
@@ -48,6 +54,8 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    mocks.requireAuth.mockResolvedValue(APP_USER_ID);
+    mocks.buildThemeWithProfileAccent.mockResolvedValue({});
     const tx = { marker: 'transaction' };
     mocks.withDbSessionTx.mockImplementation(callback =>
       callback(tx, APP_USER_ID)
@@ -99,6 +107,7 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
       displayNameForUserUpdate: 'New Name',
       usernameUpdate: 'newname',
       expectedVersion: 3,
+      precomputedAvatarTheme: undefined,
     });
     expect(mocks.finalizeProfileResponse).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -134,5 +143,76 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
 
     expect(response.status).toBe(409);
     expect(mocks.finalizeProfileResponse).not.toHaveBeenCalled();
+  });
+
+  it('derives a changed avatar theme before opening the transaction', async () => {
+    const events: string[] = [];
+    const avatarUrl = 'https://example.com/avatar.png';
+    const precomputedAvatarTheme = {
+      profileAccent: {
+        version: 1,
+        primaryHex: '#123456',
+        sourceUrl: avatarUrl,
+      },
+    };
+    mocks.parseJsonBody.mockImplementation(async () => {
+      events.push('parse');
+      return {
+        ok: true,
+        data: {
+          profileId: PROFILE_ID,
+          expectedVersion: 3,
+          updates: { avatarUrl },
+        },
+      };
+    });
+    mocks.validateUpdatesPayload.mockReturnValue({
+      ok: true,
+      updates: { avatarUrl },
+    });
+    mocks.parseProfileUpdates.mockReturnValue({
+      ok: true,
+      parsed: { avatarUrl },
+    });
+    mocks.buildProfileUpdateContext.mockReturnValue({
+      dbProfileUpdates: { avatarUrl },
+      displayNameForUserUpdate: undefined,
+      avatarUrl,
+      usernameUpdate: undefined,
+    });
+    mocks.buildThemeWithProfileAccent.mockImplementation(async () => {
+      events.push('theme');
+      return precomputedAvatarTheme;
+    });
+    mocks.withDbSessionTx.mockImplementation(async callback => {
+      events.push('transaction');
+      return callback({ marker: 'transaction' }, APP_USER_ID);
+    });
+    mocks.updateProfileRecords.mockImplementation(async () => {
+      events.push('database');
+      return {
+        updatedProfile: {
+          id: PROFILE_ID,
+          usernameNormalized: 'oldname',
+          profileEditVersion: 4,
+        },
+        oldUsernameNormalized: 'oldname',
+      };
+    });
+
+    const { PUT } = await import('@/app/api/dashboard/profile/route');
+    const response = await PUT(
+      new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(events).toEqual(['parse', 'theme', 'transaction', 'database']);
+    expect(mocks.buildThemeWithProfileAccent).toHaveBeenCalledWith({
+      existingTheme: null,
+      sourceUrl: avatarUrl,
+    });
+    expect(mocks.updateProfileRecords).toHaveBeenCalledWith(
+      expect.objectContaining({ precomputedAvatarTheme })
+    );
   });
 });
