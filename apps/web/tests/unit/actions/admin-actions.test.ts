@@ -165,9 +165,12 @@ function createMultiSelectChain(results: unknown[][]) {
     const result = results[callIndex] ?? [];
     callIndex++;
     const limit = vi.fn().mockResolvedValue(result);
+    const orderBy = vi.fn().mockReturnValue({ limit });
     const where = vi
       .fn()
-      .mockReturnValue(Object.assign(Promise.resolve(result), { limit }));
+      .mockReturnValue(
+        Object.assign(Promise.resolve(result), { limit, orderBy })
+      );
     const from = vi.fn().mockReturnValue({ where });
     return { from };
   });
@@ -793,6 +796,66 @@ describe('admin/actions.ts', () => {
       const fd = new FormData();
       await expect(toggleCreatorMarketingAction(fd)).rejects.toThrow(
         'profileId is required'
+      );
+    });
+  });
+
+  describe('post-Better Auth user moderation', () => {
+    it('uses the authenticated app user ID directly when banning a user', async () => {
+      mockGetCachedAuth.mockResolvedValue({
+        userId: '7b4b948f-9720-4c5f-98da-8a7335015da9',
+      });
+      createMultiSelectChain([
+        [{ userStatus: 'active', deletedAt: null }],
+        [{ userStatus: 'active', clerkId: null }],
+      ]);
+      createUpdateChain();
+
+      const { banUserAction } = await import('@/app/app/(shell)/admin/actions');
+
+      await banUserAction(
+        makeFormData({
+          userId: 'f95ad825-cd83-4827-b9b9-1f004119884e',
+          reason: 'policy violation',
+        })
+      );
+
+      expect(mockDbSelect).toHaveBeenCalledTimes(2);
+      expect(mockDbInsert.mock.results[0]?.value.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adminUserId: '7b4b948f-9720-4c5f-98da-8a7335015da9',
+          targetUserId: 'f95ad825-cd83-4827-b9b9-1f004119884e',
+        })
+      );
+    });
+
+    it('uses the authenticated app user ID directly when unbanning a user', async () => {
+      mockGetCachedAuth.mockResolvedValue({
+        userId: '7b4b948f-9720-4c5f-98da-8a7335015da9',
+      });
+      createMultiSelectChain([
+        [{ userStatus: 'active', deletedAt: null }],
+        [{ userStatus: 'banned', deletedAt: null, clerkId: null }],
+        [{ metadata: { previousStatus: 'active' } }],
+      ]);
+      createUpdateChain();
+
+      const { unbanUserAction } = await import(
+        '@/app/app/(shell)/admin/actions'
+      );
+
+      await unbanUserAction(
+        makeFormData({
+          userId: 'f95ad825-cd83-4827-b9b9-1f004119884e',
+        })
+      );
+
+      expect(mockDbSelect).toHaveBeenCalledTimes(3);
+      expect(mockDbInsert.mock.results[0]?.value.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          adminUserId: '7b4b948f-9720-4c5f-98da-8a7335015da9',
+          targetUserId: 'f95ad825-cd83-4827-b9b9-1f004119884e',
+        })
       );
     });
   });

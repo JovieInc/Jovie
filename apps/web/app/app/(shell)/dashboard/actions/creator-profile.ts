@@ -68,12 +68,12 @@ export async function updateCreatorProfile(
       throw new Error('Unauthorized');
     }
 
-    return await withDbSession(async clerkUserId => {
+    return await withDbSession(async appUserId => {
       // First get the user's database ID
       const [user] = await db
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.clerkId, clerkUserId))
+        .where(eq(users.id, appUserId))
         .limit(1);
 
       if (!user) {
@@ -183,7 +183,7 @@ async function requireOwnProfile() {
   const [user] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.clerkId, userId))
+    .where(eq(users.id, userId))
     .limit(1);
 
   if (!user) {

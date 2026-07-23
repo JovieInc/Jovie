@@ -38,12 +38,12 @@ export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
       throw new Error('Unauthorized');
     }
 
-    await withDbSession(async clerkUserId => {
+    await withDbSession(async appUserId => {
       // Get DB user id
       const [user] = await db
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.clerkId, clerkUserId))
+        .where(eq(users.id, appUserId))
         .limit(1);
 
       if (!user?.id) throw new TypeError('User not found');

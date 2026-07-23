@@ -141,12 +141,10 @@ async function getAudienceMemberColumnAvailability(): Promise<AudienceMemberColu
 }
 
 /**
- * Build ownership filter based on clerk user ID
+ * Build ownership filter based on the authenticated app user ID.
  */
-function buildOwnershipFilter(clerkUserId: string | null) {
-  return clerkUserId
-    ? eq(users.clerkId, clerkUserId)
-    : drizzleSql<boolean>`true`;
+function buildOwnershipFilter(appUserId: string | null) {
+  return appUserId ? eq(users.id, appUserId) : drizzleSql<boolean>`true`;
 }
 
 /**
@@ -466,7 +464,7 @@ function buildSegmentFilter(
  */
 async function fetchMembersData(
   tx: DbSessionTx,
-  clerkUserId: string | null,
+  appUserId: string | null,
   selectedProfileId: string,
   searchParams: SearchParams,
   options: {
@@ -485,7 +483,7 @@ async function fetchMembersData(
   const sortColumn = MEMBER_SORT_COLUMNS[safe.sort];
   const orderFn = safe.direction === 'asc' ? asc : desc;
 
-  const ownershipFilter = buildOwnershipFilter(clerkUserId);
+  const ownershipFilter = buildOwnershipFilter(appUserId);
   const memberIdFilter = buildMemberIdFilter(memberId);
   let typeCondition: SQL<boolean>;
   if (viewFilter === 'anonymous') {
@@ -584,7 +582,7 @@ async function fetchMembersData(
  */
 async function _fetchSubscribersData(
   tx: DbSessionTx,
-  clerkUserId: string | null,
+  appUserId: string | null,
   selectedProfileId: string,
   searchParams: SearchParams
 ): Promise<
@@ -620,10 +618,10 @@ async function _fetchSubscribersData(
     ] ?? 'ns.created_at';
   const dir = safe.direction === 'asc' ? drizzleSql`ASC` : drizzleSql`DESC`;
 
-  // Ownership JOIN condition: when clerkUserId is available, verify the profile
+  // Ownership JOIN condition: when appUserId is available, verify the profile
   // belongs to the authenticated user via the users → creatorProfiles chain.
-  const ownershipJoinFetch = clerkUserId
-    ? drizzleSql`AND u.clerk_id = ${clerkUserId}`
+  const ownershipJoinFetch = appUserId
+    ? drizzleSql`AND u.id = ${appUserId}`
     : drizzleSql``;
 
   // Keyset cursor clause for subscribers (JOV-1261).
@@ -801,7 +799,7 @@ function buildEmptyAudienceData(
 
 function buildDataPromise(
   tx: DbSessionTx,
-  clerkUserId: string,
+  appUserId: string,
   selectedProfileId: string,
   view: AudienceView,
   searchParams: SearchParams,
@@ -812,7 +810,7 @@ function buildDataPromise(
     columns: AudienceMemberColumnAvailability;
   }
 ) {
-  return fetchMembersData(tx, clerkUserId, selectedProfileId, searchParams, {
+  return fetchMembersData(tx, appUserId, selectedProfileId, searchParams, {
     includeDetails: options.includeDetails,
     memberId: options.memberId,
     viewFilter: view,
@@ -836,10 +834,10 @@ async function fetchAudienceData(
 ): Promise<AudienceServerData> {
   const columns = await getAudienceMemberColumnAvailability();
 
-  return await withDbSessionTx(async (tx, clerkUserId) => {
+  return await withDbSessionTx(async (tx, appUserId) => {
     const data = await buildDataPromise(
       tx,
-      clerkUserId,
+      appUserId,
       selectedProfileId,
       view,
       searchParams,

@@ -87,7 +87,7 @@ async function requireAdmin(): Promise<string> {
       deletedAt: users.deletedAt,
     })
     .from(users)
-    .where(eq(users.clerkId, userId))
+    .where(eq(users.id, userId))
     .limit(1);
 
   if (!adminUser) {
@@ -485,7 +485,7 @@ export async function deleteCreatorOrUserAction(
 }
 
 export async function banUserAction(formData: FormData): Promise<void> {
-  const adminClerkId = await requireAdmin();
+  const adminUserId = await requireAdmin();
 
   const userId = formData.get('userId');
   const reason = formData.get('reason');
@@ -498,19 +498,8 @@ export async function banUserAction(formData: FormData): Promise<void> {
     throw new TypeError('reason is required');
   }
 
-  // Resolve admin Clerk ID to DB UUID for audit log FK
-  const [adminUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, adminClerkId))
-    .limit(1);
-
-  if (!adminUser) {
-    throw new TypeError('Admin user not found in database');
-  }
-
   // Self-ban guard (compare DB UUIDs)
-  if (userId === adminUser.id) {
+  if (userId === adminUserId) {
     throw new TypeError('Cannot ban your own account');
   }
 
@@ -539,7 +528,7 @@ export async function banUserAction(formData: FormData): Promise<void> {
       .where(eq(users.id, userId));
 
     await tx.insert(adminAuditLog).values({
-      adminUserId: adminUser.id,
+      adminUserId,
       targetUserId: userId,
       action: 'ban_user',
       metadata: {
@@ -582,7 +571,7 @@ export async function banUserAction(formData: FormData): Promise<void> {
 }
 
 export async function unbanUserAction(formData: FormData): Promise<void> {
-  const adminClerkId = await requireAdmin();
+  const adminUserId = await requireAdmin();
 
   const userId = formData.get('userId');
 
@@ -590,19 +579,8 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
     throw new TypeError('userId is required');
   }
 
-  // Resolve admin Clerk ID to DB UUID for audit log FK
-  const [adminUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, adminClerkId))
-    .limit(1);
-
-  if (!adminUser) {
-    throw new TypeError('Admin user not found in database');
-  }
-
   // Self-unban guard (compare DB UUIDs)
-  if (userId === adminUser.id) {
+  if (userId === adminUserId) {
     throw new TypeError('Cannot restore your own account');
   }
 
@@ -680,7 +658,7 @@ export async function unbanUserAction(formData: FormData): Promise<void> {
       .where(eq(users.id, userId));
 
     await tx.insert(adminAuditLog).values({
-      adminUserId: adminUser.id,
+      adminUserId,
       targetUserId: userId,
       action: 'unban_user',
       metadata: { restoredTo: restoreStatus },
