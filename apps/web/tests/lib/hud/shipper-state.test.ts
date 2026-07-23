@@ -1,15 +1,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 // Isolate from the real ~/.hermes before any path is computed: shipper-state.ts
 // reads the machine-local pause sentinel ($HOME/.hermes/shipping-paused) and
