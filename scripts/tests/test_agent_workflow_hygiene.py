@@ -222,7 +222,11 @@ def test_workflow_test_tooling_is_hash_pinned() -> None:
     requirements = requirements_path.read_text(encoding="utf-8")
     logical_requirements = requirements.replace("\\\n", " ").splitlines()
 
-    assert "pytest==8.4.2" in requirements
+    assert any(
+        requirement.split(maxsplit=1)[0] == "pytest==9.0.3"
+        for requirement in logical_requirements
+        if requirement and not requirement.startswith("#")
+    )
     for requirement in logical_requirements:
         if not requirement or requirement.startswith("#"):
             continue
