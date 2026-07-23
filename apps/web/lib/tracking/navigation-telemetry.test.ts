@@ -16,6 +16,10 @@ vi.mock('@/lib/tracking/json-beacon', () => ({
 }));
 
 import {
+  getUxLatencySummaries,
+  resetUxLatencyForTests,
+} from '@/lib/monitoring/interaction-latency';
+import {
   markNavigationDestinationReady,
   NAVIGATION_DROP_OFF_MS,
   navigationInputMethodFromClick,
@@ -47,6 +51,7 @@ const CONTEXT = {
 describe('navigation telemetry client', () => {
   beforeEach(() => {
     resetNavigationTelemetryForTests();
+    resetUxLatencyForTests();
     localStorage.clear();
     mockIsAnalyticsAllowed.mockReturnValue(true);
     mockGetConsentState.mockReturnValue('accepted');
@@ -70,6 +75,34 @@ describe('navigation telemetry client', () => {
       })
     ).toBeNull();
     expect(mockPostJsonBeacon).not.toHaveBeenCalled();
+  });
+
+  it('records local page-to-interactive latency without analytics consent', () => {
+    mockIsAnalyticsAllowed.mockReturnValue(false);
+
+    startNavigationTelemetry({
+      itemId: 'library',
+      sourcePathname: '/app/chat/private-thread',
+      destinationHref: '/app/library?search=private',
+      inputMethod: 'pointer',
+      context: CONTEXT,
+      startedAt: 100,
+    });
+    expect(markNavigationDestinationReady('library', 425)).toBeNull();
+
+    expect(
+      getUxLatencySummaries().find(
+        summary => summary.metric === 'page_to_interactive'
+      )
+    ).toMatchObject({
+      sampleCount: 1,
+      p50Ms: 325,
+      p95Ms: 325,
+    });
+    expect(mockPostJsonBeacon).not.toHaveBeenCalled();
+    expect(localStorage.getItem('jovie:ux-latency:v1')).not.toContain(
+      'private'
+    );
   });
 
   it('emits one activation and one ready event with only bucketed dimensions', () => {

@@ -1,3 +1,4 @@
+import { recordUxLatency } from '@/lib/monitoring/interaction-latency';
 import { getConsentState, isAnalyticsAllowed } from '@/lib/tracking/consent';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import {
@@ -48,7 +49,14 @@ interface RecentImpression {
   readonly recordedAt: number;
 }
 
+interface PendingUxNavigation {
+  readonly destinationRoute: NavigationRouteBucket;
+  readonly startedAt: number;
+  readonly timeoutId: ReturnType<typeof setTimeout>;
+}
+
 let pendingNavigation: PendingNavigation | null = null;
+let pendingUxNavigation: PendingUxNavigation | null = null;
 let lastReadyNavigation: ReadyNavigation | null = null;
 const recentImpressions = new Map<string, RecentImpression>();
 
@@ -160,6 +168,33 @@ function canonicalNavigationPath(value: string): string {
   return path === '/' ? path : path.replace(/\/+$/, '');
 }
 
+function startUxNavigationMeasurement(
+  destinationRoute: NavigationRouteBucket,
+  startedAt: number
+): void {
+  if (pendingUxNavigation) {
+    clearTimeout(pendingUxNavigation.timeoutId);
+  }
+  const timeoutId = setTimeout(() => {
+    pendingUxNavigation = null;
+  }, NAVIGATION_DROP_OFF_MS);
+  pendingUxNavigation = { destinationRoute, startedAt, timeoutId };
+}
+
+function completeUxNavigationMeasurement(
+  destinationRoute: NavigationRouteBucket,
+  readyAt: number
+): void {
+  const navigation = pendingUxNavigation;
+  if (!navigation || destinationRoute !== navigation.destinationRoute) return;
+  pendingUxNavigation = null;
+  clearTimeout(navigation.timeoutId);
+  recordUxLatency(
+    'page_to_interactive',
+    Math.max(0, readyAt - navigation.startedAt)
+  );
+}
+
 /**
  * Records visible nav items, with a one-second duplicate guard for React
  * strict-mode effect replay. A later real revisit remains countable.
@@ -250,6 +285,7 @@ export function startNavigationTelemetry(input: {
   const sourceRoute = bucketNavigationRoute(input.sourcePathname);
   const destinationRoute = bucketNavigationRoute(input.destinationHref);
   const navigationId = createOpaqueId();
+  startUxNavigationMeasurement(destinationRoute, startedAt);
 
   if (!getAllowedConsentMode()) return null;
 
@@ -322,6 +358,7 @@ export function markNavigationDestinationReady(
   destinationRoute: NavigationRouteBucket,
   readyAt = nowMs()
 ): NavigationTelemetryPayload | null {
+  completeUxNavigationMeasurement(destinationRoute, readyAt);
   const navigation = pendingNavigation;
   if (!navigation || destinationRoute !== navigation.destinationRoute) {
     return null;
@@ -353,7 +390,9 @@ export function markNavigationDestinationReady(
 
 export function resetNavigationTelemetryForTests(): void {
   if (pendingNavigation) clearTimeout(pendingNavigation.timeoutId);
+  if (pendingUxNavigation) clearTimeout(pendingUxNavigation.timeoutId);
   pendingNavigation = null;
+  pendingUxNavigation = null;
   lastReadyNavigation = null;
   recentImpressions.clear();
 }

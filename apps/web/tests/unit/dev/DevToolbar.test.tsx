@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
+import { recordUxLatency } from '@/lib/monitoring/interaction-latency';
 
 const mockSetTheme = vi.fn();
 
@@ -212,6 +213,37 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       expect(observe).toHaveBeenCalledWith(screen.getByTestId('dev-toolbar'));
+    });
+  });
+
+  describe('UX latency telemetry', () => {
+    it('keeps a fixed five-metric strip for empty and populated samples', async () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      const strip = screen.getByTestId('dev-toolbar-latency');
+      expect(strip).toHaveClass('h-12');
+      expect(strip.querySelectorAll('[data-metric]')).toHaveLength(5);
+      expect(screen.getAllByText(/P50 — · P95 —/)).toHaveLength(5);
+
+      recordUxLatency('chat_first_token', 125);
+      recordUxLatency('chat_first_token', 300);
+
+      await waitFor(() => {
+        expect(
+          strip.querySelector('[data-metric="chat_first_token"]')
+        ).toHaveTextContent('P50 125ms · P95 300ms');
+      });
+      expect(strip).toHaveClass('h-12');
+      expect(strip.querySelectorAll('[data-metric]')).toHaveLength(5);
+    });
+
+    it('does not render latency chrome while the toolbar is collapsed', () => {
+      renderToolbar();
+
+      expect(
+        screen.queryByTestId('dev-toolbar-latency')
+      ).not.toBeInTheDocument();
     });
   });
 

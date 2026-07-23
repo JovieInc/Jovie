@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import {
+  Activity,
   ArrowUpCircle,
   Check,
   ChevronDown,
@@ -41,6 +42,10 @@ import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
 } from '@/lib/flags/contracts';
+import {
+  getUxLatencySummaries,
+  subscribeUxLatency,
+} from '@/lib/monitoring/interaction-latency';
 import {
   registerServiceWorker,
   SW_ENABLED_KEY,
@@ -249,6 +254,10 @@ function getPromoteTitle(
   return 'Promote to production';
 }
 
+function formatLatencyMs(value: number | null): string {
+  return value === null ? '—' : `${Math.round(value)}ms`;
+}
+
 export function DevToolbar({
   env,
   sha,
@@ -282,6 +291,9 @@ export function DevToolbar({
   const [personaAction, setPersonaAction] = useState<PersonaActionState>(null);
   const personaStatusAbortRef = useRef<AbortController | null>(null);
   const [swEnabled, setSwEnabled] = useState(false);
+  const [latencySummaries, setLatencySummaries] = useState(() =>
+    getUxLatencySummaries()
+  );
   const [promoteState, setPromoteState] = useState<
     'idle' | 'checking' | 'ready' | 'promoting' | 'done' | 'error'
   >('idle');
@@ -321,6 +333,14 @@ export function DevToolbar({
     setHidden(storedHidden === null ? defaultHidden : storedHidden === '1');
     setSwEnabled(localStorage.getItem(SW_ENABLED_KEY) === '1');
   }, [defaultHidden]);
+
+  useEffect(
+    () =>
+      subscribeUxLatency(() => {
+        setLatencySummaries(getUxLatencySummaries());
+      }),
+    []
+  );
 
   // Keyboard shortcut: Cmd+Shift+D (Mac) / Ctrl+Shift+D (other)
   useEffect(() => {
@@ -730,6 +750,38 @@ export function DevToolbar({
           style={{ maxHeight: 'min(400px, calc(100dvh - 7rem))' }}
         >
           <div className='flex flex-col'>
+            {/*
+             * Visual states: hidden/collapsed omit the drawer; expanded always
+             * reserves this exact-height strip. Empty and populated samples
+             * render the same five cells, so live telemetry changes text only.
+             * Narrow viewports scroll horizontally without moving controls.
+             */}
+            <section
+              data-testid='dev-toolbar-latency'
+              className='flex h-12 shrink-0 items-stretch overflow-x-auto border-b border-subtle'
+              aria-label='UX Latency P50 And P95'
+            >
+              <div className='flex w-24 shrink-0 items-center gap-1.5 px-4 text-3xs font-medium text-(--color-text-tertiary)'>
+                <Activity size={11} aria-hidden />
+                Latency
+              </div>
+              {latencySummaries.map(summary => (
+                <div
+                  key={summary.metric}
+                  className='flex w-32 shrink-0 flex-col justify-center border-l border-subtle px-3'
+                  data-metric={summary.metric}
+                >
+                  <span className='truncate text-3xs text-(--color-text-tertiary)'>
+                    {summary.label}
+                  </span>
+                  <span className='whitespace-nowrap text-3xs text-quaternary-token'>
+                    P50 {formatLatencyMs(summary.p50Ms)} · P95{' '}
+                    {formatLatencyMs(summary.p95Ms)}
+                  </span>
+                </div>
+              ))}
+            </section>
+
             {/* Search bar */}
             <div className='flex items-center gap-2 px-4 py-2 border-b border-subtle'>
               <Search size={12} className='shrink-0 text-quaternary-token' />

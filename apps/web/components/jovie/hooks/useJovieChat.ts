@@ -29,6 +29,7 @@ import {
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
 import { trimMessagesForChatRequest } from '@/lib/chat/request-validation';
 import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
+import { recordUxLatency } from '@/lib/monitoring/interaction-latency';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys, useChatConversationQuery } from '@/lib/queries';
 import { captureException } from '@/lib/sentry/client-lite';
@@ -112,6 +113,17 @@ interface ChatTurnMetadata {
   readonly turnId?: string;
   readonly requestId?: string;
   readonly toolStepCapExhausted?: boolean;
+}
+
+interface ActiveChatLatency {
+  readonly clientTurnId: string;
+  readonly startedAt: number;
+  firstTokenRecorded: boolean;
+  sendRoundTripRecorded: boolean;
+}
+
+function uxLatencyNowMs(): number {
+  return globalThis.performance?.now?.() ?? Date.now();
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -275,6 +287,7 @@ export function useJovieChat({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
   const activeClientTurnIdRef = useRef<string | null>(null);
+  const activeChatLatencyRef = useRef<ActiveChatLatency | null>(null);
   // Assistant SDK message ids that existed BEFORE the active turn started.
   // Between send and stream start, the SDK's "last assistant message" is still
   // the previous turn's reply; reading its parts for the new turn flashes the
@@ -431,6 +444,19 @@ export function useJovieChat({
             response.headers.get('x-conversation-id');
           const serverTurnId = response.headers.get('x-chat-turn-id');
           const clientTurnId = activeClientTurnIdRef.current;
+          const latency = activeChatLatencyRef.current;
+          if (
+            response.ok &&
+            clientTurnId &&
+            latency?.clientTurnId === clientTurnId &&
+            !latency.sendRoundTripRecorded
+          ) {
+            latency.sendRoundTripRecorded = true;
+            recordUxLatency(
+              'chat_send_round_trip',
+              Math.max(0, uxLatencyNowMs() - latency.startedAt)
+            );
+          }
           if (serverConversationId) {
             adoptServerConversationIdRef.current(
               serverConversationId,
@@ -537,6 +563,7 @@ export function useJovieChat({
         });
       }
       activeClientTurnIdRef.current = null;
+      activeChatLatencyRef.current = null;
       setIsSubmitting(false);
     },
     [activeConversationId, dispatchTimelineEvent, profileId]
@@ -577,6 +604,21 @@ export function useJovieChat({
       const finishedConversationId =
         metadata?.conversationId ?? activeConversationId;
       const clientTurnId = activeClientTurnIdRef.current;
+      const latency = activeChatLatencyRef.current;
+      const messageParts = getMessageParts(message as UIMessage);
+
+      if (
+        clientTurnId &&
+        latency?.clientTurnId === clientTurnId &&
+        !latency.firstTokenRecorded &&
+        messageParts.length > 0
+      ) {
+        latency.firstTokenRecorded = true;
+        recordUxLatency(
+          'chat_first_token',
+          Math.max(0, uxLatencyNowMs() - latency.startedAt)
+        );
+      }
 
       if (clientTurnId) {
         dispatchTimelineEvent({
@@ -585,7 +627,7 @@ export function useJovieChat({
           clientTurnId,
           turnId: metadata?.turnId,
           requestId: metadata?.requestId,
-          parts: getMessageParts(message as UIMessage),
+          parts: messageParts,
           toolStepCapExhausted: metadata?.toolStepCapExhausted,
           now: Date.now(),
         });
@@ -612,6 +654,7 @@ export function useJovieChat({
       }
 
       activeClientTurnIdRef.current = null;
+      activeChatLatencyRef.current = null;
       setIsSubmitting(false);
     },
     onError: error => {
@@ -633,6 +676,7 @@ export function useJovieChat({
           now: Date.now(),
         });
         activeClientTurnIdRef.current = null;
+        activeChatLatencyRef.current = null;
         setIsSubmitting(false);
         return;
       }
@@ -731,6 +775,14 @@ export function useJovieChat({
     }
 
     if (parts.length === 0) return;
+    const latency = activeChatLatencyRef.current;
+    if (latency?.clientTurnId === clientTurnId && !latency.firstTokenRecorded) {
+      latency.firstTokenRecorded = true;
+      recordUxLatency(
+        'chat_first_token',
+        Math.max(0, uxLatencyNowMs() - latency.startedAt)
+      );
+    }
     const signature = getPartsChangeFingerprint(parts);
     if (signature === lastAssistantPartsSignatureRef.current) return;
 
@@ -769,6 +821,7 @@ export function useJovieChat({
         now: Date.now(),
       });
       activeClientTurnIdRef.current = null;
+      activeChatLatencyRef.current = null;
     }
     setIsSubmitting(false);
   }, [
@@ -942,6 +995,12 @@ export function useJovieChat({
       setIsSubmitting(true);
       const clientTurnId = crypto.randomUUID();
       activeClientTurnIdRef.current = clientTurnId;
+      activeChatLatencyRef.current = {
+        clientTurnId,
+        startedAt: uxLatencyNowMs(),
+        firstTokenRecorded: false,
+        sendRoundTripRecorded: false,
+      };
       // Snapshot which assistant messages already exist so this turn never
       // treats a previous reply as its own streaming content (#11921).
       preTurnAssistantMessageIdsRef.current = new Set(

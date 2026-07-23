@@ -441,4 +441,23 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
   });
 
   expect(report.status, JSON.stringify(report.summaries, null, 2)).toBe('pass');
+
+  const uxLatencyStore = await page.evaluate(() => {
+    const raw = localStorage.getItem('jovie:ux-latency:v1');
+    return raw ? JSON.parse(raw) : null;
+  });
+  expect(uxLatencyStore).toMatchObject({
+    version: 1,
+    samples: {
+      chat_first_token: expect.any(Array),
+      chat_send_round_trip: expect.any(Array),
+    },
+  });
+  expect(uxLatencyStore.samples.chat_first_token).toHaveLength(SAMPLE_COUNT);
+  expect(uxLatencyStore.samples.chat_send_round_trip).toHaveLength(
+    SAMPLE_COUNT
+  );
+  expect(
+    Object.keys(uxLatencyStore.samples.chat_first_token[0]).sort()
+  ).toEqual(['durationMs', 'recordedAt']);
 });
