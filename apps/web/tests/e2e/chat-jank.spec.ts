@@ -29,7 +29,6 @@ import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 async function forceChatJankMonitor(page: Page) {
   const overrides = JSON.stringify({
     [APP_FLAG_OVERRIDE_KEYS.CHAT_JANK_MONITOR]: true,
-    [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
   });
 
   await page.addInitScript(
@@ -66,11 +65,9 @@ test('chat page renders with jank monitor flag forced on', async ({ page }) => {
   await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
   // Chat content root (see data-testid='chat-content' in JovieChat.tsx)
-  await expect(
-    page.locator(
-      '[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'
-    )
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(page.locator('[data-testid="chat-content"]')).toBeVisible({
     timeout: 30_000,
   });

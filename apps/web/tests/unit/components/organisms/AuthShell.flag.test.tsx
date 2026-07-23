@@ -1,10 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AuthShell } from '@/components/organisms/AuthShell';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
-import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
 
 const { unifiedSidebarMock } = vi.hoisted(() => ({
   unifiedSidebarMock: vi.fn(),
@@ -21,20 +20,14 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
     main,
     mobileBottomNav,
     contentClassName,
-    variant,
   }: {
     sidebar: ReactNode;
     header?: ReactNode;
     main: ReactNode;
     mobileBottomNav?: ReactNode;
     contentClassName?: string;
-    variant: 'legacy' | 'shellChatV1';
   }) => (
-    <div
-      data-testid='app-shell-frame'
-      data-shell-design={variant}
-      data-content-class={contentClassName}
-    >
+    <div data-testid='app-shell-frame' data-content-class={contentClassName}>
       {sidebar}
       {header}
       {main}
@@ -96,11 +89,9 @@ vi.mock('@/features/dashboard/organisms/MobileProfileDrawer', () => ({
   MobileProfileDrawer: () => <button type='button'>Mobile Profile</button>,
 }));
 
-function renderAuthShell(designV1: boolean, showMobileTabs = false) {
+function renderAuthShell(showMobileTabs = false) {
   return render(
-    <AppFlagProvider
-      initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: designV1 }}
-    >
+    <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
       <AuthShell
         section='dashboard'
         breadcrumbs={[]}
@@ -122,30 +113,11 @@ function renderOvAuthShell() {
   );
 }
 
-describe('AuthShell DESIGN_V1 wiring', () => {
-  beforeEach(() => {
-    localStorage.removeItem(FF_OVERRIDES_KEY);
-  });
+describe('AuthShell canonical wiring', () => {
+  it('uses the single shell frame and in-sidebar collapse control', () => {
+    renderAuthShell();
 
-  it('uses the legacy shell frame when DESIGN_V1 is disabled', () => {
-    renderAuthShell(false);
-
-    expect(screen.getByTestId('app-shell-frame')).toHaveAttribute(
-      'data-shell-design',
-      'legacy'
-    );
-    expect(
-      screen.getByRole('button', { name: 'Toggle Sidebar' })
-    ).toBeInTheDocument();
-  });
-
-  it('uses the shell chat V1 frame when DESIGN_V1 is enabled', () => {
-    renderAuthShell(true);
-
-    expect(screen.getByTestId('app-shell-frame')).toHaveAttribute(
-      'data-shell-design',
-      'shellChatV1'
-    );
+    expect(screen.getByTestId('app-shell-frame')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Toggle Sidebar' })
     ).not.toBeInTheDocument();
@@ -163,7 +135,7 @@ describe('AuthShell DESIGN_V1 wiring', () => {
   });
 
   it('keeps customer and OV mobile navigation mutually exclusive', () => {
-    const { unmount } = renderAuthShell(false, true);
+    const { unmount } = renderAuthShell(true);
 
     expect(
       screen.getByRole('navigation', { name: 'Dashboard Tabs' })

@@ -308,11 +308,7 @@ test.describe('canonical /start onboarding chat', () => {
     await installLayoutShiftObserver(page);
     await page.goto('/start', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
-    await expect(
-      page.locator(
-        '[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'
-      )
-    ).toBeVisible();
+    await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible();
     await expect(page.locator(CHAT_PANEL)).toBeVisible();
     // The resolved empty state renders the intro + centered composer (no logo).
     await expect(

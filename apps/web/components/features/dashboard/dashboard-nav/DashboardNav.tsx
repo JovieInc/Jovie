@@ -22,7 +22,6 @@ import {
 } from '@/components/shell/SidebarThreadsSection';
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
-import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
@@ -136,7 +135,6 @@ export function DashboardNav(_: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const [threadReadAtById, setThreadReadAtById] =
     useState<Record<string, string>>(readThreadReadState);
   const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(
@@ -153,7 +151,6 @@ export function DashboardNav(_: DashboardNavProps) {
   });
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
   const threadsVisible =
-    shellChatV1Enabled &&
     !isDemo &&
     !isInSettings &&
     (isMobile ? openMobile : sidebarState === 'open');
@@ -380,12 +377,11 @@ export function DashboardNav(_: DashboardNavProps) {
           onClick={demoUnavailable ? () => handleDemoNavClick(item) : undefined}
           preventNavigation={demoUnavailable}
           renderAsButton={false}
-          useShellNavItem={shellChatV1Enabled}
           onPrefetch={() => handlePrefetch(item.id)}
         />
       );
     },
-    [pathname, handleDemoNavClick, handlePrefetch, isDemo, shellChatV1Enabled]
+    [pathname, handleDemoNavClick, handlePrefetch, isDemo]
   );
 
   // Memoize renderSection to prevent creating new functions on every render

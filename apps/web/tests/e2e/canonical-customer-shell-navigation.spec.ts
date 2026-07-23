@@ -9,11 +9,6 @@
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
-import {
-  APP_FLAG_OVERRIDES_COOKIE,
-  FF_OVERRIDES_KEY,
-} from '@/lib/flags/overrides';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -49,29 +44,17 @@ const FORBIDDEN_LABELS = [
 ] as const;
 
 async function installStableShell(page: Page) {
-  const overrides = JSON.stringify({
-    [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
-  });
-  await page.addInitScript(
-    ({ cookieName, key, value }) => {
-      localStorage.setItem(key, value);
-      document.cookie = `${cookieName}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
-      window.__JOVIE_CANONICAL_NAV_CLS__ = 0;
-      new PerformanceObserver(list => {
-        for (const entry of list.getEntries()) {
-          const shift = entry as LayoutShift;
-          if (!shift.hadRecentInput) {
-            window.__JOVIE_CANONICAL_NAV_CLS__ += shift.value;
-          }
+  await page.addInitScript(() => {
+    window.__JOVIE_CANONICAL_NAV_CLS__ = 0;
+    new PerformanceObserver(list => {
+      for (const entry of list.getEntries()) {
+        const shift = entry as LayoutShift;
+        if (!shift.hadRecentInput) {
+          window.__JOVIE_CANONICAL_NAV_CLS__ += shift.value;
         }
-      }).observe({ type: 'layout-shift', buffered: true });
-    },
-    {
-      cookieName: APP_FLAG_OVERRIDES_COOKIE,
-      key: FF_OVERRIDES_KEY,
-      value: overrides,
-    }
-  );
+      }
+    }).observe({ type: 'layout-shift', buffered: true });
+  });
 }
 
 async function linkContract(links: Locator) {
@@ -90,7 +73,9 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow).toBeLessThanOrEqual(1);
 }
 
-test('canonical six are stable at 375, 768, and 1440', async ({ page }) => {
+test('canonical six are stable at 375, 768, and 1440', async ({
+  page,
+}, testInfo) => {
   test.setTimeout(180_000);
   await installStableShell(page);
   await setTestAuthBypassSession(page, 'creator-ready');
@@ -151,6 +136,12 @@ test('canonical six are stable at 375, 768, and 1440', async ({ page }) => {
     await expect(more).toHaveAttribute('aria-expanded', 'false');
     expect(await tabs.boundingBox()).toEqual(before);
     await expectNoHorizontalOverflow(page);
+    await page.screenshot({
+      path: testInfo.outputPath(
+        `canonical-customer-shell-${viewport.width}x${viewport.height}.png`
+      ),
+      fullPage: true,
+    });
   }
 
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -184,6 +175,10 @@ test('canonical six are stable at 375, 768, and 1440', async ({ page }) => {
   await expect(page.getByTestId('app-shell-right-rail')).toBeVisible();
   expect(await desktopNav.boundingBox()).toEqual(navBeforeRail);
   await expectNoHorizontalOverflow(page);
+  await page.screenshot({
+    path: testInfo.outputPath('canonical-customer-shell-1440x900.png'),
+    fullPage: true,
+  });
 
   const cls = await page.evaluate(
     () => window.__JOVIE_CANONICAL_NAV_CLS__ ?? Number.POSITIVE_INFINITY

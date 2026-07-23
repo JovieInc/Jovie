@@ -42,7 +42,6 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { useClipboard } from '@/hooks/useClipboard';
 import { env } from '@/lib/env-client';
-import { useAppFlag } from '@/lib/flags/client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
@@ -391,7 +390,6 @@ export function ChatPageClient({
   const fromOnboarding = searchParams.get('from') === 'onboarding';
   const panelParam = searchParams.get('panel');
   const enablePreviewPanel = !env.IS_E2E || panelParam === 'profile';
-  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   // Keep live profile preview data warm on chat so sidebar profile clicks and
   // @artist mentions can open the same rail used in setup/onboarding.
   const shouldHydratePreviewData = enablePreviewPanel && Boolean(activeProfile);
@@ -509,9 +507,7 @@ export function ChatPageClient({
   }, [conversationId, deleteConversation, router, notifications]);
 
   const headerActions = useMemo(() => {
-    const artistProfileToggle = designV1ChatEntitiesEnabled ? (
-      <ArtistProfileRailToggle />
-    ) : null;
+    const artistProfileToggle = <ArtistProfileRailToggle />;
 
     if (!conversationId) {
       return artistProfileToggle;
@@ -548,7 +544,6 @@ export function ChatPageClient({
     );
   }, [
     conversationId,
-    designV1ChatEntitiesEnabled,
     sessionIdCopied,
     handleCopyConversationId,
     handleArchive,
@@ -878,7 +873,7 @@ export function ChatPageClient({
     <ChatEntityPanelProvider resetKey={conversationId ?? null}>
       <ChatEntityRightPanelHost
         enablePreviewPanel={enablePreviewPanel}
-        enableChatEntityPanels={designV1ChatEntitiesEnabled}
+        enableChatEntityPanels
         profileId={activeProfile.id}
         profileSpotifyArtistId={activeProfile.spotifyId}
         profileContext={{

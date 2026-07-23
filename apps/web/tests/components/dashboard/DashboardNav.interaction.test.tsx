@@ -113,7 +113,6 @@ describe('DashboardNav interactions', () => {
 
     renderDashboardNav({
       renderFn: render,
-      appFlags: { DESIGN_V1: true },
     });
 
     expect(screen.getByText('Chats')).toBeInTheDocument();
@@ -130,7 +129,6 @@ describe('DashboardNav interactions', () => {
     });
     const loading = renderDashboardNav({
       renderFn: render,
-      appFlags: { DESIGN_V1: true },
     });
 
     expect(document.querySelector('.skeleton')).toBeInTheDocument();
@@ -144,7 +142,6 @@ describe('DashboardNav interactions', () => {
     });
     renderDashboardNav({
       renderFn: render,
-      appFlags: { DESIGN_V1: true },
     });
 
     expect(screen.getAllByRole('link', { name: 'Chat' })).toHaveLength(1);
@@ -169,7 +166,6 @@ describe('DashboardNav interactions', () => {
 
     renderDashboardNav({
       renderFn: render,
-      appFlags: { DESIGN_V1: true },
     });
 
     await waitFor(() => {

@@ -102,12 +102,10 @@ function LibrarySidebarOverride({
 
 function renderUnifiedSidebar({
   overrideContent,
-  designV1 = true,
   pathname = APP_ROUTES.LIBRARY,
   section = 'library',
 }: {
   readonly overrideContent?: ReactNode;
-  readonly designV1?: boolean;
   readonly pathname?: string;
   readonly section?: 'admin' | 'dashboard' | 'library' | 'ov' | 'settings';
 } = {}) {
@@ -118,9 +116,7 @@ function renderUnifiedSidebar({
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AppFlagProvider
-        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: designV1 }}
-      >
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
         <DashboardDataProvider value={dashboardData}>
           <TooltipProvider>
             <SidebarProvider>
@@ -181,7 +177,6 @@ describe('UnifiedSidebar library route', () => {
 
   it('omits header New Conversation and the web collapse control in Electron dashboard mode', () => {
     renderUnifiedSidebar({
-      designV1: false,
       pathname: APP_ROUTES.DASHBOARD,
       section: 'dashboard',
     });

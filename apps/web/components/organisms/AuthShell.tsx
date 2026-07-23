@@ -5,11 +5,7 @@ import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { useComposerFocus } from '@/components/features/chat/Composer';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
-import {
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
-} from '@/components/organisms/Sidebar';
+import { SidebarProvider, useSidebar } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { useOptionalHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -17,7 +13,6 @@ import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
-import { useAppFlag } from '@/lib/flags/client';
 import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
@@ -63,15 +58,9 @@ function AuthShellInner({
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
   const headerActionsState = useOptionalHeaderActions();
-  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
-
-  const sidebarTrigger = isMobile ? null : shellChatV1Enabled ? (
-    sidebarState === 'closed' ? (
-      <SidebarCollapseButton />
-    ) : null
-  ) : (
-    <SidebarTrigger />
-  );
+  const sidebarTrigger = isMobile ? null : sidebarState === 'closed' ? (
+    <SidebarCollapseButton />
+  ) : null;
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;
@@ -107,11 +96,7 @@ function AuthShellInner({
       <HeaderSearchSurfaceFromContext className='w-full sm:w-auto' />
     ) : null;
   }, [headerActionsState]);
-  const shellVariant = shellChatV1Enabled ? 'shellChatV1' : 'legacy';
-  const audioPlayer = useMemo(
-    () => <PersistentAudioBar variant={shellVariant} />,
-    [shellVariant]
-  );
+  const audioPlayer = useMemo(() => <PersistentAudioBar />, []);
 
   return (
     <AppShellFrame
@@ -141,7 +126,6 @@ function AuthShellInner({
       audioPlayer={audioPlayer}
       mobileBottomNav={mobileBottomNav}
       contentClassName={getContentClassName(hasMobileBottomNav, isTableRoute)}
-      variant={shellVariant}
       composerFocusActive={isComposerFocused && !isMobile}
     />
   );

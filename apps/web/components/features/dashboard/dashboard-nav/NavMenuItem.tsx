@@ -5,7 +5,6 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-  Kbd,
 } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
@@ -14,14 +13,10 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
 } from 'react';
 import { toast } from '@/components/feedback';
-import {
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from '@/components/organisms/Sidebar';
+import { SidebarMenuItem } from '@/components/organisms/Sidebar';
 import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,
@@ -50,53 +45,6 @@ interface NavMenuItemProps {
   readonly renderAsButton?: boolean;
   /** Hover/focus prefetch handler — wired by DashboardNav, not this component */
   readonly onPrefetch?: () => void;
-  /** Use the Shell V1 primitive for button-only rows. Links stay legacy. */
-  readonly useShellNavItem?: boolean;
-}
-
-/**
- * Render shortcut keys in tooltip format
- * Handles both "G then D" sequential and single key formats
- */
-function ShortcutKeys({ shortcut }: { readonly shortcut: KeyboardShortcut }) {
-  const { keys } = shortcut;
-
-  // Handle "G then D" style sequential shortcuts
-  if (keys.includes(' then ')) {
-    const [first, second] = keys.split(' then ');
-    return (
-      <span className='inline-flex items-center gap-1 ml-2'>
-        <Kbd variant='tooltip'>{first}</Kbd>
-        <span className='text-3xs opacity-70'>then</span>
-        <Kbd variant='tooltip'>{second}</Kbd>
-      </span>
-    );
-  }
-
-  // Handle space-separated keys (like "⌘ K")
-  return (
-    <Kbd variant='tooltip' className='ml-2'>
-      {keys}
-    </Kbd>
-  );
-}
-
-function buildTooltip(
-  name: string,
-  shortcut?: KeyboardShortcut
-): string | { children: ReactNode } {
-  if (!shortcut) {
-    return name;
-  }
-
-  return {
-    children: (
-      <>
-        <span>{name}</span>
-        <ShortcutKeys shortcut={shortcut} />
-      </>
-    ),
-  };
 }
 
 interface NavMenuInteractiveElementProps {
@@ -172,17 +120,10 @@ export function NavMenuItem({
   preventNavigation = false,
   renderAsButton = false,
   onPrefetch,
-  useShellNavItem = false,
 }: NavMenuItemProps) {
   const isElectronRuntime = useIsElectronRuntime();
   const pendingNavigationRef = useRef(false);
   const clearPendingNavigationListenersRef = useRef<(() => void) | null>(null);
-  // Memoize tooltip to prevent creating new objects on every render,
-  // which would cause unnecessary re-renders in SidebarMenuButton
-  const tooltip = useMemo(
-    () => buildTooltip(item.name, shortcut),
-    [item.name, shortcut]
-  );
 
   const handleCopyLink = useCallback(async () => {
     const origin =
@@ -201,21 +142,6 @@ export function NavMenuItem({
       globalThis.window === undefined ? BASE_URL : globalThis.location.origin;
     globalThis.open(`${origin}${item.href}`, '_blank', 'noopener,noreferrer');
   }, [item.href]);
-
-  const innerContent = (
-    <>
-      {/* Fixed-width icon container keeps sidebar glyphs optically quiet. */}
-      <span
-        data-sidebar-icon
-        className='flex h-4 w-4 shrink-0 items-center justify-center'
-      >
-        <item.icon className='h-4 w-4' strokeWidth={1.9} aria-hidden='true' />
-      </span>
-      <span className='truncate group-data-[collapsible=icon]:hidden'>
-        {item.name}
-      </span>
-    </>
-  );
 
   const showPendingShell = useCallback(() => {
     if (!onNavigate) {
@@ -365,51 +291,27 @@ export function NavMenuItem({
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <SidebarMenuItem>
-          {useShellNavItem ? (
-            <Tooltip
-              label={item.name}
-              shortcut={shellTooltipShortcut}
-              side='right'
-              block
+          <Tooltip
+            label={item.name}
+            shortcut={shellTooltipShortcut}
+            side='right'
+            block
+          >
+            <NavMenuInteractiveElement
+              item={item}
+              isActive={isActive}
+              prefetch={prefetch}
+              preventNavigation={preventNavigation}
+              renderAsButton={renderAsButton}
+              className={shellNavClassName}
+              onButtonClick={handleButtonClick}
+              onLinkClick={handleLinkClick}
+              onPressStart={handlePressStart}
+              onPrefetch={onPrefetch}
             >
-              <NavMenuInteractiveElement
-                item={item}
-                isActive={isActive}
-                prefetch={prefetch}
-                preventNavigation={preventNavigation}
-                renderAsButton={renderAsButton}
-                className={shellNavClassName}
-                onButtonClick={handleButtonClick}
-                onLinkClick={handleLinkClick}
-                onPressStart={handlePressStart}
-                onPrefetch={onPrefetch}
-              >
-                {shellInnerContent}
-              </NavMenuInteractiveElement>
-            </Tooltip>
-          ) : (
-            <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
-              <NavMenuInteractiveElement
-                item={item}
-                isActive={isActive}
-                prefetch={prefetch}
-                preventNavigation={preventNavigation}
-                renderAsButton={renderAsButton}
-                className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
-                onButtonClick={handleButtonClick}
-                onLinkClick={handleLinkClick}
-                onPressStart={handlePressStart}
-                onPrefetch={onPrefetch}
-              >
-                {innerContent}
-              </NavMenuInteractiveElement>
-            </SidebarMenuButton>
-          )}
-          {!useShellNavItem && item.badge != null ? (
-            <span className='pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 group-data-[collapsible=icon]:hidden'>
-              {item.badge}
-            </span>
-          ) : null}
+              {shellInnerContent}
+            </NavMenuInteractiveElement>
+          </Tooltip>
           {actions}
           {children}
         </SidebarMenuItem>

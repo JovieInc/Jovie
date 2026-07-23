@@ -173,7 +173,6 @@ export function JovieChat({
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
-  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   const { chatFileUploadLimit, isPro: isProUser } = usePlanGate();
   const chatEntityPanel = useOptionalChatEntityPanel();
   const { onSend: notifyJankSend } = useChatJankMonitor({
@@ -333,18 +332,16 @@ export function JovieChat({
   const profileRailLabel = displayName ?? username ?? null;
   const railContextTargets = useMemo(
     () =>
-      designV1ChatEntitiesEnabled
-        ? deriveChatRailContextTargets({
-            messages,
-            profile: profileId
-              ? {
-                  id: profileId,
-                  label: profileRailLabel,
-                }
-              : null,
-          })
-        : [],
-    [designV1ChatEntitiesEnabled, messages, profileId, profileRailLabel]
+      deriveChatRailContextTargets({
+        messages,
+        profile: profileId
+          ? {
+              id: profileId,
+              label: profileRailLabel,
+            }
+          : null,
+      }),
+    [messages, profileId, profileRailLabel]
   );
 
   useEffect(() => {
@@ -682,9 +679,6 @@ export function JovieChat({
         )}
         data-testid='chat-content'
         data-picker-open={composerPickerOpen ? 'true' : undefined}
-        data-design-v1-chat-entities={
-          designV1ChatEntitiesEnabled ? 'true' : undefined
-        }
       >
         {/* Ambient background wash — fills the full chat viewport so the
             gradient never clips to a content-sized region (#12135 / JOV-3614).

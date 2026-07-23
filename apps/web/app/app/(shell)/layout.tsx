@@ -17,7 +17,6 @@ import { canAccessAppShell } from '@/lib/auth/access-route-redirect';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { resolveUserState } from '@/lib/auth/gate';
-import { getAppFlagValue } from '@/lib/flags/server';
 import ChatLoading from './chat/loading';
 import { DashboardShellContent } from './DashboardShellContent';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
@@ -106,15 +105,7 @@ export default async function AppShellLayout({
       );
     }
 
-    // Resolve the shell variant up front so the Suspense fallback skeleton
-    // matches the post-resolve AppShellFrame layout. Without this, flag-on
-    // users would flash a 'legacy' skeleton then snap to the rounded
-    // 'shellChatV1' frame once DashboardShellContent resolves.
-    const shellChatV1 = await getAppFlagValue('DESIGN_V1', {
-      userId: auth.userId,
-    });
-    const shellVariant = shellChatV1 ? 'shellChatV1' : 'legacy';
-    const audioPlayer = <PersistentAudioBar variant={shellVariant} />;
+    const audioPlayer = <PersistentAudioBar />;
 
     // Pick the route-specific skeleton main slot.
     let routeMain: React.ReactNode = undefined;
@@ -131,7 +122,7 @@ export default async function AppShellLayout({
     }
 
     // CinematicAppBoot internally renders <AppShellSkeleton main={routeMain}
-    // variant={shellVariant} /> unless this is the FIRST shell mount of the
+    // /> unless this is the FIRST shell mount of the
     // tab AND prefers-reduced-motion is off, in which case it plays a 2.4s
     // cinematic timeline before the underlying tree resolves. Per-tab gate
     // via sessionStorage flag `jovie:cinematic-boot-played`.
@@ -140,7 +131,6 @@ export default async function AppShellLayout({
         main={routeMain}
         audioPlayer={audioPlayer}
         brandVariant={mode === 'ov' ? 'ov' : 'jovie'}
-        variant={shellVariant}
       />
     );
 

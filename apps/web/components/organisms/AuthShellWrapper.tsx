@@ -40,7 +40,6 @@ import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
-import { useAppFlag } from '@/lib/flags/client';
 import type { AppShellMode } from '@/types/app-shell';
 import { AuthShell } from './AuthShell';
 import { CommandPalette } from './CommandPalette';
@@ -91,7 +90,6 @@ function AuthShellWrapperInner({
   const pathname = usePathname();
   const headerActions = useHeaderActions();
   const isElectron = useIsElectronRuntime();
-  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const [, startTransition] = useTransition();
   const [pendingShellRoute, setPendingShellRoute] =
     useState<PendingShellRoute>(null);
@@ -117,7 +115,6 @@ function AuthShellWrapperInner({
     : 'app-shell';
 
   const showArtistProfileRailToggle =
-    shellChatV1Enabled &&
     previewEnabled &&
     !config.isDemoRoute &&
     (config.isChatRoute || pathname === APP_ROUTES.DASHBOARD);

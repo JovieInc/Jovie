@@ -7,8 +7,6 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
-import { AppFlagProvider, useAppFlag } from '@/lib/flags/client';
-import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
 
 const mockSetTheme = vi.fn();
@@ -28,18 +26,13 @@ vi.mock('@/lib/flags/contracts', () => ({
     HERO_SPOTIFY: 'code:HERO_SPOTIFY',
     BILLING_UPGRADE: 'code:BILLING_UPGRADE',
     SPOTIFY_OAUTH: 'code:SPOTIFY_OAUTH',
-    DESIGN_V1: 'code:DESIGN_V1',
-    SHELL_CHAT_V1: 'code:DESIGN_V1',
   },
   APP_FLAG_DEFAULTS: {
     CLAIM_HANDLE: false,
     HERO_SPOTIFY: false,
     BILLING_UPGRADE: false,
     SPOTIFY_OAUTH: false,
-    DESIGN_V1: false,
-    SHELL_CHAT_V1: false,
   },
-  DESIGN_V1_ALIAS_FLAGS: ['SHELL_CHAT_V1'],
 }));
 
 import { DevToolbar } from '@/components/features/dev/DevToolbar';
@@ -63,22 +56,6 @@ function renderToolbar(
       version={props?.version ?? '1.0.0'}
       defaultHidden={props?.defaultHidden}
     />
-  );
-}
-
-function ShellChatFlagProbe() {
-  const enabled = useAppFlag('SHELL_CHAT_V1');
-  return <div data-testid='shell-chat-v1-probe'>{enabled ? 'new' : 'old'}</div>;
-}
-
-function renderToolbarBesideFlagProvider() {
-  return render(
-    <>
-      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <ShellChatFlagProbe />
-      </AppFlagProvider>
-      <DevToolbar env='development' sha='abc1234' version='1.0.0' />
-    </>
   );
 }
 
@@ -397,13 +374,13 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      // Should show "5 of 5" initially (all 5 code flags)
-      expect(screen.getByText('5 of 5')).toBeInTheDocument();
+      // All registered code flags are visible before filtering.
+      expect(screen.getByText('4 of 4')).toBeInTheDocument();
 
       const searchInput = screen.getByPlaceholderText('Search flags...');
       fireEvent.change(searchInput, { target: { value: 'claim' } });
 
-      expect(screen.getByText('1 of 5')).toBeInTheDocument();
+      expect(screen.getByText('1 of 4')).toBeInTheDocument();
     });
 
     it('clears search when clear button is clicked', () => {
@@ -413,11 +390,11 @@ describe('DevToolbar', () => {
       const searchInput = screen.getByPlaceholderText('Search flags...');
       fireEvent.change(searchInput, { target: { value: 'claim' } });
 
-      expect(screen.getByText('1 of 5')).toBeInTheDocument();
+      expect(screen.getByText('1 of 4')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Clear Search' }));
 
-      expect(screen.getByText('5 of 5')).toBeInTheDocument();
+      expect(screen.getByText('4 of 4')).toBeInTheDocument();
     });
 
     it('does not show clear button when search is empty', () => {
@@ -438,8 +415,6 @@ describe('DevToolbar', () => {
 
       expect(screen.getByText('claim handle')).toBeInTheDocument();
       expect(screen.getByText('spotify oauth')).toBeInTheDocument();
-      expect(screen.getByText('design v1')).toBeInTheDocument();
-      expect(screen.queryByText('shell chat v1')).not.toBeInTheDocument();
     });
 
     it('shows source label for each non-overridden flag', () => {
@@ -447,107 +422,17 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       const sourceLabels = screen.getAllByText(/^code$/);
-      expect(sourceLabels.length).toBe(5); // all code flags
+      expect(sourceLabels.length).toBe(4); // all code flags
     });
   });
 
-  // ─── New Design Toggle ─────────────────────────────────────
-
-  describe('new design toggle', () => {
-    it('renders in the collapsed bottom bar without opening the flag list', () => {
+  describe('design studio shortcut', () => {
+    it('keeps the Design Studio shortcut available without a rollout toggle', () => {
       renderToolbar();
-
-      const toggle = screen.getByRole('button', { name: /New Design/ });
-      expect(toggle).toBeInTheDocument();
-      expect(toggle).toHaveAttribute('aria-pressed', 'false');
-      expect(
-        screen.getByRole('button', { name: 'Expand Dev Toolbar' })
-      ).toBeInTheDocument();
-    });
-
-    it('sets the DESIGN_V1 override on click', () => {
-      renderToolbar();
-
-      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
-
-      expect(
-        JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}')
-      ).toEqual({
-        'code:DESIGN_V1': true,
-      });
-    });
-
-    it('clears the DESIGN_V1 override when toggled back to the server default', () => {
-      // Server default for DESIGN_V1 is false. When the user has an
-      // override of `true` and toggles back, the result (false) matches
-      // the server default, so we remove the override entirely instead of
-      // recording a no-op `false` value. Keeps the override count honest.
-      setLocalOverrides({ 'code:DESIGN_V1': true });
-      renderToolbar();
-
-      const toggle = screen.getByRole('button', { name: /New Design/ });
-      expect(toggle).toHaveAttribute('aria-pressed', 'true');
-
-      fireEvent.click(toggle);
-
-      expect(
-        JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}')
-      ).toEqual({});
-    });
-
-    it('drops the override badge when DESIGN_V1 is toggled back to default', () => {
-      // Companion to the test above: the user-meaningful override count
-      // returns to zero when an override is cleared, so the collapsed
-      // badge should disappear (no "0 overrides" pill flicker).
-      setLocalOverrides({ 'code:DESIGN_V1': true });
-      renderToolbar();
-
-      expect(screen.getByText('1 override')).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
-
-      // Pill in the bar disappears AND the inline "(override)" hint inside
-      // the New Design button is gone now that the override matches default.
-      expect(screen.queryByText('1 override')).not.toBeInTheDocument();
-      expect(screen.queryByText('(override)')).not.toBeInTheDocument();
-    });
-
-    it('updates the collapsed override badge after toggling', () => {
-      renderToolbar();
-
-      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
-
-      expect(screen.getByText('1 override')).toBeInTheDocument();
-    });
-
-    it('keeps the Design Studio shortcut hidden until DESIGN_V1 is on', () => {
-      renderToolbar();
-
-      expect(
-        screen.queryByRole('link', { name: 'Design Studio' })
-      ).not.toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
 
       expect(
         screen.getByRole('link', { name: 'Design Studio' })
       ).toHaveAttribute('href', '/exp/page-builder');
-    });
-
-    it('syncs the override to shell flag consumers outside the toolbar', async () => {
-      renderToolbarBesideFlagProvider();
-
-      expect(screen.getByTestId('shell-chat-v1-probe')).toHaveTextContent(
-        'old'
-      );
-
-      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('shell-chat-v1-probe')).toHaveTextContent(
-          'new'
-        );
-      });
     });
   });
 

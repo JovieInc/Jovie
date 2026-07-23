@@ -1,4 +1,3 @@
-import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
 import {
   VISUAL_QA_COLOR_SCHEMES,
   type VisualQaColorScheme,
@@ -7,10 +6,6 @@ import type {
   VisualQaCaptureConfig,
   VisualQaSurface,
 } from '@/lib/visual-qa/types';
-
-const DESIGN_V1_OVERRIDES = {
-  [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
-} as const satisfies Readonly<Record<string, boolean>>;
 
 interface VisualQaSurfaceSeed
   extends Omit<VisualQaSurface, 'baseline' | 'after'> {
@@ -21,10 +16,7 @@ interface VisualQaSurfaceSeed
 }
 
 function defineSurface(seed: VisualQaSurfaceSeed): VisualQaSurface {
-  const baseline: VisualQaCaptureConfig = {
-    ...seed.baseline,
-    flagOverrides: seed.baseline.flagOverrides ?? DESIGN_V1_OVERRIDES,
-  };
+  const baseline: VisualQaCaptureConfig = { ...seed.baseline };
 
   return {
     id: seed.id,

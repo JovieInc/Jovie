@@ -20,7 +20,6 @@ export default async function LibraryPage() {
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.LIBRARY,
     authFailure: 'notFound',
-    requiredFlag: 'SHELL_CHAT_V1',
     dashboardErrorLogMessage: 'Dashboard data load failed on library page',
     dashboardErrorMessage:
       'Failed to load library data. Please refresh the page.',

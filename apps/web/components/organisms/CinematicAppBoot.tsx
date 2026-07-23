@@ -6,7 +6,6 @@ import {
   JOVIE_ICON_PATH,
   JOVIE_ICON_VIEW_BOX,
 } from '@/components/atoms/jovie-icon-path';
-import { type AppShellFrameVariant } from '@/components/organisms/AppShellFrame';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 import type { BrandVariant } from '@/lib/brand/tokens';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
@@ -32,8 +31,6 @@ interface CinematicAppBootProps {
   readonly main?: ReactNode;
   /** Existing shell audio player node passed through the direct skeleton path. */
   readonly audioPlayer?: ReactNode;
-  /** AppShellSkeleton variant — preserved across cinematic + skeleton fallbacks. */
-  readonly variant: AppShellFrameVariant;
   /** Brand skin rendered during the initial server/Suspense fallback. */
   readonly brandVariant?: BrandVariant;
   /**
@@ -74,7 +71,6 @@ interface CinematicAppBootProps {
 export function CinematicAppBoot({
   main,
   audioPlayer,
-  variant,
   brandVariant = 'jovie',
   hasSidebar = true,
 }: CinematicAppBootProps) {
@@ -120,7 +116,6 @@ export function CinematicAppBoot({
         main={main}
         audioPlayer={audioPlayer}
         brandVariant={brandVariant}
-        variant={variant}
         sidebar={skeletonSidebar}
       />
     );

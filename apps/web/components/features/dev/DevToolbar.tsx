@@ -36,11 +36,10 @@ import {
 } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
-import { useAppFlag, useStoredAppFlagOverrides } from '@/lib/flags/client';
+import { useStoredAppFlagOverrides } from '@/lib/flags/client';
 import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
-  DESIGN_V1_ALIAS_FLAGS,
 } from '@/lib/flags/contracts';
 import {
   registerServiceWorker,
@@ -59,16 +58,12 @@ type FlagEntry = {
 
 const ALL_FLAGS: FlagEntry[] = (
   Object.entries(APP_FLAG_OVERRIDE_KEYS) as [string, string][]
-)
-  .filter(
-    ([name]) => !(DESIGN_V1_ALIAS_FLAGS as readonly string[]).includes(name)
-  )
-  .map(([name, key]) => ({
-    name,
-    key,
-    source: 'code' as const,
-    serverDefault: APP_FLAG_DEFAULTS[name as keyof typeof APP_FLAG_DEFAULTS],
-  }));
+).map(([name, key]) => ({
+  name,
+  key,
+  source: 'code' as const,
+  serverDefault: APP_FLAG_DEFAULTS[name as keyof typeof APP_FLAG_DEFAULTS],
+}));
 
 /**
  * Lookup table: override-storage-key -> server default. Used to detect
@@ -296,7 +291,6 @@ export function DevToolbar({
   } | null>(null);
   const { theme, setTheme } = useTheme();
   const overridesCtx = useStoredAppFlagOverrides();
-  const designV1Enabled = useAppFlag('DESIGN_V1');
   const flagBadgeCtx = useFlagBadges();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -573,14 +567,6 @@ export function DevToolbar({
       ).length,
     [validOverrides]
   );
-  const designV1OverrideKey = APP_FLAG_OVERRIDE_KEYS.DESIGN_V1;
-  const designV1Overridden =
-    designV1OverrideKey in overrides &&
-    isMeaningfulOverride(
-      designV1OverrideKey,
-      overrides[designV1OverrideKey] as boolean
-    );
-
   /**
    * Set an override unless the new value matches the server default — in
    * which case clear the override so the count stays accurate and stale
@@ -602,13 +588,6 @@ export function DevToolbar({
     },
     [flashFlag, overridesCtx]
   );
-
-  const toggleDesignV1 = useCallback(() => {
-    const currentOverride = overrides[designV1OverrideKey];
-    const current =
-      typeof currentOverride === 'boolean' ? currentOverride : designV1Enabled;
-    setOrClearOverride(designV1OverrideKey, !current);
-  }, [designV1Enabled, designV1OverrideKey, overrides, setOrClearOverride]);
 
   // Unified flag list: filter by search, sort overrides to top
   const filteredFlags = useMemo(() => {
@@ -901,24 +880,6 @@ export function DevToolbar({
           {breakpoint}
         </span>
 
-        <Button
-          type='button'
-          variant='ghost'
-          aria-pressed={designV1Enabled}
-          title='Toggle New Design (DESIGN_V1)'
-          onClick={toggleDesignV1}
-          className={`h-auto shrink-0 gap-1 px-1.5 py-1 rounded text-3xs transition-colors ${
-            designV1Enabled
-              ? 'text-accent bg-accent/10 hover:bg-accent/15'
-              : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
-          }`}
-        >
-          <span>New Design</span>
-          {designV1Overridden && (
-            <span className='text-3xs opacity-70'>(override)</span>
-          )}
-        </Button>
-
         <div className='flex-1' />
 
         {/* Quick actions */}
@@ -994,19 +955,17 @@ export function DevToolbar({
             <span className='max-sm:hidden sm:inline text-3xs'>Route</span>
           </Button>
 
-          {designV1Enabled && (
-            <Link
-              href={APP_ROUTES.DESIGN_STUDIO}
-              title='Open Design Studio'
-              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
-              aria-label='Design Studio'
-            >
-              <PanelsTopLeft size={11} />
-              <span className='max-sm:hidden sm:inline text-3xs'>
-                Design Studio
-              </span>
-            </Link>
-          )}
+          <Link
+            href={APP_ROUTES.DESIGN_STUDIO}
+            title='Open Design Studio'
+            className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
+            aria-label='Design Studio'
+          >
+            <PanelsTopLeft size={11} />
+            <span className='max-sm:hidden sm:inline text-3xs'>
+              Design Studio
+            </span>
+          </Link>
 
           <Link
             href={APP_ROUTES.ADMIN}

@@ -38,7 +38,6 @@ import {
   userSettingsNavigation,
 } from '@/features/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
-import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { copyToClipboard } from '@/hooks/useClipboard';
@@ -428,7 +427,6 @@ export function UnifiedSidebar({
   variant = 'jovie',
 }: UnifiedSidebarProps) {
   const { creatorProfiles } = useDashboardData();
-  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const sidebarOverride = useShellSidebarOverride();
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
@@ -520,11 +518,7 @@ export function UnifiedSidebar({
 
           <SidebarBottomNowPlayingBridge />
           {isDemoRoute ? null : <SidebarUpgradeBanner />}
-          {shellChatV1Enabled ? (
-            <ShellSidebarInstallBanner />
-          ) : (
-            <SidebarInstallBanner />
-          )}
+          <ShellSidebarInstallBanner />
         </SidebarFooter>
       )}
     </Sidebar>

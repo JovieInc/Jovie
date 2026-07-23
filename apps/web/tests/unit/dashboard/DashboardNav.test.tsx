@@ -65,10 +65,9 @@ describe('DashboardNav', () => {
     expect(queryByRole('link', { name: 'Settings' })).toBeNull();
   });
 
-  it('keeps the canonical six visible when DESIGN_V1 is disabled', () => {
+  it('keeps the canonical six visible without rollout state', () => {
     const { container } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: false },
     });
 
     expect(
@@ -188,7 +187,6 @@ describe('DashboardNav', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.CALENDAR);
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
     });
 
     const chatLink = getByRole('link', { name: 'Chat' });
@@ -230,7 +228,6 @@ describe('DashboardNav', () => {
 
     const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
     });
 
     expect(getByRole('link', { name: 'Unread answer' })).toHaveClass(
@@ -247,7 +244,6 @@ describe('DashboardNav', () => {
     const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
       sidebarProps: { defaultOpen: false },
-      appFlags: { DESIGN_V1: true },
     });
 
     expect(primaryLinks(container)).toHaveLength(6);
@@ -308,7 +304,6 @@ describe('DashboardNav', () => {
 
     const { getByRole, getByText } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
     });
     const tasksLink = getByRole('link', { name: 'Tasks 7 active tasks' });
 
@@ -354,7 +349,6 @@ describe('DashboardNav', () => {
   it('reserves task metadata geometry when no badge is present', () => {
     const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
     });
 
     expect(getByRole('link', { name: 'Tasks' })).toHaveClass(

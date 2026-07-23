@@ -1460,7 +1460,7 @@ const ONBOARDING_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="onboarding-chat"]',
         '[data-testid="chat-composer-surface"]',
@@ -1508,7 +1508,7 @@ const ONBOARDING_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="onboarding-chat"]',
         '[data-testid="chat-composer-surface"]',
@@ -1535,7 +1535,7 @@ const ONBOARDING_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="onboarding-chat"]',
         '[data-testid="chat-composer-surface"]',
@@ -1562,7 +1562,7 @@ const ONBOARDING_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="onboarding-chat"]',
         '[data-testid="chat-composer-surface"]',
@@ -1589,7 +1589,7 @@ const ONBOARDING_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="onboarding-chat"]',
         '[data-testid="chat-composer-surface"]',
@@ -1616,7 +1616,7 @@ const ONBOARDING_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="onboarding-chat"]',
         '[data-testid="chat-composer-surface"]',
@@ -1643,7 +1643,7 @@ const ONBOARDING_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="onboarding-chat"]',
         '[data-testid="chat-composer-surface"]',
@@ -1670,7 +1670,7 @@ const ONBOARDING_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="onboarding-chat"]',
         '[data-testid="chat-composer-surface"]',
@@ -1697,7 +1697,7 @@ const ONBOARDING_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="onboarding-chat"]',
         '[data-testid="chat-composer-surface"]',
@@ -1724,7 +1724,7 @@ const ONBOARDING_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="onboarding-chat"]',
         '[data-testid="chat-composer-surface"]',
