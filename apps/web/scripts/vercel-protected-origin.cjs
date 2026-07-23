@@ -47,16 +47,28 @@ const TRANSIENT_VERCEL_API_STATUSES = new Set([
 ]);
 const PUBLIC_ERROR_CONTENT =
   /application error|internal server error|something went wrong|error occurred|this page could not be found|page could not be found|profile not found|temporarily unavailable|auth unavailable|turnstile is not configured/i;
-// Next.js serializes error/not-found boundary templates into the RSC flight
-// payload (<script>self.__next_f.push(...)</script>) of every healthy page, so
-// error phrases like "Profile not found" legitimately appear inside inline
-// scripts without ever rendering. Strip script blocks before the error-content
-// scan; a genuinely rendered error page carries the phrase in visible markup.
-const INLINE_SCRIPT_BLOCK = /<script\b[^>]*>[\s\S]*?<\/script\s*>/gi;
+// A healthy Next.js App Router document serializes its RSC flight payload into
+// inline <script> tags (e.g. self.__next_f.push([...])). That payload legitimately
+// echoes user-facing copy — including strings like "Profile not found" that a
+// component renders only on the error branch — so scanning the raw HTML for the
+// PUBLIC_ERROR_CONTENT phrases produces false canary failures on healthy pages.
+// The semantic error scan must therefore run against the *rendered* markup only,
+// with inline script contents removed first. Byte-size and <html>/<body>
+// structure checks still run against the raw body, so this narrowing cannot let a
+// truncated or non-HTML document through. Non-greedy, case-insensitive, and
+// dot-all so it removes every inline block (with or without attributes, across
+// newlines) without swallowing the visible markup between two scripts. An
+// unterminated final <script> (truncated document) has its remainder removed too,
+// so a partial error page can never smuggle its copy past the scan.
+const INLINE_SCRIPT_BLOCK = /<script\b[^>]*>[\s\S]*?(?:<\/script\s*>|$)/gi;
 
-function stripInlineScripts(html) {
-  return html.replace(INLINE_SCRIPT_BLOCK, '');
+function stripInlineScriptContent(html) {
+  if (typeof html !== 'string') {
+    return '';
+  }
+  return html.replace(INLINE_SCRIPT_BLOCK, ' ');
 }
+
 const PUBLIC_HTML_SURFACES = Object.freeze([
   { label: 'Homepage', path: '/', minimumBytes: 1_000 },
   { label: 'Public profile', path: '/tim', minimumBytes: 500 },
@@ -1006,7 +1018,11 @@ async function verifyPublicSurfaceOnce(
   ) {
     throw new Error(`${surface.label} returned an incomplete document.`);
   }
-  if (PUBLIC_ERROR_CONTENT.test(stripInlineScripts(body))) {
+  // Scan the rendered markup only. Inline <script> RSC flight payloads echo
+  // component copy (including error-branch strings), so testing the raw body
+  // here false-fails healthy deploys. Visible error/not-found copy lives outside
+  // <script> tags and is still caught.
+  if (PUBLIC_ERROR_CONTENT.test(stripInlineScriptContent(body))) {
     throw new Error(`${surface.label} returned error or not-found content.`);
   }
 }
@@ -1452,7 +1468,7 @@ module.exports = {
   requireExpectedEnvironment,
   resolveAuthorizedVercelDeployment,
   safeRouteLabel,
-  stripInlineScripts,
+  stripInlineScriptContent,
   validateBuildInfo,
   validateBuildIdentity,
   verifyPublicDeploymentSurfaces,
