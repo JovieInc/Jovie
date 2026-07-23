@@ -13,6 +13,7 @@ import {
   OPERATOR_NAV_SECTIONS,
 } from '@/components/organisms/operator-navigation';
 import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
@@ -139,6 +140,39 @@ describe('OperatorMobileNavigation', () => {
       ).not.toBeInTheDocument()
     );
     expect(more).not.toHaveFocus();
+  });
+
+  it('marks only the nested OV destination current while keeping the root exact-match', async () => {
+    pathnameMock.mockReturnValue(`${APP_ROUTES.ADMIN_OPS}/agents`);
+    const user = userEvent.setup();
+    render(<OperatorMobileNavigation />);
+
+    const primaryNavigation = screen.getByRole('navigation', {
+      name: 'OV Mobile Navigation',
+    });
+    expect(
+      within(primaryNavigation).getByRole('link', { name: 'Overview' })
+    ).not.toHaveAttribute('aria-current');
+    expect(
+      within(primaryNavigation).getByRole('link', { name: 'Ops' })
+    ).toHaveAttribute('aria-current', 'page');
+    expect(
+      primaryNavigation.querySelectorAll('[aria-current="page"]')
+    ).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    const expandedNavigation = screen.getByRole('navigation', {
+      name: 'OV Navigation Menu',
+    });
+    expect(
+      within(expandedNavigation).getByRole('link', { name: 'Overview' })
+    ).not.toHaveAttribute('aria-current');
+    expect(
+      within(expandedNavigation).getByRole('link', { name: 'Ops' })
+    ).toHaveAttribute('aria-current', 'page');
+    expect(
+      expandedNavigation.querySelectorAll('[aria-current="page"]')
+    ).toHaveLength(1);
   });
 
   it('keeps five 44px bottom-bar targets within the 375px contract', () => {

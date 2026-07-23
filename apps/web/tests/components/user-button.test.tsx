@@ -639,7 +639,7 @@ describe('UserButton billing actions', () => {
     expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
   });
 
-  it('anchors a long identity left and exposes Help as a direct right-side action', async () => {
+  it('keeps a long identity legible and includes Help in menu keyboard traversal', async () => {
     const longDisplayName =
       'Adele Adkins and the Very Long International Touring Ensemble';
     mockUseUserSafe.mockReturnValue({
@@ -671,12 +671,12 @@ describe('UserButton billing actions', () => {
       'w-60',
       'max-w-[calc(100vw-1rem)]'
     );
-    expect(identityRow).toHaveClass('grid', 'grid-cols-[minmax(0,1fr)_auto]');
+    expect(identityRow).toHaveClass('min-h-12', 'w-full');
 
     const profileButton = within(identityRow).getByRole('button', {
       name: `Open profile for ${longDisplayName}`,
     });
-    expect(profileButton).toHaveClass('min-w-0');
+    expect(profileButton).toHaveClass('w-full', 'min-w-0');
     expect(within(profileButton).getByText(longDisplayName)).toHaveClass(
       'truncate'
     );
@@ -685,13 +685,15 @@ describe('UserButton billing actions', () => {
       longDisplayName
     );
 
-    const helpButton = within(identityRow).getByRole('button', {
+    const helpItem = screen.getByRole('menuitem', {
       name: 'Help',
     });
-    expect(helpButton).toHaveClass('shrink-0');
-    expect(helpButton).not.toHaveAttribute('aria-haspopup');
-
-    helpButton.focus();
+    await user.keyboard('{ArrowDown}');
+    expect(helpItem).toHaveFocus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: /Settings/u })).toHaveFocus();
+    await user.keyboard('{ArrowUp}');
+    expect(helpItem).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(openMock).toHaveBeenCalledWith(
       APP_ROUTES.SUPPORT,

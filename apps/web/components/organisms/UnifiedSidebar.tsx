@@ -53,7 +53,10 @@ import {
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
-import { OPERATOR_NAV_SECTIONS } from './operator-navigation';
+import {
+  isOperatorNavigationHrefActive,
+  OPERATOR_NAV_SECTIONS,
+} from './operator-navigation';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 
@@ -70,15 +73,18 @@ const VERSION_NOTIFICATION_DELAY_MS = 10_000;
 function SettingsNavGroup({
   items,
   pathname,
+  isItemActive,
 }: Readonly<{
   items: readonly NavItem[];
   pathname: string;
+  isItemActive?: (item: NavItem) => boolean;
 }>) {
   return (
     <SidebarMenu>
       {items.map(item => {
         const isActive =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
+          isItemActive?.(item) ??
+          (pathname === item.href || pathname.startsWith(`${item.href}/`));
         return (
           <ContextMenu key={item.id}>
             <ContextMenuTrigger asChild>
@@ -138,7 +144,13 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
           <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
             {section.label}
           </span>
-          <SettingsNavGroup items={section.items} pathname={pathname} />
+          <SettingsNavGroup
+            items={section.items}
+            pathname={pathname}
+            isItemActive={item =>
+              isOperatorNavigationHrefActive(pathname, item.href)
+            }
+          />
         </div>
       ))}
     </nav>

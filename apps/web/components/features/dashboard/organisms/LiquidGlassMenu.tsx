@@ -46,6 +46,10 @@ export interface LiquidGlassMenuProps {
   readonly onExpandedItemsVisible?: (
     items: readonly LiquidGlassMenuItem[]
   ) => void;
+  readonly isItemActive?: (
+    item: LiquidGlassMenuItem,
+    pathname: string
+  ) => boolean;
 }
 
 // ============================================================================
@@ -242,6 +246,7 @@ export function LiquidGlassMenu({
   className,
   onItemActivate,
   onExpandedItemsVisible,
+  isItemActive,
 }: LiquidGlassMenuProps): React.JSX.Element {
   const pathname = usePathname();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -283,9 +288,10 @@ export function LiquidGlassMenu({
     if (isExpanded) closeMenu();
   }, [closeMenu, isExpanded, pathname]);
 
-  const isActive = (href: string) => {
-    if (href === '/app') return pathname === href;
-    return pathname === href || pathname.startsWith(`${href}/`);
+  const isActive = (item: LiquidGlassMenuItem) => {
+    if (isItemActive) return isItemActive(item, pathname);
+    if (item.href === '/app') return pathname === item.href;
+    return pathname === item.href || pathname.startsWith(`${item.href}/`);
   };
 
   const allMenuItems = [...primaryItems, ...expandedItems];
@@ -331,7 +337,7 @@ export function LiquidGlassMenu({
                   <MenuItemLink
                     key={item.id}
                     item={item}
-                    active={isActive(item.href)}
+                    active={isActive(item)}
                     onActivate={inputMethod =>
                       onItemActivate?.(item, inputMethod)
                     }
@@ -345,7 +351,7 @@ export function LiquidGlassMenu({
                       <MenuItemLink
                         key={item.id}
                         item={item}
-                        active={isActive(item.href)}
+                        active={isActive(item)}
                         onActivate={inputMethod =>
                           onItemActivate?.(item, inputMethod)
                         }
@@ -365,7 +371,7 @@ export function LiquidGlassMenu({
                       <MenuItemLink
                         key={item.id}
                         item={item}
-                        active={isActive(item.href)}
+                        active={isActive(item)}
                         onActivate={inputMethod =>
                           onItemActivate?.(item, inputMethod)
                         }
@@ -414,7 +420,7 @@ export function LiquidGlassMenu({
           {/* Primary nav items with labels */}
           {primaryItems.slice(0, 4).map(item => {
             const Icon = item.icon;
-            const active = isActive(item.href);
+            const active = isActive(item);
 
             return (
               <Link

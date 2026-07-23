@@ -3,7 +3,10 @@
 import { useCallback } from 'react';
 import { LiquidGlassMenu } from '@/features/dashboard/organisms/LiquidGlassMenu';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { OPERATOR_NAV_ITEMS } from './operator-navigation';
+import {
+  isOperatorNavigationHrefActive,
+  OPERATOR_NAV_ITEMS,
+} from './operator-navigation';
 
 const PRIMARY_OPERATOR_ITEMS = OPERATOR_NAV_ITEMS.slice(0, 4);
 const EXPANDED_OPERATOR_ITEMS = OPERATOR_NAV_ITEMS.slice(4);
@@ -21,6 +24,9 @@ export function OperatorMobileNavigation(): React.JSX.Element {
       navigationLabel='OV Mobile Navigation'
       expandedNavigationLabel='OV Navigation Menu'
       onSignOut={handleSignOut}
+      isItemActive={(item, pathname) =>
+        isOperatorNavigationHrefActive(pathname, item.href)
+      }
       className='lg:hidden'
     />
   );

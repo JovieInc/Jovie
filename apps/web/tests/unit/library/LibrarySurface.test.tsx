@@ -422,6 +422,7 @@ describe('LibrarySurface', () => {
     // Filter rail exposes Approval Status as a first-class chip group (#10384).
     fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
     const rail = screen.getByTestId('library-filter-panel');
+    expect(screen.getByRole('group', { name: 'Library Filters' })).toBe(rail);
     expect(within(rail).getByText('Approval Status')).toBeInTheDocument();
     expect(within(rail).getByText('Release Status')).toBeInTheDocument();
     expect(

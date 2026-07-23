@@ -948,6 +948,7 @@ function LibraryFilterPanel({
         className
       )}
     >
+      <legend className='sr-only'>Library Filters</legend>
       <div className='min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <div className='pb-2'>
           <p className='system-b-library-rail-title pb-1 pt-2'>Smart Filters</p>

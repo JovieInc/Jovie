@@ -15,10 +15,19 @@ import {
 } from '@/contexts/ShellSidebarOverrideContext';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
-import {
-  mockUsePathname,
-  resetDashboardNavTestMocks,
-} from '@/tests/utils/dashboard-nav-test-support';
+import { resetDashboardNavTestMocks } from '@/tests/utils/dashboard-nav-test-support';
+
+const unifiedPathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => unifiedPathnameMock(),
+  useParams: () => ({}),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
+}));
 
 const electronRuntimeMock = vi.hoisted(() => ({
   isElectronRuntime: true,
@@ -109,7 +118,7 @@ function renderUnifiedSidebar({
   readonly pathname?: string;
   readonly section?: 'admin' | 'dashboard' | 'library' | 'ov' | 'settings';
 } = {}) {
-  mockUsePathname.mockReturnValue(pathname);
+  unifiedPathnameMock.mockReturnValue(pathname);
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -141,6 +150,8 @@ describe('UnifiedSidebar library route', () => {
     electronRuntimeMock.isElectronRuntime = true;
     signOutMock.mockReset();
     resetDashboardNavTestMocks();
+    unifiedPathnameMock.mockReset();
+    unifiedPathnameMock.mockReturnValue(APP_ROUTES.CHAT);
   });
 
   it('keeps the standard dashboard navigation on the library route', () => {
@@ -236,6 +247,26 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.getByRole('button', { name: 'Sign Out' })
     ).toBeInTheDocument();
+  });
+
+  it('marks only the nested operator destination current', () => {
+    renderUnifiedSidebar({
+      pathname: `${APP_ROUTES.ADMIN_OPS}/agents`,
+      section: 'ov',
+    });
+
+    const operatorNavigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    expect(
+      within(operatorNavigation).getByRole('link', { name: 'Overview' })
+    ).not.toHaveAttribute('aria-current');
+    expect(
+      within(operatorNavigation).getByRole('link', { name: 'Ops' })
+    ).toHaveAttribute('aria-current', 'page');
+    expect(
+      operatorNavigation.querySelectorAll('[aria-current="page"]')
+    ).toHaveLength(1);
   });
 
   it('keeps Jovie-mode admin routes on the same customer navigation contract', () => {

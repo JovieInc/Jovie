@@ -111,13 +111,13 @@ function buildDropdownItems({
       render: () => (
         <div
           data-testid='user-menu-identity-row'
-          className='grid min-h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-1'
+          className='min-h-12 w-full px-1'
         >
           <button
             type='button'
             onClick={handleProfile}
             aria-label={`Open profile for ${displayName}`}
-            className='flex min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left hover:bg-interactive-hover focus-visible:bg-interactive-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+            className='flex w-full min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left hover:bg-interactive-hover focus-visible:bg-interactive-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
           >
             <Avatar
               src={userImageUrl}
@@ -152,19 +152,15 @@ function buildDropdownItems({
               </p>
             </div>
           </button>
-          <Button
-            type='button'
-            variant='secondary'
-            size='sm'
-            onClick={handleHelp}
-            className='shrink-0 gap-1 px-2'
-            aria-label='Help'
-          >
-            <HelpCircle aria-hidden='true' className='h-3.5 w-3.5' />
-            <span>Help</span>
-          </Button>
         </div>
       ),
+    },
+    {
+      type: 'action',
+      id: 'help',
+      label: 'Help',
+      icon: HelpCircle,
+      onClick: handleHelp,
     },
     { type: 'separator', id: 'sep-1' },
     {

@@ -19,6 +19,7 @@ import {
   type AdminNavigationSection,
   type AdminWorkspaceId,
 } from '@/constants/admin-navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 
 const OPERATOR_ICON_BY_ID = {
@@ -70,3 +71,18 @@ export const OPERATOR_NAV_SECTIONS = [
     items: OPERATOR_NAV_ITEMS.filter(item => item.section === 'utilities'),
   },
 ] as const;
+
+/**
+ * The operator overview is the `/app/ov` index, so it must match exactly.
+ * Every other operator destination owns its nested routes.
+ */
+export function isOperatorNavigationHrefActive(
+  pathname: string,
+  href: string
+): boolean {
+  if (href === APP_ROUTES.OV) {
+    return pathname === href;
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
