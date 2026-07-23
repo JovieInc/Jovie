@@ -7,6 +7,7 @@ import {
 
 let _state: Record<string, unknown> = {
   activeTrackId: null,
+  sourceKind: null,
   isPlaying: false,
   playbackStatus: 'idle',
   lastErrorReason: null,
@@ -17,13 +18,14 @@ let _state: Record<string, unknown> = {
   artistName: null,
   artworkUrl: null,
 };
+const toggleTrack = vi.fn().mockResolvedValue(undefined);
 
 const { stop } = vi.hoisted(() => ({ stop: vi.fn() }));
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
     playbackState: _state,
-    toggleTrack: vi.fn(),
+    toggleTrack,
     seek: vi.fn(),
     stop,
     onError: vi.fn(() => () => undefined),
@@ -36,6 +38,7 @@ beforeEach(() => {
   resetAudioChromeSnapshot();
   _state = {
     activeTrackId: null,
+    sourceKind: null,
     isPlaying: false,
     playbackStatus: 'idle',
     lastErrorReason: null,
@@ -74,6 +77,25 @@ describe('SidebarBottomNowPlayingBridge', () => {
     expect(screen.getByText('Lost in the Light')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
     expect(screen.getByLabelText('Play')).toBeInTheDocument();
+  });
+
+  it('preserves typed source provenance when compact playback toggles', () => {
+    _state = {
+      ..._state,
+      activeTrackId: 'track-1',
+      sourceKind: 'release-preview',
+      trackTitle: 'Lost in the Light',
+      isPlaying: false,
+    };
+
+    render(<SidebarBottomNowPlayingBridge />);
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+
+    expect(toggleTrack).toHaveBeenCalledWith({
+      id: 'track-1',
+      sourceKind: 'release-preview',
+      title: 'Lost in the Light',
+    });
   });
 
   it('reserves the slot when the full player owns the active track', () => {
