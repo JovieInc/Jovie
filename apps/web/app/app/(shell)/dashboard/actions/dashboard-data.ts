@@ -773,6 +773,17 @@ async function fetchDashboardBaseWithSession(
 /**
  * Full dashboard data fetch. Calls the base fetch for user/profiles/settings,
  * then augments with slow supplementary queries (links, avatar, tipping).
+ *
+ * The supplementary reads tolerate failure and fall back to safe defaults, so
+ * each one runs in its OWN short transaction (JOV-4189): in Postgres any
+ * statement error aborts the surrounding transaction (25P02), and a tolerated
+ * failure on a shared transaction poisons every later statement — the next
+ * set_config('statement_timeout', ...) in dashboardQuery then surfaces as
+ * "Failed query: SELECT set_config('statement_timeout', $1, false)" and hides
+ * the real first error. Isolating each read confines the abort to that read's
+ * transaction (rolled back on close), preserves the fallback semantics, and
+ * lets the real error reach Sentry. RLS behavior is unchanged: each
+ * transaction applies the same transaction-local app.clerk_user_id.
  */
 async function fetchDashboardCoreWithSession(
   clerkUserId: string,
@@ -781,78 +792,84 @@ async function fetchDashboardCoreWithSession(
   }
 ): Promise<CoreData> {
   try {
-    return await withDbSessionTx(
-      async (tx, sessionUserId) => {
-        const base = await fetchDashboardBaseWithSession(tx, sessionUserId, {
+    const base = await withDbSessionTx(
+      async (tx, sessionUserId) =>
+        fetchDashboardBaseWithSession(tx, sessionUserId, {
           allowMissingUserProvisioning: options?.allowMissingUserProvisioning,
-        });
+        }),
+      { clerkUserId }
+    );
 
-        // If no profile resolved, return the base result (onboarding/error state)
-        if (!base.selectedProfile) {
-          return base;
-        }
+    // If no profile resolved, return the base result (onboarding/error state)
+    if (!base.selectedProfile) {
+      return base;
+    }
 
-        const selected = base.selectedProfile;
-        const userId = base.user?.id;
-        if (!userId) return base;
+    const selected = base.selectedProfile;
+    const userId = base.user?.id;
+    if (!userId) return base;
 
-        // Fetch supplementary data sequentially.
-        // These share a single transaction connection (pg serializes queries
-        // on one connection), so parallel dispatch would just queue them
-        // while starting all timeout timers simultaneously.
-        const linkCounts = await fetchSocialLinkExistence(tx, {
+    // Supplementary reads stay sequential — parallel dispatch would just
+    // queue on the pool while starting all timeout timers simultaneously —
+    // but each is isolated in its own transaction (see the docstring above).
+    const linkCounts = await withDbSessionTx(
+      async tx =>
+        fetchSocialLinkExistence(tx, {
           context: 'dashboard_data_settled',
           operation: 'social_links_existence',
           profileId: selected.id,
           queryLabel: 'Social links existence query',
           userId,
-        });
-
-        const avatarQuality = await getAvatarQualityForProfile(
-          selected.id,
-          tx
-        ).catch((error: unknown) => {
-          Sentry.captureException(error, {
-            level: 'warning',
-            tags: {
-              query: 'avatar_quality',
-              context: 'dashboard_data_settled',
-            },
-          });
-          return UNKNOWN_AVATAR_QUALITY;
-        });
-
-        const tippingStats = await fetchTippingStatsWithSession(
-          tx,
-          selected.id
-        );
-        const bioLinkActivation = await buildBioLinkActivation(tx, selected);
-
-        const hasMusicLinks = linkCounts.hasMusicLinks;
-
-        // base.user contains { id, email, activeProfileId } at runtime,
-        // but CoreData.user is typed as { id: string }. Cast to access email
-        // for profileCompletion without an extra DB query.
-        const userEmail =
-          (base.user as { id: string; email?: string | null } | null)?.email ??
-          null;
-
-        return {
-          ...base,
-          avatarQuality,
-          hasSocialLinks: linkCounts.hasLinks,
-          hasMusicLinks,
-          tippingStats,
-          profileCompletion: buildProfileCompletion(
-            selected,
-            userEmail,
-            hasMusicLinks
-          ),
-          bioLinkActivation,
-        };
-      },
+        }),
       { clerkUserId }
     );
+
+    const avatarQuality = await withDbSessionTx(
+      async tx => getAvatarQualityForProfile(selected.id, tx),
+      { clerkUserId }
+    ).catch((error: unknown) => {
+      Sentry.captureException(error, {
+        level: 'warning',
+        tags: {
+          query: 'avatar_quality',
+          context: 'dashboard_data_settled',
+        },
+      });
+      return UNKNOWN_AVATAR_QUALITY;
+    });
+
+    const tippingStats = await withDbSessionTx(
+      async tx => fetchTippingStatsWithSession(tx, selected.id),
+      { clerkUserId }
+    );
+
+    const bioLinkActivation = await withDbSessionTx(
+      async tx => buildBioLinkActivation(tx, selected),
+      { clerkUserId }
+    );
+
+    const hasMusicLinks = linkCounts.hasMusicLinks;
+
+    // base.user contains { id, email, activeProfileId } at runtime,
+    // but CoreData.user is typed as { id: string }. Cast to access email
+    // for profileCompletion without an extra DB query.
+    const userEmail =
+      (base.user as { id: string; email?: string | null } | null)?.email ??
+      null;
+
+    return {
+      ...base,
+      avatarQuality,
+      hasSocialLinks: linkCounts.hasLinks,
+      hasMusicLinks,
+      tippingStats,
+      profileCompletion: buildProfileCompletion(
+        selected,
+        userEmail,
+        hasMusicLinks
+      ),
+      bioLinkActivation,
+    };
   } catch (error) {
     if (canUseE2EDashboardFallback(clerkUserId)) {
       return createE2EDashboardCoreData(clerkUserId);

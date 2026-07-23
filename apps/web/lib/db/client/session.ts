@@ -54,7 +54,12 @@ export async function applyRlsSessionUser(
   } catch (error) {
     logDbError('applyRlsSessionUser_set_config_failed', error, { userId });
     await resetRlsSession(db);
-    await db.execute(drizzleSql`SET app.clerk_user_id = ${userId}`);
+    // PostgreSQL rejects bind parameters on SET (see setStatementTimeout in
+    // lib/db/query-timeout.ts), so the fallback must use parameterized
+    // set_config — `SET app.clerk_user_id = $1` is a syntax error (JOV-4241).
+    await db.execute(
+      drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`
+    );
   }
 }
 
