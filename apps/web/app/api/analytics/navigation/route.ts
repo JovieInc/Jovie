@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
 import {
   getNavigationTelemetryBaseline,
+  NavigationTelemetryPrivacyUnavailableError,
   NavigationTelemetryStoreUnavailableError,
   recordNavigationTelemetryBatch,
 } from '@/lib/analytics/navigation-telemetry.server';
@@ -64,11 +65,15 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   try {
     // Authentication is an abuse boundary and a contribution cap only. The
-    // sink stores a rotating daily hash, never the account identity.
+    // sink stores a keyed rotating lifecycle hash and non-enumerable
+    // cardinality sketch, never the account identity.
     await recordNavigationTelemetryBatch(events, { contributorId: userId });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    if (error instanceof NavigationTelemetryStoreUnavailableError) {
+    if (
+      error instanceof NavigationTelemetryStoreUnavailableError ||
+      error instanceof NavigationTelemetryPrivacyUnavailableError
+    ) {
       return unavailableResponse();
     }
     await captureError('Navigation telemetry aggregate write failed', error, {
@@ -89,7 +94,12 @@ export async function GET(): Promise<NextResponse> {
       headers: { 'Cache-Control': 'private, no-store' },
     });
   } catch (error) {
-    if (!(error instanceof NavigationTelemetryStoreUnavailableError)) {
+    if (
+      !(
+        error instanceof NavigationTelemetryStoreUnavailableError ||
+        error instanceof NavigationTelemetryPrivacyUnavailableError
+      )
+    ) {
       await captureError('Navigation telemetry baseline read failed', error, {
         route: ROUTE,
         method: 'GET',

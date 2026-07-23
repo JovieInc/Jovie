@@ -184,6 +184,11 @@ export function assertValidPerfRouteDefinition(route: PerfRouteDefinition) {
   }
 
   if (route.measureMode === 'warm-navigation') {
+    if (!route.readySelectors.content?.length) {
+      throw new TypeError(
+        `Warm-navigation route "${route.id}" must define destination-specific content readiness.`
+      );
+    }
     if (!route.readySelectors.navTrigger?.length) {
       throw new TypeError(
         `Warm-navigation route "${route.id}" must define at least one navTrigger selector.`
@@ -1046,7 +1051,10 @@ const CREATOR_SHELL_ROUTES = [
         `a[href^="${APP_ROUTES.DASHBOARD}?"]`,
       ],
     },
-    timings: [{ metric: 'warm-shell-response', budget: 100 }],
+    timings: [
+      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'skeleton-to-content', budget: 750 },
+    ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
     priority: 2,
     seedProfile: 'active-user',
@@ -1285,7 +1293,10 @@ const CREATOR_SHELL_ROUTES = [
         `a[href^="${APP_ROUTES.CONTACTS}?"]`,
       ],
     },
-    timings: [{ metric: 'warm-shell-response', budget: 100 }],
+    timings: [
+      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'skeleton-to-content', budget: 1000 },
+    ],
     resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,
     priority: 12,
     seedProfile: 'active-user',
@@ -1342,7 +1353,10 @@ const CREATOR_SHELL_ROUTES = [
         `a[href^="${APP_ROUTES.TASKS}?"]`,
       ],
     },
-    timings: [{ metric: 'warm-shell-response', budget: 100 }],
+    timings: [
+      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'skeleton-to-content', budget: 1000 },
+    ],
     resourceSizes: RELEASES_RESOURCE_BUDGETS,
     priority: 14,
     seedProfile: 'active-user',

@@ -26,12 +26,16 @@ vi.mock('@/lib/rate-limit', () => ({
   createRateLimitHeaders: mockCreateRateLimitHeaders,
 }));
 vi.mock('@/lib/analytics/navigation-telemetry.server', () => ({
+  NavigationTelemetryPrivacyUnavailableError: class extends Error {},
   NavigationTelemetryStoreUnavailableError: class extends Error {},
   recordNavigationTelemetryBatch: mockRecord,
   getNavigationTelemetryBaseline: mockGetBaseline,
 }));
 
-import { NavigationTelemetryStoreUnavailableError } from '@/lib/analytics/navigation-telemetry.server';
+import {
+  NavigationTelemetryPrivacyUnavailableError,
+  NavigationTelemetryStoreUnavailableError,
+} from '@/lib/analytics/navigation-telemetry.server';
 import { GET, POST } from './route';
 
 const VALID_PAYLOAD = {
@@ -212,6 +216,16 @@ describe('/api/analytics/navigation', () => {
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
+  it('fails closed without error capture when the keyed privacy state is unavailable', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'discarded-auth-id' });
+    mockRecord.mockRejectedValue(
+      new NavigationTelemetryPrivacyUnavailableError()
+    );
+
+    expect((await POST(post(VALID_PAYLOAD))).status).toBe(503);
+    expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
   it('captures unexpected write failures without payload or identity context', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'discarded-auth-id' });
     const failure = new Error('aggregate failure');
@@ -258,5 +272,15 @@ describe('/api/analytics/navigation', () => {
       failure,
       { route: '/api/analytics/navigation', method: 'GET' }
     );
+  });
+
+  it('fails baseline publication closed when contributor privacy state is unavailable', async () => {
+    mockRequireAdmin.mockResolvedValue(null);
+    mockGetBaseline.mockRejectedValue(
+      new NavigationTelemetryPrivacyUnavailableError()
+    );
+
+    expect((await GET()).status).toBe(503);
+    expect(mockCaptureError).not.toHaveBeenCalled();
   });
 });

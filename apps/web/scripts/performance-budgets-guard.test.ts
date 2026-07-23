@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const playwrightMocks = vi.hoisted(() => ({
@@ -16,7 +17,9 @@ import {
   parseGuardCliArgs,
   runPerformanceBudgetsGuard,
   selectGuardRoutes,
+  waitForWarmDestinationReady,
 } from './performance-budgets-guard';
+import type { PerfRouteDefinition } from './performance-route-manifest';
 
 describe('performance budgets guard', () => {
   beforeEach(() => {
@@ -93,5 +96,35 @@ describe('performance budgets guard', () => {
 
     expect(playwrightMocks.chromiumLaunch).toHaveBeenCalledOnce();
     expect(playwrightMocks.browserClose).toHaveBeenCalledOnce();
+  });
+
+  it('does not pass a stalled warm destination from a persistent source shell', async () => {
+    const queriedSelectors: string[] = [];
+    const route = {
+      id: 'stalled-destination',
+      readySelectors: {
+        shell: ['[data-testid="persistent-shell"]'],
+        content: ['[data-testid="destination-content"]'],
+      },
+    } as PerfRouteDefinition;
+    const page = {
+      locator: vi.fn((selector: string) => {
+        queriedSelectors.push(selector);
+        return {
+          count: vi.fn().mockResolvedValue(1),
+          nth: vi.fn(() => ({
+            isVisible: vi.fn().mockResolvedValue(false),
+          })),
+        };
+      }),
+      waitForTimeout: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Page;
+
+    await expect(
+      waitForWarmDestinationReady(page, route, Date.now(), false, 10)
+    ).rejects.toThrow('destination-content');
+
+    expect(queriedSelectors).toContain('[data-testid="destination-content"]');
+    expect(queriedSelectors).not.toContain('[data-testid="persistent-shell"]');
   });
 });

@@ -1,12 +1,15 @@
 import 'server-only';
 
+import { env } from '@/lib/env-server';
 import { getRedis } from '@/lib/redis';
 import {
   NAVIGATION_ITEM_IDS,
   NAVIGATION_LATENCY_BUCKETS,
+  NAVIGATION_PLATFORMS,
   NAVIGATION_TELEMETRY_MAX_BATCH_SIZE,
   NAVIGATION_TELEMETRY_OWNER,
   NAVIGATION_TELEMETRY_SCHEMA_VERSION,
+  NAVIGATION_VARIANTS,
   type NavigationItemId,
   type NavigationLatencyBucket,
   type NavigationPlatform,
@@ -20,6 +23,11 @@ export const NAVIGATION_TELEMETRY_BASELINE_DAYS = 30;
 export const NAVIGATION_TELEMETRY_MINIMUM_SAMPLE = 50;
 export const NAVIGATION_TELEMETRY_RETENTION_DAYS = 35;
 export const NAVIGATION_TELEMETRY_DEDUP_TTL_SECONDS = 24 * 60 * 60;
+/**
+ * Redis HyperLogLog is deliberately non-enumerable but approximate. Requiring
+ * two estimates beyond k=50 makes estimation error fail toward suppression.
+ */
+export const NAVIGATION_TELEMETRY_CARDINALITY_SAFETY_MARGIN = 2;
 
 const KEY_PREFIX = `navigation-telemetry:v${NAVIGATION_TELEMETRY_SCHEMA_VERSION}`;
 const RETENTION_SECONDS = NAVIGATION_TELEMETRY_RETENTION_DAYS * 24 * 60 * 60;
@@ -37,26 +45,62 @@ const RECORD_NAVIGATION_TELEMETRY_BATCH_SCRIPT = `
 local results = {}
 local eventIndex = 0
 
-for keyIndex = 2, #KEYS, 2 do
-  local argumentIndex = 4 + (eventIndex * 3)
+for keyIndex = 2, #KEYS, 4 do
+  local argumentIndex = 4 + (eventIndex * 5)
   local dedupeKey = KEYS[keyIndex]
-  local contributionKey = KEYS[keyIndex + 1]
+  local lifecycleKey = KEYS[keyIndex + 1]
+  local segmentContributorsKey = KEYS[keyIndex + 2]
+  local itemContributorsKey = KEYS[keyIndex + 3]
   local aggregateField = ARGV[argumentIndex]
   local unknownItem = ARGV[argumentIndex + 1]
-  local contributionCapped = ARGV[argumentIndex + 2] == '1'
+  local eventName = ARGV[argumentIndex + 2]
+  local contributionCapped = ARGV[argumentIndex + 3] == '1'
+  local windowContributor = ARGV[argumentIndex + 4]
   local duplicate = redis.call('EXISTS', dedupeKey) == 1
-  local contributionAlreadyCounted =
-    contributionCapped and redis.call('EXISTS', contributionKey) == 1
+  local lifecycleAllowed = true
+
+  if contributionCapped and not duplicate then
+    local impression = redis.call('HGET', lifecycleKey, 'impression')
+    local activation = redis.call('HGET', lifecycleKey, 'activation')
+    local outcome = redis.call('HGET', lifecycleKey, 'outcome')
+    local shortReturn = redis.call('HGET', lifecycleKey, 'short_return')
+
+    if eventName == 'impression' then
+      lifecycleAllowed = impression == false
+    elseif eventName == 'activation' then
+      lifecycleAllowed = impression == '1' and activation == false
+    elseif eventName == 'destination_ready' or eventName == 'drop_off' then
+      lifecycleAllowed = activation == '1' and outcome == false
+    elseif eventName == 'short_return' then
+      lifecycleAllowed =
+        outcome == 'destination_ready' and shortReturn == false
+    else
+      lifecycleAllowed = false
+    end
+  end
 
   redis.call('HINCRBY', KEYS[1], '${HEALTH_ATTEMPTS_FIELD}', 1)
 
-  if duplicate or contributionAlreadyCounted then
+  if duplicate or not lifecycleAllowed then
     redis.call('HINCRBY', KEYS[1], '${HEALTH_DUPLICATES_FIELD}', 1)
     results[#results + 1] = 0
   else
     redis.call('SET', dedupeKey, '1', 'EX', ARGV[1])
     if contributionCapped then
-      redis.call('SET', contributionKey, '1', 'EX', ARGV[3])
+      if eventName == 'impression' then
+        redis.call('HSET', lifecycleKey, 'impression', '1')
+        redis.call('PFADD', segmentContributorsKey, windowContributor)
+        redis.call('PFADD', itemContributorsKey, windowContributor)
+        redis.call('EXPIRE', segmentContributorsKey, ARGV[2])
+        redis.call('EXPIRE', itemContributorsKey, ARGV[2])
+      elseif eventName == 'activation' then
+        redis.call('HSET', lifecycleKey, 'activation', '1')
+      elseif eventName == 'destination_ready' or eventName == 'drop_off' then
+        redis.call('HSET', lifecycleKey, 'outcome', eventName)
+      elseif eventName == 'short_return' then
+        redis.call('HSET', lifecycleKey, 'short_return', '1')
+      end
+      redis.call('EXPIRE', lifecycleKey, ARGV[3])
     end
     redis.call('HINCRBY', KEYS[1], aggregateField, 1)
     redis.call('HINCRBY', KEYS[1], '${HEALTH_ACCEPTED_FIELD}', 1)
@@ -77,6 +121,13 @@ export class NavigationTelemetryStoreUnavailableError extends Error {
   constructor() {
     super('Navigation telemetry aggregate store is unavailable');
     this.name = 'NavigationTelemetryStoreUnavailableError';
+  }
+}
+
+export class NavigationTelemetryPrivacyUnavailableError extends Error {
+  constructor() {
+    super('Navigation telemetry privacy key is unavailable');
+    this.name = 'NavigationTelemetryPrivacyUnavailableError';
   }
 }
 
@@ -184,6 +235,11 @@ interface MutableSegment {
   readonly items: Map<NavigationItemId, MutableItemBaseline>;
 }
 
+interface ContributorCounts {
+  readonly segments: ReadonlyMap<string, number>;
+  readonly items: ReadonlyMap<string, number>;
+}
+
 function utcDay(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -203,13 +259,80 @@ async function hashEventId(eventId: string): Promise<string> {
     .slice(0, 24);
 }
 
-async function hashContributorId(
+async function keyedContributorDigest(input: string): Promise<string> {
+  const secret = env.SESSION_SECRET?.trim();
+  if (!secret || secret.length < 32) {
+    throw new NavigationTelemetryPrivacyUnavailableError();
+  }
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { hash: 'SHA-256', name: 'HMAC' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    new TextEncoder().encode(input)
+  );
+  return Array.from(new Uint8Array(signature))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 24);
+}
+
+async function hashDailyContributorId(
   contributorId: string,
   recordedAt: Date
 ): Promise<string> {
-  return hashEventId(
-    `${NAVIGATION_TELEMETRY_SCHEMA_VERSION}:${utcDay(recordedAt)}:${contributorId}`
+  return keyedContributorDigest(
+    `navigation-telemetry:daily:v${NAVIGATION_TELEMETRY_SCHEMA_VERSION}:${utcDay(recordedAt)}:${contributorId}`
   );
+}
+
+async function hashWindowContributorId(contributorId: string): Promise<string> {
+  return keyedContributorDigest(
+    `navigation-telemetry:window:v${NAVIGATION_TELEMETRY_SCHEMA_VERSION}:${contributorId}`
+  );
+}
+
+function segmentContributorKey(input: {
+  readonly date: Date;
+  readonly navVariant: NavigationVariant;
+  readonly platform: NavigationPlatform;
+}): string {
+  return `${KEY_PREFIX}:contributors:${utcDay(input.date)}:${input.navVariant}:${input.platform}`;
+}
+
+function itemContributorKey(input: {
+  readonly date: Date;
+  readonly navVariant: NavigationVariant;
+  readonly platform: NavigationPlatform;
+  readonly itemId: NavigationItemId;
+}): string {
+  return `${segmentContributorKey(input)}:${input.itemId}`;
+}
+
+function segmentCountKey(
+  navVariant: NavigationVariant,
+  platform: NavigationPlatform
+): string {
+  return `${navVariant}|${platform}`;
+}
+
+function itemCountKey(
+  navVariant: NavigationVariant,
+  platform: NavigationPlatform,
+  itemId: NavigationItemId
+): string {
+  return `${segmentCountKey(navVariant, platform)}|${itemId}`;
+}
+
+function requireNonEmptyKeys(keys: readonly string[]): [string, ...string[]] {
+  const [first, ...rest] = keys;
+  if (!first) throw new NavigationTelemetryPrivacyUnavailableError();
+  return [first, ...rest];
 }
 
 function aggregateField(payload: NavigationTelemetryPayload): string {
@@ -228,13 +351,8 @@ function aggregateField(payload: NavigationTelemetryPayload): string {
   ].join('|');
 }
 
-function contributionField(payload: NavigationTelemetryPayload): string {
-  return [
-    payload.nav_variant,
-    payload.platform,
-    payload.item_id,
-    payload.event,
-  ].join('|');
+function lifecycleField(payload: NavigationTelemetryPayload): string {
+  return [payload.nav_variant, payload.platform, payload.item_id].join('|');
 }
 
 function assertPipelineSucceeded(results: unknown[]): void {
@@ -248,9 +366,11 @@ function assertPipelineSucceeded(results: unknown[]): void {
  */
 export async function recordNavigationTelemetry(
   payload: NavigationTelemetryPayload,
+  contributorId: string,
   recordedAt = new Date()
 ): Promise<NavigationTelemetryRecordResult> {
   const result = await recordNavigationTelemetryBatch([payload], {
+    contributorId,
     recordedAt,
   });
   const first = result.results[0];
@@ -260,16 +380,17 @@ export async function recordNavigationTelemetry(
 }
 
 /**
- * Records a bounded request in one Redis script. Impression contribution keys
- * cap one authenticated account to one item/segment contribution per UTC day,
- * so a single account cannot cross the 30-day k=50 publication threshold.
+ * Records a bounded request in one Redis script. Daily keyed lifecycle state
+ * enforces impression -> activation -> one terminal outcome -> short return,
+ * while non-enumerable daily HyperLogLogs retain only a keyed contributor
+ * digest for 30-day distinct-contributor suppression.
  */
 export async function recordNavigationTelemetryBatch(
   payloads: readonly NavigationTelemetryPayload[],
   options: {
     readonly recordedAt?: Date;
-    readonly contributorId?: string;
-  } = {}
+    readonly contributorId: string;
+  }
 ): Promise<NavigationTelemetryBatchRecordResult> {
   const redis = getRedis();
   if (!redis) throw new NavigationTelemetryStoreUnavailableError();
@@ -281,9 +402,10 @@ export async function recordNavigationTelemetryBatch(
 
   const recordedAt = options.recordedAt ?? new Date();
   const key = dailyKey(recordedAt);
-  const contributorHash = options.contributorId
-    ? await hashContributorId(options.contributorId, recordedAt)
-    : null;
+  const [dailyContributorHash, windowContributorHash] = await Promise.all([
+    hashDailyContributorId(options.contributorId, recordedAt),
+    hashWindowContributorId(options.contributorId),
+  ]);
   const eventHashes = await Promise.all(
     payloads.map(payload => hashEventId(payload.event_id))
   );
@@ -296,16 +418,25 @@ export async function recordNavigationTelemetryBatch(
 
   payloads.forEach((payload, index) => {
     const dedupeKey = `${KEY_PREFIX}:dedupe:${eventHashes[index]}`;
-    const shouldCapContribution =
-      payload.event === 'impression' && contributorHash !== null;
-    const contributionKey = shouldCapContribution
-      ? `${KEY_PREFIX}:contribution:${contributorHash}:${contributionField(payload)}`
-      : `${dedupeKey}:uncapped`;
-    keys.push(dedupeKey, contributionKey);
+    const lifecycleKey = `${KEY_PREFIX}:lifecycle:${utcDay(recordedAt)}:${dailyContributorHash}:${lifecycleField(payload)}`;
+    const segmentHllKey = segmentContributorKey({
+      date: recordedAt,
+      navVariant: payload.nav_variant,
+      platform: payload.platform,
+    });
+    const itemHllKey = itemContributorKey({
+      date: recordedAt,
+      navVariant: payload.nav_variant,
+      platform: payload.platform,
+      itemId: payload.item_id,
+    });
+    keys.push(dedupeKey, lifecycleKey, segmentHllKey, itemHllKey);
     args.push(
       aggregateField(payload),
       payload.item_id === 'unknown' ? '1' : '0',
-      shouldCapContribution ? '1' : '0'
+      payload.event,
+      '1',
+      windowContributorHash
     );
   });
 
@@ -379,7 +510,9 @@ function parseAggregateField(
 }
 
 function ratio(numerator: number, denominator: number): number {
-  return denominator > 0 ? numerator / denominator : 0;
+  return denominator > 0
+    ? Math.min(1, Math.max(0, numerator / denominator))
+    : 0;
 }
 
 function quantileBucket(
@@ -460,7 +593,8 @@ function applyRecord(segment: MutableSegment, record: AggregateRecord): void {
 }
 
 function publishItems(
-  segment: MutableSegment
+  segment: MutableSegment,
+  contributorCounts: ContributorCounts
 ): Record<NavigationItemId, SuppressedItemBaseline | PublishedItemBaseline> {
   return Object.fromEntries(
     NAVIGATION_ITEM_IDS.map(itemId => {
@@ -469,7 +603,15 @@ function publishItems(
         activations: 0,
         destinationReady: 0,
       };
-      if (item.impressions < NAVIGATION_TELEMETRY_MINIMUM_SAMPLE) {
+      const distinctContributors =
+        contributorCounts.items.get(
+          itemCountKey(segment.navVariant, segment.platform, itemId)
+        ) ?? 0;
+      if (
+        distinctContributors <
+        NAVIGATION_TELEMETRY_MINIMUM_SAMPLE +
+          NAVIGATION_TELEMETRY_CARDINALITY_SAFETY_MARGIN
+      ) {
         return [
           itemId,
           {
@@ -493,8 +635,19 @@ function publishItems(
   ) as Record<NavigationItemId, SuppressedItemBaseline | PublishedItemBaseline>;
 }
 
-function publishSegment(segment: MutableSegment): NavigationBaselineSegment {
-  if (segment.denominator < NAVIGATION_TELEMETRY_MINIMUM_SAMPLE) {
+function publishSegment(
+  segment: MutableSegment,
+  contributorCounts: ContributorCounts
+): NavigationBaselineSegment {
+  const distinctContributors =
+    contributorCounts.segments.get(
+      segmentCountKey(segment.navVariant, segment.platform)
+    ) ?? 0;
+  if (
+    distinctContributors <
+    NAVIGATION_TELEMETRY_MINIMUM_SAMPLE +
+      NAVIGATION_TELEMETRY_CARDINALITY_SAFETY_MARGIN
+  ) {
     return {
       navVariant: segment.navVariant,
       platform: segment.platform,
@@ -531,12 +684,13 @@ function publishSegment(segment: MutableSegment): NavigationBaselineSegment {
     activationToReadyP95UpperBoundMs: p95
       ? navigationLatencyBucketUpperBoundMs(p95)
       : null,
-    items: publishItems(segment),
+    items: publishItems(segment, contributorCounts),
   };
 }
 
 function readDailyHashes(input: {
   readonly hashes: readonly (Readonly<Record<string, unknown>> | null)[];
+  readonly contributorCounts: ContributorCounts;
   readonly startDate: string;
   readonly endDate: string;
 }): NavigationTelemetryBaseline {
@@ -568,12 +722,8 @@ function readDailyHashes(input: {
         `${right.navVariant}|${right.platform}`
       )
     )
-    .map(publishSegment);
-  const totalDenominator = [...segments.values()].reduce(
-    (sum, segment) => sum + segment.denominator,
-    0
-  );
-  const published = totalDenominator >= NAVIGATION_TELEMETRY_MINIMUM_SAMPLE;
+    .map(segment => publishSegment(segment, input.contributorCounts));
+  const published = publishedSegments.some(segment => !segment.suppressed);
 
   return {
     schemaVersion: NAVIGATION_TELEMETRY_SCHEMA_VERSION,
@@ -593,6 +743,42 @@ function readDailyHashes(input: {
       : null,
     segments: publishedSegments,
   };
+}
+
+function parseContributorEstimate(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new NavigationTelemetryPrivacyUnavailableError();
+  }
+  return parsed;
+}
+
+function readContributorCounts(results: readonly unknown[]): ContributorCounts {
+  const segments = new Map<string, number>();
+  const items = new Map<string, number>();
+  let index = 0;
+
+  for (const navVariant of NAVIGATION_VARIANTS) {
+    for (const platform of NAVIGATION_PLATFORMS) {
+      segments.set(
+        segmentCountKey(navVariant, platform),
+        parseContributorEstimate(results[index])
+      );
+      index += 1;
+      for (const itemId of NAVIGATION_ITEM_IDS) {
+        items.set(
+          itemCountKey(navVariant, platform, itemId),
+          parseContributorEstimate(results[index])
+        );
+        index += 1;
+      }
+    }
+  }
+
+  if (index !== results.length) {
+    throw new NavigationTelemetryPrivacyUnavailableError();
+  }
+  return { items, segments };
 }
 
 export async function getNavigationTelemetryBaseline(
@@ -616,12 +802,37 @@ export async function getNavigationTelemetryBaseline(
   const results = await pipeline.exec();
   assertPipelineSucceeded(results);
 
+  const cardinalityPipeline = redis.pipeline();
+  for (const navVariant of NAVIGATION_VARIANTS) {
+    for (const platform of NAVIGATION_PLATFORMS) {
+      cardinalityPipeline.pfcount(
+        ...requireNonEmptyKeys(
+          dates.map(date =>
+            segmentContributorKey({ date, navVariant, platform })
+          )
+        )
+      );
+      for (const itemId of NAVIGATION_ITEM_IDS) {
+        cardinalityPipeline.pfcount(
+          ...requireNonEmptyKeys(
+            dates.map(date =>
+              itemContributorKey({ date, itemId, navVariant, platform })
+            )
+          )
+        );
+      }
+    }
+  }
+  const cardinalityResults = await cardinalityPipeline.exec();
+  assertPipelineSucceeded(cardinalityResults);
+
   return readDailyHashes({
     hashes: results.map(result =>
       result && typeof result === 'object' && !(result instanceof Error)
         ? (result as Readonly<Record<string, unknown>>)
         : null
     ),
+    contributorCounts: readContributorCounts(cardinalityResults),
     startDate: utcDay(dates[0] ?? end),
     endDate: utcDay(dates.at(-1) ?? end),
   });

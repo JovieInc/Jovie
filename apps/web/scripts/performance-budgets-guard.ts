@@ -554,43 +554,49 @@ async function waitForContentReady(
   page: Page,
   route: PerfRouteDefinition,
   startedAt: number,
-  usePageWarmStart = false
+  usePageWarmStart = false,
+  timeoutMs = READY_TIMEOUT_MS
 ) {
   const loadingSelectors = route.readySelectors.loading;
-  const contentSelectors =
-    route.readySelectors.content ?? route.readySelectors.shell;
+  const contentSelectors = route.readySelectors.content;
 
   if (loadingSelectors?.length) {
-    await waitForAnyVisible(page, [
-      ...loadingSelectors,
-      ...(contentSelectors ?? []),
-    ]).catch(() => null);
-    await waitForAllHidden(page, loadingSelectors).catch(() => undefined);
+    await waitForAnyVisible(
+      page,
+      [...loadingSelectors, ...(contentSelectors ?? [])],
+      timeoutMs
+    ).catch(() => null);
+    await waitForAllHidden(page, loadingSelectors, timeoutMs).catch(
+      () => undefined
+    );
   }
 
-  await waitForAnyVisible(page, contentSelectors);
+  await waitForAnyVisible(page, contentSelectors, timeoutMs);
   if (usePageWarmStart) {
     return await readWarmNavigationElapsed(page);
   }
   return Date.now() - startedAt;
 }
 
-async function waitForWarmShellReady(
+/**
+ * Warm navigation is ready only when destination-owned content is usable.
+ * Persistent source-shell and loading selectors are deliberately insufficient:
+ * they can remain visible while the destination is stalled or broken.
+ */
+export async function waitForWarmDestinationReady(
   page: Page,
   route: PerfRouteDefinition,
   startedAt: number,
-  usePageWarmStart = false
+  usePageWarmStart = false,
+  timeoutMs = READY_TIMEOUT_MS
 ) {
-  const selectors = [
-    ...(route.readySelectors.loading ?? []),
-    ...(route.readySelectors.content ?? []),
-    ...(route.readySelectors.shell ?? []),
-  ];
-  await waitForAnyVisible(page, selectors.length > 0 ? selectors : undefined);
-  if (usePageWarmStart) {
-    return await readWarmNavigationElapsed(page);
-  }
-  return Date.now() - startedAt;
+  return waitForContentReady(
+    page,
+    route,
+    startedAt,
+    usePageWarmStart,
+    timeoutMs
+  );
 }
 
 async function armWarmNavigationStart(locator: Locator) {
@@ -681,7 +687,7 @@ async function measureWarmNavigationRoute(
   await visibleTrigger.click({ noWaitAfter: true });
 
   await routeReadyPromise;
-  const warmShellResponse = await waitForWarmShellReady(
+  const warmShellResponse = await waitForWarmDestinationReady(
     page,
     route,
     startedAt,

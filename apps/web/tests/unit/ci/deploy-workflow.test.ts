@@ -887,17 +887,14 @@ describe('deploy workflow Vercel env resolution', () => {
     );
   });
 
-  it('migrates the production database fail closed before staging under the exact-main lease', () => {
+  it('migrates production only after exact staging proof and a current-head authorization', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
     const controllerHeader = controller.slice(0, controller.indexOf('\njobs:'));
     const migrationJob = getJobBlock(workflow, 'migrate-production');
     const stagingJob = getJobBlock(workflow, 'deploy-staging');
+    const promotionJob = getJobBlock(workflow, 'promote-production');
     const resultJob = getJobBlock(workflow, 'release-result');
-    const headStep = getStepBlock(
-      migrationJob,
-      'Recheck main immediately before production DB mutation'
-    );
     const credentialStep = getStepBlock(
       migrationJob,
       'Require production migration credential'
@@ -914,52 +911,52 @@ describe('deploy workflow Vercel env resolution', () => {
       migrationJob,
       'DB verify (production schema check)'
     );
-    const postMigrationHead = getStepBlock(
-      migrationJob,
-      'Recheck main after production DB migration'
-    );
     const migrationIndex = workflow.indexOf('\n  migrate-production:');
     const stagingIndex = workflow.indexOf('\n  deploy-staging:');
+    const productionHeadIndex = workflow.indexOf('\n  production-head:');
 
     expect(controllerHeader).toContain('group: production-mutation');
     expect(controllerHeader).toContain('queue: max');
     expect(controllerHeader).toContain('cancel-in-progress: false');
-    expect(migrationJob).toContain('needs: [release-head]');
+    for (const prerequisite of [
+      'deploy-staging',
+      'attest-staging-build',
+      'canary-health-gate',
+      'alias-staging',
+      'production-head',
+    ]) {
+      expect(migrationJob).toContain(prerequisite);
+      expect(migrationJob).toContain(
+        `needs.${prerequisite}.result == 'success'`
+      );
+    }
     expect(migrationJob).toContain(
-      "needs.release-head.outputs.is_current == 'true'"
+      "needs.production-head.outputs.is_current == 'true'"
     );
     expect(migrationJob).toContain('ref: ${{ inputs.expected_sha }}');
-    expect(migrationJob).toContain(
-      'is_current: ${{ steps.post-migration-head.outputs.is_current || steps.migration-head.outputs.is_current }}'
-    );
+    expect(migrationJob).not.toContain('/commits/main');
+    expect(migrationJob).not.toContain('migration-head');
+    expect(migrationJob).not.toContain('post-migration-head');
+    expect(migrationJob).not.toContain('is_current:');
     expect(credentialStep).toContain(
       'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}'
     );
     expect(credentialStep).toContain('if [ -z "${DOPPLER_TOKEN:-}" ]');
     expect(credentialStep).toContain('exit 1');
     expect(credentialStep).not.toContain('continue-on-error');
-    expect(headStep).toContain('EXPECTED_SHA: ${{ inputs.expected_sha }}');
-    expect(headStep).toContain('/commits/main');
-    expect(headStep).toContain('[ "$current_sha" = "$EXPECTED_SHA" ]');
-    expect(postMigrationHead).toContain(
-      'EXPECTED_SHA: ${{ inputs.expected_sha }}'
-    );
-    expect(postMigrationHead).toContain('/commits/main');
     expect(migrationIndex).toBeGreaterThanOrEqual(0);
-    expect(stagingIndex).toBeGreaterThan(migrationIndex);
-    expect(stagingJob).toContain('needs: [release-head, migrate-production]');
-    expect(stagingJob).toContain(
+    expect(migrationIndex).toBeGreaterThan(stagingIndex);
+    expect(migrationIndex).toBeGreaterThan(productionHeadIndex);
+    expect(stagingJob).toContain('needs: [release-head]');
+    expect(stagingJob).not.toContain('migrate-production');
+    expect(promotionJob).toContain('migrate-production');
+    expect(promotionJob).toContain(
       "needs.migrate-production.result == 'success'"
-    );
-    expect(stagingJob).toContain(
-      "needs.migrate-production.outputs.is_current == 'true'"
     );
 
     for (const step of [preflightStep, migrateStep, verifyStep]) {
       expect(step).toContain('DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}');
-      expect(step).toContain(
-        "if: ${{ steps.migration-head.outputs.is_current == 'true' }}"
-      );
+      expect(step).not.toContain('if:');
       expect(step).toContain('doppler run --project jovie-web --config prd');
       expect(step).toContain('--only-secrets=DATABASE_URL --no-fallback --');
       expect(step).toContain('env -u DOPPLER_TOKEN');
@@ -979,8 +976,96 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(resultJob).toContain(
       'migrate-production:${{ needs.migrate-production.result }}'
     );
-    expect(resultJob).toContain(
-      'Superseded during production DB migration; neutral.'
+    expect(resultJob).not.toContain(
+      'Superseded during production DB migration'
+    );
+
+    const canMigrate = (gates: {
+      alias: boolean;
+      attested: boolean;
+      canary: boolean;
+      current: boolean;
+      deployed: boolean;
+    }) => Object.values(gates).every(Boolean);
+    const authorized = {
+      alias: true,
+      attested: true,
+      canary: true,
+      current: true,
+      deployed: true,
+    };
+
+    expect(canMigrate(authorized)).toBe(true);
+    for (const gate of Object.keys(authorized) as Array<
+      keyof typeof authorized
+    >) {
+      expect(canMigrate({ ...authorized, [gate]: false }), gate).toBe(false);
+    }
+  });
+
+  it('blocks production promotion on the exact-build canonical six-route browser budget', () => {
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const promotionJob = getJobBlock(workflow, 'promote-production');
+    const setupStep = getStepBlock(
+      promotionJob,
+      'Setup Playwright for exact-build performance gate'
+    );
+    const performanceStep = getStepBlock(
+      promotionJob,
+      'Prove canonical navigation budgets on exact staged build'
+    );
+    const finalCurrentStep = getStepBlock(
+      promotionJob,
+      'Recheck main immediately before production promotion'
+    );
+    const performanceIndex = promotionJob.indexOf(
+      'Prove canonical navigation budgets on exact staged build'
+    );
+    const finalCurrentIndex = promotionJob.indexOf(
+      'Recheck main immediately before production promotion'
+    );
+
+    expect(setupStep).toContain('uses: ./.github/actions/setup-playwright');
+    expect(setupStep).toContain("steps.stage-production.outcome == 'success'");
+    expect(performanceIndex).toBeGreaterThan(
+      promotionJob.indexOf('Build and stage production deployment')
+    );
+    expect(finalCurrentIndex).toBeGreaterThan(performanceIndex);
+    expect(finalCurrentStep).toContain(
+      "steps.performance-gate.outcome == 'success'"
+    );
+    expect(performanceStep).toContain(
+      'PRODUCTION_DEPLOYMENT_URL_B64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}'
+    );
+    expect(performanceStep).toContain(
+      'PERFORMANCE_AUTH_STATE_PATH="$auth_state"'
+    );
+    expect(performanceStep).toContain('--auth-path "$auth_state"');
+    expect(performanceStep).toContain('--runs 3');
+    for (const routeId of [
+      'creator-inbox-nav',
+      'creator-chat-nav',
+      'creator-library',
+      'creator-contacts',
+      'creator-calendar',
+      'creator-tasks',
+    ]) {
+      expect(performanceStep).toContain(`--route-id ${routeId}`);
+    }
+    expect(performanceStep).toContain(
+      'Authenticated performance credentials are required'
+    );
+    expect(performanceStep).toContain(
+      'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs"'
+    );
+    expect(performanceStep).toContain(
+      'rm -f "$auth_state" "$dynamic_secrets_file"'
+    );
+    expect(performanceStep.split('\n        run: |')[1]).not.toContain(
+      '${{ secrets.'
+    );
+    expect(promotionJob).toContain(
+      'steps.performance-gate.outputs.failure_subtype'
     );
   });
 
@@ -1575,7 +1660,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(promoteIndex).toBeGreaterThan(stageIndex);
     expect(verifyIndex).toBeGreaterThan(promoteIndex);
     expect(promoteJob).toContain(
-      'steps.stage-production.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype'
+      'steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype'
     );
     expect(domainGuardStep).toContain('id: domain-guard');
     expect(domainGuardStep).toContain(

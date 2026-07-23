@@ -99,6 +99,11 @@ describe('performance route manifest', () => {
       );
       expect(route?.readySelectors.content?.length ?? 0).toBeGreaterThan(0);
       expect(
+        getRouteTimingBudgets(route!).some(
+          timing => timing.metric === 'skeleton-to-content'
+        )
+      ).toBe(true);
+      expect(
         routes.some(
           candidate =>
             candidate.path === item.href && candidate.measureMode === 'redirect'
