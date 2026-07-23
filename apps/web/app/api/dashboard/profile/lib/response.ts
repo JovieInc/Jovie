@@ -65,7 +65,7 @@ export async function finalizeProfileResponse({
     );
   } else {
     await invalidateProfileCache(updatedProfile.usernameNormalized);
-    invalidateHomepageCache();
+    await invalidateHomepageCache();
   }
 
   trackServerEvent('dashboard_profile_updated', undefined, clerkUserId).catch(

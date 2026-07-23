@@ -67,10 +67,10 @@ export async function invalidateUsernameChange(
   ]);
 
   // Also invalidate homepage in case featured creators are affected
-  invalidateHomepageCache();
+  await invalidateHomepageCache();
 }
 
-export function invalidateHomepageCache(): void {
+export async function invalidateHomepageCache(): Promise<void> {
   revalidatePath('/');
 }
 

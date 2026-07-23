@@ -8,6 +8,8 @@
  * - invalidateAvatarCache
  */
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockRevalidatePath = vi.hoisted(() => vi.fn());
@@ -94,6 +96,17 @@ describe('Profile Cache Invalidation', () => {
   });
 
   describe('invalidateUsernameChange', () => {
+    it('keeps every exported server action async for Next.js builds', () => {
+      const source = readFileSync(
+        resolve(process.cwd(), 'lib/cache/profile.ts'),
+        'utf8'
+      );
+
+      expect(source).toMatch(
+        /export async function invalidateHomepageCache\(\): Promise<void>/
+      );
+    });
+
     it('invalidates both old and new username caches', async () => {
       const { invalidateUsernameChange } = await import('@/lib/cache/profile');
       await invalidateUsernameChange('newartist', 'oldartist');
