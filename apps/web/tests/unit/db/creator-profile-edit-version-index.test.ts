@@ -6,7 +6,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 const MIGRATION_PATH = path.resolve(
   __dirname,
-  '../../../drizzle/migrations/0084_stiff_tigra.sql'
+  '../../../drizzle/migrations/0083_first_molly_hayes.sql'
 );
 const JOURNAL_PATH = path.resolve(
   __dirname,
@@ -37,7 +37,7 @@ describe('creator profile edit-version index', () => {
     ).toEqual(['user_id', 'profile_edit_version']);
   });
 
-  it('ships an idempotent append-only migration after 0083', () => {
+  it('ships the column and idempotent index in one migration after 0082', () => {
     const sql = fs.readFileSync(MIGRATION_PATH, 'utf8');
     const journal = JSON.parse(
       fs.readFileSync(JOURNAL_PATH, 'utf8')
@@ -46,13 +46,16 @@ describe('creator profile edit-version index', () => {
     const current = journal.entries.at(-1);
 
     expect(previous).toMatchObject({
-      idx: 83,
-      tag: '0083_first_molly_hayes',
+      idx: 82,
+      tag: '0082_real_peter_parker',
     });
-    expect(current).toMatchObject({ idx: 84, tag: '0084_stiff_tigra' });
-    expect(sql.trim()).toBe(
+    expect(current).toMatchObject({ idx: 83, tag: '0083_first_molly_hayes' });
+    expect(sql).toContain(
+      'ALTER TABLE "creator_profiles" ADD COLUMN "profile_edit_version" integer DEFAULT 1 NOT NULL;'
+    );
+    expect(sql).toContain(
       'CREATE INDEX IF NOT EXISTS "idx_creator_profiles_user_edit_version" ON "creator_profiles" USING btree ("user_id","profile_edit_version");'
     );
-    expect(sql).not.toContain('ALTER TABLE');
+    expect(sql).not.toContain('DROP ');
   });
 });
