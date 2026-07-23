@@ -7,7 +7,12 @@ const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const config: StorybookConfig = {
-  stories: ['../components/**/*.stories.@(js|jsx|ts|tsx|mdx)'],
+  stories: [
+    '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+    // packages/ui atoms — highest-reuse surface; must enter Chromatic/Storybook
+    // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
+    '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+  ],
   addons: [
     '@storybook/addon-docs',
     '@storybook/addon-a11y',

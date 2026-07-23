@@ -24,7 +24,7 @@ updates:
         patterns:
           - 'electron'
         update-types:
-          - 'version-update:semver-major'
+          - 'major'
     ignore:
       # Ignore ALL automated Clerk SDK updates — element-key naming drifts
       # silently between minor versions and breaks the AuthShell SSO-only
@@ -72,6 +72,11 @@ updates:
       - 'dependencies'
       - 'github-actions'
       - 'automated'
+    groups:
+      # init/analyze load one shared bundle and must move in the same PR.
+      codeql-action:
+        patterns:
+          - 'github/codeql-action'
 
   # Enable version updates for Docker (if needed)
   - package-ecosystem: 'docker'

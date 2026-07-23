@@ -31,6 +31,7 @@ import {
   validateLiveMergeQueueRuleset,
   validateMergeQueueEnrollHotPath,
   validateMergeQueueRepoConfig,
+  validateNativeDrainQueueLabelIsolation,
 } from '../merge-queue-guard.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -481,6 +482,29 @@ describe('aggregate required checks', () => {
     const result = validateMergeQueueEnrollHotPath(autoenrollYaml);
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
+  });
+
+  it('isolates the legacy label from native drain enrollment and dequeue', () => {
+    const drainScript = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.drainScript),
+      'utf8'
+    );
+
+    expect(validateNativeDrainQueueLabelIsolation(drainScript)).toEqual({
+      ok: true,
+      errors: [],
+    });
+
+    const regressed = drainScript.replace(
+      '# native-queue-transport:enrollment:end',
+      'gh_retry pr edit "$n" --add-label merge-queue\n  # native-queue-transport:enrollment:end'
+    );
+    expect(validateNativeDrainQueueLabelIsolation(regressed)).toEqual({
+      ok: false,
+      errors: [
+        'native drain enrollment must not read, write, or require the legacy merge-queue label',
+      ],
+    });
   });
 
   it('validates the legacy Graphite ruleset shape only when explicitly selected', () => {

@@ -115,6 +115,14 @@ function getStepBlock(workflow: string, stepName: string): string {
   return block.join('\n');
 }
 
+function getSentryStatsRequests(action: string): string[] {
+  return (
+    action.match(
+      /STATS_RESPONSE=\$\(curl[\s\S]*?"https:\/\/sentry\.io\/api\/0\/organizations\/\$SENTRY_ORG\/events-stats\/"\)/g
+    ) ?? []
+  );
+}
+
 function getJobBlock(workflow: string, jobKey: string): string {
   const lines = workflow.split('\n');
   const start = lines.findIndex(line => line === `  ${jobKey}:`);
@@ -884,6 +892,7 @@ describe('deploy workflow Vercel env resolution', () => {
       getJobBlock(workflow, 'alias-staging'),
       'Verify aliased staging OAuth redirect URIs'
     );
+    const productionOauthJob = getJobBlock(workflow, 'production-oauth-gate');
 
     expect(oauthStep).toContain(
       'if PLAYWRIGHT_WORKERS=1 CI=true SMOKE_ONLY=1 \\\n'
@@ -892,9 +901,12 @@ describe('deploy workflow Vercel env resolution', () => {
       'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run --'
     );
     expect(oauthStep).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(productionOauthJob).toContain(
+      "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
+    );
     expect(
       workflow.match(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/g)
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     expect(oauthStep).toContain(
       'pnpm exec playwright test tests/e2e/oauth-providers.spec.ts'
     );
@@ -977,6 +989,31 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(deployScript).toContain('--env VERCEL_GIT_COMMIT_SHA');
     expect(deployScript).not.toMatch(/--(?:build-)?env\s+[^\s]+=/);
     expect(deployScript).not.toContain('--token');
+  });
+
+  it('skips catalog mutation only for the manual PR preview build', () => {
+    const previewWorkflow = readFileSync(workflowPath, 'utf8');
+    const productionWorkflow = readFileSync(
+      productionReleaseWorkflowPath,
+      'utf8'
+    );
+    const previewBuild = getStepBlock(
+      getJobBlock(previewWorkflow, 'ci-pr-vercel-preview'),
+      'Build (PR preview)'
+    );
+    const productionBuild = getStepBlock(
+      getJobBlock(productionWorkflow, 'promote-production'),
+      'Build and stage production deployment'
+    );
+    const webPackage = JSON.parse(
+      readFileSync(resolve(repoRoot, 'apps/web/package.json'), 'utf8')
+    ) as { scripts: Record<string, string> };
+
+    expect(previewBuild).toContain("SKIP_SKILLS_CATALOG_SYNC: '1'");
+    expect(productionBuild).not.toContain('SKIP_SKILLS_CATALOG_SYNC');
+    expect(webPackage.scripts.postbuild).toContain(
+      'scripts/sync-skills-catalog.ts'
+    );
   });
 
   it('keeps Vercel secrets and runtime values out of every preview and production process argument', () => {
@@ -1324,12 +1361,16 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     const buildIndex = workflow.indexOf(
       '- name: Build (preview target for staging verification)'
     );
+    const readinessAllowlist =
+      readinessStep.match(/--only-secrets=([^\s]+)/)?.[1]?.split(',') ?? [];
 
     expect(readinessIndex).toBeGreaterThanOrEqual(0);
     expect(buildIndex).toBeGreaterThan(readinessIndex);
     expect(readinessStep).toContain('--target=stg');
     expect(readinessStep).toContain('--source=env');
     expect(readinessStep).not.toContain('--source=vercel-file');
+    expect(readinessAllowlist).toContain('BETTER_AUTH_URL');
+    expect(readinessAllowlist).toContain('NEXT_PUBLIC_BETTER_AUTH_URL');
     expect(buildStep).toContain('vercel build');
   });
 
@@ -1347,6 +1388,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       '- name: Verify production domains are on canonical Vercel project'
     );
     const runtimeKeys = [
+      'BETTER_AUTH_URL',
       'NEXT_PUBLIC_BETTER_AUTH_URL',
       'BETTER_AUTH_SECRET',
       'DATABASE_URL',
@@ -1375,8 +1417,18 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(stageStep).toContain(
       '--no-fallback -- env -u DOPPLER_TOKEN bash -c production_stage'
     );
-    expect(stageStep).toContain('--target=prd --source=env');
-    expect(stageStep).not.toContain('--target=prd --source=vercel-file');
+    expect(stageStep).toContain('scripts/reconcile-vercel-build-env.ts');
+    expect(stageStep).toContain('--target=prd --source=vercel-file');
+    expect(stageStep).toContain('--file=.vercel/.env.production.local');
+    expect(
+      stageStep.indexOf('vercel pull --yes --environment=production')
+    ).toBeLessThan(stageStep.indexOf('scripts/reconcile-vercel-build-env.ts'));
+    expect(
+      stageStep.indexOf('scripts/reconcile-vercel-build-env.ts')
+    ).toBeLessThan(stageStep.indexOf('--target=prd --source=vercel-file'));
+    expect(stageStep.indexOf('--target=prd --source=vercel-file')).toBeLessThan(
+      stageStep.indexOf('vercel build --prod')
+    );
     expect(stageStep).toContain('required_runtime_env=(');
     expect(stageStep).toContain('Missing production runtime env:');
     expect(stageStep).toContain('runtime_env_args+=(--env "$key")');
@@ -2130,6 +2182,505 @@ exit 23
           'utf8'
         )
       ).toContain('unsafe-attempt');
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('retries production OAuth with quarantined artifacts and a clean producer workspace', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const oauthJob = getJobBlock(release, 'production-oauth-gate');
+    const oauthStep = getStepBlock(
+      oauthJob,
+      'Probe production Better Auth Google + Apple runtime'
+    );
+    expect(oauthStep).toContain('--no-deps');
+    const root = mkdtempSync(
+      resolve(tmpdir(), 'jovie-production-oauth-retry-')
+    );
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const counter = resolve(root, 'attempt-count');
+      const githubOutput = resolve(root, 'github-output');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+[ "\${PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN:-}" = "true" ] || exit 43
+attempt=0
+if [ -f "$OAUTH_TEST_COUNTER" ]; then
+  attempt="$(cat "$OAUTH_TEST_COUNTER")"
+fi
+attempt=$((attempt + 1))
+printf '%s' "$attempt" > "$OAUTH_TEST_COUNTER"
+if [ -e test-results ] || [ -L test-results ] || [ -e playwright-report ] || [ -L playwright-report ]; then
+  exit 40
+fi
+mkdir -p test-results
+printf '# Error context\n\nSafe production retry diagnostics.\n' > test-results/error-context.md
+if [ "$attempt" -eq 1 ]; then
+  printf '%s' '{"suites":[{"results":[{"status":"passed"},{"status":"failed","errors":[{"message":"CONFIRMED_OAUTH_RUNTIME_CONTRACT: apple navigation timed out"}]}]}]}' > "$PLAYWRIGHT_JSON_OUTPUT_NAME"
+  exit 1
+fi
+printf '%s' '{"config":{"workers":1},"stats":{"startTime":"2026-07-22T00:00:00.000Z","duration":1,"expected":2,"skipped":0,"unexpected":0,"flaky":0},"suites":[{"title":"oauth-providers.spec.ts","file":"oauth-providers.spec.ts","specs":[],"suites":[{"title":"candidate-bound Better Auth OAuth runtime @production-smoke","file":"oauth-providers.spec.ts","line":42,"column":1,"specs":[{"title":"google UI starts the exact Better Auth provider redirect","ok":true,"tags":[],"tests":[{"timeout":60000,"annotations":[],"expectedStatus":"passed","status":"expected","projectName":"chromium","results":[{"workerIndex":0,"status":"passed","duration":1,"errors":[],"stdout":[],"stderr":[],"retry":0}]}]},{"title":"apple UI starts the exact Better Auth provider redirect","ok":true,"tags":[],"tests":[{"timeout":60000,"annotations":[],"expectedStatus":"passed","status":"expected","projectName":"chromium","results":[{"workerIndex":0,"status":"passed","duration":1,"errors":[],"stdout":[],"stderr":[],"retry":0}]}]}]}]}],"errors":[]}' > "$PLAYWRIGHT_JSON_OUTPUT_NAME"
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'sleep'),
+        '#!/usr/bin/env bash\nexit 0\n',
+        { mode: 0o700 }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(oauthStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: githubOutput,
+            GITHUB_WORKSPACE: workspace,
+            OAUTH_TEST_COUNTER: counter,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(readFileSync(counter, 'utf8')).toBe('2');
+      expect(readFileSync(githubOutput, 'utf8')).toContain(
+        'oauth_status=passed'
+      );
+      expect(
+        readFileSync(
+          resolve(
+            runnerTemp,
+            'production-oauth-retries/attempt-1/failed-artifacts/test-results/error-context.md'
+          ),
+          'utf8'
+        )
+      ).toContain('Safe production retry diagnostics.');
+      expect(
+        readFileSync(
+          resolve(
+            runnerTemp,
+            'production-oauth-retries/attempt-1/failed-artifacts/oauth-provider-report.json'
+          ),
+          'utf8'
+        )
+      ).toContain('CONFIRMED_OAUTH_RUNTIME_CONTRACT');
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('accepts a clean report when retry history contains three passed results', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const oauthJob = getJobBlock(release, 'production-oauth-gate');
+    const oauthStep = getStepBlock(
+      oauthJob,
+      'Probe production Better Auth Google + Apple runtime'
+    );
+    const root = mkdtempSync(
+      resolve(tmpdir(), 'jovie-production-oauth-three-pass-')
+    );
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const githubOutput = resolve(root, 'github-output');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+cat > "$PLAYWRIGHT_JSON_OUTPUT_NAME" <<'JSON'
+{"config":{"workers":1},"stats":{"startTime":"2026-07-22T00:00:00.000Z","duration":1,"expected":1,"skipped":0,"unexpected":0,"flaky":1},"suites":[{"title":"oauth-providers.spec.ts","file":"oauth-providers.spec.ts","specs":[],"suites":[{"title":"candidate-bound Better Auth OAuth runtime @production-smoke","file":"oauth-providers.spec.ts","line":42,"column":1,"specs":[{"title":"google UI starts the exact Better Auth provider redirect","ok":true,"tests":[{"timeout":60000,"annotations":[],"expectedStatus":"passed","status":"flaky","projectName":"chromium","results":[{"workerIndex":0,"status":"failed","duration":1,"errors":[{"message":"transient"}],"stdout":[],"stderr":[],"retry":0},{"workerIndex":1,"status":"passed","duration":1,"errors":[],"stdout":[],"stderr":[],"retry":1}]}]},{"title":"apple UI starts the exact Better Auth provider redirect","ok":true,"tests":[{"timeout":60000,"annotations":[],"expectedStatus":"passed","status":"expected","projectName":"chromium","results":[{"workerIndex":0,"status":"passed","duration":1,"errors":[],"stdout":[],"stderr":[],"retry":0}]}]}]}]}],"errors":[]}
+JSON
+`,
+        { mode: 0o700 }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(oauthStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: githubOutput,
+            GITHUB_WORKSPACE: workspace,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(readFileSync(githubOutput, 'utf8')).toContain(
+        'oauth_status=passed'
+      );
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it.each([
+    ['duplicate OAuth file suite', 'duplicate-suite'],
+    ['missing expected spec', 'missing-spec'],
+    ['wrong expected spec title', 'wrong-spec'],
+    ['wrong project', 'wrong-project'],
+    ['empty result history', 'empty-results'],
+    ['missing final result status', 'missing-final-status'],
+    ['nonpassed final result', 'nonpassed-final'],
+  ])('rejects a fail-closed OAuth report with %s', (_label, reportCase) => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const oauthStep = getStepBlock(
+      getJobBlock(release, 'production-oauth-gate'),
+      'Probe production Better Auth Google + Apple runtime'
+    );
+    const root = mkdtempSync(
+      resolve(tmpdir(), 'jovie-production-oauth-invalid-report-')
+    );
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const githubOutput = resolve(root, 'github-output');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+cat > "$PLAYWRIGHT_JSON_OUTPUT_NAME" <<'JSON'
+{"config":{"workers":1},"stats":{"startTime":"2026-07-22T00:00:00.000Z","duration":1,"expected":2,"skipped":0,"unexpected":0,"flaky":0},"suites":[{"title":"oauth-providers.spec.ts","file":"oauth-providers.spec.ts","specs":[],"suites":[{"title":"candidate-bound Better Auth OAuth runtime @production-smoke","file":"oauth-providers.spec.ts","specs":[{"title":"google UI starts the exact Better Auth provider redirect","ok":true,"tests":[{"expectedStatus":"passed","status":"expected","projectName":"chromium","results":[{"status":"passed"}]}]},{"title":"apple UI starts the exact Better Auth provider redirect","ok":true,"tests":[{"expectedStatus":"passed","status":"expected","projectName":"chromium","results":[{"status":"passed"}]}]}]}]}],"errors":[]}
+JSON
+case "$OAUTH_REPORT_CASE" in
+  duplicate-suite) jq '.suites += [.suites[0]]' "$PLAYWRIGHT_JSON_OUTPUT_NAME" > "$PLAYWRIGHT_JSON_OUTPUT_NAME.tmp" ;;
+  missing-spec) jq 'del(.suites[0].suites[0].specs[1])' "$PLAYWRIGHT_JSON_OUTPUT_NAME" > "$PLAYWRIGHT_JSON_OUTPUT_NAME.tmp" ;;
+  wrong-spec) jq '.suites[0].suites[0].specs[1].title = "unexpected provider redirect"' "$PLAYWRIGHT_JSON_OUTPUT_NAME" > "$PLAYWRIGHT_JSON_OUTPUT_NAME.tmp" ;;
+  wrong-project) jq '.suites[0].suites[0].specs[0].tests[0].projectName = "firefox"' "$PLAYWRIGHT_JSON_OUTPUT_NAME" > "$PLAYWRIGHT_JSON_OUTPUT_NAME.tmp" ;;
+  empty-results) jq '.suites[0].suites[0].specs[0].tests[0].results = []' "$PLAYWRIGHT_JSON_OUTPUT_NAME" > "$PLAYWRIGHT_JSON_OUTPUT_NAME.tmp" ;;
+  missing-final-status) jq '.suites[0].suites[0].specs[0].tests[0].results = [{}]' "$PLAYWRIGHT_JSON_OUTPUT_NAME" > "$PLAYWRIGHT_JSON_OUTPUT_NAME.tmp" ;;
+  nonpassed-final) jq '.suites[0].suites[0].specs[0].tests[0].results = [{"status":"failed"}]' "$PLAYWRIGHT_JSON_OUTPUT_NAME" > "$PLAYWRIGHT_JSON_OUTPUT_NAME.tmp" ;;
+esac
+mv "$PLAYWRIGHT_JSON_OUTPUT_NAME.tmp" "$PLAYWRIGHT_JSON_OUTPUT_NAME"
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'sleep'),
+        '#!/usr/bin/env bash\nexit 0\n',
+        {
+          mode: 0o700,
+        }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(oauthStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: githubOutput,
+            GITHUB_WORKSPACE: workspace,
+            OAUTH_REPORT_CASE: reportCase,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
+      expect(readFileSync(githubOutput, 'utf8')).not.toContain(
+        'oauth_status=passed'
+      );
+      expect(`${result.stdout}\n${result.stderr}`).toContain(
+        'OAuth probe was inconclusive'
+      );
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it.each([
+    ['recovered flaky retry history', 'recovered-flaky'],
+    ['wrong OAuth suite marker', 'wrong-suite-marker'],
+    ['malformed suite marker', 'malformed-suite-marker'],
+    ['mixed marked and unmarked final failures', 'mixed-final-failures'],
+  ])('does not classify %s as a confirmed regression', (_label, reportCase) => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const oauthStep = getStepBlock(
+      getJobBlock(release, 'production-oauth-gate'),
+      'Probe production Better Auth Google + Apple runtime'
+    );
+    const root = mkdtempSync(
+      resolve(tmpdir(), 'jovie-production-oauth-fallback-')
+    );
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const githubOutput = resolve(root, 'github-output');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+case "$OAUTH_REPORT_CASE" in
+  recovered-flaky)
+    cat > "$PLAYWRIGHT_JSON_OUTPUT_NAME" <<'JSON'
+{"config":{"workers":1},"stats":{"expected":1,"skipped":0,"unexpected":0,"flaky":1},"errors":[],"suites":[{"title":"oauth-providers.spec.ts","file":"oauth-providers.spec.ts","specs":[],"suites":[{"title":"candidate-bound Better Auth OAuth runtime @production-smoke","specs":[{"title":"google UI starts the exact Better Auth provider redirect","tests":[{"expectedStatus":"passed","status":"flaky","projectName":"chromium","results":[{"status":"failed","errors":[{"message":"CONFIRMED_OAUTH_RUNTIME_CONTRACT: transient"}]},{"status":"passed"}]}]},{"title":"apple UI starts the exact Better Auth provider redirect","tests":[{"expectedStatus":"passed","status":"expected","projectName":"chromium","results":[{"status":"passed"}]}]}]}]}]}
+JSON
+    ;;
+  wrong-suite-marker)
+    cat > "$PLAYWRIGHT_JSON_OUTPUT_NAME" <<'JSON'
+{"config":{"workers":1},"stats":{"expected":0,"skipped":0,"unexpected":2,"flaky":0},"errors":[],"suites":[{"title":"unrelated.spec.ts","file":"unrelated.spec.ts","specs":[],"suites":[{"title":"candidate-bound Better Auth OAuth runtime @production-smoke","specs":[{"title":"google UI starts the exact Better Auth provider redirect","tests":[{"expectedStatus":"passed","status":"expected","projectName":"chromium","results":[{"status":"failed","errors":[{"message":"CONFIRMED_OAUTH_RUNTIME_CONTRACT: wrong suite"}]}]}]},{"title":"apple UI starts the exact Better Auth provider redirect","tests":[{"expectedStatus":"passed","status":"expected","projectName":"chromium","results":[{"status":"failed","errors":[{"message":"CONFIRMED_OAUTH_RUNTIME_CONTRACT: wrong suite"}]}]}]}]}]}]}
+JSON
+    ;;
+  malformed-suite-marker)
+    cat > "$PLAYWRIGHT_JSON_OUTPUT_NAME" <<'JSON'
+{"suites":[{"title":"unrelated.spec.ts","file":"unrelated.spec.ts","results":[{"status":"failed","errors":[{"message":"CONFIRMED_OAUTH_RUNTIME_CONTRACT: malformed suite"}]}]}]}
+JSON
+    ;;
+  mixed-final-failures)
+    cat > "$PLAYWRIGHT_JSON_OUTPUT_NAME" <<'JSON'
+{"config":{"workers":1},"stats":{"expected":0,"skipped":0,"unexpected":2,"flaky":0},"errors":[],"suites":[{"title":"oauth-providers.spec.ts","file":"oauth-providers.spec.ts","specs":[],"suites":[{"title":"candidate-bound Better Auth OAuth runtime @production-smoke","specs":[{"title":"google UI starts the exact Better Auth provider redirect","tests":[{"expectedStatus":"passed","status":"unexpected","projectName":"chromium","results":[{"status":"failed","errors":[{"message":"CONFIRMED_OAUTH_RUNTIME_CONTRACT: marked"}]}]}]},{"title":"apple UI starts the exact Better Auth provider redirect","tests":[{"expectedStatus":"passed","status":"unexpected","projectName":"chromium","results":[{"status":"failed","errors":[{"message":"infrastructure failure without runtime-contract evidence"}]}]}]}]}]}]}
+JSON
+    ;;
+esac
+exit 23
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'sleep'),
+        '#!/usr/bin/env bash\nexit 0\n',
+        {
+          mode: 0o700,
+        }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(oauthStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: githubOutput,
+            GITHUB_WORKSPACE: workspace,
+            OAUTH_REPORT_CASE: reportCase,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
+      expect(readFileSync(githubOutput, 'utf8')).not.toContain(
+        'oauth_status=failed'
+      );
+      expect(`${result.stdout}\n${result.stderr}`).toContain(
+        'OAuth probe was inconclusive'
+      );
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('classifies three exact aggregate OAuth failures as a confirmed regression', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const oauthStep = getStepBlock(
+      getJobBlock(release, 'production-oauth-gate'),
+      'Probe production Better Auth Google + Apple runtime'
+    );
+    const root = mkdtempSync(
+      resolve(tmpdir(), 'jovie-production-oauth-confirmed-failure-')
+    );
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const counter = resolve(root, 'attempt-count');
+      const githubOutput = resolve(root, 'github-output');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+attempt=0
+if [ -f "\${OAUTH_TEST_COUNTER}" ]; then
+  attempt="$(cat "\${OAUTH_TEST_COUNTER}")"
+fi
+attempt=$((attempt + 1))
+printf '%s' "\${attempt}" > "\${OAUTH_TEST_COUNTER}"
+cat > "\${PLAYWRIGHT_JSON_OUTPUT_NAME}" <<'JSON'
+{"config":{"workers":1},"stats":{"expected":0,"skipped":0,"unexpected":2,"flaky":0},"errors":[],"suites":[{"title":"oauth-providers.spec.ts","file":"oauth-providers.spec.ts","specs":[],"suites":[{"title":"candidate-bound Better Auth OAuth runtime @production-smoke","specs":[{"title":"google UI starts the exact Better Auth provider redirect","tests":[{"expectedStatus":"passed","status":"unexpected","projectName":"chromium","results":[{"status":"failed","errors":[{"message":"CONFIRMED_OAUTH_RUNTIME_CONTRACT: google redirect contract failed"}]}]}]},{"title":"apple UI starts the exact Better Auth provider redirect","tests":[{"expectedStatus":"passed","status":"unexpected","projectName":"chromium","results":[{"status":"failed","errors":[{"message":"CONFIRMED_OAUTH_RUNTIME_CONTRACT: apple redirect contract failed"}]}]}]}]}]}]}
+JSON
+exit 23
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'sleep'),
+        '#!/usr/bin/env bash\nexit 0\n',
+        { mode: 0o700 }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(oauthStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: githubOutput,
+            GITHUB_WORKSPACE: workspace,
+            OAUTH_TEST_COUNTER: counter,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
+      expect(readFileSync(counter, 'utf8')).toBe('3');
+      expect(readFileSync(githubOutput, 'utf8')).toContain(
+        'oauth_status=failed'
+      );
+      expect(`${result.stdout}\n${result.stderr}`).toContain(
+        'Confirmed Better Auth OAuth runtime-contract failure 3/3.'
+      );
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('stops production OAuth retries when the artifact guard poisons shared state', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const oauthStep = getStepBlock(
+      getJobBlock(release, 'production-oauth-gate'),
+      'Probe production Better Auth Google + Apple runtime'
+    );
+    const root = mkdtempSync(
+      resolve(tmpdir(), 'jovie-production-oauth-poison-')
+    );
+
+    try {
+      const workspace = resolve(root, 'workspace');
+      const web = resolve(workspace, 'apps/web');
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const counter = resolve(root, 'attempt-count');
+      const githubOutput = resolve(root, 'github-output');
+      mkdirSync(web, { recursive: true });
+      mkdirSync(fakeBin);
+      mkdirSync(runnerTemp);
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+attempt=0
+if [ -f "$OAUTH_TEST_COUNTER" ]; then
+  attempt="$(cat "$OAUTH_TEST_COUNTER")"
+fi
+attempt=$((attempt + 1))
+printf '%s' "$attempt" > "$OAUTH_TEST_COUNTER"
+mkdir -p test-results "$RUNNER_TEMP/safe-playwright-producer"
+printf '%s' '{"source":"unsafe-attempt"}' > test-results/attempt-one.json
+touch "$RUNNER_TEMP/safe-playwright-producer/blocked"
+printf '%s' '{"suites":[{"results":[{"status":"failed","errors":[{"message":"CONFIRMED_OAUTH_RUNTIME_CONTRACT: untrusted"}]}]}]}' > "$PLAYWRIGHT_JSON_OUTPUT_NAME"
+exit 23
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'sleep'),
+        '#!/usr/bin/env bash\nexit 42\n',
+        { mode: 0o700 }
+      );
+
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(oauthStep)}`],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: githubOutput,
+            GITHUB_WORKSPACE: workspace,
+            OAUTH_TEST_COUNTER: counter,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            RUNNER_TEMP: runnerTemp,
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status).toBe(1);
+      expect(readFileSync(counter, 'utf8')).toBe('1');
+      expect(`${result.stdout}\n${result.stderr}`).toContain(
+        'refusing an unsafe retry'
+      );
+      expect(readFileSync(githubOutput, 'utf8')).not.toContain(
+        'oauth_status=failed'
+      );
+      expect(
+        readFileSync(
+          resolve(
+            runnerTemp,
+            'production-oauth-retries/attempt-1/failed-artifacts/test-results/attempt-one.json'
+          ),
+          'utf8'
+        )
+      ).toContain('unsafe-attempt');
+      expect(
+        readFileSync(
+          resolve(
+            runnerTemp,
+            'production-oauth-retries/attempt-1/failed-artifacts/oauth-provider-report.json'
+          ),
+          'utf8'
+        )
+      ).toContain('CONFIRMED_OAUTH_RUNTIME_CONTRACT');
     } finally {
       rmSync(root, { force: true, recursive: true });
     }
@@ -2972,8 +3523,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(deployIndex).toBeGreaterThan(buildIndex);
     expect(inspectIndex).toBeGreaterThan(deployIndex);
     expect(canaryIndex).toBeGreaterThan(inspectIndex);
-    expect(stageStep).toContain('--target=prd --source=env');
-    expect(stageStep).not.toContain('--target=prd --source=vercel-file');
+    expect(stageStep).toContain('scripts/reconcile-vercel-build-env.ts');
+    expect(stageStep).toContain('--target=prd --source=vercel-file');
     expect(stageStep).toContain('VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"');
     expect(stageStep).toContain('NEXT_PUBLIC_BUILD_SHA="$expected"');
     expect(stageStep).toContain('--meta "githubCommitSha=${EXPECTED_SHA}"');
@@ -3351,7 +3902,47 @@ describe('production promotion exact-artifact contract', () => {
     expect(sentryAction).toContain(
       'BASELINE_RATE_LIMIT_SCALED=$((BASELINE * THRESHOLD * POST_MINUTES))'
     );
+    const statsRequests = getSentryStatsRequests(sentryAction);
+    expect(statsRequests).toHaveLength(2);
+    const exactProductionErrorQuery =
+      '--data-urlencode "query=event.type:error environment:vercel-production"';
+    for (const request of statsRequests) {
+      expect(request).toContain('curl --fail --silent --show-error --get');
+      expect(request.match(/--data-urlencode "query=[^"]+"/g)).toEqual([
+        exactProductionErrorQuery,
+      ]);
+    }
+    expect(sentryAction).not.toContain('events-stats/?project=');
     expect(sentryAction).not.toContain('SENTRY_ORG:\n        required: true');
+  });
+
+  it('excludes transaction and preview volume while preserving real production error spikes', () => {
+    const sentryAction = readFileSync(sentryGateActionPath, 'utf8');
+    const isRateSpike = (
+      baseline: number,
+      postDeploy: number,
+      baselineMinutes = 30,
+      postMinutes = 5,
+      threshold = 3
+    ) => postDeploy * baselineMinutes > baseline * threshold * postMinutes;
+
+    // Exact 2026-07-22 incident: raw Discover traffic falsely spiked at 26/21.
+    // Error-only evidence was 1/0, but that sole baseline error came from
+    // vercel-preview; exact vercel-production errors were 0/0.
+    expect(isRateSpike(26, 21)).toBe(true);
+    expect(isRateSpike(1, 0)).toBe(false);
+    expect(isRateSpike(0, 0)).toBe(false);
+
+    // A genuine error-rate increase remains blocking after filtering.
+    expect(isRateSpike(6, 4)).toBe(true);
+    const statsRequests = getSentryStatsRequests(sentryAction);
+    expect(statsRequests).toHaveLength(2);
+    for (const request of statsRequests) {
+      expect(request).toContain(
+        '--data-urlencode "query=event.type:error environment:vercel-production"'
+      );
+    }
+    expect(sentryAction).toContain('echo "gate_status=failed"');
   });
 
   it('keeps cost and main-health observers strict, deduplicated, and bounded', () => {
