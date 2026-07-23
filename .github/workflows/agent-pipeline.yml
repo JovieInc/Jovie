@@ -478,7 +478,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
-      group: agent-remediation-${{ github.repository }}
+      group: agent-remediation-${{ github.repository }}-${{ needs.guard.outputs.pr_number }}
       cancel-in-progress: false
     permissions:
       contents: write

@@ -402,6 +402,20 @@ def test_agent_pipeline_retry_budget_is_durable() -> None:
     assert '"labels[]=$ATTEMPT_LABEL"' in fix
 
 
+def test_agent_pipeline_remediation_mutex_is_scoped_per_pr() -> None:
+    """Independent PR remediations run concurrently while retries stay serial."""
+    guard = _job_block("agent-pipeline.yml", "guard")
+    fix = _job_block("agent-pipeline.yml", "fix")
+
+    assert "pr_number: ${{ steps.evaluate.outputs.pr_number }}" in guard
+    assert (
+        "group: agent-remediation-${{ github.repository }}-"
+        "${{ needs.guard.outputs.pr_number }}"
+    ) in fix
+    assert "group: agent-remediation-${{ github.repository }}\n" not in fix
+    assert "cancel-in-progress: false" in fix
+
+
 def test_conflict_paths_never_merge_or_force_push_pr_branches() -> None:
     """Conflict repair uses the shared exact-head GitHub REBASE mutation only."""
     fleet = (REPO_ROOT / "scripts/pr-conflict-handler.mjs").read_text(
