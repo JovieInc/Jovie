@@ -20,6 +20,7 @@ import {
   buildProfileUpdateContext,
   finalizeProfileResponse,
   getProfileByClerkId,
+  getProfileUpdatePreflight,
   NO_STORE_HEADERS,
   parseProfileUpdates,
   updateProfileRecords,
@@ -136,8 +137,20 @@ export async function PUT(req: Request) {
       expectedVersion,
       profileId,
     } = parsedRequest;
-    const precomputedAvatarTheme =
+    const avatarPreflight =
       avatarUrl === undefined
+        ? undefined
+        : await withDbSessionTx(
+            tx => getProfileUpdatePreflight(tx, appUserId, profileId),
+            { clerkUserId: appUserId }
+          );
+    if (avatarPreflight instanceof NextResponse) return avatarPreflight;
+
+    const precomputedAvatarTheme =
+      avatarUrl === undefined ||
+      avatarUrl === avatarPreflight?.avatarUrl ||
+      (expectedVersion !== undefined &&
+        expectedVersion !== avatarPreflight?.profileEditVersion)
         ? undefined
         : await buildThemeWithProfileAccent({
             existingTheme: null,
@@ -155,6 +168,11 @@ export async function PUT(req: Request) {
           usernameUpdate,
           expectedVersion,
           precomputedAvatarTheme,
+          ...(avatarPreflight === undefined
+            ? {}
+            : {
+                avatarPreflightVersion: avatarPreflight.profileEditVersion,
+              }),
         }),
       { clerkUserId: appUserId }
     );

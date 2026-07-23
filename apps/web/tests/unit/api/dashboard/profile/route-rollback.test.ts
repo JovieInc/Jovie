@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   requireAuth: vi.fn(),
   withDbSessionTx: vi.fn(),
   buildThemeWithProfileAccent: vi.fn(),
+  getProfileUpdatePreflight: vi.fn(),
   parseJsonBody: vi.fn(),
   validateUpdatesPayload: vi.fn(),
   parseProfileUpdates: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock('@/app/api/dashboard/profile/lib', () => ({
   validateUpdatesPayload: mocks.validateUpdatesPayload,
   parseProfileUpdates: mocks.parseProfileUpdates,
   buildProfileUpdateContext: mocks.buildProfileUpdateContext,
+  getProfileUpdatePreflight: mocks.getProfileUpdatePreflight,
   updateProfileRecords: mocks.updateProfileRecords,
   finalizeProfileResponse: mocks.finalizeProfileResponse,
   addAvatarCacheBust: (profile: unknown) => profile,
@@ -56,6 +58,10 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
     vi.clearAllMocks();
     mocks.requireAuth.mockResolvedValue(APP_USER_ID);
     mocks.buildThemeWithProfileAccent.mockResolvedValue({});
+    mocks.getProfileUpdatePreflight.mockResolvedValue({
+      avatarUrl: 'https://example.com/old-avatar.png',
+      profileEditVersion: 3,
+    });
     const tx = { marker: 'transaction' };
     mocks.withDbSessionTx.mockImplementation(callback =>
       callback(tx, APP_USER_ID)
@@ -145,7 +151,132 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
     expect(mocks.finalizeProfileResponse).not.toHaveBeenCalled();
   });
 
-  it('derives a changed avatar theme before opening the transaction', async () => {
+  it.each([
+    { status: 403, error: 'Forbidden' },
+    { status: 404, error: 'Profile not found' },
+  ])('returns $status before deriving a theme for an inaccessible exact profile', async ({
+    status,
+    error,
+  }) => {
+    const { NextResponse } = await import('next/server');
+    const avatarUrl = 'https://example.com/avatar.png';
+    mocks.parseJsonBody.mockResolvedValue({
+      ok: true,
+      data: {
+        profileId: PROFILE_ID,
+        expectedVersion: 3,
+        updates: { avatarUrl },
+      },
+    });
+    mocks.validateUpdatesPayload.mockReturnValue({
+      ok: true,
+      updates: { avatarUrl },
+    });
+    mocks.parseProfileUpdates.mockReturnValue({
+      ok: true,
+      parsed: { avatarUrl },
+    });
+    mocks.buildProfileUpdateContext.mockReturnValue({
+      dbProfileUpdates: { avatarUrl },
+      displayNameForUserUpdate: undefined,
+      avatarUrl,
+      usernameUpdate: undefined,
+    });
+    mocks.getProfileUpdatePreflight.mockResolvedValue(
+      NextResponse.json({ error }, { status })
+    );
+
+    const { PUT } = await import('@/app/api/dashboard/profile/route');
+    const response = await PUT(
+      new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
+    );
+
+    expect(response.status).toBe(status);
+    expect(mocks.buildThemeWithProfileAccent).not.toHaveBeenCalled();
+    expect(mocks.updateProfileRecords).not.toHaveBeenCalled();
+  });
+
+  it('does not derive a theme when the avatar URL is unchanged', async () => {
+    const avatarUrl = 'https://example.com/avatar.png';
+    mocks.parseJsonBody.mockResolvedValue({
+      ok: true,
+      data: {
+        profileId: PROFILE_ID,
+        expectedVersion: 3,
+        updates: { avatarUrl },
+      },
+    });
+    mocks.validateUpdatesPayload.mockReturnValue({
+      ok: true,
+      updates: { avatarUrl },
+    });
+    mocks.parseProfileUpdates.mockReturnValue({
+      ok: true,
+      parsed: { avatarUrl },
+    });
+    mocks.buildProfileUpdateContext.mockReturnValue({
+      dbProfileUpdates: { avatarUrl },
+      displayNameForUserUpdate: undefined,
+      avatarUrl,
+      usernameUpdate: undefined,
+    });
+    mocks.getProfileUpdatePreflight.mockResolvedValue({
+      avatarUrl,
+      profileEditVersion: 3,
+    });
+
+    const { PUT } = await import('@/app/api/dashboard/profile/route');
+    const response = await PUT(
+      new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.buildThemeWithProfileAccent).not.toHaveBeenCalled();
+  });
+
+  it('does not derive a theme when the requested CAS version is stale', async () => {
+    const { NextResponse } = await import('next/server');
+    const avatarUrl = 'https://example.com/avatar.png';
+    mocks.parseJsonBody.mockResolvedValue({
+      ok: true,
+      data: {
+        profileId: PROFILE_ID,
+        expectedVersion: 3,
+        updates: { avatarUrl },
+      },
+    });
+    mocks.validateUpdatesPayload.mockReturnValue({
+      ok: true,
+      updates: { avatarUrl },
+    });
+    mocks.parseProfileUpdates.mockReturnValue({
+      ok: true,
+      parsed: { avatarUrl },
+    });
+    mocks.buildProfileUpdateContext.mockReturnValue({
+      dbProfileUpdates: { avatarUrl },
+      displayNameForUserUpdate: undefined,
+      avatarUrl,
+      usernameUpdate: undefined,
+    });
+    mocks.getProfileUpdatePreflight.mockResolvedValue({
+      avatarUrl: 'https://example.com/old-avatar.png',
+      profileEditVersion: 4,
+    });
+    mocks.updateProfileRecords.mockResolvedValue(
+      NextResponse.json({ code: 'VERSION_CONFLICT' }, { status: 409 })
+    );
+
+    const { PUT } = await import('@/app/api/dashboard/profile/route');
+    const response = await PUT(
+      new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
+    );
+
+    expect(response.status).toBe(409);
+    expect(mocks.buildThemeWithProfileAccent).not.toHaveBeenCalled();
+  });
+
+  it('derives a changed avatar theme after preflight and before the write transaction', async () => {
     const events: string[] = [];
     const avatarUrl = 'https://example.com/avatar.png';
     const precomputedAvatarTheme = {
@@ -206,13 +337,22 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(events).toEqual(['parse', 'theme', 'transaction', 'database']);
+    expect(events).toEqual([
+      'parse',
+      'transaction',
+      'theme',
+      'transaction',
+      'database',
+    ]);
     expect(mocks.buildThemeWithProfileAccent).toHaveBeenCalledWith({
       existingTheme: null,
       sourceUrl: avatarUrl,
     });
     expect(mocks.updateProfileRecords).toHaveBeenCalledWith(
-      expect.objectContaining({ precomputedAvatarTheme })
+      expect.objectContaining({
+        precomputedAvatarTheme,
+        avatarPreflightVersion: 3,
+      })
     );
   });
 });

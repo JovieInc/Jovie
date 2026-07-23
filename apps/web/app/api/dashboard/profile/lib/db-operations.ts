@@ -27,11 +27,72 @@ export interface UpdateProfileRecordsParams {
   usernameUpdate: string | undefined;
   expectedVersion?: number;
   precomputedAvatarTheme: ProfileThemeRecord | undefined;
+  avatarPreflightVersion?: number;
 }
 
 export interface UpdateProfileRecordsResult {
   updatedProfile: (typeof creatorProfiles)['$inferSelect'];
   oldUsernameNormalized: string | null;
+}
+
+export interface ProfileUpdatePreflight {
+  avatarUrl: string | null;
+  profileEditVersion: number;
+}
+
+function versionConflictResponse(
+  currentVersion: number | undefined,
+  expectedVersion: number
+) {
+  return NextResponse.json(
+    {
+      error: 'Conflict: Profile has been modified by another request',
+      code: 'VERSION_CONFLICT',
+      currentVersion,
+      expectedVersion,
+    },
+    { status: 409, headers: NO_STORE_HEADERS }
+  );
+}
+
+export async function getProfileUpdatePreflight(
+  tx: DbOrTransaction,
+  appUserId: string,
+  profileId: string
+): Promise<ProfileUpdatePreflight | NextResponse> {
+  const access = await getExactProfileAccess(tx, appUserId, profileId);
+  if (!access.ok) {
+    return NextResponse.json(
+      {
+        error:
+          access.reason === 'forbidden' ? 'Forbidden' : 'Profile not found',
+      },
+      {
+        status: access.reason === 'forbidden' ? 403 : 404,
+        headers: NO_STORE_HEADERS,
+      }
+    );
+  }
+
+  const [profile] = await tx
+    .select({
+      avatarUrl: creatorProfiles.avatarUrl,
+      profileEditVersion: creatorProfiles.profileEditVersion,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+  if (!profile) {
+    return NextResponse.json(
+      { error: 'Profile not found' },
+      { status: 404, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  return {
+    avatarUrl: profile.avatarUrl,
+    profileEditVersion: profile.profileEditVersion ?? 1,
+  };
 }
 
 export async function updateProfileRecords({
@@ -43,6 +104,7 @@ export async function updateProfileRecords({
   usernameUpdate,
   expectedVersion,
   precomputedAvatarTheme,
+  avatarPreflightVersion,
 }: UpdateProfileRecordsParams): Promise<
   UpdateProfileRecordsResult | NextResponse
 > {
@@ -76,6 +138,19 @@ export async function updateProfileRecords({
     return NextResponse.json(
       { error: 'Profile not found' },
       { status: 404, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  const currentVersion = existingProfile.profileEditVersion ?? 1;
+  const compareVersion = expectedVersion ?? currentVersion;
+  if (
+    (expectedVersion !== undefined && expectedVersion !== currentVersion) ||
+    (avatarPreflightVersion !== undefined &&
+      avatarPreflightVersion !== currentVersion)
+  ) {
+    return versionConflictResponse(
+      currentVersion,
+      expectedVersion ?? avatarPreflightVersion ?? compareVersion
     );
   }
 
@@ -142,8 +217,6 @@ export async function updateProfileRecords({
     ...(finalTheme === undefined ? {} : { theme: finalTheme }),
   };
 
-  const currentVersion = existingProfile?.profileEditVersion ?? 1;
-  const compareVersion = expectedVersion ?? currentVersion;
   const [updatedProfile] = await tx
     .update(creatorProfiles)
     .set({
@@ -166,14 +239,9 @@ export async function updateProfileRecords({
         .from(creatorProfiles)
         .where(eq(creatorProfiles.id, profileId))
         .limit(1);
-      return NextResponse.json(
-        {
-          error: 'Conflict: Profile has been modified by another request',
-          code: 'VERSION_CONFLICT',
-          currentVersion: currentProfile?.profileEditVersion,
-          expectedVersion: compareVersion,
-        },
-        { status: 409, headers: NO_STORE_HEADERS }
+      return versionConflictResponse(
+        currentProfile?.profileEditVersion,
+        compareVersion
       );
     }
     return NextResponse.json(

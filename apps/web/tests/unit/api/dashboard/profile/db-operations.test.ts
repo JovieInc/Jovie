@@ -89,6 +89,56 @@ describe('updateProfileRecords exact-profile CAS', () => {
     });
   });
 
+  it.each([
+    { reason: 'forbidden' as const, status: 403 },
+    { reason: 'not_found' as const, status: 404 },
+  ])('stops the profile update preflight at exact access $reason', async ({
+    reason,
+    status,
+  }) => {
+    getExactProfileAccess.mockResolvedValue({ ok: false, reason });
+    const { tx } = createTx();
+    const { getProfileUpdatePreflight } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await getProfileUpdatePreflight(
+      tx as never,
+      'user-a',
+      'profile-a'
+    );
+
+    expect(result).toBeInstanceOf(NextResponse);
+    expect((result as NextResponse).status).toBe(status);
+    expect(tx.select).not.toHaveBeenCalled();
+  });
+
+  it('reads the current avatar and CAS version after exact access succeeds', async () => {
+    const avatarUrl = 'https://example.com/avatar.png';
+    const { tx } = createTx({
+      existing: {
+        avatarUrl,
+        profileEditVersion: 7,
+      },
+    });
+    const { getProfileUpdatePreflight } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await getProfileUpdatePreflight(
+      tx as never,
+      'user-a',
+      'profile-a'
+    );
+
+    expect(result).toEqual({ avatarUrl, profileEditVersion: 7 });
+    expect(getExactProfileAccess).toHaveBeenCalledWith(
+      tx,
+      'user-a',
+      'profile-a'
+    );
+  });
+
   it('merges settings and scopes the CAS to the selected profile primary key', async () => {
     const { tx, predicates, updates } = createTx();
     const { updateProfileRecords } = await import(
@@ -245,6 +295,73 @@ describe('updateProfileRecords exact-profile CAS', () => {
     expect((result as NextResponse).status).toBe(409);
     expect(updates).toHaveLength(1);
     expect(updates[0]?.table).toBe(creatorProfiles);
+  });
+
+  it('returns a conflict before requiring theme work for a stale avatar CAS', async () => {
+    const { tx, updates } = createTx({
+      existing: {
+        id: 'profile-a',
+        usernameNormalized: 'oldname',
+        settings: {},
+        theme: {},
+        avatarUrl: 'https://example.com/old-avatar.png',
+        profileEditVersion: 4,
+      },
+    });
+    const { updateProfileRecords } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await updateProfileRecords({
+      tx: tx as never,
+      appUserId: 'user-a',
+      profileId: 'profile-a',
+      dbProfileUpdates: {
+        avatarUrl: 'https://example.com/new-avatar.png',
+      },
+      displayNameForUserUpdate: undefined,
+      usernameUpdate: undefined,
+      expectedVersion: 3,
+      precomputedAvatarTheme: undefined,
+      avatarPreflightVersion: 4,
+    });
+
+    expect(result).toBeInstanceOf(NextResponse);
+    expect((result as NextResponse).status).toBe(409);
+    expect(updates).toHaveLength(0);
+  });
+
+  it('returns a conflict if the avatar changes after an unchanged-avatar preflight', async () => {
+    const { tx, updates } = createTx({
+      existing: {
+        id: 'profile-a',
+        usernameNormalized: 'oldname',
+        settings: {},
+        theme: {},
+        avatarUrl: 'https://example.com/concurrent-avatar.png',
+        profileEditVersion: 4,
+      },
+    });
+    const { updateProfileRecords } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await updateProfileRecords({
+      tx: tx as never,
+      appUserId: 'user-a',
+      profileId: 'profile-a',
+      dbProfileUpdates: {
+        avatarUrl: 'https://example.com/request-avatar.png',
+      },
+      displayNameForUserUpdate: undefined,
+      usernameUpdate: undefined,
+      precomputedAvatarTheme: undefined,
+      avatarPreflightVersion: 3,
+    });
+
+    expect(result).toBeInstanceOf(NextResponse);
+    expect((result as NextResponse).status).toBe(409);
+    expect(updates).toHaveLength(0);
   });
 
   it('rejects a username owned by another exact profile before writing', async () => {
