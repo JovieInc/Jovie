@@ -639,7 +639,7 @@ describe('UserButton billing actions', () => {
     expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
   });
 
-  it('keeps a long identity legible and includes Help in menu keyboard traversal', async () => {
+  it('keeps identity and Help inline as sibling roving-focus menu actions', async () => {
     const longDisplayName =
       'Adele Adkins and the Very Long International Touring Ensemble';
     mockUseUserSafe.mockReturnValue({
@@ -666,28 +666,44 @@ describe('UserButton billing actions', () => {
 
     await user.click(screen.getByText(longDisplayName));
 
-    const identityRow = await screen.findByTestId('user-menu-identity-row');
+    const identityRow = document.querySelector<HTMLElement>(
+      '[data-menu-action-row="profile-help"]'
+    );
+    expect(identityRow).not.toBeNull();
     expect(screen.getByRole('menu')).toHaveClass(
       'w-60',
       'max-w-[calc(100vw-1rem)]'
     );
-    expect(identityRow).toHaveClass('min-h-12', 'w-full');
+    expect(identityRow).toHaveClass(
+      'grid',
+      'grid-cols-[minmax(0,1fr)_auto]',
+      'min-h-12',
+      'w-full'
+    );
+    expect(identityRow?.querySelectorAll('[role="menuitem"]')).toHaveLength(2);
+    expect(identityRow?.querySelector('button, a')).toBeNull();
 
-    const profileButton = within(identityRow).getByRole('button', {
-      name: `Open profile for ${longDisplayName}`,
-    });
-    expect(profileButton).toHaveClass('w-full', 'min-w-0');
-    expect(within(profileButton).getByText(longDisplayName)).toHaveClass(
+    const profileItem = within(identityRow as HTMLElement).getByRole(
+      'menuitem',
+      {
+        name: `Open profile for ${longDisplayName}`,
+      }
+    );
+    expect(profileItem).toHaveClass('min-w-0');
+    expect(within(profileItem).getByText(longDisplayName)).toHaveClass(
       'truncate'
     );
-    expect(within(profileButton).getByText(longDisplayName)).toHaveAttribute(
+    expect(within(profileItem).getByText(longDisplayName)).toHaveAttribute(
       'title',
       longDisplayName
     );
 
-    const helpItem = screen.getByRole('menuitem', {
+    const helpItem = within(identityRow as HTMLElement).getByRole('menuitem', {
       name: 'Help',
     });
+    expect(helpItem).toHaveClass('shrink-0');
+    await user.keyboard('{ArrowDown}');
+    expect(profileItem).toHaveFocus();
     await user.keyboard('{ArrowDown}');
     expect(helpItem).toHaveFocus();
     await user.keyboard('{ArrowDown}');

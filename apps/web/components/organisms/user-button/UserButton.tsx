@@ -1,7 +1,7 @@
 'use client';
 
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
-import { Button, CommonDropdown } from '@jovie/ui';
+import { Button, buttonVariants, CommonDropdown } from '@jovie/ui';
 import {
   CreditCard,
   FileText,
@@ -104,63 +104,68 @@ function buildDropdownItems({
   isElectronRuntime,
 }: BuildDropdownItemsParams): CommonDropdownItem[] {
   const items: CommonDropdownItem[] = [
-    // Profile card
     {
-      type: 'custom',
-      id: 'profile-card',
-      render: () => (
-        <div
-          data-testid='user-menu-identity-row'
-          className='min-h-12 w-full px-1'
-        >
-          <button
-            type='button'
-            onClick={handleProfile}
-            aria-label={`Open profile for ${displayName}`}
-            className='flex w-full min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left hover:bg-interactive-hover focus-visible:bg-interactive-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
-          >
-            <Avatar
-              src={userImageUrl}
-              alt={displayName || 'User avatar'}
-              name={displayName || userInitials}
-              size='xs'
-              className='shrink-0'
-            />
-            <div className='min-w-0 flex-1'>
-              <div className='flex min-w-0 items-center gap-2'>
-                <span
-                  title={displayName}
-                  className='min-w-0 flex-1 truncate text-app font-medium text-primary-token'
-                >
-                  {displayName}
-                </span>
-                {billingStatus.isPro && (
-                  <Badge
-                    variant='secondary'
-                    size='sm'
-                    className='shrink-0 rounded-full px-1.5 py-0 text-3xs font-medium'
+      type: 'action-row',
+      id: 'profile-help',
+      className:
+        'grid min-h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-1',
+      items: [
+        {
+          type: 'action',
+          id: 'profile-card',
+          label: `Open profile for ${displayName}`,
+          onClick: handleProfile,
+          className: 'min-w-0 gap-2.5 px-1.5 py-1.5',
+          content: (
+            <>
+              <Avatar
+                src={userImageUrl}
+                alt={displayName || 'User avatar'}
+                name={displayName || userInitials}
+                size='xs'
+                className='shrink-0'
+              />
+              <div className='min-w-0 flex-1'>
+                <div className='flex min-w-0 items-center gap-2'>
+                  <span
+                    title={displayName}
+                    className='min-w-0 flex-1 truncate text-app font-medium text-primary-token'
                   >
-                    Pro
-                  </Badge>
-                )}
+                    {displayName}
+                  </span>
+                  {billingStatus.isPro && (
+                    <Badge
+                      variant='secondary'
+                      size='sm'
+                      className='shrink-0 rounded-full px-1.5 py-0 text-3xs font-medium'
+                    >
+                      Pro
+                    </Badge>
+                  )}
+                </div>
+                <p
+                  aria-hidden={formattedUsername ? undefined : true}
+                  className='mt-0.5 h-4 truncate text-2xs text-tertiary-token'
+                >
+                  {formattedUsername ?? '\u00A0'}
+                </p>
               </div>
-              <p
-                aria-hidden={formattedUsername ? undefined : true}
-                className='mt-0.5 h-4 truncate text-2xs text-tertiary-token'
-              >
-                {formattedUsername ?? '\u00A0'}
-              </p>
-            </div>
-          </button>
-        </div>
-      ),
-    },
-    {
-      type: 'action',
-      id: 'help',
-      label: 'Help',
-      icon: HelpCircle,
-      onClick: handleHelp,
+            </>
+          ),
+        },
+        {
+          type: 'action',
+          id: 'help',
+          label: 'Help',
+          icon: HelpCircle,
+          onClick: handleHelp,
+          className: buttonVariants({
+            variant: 'secondary',
+            size: 'sm',
+            className: 'shrink-0 gap-1 px-2',
+          }),
+        },
+      ],
     },
     { type: 'separator', id: 'sep-1' },
     {
