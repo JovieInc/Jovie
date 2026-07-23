@@ -339,3 +339,13 @@ test('desktop staging is a bounded artifact and production is separately proven'
   assert.doesNotMatch(marker, /contents: write|electron-builder publish/);
   assert.doesNotMatch(desktopWorkflow, /--publish always/);
 });
+
+test('desktop publisher passes the release version as an equals-form option', () => {
+  const publish = step(
+    job(desktopWorkflow, 'build'),
+    'Publish production desktop release'
+  );
+
+  assert.match(publish, /--version="\$release_version"/);
+  assert.doesNotMatch(publish, /--version\s+"\$release_version"/);
+});
