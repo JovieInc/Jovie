@@ -94,8 +94,9 @@ test('canonical six are stable at 375, 768, and 1440', async ({ page }) => {
   test.setTimeout(180_000);
   await installStableShell(page);
   await setTestAuthBypassSession(page, 'creator-ready');
+  const chatWithProfileRail = `${APP_ROUTES.CHAT}?panel=profile`;
   await page.goto(
-    `/api/dev/test-auth/enter?persona=creator-ready&redirect=${encodeURIComponent(APP_ROUTES.CHAT)}`,
+    `/api/dev/test-auth/enter?persona=creator-ready&redirect=${encodeURIComponent(chatWithProfileRail)}`,
     { waitUntil: 'domcontentloaded' }
   );
   await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible({

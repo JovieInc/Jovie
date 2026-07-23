@@ -98,11 +98,15 @@ function resolveOperationFallback(
 ): { log: string; fallbackData: unknown } | null {
   switch (operation) {
     case 'creator_profiles':
+      // A creator_profiles schema error cannot safely be represented as an
+      // empty profile list. The canonical auth gate may still resolve the
+      // same user as ACTIVE from its narrower projection, which would make
+      // /app redirect to /start while /start redirects back to /app.
+      // Propagate the error so the dashboard loader can expose
+      // dashboardLoadError (or its local E2E fallback) instead of inventing
+      // an onboarding state.
       if (hasMigrationErrorCode || isCreatorProfilesColumnMissing(message)) {
-        return {
-          log: '[Dashboard] creator_profiles schema migration in progress; treating as needs onboarding',
-          fallbackData: [],
-        };
+        return null;
       }
       break;
     case 'user_settings':
