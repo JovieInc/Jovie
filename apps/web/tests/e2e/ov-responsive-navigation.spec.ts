@@ -1,6 +1,10 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  normalizeNavigationContract,
+  type RawNavigationContract,
+} from './utils/ov-navigation-contract';
 
 const VIEWPORTS = [
   { label: 'mobile-375', width: 375, height: 812 },
@@ -42,25 +46,80 @@ async function customerNavigationContract(
   navigation: Locator,
   mobile: boolean
 ) {
-  const stableMarkup = mobile
-    ? await navigation.evaluate(element => element.outerHTML)
-    : await navigation
-        .locator('[data-nav-section]')
-        .evaluateAll(sections =>
-          sections.map(section => section.outerHTML).join('')
-        );
-  const accessibility = await navigation
-    .locator('a[href], button')
-    .evaluateAll(elements =>
-      elements.map(element => ({
-        role: element.tagName.toLowerCase(),
-        name: element.getAttribute('aria-label') ?? element.textContent?.trim(),
-        href: element.getAttribute('href'),
-        current: element.getAttribute('aria-current'),
-      }))
-    );
+  const rawContract = await navigation.evaluate(
+    (element, isMobile): RawNavigationContract => {
+      const roots = isMobile
+        ? [element]
+        : Array.from(element.querySelectorAll('[data-nav-section]'));
+      const nodes = roots.flatMap((root, rootIndex) =>
+        [root, ...Array.from(root.querySelectorAll('*'))].map(
+          (node, nodeIndex) => ({
+            rootIndex,
+            nodeIndex,
+            tag: node.tagName.toLowerCase(),
+            role: node.getAttribute('role'),
+            text:
+              Array.from(node.childNodes)
+                .filter(child => child.nodeType === Node.TEXT_NODE)
+                .map(child => child.textContent ?? '')
+                .join(' ') || null,
+            href: node.getAttribute('href'),
+            type: node.getAttribute('type'),
+            classes: Array.from(node.classList),
+            aria: Object.fromEntries(
+              Array.from(node.attributes)
+                .filter(attribute => attribute.name.startsWith('aria-'))
+                .map(attribute => [attribute.name, attribute.value])
+            ),
+          })
+        )
+      );
+      const styleInvariants = roots.flatMap((root, rootIndex) =>
+        [
+          root,
+          ...Array.from(root.querySelectorAll<HTMLElement>('[style]')),
+        ].map(node => {
+          const nodeIndex = [
+            root,
+            ...Array.from(root.querySelectorAll('*')),
+          ].indexOf(node);
+          const style = globalThis.getComputedStyle(node);
+          return {
+            rootIndex,
+            nodeIndex,
+            styles: {
+              display: style.display,
+              visibility: style.visibility,
+              opacity: style.opacity,
+              'pointer-events': style.pointerEvents,
+              'background-color': style.backgroundColor,
+              'border-top-width': style.borderTopWidth,
+              'border-top-style': style.borderTopStyle,
+              'box-shadow': style.boxShadow,
+              'mix-blend-mode': style.mixBlendMode,
+              'backdrop-filter': style.backdropFilter,
+            },
+          };
+        })
+      );
+      const accessibility = Array.from(
+        element.querySelectorAll('a[href], button')
+      ).map(interactive => ({
+        role: interactive.tagName.toLowerCase(),
+        name:
+          interactive.getAttribute('aria-label') ??
+          interactive.textContent?.trim() ??
+          null,
+        href: interactive.getAttribute('href'),
+        current: interactive.getAttribute('aria-current'),
+      }));
 
-  return { stableMarkup, accessibility };
+      return { nodes, styleInvariants, accessibility };
+    },
+    mobile
+  );
+
+  return normalizeNavigationContract(rawContract);
 }
 
 test.describe('OV responsive navigation exclusivity', () => {
