@@ -15,7 +15,6 @@ export interface HomepagePosterHeroCta {
 export interface HomepagePosterHeroProps {
   readonly headline: string;
   readonly subtitle: string;
-  readonly lede?: string;
   readonly primaryCta: HomepagePosterHeroCta;
   readonly secondaryCta?: HomepagePosterHeroCta;
   readonly media: ReactNode;
@@ -27,7 +26,6 @@ export interface HomepagePosterHeroProps {
 export function HomepagePosterHero({
   headline,
   subtitle,
-  lede,
   primaryCta,
   secondaryCta,
   media,
@@ -55,9 +53,13 @@ export function HomepagePosterHero({
           {headline}
         </h1>
         <p className='homepage-poster-hero__subtitle'>{subtitle}</p>
-        {lede ? <p className='homepage-poster-hero__lede'>{lede}</p> : null}
         <div className='homepage-poster-hero__actions'>
-          <Button asChild size='md' variant='primary'>
+          <Button
+            asChild
+            size='md'
+            variant='primary'
+            className='homepage-poster-hero__primary-cta'
+          >
             <LinkComponent
               href={primaryCta.href}
               prefetch={primaryCta.prefetch}
@@ -71,7 +73,12 @@ export function HomepagePosterHero({
             </LinkComponent>
           </Button>
           {secondaryCta ? (
-            <Button asChild size='md' variant='secondary'>
+            <Button
+              asChild
+              size='md'
+              variant='ghost'
+              className='homepage-poster-hero__secondary-cta'
+            >
               <LinkComponent
                 href={secondaryCta.href}
                 prefetch={secondaryCta.prefetch}

@@ -106,6 +106,7 @@
   /* System B semantic aliases for public app surfaces. Keep page-level recipes
      on these names instead of route-local Tailwind literals. */
   --system-b-cinematic-black: #06070a;
+  --system-b-true-black: #000;
   --system-b-text-primary: var(--color-text-primary-token);
   --system-b-bg-page: var(--color-bg-base);
   --system-b-bg-surface-0: var(--color-bg-surface-0);

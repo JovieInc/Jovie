@@ -51,4 +51,26 @@ describe('HomeTrustSection', () => {
       container.querySelectorAll('[data-mobile-logo="secondary"]')
     ).toHaveLength(1);
   });
+
+  it('supports the locked four-logo homepage trust strip', () => {
+    const { container } = render(
+      <HomeTrustSection
+        presentation='inline-strip'
+        label='Artists distributed through'
+        includeSecondaryLogo={false}
+      />
+    );
+
+    expect(screen.getByTestId('homepage-trust')).toHaveAttribute(
+      'data-logo-count',
+      '4'
+    );
+    expect(screen.getByText('Artists distributed through')).toBeInTheDocument();
+    expect(
+      screen.queryByAltText('Black Hole Recordings')
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelectorAll('.homepage-trust-logo-slot')
+    ).toHaveLength(4);
+  });
 });

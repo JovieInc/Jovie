@@ -1816,7 +1816,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   z-index: 2;
   display: flex;
   flex-shrink: 0;
-  width: min(100%, 68rem);
+  width: min(100%, 72rem);
   flex-direction: column;
   align-items: center;
   padding-inline: var(--homepage-page-gutter);
@@ -1824,25 +1824,26 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-poster-hero__headline {
-  max-width: 14ch;
+  max-width: 18ch;
   margin: 0;
   color: var(--color-text-primary-token);
   font-family:
     var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
-  font-size: var(--ds-marketing-display-size);
-  font-weight: 600;
-  letter-spacing: var(--ds-marketing-display-tracking);
-  line-height: var(--ds-marketing-display-leading);
+  font-size: clamp(42px, 5.6vw, 80px);
+  font-weight: 900;
+  letter-spacing: -0.055em;
+  line-height: 0.94;
   text-wrap: balance;
+  white-space: pre-line;
 }
 
 .homepage-poster-hero__subtitle {
-  max-width: 34ch;
+  max-width: 54ch;
   margin: var(--space-6) 0 0;
   color: var(--color-text-secondary-token);
-  font-size: var(--ds-marketing-lede-size);
-  line-height: var(--ds-marketing-lede-leading);
-  letter-spacing: var(--ds-marketing-lede-tracking);
+  font-size: clamp(1rem, 1.45vw, 1.25rem);
+  line-height: 1.45;
+  letter-spacing: -0.015em;
   text-wrap: balance;
 }
 
@@ -1852,6 +1853,36 @@ body:has(.home-viewport)::-webkit-scrollbar {
   justify-content: center;
   gap: var(--space-3);
   margin-top: var(--space-6);
+}
+
+.homepage-poster-hero__primary-cta {
+  min-height: var(--space-10);
+  border-color: var(--linear-accent-blue);
+  background: var(--linear-accent-blue);
+  color: var(--color-accent-foreground);
+}
+
+.homepage-poster-hero__primary-cta:hover {
+  border-color: color-mix(
+    in oklab,
+    var(--linear-accent-blue) 88%,
+    var(--system-b-text-primary)
+  );
+  background: color-mix(
+    in oklab,
+    var(--linear-accent-blue) 88%,
+    var(--system-b-text-primary)
+  );
+}
+
+.homepage-poster-hero__secondary-cta {
+  min-height: var(--space-10);
+  color: var(--color-text-secondary-token);
+}
+
+.homepage-poster-hero__secondary-cta:hover {
+  background: transparent;
+  color: var(--color-text-primary-token);
 }
 
 .homepage-poster-hero__seam {
@@ -1866,23 +1897,23 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-poster-hero__electric-seam {
   --homepage-electric-seam-base: color-mix(
     in oklab,
-    var(--system-b-text-primary) 72%,
+    var(--linear-accent-blue) 28%,
     transparent
   );
   --homepage-electric-seam-glow: color-mix(
     in oklab,
-    var(--system-b-accent-cyan) 72%,
+    var(--linear-accent-blue) 78%,
     transparent
   );
   --homepage-electric-seam-spark: color-mix(
     in oklab,
-    var(--system-b-accent-cyan) 84%,
+    var(--linear-accent-blue) 92%,
     transparent
   );
   --homepage-electric-seam-core: color-mix(
     in oklab,
-    var(--system-b-text-primary) 92%,
-    var(--system-b-accent-cyan)
+    var(--system-b-text-primary) 82%,
+    var(--linear-accent-blue)
   );
 }
 
@@ -1957,7 +1988,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 @media (prefers-reduced-motion: no-preference) {
   .homepage-poster-hero__headline,
   .homepage-poster-hero__subtitle,
-  .homepage-poster-hero__lede,
   .homepage-poster-hero__actions,
   .homepage-poster-hero__seam,
   .homepage-poster-hero__media {
@@ -1967,10 +1997,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
   .homepage-poster-hero__subtitle {
     animation-delay: 70ms;
-  }
-
-  .homepage-poster-hero__lede {
-    animation-delay: 105ms;
   }
 
   .homepage-poster-hero__actions {
@@ -2048,10 +2074,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   overflow: hidden;
   border: 1px solid var(--system-b-app-frame-seam);
   border-radius: var(--radius-xl);
-  background: var(--system-b-bg-surface-1);
-  box-shadow:
-    var(--shadow-card),
-    0 40px 120px rgba(0, 0, 0, 0.55);
+  background: var(--system-b-true-black);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.55);
 }
 
 /* Cinematic stage light: a single hairline of light caught on the pane's top
@@ -2059,7 +2083,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-product-pane::after {
   position: absolute;
   inset: 0 0 auto;
-  z-index: 1;
+  z-index: 2;
   height: 1px;
   content: "";
   background: linear-gradient(
@@ -2070,6 +2094,16 @@ body:has(.home-viewport)::-webkit-scrollbar {
     color-mix(in oklab, var(--system-b-text-primary) 26%, transparent) 68%,
     transparent 96%
   );
+  pointer-events: none;
+}
+
+.homepage-product-pane::before {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 2;
+  height: 28%;
+  content: "";
+  background: linear-gradient(180deg, transparent, var(--system-b-bg-page) 94%);
   pointer-events: none;
 }
 
@@ -3097,21 +3131,25 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
   .homepage-poster-hero__headline {
     max-width: 20ch;
-    font-size: clamp(2.4rem, 9vw, 3.1rem);
-    line-height: 0.94;
+    font-size: clamp(32px, 9vw, 42px);
+    letter-spacing: -0.045em;
+    line-height: 0.98;
   }
 
   .homepage-poster-hero__subtitle {
+    max-width: 34ch;
     margin-top: var(--space-4);
     font-size: 1rem;
+    line-height: 1.42;
   }
 
   .homepage-poster-hero__actions {
-    margin-top: var(--space-5);
+    gap: var(--space-2);
+    margin-top: var(--space-4);
   }
 
   .homepage-poster-hero__seam {
-    margin-block: var(--space-6) var(--space-5);
+    margin-block: var(--space-4) var(--space-4);
   }
 
   .homepage-product-pane {
@@ -3419,6 +3457,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   will-change: transform, opacity;
 }
 
+.system-b-mounted-home-trust-strip[data-logo-count="4"]
+  .system-b-mounted-home-trust-strip-logo-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .system-b-mounted-home-trust-strip
   .system-b-mounted-home-trust-strip-logo-slot {
   display: flex;
@@ -3493,6 +3536,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
     gap: var(--space-4) var(--space-6);
   }
 
+  .system-b-mounted-home-trust-strip[data-logo-count="4"]
+    .system-b-mounted-home-trust-strip-logo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .system-b-mounted-home-trust-strip
     .system-b-mounted-home-trust-strip-logo-slot {
     height: calc(var(--space-10) + var(--space-1));
@@ -3511,6 +3559,17 @@ body:has(.home-viewport)::-webkit-scrollbar {
     grid-column: 1 / -1;
     height: calc(var(--space-8) + var(--space-1));
     justify-content: center;
+  }
+
+  .system-b-mounted-home-trust-strip[data-logo-count="4"]
+    .system-b-mounted-home-trust-strip-logo-slot--umg {
+    grid-column: auto;
+    justify-content: flex-start;
+  }
+
+  .system-b-mounted-home-trust-strip[data-logo-count="4"]
+    .system-b-mounted-home-trust-strip-logo-slot--armada {
+    justify-content: flex-end;
   }
 
   .system-b-mounted-home-trust-strip

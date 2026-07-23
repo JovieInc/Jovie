@@ -11,6 +11,7 @@ interface HomeTrustSectionProps {
   readonly variant?: 'default' | 'compact';
   readonly className?: string;
   readonly presentation?: 'card' | 'inline-strip';
+  readonly includeSecondaryLogo?: boolean;
   /** Label rendered above the logos. Artist-profile and release-notification
    * surfaces use the default ("Trusted by artists and teams releasing on");
    * the homepage hero historically used a shorter variant. */
@@ -59,6 +60,7 @@ export function HomeTrustSection({
   variant = 'default',
   className,
   presentation = 'card',
+  includeSecondaryLogo = true,
   label = 'Trusted by artists and teams releasing on',
 }: Readonly<HomeTrustSectionProps>) {
   const isInlineStrip = presentation === 'inline-strip';
@@ -70,6 +72,7 @@ export function HomeTrustSection({
     <section
       data-testid='homepage-trust'
       data-presentation={presentation}
+      data-logo-count={includeSecondaryLogo ? '5' : '4'}
       className={cn(
         isInlineStrip
           ? 'system-b-mounted-home-trust-strip'
@@ -146,19 +149,21 @@ export function HomeTrustSection({
               )}
             />
           </div>
-          <div
-            data-mobile-logo='secondary'
-            className={getSlotClass(isInlineStrip, 'black-hole')}
-          >
-            <BlackHoleRecordingsLogo
-              className={getLogoClass(
-                isInlineStrip,
-                'homepage-trust-logo homepage-trust-logo--black-hole system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--black-hole',
-                'h-4 w-auto sm:h-5',
-                ''
-              )}
-            />
-          </div>
+          {includeSecondaryLogo ? (
+            <div
+              data-mobile-logo='secondary'
+              className={getSlotClass(isInlineStrip, 'black-hole')}
+            >
+              <BlackHoleRecordingsLogo
+                className={getLogoClass(
+                  isInlineStrip,
+                  'homepage-trust-logo homepage-trust-logo--black-hole system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--black-hole',
+                  'h-4 w-auto sm:h-5',
+                  ''
+                )}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

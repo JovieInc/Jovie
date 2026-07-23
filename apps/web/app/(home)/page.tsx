@@ -135,7 +135,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${BASE_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - Your AI artist manager.`,
+          alt: HOMEPAGE_LAUNCH_COPY.seo.title,
           type: 'image/png',
         },
       ],
@@ -147,7 +147,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${BASE_URL}/og/default.png`,
-          alt: `${APP_NAME} - Your AI artist manager.`,
+          alt: HOMEPAGE_LAUNCH_COPY.seo.title,
           width: 1200,
           height: 630,
         },
@@ -205,7 +205,6 @@ function HomepageHero() {
         headingId='home-hero-heading'
         headline={HERO_COPY.headline}
         subtitle={HERO_COPY.subhead}
-        lede={HERO_COPY.lede}
         trackedLinkComponent={HomepageTrackedLink}
         primaryCta={{
           label: HERO_COPY.primaryCta.label,
@@ -236,8 +235,9 @@ function HomepageHero() {
       />
       <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
         <HomeTrustSection
-          label='Artists Distributed Through'
+          label='Artists distributed through' // ui-casing-allow: design-locked trust strip copy
           presentation='inline-strip'
+          includeSecondaryLogo={false}
         />
       </div>
     </>

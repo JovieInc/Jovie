@@ -285,17 +285,8 @@ async function prepareScenario(
       page.getByText('Cosmic Gate & Tim White').first()
     ).toBeVisible();
     await expect(page.getByText('Take Me Over').first()).toBeVisible();
-    await expect(page.getByTestId('shell-v1-release-drawer')).toBeVisible();
-    await page.getByRole('tab', { name: 'Distribution' }).click();
-    await expect(
-      page.getByRole('tab', { name: 'Distribution' })
-    ).toHaveAttribute('aria-selected', 'true');
-    await expect(
-      page
-        .getByTestId('shell-v1-release-drawer')
-        .getByText('Spotify', { exact: true })
-        .first()
-    ).toBeVisible();
+    await expect(page.getByTestId('shell-v1-picking-up')).toHaveCount(1);
+    await expect(page.getByTestId('shell-v1-release-drawer')).toHaveCount(0);
   }
 
   if (scenario.id === 'release-presave-mobile') {

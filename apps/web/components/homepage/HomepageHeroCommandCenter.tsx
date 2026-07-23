@@ -51,14 +51,14 @@ export function HomepageHeroCommandCenter({
 }: Readonly<{ images: HomepageHeroCommandCenterImages }>) {
   return (
     <section
-      aria-label='Jovie Release Operating System'
+      aria-label='Jovie Releases Table'
       className='homepage-hero-command-center system-b-mounted-home-command-center'
       data-testid='homepage-hero-command-center'
     >
       <div className='homepage-product-rail system-b-mounted-home-command-rail'>
         <ProductPane
           image={images.product}
-          alt='Jovie release workspace with release status, assets, and launch progress'
+          alt='Jovie Releases table with real catalog rows and release status'
           sizes='(min-width: 1360px) 1298px, (min-width: 768px) calc(100vw - 4rem), calc(100vw - 3rem)'
           className='homepage-product-pane--desktop'
           priority

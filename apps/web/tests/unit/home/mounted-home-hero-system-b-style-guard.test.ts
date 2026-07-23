@@ -102,12 +102,12 @@ describe('mounted homepage hero System B source contract', () => {
     expect(css).toContain('var(--homepage-page-gutter)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('var(--font-satoshi)');
-    expect(css).toContain(
-      'letter-spacing: var(--ds-marketing-display-tracking);'
-    );
-    expect(css).toContain('font-size: var(--ds-marketing-display-size);');
-    expect(css).toContain('line-height: var(--ds-marketing-display-leading);');
-    expect(css).toContain('font-size: var(--ds-marketing-lede-size);');
+    expect(css).toContain('letter-spacing: -0.055em;');
+    expect(css).toContain('font-size: clamp(42px, 5.6vw, 80px);');
+    expect(css).toContain('font-weight: 900;');
+    expect(css).toContain('line-height: 0.94;');
+    expect(css).toContain('font-size: clamp(1rem, 1.45vw, 1.25rem);');
+    expect(css).toContain('var(--linear-accent-blue)');
     expect(css).toContain('mask-image: linear-gradient(');
     expect(css).toContain('min-height: var(--space-6);');
   });

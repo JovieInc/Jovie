@@ -19,6 +19,11 @@ const primaryCta: HomepagePosterHeroCta = {
   eventProperties: { variant: 'A' },
 };
 
+const secondaryCta: HomepagePosterHeroCta = {
+  label: 'See a live profile',
+  href: '/timwhite',
+};
+
 function renderHero(
   trackedLinkComponent?: ComponentProps<
     typeof HomepagePosterHero
@@ -29,6 +34,7 @@ function renderHero(
       headline='Your artist work, in motion'
       subtitle='A focused workspace for the next release.'
       primaryCta={primaryCta}
+      secondaryCta={secondaryCta}
       media={<div>Poster media</div>}
       seam={<div>Reserved seam</div>}
       trackedLinkComponent={trackedLinkComponent}
@@ -50,6 +56,14 @@ describe('HomepagePosterHero', () => {
     const primaryLink = screen.getByRole('link', { name: 'Enter Jovie' });
     expect(primaryLink).toHaveAttribute('href', '/signup');
     expect(primaryLink).toHaveAttribute('data-size', 'md');
+    expect(primaryLink).toHaveClass('homepage-poster-hero__primary-cta');
+
+    const secondaryLink = screen.getByRole('link', {
+      name: 'See a live profile',
+    });
+    expect(secondaryLink).toHaveAttribute('href', '/timwhite');
+    expect(secondaryLink).toHaveAttribute('data-variant', 'ghost');
+    expect(secondaryLink).toHaveClass('homepage-poster-hero__secondary-cta');
   });
 
   it('keeps the copy, media, and reserved seam slots present', () => {

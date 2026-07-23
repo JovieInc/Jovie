@@ -61,20 +61,29 @@ test.describe('Homepage', () => {
     const hero = page.getByTestId('homepage-hero-shell');
 
     await expect(hero).toBeVisible();
+    await expect(page).toHaveTitle(
+      'Jovie — You make the music. Jovie runs the business.'
+    );
     await expect(hero.getByText('operating system')).toHaveCount(0);
     await expect(
       hero.getByRole('heading', {
-        name: 'Your catalog has untapped potential.',
+        name: 'You make the music. Jovie runs the business.',
       })
     ).toBeVisible();
-    await expect(hero.getByText('You make the music.')).toBeVisible();
     await expect(
-      hero.getByRole('link', { name: 'Get started', exact: true })
+      hero.getByText(
+        'It finds what your songs need — the presave, the pitch, the page — drafts it, and waits for your yes.'
+      )
+    ).toBeVisible();
+    await expect(
+      hero.getByText('Drive streams. Capture fans. Get paid.')
+    ).toHaveCount(0);
+    await expect(
+      hero.getByRole('link', { name: 'Claim your free profile', exact: true })
     ).toHaveAttribute('href', /\/start\?starter_prompt=/);
-    // Secondary CTA hidden while WAITLIST_ENABLED is on.
     await expect(
       hero.getByRole('link', { name: 'See a live profile', exact: true })
-    ).toHaveCount(0);
+    ).toHaveAttribute('href', '/timwhite');
     await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
   });
 
@@ -145,7 +154,7 @@ test.describe('Homepage', () => {
     await expect(commandCenter).toBeVisible();
     await expect(
       commandCenter.getByAltText(
-        'Jovie release workspace with release status, assets, and launch progress'
+        'Jovie Releases table with real catalog rows and release status'
       )
     ).toBeVisible();
     await expect(commandCenter.locator('img')).toHaveCount(1);
@@ -197,6 +206,17 @@ test.describe('Homepage', () => {
         `${image.alt} should be loaded at device pixel ratio quality`
       ).toBeGreaterThanOrEqual(image.requiredWidth);
     }
+
+    const paneTreatment = await commandCenter
+      .locator('[data-product-pane]')
+      .evaluate(element => ({
+        backgroundColor: getComputedStyle(element).backgroundColor,
+        borderColor: getComputedStyle(element).borderColor,
+        bottomFade: getComputedStyle(element, '::before').backgroundImage,
+      }));
+    expect(paneTreatment.backgroundColor).toBe('rgb(0, 0, 0)');
+    expect(paneTreatment.borderColor).toBe('rgba(255, 255, 255, 0.07)');
+    expect(paneTreatment.bottomFade).toContain('linear-gradient');
   });
 
   test('electric seam keeps hero geometry stable and respects reduced motion', async ({
@@ -243,10 +263,15 @@ test.describe('Homepage', () => {
   test('renders the System B narrative in order through the footer CTA', async ({
     page,
   }) => {
-    await expect(page.getByTestId('homepage-trust')).toHaveAttribute(
+    const trustStrip = page.getByTestId('homepage-trust');
+    await expect(trustStrip).toHaveAttribute(
       'data-presentation',
       'inline-strip'
     );
+    await expect(trustStrip).toHaveAttribute('data-logo-count', '4');
+    await expect(
+      trustStrip.locator('.homepage-trust-logo-slot')
+    ).toHaveCount(4);
     await expect(page.getByTestId('homepage-story-stack')).toHaveAttribute(
       'data-proof-transition',
       'true'
@@ -406,7 +431,7 @@ test.describe('Homepage', () => {
 
     await expect(
       page.getByRole('heading', {
-        name: 'Your catalog has untapped potential.',
+        name: 'You make the music. Jovie runs the business.',
       })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
@@ -439,6 +464,29 @@ test.describe('Homepage', () => {
     await expect(
       header.getByRole('link', { name: 'Log in', exact: true })
     ).toHaveAttribute('href', '/signin');
+
+    const headlineLineCount = await page
+      .getByRole('heading', {
+        name: 'You make the music. Jovie runs the business.',
+      })
+      .evaluate(element => {
+        const style = getComputedStyle(element);
+        const lineHeight = Number.parseFloat(style.lineHeight);
+        return Math.round(element.getBoundingClientRect().height / lineHeight);
+      });
+    expect(headlineLineCount).toBeLessThanOrEqual(4);
+
+    await page.setViewportSize({ width: 320, height: 568 });
+    await gotoHomepage(page);
+    const primaryCta = page.getByRole('link', {
+      name: 'Claim your free profile',
+      exact: true,
+    });
+    await expect(primaryCta).toBeVisible();
+    const primaryCtaBounds = await primaryCta.boundingBox();
+    expect(
+      (primaryCtaBounds?.y ?? 568) + (primaryCtaBounds?.height ?? 0)
+    ).toBeLessThanOrEqual(568);
   });
 
   test('has no horizontal overflow across common viewports', async ({

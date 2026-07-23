@@ -22,21 +22,21 @@ export interface HomepageHeroCarouselSlide {
 
 export const HOMEPAGE_LAUNCH_COPY = {
   seo: {
-    title: 'Jovie | Your AI artist manager',
+    title: 'Jovie — You make the music. Jovie runs the business.',
     description:
       'Jovie is the AI artist workspace that surfaces opportunities in your catalog — presaves, captures, pitches — and helps you ship the next one.',
   },
   hero: {
-    headline: 'Your catalog has untapped potential.',
-    subhead: 'Jovie finds it.',
-    lede: 'Drive streams. Capture fans. Get paid.',
+    headline: 'You make the music.\nJovie runs the business.',
+    subhead:
+      'It finds what your songs need — the presave, the pitch, the page — drafts it, and waits for your yes.',
     primaryCta: {
       ...HOMEPAGE_FRONT_DOOR_CTA.primary,
-      label: 'Get started',
+      label: 'Claim your free profile',
     },
     secondaryCta: {
       label: 'See a live profile',
-      href: APP_ROUTES.ARTIST_PROFILES,
+      href: '/timwhite',
     },
   },
   fallbackCta: {
