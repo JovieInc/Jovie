@@ -321,6 +321,46 @@ describe('repairSharpRuntimeTraces', () => {
     expect(plainTraceAfter).toBe(plainTraceBefore);
   });
 
+  it('accepts the expected native addon alongside an optional libc addon', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'jovie-sharp-trace-'));
+    temporaryRoots.push(root);
+    const traceRoot = path.join(root, '.next', 'server');
+    const libraryPath = path.join(root, 'libvips-cpp.so.8.18.3');
+    writeFileSync(libraryPath, 'fixture');
+    const expectedNativeAddonPath = createSharpNativeAddon(
+      root,
+      getSharpNativePackageName(glibcX64)
+    );
+    const optionalNativeAddonPath = createSharpNativeAddon(
+      root,
+      '@img/sharp-linuxmusl-x64'
+    );
+    const sharpTracePath = writeTrace(
+      traceRoot,
+      'app/api/chat/route.js.nft.json',
+      [
+        '../../../../node_modules/sharp-76070f79591ce98c',
+        toTraceRelativePath(traceRoot, optionalNativeAddonPath),
+        toTraceRelativePath(traceRoot, expectedNativeAddonPath),
+      ]
+    );
+
+    expect(
+      repairSharpRuntimeTraces({
+        traceRoot,
+        sharedLibraries: [libraryPath],
+        ...glibcX64,
+      })
+    ).toEqual({ repairedTraceCount: 1, sharpTraceCount: 1 });
+
+    expect(JSON.parse(readFileSync(sharpTracePath, 'utf8')).files).toContain(
+      path
+        .relative(path.dirname(sharpTracePath), libraryPath)
+        .split(path.sep)
+        .join('/')
+    );
+  });
+
   it('fails closed when a syntactically matching native addon is missing', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'jovie-sharp-trace-'));
     temporaryRoots.push(root);

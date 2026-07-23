@@ -212,19 +212,16 @@ export function repairSharpRuntimeTraces({
       .filter(({ file, packageName }) =>
         isSharpNativeAddonEntry(file, packageName)
       );
-    const mismatchedAddon = nativeAddonEntries.find(
-      ({ packageName }) => packageName !== expectedNativePackageName
-    );
-    if (mismatchedAddon) {
-      throw new Error(
-        `Sharp runtime trace native addon must belong to ${expectedNativePackageName}, found ${mismatchedAddon.packageName ?? 'an unknown package'}: ${tracePath}`
-      );
-    }
-
     const expectedAddon = nativeAddonEntries.find(
       ({ packageName }) => packageName === expectedNativePackageName
     );
     if (!expectedAddon) {
+      const mismatchedAddon = nativeAddonEntries[0];
+      if (mismatchedAddon) {
+        throw new Error(
+          `Sharp runtime trace native addon must belong to ${expectedNativePackageName}, found ${mismatchedAddon.packageName ?? 'an unknown package'}: ${tracePath}`
+        );
+      }
       throw new Error(
         `Sharp runtime trace is missing a native addon from ${expectedNativePackageName}: ${tracePath}`
       );
