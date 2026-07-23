@@ -103,9 +103,44 @@ const CREATOR_SHELL_SLICE_ROUTES = [
 
 const RELEASE_BUDGET_CREATOR_SHELL_ROUTE_IDS = [
   'creator-releases',
+  'creator-library-cold',
   'creator-library',
+  'creator-tasks-cold',
   'creator-tasks',
   'creator-lyrics',
+] as const;
+
+const CANONICAL_SHELL_PERF_PAIRS = [
+  {
+    itemId: 'inbox',
+    coldRouteId: 'creator-app-home',
+    warmRouteId: 'creator-inbox-nav',
+  },
+  {
+    itemId: 'chat',
+    coldRouteId: 'creator-chat',
+    warmRouteId: 'creator-chat-nav',
+  },
+  {
+    itemId: 'library',
+    coldRouteId: 'creator-library-cold',
+    warmRouteId: 'creator-library',
+  },
+  {
+    itemId: 'contacts',
+    coldRouteId: 'creator-contacts-cold',
+    warmRouteId: 'creator-contacts',
+  },
+  {
+    itemId: 'calendar',
+    coldRouteId: 'creator-calendar-cold',
+    warmRouteId: 'creator-calendar',
+  },
+  {
+    itemId: 'tasks',
+    coldRouteId: 'creator-tasks-cold',
+    warmRouteId: 'creator-tasks',
+  },
 ] as const;
 
 function requireRoute(id: string) {
@@ -155,6 +190,22 @@ describe('performance route manifest shell slice coverage', () => {
       const route = requireRoute(routeId);
       expect(getRouteResourceBudgets(route)).toEqual(releaseResourceBudgets);
     }
+  });
+
+  it.each(
+    CANONICAL_SHELL_PERF_PAIRS
+  )('measures $itemId with both cold-load and warm-navigation routes', expectation => {
+    const coldRoute = requireRoute(expectation.coldRouteId);
+    const warmRoute = requireRoute(expectation.warmRouteId);
+
+    expect(coldRoute.path).toBe(warmRoute.path);
+    expect(coldRoute.measureMode).toBe('page-load');
+    expect(coldRoute.warmupStrategy).toBe('authenticated-route');
+    expect(warmRoute.measureMode).toBe('warm-navigation');
+    expect(warmRoute.warmupStrategy).toBe('authenticated-shell');
+    expect(warmRoute.navigationItemId).toBe(expectation.itemId);
+    expectBudgetCoverage(coldRoute);
+    expectBudgetCoverage(warmRoute);
   });
 
   it('uses real profile-rail content rather than its skeleton as readiness', () => {

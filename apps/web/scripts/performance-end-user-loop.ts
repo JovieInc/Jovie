@@ -9,6 +9,7 @@ import {
   type PageResult,
   runPerformanceBudgetsGuard,
 } from './performance-budgets-guard';
+import { buildStandaloneServerLaunch } from './performance-launch-check';
 import {
   buildOptimizerPrompt,
   createEmptyRunState,
@@ -208,14 +209,32 @@ export function resolveServerBaseUrl(requestedBaseUrl: string, port: number) {
   return parsedUrl.toString().replace(/\/$/, '');
 }
 
+export function resolveEndUserServerLaunch(
+  requestedBaseUrl: string,
+  port: number,
+  extraEnv: NodeJS.ProcessEnv = {}
+) {
+  const baseUrl = resolveServerBaseUrl(requestedBaseUrl, port);
+  return {
+    baseUrl,
+    launch: buildStandaloneServerLaunch(baseUrl, {
+      ...process.env,
+      ...extraEnv,
+    }),
+  };
+}
+
 async function startServer(
   artifactDir: string,
   requestedBaseUrl: string,
   port: number,
   extraEnv?: NodeJS.ProcessEnv
 ) {
-  const baseUrl = resolveServerBaseUrl(requestedBaseUrl, port);
-  const hostname = new URL(baseUrl).hostname;
+  const { baseUrl, launch } = resolveEndUserServerLaunch(
+    requestedBaseUrl,
+    port,
+    extraEnv
+  );
   const logPath = resolve(artifactDir, 'server.log');
   writeFileSync(logPath, '');
 
@@ -231,16 +250,9 @@ async function startServer(
     );
   }
 
-  const child = spawn('doppler', ['run', '--', 'node', standaloneServerPath], {
+  const child = spawn('doppler', launch.args, {
     cwd: repoRoot,
-    env: {
-      ...process.env,
-      ...extraEnv,
-      HOSTNAME: hostname,
-      PORT: String(port),
-      // Enable test auth bypass for authenticated route measurement
-      E2E_USE_TEST_AUTH_BYPASS: '1',
-    },
+    env: launch.env,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
