@@ -90,7 +90,7 @@ jobs:
       name: Staging – jovie
       url: https://staging.jov.ie
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.expected_sha }}
           persist-credentials: false
@@ -463,7 +463,7 @@ jobs:
     outputs:
       is_current: ${{ steps.head.outputs.is_current }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.expected_sha }}
           persist-credentials: false
@@ -662,7 +662,7 @@ jobs:
       # A current generation still requires the inner pre-mutation script proof.
       promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha || steps.mutation-head.outputs.superseded_sha }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.expected_sha }}
           persist-credentials: false
@@ -939,7 +939,7 @@ jobs:
       baseline_errors: ${{ steps.sentry-gate.outputs.baseline_errors }}
       post_deploy_errors: ${{ steps.sentry-gate.outputs.post_deploy_errors }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.expected_sha }}
           fetch-depth: 1
@@ -970,7 +970,7 @@ jobs:
       ba_health: ${{ steps.gate-result.outputs.ba_health }}
       oauth_status: ${{ steps.gate-result.outputs.oauth_status }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.expected_sha }}
           fetch-depth: 1
@@ -1231,7 +1231,7 @@ jobs:
     outputs:
       rolled_back: ${{ steps.rollback.outputs.rolled_back }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.expected_sha }}
           fetch-depth: 1
