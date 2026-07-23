@@ -24,7 +24,9 @@ export const DESKTOP_SMOKE_SPECS = [
   'golden-path.spec.ts',
   // Quarantined (do not re-add while in apps/web/tests/quarantine.json):
   // - profile-fan-capture-golden-path.spec.ts (e2e-fan-capture-otp-timeout)
-  // - start-onboarding-llm-failure.spec.ts (e2e-onboarding-llm-failure)
+  // Un-quarantined in JOV-4179: the smoke lanes arm
+  // CHAT_LLM_FAILURE_INJECTION=1 + SESSION_SECRET + UPSTASH_REDIS_* for it.
+  'start-onboarding-llm-failure.spec.ts',
   'onboarding-robot.smoke.spec.ts',
   'signup-funnel.smoke.spec.ts',
   'claim-prebuilt.smoke.spec.ts',
