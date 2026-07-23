@@ -257,6 +257,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ needs.guard.outputs.issue_number }}
           BRANCH_NAME: ${{ needs.guard.outputs.branch_name }}
+          TRACKER_CLAIM_OWNER: github-ai:${{ github.repository }}:${{ github.run_id }}:${{ github.run_attempt }}
         run: |
           node scripts/github-claim-issue.mjs "$ISSUE_NUMBER" \
             "GitHub AI Orchestrator claimed issue #${ISSUE_NUMBER}. Working branch: ${BRANCH_NAME}."
@@ -384,10 +385,10 @@ jobs:
             --title "$PR_TITLE" \
             --body-file "$PR_BODY_FILE"
 
-  sync_in_review:
-    name: Sync issue to In Review
-    needs: [guard, implement_and_open_pr]
-    if: needs.guard.outputs.should_run == 'true'
+  finalize_claim:
+    name: Finalize GitHub issue claim
+    needs: [guard, claim_issue, implement_and_open_pr]
+    if: ${{ always() && needs.guard.outputs.should_run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -399,29 +400,23 @@ jobs:
         with:
           sparse-checkout: |
             scripts/lib/tracker.mjs
+            scripts/github-finalize-issue-claim.mjs
           sparse-checkout-cone-mode: false
 
-      - name: Transition issue to in-review
+      - name: Finalize exact owned claim
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ needs.guard.outputs.issue_number }}
           BRANCH_NAME: ${{ needs.guard.outputs.branch_name }}
+          IMPLEMENT_RESULT: ${{ needs.implement_and_open_pr.result }}
+          TRACKER_CLAIM_OWNER: github-ai:${{ github.repository }}:${{ github.run_id }}:${{ github.run_attempt }}
         run: |
           PR_URL=$(gh pr list --head "$BRANCH_NAME" --state open --json url --jq '.[0].url // empty')
-          NOTE="Automated PR opened for #${ISSUE_NUMBER}"
+          OUTCOME="retryable"
+          NOTE="Implementation result: ${IMPLEMENT_RESULT}. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           if [[ -n "$PR_URL" ]]; then
-            NOTE="${NOTE}: ${PR_URL}"
+            OUTCOME="in-review"
+            NOTE="Automated PR opened for #${ISSUE_NUMBER}: ${PR_URL}. ${NOTE}"
           fi
-          export NOTE
-          node --input-type=module -e "
-            import { transitionIssue } from './scripts/lib/tracker.mjs';
-            const result = transitionIssue({
-              number: Number(process.env.ISSUE_NUMBER),
-              status: 'in-review',
-              note: process.env.NOTE,
-            });
-            if (!result.success) {
-              console.error(result.error ?? 'transition failed');
-              process.exit(1);
-            }
-          "
+          node scripts/github-finalize-issue-claim.mjs \
+            "$ISSUE_NUMBER" "$OUTCOME" "$NOTE"

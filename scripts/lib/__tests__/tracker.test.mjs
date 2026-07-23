@@ -6,6 +6,7 @@ import {
   buildIssueCreateArgs,
   claimIssue,
   fileGithubIssue,
+  finalizeIssueClaim,
   parseIssueNumber,
   queryTodoIssues,
   STATUS_IN_PROGRESS,
@@ -125,6 +126,46 @@ describe('claimIssue', () => {
     expect(calls[2].join(' ')).toContain('test claim');
   });
 
+  it('persists the exact owner before publishing an in-progress claim', () => {
+    const calls = [];
+    const exec = args => {
+      calls.push(args);
+      return '';
+    };
+    const result = claimIssue(
+      {
+        number: 42,
+        note: 'owned claim',
+        ownerToken: 'github-ai:JovieInc/Jovie:123:1',
+      },
+      exec
+    );
+    expect(result.success).toBe(true);
+    expect(calls[0]).toContain('comment');
+    expect(calls[0].join(' ')).toContain(
+      '<!-- github-ai-claim-owner:github-ai:JovieInc/Jovie:123:1 -->'
+    );
+    expect(calls[1]).toContain(STATUS_IN_PROGRESS);
+  });
+
+  it('does not publish an unowned status when the owner receipt fails', () => {
+    const calls = [];
+    const exec = args => {
+      calls.push(args);
+      throw new Error('comment unavailable');
+    };
+    const result = claimIssue(
+      {
+        number: 42,
+        ownerToken: 'github-ai:JovieInc/Jovie:123:1',
+      },
+      exec
+    );
+    expect(result).toMatchObject({ success: false });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain('comment');
+  });
+
   it('keeps the status claim when assignee assignment fails', () => {
     const calls = [];
     const exec = args => {
@@ -139,6 +180,151 @@ describe('claimIssue', () => {
     expect(result.success).toBe(true);
     expect(calls[0]).toContain(STATUS_IN_PROGRESS);
     expect(calls.at(-1)).toContain('comment');
+  });
+});
+
+describe('finalizeIssueClaim', () => {
+  const ownerToken = 'github-ai:JovieInc/Jovie:123:1';
+  const ownerMarker = `<!-- github-ai-claim-owner:${ownerToken} -->`;
+
+  function createExec({ labels, comments }) {
+    const calls = [];
+    const exec = args => {
+      calls.push(args);
+      const endpoint = args.at(-1);
+      if (String(endpoint).includes('/comments?')) {
+        return JSON.stringify([comments]);
+      }
+      if (String(endpoint).endsWith('/issues/42')) {
+        return JSON.stringify({
+          state: 'open',
+          labels: labels.map(name => ({ name })),
+        });
+      }
+      return '';
+    };
+    return { calls, exec };
+  }
+
+  it('releases an owned failed claim while retaining agent-ready', () => {
+    const { calls, exec } = createExec({
+      labels: [AGENT_READY_LABEL, STATUS_IN_PROGRESS],
+      comments: [{ user: { login: 'github-actions[bot]' }, body: ownerMarker }],
+    });
+    const result = finalizeIssueClaim(
+      {
+        number: 42,
+        ownerToken,
+        outcome: 'retryable',
+        note: 'Implementation result: failure',
+        repo: 'JovieInc/Jovie',
+      },
+      exec
+    );
+    expect(result).toMatchObject({ success: true, changed: true });
+    const edit = calls.find(call => call[0] === 'issue' && call[1] === 'edit');
+    expect(edit).toContain(STATUS_IN_PROGRESS);
+    expect(edit).not.toContain(AGENT_READY_LABEL);
+    expect(edit).not.toContain('--add-label');
+    expect(calls.some(call => call.join(' ').includes('result: failure'))).toBe(
+      true
+    );
+  });
+
+  it('transitions an owned claim to in-review when a PR exists', () => {
+    const { calls, exec } = createExec({
+      labels: [AGENT_READY_LABEL, STATUS_IN_PROGRESS],
+      comments: [{ user: { login: 'github-actions[bot]' }, body: ownerMarker }],
+    });
+    const result = finalizeIssueClaim(
+      {
+        number: 42,
+        ownerToken,
+        outcome: 'in-review',
+        note: 'PR opened',
+        repo: 'JovieInc/Jovie',
+      },
+      exec
+    );
+    expect(result).toMatchObject({ success: true, changed: true });
+    const edit = calls.find(call => call[0] === 'issue' && call[1] === 'edit');
+    expect(edit).toContain(STATUS_IN_PROGRESS);
+    expect(edit).toContain(STATUS_IN_REVIEW);
+  });
+
+  it('cannot release a newer run claim', () => {
+    const { calls, exec } = createExec({
+      labels: [AGENT_READY_LABEL, STATUS_IN_PROGRESS],
+      comments: [
+        { user: { login: 'github-actions[bot]' }, body: ownerMarker },
+        {
+          user: { login: 'github-actions[bot]' },
+          body: '<!-- github-ai-claim-owner:github-ai:JovieInc/Jovie:456:1 -->',
+        },
+      ],
+    });
+    const result = finalizeIssueClaim(
+      {
+        number: 42,
+        ownerToken,
+        outcome: 'retryable',
+        repo: 'JovieInc/Jovie',
+      },
+      exec
+    );
+    expect(result).toMatchObject({
+      success: true,
+      changed: false,
+      reason: 'not-owner',
+    });
+    expect(calls.some(call => call[0] === 'issue')).toBe(false);
+  });
+
+  it('is idempotent after a claim is already finalized', () => {
+    const { calls, exec } = createExec({
+      labels: [AGENT_READY_LABEL],
+      comments: [{ user: { login: 'github-actions[bot]' }, body: ownerMarker }],
+    });
+    const result = finalizeIssueClaim(
+      {
+        number: 42,
+        ownerToken,
+        outcome: 'retryable',
+        repo: 'JovieInc/Jovie',
+      },
+      exec
+    );
+    expect(result).toMatchObject({
+      success: true,
+      changed: false,
+      reason: 'already-finalized',
+    });
+    expect(calls.some(call => call[0] === 'issue')).toBe(false);
+  });
+
+  it('retries label cleanup without duplicating persisted metadata', () => {
+    const { calls, exec } = createExec({
+      labels: [AGENT_READY_LABEL, STATUS_IN_PROGRESS],
+      comments: [
+        { user: { login: 'github-actions[bot]' }, body: ownerMarker },
+        {
+          user: { login: 'github-actions[bot]' },
+          body: `<!-- github-ai-claim-finalized:${ownerToken}:retryable -->`,
+        },
+      ],
+    });
+    const result = finalizeIssueClaim(
+      {
+        number: 42,
+        ownerToken,
+        outcome: 'retryable',
+        repo: 'JovieInc/Jovie',
+      },
+      exec
+    );
+    expect(result).toMatchObject({ success: true, changed: true });
+    expect(calls.filter(call => call[0] === 'issue')).toHaveLength(1);
+    expect(calls.find(call => call[0] === 'issue')).toContain('edit');
   });
 });
 
