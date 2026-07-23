@@ -254,3 +254,25 @@ describe('buildContentSecurityPolicyReportOnly', () => {
     expect(result).toContain('report-uri');
   });
 });
+
+describe('Google Identity Services allowlist (JOV-4369)', () => {
+  it('allows the GIS script origin in script-src', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const scriptSrc = findDirective(csp, 'script-src');
+
+    expect(scriptSrc).toContain('https://accounts.google.com');
+  });
+
+  it('allows the One Tap iframe origin in frame-src', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const frameSrc = findDirective(csp, 'frame-src');
+
+    expect(frameSrc).toContain('https://accounts.google.com');
+  });
+});
