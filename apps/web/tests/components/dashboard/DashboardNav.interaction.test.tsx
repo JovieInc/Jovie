@@ -6,6 +6,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   mockOpenPreviewPanel,
   mockRouterPush,
+  mockStartNavigationTelemetry,
   mockToastInfo,
   mockUseChatConversationsQuery,
   mockUsePathname,
@@ -45,6 +46,27 @@ describe('DashboardNav interactions', () => {
       expect(link.querySelector('svg')).toBeTruthy();
       expect(link.querySelector('span.truncate')).toHaveTextContent(label);
     }
+  });
+
+  it('wires a plain nav click to one canonical privacy-safe activation', async () => {
+    const user = userEvent.setup();
+    renderDashboardNav({ renderFn: render });
+
+    const libraryLink = screen.getByRole('link', { name: 'Library' });
+    libraryLink.addEventListener('click', event => event.preventDefault());
+    await user.click(libraryLink);
+
+    expect(mockStartNavigationTelemetry).toHaveBeenCalledExactlyOnceWith({
+      itemId: 'library',
+      sourcePathname: APP_ROUTES.CHAT,
+      destinationHref: APP_ROUTES.LIBRARY,
+      inputMethod: 'pointer',
+      context: {
+        isElectron: false,
+        isMobile: false,
+        navVariant: 'canonical_customer_ia_v1',
+      },
+    });
   });
 
   it('does not duplicate sidebar Search or removed primary destinations', () => {

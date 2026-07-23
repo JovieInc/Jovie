@@ -11,6 +11,8 @@ import {
   useRef,
   useState,
 } from 'react';
+import { navigationInputMethodFromClick } from '@/lib/tracking/navigation-telemetry';
+import type { NavigationInputMethod } from '@/lib/tracking/navigation-telemetry-contract';
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -37,6 +39,13 @@ export interface LiquidGlassMenuProps {
   readonly navigationLabel?: string;
   readonly expandedNavigationLabel?: string;
   readonly className?: string;
+  readonly onItemActivate?: (
+    item: LiquidGlassMenuItem,
+    inputMethod: NavigationInputMethod
+  ) => void;
+  readonly onExpandedItemsVisible?: (
+    items: readonly LiquidGlassMenuItem[]
+  ) => void;
 }
 
 // ============================================================================
@@ -174,15 +183,28 @@ function Badge({
 function MenuItemLink({
   item,
   active,
+  onActivate,
 }: {
   readonly item: LiquidGlassMenuItem;
   readonly active: boolean;
+  readonly onActivate?: (inputMethod: NavigationInputMethod) => void;
 }) {
   const Icon = item.icon;
 
   return (
     <Link
       href={item.href}
+      onClick={event => {
+        if (
+          event.button === 0 &&
+          !event.metaKey &&
+          !event.ctrlKey &&
+          !event.shiftKey &&
+          !event.altKey
+        ) {
+          onActivate?.(navigationInputMethodFromClick(event.detail));
+        }
+      }}
       aria-current={active ? 'page' : undefined}
       className={cn(
         'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption transition-[background-color,color] duration-subtle ease-subtle active:bg-surface-2',
@@ -218,6 +240,8 @@ export function LiquidGlassMenu({
   navigationLabel = 'Dashboard Tabs',
   expandedNavigationLabel = 'Expanded Navigation Menu',
   className,
+  onItemActivate,
+  onExpandedItemsVisible,
 }: LiquidGlassMenuProps): React.JSX.Element {
   const pathname = usePathname();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -246,10 +270,11 @@ export function LiquidGlassMenu({
   // Move keyboard focus into the menu as soon as it opens.
   useEffect(() => {
     if (!isExpanded) return;
+    onExpandedItemsVisible?.([...expandedItems, ...utilityItems]);
     expandedMenuRef.current
       ?.querySelector<HTMLElement>('a[href], button:not([disabled])')
       ?.focus();
-  }, [isExpanded]);
+  }, [expandedItems, isExpanded, onExpandedItemsVisible, utilityItems]);
 
   // Close on route change without stealing focus from the destination page.
   useEffect(() => {
@@ -307,6 +332,9 @@ export function LiquidGlassMenu({
                     key={item.id}
                     item={item}
                     active={isActive(item.href)}
+                    onActivate={inputMethod =>
+                      onItemActivate?.(item, inputMethod)
+                    }
                   />
                 ))}
 
@@ -318,6 +346,9 @@ export function LiquidGlassMenu({
                         key={item.id}
                         item={item}
                         active={isActive(item.href)}
+                        onActivate={inputMethod =>
+                          onItemActivate?.(item, inputMethod)
+                        }
                       />
                     ))}
                   </>
@@ -335,6 +366,9 @@ export function LiquidGlassMenu({
                         key={item.id}
                         item={item}
                         active={isActive(item.href)}
+                        onActivate={inputMethod =>
+                          onItemActivate?.(item, inputMethod)
+                        }
                       />
                     ))}
                   </>
@@ -386,6 +420,20 @@ export function LiquidGlassMenu({
               <Link
                 key={item.id}
                 href={item.href}
+                onClick={event => {
+                  if (
+                    event.button === 0 &&
+                    !event.metaKey &&
+                    !event.ctrlKey &&
+                    !event.shiftKey &&
+                    !event.altKey
+                  ) {
+                    onItemActivate?.(
+                      item,
+                      navigationInputMethodFromClick(event.detail)
+                    );
+                  }
+                }}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'relative flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',

@@ -4,9 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardMobileTabs } from '@/components/features/dashboard/organisms/DashboardMobileTabs';
 import { APP_ROUTES } from '@/constants/routes';
 
-const { mockPathname, mockSignOut } = vi.hoisted(() => ({
+const {
+  mockPathname,
+  mockSignOut,
+  mockStartNavigationTelemetry,
+  mockTrackNavigationImpressions,
+} = vi.hoisted(() => ({
   mockPathname: vi.fn(() => APP_ROUTES.CHAT),
   mockSignOut: vi.fn(),
+  mockStartNavigationTelemetry: vi.fn(),
+  mockTrackNavigationImpressions: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -15,6 +22,19 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/hooks/useClerkSafe', () => ({
   useAuthSafe: () => ({ signOut: mockSignOut }),
+}));
+
+vi.mock('@/hooks/useMediaQuery', () => ({ useMediaQuery: () => true }));
+vi.mock('@/lib/desktop/electron-bridge', () => ({
+  useIsElectronRuntime: () => false,
+}));
+vi.mock('@/lib/tracking/navigation-telemetry', () => ({
+  navigationInputMethodFromClick: (detail: number) =>
+    detail === 0 ? 'keyboard' : 'pointer',
+  startNavigationTelemetry: (...args: unknown[]) =>
+    mockStartNavigationTelemetry(...args),
+  trackNavigationImpressions: (...args: unknown[]) =>
+    mockTrackNavigationImpressions(...args),
 }));
 
 const CANONICAL_LABELS = [
@@ -31,6 +51,8 @@ describe('DashboardMobileTabs', () => {
     mockPathname.mockReset();
     mockPathname.mockReturnValue(APP_ROUTES.CHAT);
     mockSignOut.mockReset();
+    mockStartNavigationTelemetry.mockReset();
+    mockTrackNavigationImpressions.mockReset();
   });
 
   it('fits the first three canonical destinations behind primary plus More', () => {
@@ -50,6 +72,34 @@ describe('DashboardMobileTabs', () => {
     expect(directLinks.every(link => link.className.includes('min-w-16'))).toBe(
       true
     );
+  });
+
+  it('tracks visible items and wires one mobile activation', async () => {
+    const user = userEvent.setup();
+    render(<DashboardMobileTabs />);
+
+    expect(mockTrackNavigationImpressions).toHaveBeenCalledWith(
+      ['inbox', 'chat', 'library'],
+      APP_ROUTES.CHAT,
+      expect.objectContaining({
+        isMobile: true,
+        navVariant: 'canonical_customer_ia_v1',
+      })
+    );
+    const libraryLink = screen.getByRole('link', { name: 'Library' });
+    libraryLink.addEventListener('click', event => event.preventDefault());
+    await user.click(libraryLink);
+    expect(mockStartNavigationTelemetry).toHaveBeenCalledExactlyOnceWith({
+      itemId: 'library',
+      sourcePathname: APP_ROUTES.CHAT,
+      destinationHref: APP_ROUTES.LIBRARY,
+      inputMethod: 'pointer',
+      context: {
+        isElectron: false,
+        isMobile: true,
+        navVariant: 'canonical_customer_ia_v1',
+      },
+    });
   });
 
   it('shows the exact six in order, with Settings separated as utility', async () => {

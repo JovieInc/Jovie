@@ -26,6 +26,8 @@ import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import type { KeyboardShortcut } from '@/lib/keyboard-shortcuts';
+import { navigationInputMethodFromClick } from '@/lib/tracking/navigation-telemetry';
+import type { NavigationInputMethod } from '@/lib/tracking/navigation-telemetry-contract';
 import type { NavItem } from './types';
 
 interface NavMenuItemProps {
@@ -39,6 +41,8 @@ interface NavMenuItemProps {
   readonly onCancelNavigate?: () => void;
   /** Optional click side effect for links or buttons */
   readonly onClick?: () => void;
+  /** Privacy-safe activation callback for a plain same-tab navigation. */
+  readonly onActivate?: (inputMethod: NavigationInputMethod) => void;
   /** When true, keeps link markup but prevents navigation on click */
   readonly preventNavigation?: boolean;
   /** When true, renders a button instead of a link */
@@ -117,6 +121,7 @@ export function NavMenuItem({
   onNavigate,
   onCancelNavigate,
   onClick,
+  onActivate,
   preventNavigation = false,
   renderAsButton = false,
   onPrefetch,
@@ -191,7 +196,6 @@ export function NavMenuItem({
       }
       const isPlainNavigation =
         !preventNavigation &&
-        Boolean(onNavigate) &&
         event.button === 0 &&
         !event.metaKey &&
         !event.ctrlKey &&
@@ -200,6 +204,9 @@ export function NavMenuItem({
 
       if (!hadPendingPointerNavigation && isPlainNavigation) {
         showPendingShell();
+      }
+      if (isPlainNavigation) {
+        onActivate?.(navigationInputMethodFromClick(event.detail));
       }
       onClick?.();
 
@@ -211,6 +218,7 @@ export function NavMenuItem({
       clearPendingNavigationListeners,
       onCancelNavigate,
       onClick,
+      onActivate,
       onNavigate,
       preventNavigation,
       showPendingShell,

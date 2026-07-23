@@ -22,10 +22,17 @@ import {
 } from '@/components/shell/SidebarThreadsSection';
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
+import {
+  completeNavigationTelemetry,
+  type NavigationTelemetryContext,
+  startNavigationTelemetry,
+  trackNavigationImpressions,
+} from '@/lib/tracking/navigation-telemetry';
 import {
   artistSettingsNavigation,
   primaryNavigation,
@@ -135,6 +142,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const isElectron = useIsElectronRuntime();
   const [threadReadAtById, setThreadReadAtById] =
     useState<Record<string, string>>(readThreadReadState);
   const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(
@@ -143,6 +151,14 @@ export function DashboardNav(_: DashboardNavProps) {
   const artistName = selectedProfile?.displayName?.trim();
   const profileId = selectedProfile?.id ?? '';
   const isDemo = isDemoRoutePath(pathname);
+  const telemetryContext = useMemo<NavigationTelemetryContext>(
+    () => ({
+      isElectron,
+      isMobile,
+      navVariant: 'canonical_customer_ia_v1',
+    }),
+    [isElectron, isMobile]
+  );
   const { canAccessTasksWorkspace, isLoading: isPlanGateLoading } =
     usePlanGate();
   const { data: taskStats } = useTaskStatsQuery(profileId, {
@@ -187,6 +203,29 @@ export function DashboardNav(_: DashboardNavProps) {
     writeTasksSeenAt(nextSeenAt);
     setTasksSeenAt(nextSeenAt);
   }, [pathname]);
+
+  useEffect(() => {
+    if (isDemo || isMobile) return;
+    trackNavigationImpressions(
+      isInSettings ? ['settings'] : primaryNavigation.map(item => item.id),
+      pathname,
+      telemetryContext
+    );
+  }, [isDemo, isInSettings, isMobile, pathname, telemetryContext]);
+
+  useEffect(() => {
+    if (isDemo) return;
+    let secondFrame = 0;
+    const firstFrame = globalThis.requestAnimationFrame(() => {
+      secondFrame = globalThis.requestAnimationFrame(() => {
+        completeNavigationTelemetry(pathname);
+      });
+    });
+    return () => {
+      globalThis.cancelAnimationFrame(firstFrame);
+      if (secondFrame) globalThis.cancelAnimationFrame(secondFrame);
+    };
+  }, [isDemo, pathname]);
 
   const artistSettingsLabel = 'Artist';
 
@@ -375,13 +414,32 @@ export function DashboardNav(_: DashboardNavProps) {
           shortcut={shortcut}
           prefetch={undefined}
           onClick={demoUnavailable ? () => handleDemoNavClick(item) : undefined}
+          onActivate={
+            demoUnavailable
+              ? undefined
+              : inputMethod =>
+                  startNavigationTelemetry({
+                    itemId: isInSettings ? 'settings' : item.id,
+                    sourcePathname: pathname,
+                    destinationHref: item.href,
+                    inputMethod,
+                    context: telemetryContext,
+                  })
+          }
           preventNavigation={demoUnavailable}
           renderAsButton={false}
           onPrefetch={() => handlePrefetch(item.id)}
         />
       );
     },
-    [pathname, handleDemoNavClick, handlePrefetch, isDemo]
+    [
+      pathname,
+      handleDemoNavClick,
+      handlePrefetch,
+      isDemo,
+      isInSettings,
+      telemetryContext,
+    ]
   );
 
   // Memoize renderSection to prevent creating new functions on every render
