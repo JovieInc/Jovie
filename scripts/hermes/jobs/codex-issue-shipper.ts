@@ -30,6 +30,8 @@ import { availableParallelism, freemem, loadavg, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  type AgentFailureDisposition,
+  actionForAgentFailure,
   buildAgentCommand,
   buildAgentPrompt,
   buildDispatchPlans,
@@ -41,6 +43,7 @@ import {
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
+  classifyAgentFailure,
   countRetryReleases,
   type DispatchPlan,
   EPIC_LABEL,
@@ -51,6 +54,7 @@ import {
   type GithubIssue,
   gbrainContextBlocker,
   HUMAN_REVIEW_LABEL,
+  INCIDENT_RELEASE_COMMENT_HEADER,
   type IssueComment,
   isAlreadyClaimedOrBlocked,
   labelNames,
@@ -934,6 +938,61 @@ function releaseClaimForRetry(
   }
 }
 
+function releaseClaimForIncident(
+  config: ShipperConfig,
+  plan: DispatchPlan,
+  input: {
+    readonly disposition: Extract<
+      AgentFailureDisposition,
+      'provider_cooldown' | 'system_retryable'
+    >;
+    readonly provider: string;
+    readonly routeIndex: number;
+    readonly reason: string;
+  }
+): void {
+  removeClaimLabel(config, plan, 'incident_release_claim_label_failed');
+
+  const observedAt = new Date().toISOString();
+  try {
+    commentIssue(
+      config,
+      plan.issue.number,
+      [
+        INCIDENT_RELEASE_COMMENT_HEADER,
+        '',
+        `Failure class: \`${input.disposition}\``,
+        `Provider: \`${input.provider}\``,
+        `Route index: \`${input.routeIndex}\``,
+        `Observed at: \`${observedAt}\``,
+        'Task retry budget: unchanged',
+        '',
+        input.reason,
+      ].join('\n')
+    );
+  } catch (err) {
+    logJobEvent({
+      job: JOB,
+      event: 'incident_release_comment_failed',
+      issue: plan.issue.number,
+      error: shortError(err),
+    });
+  }
+
+  logJobEvent({
+    job: JOB,
+    event: 'controller_incident_released',
+    issue: plan.issue.number,
+    provider: input.provider,
+    account: null,
+    failureClass: input.disposition,
+    observedAt,
+    retryAt: null,
+    resetAt: null,
+    routeIndex: input.routeIndex,
+  });
+}
+
 function fetchIssueComments(
   config: ShipperConfig,
   issueNumber: number
@@ -1082,6 +1141,14 @@ function agentLogsDir(): string {
   const dir = join(HERMES_PATHS.logsDir, JOB);
   mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+function readAgentFailureOutput(result: AgentRunResult): string {
+  try {
+    return readFileSync(result.logPath, 'utf8').slice(-128 * 1024);
+  } catch {
+    return '';
+  }
 }
 
 function runAgent(
@@ -1236,11 +1303,12 @@ async function dispatchPlan(
   const gbrain = collectGbrainContext(plan);
   const gbrainBlocker = gbrainContextBlocker(gbrain);
   if (gbrainBlocker) {
-    markBlocked(config, plan, gbrainBlocker);
     logJobEvent({
       job: JOB,
-      event: 'gbrain_coordination_blocked',
+      event: 'gbrain_coordination_retry_scheduled',
       issue: plan.issue.number,
+      failureClass: 'system_retryable',
+      observedAt: new Date().toISOString(),
       error: gbrainBlocker,
     });
     return;
@@ -1286,7 +1354,8 @@ async function dispatchPlan(
     const chain = parseAgentChain(process.env, config.agent);
     let agentResult!: AgentRunResult;
     let pr: { number: number; url: string } | null = null;
-    let isSystemKilled = false;
+    let failureDisposition: AgentFailureDisposition | null = null;
+    let finalRouteIndex = 0;
 
     for (let attempt = 0; attempt < chain.length; attempt++) {
       const agent = chain[attempt];
@@ -1309,6 +1378,7 @@ async function dispatchPlan(
         prompt,
         prepared.repoRoot
       );
+      finalRouteIndex = attempt;
       logJobEvent({
         job: JOB,
         event: agentResult.ok ? 'agent_succeeded' : 'agent_failed',
@@ -1324,17 +1394,44 @@ async function dispatchPlan(
         gbrainSlug: gbrain.captureSlug,
       });
 
-      // SIGTERM or timeout = system interruption — do not chain, release.
-      // A null exit status means the agent never ran to a decision — a
-      // spawn/infra failure (e.g. a harness binary missing), not a code
-      // verdict. Treat it like a system interruption: release, don't block.
-      isSystemKilled =
-        agentResult.status === 143 ||
-        agentResult.status === 137 ||
-        agentResult.status === null ||
-        Boolean(agentResult.error?.includes('timeout')) ||
-        Boolean(agentResult.error?.includes('killed'));
-      if (isSystemKilled) break;
+      if (!agentResult.ok) {
+        failureDisposition = classifyAgentFailure(
+          agentResult.status,
+          agentResult.signal,
+          readAgentFailureOutput(agentResult),
+          agentResult.error
+        );
+        const action = actionForAgentFailure(
+          failureDisposition,
+          attempt < chain.length - 1
+        );
+        logJobEvent({
+          job: JOB,
+          event: 'agent_failure_classified',
+          issue: dispatch.issue.number,
+          provider: agent,
+          account: null,
+          failureClass: failureDisposition,
+          observedAt: new Date().toISOString(),
+          retryAt: null,
+          resetAt: null,
+          routeIndex: attempt,
+          action,
+        });
+        if (action === 'fallback') {
+          logJobEvent({
+            job: JOB,
+            event: 'agent_incident_fallback',
+            issue: dispatch.issue.number,
+            failureClass: failureDisposition,
+            fromAgent: agent,
+            toAgent: chain[attempt + 1],
+            routeIndex: attempt,
+          });
+          continue;
+        }
+        break;
+      }
 
       pr = findPrForBranch(config, dispatch.branchName);
       if (pr || safeHasWork()) break;
@@ -1350,48 +1447,44 @@ async function dispatchPlan(
       }
     }
 
-    if (isSystemKilled) {
-      releaseOrEscalate(
-        config,
-        dispatch,
-        [
-          `Agent was interrupted (status=${agentResult.status}) - releasing claim for retry.`,
-          '',
-          agentResult.error ? `Error: \`${agentResult.error}\`` : null,
-          `Log: \`${agentResult.logPath}\``,
-          `State: \`${agentResult.statePath}\``,
-        ]
-          .filter((line): line is string => line !== null)
-          .join('\n')
-      );
-      logJobEvent({
-        job: JOB,
-        event: 'agent_interrupted_release_claim',
-        issue: dispatch.issue.number,
-        status: agentResult.status,
-        error: agentResult.error,
-      });
-      return;
-    }
-
-    // Non-zero exit (but not killed) = genuine failure, mark blocked
     if (!agentResult.ok) {
-      markBlocked(
-        config,
-        dispatch,
-        [
-          `Agent exited without successfully shipping.`,
-          '',
-          `Status: \`${agentResult.status ?? 'null'}\``,
-          `Signal: \`${agentResult.signal ?? 'null'}\``,
-          agentResult.error ? `Error: \`${agentResult.error}\`` : null,
-          `Log: \`${agentResult.logPath}\``,
-          `Prompt: \`${agentResult.promptPath}\``,
-          `State: \`${agentResult.statePath}\``,
-        ]
-          .filter((line): line is string => line !== null)
-          .join('\n')
-      );
+      const disposition =
+        failureDisposition ??
+        classifyAgentFailure(
+          agentResult.status,
+          agentResult.signal,
+          readAgentFailureOutput(agentResult),
+          agentResult.error
+        );
+      const reason = [
+        `Agent exited without successfully shipping.`,
+        '',
+        `Failure class: \`${disposition}\``,
+        `Status: \`${agentResult.status ?? 'null'}\``,
+        `Signal: \`${agentResult.signal ?? 'null'}\``,
+        agentResult.error ? `Error: \`${agentResult.error}\`` : null,
+        `Log: \`${agentResult.logPath}\``,
+        `Prompt: \`${agentResult.promptPath}\``,
+        `State: \`${agentResult.statePath}\``,
+      ]
+        .filter((line): line is string => line !== null)
+        .join('\n');
+      const action = actionForAgentFailure(disposition, false);
+      if (action === 'block_task') {
+        markBlocked(config, dispatch, reason);
+      } else if (action === 'retry_task') {
+        releaseOrEscalate(config, dispatch, reason);
+      } else {
+        releaseClaimForIncident(config, dispatch, {
+          disposition: disposition as Extract<
+            AgentFailureDisposition,
+            'provider_cooldown' | 'system_retryable'
+          >,
+          provider: chain[finalRouteIndex],
+          routeIndex: finalRouteIndex,
+          reason,
+        });
+      }
       return;
     }
 
@@ -1570,11 +1663,12 @@ async function dispatchBatch(
           issue: plan.issue.number,
           error: shortError(err),
         });
-        markBlocked(
-          config,
-          plan,
-          `Dispatcher failed before a clean agent handoff.\n\n\`\`\`text\n${shortError(err)}\n\`\`\``
-        );
+        releaseClaimForIncident(config, plan, {
+          disposition: 'system_retryable',
+          provider: 'dispatcher',
+          routeIndex: 0,
+          reason: `Dispatcher failed before a clean agent handoff.\n\n\`\`\`text\n${shortError(err)}\n\`\`\``,
+        });
       }
     })
   );

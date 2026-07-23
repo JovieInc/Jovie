@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  actionForAgentFailure,
   buildAgentCommand,
   buildAgentPrompt,
   buildDispatchPlans,
@@ -10,7 +11,9 @@ import {
   CODEX_BLOCKED_LABEL,
   CODEX_CLAIM_LABEL,
   CODEX_TRUSTED_LABEL,
+  classifyAgentFailure,
   classifyCheckout,
+  consumesTaskRetryBudget,
   countRetryReleases,
   describeCheckout,
   dirtyPathsAreRecoverableDetritus,
@@ -21,6 +24,7 @@ import {
   GH_EAGAIN_BACKOFF_THRESHOLD,
   GhEagainBackoff,
   gbrainContextBlocker,
+  INCIDENT_RELEASE_COMMENT_HEADER,
   INVALID_LABEL,
   isAlreadyClaimedOrBlocked,
   isInvalidMisroute,
@@ -355,15 +359,18 @@ describe('codex issue shipper prompt', () => {
     expect(query).toContain('area:ops');
   });
 
-  it('blocks agent launch when gbrain context collection failed', () => {
-    expect(
-      gbrainContextBlocker({
-        captureSlug: 'ops/codex-issue-shipper/github-12962 (capture failed)',
-        queryText: 'Jovie implementation context',
-        queryResult:
-          'gbrain query failed: connect ECONNREFUSED 127.0.0.1:7801\n\ngbrain capture failed: Page not found',
-      })
-    ).toContain('system-blocker');
+  it('fails closed without a task blocker when gbrain context collection failed', () => {
+    const blocker = gbrainContextBlocker({
+      captureSlug: 'ops/codex-issue-shipper/github-12962 (capture failed)',
+      queryText: 'Jovie implementation context',
+      queryResult:
+        'gbrain query failed: connect ECONNREFUSED 127.0.0.1:7801\n\ngbrain capture failed: Page not found',
+    });
+    expect(blocker).toContain('system-blocker');
+    const disposition = classifyAgentFailure(1, null, blocker ?? '');
+    expect(disposition).toBe('system_retryable');
+    expect(consumesTaskRetryBudget(disposition)).toBe(false);
+    expect(actionForAgentFailure(disposition, false)).toBe('release_incident');
 
     expect(
       gbrainContextBlocker({
@@ -883,6 +890,158 @@ describe('agent fallback chain', () => {
   });
 });
 
+describe('agent failure disposition', () => {
+  /**
+   * @type {Array<[string, number | null, NodeJS.Signals | null, string,
+   *   import('../../hermes/lib/codex-issue-shipper.ts').AgentFailureDisposition]>}
+   */
+  const cases = [
+    [
+      'Claude five-hour exhaustion',
+      1,
+      null,
+      'hit your 5-hour limit',
+      'provider_cooldown',
+    ],
+    [
+      'Claude weekly exhaustion',
+      1,
+      null,
+      'weekly limit reached',
+      'provider_cooldown',
+    ],
+    [
+      'OAuth refresh failure',
+      1,
+      null,
+      'OAuth session expired and could not be refreshed',
+      'provider_cooldown',
+    ],
+    [
+      'subscription disabled',
+      1,
+      null,
+      'organization disabled Claude subscription access',
+      'provider_cooldown',
+    ],
+    [
+      'Codex login required',
+      1,
+      null,
+      'not logged in; run codex login',
+      'provider_cooldown',
+    ],
+    [
+      'OpenRouter 402',
+      1,
+      null,
+      'HTTP 402 cannot afford max_tokens',
+      'provider_cooldown',
+    ],
+    [
+      'Sakana 429',
+      1,
+      null,
+      'status 429 too many requests',
+      'provider_cooldown',
+    ],
+    [
+      'retired Grok model',
+      1,
+      null,
+      'unknown model grok-composer-2.5-fast',
+      'provider_cooldown',
+    ],
+    [
+      'GitHub rate limit',
+      1,
+      null,
+      'GitHub API rate limit exceeded',
+      'system_retryable',
+    ],
+    [
+      'GitHub GraphQL rate limit',
+      1,
+      null,
+      'GraphQL: API rate limit exceeded',
+      'system_retryable',
+    ],
+    [
+      'GitHub outage',
+      1,
+      null,
+      'GitHub returned 503 unavailable',
+      'system_retryable',
+    ],
+    [
+      'gbrain timeout',
+      1,
+      null,
+      'gbrain query failed: ETIMEDOUT',
+      'system_retryable',
+    ],
+    ['missing executable', 1, null, 'spawn codex ENOENT', 'system_retryable'],
+    ['network timeout', 1, null, 'spawnSync git ETIMEDOUT', 'system_retryable'],
+    ['spawn failure', null, null, '', 'system_retryable'],
+    ['runner termination', 143, 'SIGTERM', '', 'system_retryable'],
+    [
+      'deterministic test failure',
+      1,
+      null,
+      'AssertionError: expected 2 to equal 3',
+      'task_retryable',
+    ],
+    [
+      'deterministic HTTP assertion',
+      1,
+      null,
+      'AssertionError: expected HTTP 429 to equal 200',
+      'task_retryable',
+    ],
+    [
+      'explicit human boundary',
+      1,
+      null,
+      'This issue requires human review',
+      'task_terminal',
+    ],
+    [
+      'security boundary',
+      1,
+      null,
+      'security blocker: rotate production credentials',
+      'task_terminal',
+    ],
+  ];
+
+  it.each(cases)('%s', (_name, status, signal, output, expected) => {
+    expect(classifyAgentFailure(status, signal, output)).toBe(expected);
+  });
+
+  it('charges only deterministic retryable task failures to the task budget', () => {
+    expect(consumesTaskRetryBudget('task_retryable')).toBe(true);
+    expect(consumesTaskRetryBudget('task_terminal')).toBe(false);
+    expect(consumesTaskRetryBudget('provider_cooldown')).toBe(false);
+    expect(consumesTaskRetryBudget('system_retryable')).toBe(false);
+  });
+
+  /** @type {import('../../hermes/lib/codex-issue-shipper.ts').AgentFailureDisposition[]} */
+  const incidentDispositions = ['provider_cooldown', 'system_retryable'];
+
+  it.each(
+    incidentDispositions
+  )('%s falls back, then releases without blocking when routes are exhausted', disposition => {
+    expect(actionForAgentFailure(disposition, true)).toBe('fallback');
+    expect(actionForAgentFailure(disposition, false)).toBe('release_incident');
+  });
+
+  it('preserves deterministic task retry and terminal blocker behavior', () => {
+    expect(actionForAgentFailure('task_retryable', true)).toBe('fallback');
+    expect(actionForAgentFailure('task_retryable', false)).toBe('retry_task');
+    expect(actionForAgentFailure('task_terminal', true)).toBe('block_task');
+  });
+});
+
 describe('retry escalation (#13126)', () => {
   // The real comment strings the shipper posts — the header is the exported
   // constant the emitter (releaseClaimForRetry) also uses, so these stay in
@@ -894,6 +1053,10 @@ describe('retry escalation (#13126)', () => {
   };
   const restartRecoveryComment = {
     body: 'Jovie agent (codex issue shipper) restarted mid-dispatch (owner pid 4242 gone). Claim released for retry.',
+    viewerDidAuthor: true,
+  };
+  const incidentReleaseComment = {
+    body: `${INCIDENT_RELEASE_COMMENT_HEADER}\n\nFailure class: provider_cooldown`,
     viewerDidAuthor: true,
   };
   const claimComment = {
@@ -918,6 +1081,7 @@ describe('retry escalation (#13126)', () => {
         claimComment,
         releaseComment,
         restartRecoveryComment, // "Claim released for retry" — infra restart, not a task failure
+        incidentReleaseComment, // controller incident, never a task failure
         releaseComment,
         blockedComment,
         forgedComment, // header present but not shipper-authored
