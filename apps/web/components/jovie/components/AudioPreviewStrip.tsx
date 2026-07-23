@@ -2,6 +2,8 @@
 
 import { FileAudio2, Loader2, X } from 'lucide-react';
 
+import { GlobalAudioPreviewAction } from '@/components/organisms/GlobalAudioPreviewAction';
+
 import type { PendingAudio } from '../hooks/useChatAudioAttachments';
 
 interface AudioPreviewStripProps {
@@ -66,14 +68,15 @@ export function AudioPreviewStrip({ audio, onRemove }: AudioPreviewStripProps) {
           </p>
         </div>
         {audio.status === 'ready' && audio.previewUrl ? (
-          <audio
-            controls
-            src={audio.previewUrl}
-            className='h-8 max-w-[9rem]'
-            data-testid='chat-audio-preview-player'
-          >
-            <track kind='captions' />
-          </audio>
+          <GlobalAudioPreviewAction
+            id={audio.id}
+            title={audio.name}
+            audioUrl={audio.previewUrl}
+            sourceKind='chat-upload-preview'
+            releaseTitle={audio.releaseTitle}
+            stopOnUnmount
+            className='shrink-0'
+          />
         ) : null}
       </div>
     </div>
