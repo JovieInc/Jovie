@@ -1139,6 +1139,10 @@ ${fixtureCheckout}
       'utf8'
     );
     const aliasJob = jobBlock(productionRelease, 'alias-staging');
+    const productionOauthJob = jobBlock(
+      productionRelease,
+      'production-oauth-gate'
+    );
     const oauthProbe = stepBlock(
       aliasJob,
       'Verify aliased staging OAuth redirect URIs'
@@ -1179,9 +1183,12 @@ ${fixtureCheckout}
       'PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
     );
     expect(oauthProbe).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+    expect(productionOauthJob).toContain(
+      "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
+    );
     expect(
       productionRelease.match(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/g)
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     const action = readFileSync(
       join(githubRoot, 'actions/upload-safe-playwright-artifact/action.yml'),
       'utf8'
