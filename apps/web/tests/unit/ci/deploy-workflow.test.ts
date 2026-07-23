@@ -115,6 +115,14 @@ function getStepBlock(workflow: string, stepName: string): string {
   return block.join('\n');
 }
 
+function getSentryStatsRequests(action: string): string[] {
+  return (
+    action.match(
+      /STATS_RESPONSE=\$\(curl[\s\S]*?"https:\/\/sentry\.io\/api\/0\/organizations\/\$SENTRY_ORG\/events-stats\/"\)/g
+    ) ?? []
+  );
+}
+
 function getJobBlock(workflow: string, jobKey: string): string {
   const lines = workflow.split('\n');
   const start = lines.findIndex(line => line === `  ${jobKey}:`);
@@ -981,6 +989,31 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(deployScript).toContain('--env VERCEL_GIT_COMMIT_SHA');
     expect(deployScript).not.toMatch(/--(?:build-)?env\s+[^\s]+=/);
     expect(deployScript).not.toContain('--token');
+  });
+
+  it('skips catalog mutation only for the manual PR preview build', () => {
+    const previewWorkflow = readFileSync(workflowPath, 'utf8');
+    const productionWorkflow = readFileSync(
+      productionReleaseWorkflowPath,
+      'utf8'
+    );
+    const previewBuild = getStepBlock(
+      getJobBlock(previewWorkflow, 'ci-pr-vercel-preview'),
+      'Build (PR preview)'
+    );
+    const productionBuild = getStepBlock(
+      getJobBlock(productionWorkflow, 'promote-production'),
+      'Build and stage production deployment'
+    );
+    const webPackage = JSON.parse(
+      readFileSync(resolve(repoRoot, 'apps/web/package.json'), 'utf8')
+    ) as { scripts: Record<string, string> };
+
+    expect(previewBuild).toContain("SKIP_SKILLS_CATALOG_SYNC: '1'");
+    expect(productionBuild).not.toContain('SKIP_SKILLS_CATALOG_SYNC');
+    expect(webPackage.scripts.postbuild).toContain(
+      'scripts/sync-skills-catalog.ts'
+    );
   });
 
   it('keeps Vercel secrets and runtime values out of every preview and production process argument', () => {
@@ -3869,7 +3902,47 @@ describe('production promotion exact-artifact contract', () => {
     expect(sentryAction).toContain(
       'BASELINE_RATE_LIMIT_SCALED=$((BASELINE * THRESHOLD * POST_MINUTES))'
     );
+    const statsRequests = getSentryStatsRequests(sentryAction);
+    expect(statsRequests).toHaveLength(2);
+    const exactProductionErrorQuery =
+      '--data-urlencode "query=event.type:error environment:vercel-production"';
+    for (const request of statsRequests) {
+      expect(request).toContain('curl --fail --silent --show-error --get');
+      expect(request.match(/--data-urlencode "query=[^"]+"/g)).toEqual([
+        exactProductionErrorQuery,
+      ]);
+    }
+    expect(sentryAction).not.toContain('events-stats/?project=');
     expect(sentryAction).not.toContain('SENTRY_ORG:\n        required: true');
+  });
+
+  it('excludes transaction and preview volume while preserving real production error spikes', () => {
+    const sentryAction = readFileSync(sentryGateActionPath, 'utf8');
+    const isRateSpike = (
+      baseline: number,
+      postDeploy: number,
+      baselineMinutes = 30,
+      postMinutes = 5,
+      threshold = 3
+    ) => postDeploy * baselineMinutes > baseline * threshold * postMinutes;
+
+    // Exact 2026-07-22 incident: raw Discover traffic falsely spiked at 26/21.
+    // Error-only evidence was 1/0, but that sole baseline error came from
+    // vercel-preview; exact vercel-production errors were 0/0.
+    expect(isRateSpike(26, 21)).toBe(true);
+    expect(isRateSpike(1, 0)).toBe(false);
+    expect(isRateSpike(0, 0)).toBe(false);
+
+    // A genuine error-rate increase remains blocking after filtering.
+    expect(isRateSpike(6, 4)).toBe(true);
+    const statsRequests = getSentryStatsRequests(sentryAction);
+    expect(statsRequests).toHaveLength(2);
+    for (const request of statsRequests) {
+      expect(request).toContain(
+        '--data-urlencode "query=event.type:error environment:vercel-production"'
+      );
+    }
+    expect(sentryAction).toContain('echo "gate_status=failed"');
   });
 
   it('keeps cost and main-health observers strict, deduplicated, and bounded', () => {
