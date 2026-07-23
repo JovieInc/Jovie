@@ -20,6 +20,7 @@ import {
   createLighthouseUploadEnvironment,
   readRegularArtifactRecords,
   readSensitiveValues,
+  resolveLighthouseCliPath,
   uploadSealedArtifacts,
   validateExactLighthouseAssertions,
   validateExactLighthouseConfig,
@@ -348,14 +349,13 @@ describe('exact production Lighthouse evidence guard', () => {
       vi.stubEnv('VERCEL_TOKEN', 'sentinel-vercel-token');
       vi.stubEnv('SOME_SECRET', 'sentinel-generic-secret');
       const spawnImpl = vi.fn((command, args, options) => {
-        expect(command).toBe('pnpm');
+        expect(command).toBe(process.execPath);
         const uploadRoot = options.cwd as string;
         const isolatedDirectory = join(uploadRoot, '.lighthouseci');
         const isolatedConfig = join(uploadRoot, 'lighthouserc.json');
         const isolatedArtifact = join(isolatedDirectory, 'lhr-1.json');
         expect(args).toEqual([
-          'exec',
-          'lhci',
+          resolveLighthouseCliPath(),
           'upload',
           `--config=${isolatedConfig}`,
         ]);
@@ -524,6 +524,96 @@ describe('exact production Lighthouse evidence guard', () => {
         uploadSealedArtifacts(configPath, directory, seal, [], spawnImpl)
       ).toThrow('did not publish every exact route');
       expect(() => statSync(join(directory, 'links.json'))).toThrow();
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('invokes the LHCI entrypoint directly so project discovery cannot re-anchor the uploader', () => {
+    // Regression for the postdeploy-probes production failure: `pnpm exec`
+    // re-anchors at the nearest package root when the isolated upload root has
+    // no package.json, and LHCI derives .lighthouseci from process.cwd() — so
+    // the uploader wrote links.json into the sealed source tree. The uploader
+    // must be spawned as `node <lhci cli> upload` with cwd pinned to the
+    // isolated root, never through a package-manager exec layer.
+    const cliPath = resolveLighthouseCliPath();
+    expect(cliPath).toMatch(/[\\/]@lhci[\\/]cli[\\/]src[\\/]cli\.js$/);
+
+    const root = mkdtempSync(join(tmpdir(), 'jovie-lhci-direct-spawn-'));
+    const directory = join(root, '.lighthouseci');
+    const configPath = join(root, 'lighthouserc.json');
+    try {
+      mkdirSync(directory);
+      writeFileSync(configPath, JSON.stringify(configFixture()));
+      writeFileSync(
+        join(directory, 'lhr-1.json'),
+        JSON.stringify(reportFixture(HOME_URL))
+      );
+      const seal = createLighthouseArtifactSeal(
+        readRegularArtifactRecords(directory)
+      );
+      const spawnImpl = vi.fn((command, args, options) => {
+        expect(command).toBe(process.execPath);
+        expect(args[0]).toBe(cliPath);
+        expect(args.slice(1)).toEqual([
+          'upload',
+          `--config=${join(options.cwd as string, 'lighthouserc.json')}`,
+        ]);
+        // The uploader's cwd is the isolated root, not a package directory.
+        expect(() =>
+          statSync(join(options.cwd as string, 'package.json'))
+        ).toThrow();
+        writeFileSync(
+          join(options.cwd as string, '.lighthouseci', 'links.json'),
+          JSON.stringify({
+            [HOME_URL]: 'https://storage.example/home',
+            [PROFILE_URL]: 'https://storage.example/profile',
+          })
+        );
+        return { status: 0 };
+      }) as unknown as typeof spawnSync;
+
+      uploadSealedArtifacts(configPath, directory, seal, [], spawnImpl);
+      expect(spawnImpl).toHaveBeenCalledOnce();
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it('fails closed when a re-anchored uploader writes links into the sealed source tree', () => {
+    // Reproduces the prior production sequence: an uploader whose cwd was
+    // re-anchored at the package root writes links.json next to the sealed
+    // source artifacts instead of inside its isolated copy. The seal must
+    // detect the source-tree mutation and fail closed — never mask it.
+    const root = mkdtempSync(join(tmpdir(), 'jovie-lhci-reanchor-'));
+    const directory = join(root, '.lighthouseci');
+    const configPath = join(root, 'lighthouserc.json');
+    try {
+      mkdirSync(directory);
+      writeFileSync(configPath, JSON.stringify(configFixture()));
+      writeFileSync(
+        join(directory, 'lhr-1.json'),
+        JSON.stringify(reportFixture(HOME_URL))
+      );
+      const seal = createLighthouseArtifactSeal(
+        readRegularArtifactRecords(directory)
+      );
+      const spawnImpl = ((_command, _args, _options) => {
+        // Emulate LHCI resolving `.lighthouseci` from a re-anchored cwd equal
+        // to the package root (the sealed source tree's parent).
+        writeFileSync(
+          join(directory, 'links.json'),
+          JSON.stringify({
+            [HOME_URL]: 'https://storage.example/home',
+            [PROFILE_URL]: 'https://storage.example/profile',
+          })
+        );
+        return { status: 0 };
+      }) as unknown as typeof spawnSync;
+
+      expect(() =>
+        uploadSealedArtifacts(configPath, directory, seal, [], spawnImpl)
+      ).toThrow('Lighthouse artifact set changed after validation.');
     } finally {
       rmSync(root, { force: true, recursive: true });
     }
