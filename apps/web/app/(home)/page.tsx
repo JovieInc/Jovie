@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import {
-  type HomepageArtistOutcomeCards,
-  HomepageArtistOutcomes,
-} from '@/components/homepage/HomepageArtistOutcomes';
 import { HomepageClosedLoop } from '@/components/homepage/HomepageClosedLoop';
 import { HomepageElectricSeam } from '@/components/homepage/HomepageElectricSeam';
 import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
+import {
+  HomepageMeetJovie,
+  type HomepageMeetJovieCards,
+} from '@/components/homepage/HomepageMeetJovie';
 import { HomepageOpportunitySection } from '@/components/homepage/HomepageOpportunitySection';
 import { HomepagePosterHero } from '@/components/homepage/HomepagePosterHero';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
@@ -36,13 +36,6 @@ import { getMarketingExportImage } from '@/lib/screenshots/registry';
 // the initial document for SEO. The motion-driven workspace lives behind a
 // client `*Lazy.tsx` shim with reserved placeholder geometry, so its chunk and
 // scroll subscriptions do not compete with hero hydration or shift the page.
-const HomepageV2Pricing = dynamic(
-  () =>
-    import('@/components/marketing/homepage-v2/HomepageV2Ctas').then(m => ({
-      default: m.HomepageV2Pricing,
-    })),
-  { ssr: true }
-);
 const HomepageV2FinalCta = dynamic(
   () =>
     import('@/components/marketing/homepage-v2/HomepageV2Ctas').then(m => ({
@@ -79,7 +72,7 @@ const ARTIST_OUTCOME_CARDS = [
     title: 'Get Paid',
     image: getMarketingExportImage('tim-white-profile-pay-mobile'),
   },
-] as const satisfies HomepageArtistOutcomeCards;
+] as const satisfies HomepageMeetJovieCards;
 
 export const revalidate = false;
 
@@ -212,6 +205,7 @@ function HomepageHero() {
         headingId='home-hero-heading'
         headline={HERO_COPY.headline}
         subtitle={HERO_COPY.subhead}
+        lede={HERO_COPY.lede}
         trackedLinkComponent={HomepageTrackedLink}
         primaryCta={{
           label: HERO_COPY.primaryCta.label,
@@ -221,6 +215,15 @@ function HomepageHero() {
           eventProperties: {
             cta: 'primary',
             label: HERO_COPY.primaryCta.label,
+          },
+        }}
+        secondaryCta={{
+          label: HERO_COPY.secondaryCta.label,
+          href: HERO_COPY.secondaryCta.href,
+          eventName: 'homepage_hero_secondary_cta_clicked',
+          eventProperties: {
+            cta: 'secondary',
+            label: HERO_COPY.secondaryCta.label,
           },
         }}
         seam={
@@ -281,11 +284,10 @@ function HomepageFaq() {
 function HomepageUnlockedSections() {
   return (
     <>
+      <HomepageMeetJovie cards={ARTIST_OUTCOME_CARDS} />
       <HomepageOpportunity />
       <HomepageWorkspaceSectionLazy screenshot={WORKSPACE_SCREENSHOT} />
-      <HomepageArtistOutcomes cards={ARTIST_OUTCOME_CARDS} />
       <HomepageClosedLoop />
-      <HomepageV2Pricing />
       <HomepageFaq />
     </>
   );

@@ -105,7 +105,15 @@ function resolveLocalBetterAuthUrl(): URL | undefined {
     return undefined;
   }
 
-  const configuredUrl = new URL(env.BETTER_AUTH_URL);
+  // A malformed BETTER_AUTH_URL must degrade to the non-local path, never
+  // abort the build while prerendering (page-data collection runs this
+  // module's import graph).
+  let configuredUrl: URL;
+  try {
+    configuredUrl = new URL(env.BETTER_AUTH_URL);
+  } catch {
+    return undefined;
+  }
   return LOOPBACK_HOSTNAMES.has(configuredUrl.hostname)
     ? configuredUrl
     : undefined;

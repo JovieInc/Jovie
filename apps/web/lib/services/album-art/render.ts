@@ -151,7 +151,7 @@ export async function renderAlbumArtCandidate(params: {
   readonly artistName: string;
   readonly style: AlbumArtStylePreset;
 }): Promise<{ readonly fullRes: Buffer; readonly preview: Buffer }> {
-  const base = await sharp(params.background, { failOnError: false })
+  const base = await sharp(params.background, { failOn: 'none' })
     .rotate()
     .resize(COVER_SIZE, COVER_SIZE, { fit: 'cover' })
     .toColourspace('srgb')

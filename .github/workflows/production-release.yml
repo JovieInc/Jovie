@@ -1012,13 +1012,30 @@ jobs:
         continue-on-error: true
         env:
           BASE_URL: https://jov.ie
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
         run: |
           set -euo pipefail
+          : >> "$GITHUB_OUTPUT"
           # The browser must issue the same-origin POST
           # /api/auth/sign-in/social before either provider navigation exists.
           cd apps/web
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          oauth_retry_root="$RUNNER_TEMP/production-oauth-retries"
+          mkdir -m 700 "$oauth_retry_root"
+
+          quarantine_oauth_artifacts() {
+            destination="$1"
+            for artifact_path in test-results playwright-report; do
+              if [ -e "$artifact_path" ] || [ -L "$artifact_path" ]; then
+                if [ ! -d "$destination" ]; then
+                  mkdir -m 700 "$destination"
+                fi
+                mv -- "$artifact_path" "$destination/"
+              fi
+            done
+          }
+
           attempt=1
           max_attempts=3
           confirmed_attempts=0
@@ -1030,13 +1047,45 @@ jobs:
               PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" \
               --run -- pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
-              --project=chromium --reporter=json || probe_status=$?
+              --project=chromium --no-deps --reporter=json || probe_status=$?
             if [ "$probe_status" -eq 0 ] && jq -e '
-              def results:
-                [ .suites[]? | .. | objects | select(has("results")) | .results[]? ];
+              def oauth_suites:
+                [.suites[]? | select(
+                  type == "object" and
+                  .title == "oauth-providers.spec.ts" and
+                  .file == "oauth-providers.spec.ts"
+                )];
+              def oauth_specs:
+                oauth_suites[0].suites[0].specs;
               type == "object" and (.suites | type == "array") and
-              (results | map(select(.status == "passed")) | length) == 2 and
-              (results | map(select(.status == "skipped")) | length) == 0
+              (.suites | length) == 1 and
+              (oauth_suites | length) == 1 and
+              (oauth_suites[0].specs | type == "array") and
+              (oauth_suites[0].specs | length) == 0 and
+              (oauth_suites[0].suites | type == "array") and
+              (oauth_suites[0].suites | length) == 1 and
+              oauth_suites[0].suites[0].title == "candidate-bound Better Auth OAuth runtime @production-smoke" and
+              (oauth_specs | type == "array") and
+              (oauth_specs | map(.title)) == [
+                "google UI starts the exact Better Auth provider redirect",
+                "apple UI starts the exact Better Auth provider redirect"
+              ] and
+              all(oauth_specs[];
+                (.tests | type == "array") and
+                (.tests | length) == 1 and
+                (.tests[0].status == "expected" or .tests[0].status == "flaky") and
+                .tests[0].expectedStatus == "passed" and
+                .tests[0].projectName == "chromium" and
+                (.tests[0].results | type == "array") and
+                (.tests[0].results | length) > 0 and
+                .tests[0].results[-1].status == "passed"
+              ) and
+              (.errors | type == "array") and
+              (.errors | length) == 0 and
+              (.stats | type == "object") and
+              (.stats.unexpected // 0) == 0 and
+              (.stats.skipped // 0) == 0 and
+              ((.stats.expected // 0) + (.stats.flaky // 0) == 2)
             ' >/dev/null "$report"; then
               {
                 echo "ba_health=passed"
@@ -1046,19 +1095,68 @@ jobs:
               exit 0
             fi
 
+            attempt_artifact_root="$oauth_retry_root/attempt-${attempt}"
+            mkdir -m 700 "$attempt_artifact_root"
+            if [ -f "$report" ]; then
+              mkdir -m 700 "$attempt_artifact_root/failed-artifacts"
+              mv -- "$report" "$attempt_artifact_root/failed-artifacts/oauth-provider-report.json"
+              report="$attempt_artifact_root/failed-artifacts/oauth-provider-report.json"
+            fi
+            quarantine_oauth_artifacts "$attempt_artifact_root/failed-artifacts"
+
             # Only explicit runtime-contract assertions in a valid Playwright
             # report confirm a regression. Browser/tool/network/report failures
             # remain uncertainty and can never request rollback.
-            if [ -s "$report" ] && jq -e '
-              def results:
-                [ .suites[]? | .. | objects | select(has("results")) | .results[]? ];
+            if [ "$probe_status" -ne 0 ] && [ -s "$report" ] && jq -e '
+              def oauth_suites:
+                [.suites[]? | select(
+                  type == "object" and
+                  .title == "oauth-providers.spec.ts" and
+                  .file == "oauth-providers.spec.ts"
+                )];
+              def oauth_specs:
+                oauth_suites[0].suites[0].specs;
+              def oauth_tests:
+                [oauth_specs[]?.tests[]?];
+              def final_results:
+                [oauth_tests[]?.results[-1]];
               type == "object" and (.suites | type == "array") and
-              (results | map(select(.status == "failed")) | length) > 0 and
-              all(results[] | select(.status != "passed" and .status != "skipped");
-                .status == "failed" and
-                ([.errors[]?.message // ""] | any(
-                  contains("CONFIRMED_OAUTH_RUNTIME_CONTRACT")
-                ))
+              (.suites | length) == 1 and
+              (oauth_suites | length) == 1 and
+              (oauth_suites[0].specs | type == "array") and
+              (oauth_suites[0].specs | length) == 0 and
+              (oauth_suites[0].suites | type == "array") and
+              (oauth_suites[0].suites | length) == 1 and
+              oauth_suites[0].suites[0].title == "candidate-bound Better Auth OAuth runtime @production-smoke" and
+              (oauth_specs | type == "array") and
+              (oauth_specs | map(.title)) == [
+                "google UI starts the exact Better Auth provider redirect",
+                "apple UI starts the exact Better Auth provider redirect"
+              ] and
+              (oauth_tests | length) == 2 and
+              all(oauth_specs[];
+                (.tests | type == "array") and
+                (.tests | length) == 1 and
+                (
+                  (.tests[0].status == "unexpected" and
+                    .tests[0].results[-1].status == "failed") or
+                  (.tests[0].status == "expected" and
+                    .tests[0].results[-1].status == "passed")
+                ) and
+                .tests[0].projectName == "chromium" and
+                .tests[0].expectedStatus == "passed" and
+                (.tests[0].results | type == "array") and
+                (.tests[0].results | length) > 0
+              ) and
+              (final_results | map(select(.status == "failed")) | length) > 0 and
+              all(final_results[];
+                .status == "passed" or
+                (
+                  .status == "failed" and
+                  ([.errors[]?.message // ""] | any(
+                    contains("CONFIRMED_OAUTH_RUNTIME_CONTRACT")
+                  ))
+                )
               )
             ' >/dev/null "$report"; then
               confirmed_attempts=$((confirmed_attempts + 1))
@@ -1066,6 +1164,10 @@ jobs:
             else
               uncertain=true
               echo "OAuth attempt ${attempt}/${max_attempts} lacked exact structured runtime-contract evidence."
+            fi
+            if [ -f "$RUNNER_TEMP/safe-playwright-producer/blocked" ]; then
+              echo "::error::Playwright artifact guard blocked production OAuth output; refusing an unsafe retry."
+              exit 1
             fi
             if [ "$attempt" -lt "$max_attempts" ]; then
               sleep_seconds=$((attempt * 15))

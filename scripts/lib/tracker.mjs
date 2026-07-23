@@ -19,6 +19,8 @@ import { execFileSync } from 'node:child_process';
 export const STATUS_IN_PROGRESS = 'status:in-progress';
 export const STATUS_IN_REVIEW = 'status:in-review';
 export const AGENT_READY_LABEL = 'agent-ready';
+export const CLAIM_OWNER_MARKER = 'github-ai-claim-owner';
+export const CLAIM_FINALIZED_MARKER = 'github-ai-claim-finalized';
 
 /** @type {ReadonlySet<string>} */
 export const STATUS_LABELS = new Set([STATUS_IN_PROGRESS, STATUS_IN_REVIEW]);
@@ -44,6 +46,28 @@ function defaultExec(args, input) {
 
 function repoArgs(repo) {
   return repo ? ['--repo', repo] : [];
+}
+
+function isValidClaimOwner(ownerToken) {
+  return /^[A-Za-z0-9._:/-]+$/.test(ownerToken ?? '');
+}
+
+function claimOwnerMarker(ownerToken) {
+  return `<!-- ${CLAIM_OWNER_MARKER}:${ownerToken} -->`;
+}
+
+function claimFinalizedMarker(ownerToken, outcome) {
+  return `<!-- ${CLAIM_FINALIZED_MARKER}:${ownerToken}:${outcome} -->`;
+}
+
+function commentAuthor(comment) {
+  return comment?.user?.login ?? comment?.author?.login ?? '';
+}
+
+function flattenComments(raw) {
+  const parsed = JSON.parse(raw);
+  const pages = Array.isArray(parsed) ? parsed : [];
+  return pages.flatMap(page => (Array.isArray(page) ? page : [page]));
 }
 
 /**
@@ -112,12 +136,33 @@ export function shouldMirrorLinear(env = process.env) {
  * Claim a GitHub issue for agent work: assignee + status:in-progress label.
  * Never throws.
  *
- * @param {{ number: number, assignee?: string, note?: string, repo?: string }} input
+ * @param {{ number: number, assignee?: string, note?: string, repo?: string, ownerToken?: string }} input
  * @param {(args: string[]) => string} [exec]
  */
 export function claimIssue(input, exec = args => defaultExec(args)) {
-  const { number, assignee, note = 'Agent dispatch', repo } = input;
+  const { number, assignee, note = 'Agent dispatch', repo, ownerToken } = input;
   try {
+    if (ownerToken && !isValidClaimOwner(ownerToken)) {
+      throw new Error('Invalid claim owner token');
+    }
+
+    const commentArgs = [
+      'issue',
+      'comment',
+      String(number),
+      ...repoArgs(repo),
+      '--body',
+      `**Agent claim** ${note}${
+        ownerToken ? `\n\n${claimOwnerMarker(ownerToken)}` : ''
+      }`,
+    ];
+
+    // Persist the exact owner before publishing the status label. If the
+    // receipt write fails, there is no unowned in-progress claim to strand.
+    if (ownerToken) {
+      exec(commentArgs);
+    }
+
     const editArgs = [
       'issue',
       'edit',
@@ -145,14 +190,9 @@ export function claimIssue(input, exec = args => defaultExec(args)) {
       }
     }
 
-    exec([
-      'issue',
-      'comment',
-      String(number),
-      ...repoArgs(repo),
-      '--body',
-      `**Agent claim** ${note}`,
-    ]);
+    if (!ownerToken) {
+      exec(commentArgs);
+    }
 
     return {
       success: true,
@@ -162,6 +202,118 @@ export function claimIssue(input, exec = args => defaultExec(args)) {
   } catch (error) {
     return {
       success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Finalize an orchestrator-owned issue claim. The latest trusted claim receipt
+ * must match ownerToken, so an old workflow run cannot release a newer run's
+ * claim. Retryable finalization removes only status:in-progress and preserves
+ * agent-ready. PR finalization transitions the owned claim to in-review.
+ *
+ * @param {{ number: number, ownerToken: string, outcome: 'retryable' | 'in-review', note?: string, repo: string, expectedActor?: string }} input
+ * @param {(args: string[]) => string} [exec]
+ */
+export function finalizeIssueClaim(input, exec = args => defaultExec(args)) {
+  const {
+    number,
+    ownerToken,
+    outcome,
+    note = '',
+    repo,
+    expectedActor = 'github-actions[bot]',
+  } = input;
+
+  try {
+    if (!repo) throw new Error('repo is required to finalize a claim');
+    if (!isValidClaimOwner(ownerToken)) {
+      throw new Error('Invalid claim owner token');
+    }
+    if (outcome !== 'retryable' && outcome !== 'in-review') {
+      throw new Error(`Invalid claim finalizer outcome: ${outcome}`);
+    }
+
+    const comments = flattenComments(
+      exec([
+        'api',
+        '--paginate',
+        '--slurp',
+        `repos/${repo}/issues/${number}/comments?per_page=100`,
+      ])
+    ).filter(comment => commentAuthor(comment) === expectedActor);
+    const latestClaim = comments
+      .map(comment => String(comment?.body ?? ''))
+      .filter(body => body.includes(`<!-- ${CLAIM_OWNER_MARKER}:`))
+      .at(-1);
+
+    if (!latestClaim?.includes(claimOwnerMarker(ownerToken))) {
+      return {
+        success: true,
+        changed: false,
+        number,
+        outcome,
+        reason: 'not-owner',
+      };
+    }
+
+    const issue = JSON.parse(exec(['api', `repos/${repo}/issues/${number}`]));
+    const labels = new Set(
+      (issue.labels ?? []).map(label =>
+        typeof label === 'string' ? label : label.name
+      )
+    );
+    const alreadyFinalized =
+      outcome === 'in-review'
+        ? labels.has(STATUS_IN_REVIEW) && !labels.has(STATUS_IN_PROGRESS)
+        : !labels.has(STATUS_IN_PROGRESS);
+    if (alreadyFinalized) {
+      return {
+        success: true,
+        changed: false,
+        number,
+        outcome,
+        reason: 'already-finalized',
+      };
+    }
+
+    if (!labels.has(STATUS_IN_PROGRESS)) {
+      return {
+        success: true,
+        changed: false,
+        number,
+        outcome,
+        reason: 'no-active-claim',
+      };
+    }
+
+    const finalizedMarker = claimFinalizedMarker(ownerToken, outcome);
+    const hasFinalizedReceipt = comments.some(comment =>
+      String(comment?.body ?? '').includes(finalizedMarker)
+    );
+    if (!hasFinalizedReceipt) {
+      exec([
+        'issue',
+        'comment',
+        String(number),
+        ...repoArgs(repo),
+        '--body',
+        `**Agent claim finalizer** ${note}\n\n${finalizedMarker}`,
+      ]);
+    }
+
+    if (outcome === 'in-review') {
+      swapLabels(number, [STATUS_IN_PROGRESS], [STATUS_IN_REVIEW], exec, repo);
+    } else {
+      swapLabels(number, [STATUS_IN_PROGRESS], [], exec, repo);
+    }
+
+    return { success: true, changed: true, number, outcome };
+  } catch (error) {
+    return {
+      success: false,
+      changed: false,
       error: error instanceof Error ? error.message : String(error),
     };
   }
