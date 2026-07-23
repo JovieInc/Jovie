@@ -1002,7 +1002,7 @@ jobs:
           }
           pnpm --filter @jovie/desktop exec electron-builder publish \
             --config electron-builder.yml \
-            --version "$release_version" \
+            --version="$release_version" \
             --files "${publish_files[@]}"
 
       - name: Capture production publisher identity
