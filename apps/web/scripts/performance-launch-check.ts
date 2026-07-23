@@ -203,9 +203,35 @@ async function waitForServer(baseUrl: string, child: ReturnType<typeof spawn>) {
   throw new Error('Timed out waiting for the launch perf server to start.');
 }
 
+export function buildStandaloneServerLaunch(baseUrl: string) {
+  const parsedBaseUrl = new URL(baseUrl);
+  return {
+    args: [
+      'run',
+      '--project',
+      'jovie-web',
+      '--config',
+      'dev',
+      '--preserve-env=BETTER_AUTH_URL',
+      '--',
+      'node',
+      standaloneServerPath,
+    ],
+    env: {
+      ...process.env,
+      HOSTNAME: parsedBaseUrl.hostname,
+      PORT: parsedBaseUrl.port,
+      NODE_ENV: 'production',
+      E2E_USE_TEST_AUTH_BYPASS: '1',
+      BETTER_AUTH_URL: baseUrl,
+    },
+  } satisfies {
+    readonly args: string[];
+    readonly env: NodeJS.ProcessEnv;
+  };
+}
+
 async function startServer(baseUrl: string, artifactDir: string) {
-  const hostname = new URL(baseUrl).hostname;
-  const port = new URL(baseUrl).port;
   const logPath = resolve(artifactDir, 'server.log');
   writeFileSync(logPath, '');
 
@@ -217,30 +243,12 @@ async function startServer(baseUrl: string, artifactDir: string) {
     );
   }
 
-  const child = spawn(
-    'doppler',
-    [
-      'run',
-      '--project',
-      'jovie-web',
-      '--config',
-      'dev',
-      '--',
-      'node',
-      standaloneServerPath,
-    ],
-    {
-      cwd: repoRoot,
-      env: {
-        ...process.env,
-        HOSTNAME: hostname,
-        PORT: port,
-        NODE_ENV: 'production',
-        E2E_USE_TEST_AUTH_BYPASS: '1',
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }
-  );
+  const launch = buildStandaloneServerLaunch(baseUrl);
+  const child = spawn('doppler', launch.args, {
+    cwd: repoRoot,
+    env: launch.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 
   const appendOutput = (chunk: Buffer | string) => {
     writeFileSync(logPath, String(chunk), { flag: 'a' });
@@ -417,8 +425,11 @@ async function main() {
   }
 }
 
-main().catch(error => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${message}\n`);
-  process.exit(1);
-});
+const entryPath = process.argv[1] ? resolve(process.argv[1]) : null;
+if (entryPath === fileURLToPath(import.meta.url)) {
+  void main().catch(error => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`${message}\n`);
+    process.exit(1);
+  });
+}
