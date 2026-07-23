@@ -98,6 +98,8 @@ export interface PerfRouteDefinition {
   readonly group: PerfRouteGroup;
   readonly surface: PerfRouteSurface;
   readonly path: string;
+  readonly navigationItemId?: string;
+  readonly warmNavigationStartPath?: string;
   readonly resolvePath?: (
     route: PerfRouteDefinition,
     context: PerfResolveContext
@@ -130,6 +132,135 @@ function normalizeRouteDefinition(
     timingBudgets: getRouteTimingBudgets(route),
     resourceBudgets: getRouteResourceBudgets(route),
   };
+}
+
+const DYNAMIC_ROUTE_TOKEN_PATTERN = /\[[^[\]/]+\]/;
+
+function assertNonemptySelectors(
+  route: PerfRouteDefinition,
+  selectorGroup: keyof PerfReadySelectors,
+  selectors: readonly string[] | undefined
+) {
+  if (!selectors) return;
+
+  const emptyIndex = selectors.findIndex(
+    selector => selector.trim().length === 0
+  );
+  if (emptyIndex >= 0) {
+    throw new TypeError(
+      `Performance route "${route.id}" has an empty ${selectorGroup} selector at index ${emptyIndex}.`
+    );
+  }
+}
+
+export function assertValidPerfRouteDefinition(route: PerfRouteDefinition) {
+  if (!route.id.trim()) {
+    throw new TypeError('Performance route ids must not be empty.');
+  }
+  if (!route.path.trim() || !route.path.startsWith('/')) {
+    throw new TypeError(
+      `Performance route "${route.id}" must define an absolute path beginning with "/".`
+    );
+  }
+
+  for (const selectorGroup of Object.keys(
+    route.readySelectors
+  ) as (keyof PerfReadySelectors)[]) {
+    assertNonemptySelectors(
+      route,
+      selectorGroup,
+      route.readySelectors[selectorGroup]
+    );
+  }
+
+  const readySelectors = [
+    ...(route.readySelectors.shell ?? []),
+    ...(route.readySelectors.content ?? []),
+  ];
+  if (readySelectors.length === 0) {
+    throw new TypeError(
+      `Performance route "${route.id}" must define at least one shell or content ready selector.`
+    );
+  }
+
+  if (route.measureMode === 'warm-navigation') {
+    if (!route.readySelectors.navTrigger?.length) {
+      throw new TypeError(
+        `Warm-navigation route "${route.id}" must define at least one navTrigger selector.`
+      );
+    }
+    if (!route.warmNavigationStartPath?.startsWith('/')) {
+      throw new TypeError(
+        `Warm-navigation route "${route.id}" must define warmNavigationStartPath as an absolute app path.`
+      );
+    }
+    if (route.warmNavigationStartPath === route.path) {
+      throw new TypeError(
+        `Warm-navigation route "${route.id}" cannot start from its destination path "${route.path}".`
+      );
+    }
+  }
+
+  if (route.measureMode === 'redirect') {
+    const destinations = route.readySelectors.redirectDestinations;
+    if (!destinations?.length) {
+      throw new TypeError(
+        `Redirect route "${route.id}" must define at least one redirect destination.`
+      );
+    }
+    if (destinations.includes(route.path)) {
+      throw new TypeError(
+        `Redirect route "${route.id}" loops back to its configured path "${route.path}".`
+      );
+    }
+  }
+
+  if (DYNAMIC_ROUTE_TOKEN_PATTERN.test(route.path) && !route.resolvePath) {
+    throw new TypeError(
+      `Dynamic performance route "${route.id}" must define resolvePath for "${route.path}".`
+    );
+  }
+}
+
+export function assertResolvedPerfRoutePath(
+  route: PerfRouteDefinition,
+  resolvedPath: string
+) {
+  if (!resolvedPath.trim() || !resolvedPath.startsWith('/')) {
+    throw new TypeError(
+      `Performance route "${route.id}" resolved to invalid path "${resolvedPath}". Expected an absolute app path.`
+    );
+  }
+  if (DYNAMIC_ROUTE_TOKEN_PATTERN.test(resolvedPath)) {
+    throw new TypeError(
+      `Performance route "${route.id}" left dynamic tokens unresolved: "${resolvedPath}".`
+    );
+  }
+}
+
+export function assertValidPerfRouteManifest(
+  routes: readonly PerfRouteDefinition[]
+) {
+  const routeIds = new Set<string>();
+  const navigationItemIds = new Set<string>();
+  for (const route of routes) {
+    assertValidPerfRouteDefinition(route);
+    if (routeIds.has(route.id)) {
+      throw new TypeError(
+        `Performance route manifest contains duplicate id "${route.id}".`
+      );
+    }
+    routeIds.add(route.id);
+
+    if (route.measureMode === 'warm-navigation' && route.navigationItemId) {
+      if (navigationItemIds.has(route.navigationItemId)) {
+        throw new TypeError(
+          `Performance route manifest contains duplicate warm-navigation item "${route.navigationItemId}".`
+        );
+      }
+      navigationItemIds.add(route.navigationItemId);
+    }
+  }
 }
 
 const RELEASE_TASKS_ROUTE_TEMPLATE = `${APP_ROUTES.RELEASES}/[releaseId]/tasks`;
@@ -881,8 +1012,8 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: ['[data-testid="chat-content"]'],
-      loading: ['[data-testid="chat-loading"]'],
+      content: ['[data-testid="opportunity-inbox-page"]'],
+      loading: ['[data-testid="dashboard-segment-skeleton"]'],
     },
     timings: [
       { metric: 'first-contentful-paint', budget: 1500 },
@@ -894,6 +1025,30 @@ const CREATOR_SHELL_ROUTES = [
     ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
     priority: 1,
+    seedProfile: 'active-user',
+  },
+  {
+    id: 'creator-inbox-nav',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.DASHBOARD,
+    navigationItemId: 'inbox',
+    warmNavigationStartPath: APP_ROUTES.CHAT,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-shell',
+    measureMode: 'warm-navigation',
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"]'],
+      content: ['[data-testid="opportunity-inbox-page"]'],
+      loading: ['[data-testid="dashboard-segment-skeleton"]'],
+      navTrigger: [
+        `a[href="${APP_ROUTES.DASHBOARD}"]`,
+        `a[href^="${APP_ROUTES.DASHBOARD}?"]`,
+      ],
+    },
+    timings: [{ metric: 'warm-shell-response', budget: 100 }],
+    resourceSizes: CHAT_RESOURCE_BUDGETS,
+    priority: 2,
     seedProfile: 'active-user',
   },
   {
@@ -917,7 +1072,34 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'skeleton-to-content', budget: 1200 },
     ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
-    priority: 2,
+    priority: 3,
+    seedProfile: 'active-user',
+  },
+  {
+    id: 'creator-chat-nav',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.CHAT,
+    navigationItemId: 'chat',
+    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-shell',
+    measureMode: 'warm-navigation',
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"]'],
+      content: ['[data-testid="chat-content"]'],
+      loading: ['[data-testid="chat-loading"]'],
+      navTrigger: [
+        `a[href="${APP_ROUTES.CHAT}"]`,
+        `a[href^="${APP_ROUTES.CHAT}?"]`,
+      ],
+    },
+    timings: [
+      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'skeleton-to-content', budget: 1200 },
+    ],
+    resourceSizes: CHAT_RESOURCE_BUDGETS,
+    priority: 4,
     seedProfile: 'active-user',
   },
   {
@@ -942,7 +1124,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'skeleton-to-content', budget: 1200 },
     ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
-    priority: 3,
+    priority: 5,
     seedProfile: 'active-user',
   },
   {
@@ -968,7 +1150,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'skeleton-to-content', budget: 600 },
     ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
-    priority: 4,
+    priority: 6,
     seedProfile: 'active-user',
   },
   {
@@ -988,7 +1170,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'time-to-first-byte', budget: 1200 },
     ],
     resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,
-    priority: 5,
+    priority: 7,
     seedProfile: 'active-user',
   },
   {
@@ -1014,7 +1196,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'skeleton-to-content', budget: 600 },
     ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
-    priority: 6,
+    priority: 8,
     seedProfile: 'active-user',
   },
   {
@@ -1035,7 +1217,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'time-to-first-byte', budget: 1200 },
     ],
     resourceSizes: ARTIST_PROFILE_SETTINGS_RESOURCE_BUDGETS,
-    priority: 7,
+    priority: 9,
     seedProfile: 'active-user',
   },
   {
@@ -1044,26 +1226,18 @@ const CREATOR_SHELL_ROUTES = [
     surface: 'creator-app',
     path: APP_ROUTES.RELEASES,
     requiresAuth: true,
-    warmupStrategy: 'authenticated-shell',
-    measureMode: 'warm-navigation',
+    warmupStrategy: 'authenticated-route',
+    measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-app-shell-frame="true"]'],
-      content: [
-        '[data-testid="releases-loading"]',
-        '[data-testid="releases-matrix"]',
-      ],
-      loading: ['[data-testid="releases-loading"]'],
-      navTrigger: [`a[href="${APP_ROUTES.RELEASES}"]`],
-      redirectDestinations: [APP_ROUTES.RELEASES],
+      content: ['[data-testid="library-surface"]'],
+      redirectDestinations: [`${APP_ROUTES.LIBRARY}?view=releases`],
     },
     timings: [
-      // Initial-load render budgets for releases are covered by Lighthouse.
-      // The local launch gate only enforces the warm authenticated nav path.
-      { metric: 'warm-shell-response', budget: 100 },
-      { metric: 'skeleton-to-content', budget: 1000 },
+      { metric: 'redirect-complete', budget: 700 },
+      { metric: 'time-to-first-byte', budget: 1200 },
     ],
     resourceSizes: RELEASES_RESOURCE_BUDGETS,
-    priority: 8,
+    priority: 10,
     seedProfile: 'active-user',
   },
   {
@@ -1071,6 +1245,8 @@ const CREATOR_SHELL_ROUTES = [
     group: 'creator-shell',
     surface: 'creator-app',
     path: APP_ROUTES.LIBRARY,
+    navigationItemId: 'library',
+    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
     requiresAuth: true,
     warmupStrategy: 'authenticated-shell',
     measureMode: 'warm-navigation',
@@ -1080,8 +1256,7 @@ const CREATOR_SHELL_ROUTES = [
       loading: ['main[aria-label="Loading Library"]'],
       navTrigger: [
         `a[href="${APP_ROUTES.LIBRARY}"]`,
-        `a[href="${APP_ROUTES.DASHBOARD_LIBRARY}"]`,
-        `a[href="${APP_ROUTES.LEGACY_DASHBOARD_LIBRARY}"]`,
+        `a[href^="${APP_ROUTES.LIBRARY}?"]`,
       ],
     },
     timings: [
@@ -1089,7 +1264,57 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'skeleton-to-content', budget: 1000 },
     ],
     resourceSizes: RELEASES_RESOURCE_BUDGETS,
-    priority: 9,
+    priority: 11,
+    seedProfile: 'active-user',
+  },
+  {
+    id: 'creator-contacts',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.CONTACTS,
+    navigationItemId: 'contacts',
+    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-shell',
+    measureMode: 'warm-navigation',
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"]'],
+      content: ['[data-testid="contacts-table"]'],
+      navTrigger: [
+        `a[href="${APP_ROUTES.CONTACTS}"]`,
+        `a[href^="${APP_ROUTES.CONTACTS}?"]`,
+      ],
+    },
+    timings: [{ metric: 'warm-shell-response', budget: 100 }],
+    resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,
+    priority: 12,
+    seedProfile: 'active-user',
+  },
+  {
+    id: 'creator-calendar',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.CALENDAR,
+    navigationItemId: 'calendar',
+    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-shell',
+    measureMode: 'warm-navigation',
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"]'],
+      content: ['[data-testid="calendar-workspace"]'],
+      loading: ['[aria-label="Loading Calendar"]'],
+      navTrigger: [
+        `a[href="${APP_ROUTES.CALENDAR}"]`,
+        `a[href^="${APP_ROUTES.CALENDAR}?"]`,
+      ],
+    },
+    timings: [
+      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'skeleton-to-content', budget: 1000 },
+    ],
+    resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,
+    priority: 13,
     seedProfile: 'active-user',
   },
   {
@@ -1097,6 +1322,8 @@ const CREATOR_SHELL_ROUTES = [
     group: 'creator-shell',
     surface: 'creator-app',
     path: APP_ROUTES.TASKS,
+    navigationItemId: 'tasks',
+    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
     requiresAuth: true,
     warmupStrategy: 'authenticated-shell',
     measureMode: 'warm-navigation',
@@ -1110,11 +1337,38 @@ const CREATOR_SHELL_ROUTES = [
         '[data-testid="tasks-upgrade-interstitial"]',
         '[data-testid="release-plan-upgrade-interstitial"]',
       ],
-      navTrigger: [`a[href="${APP_ROUTES.TASKS}"]`],
+      navTrigger: [
+        `a[href="${APP_ROUTES.TASKS}"]`,
+        `a[href^="${APP_ROUTES.TASKS}?"]`,
+      ],
     },
     timings: [{ metric: 'warm-shell-response', budget: 100 }],
     resourceSizes: RELEASES_RESOURCE_BUDGETS,
-    priority: 10,
+    priority: 14,
+    seedProfile: 'active-user',
+  },
+  {
+    id: 'creator-profile-rail',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.CHAT,
+    navigationItemId: 'profile',
+    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-shell',
+    measureMode: 'warm-navigation',
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"]'],
+      content: ['[data-testid="chat-profile-preview-rail"]'],
+      loading: ['[data-testid="chat-loading"]'],
+      navTrigger: ['button[aria-label^="Open "][aria-label$=" profile"]'],
+    },
+    timings: [
+      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'skeleton-to-content', budget: 1200 },
+    ],
+    resourceSizes: CHAT_RESOURCE_BUDGETS,
+    priority: 15,
     seedProfile: 'active-user',
   },
   {
@@ -1137,7 +1391,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'time-to-first-byte', budget: 1600 },
     ],
     resourceSizes: RELEASES_RESOURCE_BUDGETS,
-    priority: 11,
+    priority: 16,
     seedProfile: 'active-user',
   },
   {
@@ -1164,7 +1418,7 @@ const CREATOR_SHELL_ROUTES = [
       { metric: 'skeleton-to-content', budget: 600 },
     ],
     resourceSizes: RELEASES_RESOURCE_BUDGETS,
-    priority: 12,
+    priority: 17,
     seedProfile: 'active-user',
   },
 ] as const satisfies readonly PerfRouteDefinition[];
@@ -1228,26 +1482,6 @@ const CREATOR_ALIAS_ROUTES = [
     ],
     resourceSizes: CHAT_RESOURCE_BUDGETS,
     priority: 3,
-    seedProfile: 'active-user',
-  },
-  {
-    id: 'creator-alias-contacts',
-    group: 'creator-alias',
-    surface: 'creator-app',
-    path: APP_ROUTES.CONTACTS,
-    requiresAuth: true,
-    warmupStrategy: 'authenticated-route',
-    measureMode: 'redirect',
-    readySelectors: {
-      content: ['section#contacts'],
-      redirectDestinations: [APP_ROUTES.SETTINGS_CONTACTS],
-    },
-    timings: [
-      { metric: 'redirect-complete', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1200 },
-    ],
-    resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,
-    priority: 4,
     seedProfile: 'active-user',
   },
   {
@@ -1816,6 +2050,8 @@ const NORMALIZED_END_USER_PERF_ROUTE_MANIFEST =
   END_USER_PERF_ROUTE_MANIFEST.map(route =>
     normalizeRouteDefinition(route)
   ) as readonly PerfRouteDefinition[];
+
+assertValidPerfRouteManifest(NORMALIZED_END_USER_PERF_ROUTE_MANIFEST);
 
 export const END_USER_PERF_GROUP_ORDER = Object.keys(
   GROUP_PRIORITY

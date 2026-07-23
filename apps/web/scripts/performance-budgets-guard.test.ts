@@ -67,6 +67,16 @@ describe('performance budgets guard', () => {
     expect(selected[0]?.path).toContain('resume=spotify');
   });
 
+  it('fails before browser measurement when a manifest has an empty nav locator', async () => {
+    await expect(
+      loadGuardManifestRoutes(
+        'apps/web/scripts/fixtures/performance-route-manifest.invalid.fixture.ts'
+      )
+    ).rejects.toThrow(
+      'invalid-warm-nav-fixture" has an empty navTrigger selector at index 0'
+    );
+  });
+
   it('fails loudly when an authenticated route is measured without auth state', async () => {
     await expect(
       runPerformanceBudgetsGuard({

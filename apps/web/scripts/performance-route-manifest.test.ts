@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { primaryNavigation } from '../components/features/dashboard/dashboard-nav/config';
+import { APP_ROUTES } from '../constants/routes';
 import {
+  assertResolvedPerfRoutePath,
+  assertValidPerfRouteDefinition,
+  assertValidPerfRouteManifest,
   END_USER_PERF_GROUP_ORDER,
   getEndUserPerfRouteManifest,
   getPrimaryTimingMetricName,
   getRouteResourceBudgets,
   getRouteTimingBudgets,
+  type PerfRouteDefinition,
   selectPerfRoutes,
 } from './performance-route-manifest';
 
@@ -59,18 +65,85 @@ describe('performance route manifest', () => {
     ]);
   });
 
-  it('measures the canonical releases shell routes', () => {
+  it('keeps the canonical six-item navigation in warm-measurement parity', () => {
     const routes = getEndUserPerfRouteManifest();
+    const warmRoutesByNavigationItem = new Map(
+      routes
+        .filter(
+          route =>
+            route.measureMode === 'warm-navigation' &&
+            route.navigationItemId &&
+            route.navigationItemId !== 'profile'
+        )
+        .map(route => [route.navigationItemId, route])
+    );
+
+    expect([...warmRoutesByNavigationItem.keys()]).toEqual(
+      primaryNavigation.map(item => item.id)
+    );
+
+    for (const item of primaryNavigation) {
+      const route = warmRoutesByNavigationItem.get(item.id);
+      expect(
+        route,
+        `canonical nav item "${item.id}" must have warm-navigation coverage`
+      ).toBeDefined();
+      expect(route?.path).toBe(item.href);
+      expect(route?.warmupStrategy).toBe('authenticated-shell');
+      expect(route?.warmNavigationStartPath).not.toBe(item.href);
+      expect(route?.readySelectors.navTrigger).toContain(
+        `a[href="${item.href}"]`
+      );
+      expect(route?.readySelectors.navTrigger).toContain(
+        `a[href^="${item.href}?"]`
+      );
+      expect(route?.readySelectors.content?.length ?? 0).toBeGreaterThan(0);
+      expect(
+        routes.some(
+          candidate =>
+            candidate.path === item.href && candidate.measureMode === 'redirect'
+        ),
+        `canonical nav path "${item.href}" must not also be modeled as a redirect`
+      ).toBe(false);
+    }
+  });
+
+  it('uses Inbox readiness for /app and treats Releases as a Library redirect', () => {
+    const routes = getEndUserPerfRouteManifest();
+    const appHome = routes.find(route => route.id === 'creator-app-home');
     const releases = routes.find(route => route.id === 'creator-releases');
     const releaseTasks = routes.find(
       route => route.id === 'creator-release-tasks'
     );
 
+    expect(appHome?.path).toBe(APP_ROUTES.DASHBOARD);
+    expect(appHome?.readySelectors.content).toEqual([
+      '[data-testid="opportunity-inbox-page"]',
+    ]);
+    expect(appHome?.readySelectors.content).not.toContain(
+      '[data-testid="chat-content"]'
+    );
     expect(releases?.path).toBe('/app/releases');
-    expect(releases?.readySelectors.navTrigger).toEqual([
-      'a[href="/app/releases"]',
+    expect(releases?.measureMode).toBe('redirect');
+    expect(releases?.readySelectors.redirectDestinations).toEqual([
+      '/app/library?view=releases',
     ]);
     expect(releaseTasks?.path).toBe('/app/releases/[releaseId]/tasks');
+  });
+
+  it('measures the canonical profile rail control without inventing a link route', () => {
+    const profile = getEndUserPerfRouteManifest().find(
+      route => route.navigationItemId === 'profile'
+    );
+
+    expect(profile?.path).toBe(APP_ROUTES.CHAT);
+    expect(profile?.measureMode).toBe('warm-navigation');
+    expect(profile?.readySelectors.navTrigger).toEqual([
+      'button[aria-label^="Open "][aria-label$=" profile"]',
+    ]);
+    expect(profile?.readySelectors.content).toContain(
+      '[data-testid="chat-profile-preview-rail"]'
+    );
   });
 
   it('measures canonical chat onboarding at /start, not the legacy form shim', () => {
@@ -106,5 +179,92 @@ describe('performance route manifest', () => {
         resource => resource.resourceType === 'font'
       )?.budget
     ).toBe(75);
+  });
+
+  it('rejects empty locators and redirect loops with route-specific errors', () => {
+    const baseRoute = {
+      id: 'fixture-route',
+      group: 'creator-shell',
+      surface: 'creator-app',
+      path: '/app/fixture',
+      requiresAuth: true,
+      warmupStrategy: 'authenticated-route',
+      measureMode: 'page-load',
+      readySelectors: { content: ['main'] },
+      timings: [{ metric: 'first-contentful-paint', budget: 100 }],
+      resourceSizes: [{ resourceType: 'total', budget: 100 }],
+      priority: 1,
+    } as const satisfies PerfRouteDefinition;
+
+    expect(() =>
+      assertValidPerfRouteDefinition({
+        ...baseRoute,
+        readySelectors: { content: [''] },
+      })
+    ).toThrow('fixture-route" has an empty content selector at index 0');
+
+    expect(() =>
+      assertValidPerfRouteDefinition({
+        ...baseRoute,
+        measureMode: 'redirect',
+        readySelectors: {
+          content: ['main'],
+          redirectDestinations: ['/app/fixture'],
+        },
+      })
+    ).toThrow('fixture-route" loops back to its configured path');
+  });
+
+  it('rejects duplicate warm-navigation coverage before map construction', () => {
+    const warmRoute = {
+      id: 'fixture-warm-route',
+      group: 'creator-shell',
+      surface: 'creator-app',
+      path: '/app/library',
+      navigationItemId: 'library',
+      warmNavigationStartPath: '/app',
+      requiresAuth: true,
+      warmupStrategy: 'authenticated-shell',
+      measureMode: 'warm-navigation',
+      readySelectors: {
+        content: ['main'],
+        navTrigger: ['a[href="/app/library"]'],
+      },
+      timings: [{ metric: 'warm-shell-response', budget: 100 }],
+      resourceSizes: [{ resourceType: 'total', budget: 100 }],
+      priority: 1,
+    } as const satisfies PerfRouteDefinition;
+
+    expect(() =>
+      assertValidPerfRouteManifest([
+        warmRoute,
+        { ...warmRoute, id: 'duplicate-warm-route' },
+      ])
+    ).toThrow('duplicate warm-navigation item "library"');
+  });
+
+  it('requires dynamic fixtures to resolve every route token', () => {
+    const dynamicRoute = {
+      id: 'dynamic-fixture',
+      group: 'creator-shell',
+      surface: 'creator-app',
+      path: '/app/chat/[id]',
+      resolvePath: async () => '/app/chat/conversation-123',
+      requiresAuth: true,
+      warmupStrategy: 'authenticated-route',
+      measureMode: 'page-load',
+      readySelectors: { content: ['main'] },
+      timings: [{ metric: 'first-contentful-paint', budget: 100 }],
+      resourceSizes: [{ resourceType: 'total', budget: 100 }],
+      priority: 1,
+    } as const satisfies PerfRouteDefinition;
+
+    expect(() => assertValidPerfRouteDefinition(dynamicRoute)).not.toThrow();
+    expect(() =>
+      assertResolvedPerfRoutePath(dynamicRoute, '/app/chat/conversation-123')
+    ).not.toThrow();
+    expect(() =>
+      assertResolvedPerfRoutePath(dynamicRoute, '/app/chat/[id]')
+    ).toThrow('dynamic-fixture" left dynamic tokens unresolved');
   });
 });

@@ -422,6 +422,7 @@ export function CalendarPageClient() {
 
   return (
     <PageShell
+      data-testid='calendar-workspace'
       toolbar={
         <PageToolbar
           start={
