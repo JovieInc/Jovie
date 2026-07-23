@@ -133,6 +133,32 @@ describe('PUT /api/dashboard/profile rollback behavior', () => {
     );
   });
 
+  it.each([
+    ['non-integer', 1.5],
+    ['less than one', 0],
+    ['wrong type', '1'],
+  ])('rejects an expectedVersion that is %s', async (_label, expectedVersion) => {
+    mockParseJsonBody.mockResolvedValue({
+      ok: true,
+      data: { updates: {}, expectedVersion },
+    });
+
+    const { PUT } = await import('@/app/api/dashboard/profile/route');
+    const response = await PUT(
+      new Request('http://localhost/api/dashboard/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ updates: {}, expectedVersion }),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Invalid expected profile version',
+    });
+    expect(mockValidateUpdatesPayload).not.toHaveBeenCalled();
+    expect(mockGetProfileByClerkId).not.toHaveBeenCalled();
+  });
+
   it('rolls Clerk back when DB update throws', async () => {
     const rollback = vi.fn().mockResolvedValue(undefined);
     mockSyncClerkProfile.mockResolvedValue({

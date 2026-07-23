@@ -316,6 +316,86 @@ describe('social link compare-and-swap routes', () => {
     expect(mocks.syncPrimaryMusicUrls).not.toHaveBeenCalled();
   });
 
+  it('accepts a social link through PATCH with compare-and-swap versioning', async () => {
+    mocks.state = {
+      ...mocks.state!,
+      isActive: false,
+      state: 'suggested',
+    };
+    const { PATCH } = await import(
+      '@/app/api/dashboard/social-links/route.patch'
+    );
+
+    const response = await PATCH(
+      new Request('http://localhost/api/dashboard/social-links', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: PROFILE_ID,
+          linkId: LINK_ID,
+          action: 'accept',
+          expectedVersion: 1,
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      version: 2,
+      link: {
+        id: LINK_ID,
+        isActive: true,
+        state: 'active',
+        version: 2,
+      },
+    });
+    expect(mocks.state).toMatchObject({
+      isActive: true,
+      state: 'active',
+      version: 2,
+    });
+    expect(mocks.syncPrimaryMusicUrls).toHaveBeenCalledWith(mockDb, PROFILE_ID);
+    expect(mocks.invalidateSocialLinksCache).toHaveBeenCalledWith(
+      PROFILE_ID,
+      'artist'
+    );
+  });
+
+  it('returns VERSION_CONFLICT from PATCH before mutating a stale link', async () => {
+    const { PATCH } = await import(
+      '@/app/api/dashboard/social-links/route.patch'
+    );
+
+    const response = await PATCH(
+      new Request('http://localhost/api/dashboard/social-links', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: PROFILE_ID,
+          linkId: LINK_ID,
+          action: 'dismiss',
+          expectedVersion: 2,
+        }),
+      })
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: 'VERSION_CONFLICT',
+      expectedVersion: 2,
+      currentVersion: 1,
+    });
+    expect(mocks.state).toMatchObject({
+      isActive: true,
+      state: 'active',
+      version: 1,
+    });
+    expect(mockDb.update).not.toHaveBeenCalled();
+    expect(mocks.syncPrimaryMusicUrls).not.toHaveBeenCalled();
+    expect(mocks.invalidateSocialLinksCache).not.toHaveBeenCalled();
+  });
+
   it('rejects an older delete after a newer re-add wins the same link version', async () => {
     const { DELETE } = await import(
       '@/app/api/dashboard/social-links/route.delete'

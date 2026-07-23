@@ -141,7 +141,7 @@
 |-------|---------|------|-------------|
 | `/api/chat` | POST | `auth` | Send chat message to AI assistant |
 | `/api/chat/confirm-edit` | POST | `auth` | Confirm AI-suggested profile edit |
-| `/api/chat/confirm-link` | POST | `auth` | Confirm AI-suggested link add |
+| `/api/chat/confirm-link` | POST | `auth` | Confirm AI-suggested link add; optional `expectedVersion` enforces CAS, success returns `version`, stale writes return 409 `VERSION_CONFLICT` |
 | `/api/chat/confirm-remove-link` | POST | `auth` | Confirm AI-suggested link removal |
 | `/api/chat/conversations` | GET, POST | `auth` | List/create conversations |
 | `/api/chat/conversations/[id]` | GET, DELETE | `auth` | Get/delete conversation |
@@ -206,14 +206,14 @@
 | `/api/dashboard/pixels` | GET, POST | `auth` | Pixel management |
 | `/api/dashboard/pixels/health` | GET | `auth` | Pixel health check |
 | `/api/dashboard/pixels/test-event` | POST | `auth` | Send test pixel event |
-| `/api/dashboard/profile` | GET, PUT | `auth` | Profile data |
+| `/api/dashboard/profile` | GET, PUT | `auth` | Profile data; PUT accepts optional integer `expectedVersion`, success returns `profile.profileEditVersion`, stale writes return 409 `VERSION_CONFLICT` |
 | `/api/dashboard/releases/artwork-downloads` | POST | `auth` | Toggle allow-artwork-downloads for the active profile |
 | `/api/dashboard/releases/[releaseId]/analytics` | GET | `auth` | Release analytics |
 | `/api/dashboard/releases/[releaseId]/pitch` | POST | `auth` | Generate release pitch |
 | `/api/dashboard/releases/[releaseId]/tracks` | GET | `auth` | Release tracks |
 | `/api/dashboard/retargeting/attribution` | GET | `auth` | Retargeting attribution data |
 | `/api/dashboard/shop` | GET, POST | `auth` | Shop management |
-| `/api/dashboard/social-links` | GET, POST, PUT, DELETE | `auth` | Social link CRUD |
+| `/api/dashboard/social-links` | GET, POST, PUT, PATCH, DELETE | `auth` | Social link CRUD; PUT/PATCH/DELETE accept optional `expectedVersion`, success returns `version`, stale writes return 409 `VERSION_CONFLICT` |
 | `/api/dashboard/tour-dates/[id]/analytics` | GET | `auth` | Tour date analytics |
 
 ### Dev

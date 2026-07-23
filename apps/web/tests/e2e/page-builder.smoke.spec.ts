@@ -28,12 +28,14 @@ test.beforeEach(() => {
 test('page builder returns not-found without exposing prototype data', async ({
   page,
 }) => {
-  const response = await page.goto('/exp/page-builder', {
+  await page.goto('/exp/page-builder', {
     waitUntil: 'domcontentloaded',
   });
-  await page.waitForTimeout(SMOKE_TIMEOUTS.HYDRATION_SETTLE);
 
-  expect(response?.status()).toBe(404);
+  // Streamed App Router notFound() responses can retain HTTP 200. Prove the
+  // fail-closed gate by its sentinel, original path, and absent prototype data.
+  expect(new URL(page.url()).pathname).toBe('/exp/page-builder');
+  await expect(page.getByTestId('not-found')).toBeVisible();
   await expect(
     page.locator('[data-body-section="marketing-hero"]')
   ).toHaveCount(0);
@@ -49,12 +51,12 @@ test('page builder returns not-found for authenticated non-admins', async ({
   );
 
   await setTestAuthBypassSession(page, 'creator-ready');
-  const response = await page.goto('/exp/page-builder', {
+  await page.goto('/exp/page-builder', {
     waitUntil: 'domcontentloaded',
   });
-  await page.waitForTimeout(SMOKE_TIMEOUTS.HYDRATION_SETTLE);
 
-  expect(response?.status()).toBe(404);
+  expect(new URL(page.url()).pathname).toBe('/exp/page-builder');
+  await expect(page.getByTestId('not-found')).toBeVisible();
   await expect(
     page.locator('[data-body-section="marketing-hero"]')
   ).toHaveCount(0);
