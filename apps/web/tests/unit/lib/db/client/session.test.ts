@@ -61,6 +61,50 @@ describe('lib/db/client/session RLS helpers', () => {
     );
   });
 
+  it('applyRlsSessionUser falls back to parameterized set_config when the primary statement fails', async () => {
+    const { applyRlsSessionUser } = await import('@/lib/db/client/session');
+    const { logDbError } = await import('@/lib/db/client/logging');
+    const db = { execute: mockDbExecute };
+    const primaryError = new Error('connection terminated unexpectedly');
+
+    mockDbExecute
+      .mockRejectedValueOnce(primaryError) // primary clear+set fails
+      .mockResolvedValueOnce(undefined) // resetRlsSession succeeds
+      .mockResolvedValueOnce(undefined); // fallback succeeds
+
+    await applyRlsSessionUser(db, 'user_fallback_123');
+
+    expect(mockDbExecute).toHaveBeenCalledTimes(3);
+    expect(logDbError).toHaveBeenCalledWith(
+      'applyRlsSessionUser_set_config_failed',
+      primaryError,
+      { userId: 'user_fallback_123' }
+    );
+
+    // PostgreSQL rejects bind parameters on SET (see setStatementTimeout in
+    // lib/db/query-timeout.ts), so the fallback must use parameterized
+    // set_config — never `SET app.clerk_user_id = $1` (JOV-4241).
+    const fallbackQueryText = JSON.stringify(mockDbExecute.mock.calls[2]?.[0]);
+    expect(fallbackQueryText).toContain("set_config('app.clerk_user_id'");
+    expect(fallbackQueryText).toContain('user_fallback_123');
+    expect(fallbackQueryText).not.toContain('SET app.clerk_user_id');
+  });
+
+  it('applyRlsSessionUser propagates the fallback failure instead of hiding it', async () => {
+    const { applyRlsSessionUser } = await import('@/lib/db/client/session');
+    const db = { execute: mockDbExecute };
+    const fallbackError = new Error('fallback set_config failed');
+
+    mockDbExecute
+      .mockRejectedValueOnce(new Error('primary set_config failed'))
+      .mockResolvedValueOnce(undefined) // resetRlsSession succeeds
+      .mockRejectedValueOnce(fallbackError);
+
+    await expect(applyRlsSessionUser(db, 'user_fallback_123')).rejects.toBe(
+      fallbackError
+    );
+  });
+
   it('resetRlsSession clears app.clerk_user_id on pooled reuse', async () => {
     const { resetRlsSession } = await import('@/lib/db/client/session');
     const db = { execute: mockDbExecute };
