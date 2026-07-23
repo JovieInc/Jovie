@@ -15,6 +15,9 @@ const mockRevalidateTag = vi.hoisted(() => vi.fn());
 const mockInvalidateProfileEdgeCache = vi.hoisted(() =>
   vi.fn().mockResolvedValue(undefined)
 );
+const mockInvalidateHandleCache = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined)
+);
 
 vi.mock('next/cache', () => ({
   revalidatePath: mockRevalidatePath,
@@ -23,6 +26,10 @@ vi.mock('next/cache', () => ({
 
 vi.mock('@/lib/services/profile/queries', () => ({
   invalidateProfileEdgeCache: mockInvalidateProfileEdgeCache,
+}));
+
+vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
+  invalidateHandleCache: mockInvalidateHandleCache,
 }));
 
 vi.mock('@/lib/cache/tags', () => ({
@@ -102,6 +109,15 @@ describe('Profile Cache Invalidation', () => {
       await invalidateUsernameChange('newartist', 'oldartist');
 
       expect(mockRevalidatePath).toHaveBeenCalledWith('/');
+    });
+
+    it('invalidates old and new handle-availability Redis keys', async () => {
+      const { invalidateUsernameChange } = await import('@/lib/cache/profile');
+      await invalidateUsernameChange('newartist', 'oldartist');
+
+      expect(mockInvalidateHandleCache).toHaveBeenCalledTimes(2);
+      expect(mockInvalidateHandleCache).toHaveBeenNthCalledWith(1, 'newartist');
+      expect(mockInvalidateHandleCache).toHaveBeenNthCalledWith(2, 'oldartist');
     });
   });
 

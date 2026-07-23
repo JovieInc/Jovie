@@ -5,7 +5,6 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateUsernameChange } from '@/lib/cache/profile';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { invalidateHandleCache } from '@/lib/onboarding/handle-availability-cache';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export type UsernameValidationErrorCode = 'INVALID_USERNAME' | 'USERNAME_TAKEN';
@@ -141,15 +140,6 @@ export async function syncCanonicalUsernameFromApp(
       outcome.normalized,
       outcome.previousCanonicalUsername
     );
-
-    // Invalidate handle-availability cache for both old and new handles.
-    // This ensures old handle availability and new handle reservation update quickly.
-    await Promise.all([
-      invalidateHandleCache(outcome.normalized),
-      outcome.previousCanonicalUsername
-        ? invalidateHandleCache(outcome.previousCanonicalUsername)
-        : Promise.resolve(),
-    ]);
   }
 }
 

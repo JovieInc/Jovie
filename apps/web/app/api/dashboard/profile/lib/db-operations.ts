@@ -179,11 +179,11 @@ export async function updateProfileRecords({
     );
   }
 
-  if (displayNameForUserUpdate) {
+  if (displayNameForUserUpdate && access.ownerUserId) {
     await tx
       .update(users)
       .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
-      .where(eq(users.id, appUserId));
+      .where(eq(users.id, access.ownerUserId));
   }
 
   return {

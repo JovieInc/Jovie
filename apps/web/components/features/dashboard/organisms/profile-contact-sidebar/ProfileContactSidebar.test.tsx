@@ -22,6 +22,7 @@ type DeferredMutationCall = {
 
 const mockState = vi.hoisted(() => ({
   initialPreviewData: {
+    id: 'profile-1',
     username: 'artist',
     displayName: 'Artist',
     avatarUrl: null,
@@ -298,9 +299,9 @@ vi.mock('@/lib/queries', async () => {
     usePressPhotosQuery: () => ({ data: [] }),
     usePressPhotoUploadMutation: () => ({ mutateAsync: vi.fn() }),
     useProfileMonetizationSummary: () => ({ data: null }),
-    useProfileSaveMutation: () => {
+    useProfileSaveMutation: (profileId: string | undefined) => {
       if (mockState.useRealProfileMutation) {
-        return actual.useProfileSaveMutation();
+        return actual.useProfileSaveMutation(profileId);
       }
       return {
         mutateAsync: (variables: Record<string, unknown>) =>
@@ -333,6 +334,7 @@ function renderEditingSidebar() {
   });
   queryClient.setQueryData(queryKeys.user.profile(), {
     ...mockState.initialPreviewData,
+    id: mockState.selectedProfileId,
   });
   const renderTree = () => (
     <QueryClientProvider client={queryClient}>

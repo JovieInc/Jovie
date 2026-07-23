@@ -13,7 +13,7 @@ export function isCanonicalUuid(value: unknown): value is string {
 }
 
 export type ProfileAccessDecision =
-  | { ok: true; profileId: string }
+  | { ok: true; profileId: string; ownerUserId: string | null }
   | {
       ok: false;
       reason: 'invalid' | 'not_found' | 'forbidden' | 'ambiguous';
@@ -48,16 +48,31 @@ export function resolveProfileAccess(input: {
         claim.userId === input.appUserId &&
         (claim.role === 'owner' || claim.role === 'manager')
     );
-    return writableClaims.length === 1
-      ? { ok: true, profileId: input.profileId }
-      : {
-          ok: false,
-          reason: writableClaims.length > 1 ? 'ambiguous' : 'forbidden',
-        };
+    if (writableClaims.length !== 1) {
+      return {
+        ok: false,
+        reason: writableClaims.length > 1 ? 'ambiguous' : 'forbidden',
+      };
+    }
+
+    const ownerClaims = input.claimRows.filter(claim => claim.role === 'owner');
+    if (ownerClaims.length > 1) {
+      return { ok: false, reason: 'ambiguous' };
+    }
+
+    return {
+      ok: true,
+      profileId: input.profileId,
+      ownerUserId: ownerClaims[0]?.userId ?? null,
+    };
   }
 
   return input.profileRows[0]?.legacyUserId === input.appUserId
-    ? { ok: true, profileId: input.profileId }
+    ? {
+        ok: true,
+        profileId: input.profileId,
+        ownerUserId: input.profileRows[0].legacyUserId,
+      }
     : { ok: false, reason: 'forbidden' };
 }
 

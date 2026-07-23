@@ -112,7 +112,9 @@ export function useProfileEditor(
   const dashboardData = useDashboardData();
 
   // Profile mutation hooks
-  const profileMutation = useProfileSaveMutation();
+  const profileMutation = useProfileSaveMutation(
+    dashboardData.selectedProfile?.id
+  );
   const avatarMutation = useAvatarMutation({
     profileId: dashboardData.selectedProfile?.id,
   });

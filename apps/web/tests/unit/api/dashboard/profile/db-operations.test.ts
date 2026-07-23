@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 const getExactProfileAccess = vi.hoisted(() => vi.fn());
@@ -84,6 +85,7 @@ describe('updateProfileRecords exact-profile CAS', () => {
     getExactProfileAccess.mockResolvedValue({
       ok: true,
       profileId: 'profile-a',
+      ownerUserId: 'user-a',
     });
   });
 
@@ -120,7 +122,7 @@ describe('updateProfileRecords exact-profile CAS', () => {
   });
 
   it('keeps username, profile fields, and users.name in one transaction outcome', async () => {
-    const { tx, updates } = createTx({ conflict: null });
+    const { tx, predicates, updates } = createTx({ conflict: null });
     const { updateProfileRecords } = await import(
       '@/app/api/dashboard/profile/lib/db-operations'
     );
@@ -142,6 +144,39 @@ describe('updateProfileRecords exact-profile CAS', () => {
       usernameNormalized: 'newname',
     });
     expect(updates[1]?.values).toMatchObject({ name: 'New Name' });
+    expect(predicates[1]).toEqual({
+      left: users.id,
+      right: 'user-a',
+    });
+  });
+
+  it('updates the profile owner identity instead of the manager identity', async () => {
+    getExactProfileAccess.mockResolvedValue({
+      ok: true,
+      profileId: 'profile-a',
+      ownerUserId: 'owner-user',
+    });
+    const { tx, predicates, updates } = createTx();
+    const { updateProfileRecords } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await updateProfileRecords({
+      tx: tx as never,
+      appUserId: 'manager-user',
+      profileId: 'profile-a',
+      dbProfileUpdates: { displayName: 'Artist Name' },
+      displayNameForUserUpdate: 'Artist Name',
+      usernameUpdate: undefined,
+      expectedVersion: 1,
+    });
+
+    expect(result).not.toBeInstanceOf(NextResponse);
+    expect(updates[1]?.table).toBe(users);
+    expect(predicates[1]).toEqual({
+      left: users.id,
+      right: 'owner-user',
+    });
   });
 
   it('does not update users.name when the exact CAS loses', async () => {

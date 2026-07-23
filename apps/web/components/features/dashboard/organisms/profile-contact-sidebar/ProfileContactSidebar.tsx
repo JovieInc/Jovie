@@ -434,7 +434,7 @@ export function ProfileContactSidebar() {
   );
 
   // Mutations for profile editing
-  const profileMutation = useProfileSaveMutation();
+  const profileMutation = useProfileSaveMutation(selectedProfile?.id);
   const pressPhotoUploadMutation = usePressPhotoUploadMutation(
     selectedProfile?.id
   );

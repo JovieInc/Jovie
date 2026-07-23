@@ -25,6 +25,7 @@ describe('resolveProfileAccess', () => {
     expect(resolve([{ userId: USER_A, role }])).toEqual({
       ok: true,
       profileId: PROFILE,
+      ownerUserId: role === 'owner' ? USER_A : null,
     });
   });
 
@@ -36,7 +37,11 @@ describe('resolveProfileAccess', () => {
   });
 
   it('uses legacy ownership only when the exact target has no claims', () => {
-    expect(resolve()).toEqual({ ok: true, profileId: PROFILE });
+    expect(resolve()).toEqual({
+      ok: true,
+      profileId: PROFILE,
+      ownerUserId: USER_A,
+    });
     expect(resolve([], USER_B)).toEqual({
       ok: false,
       reason: 'forbidden',
@@ -166,7 +171,11 @@ describe('getExactProfileAccess', () => {
 
     await expect(
       getExactProfileAccess(fake.tx, USER_A, PROFILE)
-    ).resolves.toEqual({ ok: true, profileId: PROFILE });
+    ).resolves.toEqual({
+      ok: true,
+      profileId: PROFILE,
+      ownerUserId: role === 'owner' ? USER_A : null,
+    });
     expect(fake.select).toHaveBeenCalledTimes(1);
     expect(fake.from).toHaveBeenCalledTimes(1);
     expect(fake.firstLeftJoin).toHaveBeenCalledTimes(1);
@@ -194,7 +203,38 @@ describe('getExactProfileAccess', () => {
 
     await expect(
       getExactProfileAccess(fake.tx, USER_A, PROFILE)
-    ).resolves.toEqual({ ok: true, profileId: PROFILE });
+    ).resolves.toEqual({
+      ok: true,
+      profileId: PROFILE,
+      ownerUserId: USER_A,
+    });
+  });
+
+  it('returns the canonical owner when a manager edits the profile', async () => {
+    const fake = fakeAccessTransaction([
+      {
+        userId: USER_A,
+        profileId: PROFILE,
+        legacyUserId: USER_A,
+        claimUserId: USER_A,
+        claimRole: 'manager',
+      },
+      {
+        userId: USER_A,
+        profileId: PROFILE,
+        legacyUserId: USER_A,
+        claimUserId: USER_B,
+        claimRole: 'owner',
+      },
+    ]);
+
+    await expect(
+      getExactProfileAccess(fake.tx, USER_A, PROFILE)
+    ).resolves.toEqual({
+      ok: true,
+      profileId: PROFILE,
+      ownerUserId: USER_B,
+    });
   });
 
   it.each([

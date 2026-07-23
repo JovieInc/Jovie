@@ -40,6 +40,7 @@ export function useProfileForm({
     isSuccess,
     reset: resetMutation,
   } = useProfileMutation({
+    profileId: artist.id,
     onSuccess: data => {
       if (!data?.profile) return;
       const updatedArtist = convertDrizzleCreatorProfileToArtist(

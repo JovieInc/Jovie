@@ -2,7 +2,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAvatarMutation } from './useProfileMutation';
+import {
+  useAvatarMutation,
+  useProfileMutation,
+  useProfileSaveMutation,
+} from './useProfileMutation';
 
 const { mockUpdateProfile, mockUploadAvatar } = vi.hoisted(() => ({
   mockUpdateProfile: vi.fn(),
@@ -132,5 +136,129 @@ describe('useAvatarMutation', () => {
     });
 
     expect(queryClient.getQueryData(['user', 'profile'])).toEqual(otherProfile);
+  });
+});
+
+describe('profile-scoped mutations', () => {
+  let queryClient: QueryClient;
+  let wrapper: ({ children }: { children: ReactNode }) => ReactNode;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    });
+    wrapper = ({ children }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  });
+
+  it('does not let a useProfileMutation A completion overwrite profile B', async () => {
+    let resolveUpdate:
+      | ((response: {
+          profile: {
+            id: string;
+            displayName: string;
+          };
+        }) => void)
+      | undefined;
+    mockUpdateProfile.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveUpdate = resolve;
+        })
+    );
+    const onSuccess = vi.fn();
+    queryClient.setQueryData(['user', 'profile'], {
+      id: SELECTED_PROFILE_ID,
+      displayName: 'Profile A',
+    });
+    const { result, rerender } = renderHook(
+      ({ profileId }) =>
+        useProfileMutation({ profileId, onSuccess, silent: true }),
+      { initialProps: { profileId: SELECTED_PROFILE_ID }, wrapper }
+    );
+    let mutationPromise: Promise<unknown> | undefined;
+
+    act(() => {
+      mutationPromise = result.current.mutateAsync({
+        profileId: SELECTED_PROFILE_ID,
+        updates: { displayName: 'Profile A saved' },
+      });
+    });
+    await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledOnce());
+
+    const profileB = {
+      id: OTHER_PROFILE_ID,
+      displayName: 'Profile B',
+    };
+    queryClient.setQueryData(['user', 'profile'], profileB);
+    rerender({ profileId: OTHER_PROFILE_ID });
+
+    await act(async () => {
+      resolveUpdate?.({
+        profile: {
+          id: SELECTED_PROFILE_ID,
+          displayName: 'Profile A saved',
+        },
+      });
+      await mutationPromise;
+    });
+
+    expect(queryClient.getQueryData(['user', 'profile'])).toEqual(profileB);
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  it('does not let a useProfileSaveMutation A completion overwrite profile B', async () => {
+    let resolveUpdate:
+      | ((response: {
+          profile: {
+            id: string;
+            displayName: string;
+          };
+        }) => void)
+      | undefined;
+    mockUpdateProfile.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveUpdate = resolve;
+        })
+    );
+    queryClient.setQueryData(['user', 'profile'], {
+      id: SELECTED_PROFILE_ID,
+      displayName: 'Profile A',
+    });
+    const { result, rerender } = renderHook(
+      ({ profileId }) => useProfileSaveMutation(profileId),
+      { initialProps: { profileId: SELECTED_PROFILE_ID }, wrapper }
+    );
+    let mutationPromise: Promise<unknown> | undefined;
+
+    act(() => {
+      mutationPromise = result.current.mutateAsync({
+        profileId: SELECTED_PROFILE_ID,
+        updates: { displayName: 'Profile A saved' },
+      });
+    });
+    await waitFor(() => expect(mockUpdateProfile).toHaveBeenCalledOnce());
+
+    const profileB = {
+      id: OTHER_PROFILE_ID,
+      displayName: 'Profile B',
+    };
+    queryClient.setQueryData(['user', 'profile'], profileB);
+    rerender({ profileId: OTHER_PROFILE_ID });
+
+    await act(async () => {
+      resolveUpdate?.({
+        profile: {
+          id: SELECTED_PROFILE_ID,
+          displayName: 'Profile A saved',
+        },
+      });
+      await mutationPromise;
+    });
+
+    expect(queryClient.getQueryData(['user', 'profile'])).toEqual(profileB);
   });
 });
