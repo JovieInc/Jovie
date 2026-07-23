@@ -17,9 +17,9 @@ import { logger } from '@/lib/utils/logger';
  * - `get`/`set`/`increment` are best-effort: bounded by a 500ms timeout race,
  *   warn-and-degrade, never throw. Sessions stay durable in Postgres
  *   (`storeSessionInDatabase: true`), so Redis loss only costs latency.
- * - `delete` FAILS CLOSED: retried once, then throws. A swallowed delete
- *   would leave a revoked session readable from Redis until TTL — sign-out
- *   must fail visibly instead (security.md fail-closed persistence rule).
+ * - `getAndDelete`/`delete` FAIL CLOSED. A swallowed removal could allow
+ *   reuse of a one-time value or leave a revoked session readable from Redis
+ *   until TTL (security.md fail-closed persistence rule).
  * - In-memory Map fallback is used ONLY when Redis is unconfigured AND the
  *   deploy is not production (security.md bans in-memory public traffic
  *   controls in production).
@@ -115,6 +115,12 @@ function memoryIncrement(key: string, ttlSeconds: number): number {
   return count;
 }
 
+function memoryGetAndDelete(key: string): string | null {
+  const value = memoryGet(key);
+  memoryStore.delete(key);
+  return value;
+}
+
 /** Test-only: clear the non-production in-memory fallback store. */
 export function resetSecondaryStorageMemoryForTests(): void {
   memoryStore.clear();
@@ -124,7 +130,7 @@ export function resetSecondaryStorageMemoryForTests(): void {
 // Storage implementation
 // ---------------------------------------------------------------------------
 
-export const secondaryStorage: SecondaryStorage = {
+export const secondaryStorage = {
   async get(key) {
     const redis = getRedis();
     if (!redis) {
@@ -198,6 +204,35 @@ export const secondaryStorage: SecondaryStorage = {
     }
   },
 
+  async getAndDelete(key) {
+    const redis = getRedis();
+    if (!redis) {
+      if (!isProductionDeploy()) return memoryGetAndDelete(key);
+      const error = new Error(
+        'Secondary storage getAndDelete failed closed: Redis unavailable in production'
+      );
+      await captureError(
+        'Better Auth secondary storage getAndDelete unavailable',
+        error,
+        { operation: 'secondary-storage.getAndDelete' }
+      );
+      throw error;
+    }
+
+    try {
+      return toStringValue(await withTimeout(redis.getdel(key)));
+    } catch (operationError) {
+      await captureError(
+        'Better Auth secondary storage getAndDelete failed',
+        operationError,
+        { operation: 'secondary-storage.getAndDelete' }
+      );
+      throw new Error('Secondary storage getAndDelete failed closed', {
+        cause: operationError,
+      });
+    }
+  },
+
   async delete(key) {
     const redis = getRedis();
     if (!redis) {
@@ -239,4 +274,4 @@ export const secondaryStorage: SecondaryStorage = {
       });
     }
   },
-};
+} satisfies SecondaryStorage;
