@@ -25,7 +25,7 @@ describe('syncCanonicalUsernameFromApp', () => {
 
   it('invalidates both old and new usernames after a rename', async () => {
     const selectCalls: unknown[] = [
-      [{ id: 'user-1' }],
+      [{ id: 'user-1', activeProfileId: 'profile-1' }],
       [{ id: 'profile-1', usernameNormalized: 'oldname' }],
       [],
     ];

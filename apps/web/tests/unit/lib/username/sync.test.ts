@@ -45,7 +45,7 @@ describe('syncCanonicalUsernameFromApp', () => {
 
   it('invalidates old and new profile caches when username changes', async () => {
     const tx = createTx([
-      [{ id: 'user-1' }],
+      [{ id: 'user-1', activeProfileId: 'profile-1' }],
       [{ id: 'profile-1', usernameNormalized: 'oldname' }],
       [],
     ]);
@@ -70,7 +70,7 @@ describe('syncCanonicalUsernameFromApp', () => {
 
   it('does not invalidate caches when username is unchanged', async () => {
     const tx = createTx([
-      [{ id: 'user-1' }],
+      [{ id: 'user-1', activeProfileId: 'profile-1' }],
       [{ id: 'profile-1', usernameNormalized: 'samehandle' }],
     ]);
 

@@ -17,8 +17,6 @@ export type { UpdateProfileRecordsParams } from './db-operations';
 export { getProfileByClerkId, updateProfileRecords } from './db-operations';
 export type { FinalizeProfileResponseParams } from './response';
 export { addAvatarCacheBust, finalizeProfileResponse } from './response';
-export type { TestProfileUpdateParams } from './test-helpers';
-export { handleTestProfileUpdate } from './test-helpers';
 export type {
   ParsedUpdatesResult,
   ProfileUpdateInput,

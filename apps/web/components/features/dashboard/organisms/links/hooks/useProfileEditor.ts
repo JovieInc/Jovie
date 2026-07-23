@@ -113,7 +113,9 @@ export function useProfileEditor(
 
   // Profile mutation hooks
   const profileMutation = useProfileSaveMutation();
-  const avatarMutation = useAvatarMutation();
+  const avatarMutation = useAvatarMutation({
+    profileId: dashboardData.selectedProfile?.id,
+  });
 
   const [artist, setArtist] = useState<Artist | null>(
     dashboardData.selectedProfile
@@ -194,6 +196,7 @@ export function useProfileEditor(
 
       try {
         const result = await profileMutation.mutateAsync({
+          profileId,
           updates: { displayName, username },
         });
 

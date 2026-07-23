@@ -66,6 +66,7 @@ const mockState = vi.hoisted(() => ({
   profileCalls: [] as DeferredMutationCall[],
   removeCalls: [] as DeferredMutationCall[],
   useRealProfileMutation: false,
+  selectedProfileId: 'profile-1',
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -79,7 +80,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
     selectedProfile: {
-      id: 'profile-1',
+      id: mockState.selectedProfileId,
       settings: {},
       profileEditVersion: 1,
     },
@@ -322,13 +323,21 @@ function renderEditingSidebar() {
   queryClient.setQueryData(queryKeys.user.profile(), {
     ...mockState.initialPreviewData,
   });
-  const view = render(
+  const renderTree = () => (
     <QueryClientProvider client={queryClient}>
       <ProfileContactSidebar />
     </QueryClientProvider>
   );
+  const view = render(renderTree());
   fireEvent.click(screen.getByRole('button', { name: 'Edit profile' }));
-  return { ...view, queryClient };
+  return {
+    ...view,
+    queryClient,
+    switchProfile(profileId: string) {
+      mockState.selectedProfileId = profileId;
+      view.rerender(renderTree());
+    },
+  };
 }
 
 function openAboutTab() {
@@ -386,6 +395,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     mockState.toastSuccess.mockReset();
     mockState.toastError.mockReset();
     mockState.useRealProfileMutation = false;
+    mockState.selectedProfileId = 'profile-1';
     vi.unstubAllGlobals();
   });
 
@@ -427,6 +437,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     await resolveProfileCall(0, 2, 'Bio A');
     await waitFor(() => expect(mockState.profileCalls).toHaveLength(2));
     expect(mockState.profileCalls[1]?.variables).toEqual({
+      profileId: 'profile-1',
       expectedVersion: 2,
       updates: { bio: 'Bio C' },
     });
@@ -438,6 +449,34 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
       'saved'
     );
     expect(mockState.toastError).not.toHaveBeenCalled();
+  });
+
+  it('drops an in-flight completion and stale CAS state after switching profiles', async () => {
+    const user = userEvent.setup();
+    const view = renderEditingSidebar();
+    openAboutTab();
+
+    await user.click(screen.getByRole('button', { name: 'Set bio A' }));
+    expect(mockState.profileCalls[0]?.variables).toMatchObject({
+      profileId: 'profile-1',
+      expectedVersion: 1,
+    });
+
+    view.switchProfile('profile-2');
+    await user.click(screen.getByRole('button', { name: 'Set bio B' }));
+    expect(mockState.profileCalls).toHaveLength(1);
+
+    await resolveProfileCall(0, 99, 'Bio A');
+    await waitFor(() => expect(mockState.profileCalls).toHaveLength(2));
+    expect(mockState.profileCalls[1]?.variables).toEqual({
+      profileId: 'profile-2',
+      expectedVersion: 1,
+      updates: { bio: 'Bio B' },
+    });
+    expect(screen.getByTestId('bio-value')).toHaveTextContent('Bio B');
+
+    await resolveProfileCall(1, 2, 'Bio B');
+    expect(screen.getByTestId('bio-value')).toHaveTextContent('Bio B');
   });
 
   it('uses real TanStack mutateAsync settlement without a stuck status or stale cache', async () => {
@@ -471,6 +510,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
 
     expect(requests).toHaveLength(1);
     expect(requests[0]?.body).toEqual({
+      profileId: 'profile-1',
       expectedVersion: 1,
       updates: { bio: 'Bio A' },
     });
@@ -489,6 +529,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     });
     await waitFor(() => expect(requests).toHaveLength(2));
     expect(requests[1]?.body).toEqual({
+      profileId: 'profile-1',
       expectedVersion: 2,
       updates: { bio: 'Bio C' },
     });
@@ -562,6 +603,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     });
     await waitFor(() => expect(requests).toHaveLength(2));
     expect(requests[1]?.body).toEqual({
+      profileId: 'profile-1',
       expectedVersion: 2,
       updates: { bio: 'Bio B' },
     });
@@ -641,6 +683,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(mockState.profileCalls[1]?.variables).toEqual({
+      profileId: 'profile-1',
       expectedVersion: 2,
       updates: { bio: 'Bio A' },
     });
@@ -677,6 +720,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     await resolveProfileCall(1, 2);
     await waitFor(() => expect(mockState.profileCalls).toHaveLength(3));
     expect(mockState.profileCalls[2]?.variables).toEqual({
+      profileId: 'profile-1',
       expectedVersion: 2,
       updates: { bio: 'Bio A' },
     });

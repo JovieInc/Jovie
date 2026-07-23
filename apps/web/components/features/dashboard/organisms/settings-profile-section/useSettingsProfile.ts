@@ -185,6 +185,7 @@ export function useSettingsProfile({
       try {
         // Use TanStack Query mutation via ref to get latest function
         response = await saveProfileMutationRef.current({
+          profileId: artistRef.current.id,
           updates: {
             username,
             displayName,
@@ -289,6 +290,7 @@ export function useSettingsProfile({
       try {
         // Use TanStack Query mutation for profile update
         const response = await updateProfileMutation({
+          profileId: artist.id,
           updates: {
             avatarUrl: imageUrl,
           },

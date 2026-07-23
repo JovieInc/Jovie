@@ -6,6 +6,8 @@
 
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getExactProfileAccess } from '@/lib/auth/profile-access';
+import type { DbOrTransaction } from '@/lib/db';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
@@ -15,9 +17,12 @@ import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server'
 import { NO_STORE_HEADERS } from './constants';
 
 export interface UpdateProfileRecordsParams {
-  clerkUserId: string;
+  tx: DbOrTransaction;
+  appUserId: string;
+  profileId: string;
   dbProfileUpdates: Record<string, unknown>;
   displayNameForUserUpdate: string | undefined;
+  usernameUpdate: string | undefined;
   expectedVersion?: number;
 }
 
@@ -27,23 +32,33 @@ export interface UpdateProfileRecordsResult {
 }
 
 export async function updateProfileRecords({
-  clerkUserId,
+  tx,
+  appUserId,
+  profileId,
   dbProfileUpdates,
   displayNameForUserUpdate,
+  usernameUpdate,
   expectedVersion,
 }: UpdateProfileRecordsParams): Promise<
   UpdateProfileRecordsResult | NextResponse
 > {
-  const user = await getUserByClerkId(db, clerkUserId);
-  if (!user) {
+  const access = await getExactProfileAccess(tx, appUserId, profileId);
+  if (!access.ok) {
     return NextResponse.json(
-      { error: 'User not found' },
-      { status: 404, headers: NO_STORE_HEADERS }
+      {
+        error:
+          access.reason === 'forbidden' ? 'Forbidden' : 'Profile not found',
+      },
+      {
+        status: access.reason === 'forbidden' ? 403 : 404,
+        headers: NO_STORE_HEADERS,
+      }
     );
   }
 
-  const [existingProfile] = await db
+  const [existingProfile] = await tx
     .select({
+      id: creatorProfiles.id,
       usernameNormalized: creatorProfiles.usernameNormalized,
       settings: creatorProfiles.settings,
       theme: creatorProfiles.theme,
@@ -51,8 +66,28 @@ export async function updateProfileRecords({
       profileEditVersion: creatorProfiles.profileEditVersion,
     })
     .from(creatorProfiles)
-    .where(eq(creatorProfiles.userId, user.id))
+    .where(eq(creatorProfiles.id, profileId))
     .limit(1);
+  if (!existingProfile) {
+    return NextResponse.json(
+      { error: 'Profile not found' },
+      { status: 404, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  if (usernameUpdate && usernameUpdate !== existingProfile.usernameNormalized) {
+    const [conflict] = await tx
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, usernameUpdate))
+      .limit(1);
+    if (conflict && conflict.id !== profileId) {
+      return NextResponse.json(
+        { error: 'Handle already taken' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+  }
 
   const incomingSettings = dbProfileUpdates.settings;
   const mergedSettings =
@@ -97,13 +132,16 @@ export async function updateProfileRecords({
 
   const finalProfileUpdates = {
     ...dbProfileUpdates,
+    ...(usernameUpdate
+      ? { username: usernameUpdate, usernameNormalized: usernameUpdate }
+      : {}),
     ...(mergedSettings === undefined ? {} : { settings: mergedSettings }),
     ...(finalTheme === undefined ? {} : { theme: finalTheme }),
   };
 
   const currentVersion = existingProfile?.profileEditVersion ?? 1;
   const compareVersion = expectedVersion ?? currentVersion;
-  const [updatedProfile] = await db
+  const [updatedProfile] = await tx
     .update(creatorProfiles)
     .set({
       ...finalProfileUpdates,
@@ -112,7 +150,7 @@ export async function updateProfileRecords({
     })
     .where(
       and(
-        eq(creatorProfiles.userId, user.id),
+        eq(creatorProfiles.id, profileId),
         eq(creatorProfiles.profileEditVersion, compareVersion)
       )
     )
@@ -120,10 +158,10 @@ export async function updateProfileRecords({
 
   if (!updatedProfile) {
     if (existingProfile) {
-      const [currentProfile] = await db
+      const [currentProfile] = await tx
         .select({ profileEditVersion: creatorProfiles.profileEditVersion })
         .from(creatorProfiles)
-        .where(eq(creatorProfiles.userId, user.id))
+        .where(eq(creatorProfiles.id, profileId))
         .limit(1);
       return NextResponse.json(
         {
@@ -142,10 +180,10 @@ export async function updateProfileRecords({
   }
 
   if (displayNameForUserUpdate) {
-    await db
+    await tx
       .update(users)
       .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
-      .where(eq(users.id, user.id));
+      .where(eq(users.id, appUserId));
   }
 
   return {

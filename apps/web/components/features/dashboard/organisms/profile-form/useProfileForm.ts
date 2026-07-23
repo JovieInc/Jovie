@@ -97,6 +97,7 @@ export function useProfileForm({
     }
 
     await updateProfile({
+      profileId: artist.id,
       updates: {
         displayName: formData.name,
         bio: formData.tagline,

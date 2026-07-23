@@ -31,7 +31,7 @@ export interface ProfileSettingsUpdate {
  * Profile update payload for display name, username, avatar, and other fields.
  */
 export interface ProfileUpdateInput {
-  profileId?: string;
+  profileId: string;
   /** Compare-and-swap token returned by the previous profile response. */
   expectedVersion?: number;
   updates: {
@@ -205,6 +205,7 @@ export function useProfileMutation(options: UseProfileMutationOptions = {}) {
 // ============================================================================
 
 export interface UseAvatarMutationOptions {
+  profileId?: string;
   /** Called on successful upload with the new avatar URL */
   onSuccess?: (avatarUrl: string) => void;
   /** Called on error */
@@ -238,7 +239,13 @@ export function useAvatarMutation(options: UseAvatarMutationOptions = {}) {
       const blobUrl = await uploadAvatarToBlob(file);
 
       // Step 2: Update profile with new URL
-      await updateProfileApi({ updates: { avatarUrl: blobUrl } });
+      const profileId =
+        options.profileId ??
+        queryClient.getQueryData<ProfileData>(queryKeys.user.profile())?.id;
+      if (!profileId) {
+        throw new Error('Missing profile id; please refresh and try again.');
+      }
+      await updateProfileApi({ profileId, updates: { avatarUrl: blobUrl } });
 
       return blobUrl;
     },

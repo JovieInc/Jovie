@@ -50,7 +50,7 @@ interface SettingsMutationOptions {
 }
 
 const updateSettings = createMutationFn<
-  SettingsUpdateInput,
+  SettingsUpdateInput & { profileId: string },
   SettingsUpdateResponse
 >('/api/dashboard/profile', 'PUT');
 
@@ -91,7 +91,15 @@ export function useUpdateSettingsMutation(
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: updateSettings,
+    mutationFn: (variables: SettingsUpdateInput) => {
+      const profileId = queryClient.getQueryData<{ id: string }>(
+        queryKeys.user.profile()
+      )?.id;
+      if (!profileId) {
+        throw new Error('Missing profile id; please refresh and try again.');
+      }
+      return updateSettings({ ...variables, profileId });
+    },
 
     onSuccess: (_data, variables) => {
       if (!options.silentSuccess) {

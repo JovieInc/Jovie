@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => ({
     version: 1,
   } as LinkState | null,
   concurrentCreateWins: false,
+  transactionTail: Promise.resolve(),
   deleteUpdateReached: Promise.resolve(),
   resolveDeleteUpdateReached: undefined as (() => void) | undefined,
   releaseDeleteUpdate: undefined as (() => void) | undefined,
@@ -57,6 +58,7 @@ function versionFromPredicate(predicate: {
 }
 
 const mockDb = vi.hoisted(() => ({
+  execute: vi.fn().mockResolvedValue([]),
   select: vi.fn((selection: Record<string, unknown>) => {
     mocks.selections.push(selection);
     const chain = {
@@ -163,7 +165,25 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mocks.getCachedAuth,
 }));
 vi.mock('@/lib/auth/session', () => ({
-  withDbSessionTx: vi.fn(async callback => callback(mockDb, 'clerk-user-1')),
+  withDbSessionTx: vi.fn(async callback => {
+    let release: (() => void) | undefined;
+    const tx = {
+      ...mockDb,
+      execute: async (...args: unknown[]) => {
+        const previous = mocks.transactionTail;
+        mocks.transactionTail = new Promise<void>(resolve => {
+          release = resolve;
+        });
+        await previous;
+        return mockDb.execute(...args);
+      },
+    };
+    try {
+      return await callback(tx, 'clerk-user-1');
+    } finally {
+      release?.();
+    }
+  }),
 }));
 vi.mock('@/lib/db/queries/shared', () => ({
   getAuthenticatedProfile: vi.fn().mockResolvedValue({
@@ -212,6 +232,7 @@ describe('social link compare-and-swap routes', () => {
     mocks.getCachedAuth.mockResolvedValue({ userId: 'internal-user-1' });
     mocks.selections = [];
     mocks.concurrentCreateWins = false;
+    mocks.transactionTail = Promise.resolve();
     resetBarriers();
   });
 
@@ -316,6 +337,50 @@ describe('social link compare-and-swap routes', () => {
     expect(mocks.syncPrimaryMusicUrls).not.toHaveBeenCalled();
   });
 
+  it('serializes concurrent different-URL creates for the same platform', async () => {
+    mocks.state = null;
+    const { POST } = await import('@/app/api/chat/confirm-link/route');
+    const request = (url: string) =>
+      POST(
+        new Request('http://localhost/api/chat/confirm-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profileId: PROFILE_ID,
+            platform: 'instagram',
+            url,
+            normalizedUrl: url,
+          }),
+        })
+      );
+
+    const [first, second] = await Promise.all([
+      request('https://instagram.com/first'),
+      request('https://instagram.com/second'),
+    ]);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(await first.json()).toMatchObject({
+      linkId: LINK_ID,
+      outcome: 'created',
+    });
+    expect(await second.json()).toMatchObject({
+      linkId: LINK_ID,
+      outcome: 'updated',
+    });
+    expect(mockDb.insert).toHaveBeenCalledWith(socialLinks);
+    expect(
+      mockDb.insert.mock.calls.filter(([table]) => table === socialLinks)
+    ).toHaveLength(1);
+    expect(mocks.state).toMatchObject({
+      id: LINK_ID,
+      url: 'https://instagram.com/second',
+      version: 2,
+    });
+    expect(mockDb.execute).toHaveBeenCalledTimes(2);
+  });
+
   it('accepts a social link through PATCH with compare-and-swap versioning', async () => {
     mocks.state = {
       ...mocks.state!,
@@ -355,7 +420,13 @@ describe('social link compare-and-swap routes', () => {
       state: 'active',
       version: 2,
     });
-    expect(mocks.syncPrimaryMusicUrls).toHaveBeenCalledWith(mockDb, PROFILE_ID);
+    expect(mocks.syncPrimaryMusicUrls).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: mockDb.select,
+        update: mockDb.update,
+      }),
+      PROFILE_ID
+    );
     expect(mocks.invalidateSocialLinksCache).toHaveBeenCalledWith(
       PROFILE_ID,
       'artist'

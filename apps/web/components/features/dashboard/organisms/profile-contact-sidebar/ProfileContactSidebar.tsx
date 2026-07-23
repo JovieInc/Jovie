@@ -137,6 +137,7 @@ interface FieldOperationLedger {
   readonly operations: Map<number, FieldOperation>;
 }
 interface QueuedFieldSave {
+  readonly profileId: string;
   readonly field: EditableProfileField;
   readonly generation: number;
   readonly previewValue: EditableProfileValue;
@@ -282,6 +283,7 @@ export function ProfileContactSidebar() {
     Map<EditableProfileField, QueuedFieldSave>
   >(new Map());
   const profileSaveWorkerRunningRef = useRef(false);
+  const selectedProfileIdRef = useRef(selectedProfile?.id);
   const profileVersionRef = useRef<number | undefined>(
     previewData?.profileEditVersion ?? selectedProfile?.profileEditVersion
   );
@@ -307,18 +309,41 @@ export function ProfileContactSidebar() {
   }, []);
 
   useEffect(() => {
+    const nextProfileId = selectedProfile?.id;
+    if (selectedProfileIdRef.current === nextProfileId) return;
+
+    selectedProfileIdRef.current = nextProfileId;
+    operationEpochRef.current += 1;
+    profileVersionRef.current = selectedProfile?.profileEditVersion;
+    queuedFieldSavesRef.current.clear();
+    fieldOperationLedgersRef.current = {};
+    fieldGenerationRef.current = {
+      bio: 0,
+      location: 0,
+      hometown: 0,
+      genres: 0,
+    };
+    linkGenerationRef.current.clear();
+    linkVersionByPlatformRef.current.clear();
+    linkPlatformQueueRef.current.clear();
+    pendingOperationCountRef.current = 0;
+    activeMutationErrorRef.current = null;
+    setMutationStatus(IDLE_MUTATION_STATUS);
+  }, [selectedProfile?.id, selectedProfile?.profileEditVersion]);
+
+  useEffect(() => {
     profileVersionRef.current =
       previewData?.profileEditVersion ?? selectedProfile?.profileEditVersion;
+  }, [previewData?.profileEditVersion, selectedProfile?.profileEditVersion]);
+
+  useEffect(() => {
+    linkVersionByPlatformRef.current.clear();
     for (const link of previewData?.links ?? []) {
       if (link.version !== undefined) {
         linkVersionByPlatformRef.current.set(link.platform, link.version);
       }
     }
-  }, [
-    previewData?.links,
-    previewData?.profileEditVersion,
-    selectedProfile?.profileEditVersion,
-  ]);
+  }, [previewData?.links]);
 
   const patchPreviewData = useCallback(
     (updater: (current: PreviewPanelData) => PreviewPanelData) => {
@@ -503,10 +528,10 @@ export function ProfileContactSidebar() {
 
         try {
           const result = await profileMutation.mutateAsync({
+            profileId: queuedSave.profileId,
             expectedVersion: profileVersionRef.current,
             updates: queuedSave.updates,
           });
-          profileVersionRef.current = result.profile.profileEditVersion;
 
           const operation = fieldOperationLedgersRef.current[
             field
@@ -516,19 +541,17 @@ export function ProfileContactSidebar() {
             operationEpochRef.current === queuedSave.epoch &&
             operation
           ) {
+            profileVersionRef.current = result.profile.profileEditVersion;
             operation.state = 'succeeded';
             patchPreviewData(data => ({
               ...data,
               profileEditVersion: result.profile.profileEditVersion,
             }));
             reconcileFieldOperations(field);
+            completeMutationSuccess();
           }
-          completeMutationSuccess();
         } catch (error) {
           const conflictVersion = getConflictVersion(error);
-          if (conflictVersion !== undefined) {
-            profileVersionRef.current = conflictVersion;
-          }
           const operation = fieldOperationLedgersRef.current[
             field
           ]?.operations.get(queuedSave.generation);
@@ -537,8 +560,10 @@ export function ProfileContactSidebar() {
             operationEpochRef.current === queuedSave.epoch &&
             operation;
           if (!canReconcile) {
-            completeMutationSuccess();
             continue;
+          }
+          if (conflictVersion !== undefined) {
+            profileVersionRef.current = conflictVersion;
           }
 
           operation.state = 'failed';
@@ -563,6 +588,9 @@ export function ProfileContactSidebar() {
       }
     } finally {
       profileSaveWorkerRunningRef.current = false;
+      if (queuedFieldSavesRef.current.size > 0) {
+        void drainProfileSaveQueue();
+      }
     }
   }, [
     completeMutationError,
@@ -602,6 +630,7 @@ export function ProfileContactSidebar() {
       }
 
       queuedFieldSavesRef.current.set(field, {
+        profileId: selectedProfile.id,
         field,
         generation,
         previewValue,

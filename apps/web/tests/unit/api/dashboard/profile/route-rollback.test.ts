@@ -1,260 +1,138 @@
-import { NextResponse } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockWithDbSession = vi.hoisted(() => vi.fn());
-const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
-const mockParseJsonBody = vi.hoisted(() => vi.fn());
-const mockValidateUpdatesPayload = vi.hoisted(() => vi.fn());
-const mockParseProfileUpdates = vi.hoisted(() => vi.fn());
-const mockBuildProfileUpdateContext = vi.hoisted(() => vi.fn());
-const mockGuardUsernameUpdate = vi.hoisted(() => vi.fn());
-const mockBuildClerkUpdates = vi.hoisted(() => vi.fn());
-const mockSyncClerkProfile = vi.hoisted(() => vi.fn());
-const mockUpdateProfileRecords = vi.hoisted(() => vi.fn());
-const mockFinalizeProfileResponse = vi.hoisted(() => vi.fn());
-const mockAddAvatarCacheBust = vi.hoisted(() => vi.fn());
-const mockHandleTestProfileUpdate = vi.hoisted(() => vi.fn());
-const mockGetProfileByClerkId = vi.hoisted(() => vi.fn());
-const mockCaptureError = vi.hoisted(() => vi.fn());
+const mocks = vi.hoisted(() => ({
+  withDbSessionTx: vi.fn(),
+  parseJsonBody: vi.fn(),
+  validateUpdatesPayload: vi.fn(),
+  parseProfileUpdates: vi.fn(),
+  buildProfileUpdateContext: vi.fn(),
+  updateProfileRecords: vi.fn(),
+  finalizeProfileResponse: vi.fn(),
+  captureError: vi.fn(),
+}));
 
 vi.mock('@/lib/auth/session', () => ({
-  withDbSession: mockWithDbSession,
+  withDbSession: vi.fn(),
+  withDbSessionTx: mocks.withDbSessionTx,
 }));
-
-vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
-}));
-
 vi.mock('@/lib/http/parse-json', () => ({
-  parseJsonBody: mockParseJsonBody,
+  parseJsonBody: mocks.parseJsonBody,
 }));
-
-vi.mock('@/lib/error-tracking', () => ({
-  captureError: mockCaptureError,
-}));
-
+vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.captureError }));
+vi.mock('@/lib/db', () => ({ db: {} }));
+vi.mock('@/lib/db/query-timeout', () => ({ dashboardQuery: vi.fn() }));
 vi.mock('@/lib/db/social-links-sync', () => ({
-  syncSocialLinksFromPrimaryMusicUrls: vi.fn().mockResolvedValue(undefined),
+  syncSocialLinksFromPrimaryMusicUrls: vi.fn(),
 }));
-
-vi.mock('@/lib/db', () => ({
-  db: {},
+vi.mock('@/lib/wallet/apple/profile-pass', () => ({
+  refreshAppleWalletProfilePassForProfileId: vi.fn(),
 }));
-
-vi.mock('@/lib/db/query-timeout', () => ({
-  dashboardQuery: vi.fn(),
-}));
-
 vi.mock('@/lib/utils/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: { warn: vi.fn(), error: vi.fn() },
 }));
-
 vi.mock('@/app/api/dashboard/profile/lib', () => ({
   NO_STORE_HEADERS: { 'Cache-Control': 'no-store' },
-  validateUpdatesPayload: mockValidateUpdatesPayload,
-  parseProfileUpdates: mockParseProfileUpdates,
-  buildProfileUpdateContext: mockBuildProfileUpdateContext,
-  guardUsernameUpdate: mockGuardUsernameUpdate,
-  buildClerkUpdates: mockBuildClerkUpdates,
-  syncClerkProfile: mockSyncClerkProfile,
-  updateProfileRecords: mockUpdateProfileRecords,
-  finalizeProfileResponse: mockFinalizeProfileResponse,
-  addAvatarCacheBust: mockAddAvatarCacheBust,
-  handleTestProfileUpdate: mockHandleTestProfileUpdate,
-  getProfileByClerkId: mockGetProfileByClerkId,
+  validateUpdatesPayload: mocks.validateUpdatesPayload,
+  parseProfileUpdates: mocks.parseProfileUpdates,
+  buildProfileUpdateContext: mocks.buildProfileUpdateContext,
+  updateProfileRecords: mocks.updateProfileRecords,
+  finalizeProfileResponse: mocks.finalizeProfileResponse,
+  addAvatarCacheBust: (profile: unknown) => profile,
+  getProfileByClerkId: vi.fn(),
 }));
 
-describe('PUT /api/dashboard/profile rollback behavior', () => {
+const APP_USER_ID = '11111111-1111-4111-8111-111111111111';
+const PROFILE_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+describe('PUT /api/dashboard/profile exact transaction', () => {
   beforeEach(() => {
     vi.resetModules();
-    vi.stubEnv('NODE_ENV', 'development');
     vi.clearAllMocks();
-
-    mockWithDbSession.mockImplementation(async handler => handler('clerk_123'));
-    mockGetCurrentUserEntitlements.mockResolvedValue({
-      canRemoveBranding: true,
-    });
-    mockParseJsonBody.mockResolvedValue({ ok: true, data: { updates: {} } });
-    mockValidateUpdatesPayload.mockReturnValue({ ok: true, updates: {} });
-    mockParseProfileUpdates.mockReturnValue({ ok: true, parsed: {} });
-    mockBuildProfileUpdateContext.mockReturnValue({
-      dbProfileUpdates: {},
-      displayNameForUserUpdate: undefined,
-      avatarUrl: undefined,
-      usernameUpdate: undefined,
-    });
-    mockGetProfileByClerkId.mockResolvedValue({
-      profile: {
-        username: 'existing-user',
-        displayName: 'Existing User',
-        avatarUrl: '/avatars/existing.png',
+    const tx = { marker: 'transaction' };
+    mocks.withDbSessionTx.mockImplementation(callback =>
+      callback(tx, APP_USER_ID)
+    );
+    mocks.parseJsonBody.mockResolvedValue({
+      ok: true,
+      data: {
+        profileId: PROFILE_ID,
+        expectedVersion: 3,
+        updates: { username: 'newname', displayName: 'New Name' },
       },
     });
-    mockGuardUsernameUpdate.mockResolvedValue(null);
-    mockBuildClerkUpdates.mockReturnValue({ firstName: 'New' });
-    mockAddAvatarCacheBust.mockImplementation(profile => profile);
-    mockFinalizeProfileResponse.mockResolvedValue(undefined);
-    mockHandleTestProfileUpdate.mockResolvedValue(
-      NextResponse.json({ profile: {} })
-    );
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it('passes old username to finalize response after profile update', async () => {
-    const rollback = vi.fn().mockResolvedValue(undefined);
-    mockSyncClerkProfile.mockResolvedValue({
-      clerkSyncFailed: false,
-      rollback,
+    mocks.validateUpdatesPayload.mockReturnValue({
+      ok: true,
+      updates: { username: 'newname', displayName: 'New Name' },
     });
-    mockUpdateProfileRecords.mockResolvedValue({
-      updatedProfile: { id: 'profile-1', usernameNormalized: 'newname' },
+    mocks.parseProfileUpdates.mockReturnValue({
+      ok: true,
+      parsed: { username: 'newname', displayName: 'New Name' },
+    });
+    mocks.buildProfileUpdateContext.mockReturnValue({
+      dbProfileUpdates: { displayName: 'New Name' },
+      displayNameForUserUpdate: 'New Name',
+      avatarUrl: undefined,
+      usernameUpdate: 'newname',
+    });
+    mocks.updateProfileRecords.mockResolvedValue({
+      updatedProfile: {
+        id: PROFILE_ID,
+        usernameNormalized: 'newname',
+        profileEditVersion: 4,
+      },
       oldUsernameNormalized: 'oldname',
     });
+  });
 
+  it('passes the exact profile, app UUID, username, and CAS token into one transaction', async () => {
     const { PUT } = await import('@/app/api/dashboard/profile/route');
     const response = await PUT(
-      new Request('http://localhost/api/dashboard/profile', {
-        method: 'PUT',
-        body: JSON.stringify({ updates: { username: 'newname' } }),
-      })
+      new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
     );
 
     expect(response.status).toBe(200);
-    expect(mockFinalizeProfileResponse).toHaveBeenCalledWith(
+    expect(mocks.updateProfileRecords).toHaveBeenCalledWith({
+      tx: { marker: 'transaction' },
+      appUserId: APP_USER_ID,
+      profileId: PROFILE_ID,
+      dbProfileUpdates: { displayName: 'New Name' },
+      displayNameForUserUpdate: 'New Name',
+      usernameUpdate: 'newname',
+      expectedVersion: 3,
+    });
+    expect(mocks.finalizeProfileResponse).toHaveBeenCalledWith(
       expect.objectContaining({
         oldUsernameNormalized: 'oldname',
-        updatedProfile: expect.objectContaining({
-          usernameNormalized: 'newname',
-        }),
+        clerkUserId: APP_USER_ID,
       })
     );
   });
 
-  it.each([
-    ['non-integer', 1.5],
-    ['less than one', 0],
-    ['wrong type', '1'],
-  ])('rejects an expectedVersion that is %s', async (_label, expectedVersion) => {
-    mockParseJsonBody.mockResolvedValue({
+  it('rejects a missing or non-canonical selected profile id', async () => {
+    mocks.parseJsonBody.mockResolvedValue({
       ok: true,
-      data: { updates: {}, expectedVersion },
+      data: { profileId: 'profile-1', updates: { bio: 'x' } },
     });
-
     const { PUT } = await import('@/app/api/dashboard/profile/route');
     const response = await PUT(
-      new Request('http://localhost/api/dashboard/profile', {
-        method: 'PUT',
-        body: JSON.stringify({ updates: {}, expectedVersion }),
-      })
+      new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({
-      error: 'Invalid expected profile version',
-    });
-    expect(mockValidateUpdatesPayload).not.toHaveBeenCalled();
-    expect(mockGetProfileByClerkId).not.toHaveBeenCalled();
+    expect(mocks.updateProfileRecords).not.toHaveBeenCalled();
   });
 
-  it('rolls Clerk back when DB update throws', async () => {
-    const rollback = vi.fn().mockResolvedValue(undefined);
-    mockSyncClerkProfile.mockResolvedValue({
-      clerkSyncFailed: false,
-      rollback,
-    });
-    mockUpdateProfileRecords.mockRejectedValue(new Error('db failed'));
-
+  it('returns the transaction CAS conflict without post-commit effects', async () => {
+    const { NextResponse } = await import('next/server');
+    mocks.updateProfileRecords.mockResolvedValue(
+      NextResponse.json({ code: 'VERSION_CONFLICT' }, { status: 409 })
+    );
     const { PUT } = await import('@/app/api/dashboard/profile/route');
     const response = await PUT(
-      new Request('http://localhost/api/dashboard/profile', {
-        method: 'PUT',
-        body: JSON.stringify({ updates: {} }),
-      })
+      new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
     );
 
-    expect(response.status).toBe(500);
-    expect(rollback).toHaveBeenCalledTimes(1);
-    expect(mockCaptureError).toHaveBeenCalledWith(
-      'Profile update failed',
-      expect.any(Error),
-      expect.objectContaining({ method: 'PUT' })
-    );
-  });
-
-  it('skips Clerk sync for no-op identity updates', async () => {
-    mockParseJsonBody.mockResolvedValue({
-      ok: true,
-      data: {
-        updates: {
-          username: 'existing-user',
-          displayName: 'Existing User',
-          careerHighlights: 'Updated highlights',
-        },
-      },
-    });
-    mockValidateUpdatesPayload.mockReturnValue({
-      ok: true,
-      updates: {
-        username: 'existing-user',
-        displayName: 'Existing User',
-        careerHighlights: 'Updated highlights',
-      },
-    });
-    mockParseProfileUpdates.mockReturnValue({
-      ok: true,
-      parsed: {
-        username: 'existing-user',
-        displayName: 'Existing User',
-        careerHighlights: 'Updated highlights',
-      },
-    });
-    mockBuildProfileUpdateContext.mockReturnValue({
-      dbProfileUpdates: { careerHighlights: 'Updated highlights' },
-      displayNameForUserUpdate: 'Existing User',
-      avatarUrl: undefined,
-      usernameUpdate: 'existing-user',
-    });
-    mockBuildClerkUpdates.mockImplementation(displayName =>
-      displayName ? { firstName: 'New' } : {}
-    );
-    mockSyncClerkProfile.mockResolvedValue({ clerkSyncFailed: false });
-    mockUpdateProfileRecords.mockResolvedValue({
-      updatedProfile: { id: 'profile-1', usernameNormalized: 'existing-user' },
-      oldUsernameNormalized: 'existing-user',
-    });
-
-    const { PUT } = await import('@/app/api/dashboard/profile/route');
-    const response = await PUT(
-      new Request('http://localhost/api/dashboard/profile', {
-        method: 'PUT',
-        body: JSON.stringify({
-          updates: {
-            username: 'existing-user',
-            displayName: 'Existing User',
-            careerHighlights: 'Updated highlights',
-          },
-        }),
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockGuardUsernameUpdate).toHaveBeenCalledWith(
-      'clerk_123',
-      undefined
-    );
-    expect(mockBuildClerkUpdates).toHaveBeenCalledWith(undefined);
-    expect(mockSyncClerkProfile).toHaveBeenCalledWith({
-      clerkUserId: 'clerk_123',
-      clerkUpdates: {},
-      avatarUrl: undefined,
-    });
-    expect(mockUpdateProfileRecords).toHaveBeenCalledWith({
-      clerkUserId: 'clerk_123',
-      dbProfileUpdates: { careerHighlights: 'Updated highlights' },
-      displayNameForUserUpdate: undefined,
-    });
+    expect(response.status).toBe(409);
+    expect(mocks.finalizeProfileResponse).not.toHaveBeenCalled();
   });
 });
