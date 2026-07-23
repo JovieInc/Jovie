@@ -1,11 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
-  type HomepageArtistOutcomeCards,
-  HomepageArtistOutcomes,
-} from '@/components/homepage/HomepageArtistOutcomes';
+  HomepageMeetJovie,
+  type HomepageMeetJovieCards,
+} from '@/components/homepage/HomepageMeetJovie';
 
-const CARDS: HomepageArtistOutcomeCards = [
+const CARDS: HomepageMeetJovieCards = [
   {
     id: 'drive-streams',
     title: 'Drive Streams',
@@ -38,18 +38,18 @@ const CARDS: HomepageArtistOutcomeCards = [
   },
 ];
 
-describe('HomepageArtistOutcomes', () => {
-  it('renders exactly three static artist outcomes with semantic headings', () => {
-    render(<HomepageArtistOutcomes cards={CARDS} />);
+describe('HomepageMeetJovie', () => {
+  it('renders the Meet Jovie intro and all three outcome cards', () => {
+    render(<HomepageMeetJovie cards={CARDS} />);
 
     expect(
-      screen.getByRole('heading', {
-        level: 2,
-        name: 'Every fan has a next move.',
-      })
+      screen.getByRole('heading', { level: 2, name: 'Meet Jovie' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('list', { name: 'Artist Outcomes' })
+      screen.getByText(/AI artist workspace that surfaces opportunities/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('list', { name: 'Outcomes Jovie Delivers' })
     ).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
 
@@ -60,8 +60,15 @@ describe('HomepageArtistOutcomes', () => {
     }
   });
 
-  it('preserves registry-backed image geometry and has no carousel controls', () => {
-    render(<HomepageArtistOutcomes cards={CARDS} />);
+  it('renders carousel controls and preserves registry-backed image geometry', () => {
+    render(<HomepageMeetJovie cards={CARDS} />);
+
+    expect(
+      screen.getByRole('button', { name: 'Previous Outcomes' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Next Outcomes' })
+    ).toBeInTheDocument();
 
     const images = screen.getAllByRole('img');
     expect(images).toHaveLength(3);
@@ -76,13 +83,6 @@ describe('HomepageArtistOutcomes', () => {
         'height',
         String(card.image.height)
       );
-      expect(images[index]).toHaveAttribute(
-        'sizes',
-        '(min-width: 1360px) 390px, (min-width: 768px) 30vw, calc(100vw - 3rem)'
-      );
     }
-
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });

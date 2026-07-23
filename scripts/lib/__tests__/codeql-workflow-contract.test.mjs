@@ -14,6 +14,9 @@ const DEPENDABOT_CONFIG = readFileSync(
 const GITHUB_ACTIONS_DEPENDABOT = DEPENDABOT_CONFIG.match(
   /  - package-ecosystem: 'github-actions'[\s\S]*?(?=\n  - package-ecosystem:|$)/
 )?.[0];
+const NPM_DEPENDABOT = DEPENDABOT_CONFIG.match(
+  /  - package-ecosystem: 'npm'[\s\S]*?(?=\n  - package-ecosystem:|$)/
+)?.[0];
 
 const CODEQL_ACTION_PIN =
   /^\s*uses:\s*github\/codeql-action\/([^@\s]+)@([0-9a-f]{40})\s+#\s+(v\S+)\s*$/gm;
@@ -36,6 +39,12 @@ describe('CodeQL workflow version coherence', () => {
   it('groups CodeQL action updates so Dependabot moves every component together', () => {
     expect(GITHUB_ACTIONS_DEPENDABOT).toMatch(
       /groups:\n(?:\s+#.*\n)*\s+codeql-action:\n\s+patterns:\n\s+- 'github\/codeql-action'/
+    );
+  });
+
+  it('uses Dependabot schema values for Electron major updates', () => {
+    expect(NPM_DEPENDABOT).toMatch(
+      /electron-major:[\s\S]*?update-types:\n\s+- 'major'/
     );
   });
 });
