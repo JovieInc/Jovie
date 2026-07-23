@@ -1,8 +1,83 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
+const INSTALL_HELPER = join(
+  REPO_ROOT,
+  'scripts/hermes/lib/install-launchd-artifacts.sh'
+);
+
+function installLaunchdFixtures({ pythonSource, plistSource }) {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'hermes-launchd-install-'));
+  const sourceDir = join(fixtureRoot, 'source');
+  const installedDir = join(fixtureRoot, 'installed');
+  const binDir = join(fixtureRoot, 'bin');
+  mkdirSync(sourceDir);
+  mkdirSync(installedDir);
+  mkdirSync(binDir);
+
+  const pythonPath = join(sourceDir, 'entrypoint.py');
+  const plistPath = join(sourceDir, 'job.plist');
+  const installedPython = join(installedDir, 'entrypoint.py');
+  const installedPlist = join(installedDir, 'job.plist');
+  writeFileSync(pythonPath, pythonSource);
+  writeFileSync(plistPath, plistSource);
+  writeFileSync(installedPython, 'ORIGINAL_PYTHON\n');
+  writeFileSync(installedPlist, 'ORIGINAL_PLIST\n');
+
+  const plutilPath = join(binDir, 'plutil');
+  writeFileSync(
+    plutilPath,
+    `#!/usr/bin/env python3
+import plistlib
+import sys
+
+with open(sys.argv[-1], 'rb') as handle:
+    plistlib.load(handle)
+`
+  );
+  chmodSync(plutilPath, 0o755);
+
+  const result = spawnSync(
+    'bash',
+    [
+      '-c',
+      `set -euo pipefail
+source "$INSTALL_HELPER"
+stage="$(hermes_create_launchd_stage)"
+trap 'hermes_remove_launchd_stage "$stage"' EXIT
+hermes_stage_artifact "$FIXTURE_PYTHON" "$stage/entrypoint.py" 755
+hermes_stage_artifact "$FIXTURE_PLIST" "$stage/job.plist" 644
+hermes_install_validated_launchd_artifacts "$stage" \
+  "$stage/entrypoint.py" "$INSTALLED_PYTHON" 755 \
+  "$stage/job.plist" "$INSTALLED_PLIST" 644`,
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        FIXTURE_PLIST: plistPath,
+        FIXTURE_PYTHON: pythonPath,
+        HERMES_PLUTIL_BIN: plutilPath,
+        INSTALLED_PLIST: installedPlist,
+        INSTALLED_PYTHON: installedPython,
+        INSTALL_HELPER,
+      },
+    }
+  );
+
+  return { installedPlist, installedPython, result };
+}
 
 function renderTemplate(templatePath, mapping) {
   let content = readFileSync(templatePath, 'utf8');
@@ -81,6 +156,28 @@ describe('hermes gh monitor launchd templates', () => {
 });
 
 describe('shipper-gated entrypoint', () => {
+  it('compiles every Python launchd entrypoint', () => {
+    const entrypoints = readdirSync(join(REPO_ROOT, 'scripts/hermes')).filter(
+      entry => entry.endsWith('.py')
+    );
+    const pycache = mkdtempSync(join(tmpdir(), 'hermes-pycache-'));
+
+    expect(entrypoints.length).toBeGreaterThan(0);
+
+    for (const entrypoint of entrypoints) {
+      const result = spawnSync(
+        'python3',
+        ['-m', 'py_compile', join(REPO_ROOT, 'scripts/hermes', entrypoint)],
+        {
+          encoding: 'utf8',
+          env: { ...process.env, PYTHONPYCACHEPREFIX: pycache },
+        }
+      );
+      expect(result.stderr).toBe('');
+      expect(result.status).toBe(0);
+    }
+  });
+
   it('documents gbrain and grok preflight gates', () => {
     const script = readFileSync(
       join(REPO_ROOT, 'scripts/hermes/shipper-gated-entrypoint.py'),
@@ -133,6 +230,60 @@ describe('shipper-gated entrypoint', () => {
       '<key>HERMES_CODEX_SHIPPER_MAX_PARALLEL_AGENTS</key>'
     );
     expect(rendered).toContain('<string>2</string>');
+  });
+});
+
+describe('hermes launchd artifact installation', () => {
+  const validPython = 'print("ready")\n';
+  const validPlist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>Label</key><string>test</string></dict></plist>
+`;
+
+  it('installs only validated artifacts with source-identical bytes', () => {
+    const { installedPlist, installedPython, result } = installLaunchdFixtures({
+      plistSource: validPlist,
+      pythonSource: validPython,
+    });
+
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(readFileSync(installedPython, 'utf8')).toBe(validPython);
+    expect(readFileSync(installedPlist, 'utf8')).toBe(validPlist);
+  });
+
+  it.each([
+    {
+      name: 'invalid Python',
+      plistSource: validPlist,
+      pythonSource: 'def broken(:\n',
+    },
+    {
+      name: 'invalid plist',
+      plistSource: '<plist><dict>',
+      pythonSource: validPython,
+    },
+  ])('rejects $name before replacing installed artifacts', fixtures => {
+    const { installedPlist, installedPython, result } =
+      installLaunchdFixtures(fixtures);
+
+    expect(result.status).not.toBe(0);
+    expect(readFileSync(installedPython, 'utf8')).toBe('ORIGINAL_PYTHON\n');
+    expect(readFileSync(installedPlist, 'utf8')).toBe('ORIGINAL_PLIST\n');
+  });
+
+  it.each([
+    'bootstrap-air.sh',
+    'bootstrap-pro-launchd.sh',
+  ])('%s installs launchd artifacts through the validated stage', bootstrapName => {
+    const bootstrap = readFileSync(
+      join(REPO_ROOT, 'scripts/hermes', bootstrapName),
+      'utf8'
+    );
+
+    expect(bootstrap).toContain('source "$INSTALL_HELPER"');
+    expect(bootstrap).toContain('hermes_create_launchd_stage');
+    expect(bootstrap).toContain('hermes_install_validated_launchd_artifacts');
   });
 });
 

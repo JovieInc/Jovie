@@ -102,7 +102,7 @@ export async function deriveProfileAccentThemeFromBuffer(params: {
 }): Promise<ProfileAccentTheme | null> {
   const sharp = await getSharp();
   const stats = await withTimeout(
-    sharp(params.buffer, { failOnError: false })
+    sharp(params.buffer, { failOn: 'none' })
       .rotate()
       .withMetadata({ orientation: undefined })
       .resize({ width: 72, height: 72, fit: 'cover', position: 'centre' })

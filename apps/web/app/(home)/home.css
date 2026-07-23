@@ -1798,12 +1798,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   display: flex;
   width: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
   flex-direction: column;
   align-items: center;
   overflow: clip;
   padding-top: calc(
     var(--homepage-header-height) +
-    clamp(var(--space-12), 5.5vw, var(--space-20))
+    clamp(var(--space-10), 4.25vw, var(--space-16))
   );
   background: var(--system-b-bg-page);
   color: var(--color-text-primary-token);
@@ -1813,6 +1815,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   z-index: 2;
   display: flex;
+  flex-shrink: 0;
   width: min(100%, 68rem);
   flex-direction: column;
   align-items: center;
@@ -1844,15 +1847,20 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-poster-hero__actions {
-  margin-top: var(--space-8);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
 }
 
 .homepage-poster-hero__seam {
   position: relative;
   z-index: 2;
-  width: min(34rem, calc(100% - var(--homepage-page-gutter) * 2));
+  flex-shrink: 0;
+  width: min(48rem, calc(100% - var(--homepage-page-gutter) * 2));
   min-height: var(--space-6);
-  margin-block: var(--space-8) var(--space-6);
+  margin-block: var(--space-5) var(--space-6);
 }
 
 .homepage-poster-hero__electric-seam {
@@ -1898,6 +1906,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-poster-hero__media {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
   width: min(
     var(--ds-public-content-max),
     calc(100% - var(--homepage-page-gutter) * 2)
@@ -1945,6 +1957,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 @media (prefers-reduced-motion: no-preference) {
   .homepage-poster-hero__headline,
   .homepage-poster-hero__subtitle,
+  .homepage-poster-hero__lede,
   .homepage-poster-hero__actions,
   .homepage-poster-hero__seam,
   .homepage-poster-hero__media {
@@ -1954,6 +1967,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
   .homepage-poster-hero__subtitle {
     animation-delay: 70ms;
+  }
+
+  .homepage-poster-hero__lede {
+    animation-delay: 105ms;
   }
 
   .homepage-poster-hero__actions {
@@ -2032,7 +2049,28 @@ body:has(.home-viewport)::-webkit-scrollbar {
   border: 1px solid var(--system-b-app-frame-seam);
   border-radius: var(--radius-xl);
   background: var(--system-b-bg-surface-1);
-  box-shadow: var(--shadow-card);
+  box-shadow:
+    var(--shadow-card),
+    0 40px 120px rgba(0, 0, 0, 0.55);
+}
+
+/* Cinematic stage light: a single hairline of light caught on the pane's top
+   edge, brightest at center and falling off before the corners. */
+.homepage-product-pane::after {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: 1px;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent 4%,
+    color-mix(in oklab, var(--system-b-text-primary) 26%, transparent) 32%,
+    color-mix(in oklab, var(--system-b-text-primary) 34%, transparent) 50%,
+    color-mix(in oklab, var(--system-b-text-primary) 26%, transparent) 68%,
+    transparent 96%
+  );
+  pointer-events: none;
 }
 
 .homepage-product-pane__image {
@@ -2046,6 +2084,44 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-product-pane--desktop {
   width: 100%;
   aspect-ratio: 1.6;
+}
+
+/* Full-viewport hero: the media column flexes to the fold and the pane lands
+   flat on the viewport edge — no bottom border or radius — so the crop reads
+   as a deliberate stage floor instead of a clipped card. The rail and pane
+   size each other with flex (percentage heights do not resolve against a
+   zero-basis flex track); the image fills the pane absolutely, which always
+   resolves against the pane's used padding box. */
+.homepage-poster-hero .homepage-hero-command-center {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.homepage-poster-hero .homepage-product-rail {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  aspect-ratio: auto;
+}
+
+.homepage-poster-hero .homepage-product-pane--desktop {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  aspect-ratio: auto;
+}
+
+.homepage-poster-hero .homepage-product-pane {
+  border-bottom: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.homepage-poster-hero .homepage-product-pane__image {
+  position: absolute;
+  inset: 0;
 }
 
 /* The named view timeline feeds the proof-strip scroll animations
@@ -3020,9 +3096,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-poster-hero__headline {
-    max-width: 12ch;
-    font-size: clamp(2.55rem, 11vw, 3.35rem);
-    line-height: 0.92;
+    max-width: 20ch;
+    font-size: clamp(2.4rem, 9vw, 3.1rem);
+    line-height: 0.94;
   }
 
   .homepage-poster-hero__subtitle {
@@ -3248,6 +3324,23 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-variant-numeric: tabular-nums;
 }
 
+/* Quiet feature-accent rotation on the step numerals — color lives on small
+   text only, matching the outcome-card title rules. */
+.system-b-mounted-home-workspace-callout:nth-child(1)
+.system-b-mounted-home-workspace-callout-label {
+  color: var(--color-accent-blue);
+}
+
+.system-b-mounted-home-workspace-callout:nth-child(2)
+  .system-b-mounted-home-workspace-callout-label {
+  color: var(--color-accent-purple);
+}
+
+.system-b-mounted-home-workspace-callout:nth-child(3)
+  .system-b-mounted-home-workspace-callout-label {
+  color: var(--color-accent-teal);
+}
+
 .system-b-mounted-home-workspace-callout
   .system-b-mounted-home-workspace-callout-title {
   color: var(--color-text-primary-token);
@@ -3335,7 +3428,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   justify-content: center;
   color: var(--color-text-tertiary-token);
   filter: grayscale(1);
-  opacity: 1;
+  opacity: 0.72;
 }
 
 .system-b-mounted-home-trust-strip .system-b-mounted-home-trust-strip-logo {
@@ -3510,6 +3603,21 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-text-primary-token);
 }
 
+/* Closing light: a low, wide glow behind the final ask so the page closes on
+   the same cinematic register as the hero product stage. */
+.system-b-mounted-home-footer-cta::before {
+  position: absolute;
+  inset: auto 10% -32%;
+  z-index: 0;
+  height: 62%;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-blue-subtle);
+  content: "";
+  filter: blur(90px);
+  opacity: 0.34;
+  pointer-events: none;
+}
+
 .system-b-mounted-home-footer-cta-container {
   position: relative;
   z-index: 1;
@@ -3519,7 +3627,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-block: var(--homepage-chapter-space);
+  padding-block: calc(var(--homepage-chapter-space) + var(--space-16));
   padding-inline: var(--homepage-page-gutter);
   text-align: center;
 }
@@ -3664,6 +3772,55 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* SYSTEM B MOUNTED HOME FOOTER CTA PRIMITIVES END */
 
+/* FOOTER CTA ABYSS (decorative layer — lives outside the flat primitives
+   block by design, same contract as the hero stage gradients). Two hairline
+   grids on a perspective floor, receding toward a vanishing point below the
+   fold. Cyan at whisper opacity — felt, not seen. The plane is oversized so
+   rotation and drift never expose an edge, and the top mask lets the lines
+   dissolve upward into the page. */
+.system-b-mounted-home-footer-cta-abyss {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 0;
+  height: 62%;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, transparent, black 58%);
+  mask-image: linear-gradient(180deg, transparent, black 58%);
+  perspective: 720px;
+  pointer-events: none;
+}
+
+.system-b-mounted-home-footer-cta-abyss-plane {
+  position: absolute;
+  inset: -70% -25% 0;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--system-b-accent-cyan) 68%, transparent) 0 1px,
+      transparent 1px 96px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in oklab, var(--system-b-accent-cyan) 52%, transparent) 0 1px,
+      transparent 1px 64px
+    );
+  opacity: 0.22;
+  transform: rotateX(58deg);
+  transform-origin: center bottom;
+}
+
+@keyframes homepage-footer-cta-abyss-drift {
+  to {
+    transform: rotateX(58deg) translateY(64px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .system-b-mounted-home-footer-cta-abyss-plane {
+    animation: homepage-footer-cta-abyss-drift 26s linear infinite;
+  }
+}
+
 /* HOMEPAGE CLOSED LOOP SYSTEM B START */
 .homepage-closed-loop-section {
   --homepage-closed-loop-rule: color-mix(
@@ -3699,7 +3856,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-closed-loop-copy {
-  grid-column: 1 / span 5;
+  grid-column: 1 / span 6;
   align-self: start;
 }
 
@@ -3713,7 +3870,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-closed-loop-headline {
-  max-width: 14ch;
+  max-width: 28ch;
   margin: 0;
   color: var(--color-text-primary-token);
   font-family:
@@ -3736,7 +3893,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-closed-loop-story {
-  grid-column: 6 / -1;
+  grid-column: 7 / -1;
   display: grid;
   min-width: 0;
   grid-template-columns: minmax(calc(var(--space-24) * 2), 0.72fr) minmax(
@@ -3748,10 +3905,25 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-closed-loop-visual {
+  position: relative;
   width: 100%;
-  max-width: calc(var(--space-24) * 3);
+  max-width: calc(var(--space-24) * 3 + var(--space-8));
   margin: 0 auto;
   color: var(--color-text-tertiary-token);
+}
+
+/* The one cyan accent moment for the chapter: a soft signal glow behind the
+   loop, matching the hero seam's register. */
+.homepage-closed-loop-visual::before {
+  position: absolute;
+  inset: 12%;
+  z-index: -1;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--system-b-accent-cyan) 16%, transparent);
+  content: "";
+  filter: blur(48px);
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .homepage-closed-loop-visual-svg {
@@ -3765,6 +3937,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-text-tertiary-token);
 }
 
+.homepage-closed-loop-visual-pulse,
+.homepage-closed-loop-visual-node--active {
+  color: var(--system-b-accent-cyan);
+}
+
 .homepage-closed-loop-visual-arc,
 .homepage-closed-loop-visual-nodes,
 .homepage-closed-loop-visual-hub {
@@ -3772,12 +3949,28 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-closed-loop-visual-arc--muted,
-.homepage-closed-loop-visual-plus {
+.homepage-closed-loop-visual-core {
   color: var(--color-text-secondary-token);
 }
 
 .homepage-closed-loop-visual-hub {
   fill: var(--system-b-bg-surface-0);
+}
+
+/* Signal pulse: one short cyan arc with a head dot, orbiting the ring slowly.
+   Transform-only; fully disabled under prefers-reduced-motion. */
+@keyframes homepage-closed-loop-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .homepage-closed-loop-visual-pulse {
+    animation: homepage-closed-loop-orbit 14s linear infinite;
+    transform-box: view-box;
+    transform-origin: center;
+  }
 }
 
 .homepage-closed-loop-visual-caption {
@@ -3947,8 +4140,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 /* HOMEPAGE CLOSED LOOP SYSTEM B END */
 
-/* HOMEPAGE ARTIST OUTCOMES SYSTEM B START */
-.homepage-artist-outcomes {
+/* HOMEPAGE MEET JOVIE SYSTEM B START */
+.homepage-meet-jovie {
   position: relative;
   overflow: clip;
   padding-block: var(--homepage-chapter-space);
@@ -3957,26 +4150,23 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-family: var(--font-sans);
 }
 
-.homepage-artist-outcomes__inner {
-  display: grid;
+.homepage-meet-jovie__header {
+  display: flex;
   width: min(
     var(--ds-public-content-max),
-    calc(100% - var(--homepage-grid-gutter) * 2)
+    calc(100% - var(--homepage-page-gutter) * 2)
   );
-  max-width: none;
   margin-inline: auto;
-  padding-inline: 0;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  column-gap: clamp(var(--space-4), 2vw, var(--space-6));
-  row-gap: clamp(var(--space-12), 6vw, var(--space-20));
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-6);
 }
 
-.homepage-artist-outcomes__copy {
-  grid-column: 1 / span 6;
+.homepage-meet-jovie__copy {
+  max-width: 44rem;
 }
 
-.homepage-artist-outcomes__copy h2 {
-  max-width: 16ch;
+.homepage-meet-jovie__heading {
   margin: 0;
   color: var(--color-text-primary-token);
   font-family:
@@ -3988,7 +4178,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-wrap: balance;
 }
 
-.homepage-artist-outcomes__copy p {
+.homepage-meet-jovie__intro {
   max-width: 34rem;
   margin: var(--space-5) 0 0;
   color: var(--color-text-secondary-token);
@@ -3998,61 +4188,119 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-wrap: pretty;
 }
 
-.homepage-artist-outcomes__list {
-  grid-column: 1 / -1;
-  display: grid;
-  margin: 0;
-  padding: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: clamp(var(--space-10), 6vw, var(--space-20));
-  list-style: none;
+.homepage-meet-jovie__carousel {
+  width: min(
+    var(--ds-public-content-max),
+    calc(100% - var(--homepage-page-gutter) * 2)
+  );
+  margin: var(--space-10) auto 0;
 }
 
+.homepage-meet-jovie__controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.homepage-meet-jovie__track {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  gap: clamp(var(--space-4), 2vw, var(--space-6));
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.homepage-meet-jovie__track::-webkit-scrollbar {
+  display: none;
+}
+
+.homepage-meet-jovie__card {
+  flex: 0 0 auto;
+  width: clamp(19rem, 30vw, 24rem);
+  scroll-snap-align: start;
+}
+
+@media (max-width: 767px) {
+  .homepage-meet-jovie__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .homepage-meet-jovie__card {
+    width: 78vw;
+  }
+}
+/* HOMEPAGE MEET JOVIE SYSTEM B END */
+
+/* HOMEPAGE ARTIST OUTCOMES SYSTEM B START */
 .homepage-artist-outcome {
   position: relative;
   display: grid;
   min-width: 0;
-  gap: var(--space-4);
   border-top: var(--space-px) solid var(--homepage-chapter-rule);
   padding: var(--space-5) 0 0;
 }
 
-/* Seam between cards, centered in the column gap, so every media frame keeps
-   an identical width (equal optical weight) while the first card still aligns
-   to the shared grid gutter. */
+/* Seam between cards, centered in the carousel gap, so every media frame
+   keeps an identical width (equal optical weight). */
 .homepage-artist-outcome + .homepage-artist-outcome::before {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(clamp(var(--space-10), 6vw, var(--space-20)) / -2);
+  left: calc(clamp(var(--space-4), 2vw, var(--space-6)) / -2);
   width: var(--space-px);
   background: var(--homepage-chapter-rule);
   content: "";
 }
 
+/* Editorial overlay: the card title rides on the artwork behind a flat tint
+   band (gradients are contract-forbidden in this block), white display type
+   with a small feature-accent rule — Apple tile register. */
+.homepage-artist-outcome__caption {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  padding: var(--space-6);
+  background: color-mix(in oklab, var(--system-b-bg-page) 52%, transparent);
+}
+
 .homepage-artist-outcome h3 {
   margin: 0;
   color: var(--color-text-primary-token);
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--leading-tight);
-  letter-spacing: 0;
+  letter-spacing: -0.015em;
+  text-shadow: 0 1px 10px
+    color-mix(in oklab, var(--system-b-bg-page) 85%, transparent);
 }
 
-/* Feature differentiation: Geist feature accent on card TITLE TEXT ONLY
-   (design/jovie-design-decision-log 2026-07-05 — never on container
-   backgrounds, CTAs, icon backgrounds, or decorative glows).
+.homepage-artist-outcome h3::before {
+  display: block;
+  width: var(--space-8);
+  height: 2px;
+  margin-bottom: var(--space-3);
+  background: currentcolor;
+  content: "";
+}
+
+/* Feature differentiation: accent on the title rule only (never container
+   backgrounds, CTAs, or decorative glows).
    Streams = track/analytics blue, Fans = artist purple, Paid = success green. */
-.homepage-artist-outcome:nth-child(1) h3 {
-  color: var(--color-accent-blue);
+.homepage-artist-outcome:nth-child(1) h3::before {
+  background: var(--color-accent-blue);
 }
 
-.homepage-artist-outcome:nth-child(2) h3 {
-  color: var(--color-accent-purple);
+.homepage-artist-outcome:nth-child(2) h3::before {
+  background: var(--color-accent-purple);
 }
 
-.homepage-artist-outcome:nth-child(3) h3 {
-  color: var(--color-accent-green);
+.homepage-artist-outcome:nth-child(3) h3::before {
+  background: var(--color-accent-green);
 }
 
 .homepage-artist-outcome__media {
@@ -4071,15 +4319,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
   height: 100%;
   object-fit: cover;
   object-position: center top;
-  opacity: 0.88;
-  transition:
-    opacity var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
-    filter var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
+  opacity: 1;
+  transition: filter var(--ds-motion-subtle-duration)
+    var(--ds-motion-subtle-easing);
 }
 
 .homepage-artist-outcome:hover .homepage-artist-outcome__media img {
   filter: brightness(1.06);
-  opacity: 1;
 }
 
 /* Staggered rise-in on load (transform/opacity only — zero layout shift).
@@ -4097,14 +4343,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .homepage-artist-outcomes__copy h2,
-  .homepage-artist-outcomes__copy p,
+  .homepage-meet-jovie__heading,
+  .homepage-meet-jovie__intro,
   .homepage-artist-outcome {
     animation: homepage-artist-outcomes-rise var(--ds-motion-cinematic-duration)
       var(--ds-motion-cinematic-easing) both;
   }
 
-  .homepage-artist-outcomes__copy p {
+  .homepage-meet-jovie__intro {
     animation-delay: 70ms;
   }
 
@@ -4451,56 +4697,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 @media (max-width: 767px) {
-  .homepage-artist-outcomes__inner {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: var(--space-12);
-  }
-
-  .homepage-artist-outcomes__copy,
-  .homepage-artist-outcomes__list {
-    grid-column: 1;
-  }
-
-  .homepage-artist-outcomes__copy h2 {
-    max-width: 12ch;
-    font-size: clamp(var(--text-3xl), 10vw, var(--text-4xl));
-    line-height: var(--ds-marketing-title-leading);
-  }
-
-  /* Mobile: the card row becomes an edge-to-edge snap rail whose first card
-     and snap position align to the shared grid gutter. */
-  .homepage-artist-outcomes__list {
-    width: 100vw;
-    margin-inline: calc(50% - 50vw);
-    grid-auto-columns: min(76vw, 19rem);
-    grid-auto-flow: column;
-    grid-template-columns: none;
-    gap: var(--space-4);
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    scroll-padding-left: var(--homepage-grid-gutter);
-    scroll-snap-type: x mandatory;
-    padding-right: var(--homepage-grid-gutter);
-    padding-bottom: var(--space-3);
-    padding-left: var(--homepage-grid-gutter);
-    scrollbar-width: none;
-  }
-
-  .homepage-artist-outcomes__list::-webkit-scrollbar {
-    display: none;
-  }
-
-  .homepage-artist-outcome {
-    scroll-snap-align: start;
-  }
-
-  .homepage-artist-outcome + .homepage-artist-outcome::before {
-    content: none;
-  }
-
   .homepage-artist-outcome__media {
     aspect-ratio: 0.86;
+  }
+
+  .homepage-artist-outcome__caption {
+    padding: var(--space-5);
   }
 
   .homepage-outcome-heading {
@@ -4564,9 +4766,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   --homepage-grid-max: var(--ds-public-content-max);
   --homepage-grid-gutter: var(--homepage-page-gutter);
   --homepage-chapter-space: clamp(
-    calc(var(--space-24) + var(--space-8)),
-    10vw,
-    calc(var(--space-24) * 2)
+    calc(var(--space-24) + var(--space-2)),
+    8.5vw,
+    calc(var(--space-24) + var(--space-16))
   );
   --homepage-chapter-rule: color-mix(
     in oklab,
@@ -4620,7 +4822,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-opportunity-section__copy {
-  grid-column: 1 / span 5;
+  grid-column: 1 / span 6;
   grid-row: 1;
   align-self: start;
 }
@@ -4645,7 +4847,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 /* Opportunity headline rides the shared marketing title ramp (sentence case,
    0 tracking) so it sits one tier below the hero display. */
 .homepage-opportunity-section__headline {
-  max-width: 14ch;
+  max-width: 19ch;
   margin: 0;
   color: var(--system-b-text-primary);
   font-family: var(--font-sans);
@@ -4678,7 +4880,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 /* The demo shares row 1 with the copy so the composer proof sits beside the
    headline instead of auto-placing below the card row (dead band). */
 .homepage-opportunity-section__demo {
-  grid-column: 6 / -1;
+  grid-column: 7 / -1;
   grid-row: 1;
   min-width: 0;
   align-self: start;
@@ -4711,6 +4913,22 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-tight);
   letter-spacing: -0.015em;
+}
+
+/* Same quiet accent rotation as the workspace numerals, on title text only. */
+.homepage-opportunity-section__item:nth-child(1)
+.homepage-opportunity-section__item-title {
+  color: var(--color-accent-blue);
+}
+
+.homepage-opportunity-section__item:nth-child(2)
+  .homepage-opportunity-section__item-title {
+  color: var(--color-accent-purple);
+}
+
+.homepage-opportunity-section__item:nth-child(3)
+  .homepage-opportunity-section__item-title {
+  color: var(--color-accent-teal);
 }
 
 .homepage-opportunity-section__demo-copy p,
@@ -4753,7 +4971,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-workspace-section__copy {
-  grid-column: 1 / span 5;
+  grid-column: 1 / span 7;
   max-width: none;
   margin-inline: 0;
   justify-self: stretch;
@@ -4762,7 +4980,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-workspace-section__copy h2 {
   display: grid;
-  max-width: 12ch;
+  max-width: 30ch;
 }
 
 .homepage-workspace-visual {
@@ -5054,9 +5272,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
 @media (max-width: 767px) {
   .home-viewport {
     --homepage-chapter-space: clamp(
-      var(--space-20),
-      22vw,
-      calc(var(--space-24) + var(--space-8))
+      var(--space-16),
+      18vw,
+      calc(var(--space-24) + var(--space-2))
     );
   }
 
