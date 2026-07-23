@@ -60,6 +60,8 @@ cleanup_old_branches*.sh
 # Build-critical web postbuild script
 !apps/web/scripts/
 !apps/web/scripts/sync-standalone-assets.mjs
+!apps/web/scripts/ensure-sharp-runtime-traces.mjs
+!apps/web/scripts/resolve-package-json.mjs
 
 # Source-deploy fallback still needs these runtime directories from apps/web.
 !apps/web/scripts/

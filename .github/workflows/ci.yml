@@ -1054,7 +1054,7 @@ jobs:
           python-version: '3.12'
       - name: Install pytest (structural regression tests)
         if: steps.structural.outputs.skip != 'true'
-        run: pip install pytest --quiet
+        run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
       - name: Run ci-fast lanes
         id: lanes
         env:
@@ -4306,6 +4306,7 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          SKIP_SKILLS_CATALOG_SYNC: '1'
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

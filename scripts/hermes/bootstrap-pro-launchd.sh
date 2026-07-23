@@ -28,6 +28,10 @@ LAUNCHD_TEMPLATE_DIR="${REPO_ROOT}/scripts/hermes/launchd"
 SHIPPER_ENTRYPOINT_SRC="${REPO_ROOT}/scripts/hermes/shipper-gated-entrypoint.py"
 SHIPPER_ENTRYPOINT_DST="${HERMES_SCRIPTS}/shipper-gated-entrypoint.py"
 CODEX_SHIPPER_PLIST_TEMPLATE="${LAUNCHD_TEMPLATE_DIR}/co.jovie.hermes.cron-codex-issue-shipper.plist.template"
+INSTALL_HELPER="${REPO_ROOT}/scripts/hermes/lib/install-launchd-artifacts.sh"
+
+# shellcheck source=scripts/hermes/lib/install-launchd-artifacts.sh
+source "$INSTALL_HELPER"
 
 log() { printf "\033[1;34m▶\033[0m %s\n" "$*"; }
 ok() { printf "\033[1;32m✓\033[0m %s\n" "$*"; }
@@ -81,33 +85,45 @@ fi
 require_cmd node
 require_cmd python3
 require_cmd launchctl
+require_cmd plutil
+require_cmd shasum
 chmod +x "${REPO_ROOT}/scripts/hermes/ship-loop.sh"
 [[ -f "$SHIPPER_ENTRYPOINT_SRC" ]] || die "Missing shipper entrypoint: $SHIPPER_ENTRYPOINT_SRC"
 [[ -f "$CODEX_SHIPPER_PLIST_TEMPLATE" ]] || die "Missing codex shipper plist: $CODEX_SHIPPER_PLIST_TEMPLATE"
 
 mkdir -p "$HERMES_HOME/logs/launchd" "$HERMES_SCRIPTS" "$LAUNCH_AGENTS"
-cp "$SHIPPER_ENTRYPOINT_SRC" "$SHIPPER_ENTRYPOINT_DST"
-chmod +x "$SHIPPER_ENTRYPOINT_DST"
-ok "installed shipper-gated-entrypoint.py"
+LAUNCHD_STAGE="$(hermes_create_launchd_stage)"
+trap 'hermes_remove_launchd_stage "$LAUNCHD_STAGE"' EXIT
+INSTALL_ARGS=()
+hermes_stage_artifact "$SHIPPER_ENTRYPOINT_SRC" \
+  "${LAUNCHD_STAGE}/shipper-gated-entrypoint.py" 755
+INSTALL_ARGS+=(
+  "${LAUNCHD_STAGE}/shipper-gated-entrypoint.py"
+  "$SHIPPER_ENTRYPOINT_DST"
+  755
+)
 
 log "Rendering Houston launchd plists (mode=$MODE)"
 while IFS= read -r label; do
   [[ -n "$label" ]] || continue
   tmpl="${PRO_TEMPLATE_DIR}/${label}.plist.template"
-  out="${LAUNCH_AGENTS}/${label}.plist"
+  out="${LAUNCHD_STAGE}/${label}.plist"
   render_plist "$tmpl" "$out"
-  ok "rendered $label"
+  INSTALL_ARGS+=("$out" "${LAUNCH_AGENTS}/${label}.plist" 644)
+  ok "staged $label"
 done < <(pro_labels)
 
-render_plist "$CODEX_SHIPPER_PLIST_TEMPLATE" "${LAUNCH_AGENTS}/co.jovie.hermes.cron-codex-issue-shipper.plist"
-ok "rendered co.jovie.hermes.cron-codex-issue-shipper"
+CODEX_SHIPPER_PLIST_STAGE="${LAUNCHD_STAGE}/co.jovie.hermes.cron-codex-issue-shipper.plist"
+render_plist "$CODEX_SHIPPER_PLIST_TEMPLATE" "$CODEX_SHIPPER_PLIST_STAGE"
+INSTALL_ARGS+=(
+  "$CODEX_SHIPPER_PLIST_STAGE"
+  "${LAUNCH_AGENTS}/co.jovie.hermes.cron-codex-issue-shipper.plist"
+  644
+)
+ok "staged co.jovie.hermes.cron-codex-issue-shipper"
 
-AGENTCOOKIE_SENDER_TEMPLATE="${PRO_TEMPLATE_DIR}/co.jovie.hermes.agentcookie-sender.plist.template"
-if [[ -f "$AGENTCOOKIE_SENDER_TEMPLATE" ]]; then
-  render_plist "$AGENTCOOKIE_SENDER_TEMPLATE" \
-    "${LAUNCH_AGENTS}/co.jovie.hermes.agentcookie-sender.plist"
-  ok "rendered co.jovie.hermes.agentcookie-sender"
-fi
+hermes_install_validated_launchd_artifacts "$LAUNCHD_STAGE" "${INSTALL_ARGS[@]}"
+ok "validated and installed launchd artifacts"
 
 if [[ "$MODE" == "reconfigure" ]]; then
   log "Reconfigure complete. Restart with:"
