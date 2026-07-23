@@ -169,7 +169,11 @@ describe('feature flag registry integrity', () => {
       expect(productionReferences).toEqual([]);
     }
 
-    for (const retiredShellMarker of ['shellChatV1', 'data-shell-design']) {
+    for (const retiredShellMarker of [
+      'shellChatV1',
+      'data-shell-design',
+      'data-design-v1-auth',
+    ]) {
       const productionReferences = SOURCE_CORPUS.filter(({ source }) =>
         source.includes(retiredShellMarker)
       ).map(({ relativePath }) => relativePath);
