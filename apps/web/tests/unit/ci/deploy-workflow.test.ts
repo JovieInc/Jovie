@@ -991,6 +991,31 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(deployScript).not.toContain('--token');
   });
 
+  it('skips catalog mutation only for the manual PR preview build', () => {
+    const previewWorkflow = readFileSync(workflowPath, 'utf8');
+    const productionWorkflow = readFileSync(
+      productionReleaseWorkflowPath,
+      'utf8'
+    );
+    const previewBuild = getStepBlock(
+      getJobBlock(previewWorkflow, 'ci-pr-vercel-preview'),
+      'Build (PR preview)'
+    );
+    const productionBuild = getStepBlock(
+      getJobBlock(productionWorkflow, 'promote-production'),
+      'Build and stage production deployment'
+    );
+    const webPackage = JSON.parse(
+      readFileSync(resolve(repoRoot, 'apps/web/package.json'), 'utf8')
+    ) as { scripts: Record<string, string> };
+
+    expect(previewBuild).toContain("SKIP_SKILLS_CATALOG_SYNC: '1'");
+    expect(productionBuild).not.toContain('SKIP_SKILLS_CATALOG_SYNC');
+    expect(webPackage.scripts.postbuild).toContain(
+      'scripts/sync-skills-catalog.ts'
+    );
+  });
+
   it('keeps Vercel secrets and runtime values out of every preview and production process argument', () => {
     const previewWorkflow = readFileSync(workflowPath, 'utf8');
     const productionWorkflow = readFileSync(
