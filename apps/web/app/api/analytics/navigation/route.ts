@@ -8,6 +8,10 @@ import {
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import {
+  createRateLimitHeaders,
+  navigationTelemetryLimiter,
+} from '@/lib/rate-limit';
 import { navigationTelemetryPayloadSchema } from '@/lib/tracking/navigation-telemetry-contract';
 
 const ROUTE = '/api/analytics/navigation';
@@ -24,6 +28,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   const { userId } = await getCachedAuth();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const rateLimit = await navigationTelemetryLimiter.limit(userId);
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded' },
+      { status: 429, headers: createRateLimitHeaders(rateLimit) }
+    );
   }
 
   const body = await parseJsonBody(request, {

@@ -53,6 +53,11 @@ export const albumArtGenerationBurstLimiter = createRateLimiter(
  */
 export const apiLimiter = createRateLimiter(RATE_LIMITERS.api);
 
+/** Aggregate-only shell navigation telemetry, keyed by authenticated user. */
+export const navigationTelemetryLimiter = createRateLimiter(
+  RATE_LIMITERS.navigationTelemetry
+);
+
 // ============================================================================
 // Onboarding Operations
 // ============================================================================
@@ -1058,6 +1063,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     albumArtGeneration: albumArtGenerationLimiter,
     albumArtGenerationBurst: albumArtGenerationBurstLimiter,
     api: apiLimiter,
+    navigationTelemetry: navigationTelemetryLimiter,
     onboarding: onboardingLimiter,
     handleCheck: handleCheckLimiter,
     anonymousOnboardingChatIp: anonymousOnboardingChatIpLimiter,

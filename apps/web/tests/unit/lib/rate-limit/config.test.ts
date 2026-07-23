@@ -96,6 +96,7 @@ describe('Rate Limit Config', () => {
         const requiredLimiters = [
           'avatarUpload',
           'api',
+          'navigationTelemetry',
           'onboarding',
           'handleCheck',
           'dashboardLinks',
@@ -166,6 +167,15 @@ describe('Rate Limit Config', () => {
         expect(RATE_LIMITERS.onboarding.analytics).toBe(true);
         expect(RATE_LIMITERS.paymentIntent.analytics).toBe(true);
         expect(RATE_LIMITERS.adminImpersonate.analytics).toBe(true);
+      });
+
+      it('should preserve ordinary navigation telemetry fanout', () => {
+        // A desktop transition can emit six impressions plus activation and
+        // readiness. Keep at least one such transition per second available.
+        expect(RATE_LIMITERS.navigationTelemetry.limit).toBeGreaterThanOrEqual(
+          8 * 60
+        );
+        expect(RATE_LIMITERS.navigationTelemetry.window).toBe('1 m');
       });
 
       it('should disable analytics for high-volume public endpoints', () => {

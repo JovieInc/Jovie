@@ -7,7 +7,10 @@
 
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import type { NavigationTelemetryPayload } from '@/lib/tracking/navigation-telemetry-contract';
+import {
+  NAVIGATION_TELEMETRY_ENDPOINT,
+  type NavigationTelemetryPayload,
+} from '@/lib/tracking/navigation-telemetry-contract';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -17,13 +20,69 @@ test.skip(
 );
 
 async function installConsentAndClsObserver(page: Page) {
-  await page.addInitScript(() => {
+  await page.addInitScript(endpoint => {
     localStorage.setItem(
       'jv_cc',
       JSON.stringify({ essential: true, analytics: true, marketing: false })
     );
     localStorage.setItem('jovie_tracking_consent', 'accepted');
     window.__JOVIE_NAV_TELEMETRY_CLS__ = 0;
+    window.__JOVIE_NAV_TELEMETRY_OBSERVATIONS__ = [];
+
+    let sequence = 0;
+    const isNavigationTelemetryUrl = (value: unknown) =>
+      String(value).includes(endpoint);
+    const capture = (
+      body: BodyInit | null | undefined,
+      librarySurfaceVisible: boolean,
+      observationSequence: number
+    ) => {
+      const append = (raw: string) => {
+        try {
+          window.__JOVIE_NAV_TELEMETRY_OBSERVATIONS__?.push({
+            payload: JSON.parse(raw) as NavigationTelemetryPayload,
+            librarySurfaceVisible,
+            sequence: observationSequence,
+          });
+        } catch {
+          // The route schema owns payload validation; malformed bodies are
+          // irrelevant to this browser-ordering assertion.
+        }
+      };
+
+      if (typeof body === 'string') {
+        append(body);
+      } else if (body instanceof Blob) {
+        void body.text().then(append);
+      }
+    };
+
+    const originalSendBeacon = navigator.sendBeacon.bind(navigator);
+    navigator.sendBeacon = (url, data) => {
+      const librarySurfaceVisible = Boolean(
+        document.querySelector('[data-testid="library-surface"]')
+      );
+      const observationSequence = sequence++;
+      const sent = originalSendBeacon(url, data);
+      if (sent && isNavigationTelemetryUrl(url)) {
+        capture(data, librarySurfaceVisible, observationSequence);
+      }
+      return sent;
+    };
+
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    globalThis.fetch = (input, init) => {
+      const url = input instanceof Request ? input.url : input;
+      if (isNavigationTelemetryUrl(url)) {
+        capture(
+          init?.body,
+          Boolean(document.querySelector('[data-testid="library-surface"]')),
+          sequence++
+        );
+      }
+      return originalFetch(input, init);
+    };
+
     new PerformanceObserver(list => {
       for (const entry of list.getEntries()) {
         const shift = entry as LayoutShift;
@@ -32,19 +91,16 @@ async function installConsentAndClsObserver(page: Page) {
         }
       }
     }).observe({ type: 'layout-shift', buffered: true });
-  });
+  }, NAVIGATION_TELEMETRY_ENDPOINT);
 }
 
 test('desktop navigation emits exactly one redacted activation-to-ready pair', async ({
   page,
 }, testInfo) => {
   test.setTimeout(120_000);
-  const payloads: NavigationTelemetryPayload[] = [];
 
   await installConsentAndClsObserver(page);
   await page.route('**/api/analytics/navigation', async route => {
-    const raw = route.request().postData();
-    if (raw) payloads.push(JSON.parse(raw) as NavigationTelemetryPayload);
     await route.fulfill({ status: 204, body: '' });
   });
   await setTestAuthBypassSession(page, 'creator-ready', 'e2e-nav-telemetry');
@@ -54,9 +110,9 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
     page.getByRole('navigation', { name: 'Dashboard Navigation' })
   ).toBeVisible({ timeout: 30_000 });
 
-  payloads.length = 0;
   await page.evaluate(() => {
     window.__JOVIE_NAV_TELEMETRY_CLS__ = 0;
+    window.__JOVIE_NAV_TELEMETRY_OBSERVATIONS__ = [];
   });
   await page
     .getByRole('navigation', { name: 'Dashboard Navigation' })
@@ -69,25 +125,35 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
   await expect
     .poll(
       () =>
-        payloads.filter(
-          payload =>
-            payload.item_id === 'library' &&
-            ['activation', 'destination_ready'].includes(payload.event)
-        ).length,
+        page.evaluate(
+          () =>
+            window.__JOVIE_NAV_TELEMETRY_OBSERVATIONS__?.filter(
+              observation =>
+                observation.payload.item_id === 'library' &&
+                ['activation', 'destination_ready'].includes(
+                  observation.payload.event
+                )
+            ).length ?? 0
+        ),
       { timeout: 10_000 }
     )
     .toBe(2);
 
-  const clickToReady = payloads.filter(
-    payload =>
-      payload.item_id === 'library' &&
-      ['activation', 'destination_ready'].includes(payload.event)
+  const observations = await page.evaluate(
+    () => window.__JOVIE_NAV_TELEMETRY_OBSERVATIONS__ ?? []
   );
-  expect(clickToReady.map(payload => payload.event)).toEqual([
+  const clickToReady = observations
+    .filter(
+      observation =>
+        observation.payload.item_id === 'library' &&
+        ['activation', 'destination_ready'].includes(observation.payload.event)
+    )
+    .toSorted((left, right) => left.sequence - right.sequence);
+  expect(clickToReady.map(({ payload }) => payload.event)).toEqual([
     'activation',
     'destination_ready',
   ]);
-  expect(clickToReady[0]).toMatchObject({
+  expect(clickToReady[0]?.payload).toMatchObject({
     source_route: 'chat',
     destination_route: 'library',
     input_method: 'pointer',
@@ -95,8 +161,11 @@ test('desktop navigation emits exactly one redacted activation-to-ready pair', a
     nav_variant: 'canonical_customer_ia_v1',
     consent_mode: 'explicit',
   });
-  expect(clickToReady[1]?.latency_bucket).not.toBe('na');
+  expect(clickToReady[0]?.librarySurfaceVisible).toBe(false);
+  expect(clickToReady[1]?.librarySurfaceVisible).toBe(true);
+  expect(clickToReady[1]?.payload.latency_bucket).not.toBe('na');
 
+  const payloads = observations.map(({ payload }) => payload);
   const serialized = JSON.stringify(payloads);
   for (const forbidden of [
     'pathname',
@@ -137,5 +206,12 @@ declare global {
 
   interface Window {
     __JOVIE_NAV_TELEMETRY_CLS__?: number;
+    __JOVIE_NAV_TELEMETRY_OBSERVATIONS__?: BrowserTelemetryObservation[];
+  }
+
+  interface BrowserTelemetryObservation {
+    readonly payload: NavigationTelemetryPayload;
+    readonly librarySurfaceVisible: boolean;
+    readonly sequence: number;
   }
 }

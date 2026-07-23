@@ -66,6 +66,12 @@ vi.mock('@/lib/rate-limit/config', () => ({
       requireRedis: true,
     },
     api: { name: 'API', limit: 100, window: '1 m', prefix: 'api_calls' },
+    navigationTelemetry: {
+      name: 'Navigation Telemetry',
+      limit: 600,
+      window: '1 m',
+      prefix: 'navigation_telemetry',
+    },
     onboarding: {
       name: 'Onboarding',
       limit: 3,
@@ -323,6 +329,7 @@ describe('limiters.ts', () => {
         'albumArtGeneration',
         'albumArtGenerationBurst',
         'api',
+        'navigationTelemetry',
         'onboarding',
         'handleCheck',
         'dashboardLinks',

@@ -6,17 +6,25 @@ const {
   mockRecord,
   mockGetBaseline,
   mockCaptureError,
+  mockRateLimit,
+  mockCreateRateLimitHeaders,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockRequireAdmin: vi.fn(),
   mockRecord: vi.fn(),
   mockGetBaseline: vi.fn(),
   mockCaptureError: vi.fn(),
+  mockRateLimit: vi.fn(),
+  mockCreateRateLimitHeaders: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mockGetCachedAuth }));
 vi.mock('@/lib/admin', () => ({ requireAdmin: mockRequireAdmin }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: mockCaptureError }));
+vi.mock('@/lib/rate-limit', () => ({
+  navigationTelemetryLimiter: { limit: mockRateLimit },
+  createRateLimitHeaders: mockCreateRateLimitHeaders,
+}));
 vi.mock('@/lib/analytics/navigation-telemetry.server', () => ({
   NavigationTelemetryStoreUnavailableError: class extends Error {},
   recordNavigationTelemetry: mockRecord,
@@ -56,11 +64,39 @@ describe('/api/analytics/navigation', () => {
     mockRecord.mockReset().mockResolvedValue({ status: 'accepted' });
     mockGetBaseline.mockReset();
     mockCaptureError.mockReset();
+    mockRateLimit.mockReset().mockResolvedValue({
+      success: true,
+      limit: 100,
+      remaining: 99,
+      reset: new Date('2026-07-22T12:01:00Z'),
+    });
+    mockCreateRateLimitHeaders.mockReset().mockReturnValue({
+      'X-RateLimit-Limit': '100',
+      'X-RateLimit-Remaining': '0',
+    });
   });
 
   it('rejects unauthenticated writes before parsing', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: null });
     expect((await POST(post(VALID_PAYLOAD))).status).toBe(401);
+    expect(mockRecord).not.toHaveBeenCalled();
+    expect(mockRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('rate limits authenticated writes by user before parsing', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'app-user-id' });
+    mockRateLimit.mockResolvedValue({
+      success: false,
+      limit: 100,
+      remaining: 0,
+      reset: new Date('2026-07-22T12:01:00Z'),
+    });
+
+    const response = await POST(post({ malformed: true }));
+
+    expect(response.status).toBe(429);
+    expect(mockRateLimit).toHaveBeenCalledExactlyOnceWith('app-user-id');
+    expect(response.headers.get('x-ratelimit-remaining')).toBe('0');
     expect(mockRecord).not.toHaveBeenCalled();
   });
 
@@ -73,9 +109,44 @@ describe('/api/analytics/navigation', () => {
     expect(mockRecord).not.toHaveBeenCalled();
   });
 
+  it('rejects impossible event-specific combinations', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'discarded-auth-id' });
+    expect(
+      (
+        await POST(
+          post({
+            ...VALID_PAYLOAD,
+            event: 'destination_ready',
+            latency_bucket: 'na',
+            success: true,
+          })
+        )
+      ).status
+    ).toBe(400);
+    expect(mockRecord).not.toHaveBeenCalled();
+  });
+
+  it('rejects an event id whose semantic suffix disagrees with the event', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'discarded-auth-id' });
+    expect(
+      (
+        await POST(
+          post({
+            ...VALID_PAYLOAD,
+            event: 'destination_ready',
+            latency_bucket: 'le_500ms',
+            success: true,
+          })
+        )
+      ).status
+    ).toBe(400);
+    expect(mockRecord).not.toHaveBeenCalled();
+  });
+
   it('discards authentication identity before the aggregate sink', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'discarded-auth-id' });
     expect((await POST(post(VALID_PAYLOAD))).status).toBe(204);
+    expect(mockRateLimit).toHaveBeenCalledExactlyOnceWith('discarded-auth-id');
     expect(mockRecord).toHaveBeenCalledExactlyOnceWith(VALID_PAYLOAD);
     expect(JSON.stringify(mockRecord.mock.calls)).not.toContain(
       'discarded-auth-id'

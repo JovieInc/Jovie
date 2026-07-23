@@ -27,6 +27,30 @@ const HEALTH_ACCEPTED_FIELD = 'health|accepted';
 const HEALTH_DUPLICATES_FIELD = 'health|duplicates';
 const HEALTH_UNKNOWN_ITEMS_FIELD = 'health|unknown_items';
 
+/**
+ * Dedupe claim and aggregate mutations execute as one Redis operation. If the
+ * HTTP response is lost after Redis commits, a retry observes the dedupe key
+ * and cannot increment the event aggregate twice.
+ */
+const RECORD_NAVIGATION_TELEMETRY_SCRIPT = `
+if redis.call('EXISTS', KEYS[1]) == 1 then
+  redis.call('HINCRBY', KEYS[2], ARGV[4], 1)
+  redis.call('HINCRBY', KEYS[2], ARGV[6], 1)
+  redis.call('EXPIRE', KEYS[2], ARGV[2])
+  return 0
+end
+
+redis.call('SET', KEYS[1], '1', 'EX', ARGV[1])
+redis.call('HINCRBY', KEYS[2], ARGV[3], 1)
+redis.call('HINCRBY', KEYS[2], ARGV[4], 1)
+redis.call('HINCRBY', KEYS[2], ARGV[5], 1)
+if ARGV[8] == '1' then
+  redis.call('HINCRBY', KEYS[2], ARGV[7], 1)
+end
+redis.call('EXPIRE', KEYS[2], ARGV[2])
+return 1
+`;
+
 export class NavigationTelemetryStoreUnavailableError extends Error {
   constructor() {
     super('Navigation telemetry aggregate store is unavailable');
@@ -174,28 +198,6 @@ function assertPipelineSucceeded(results: unknown[]): void {
   if (error instanceof Error) throw error;
 }
 
-async function incrementHealth(input: {
-  readonly key: string;
-  readonly duplicate: boolean;
-  readonly unknownItem: boolean;
-}): Promise<void> {
-  const redis = getRedis();
-  if (!redis) throw new NavigationTelemetryStoreUnavailableError();
-
-  const pipeline = redis.pipeline();
-  pipeline.hincrby(input.key, HEALTH_ATTEMPTS_FIELD, 1);
-  pipeline.hincrby(
-    input.key,
-    input.duplicate ? HEALTH_DUPLICATES_FIELD : HEALTH_ACCEPTED_FIELD,
-    1
-  );
-  if (input.unknownItem && !input.duplicate) {
-    pipeline.hincrby(input.key, HEALTH_UNKNOWN_ITEMS_FIELD, 1);
-  }
-  pipeline.expire(input.key, RETENTION_SECONDS);
-  assertPipelineSucceeded(await pipeline.exec());
-}
-
 /**
  * Aggregate-first write. No raw event row exists. The only transient key is a
  * SHA-256 prefix of the opaque event id, retained for retry deduplication.
@@ -210,32 +212,26 @@ export async function recordNavigationTelemetry(
   const key = dailyKey(recordedAt);
   const eventHash = await hashEventId(payload.event_id);
   const dedupeKey = `${KEY_PREFIX}:dedupe:${eventHash}`;
-  const dedupeResult = await redis.set(dedupeKey, '1', {
-    nx: true,
-    ex: NAVIGATION_TELEMETRY_DEDUP_TTL_SECONDS,
-  });
+  const result = await redis
+    .createScript<0 | 1>(RECORD_NAVIGATION_TELEMETRY_SCRIPT)
+    .eval(
+      [dedupeKey, key],
+      [
+        String(NAVIGATION_TELEMETRY_DEDUP_TTL_SECONDS),
+        String(RETENTION_SECONDS),
+        aggregateField(payload),
+        HEALTH_ATTEMPTS_FIELD,
+        HEALTH_ACCEPTED_FIELD,
+        HEALTH_DUPLICATES_FIELD,
+        HEALTH_UNKNOWN_ITEMS_FIELD,
+        payload.item_id === 'unknown' ? '1' : '0',
+      ]
+    );
 
-  if (dedupeResult !== 'OK') {
-    await incrementHealth({ key, duplicate: true, unknownItem: false });
-    return { status: 'duplicate' };
+  if (result !== 0 && result !== 1) {
+    throw new Error('Unexpected navigation telemetry aggregate result');
   }
-
-  try {
-    const pipeline = redis.pipeline();
-    pipeline.hincrby(key, aggregateField(payload), 1);
-    pipeline.hincrby(key, HEALTH_ATTEMPTS_FIELD, 1);
-    pipeline.hincrby(key, HEALTH_ACCEPTED_FIELD, 1);
-    if (payload.item_id === 'unknown') {
-      pipeline.hincrby(key, HEALTH_UNKNOWN_ITEMS_FIELD, 1);
-    }
-    pipeline.expire(key, RETENTION_SECONDS);
-    assertPipelineSucceeded(await pipeline.exec());
-    return { status: 'accepted' };
-  } catch (error) {
-    // Let the next keepalive retry reclaim the id when the aggregate failed.
-    await redis.del(dedupeKey).catch(() => undefined);
-    throw error;
-  }
+  return { status: result === 1 ? 'accepted' : 'duplicate' };
 }
 
 function parseCount(value: unknown): number {
@@ -268,7 +264,7 @@ function parseAggregateField(
 
   const candidate = {
     schema_version: NAVIGATION_TELEMETRY_SCHEMA_VERSION,
-    event_id: 'aggregate-field-parser',
+    event_id: `aggregate-field-parser:${event}`,
     event,
     item_id: itemId,
     source_route: sourceRoute,

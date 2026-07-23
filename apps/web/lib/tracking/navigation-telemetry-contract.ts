@@ -104,7 +104,86 @@ export const navigationTelemetryPayloadSchema = z
     latency_bucket: z.enum(NAVIGATION_LATENCY_BUCKETS),
     success: z.boolean(),
   })
-  .strict();
+  .strict()
+  .superRefine((payload, context) => {
+    const invalid = (
+      path: 'input_method' | 'latency_bucket' | 'success',
+      message: string
+    ) => {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [path],
+        message,
+      });
+    };
+
+    if (!payload.event_id.endsWith(`:${payload.event}`)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['event_id'],
+        message: 'Event id suffix must match the event type',
+      });
+    }
+
+    if (payload.event === 'impression') {
+      if (payload.input_method !== 'none') {
+        invalid('input_method', 'Impressions cannot have an input method');
+      }
+      if (payload.latency_bucket !== 'na') {
+        invalid('latency_bucket', 'Impressions cannot have latency');
+      }
+      if (!payload.success) {
+        invalid('success', 'Impressions must be successful');
+      }
+      if (payload.source_route !== payload.destination_route) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['destination_route'],
+          message: 'Impressions must remain within one route bucket',
+        });
+      }
+      return;
+    }
+
+    if (payload.input_method === 'none') {
+      invalid('input_method', `${payload.event} requires an input method`);
+    }
+    if (
+      payload.item_id !== 'unknown' &&
+      payload.item_id !== payload.destination_route
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['destination_route'],
+        message: `${payload.event} destination must match its navigation item`,
+      });
+    }
+
+    if (payload.event === 'activation') {
+      if (payload.latency_bucket !== 'na') {
+        invalid('latency_bucket', 'Activations cannot have latency');
+      }
+      if (payload.success) {
+        invalid('success', 'Activations cannot be marked successful');
+      }
+      return;
+    }
+
+    if (payload.latency_bucket === 'na') {
+      invalid('latency_bucket', `${payload.event} requires bounded latency`);
+    }
+
+    if (payload.event === 'destination_ready') {
+      if (!payload.success) {
+        invalid('success', 'Destination readiness must be successful');
+      }
+      return;
+    }
+
+    if (payload.success) {
+      invalid('success', `${payload.event} cannot be marked successful`);
+    }
+  });
 
 export type NavigationTelemetryPayload = z.infer<
   typeof navigationTelemetryPayloadSchema

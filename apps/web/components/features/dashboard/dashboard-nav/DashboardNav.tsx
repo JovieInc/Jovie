@@ -28,7 +28,6 @@ import { usePlanGate } from '@/lib/queries';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
-  completeNavigationTelemetry,
   type NavigationTelemetryContext,
   startNavigationTelemetry,
   trackNavigationImpressions,
@@ -212,20 +211,6 @@ export function DashboardNav(_: DashboardNavProps) {
       telemetryContext
     );
   }, [isDemo, isInSettings, isMobile, pathname, telemetryContext]);
-
-  useEffect(() => {
-    if (isDemo) return;
-    let secondFrame = 0;
-    const firstFrame = globalThis.requestAnimationFrame(() => {
-      secondFrame = globalThis.requestAnimationFrame(() => {
-        completeNavigationTelemetry(pathname);
-      });
-    });
-    return () => {
-      globalThis.cancelAnimationFrame(firstFrame);
-      if (secondFrame) globalThis.cancelAnimationFrame(secondFrame);
-    };
-  }, [isDemo, pathname]);
 
   const artistSettingsLabel = 'Artist';
 

@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
+import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -276,6 +277,7 @@ export function OpportunityInboxPageClient({
       className='system-b-opportunity-inbox-page'
       data-testid='opportunity-inbox-page'
     >
+      <NavigationDestinationReady destination='inbox' />
       <HomeRightPanelHost />
       <header className='system-b-opportunity-inbox-page-header'>
         {/* ui-casing-allow: design-locked inbox copy */}

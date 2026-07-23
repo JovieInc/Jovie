@@ -16,7 +16,7 @@ vi.mock('@/lib/tracking/json-beacon', () => ({
 }));
 
 import {
-  completeNavigationTelemetry,
+  markNavigationDestinationReady,
   NAVIGATION_DROP_OFF_MS,
   navigationInputMethodFromClick,
   resetNavigationTelemetryForTests,
@@ -84,8 +84,9 @@ describe('navigation telemetry client', () => {
       context: CONTEXT,
       startedAt: 100,
     });
-    const ready = completeNavigationTelemetry('/app/library?view=all', 460);
-    const duplicateReady = completeNavigationTelemetry('/app/library', 500);
+    const wrongDestination = markNavigationDestinationReady('contacts', 450);
+    const ready = markNavigationDestinationReady('library', 460);
+    const duplicateReady = markNavigationDestinationReady('library', 500);
 
     expect(activation).toMatchObject({
       event: 'activation',
@@ -98,6 +99,7 @@ describe('navigation telemetry client', () => {
       latency_bucket: 'le_500ms',
       success: true,
     });
+    expect(wrongDestination).toBeNull();
     expect(duplicateReady).toBeNull();
     expect(mockPostJsonBeacon).toHaveBeenCalledTimes(2);
     expect(mockPostJsonBeacon).toHaveBeenNthCalledWith(
@@ -118,6 +120,20 @@ describe('navigation telemetry client', () => {
     expect(
       trackNavigationImpressions(['inbox'], '/app', CONTEXT, 1100)
     ).toHaveLength(1);
+  });
+
+  it('does not start telemetry for an already-active destination', () => {
+    expect(
+      startNavigationTelemetry({
+        itemId: 'library',
+        sourcePathname: '/app/library?view=grid',
+        destinationHref: '/app/library/',
+        inputMethod: 'pointer',
+        context: CONTEXT,
+        startedAt: 100,
+      })
+    ).toBeNull();
+    expect(mockPostJsonBeacon).not.toHaveBeenCalled();
   });
 
   it('records one bounded drop-off when destination ready never arrives', () => {
@@ -151,7 +167,7 @@ describe('navigation telemetry client', () => {
       context: CONTEXT,
       startedAt: 100,
     });
-    completeNavigationTelemetry('/app/library', 400);
+    markNavigationDestinationReady('library', 400);
 
     startNavigationTelemetry({
       itemId: 'chat',

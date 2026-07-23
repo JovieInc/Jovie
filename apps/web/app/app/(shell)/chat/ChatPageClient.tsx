@@ -27,6 +27,7 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
+import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import {
@@ -911,6 +912,7 @@ export function ChatPageClient({
         }
       >
         <ChatWorkspaceSurface>
+          <NavigationDestinationReady destination='chat' />
           <WelcomeChatBootstrapAnnouncer state={welcomeChatBootstrapState} />
           <JovieChat
             profileId={activeProfile.id}

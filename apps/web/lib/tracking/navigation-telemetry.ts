@@ -10,6 +10,7 @@ import {
   type NavigationInputMethod,
   type NavigationItemId,
   type NavigationPlatform,
+  type NavigationRouteBucket,
   type NavigationTelemetryEvent,
   type NavigationTelemetryPayload,
   type NavigationVariant,
@@ -132,6 +133,11 @@ export function navigationInputMethodFromClick(detail: number) {
   return detail === 0 ? 'keyboard' : 'pointer';
 }
 
+function canonicalNavigationPath(value: string): string {
+  const path = value.split(/[?#]/, 1)[0] || '/';
+  return path === '/' ? path : path.replace(/\/+$/, '');
+}
+
 /**
  * Records visible nav items, with a one-second duplicate guard for React
  * strict-mode effect replay. A later real revisit remains countable.
@@ -196,6 +202,13 @@ export function startNavigationTelemetry(input: {
   readonly context: NavigationTelemetryContext;
   readonly startedAt?: number;
 }): NavigationTelemetryPayload | null {
+  if (
+    canonicalNavigationPath(input.sourcePathname) ===
+    canonicalNavigationPath(input.destinationHref)
+  ) {
+    return null;
+  }
+
   const startedAt = input.startedAt ?? nowMs();
   const itemId = allowlistNavigationItemId(input.itemId);
   const sourceRoute = bucketNavigationRoute(input.sourcePathname);
@@ -261,16 +274,16 @@ export function startNavigationTelemetry(input: {
   return activation;
 }
 
-/** Called after the destination pathname commits and two animation frames paint. */
-export function completeNavigationTelemetry(
-  pathname: string,
+/**
+ * Called only by the destination surface after its own data and usable UI are
+ * ready. A route commit alone is deliberately insufficient.
+ */
+export function markNavigationDestinationReady(
+  destinationRoute: NavigationRouteBucket,
   readyAt = nowMs()
 ): NavigationTelemetryPayload | null {
   const navigation = pendingNavigation;
-  if (
-    !navigation ||
-    bucketNavigationRoute(pathname) !== navigation.destinationRoute
-  ) {
+  if (!navigation || destinationRoute !== navigation.destinationRoute) {
     return null;
   }
 

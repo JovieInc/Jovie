@@ -28,7 +28,6 @@ export const mockOpenPreviewPanel = vi.fn();
 export const mockTogglePreviewPanel = vi.fn();
 export const mockStartNavigationTelemetry = vi.fn();
 export const mockTrackNavigationImpressions = vi.fn();
-export const mockCompleteNavigationTelemetry = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
@@ -97,8 +96,6 @@ vi.mock('@/lib/tracking/navigation-telemetry', () => ({
     mockStartNavigationTelemetry(...args),
   trackNavigationImpressions: (...args: unknown[]) =>
     mockTrackNavigationImpressions(...args),
-  completeNavigationTelemetry: (...args: unknown[]) =>
-    mockCompleteNavigationTelemetry(...args),
 }));
 
 vi.mock('@/hooks/useClipboard', () => ({
@@ -195,7 +192,6 @@ export function resetDashboardNavTestMocks() {
   mockTogglePreviewPanel.mockReset();
   mockStartNavigationTelemetry.mockReset();
   mockTrackNavigationImpressions.mockReset();
-  mockCompleteNavigationTelemetry.mockReset();
 }
 
 export function renderDashboardNav({

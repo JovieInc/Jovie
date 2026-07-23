@@ -101,6 +101,12 @@
 | `/api/audience/visit` | POST | `public` | Track profile visit |
 | `/s/[code]` | GET | `public` | Track source link or QR scan and redirect |
 
+### Analytics
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/analytics/navigation` | POST, GET | `auth` (POST), `admin` (GET) | Rate-limited, aggregate-only app navigation telemetry writes; privacy-suppressed admin baseline reads |
+
 ### Billing
 
 | Route | Methods | Auth | Description |

@@ -1,8 +1,20 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 
+const { mockMarkNavigationDestinationReady } = vi.hoisted(() => ({
+  mockMarkNavigationDestinationReady: vi.fn(),
+}));
+
+vi.mock('@/lib/tracking/navigation-telemetry', () => ({
+  markNavigationDestinationReady: mockMarkNavigationDestinationReady,
+}));
+
 describe('SettingsSection', () => {
+  beforeEach(() => {
+    mockMarkNavigationDestinationReady.mockReset();
+  });
+
   it('renders the heading and description', () => {
     render(
       <SettingsSection
@@ -19,5 +31,8 @@ describe('SettingsSection', () => {
     expect(
       screen.getByText('Photo, display name, and username.')
     ).toBeInTheDocument();
+    expect(mockMarkNavigationDestinationReady).toHaveBeenCalledExactlyOnceWith(
+      'settings'
+    );
   });
 });

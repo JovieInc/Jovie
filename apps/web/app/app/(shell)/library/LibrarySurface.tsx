@@ -59,6 +59,7 @@ import {
   useState,
 } from 'react';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
+import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
@@ -1753,6 +1754,7 @@ function EmptyCatalog() {
       contentPadding='none'
       data-testid='library-surface'
     >
+      <NavigationDestinationReady destination='library' />
       <TableEmptyState
         icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
         title='No Library Items'
@@ -2872,6 +2874,7 @@ export function LibrarySurface({
         />
       }
     >
+      <NavigationDestinationReady destination='library' />
       <div
         data-testid='library-content-frame'
         className='grid h-full min-h-0 flex-1 overflow-hidden'

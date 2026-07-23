@@ -94,6 +94,7 @@ export {
   isrcRescanLimiter,
   merchCheckoutLimiter,
   musicBrainzLookupLimiter,
+  navigationTelemetryLimiter,
   onboardingLimiter,
   paymentIntentLimiter,
   publicClickLimiter,

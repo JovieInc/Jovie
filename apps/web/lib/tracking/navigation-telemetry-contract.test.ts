@@ -71,6 +71,58 @@ describe('navigation telemetry contract', () => {
     ).toBe(false);
   });
 
+  it('rejects impossible event-specific field combinations', () => {
+    const impossible = [
+      { ...VALID_PAYLOAD, input_method: 'none' },
+      { ...VALID_PAYLOAD, latency_bucket: 'le_100ms' },
+      { ...VALID_PAYLOAD, success: true },
+      { ...VALID_PAYLOAD, destination_route: 'contacts' },
+      {
+        ...VALID_PAYLOAD,
+        event: 'destination_ready',
+        latency_bucket: 'le_500ms',
+        success: true,
+      },
+      {
+        ...VALID_PAYLOAD,
+        event: 'impression',
+        input_method: 'none',
+        source_route: 'chat',
+        destination_route: 'library',
+        success: true,
+      },
+      {
+        ...VALID_PAYLOAD,
+        event: 'destination_ready',
+        latency_bucket: 'na',
+        success: true,
+      },
+      {
+        ...VALID_PAYLOAD,
+        event: 'drop_off',
+        latency_bucket: 'le_10s',
+        success: true,
+      },
+    ] as const;
+
+    for (const payload of impossible) {
+      expect(
+        navigationTelemetryPayloadSchema.safeParse(payload).success,
+        JSON.stringify(payload)
+      ).toBe(false);
+    }
+
+    expect(
+      navigationTelemetryPayloadSchema.safeParse({
+        ...VALID_PAYLOAD,
+        event_id: 'navigation-1234567890:destination_ready',
+        event: 'destination_ready',
+        latency_bucket: 'le_500ms',
+        success: true,
+      }).success
+    ).toBe(true);
+  });
+
   it('rejects every raw or identifying field instead of silently stripping it', () => {
     for (const forbidden of [
       'pathname',
