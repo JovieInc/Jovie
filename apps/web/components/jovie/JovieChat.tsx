@@ -724,6 +724,7 @@ export function JovieChat({
         <div className='relative flex flex-1 flex-col overflow-hidden'>
           <div
             ref={scrollContainerRef}
+            data-testid='chat-message-scroll'
             className={cn(
               'absolute inset-0 overflow-y-auto px-4 py-5 sm:px-5',
               !showThreadView && 'flex flex-col',
