@@ -1098,7 +1098,7 @@ export function ProfileContactSidebar() {
       <EntitySidebarShell
         isOpen={isOpen}
         ariaLabel='Profile Contact'
-        data-testid='profile-contact-sidebar'
+        data-testid='profile-contact-sidebar-skeleton'
         headerMode='minimal'
         hideMinimalHeaderBar
         contentBleed

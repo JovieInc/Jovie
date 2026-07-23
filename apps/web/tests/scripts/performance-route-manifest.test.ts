@@ -138,11 +138,11 @@ describe('performance route manifest shell slice coverage', () => {
     expect(getPrimaryTimingMetricName(route)).toBe(expectation.primaryMetric);
     expectBudgetCoverage(route);
 
-    if (expectation.navTrigger) {
+    if ('navTrigger' in expectation) {
       expect(route.readySelectors.navTrigger).toContain(expectation.navTrigger);
     }
 
-    if (expectation.resolvesDynamicPath) {
+    if ('resolvesDynamicPath' in expectation) {
       expect(route.resolvePath).toEqual(expect.any(Function));
     }
   });
@@ -155,5 +155,16 @@ describe('performance route manifest shell slice coverage', () => {
       const route = requireRoute(routeId);
       expect(getRouteResourceBudgets(route)).toEqual(releaseResourceBudgets);
     }
+  });
+
+  it('uses real profile-rail content rather than its skeleton as readiness', () => {
+    const profileRail = requireRoute('creator-profile-rail');
+
+    expect(profileRail.readySelectors.content).toEqual([
+      '[data-testid="profile-contact-sidebar"]',
+    ]);
+    expect(profileRail.readySelectors.content).not.toContain(
+      '[data-testid="profile-contact-sidebar-skeleton"]'
+    );
   });
 });

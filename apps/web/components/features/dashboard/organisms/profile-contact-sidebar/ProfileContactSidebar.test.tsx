@@ -67,6 +67,7 @@ const mockState = vi.hoisted(() => ({
   removeCalls: [] as DeferredMutationCall[],
   useRealProfileMutation: false,
   selectedProfileId: 'profile-1',
+  previewReady: true,
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -92,11 +93,17 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', async () => {
   return {
     usePreviewPanelState: () => ({ isOpen: true, close: vi.fn() }),
     usePreviewPanelData: () => {
-      const [previewData, setPreviewData] = React.useState(() => ({
-        ...mockState.initialPreviewData,
-        genres: [...mockState.initialPreviewData.genres],
-        links: mockState.initialPreviewData.links.map(link => ({ ...link })),
-      }));
+      const [previewData, setPreviewData] = React.useState(() =>
+        mockState.previewReady
+          ? {
+              ...mockState.initialPreviewData,
+              genres: [...mockState.initialPreviewData.genres],
+              links: mockState.initialPreviewData.links.map(link => ({
+                ...link,
+              })),
+            }
+          : null
+      );
       return { previewData, setPreviewData };
     },
   };
@@ -400,6 +407,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     mockState.toastError.mockReset();
     mockState.useRealProfileMutation = false;
     mockState.selectedProfileId = 'profile-1';
+    mockState.previewReady = true;
     vi.unstubAllGlobals();
   });
 
@@ -407,6 +415,26 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     renderEditingSidebar();
 
     expect(screen.getByTestId('profile-contact-sidebar')).toBeInTheDocument();
+  });
+
+  it('does not expose content readiness while the profile rail is a skeleton', () => {
+    mockState.previewReady = false;
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ProfileContactSidebar />
+      </QueryClientProvider>
+    );
+
+    expect(
+      screen.getByTestId('profile-contact-sidebar-skeleton')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('profile-contact-sidebar')).toBeNull();
   });
 
   it('paints a deferred bio save immediately and exposes a stable live status slot', async () => {
