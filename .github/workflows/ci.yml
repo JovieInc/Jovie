@@ -88,7 +88,7 @@ jobs:
           echo "sha256=$context_sha" >> "$GITHUB_OUTPUT"
 
       - name: Expose GitHub Actions cache runtime to BuildKit
-        uses: crazy-max/ghaction-github-runtime@3cb05d89e1f492524af3d41a1c98c83bc3025124 # v3
+        uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
 
       - name: Build twice and prove the dependency layer is cached
         shell: bash
