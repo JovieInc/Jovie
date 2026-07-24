@@ -18,6 +18,7 @@ const config: StorybookConfig = {
     '@storybook/addon-a11y',
     '@storybook/addon-vitest',
     '@chromatic-com/storybook',
+    '@storybook/addon-mcp'
   ],
   framework: {
     name: '@storybook/nextjs-vite',
@@ -257,30 +258,21 @@ const config: StorybookConfig = {
           find: '@jovie/ui',
           replacement: path.resolve(__dirname, '../../../packages/ui'),
         },
-        // Force real React packages. Next's compiled react
-        // (next/dist/compiled/react) is CJS-without-default-export and breaks
-        // the Storybook preview ESM graph ("does not provide an export named
-        // 'default'"), leaving the iframe spinner forever.
-        {
-          find: /^react$/,
-          replacement: require.resolve('react'),
-        },
-        {
-          find: /^react-dom$/,
-          replacement: require.resolve('react-dom'),
-        },
-        {
-          find: /^react\/jsx-runtime$/,
-          replacement: require.resolve('react/jsx-runtime'),
-        },
-        {
-          find: /^react\/jsx-dev-runtime$/,
-          replacement: require.resolve('react/jsx-dev-runtime'),
-        },
+        // Keep React as bare package IDs (not absolute CJS paths). Absolute
+        // require.resolve('react') forces Vite to serve raw /@fs CJS without
+        // default-export interop, which breaks browser-mode story tests
+        // ("does not provide an export named 'default'"). Bare IDs let
+        // optimizeDeps prebundle + interop correctly. next/dist/compiled/react
+        // is rewritten to bare 'react' below.
         { find: '@', replacement: path.resolve(__dirname, '..') },
         ...normalizedAlias,
       ],
-      dedupe: ['react', 'react-dom'],
+      dedupe: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
+      ],
     };
 
     // Storybook 10 + modern packages need a current esbuild target.
@@ -299,40 +291,76 @@ const config: StorybookConfig = {
       ...config.optimizeDeps,
       exclude: [...(config.optimizeDeps?.exclude || []), '@clerk/elements'],
       holdUntilCrawlEnd: false,
+      // React 19 CJS entries need default-export interop in the browser ESM graph.
+      needsInterop: [
+        ...new Set([
+          ...(config.optimizeDeps?.needsInterop || []),
+          'react',
+          'react-dom',
+          'react-dom/client',
+        ]),
+      ],
+      include: [
+        ...new Set([
+          ...(config.optimizeDeps?.include || []),
+          'react',
+          'react-dom',
+          'react/jsx-runtime',
+          'react/jsx-dev-runtime',
+          'react-dom/client',
+        ]),
+      ],
       esbuildOptions: {
         ...(config.optimizeDeps?.esbuildOptions || {}),
         target: 'esnext',
       },
     };
 
-    // Absolute-path imports of next/dist/compiled/react bypass resolve.alias.
-    // Intercept them in resolveId so the preview gets real React ESM.
-    const reactPkg = require.resolve('react');
-    const reactDomPkg = require.resolve('react-dom');
-    const jsxRuntime = require.resolve('react/jsx-runtime');
-    const jsxDevRuntime = require.resolve('react/jsx-dev-runtime');
+    // Absolute-path imports of next/dist/compiled/react bypass package resolution.
+    // Re-resolve through Vite so optimizeDeps + needsInterop still apply.
+    // Do NOT return bare 'react' (already-resolved) or absolute CJS paths
+    // (raw /@fs without default-export interop).
     const rewriteNextReactPlugin = {
       name: 'jovie-storybook-rewrite-next-react',
       enforce: 'pre' as const,
-      resolveId(source: string) {
+      async resolveId(
+        this: {
+          resolve: (
+            source: string,
+            importer: string | undefined,
+            options: { skipSelf?: boolean }
+          ) => Promise<{ id: string } | null>;
+        },
+        source: string,
+        importer: string | undefined
+      ) {
         const normalized = source.replace(/\\/g, '/');
+        if (!normalized.includes('next/dist/compiled/react')) {
+          return null;
+        }
+
+        let bare: string | null = null;
         if (normalized.includes('next/dist/compiled/react-dom')) {
-          return reactDomPkg;
-        }
-        if (normalized.includes('next/dist/compiled/react/jsx-dev-runtime')) {
-          return jsxDevRuntime;
-        }
-        if (normalized.includes('next/dist/compiled/react/jsx-runtime')) {
-          return jsxRuntime;
-        }
-        if (
+          bare = 'react-dom';
+        } else if (
+          normalized.includes('next/dist/compiled/react/jsx-dev-runtime')
+        ) {
+          bare = 'react/jsx-dev-runtime';
+        } else if (
+          normalized.includes('next/dist/compiled/react/jsx-runtime')
+        ) {
+          bare = 'react/jsx-runtime';
+        } else if (
           normalized.includes('next/dist/compiled/react/index.js') ||
           normalized.endsWith('next/dist/compiled/react') ||
           normalized.includes('next/dist/compiled/react.js')
         ) {
-          return reactPkg;
+          bare = 'react';
         }
-        return null;
+
+        if (!bare) return null;
+
+        return this.resolve(bare, importer, { skipSelf: true });
       },
     };
 

@@ -13,7 +13,7 @@ export const Default: Story = {
   render: () => (
     <button
       type='button'
-      className={closeButtonClassName.join(' ')}
+      className={closeButtonClassName}
       aria-label='Close'
     >
       <CloseButtonIcon />
@@ -25,7 +25,7 @@ export const Disabled: Story = {
   render: () => (
     <button
       type='button'
-      className={closeButtonClassName.join(' ')}
+      className={closeButtonClassName}
       disabled
       aria-label='Close'
     >

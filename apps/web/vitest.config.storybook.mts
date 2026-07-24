@@ -2,12 +2,58 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Next's compiled React (next/dist/compiled/react*) is CJS without a default
+ * export. Rewrite those ids by re-resolving the real package name so Vite keeps
+ * the id on the package graph and can apply optimizeDeps + needsInterop.
+ *
+ * Critical: do NOT return a bare string 'react' (already-resolved, breaks load)
+ * and do NOT return require.resolve('react') absolute paths (served as raw
+ * /@fs CJS without default-export interop). Always use this.resolve().
+ */
+function rewriteNextCompiledReactPlugin(): Plugin {
+  return {
+    name: 'jovie-vitest-storybook-rewrite-next-react',
+    enforce: 'pre',
+    async resolveId(source, importer, options) {
+      const normalized = source.replace(/\\/g, '/');
+      if (!normalized.includes('next/dist/compiled/react')) {
+        return null;
+      }
+
+      let bare: string | null = null;
+      if (normalized.includes('next/dist/compiled/react-dom')) {
+        bare = 'react-dom';
+      } else if (normalized.includes('next/dist/compiled/react/jsx-dev-runtime')) {
+        bare = 'react/jsx-dev-runtime';
+      } else if (normalized.includes('next/dist/compiled/react/jsx-runtime')) {
+        bare = 'react/jsx-runtime';
+      } else if (
+        normalized.includes('next/dist/compiled/react/index.js') ||
+        normalized.endsWith('next/dist/compiled/react') ||
+        normalized.includes('next/dist/compiled/react.js')
+      ) {
+        bare = 'react';
+      }
+
+      if (!bare) return null;
+
+      return this.resolve(bare, importer, {
+        ...options,
+        skipSelf: true,
+      });
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
+    rewriteNextCompiledReactPlugin(),
     storybookTest({
       configDir: path.join(dirname, '.storybook'),
       tags: {
@@ -28,6 +74,20 @@ export default defineConfig({
     // (Storybook's internal React 18 compat chunk occasionally fails to load)
     retry: process.env.CI ? 3 : 0,
     fileParallelism: false,
+    deps: {
+      optimizer: {
+        web: {
+          enabled: true,
+          include: [
+            'react',
+            'react-dom',
+            'react/jsx-runtime',
+            'react/jsx-dev-runtime',
+            'react-dom/client',
+          ],
+        },
+      },
+    },
   },
   esbuild: {
     target: 'esnext',
@@ -49,6 +109,10 @@ export default defineConfig({
   optimizeDeps: {
     // Default Vite browser target (chrome87) cannot esbuild-prebundle modern ESM
     // (destructuring, etc.) pulled in transitively by Storybook stories.
+    holdUntilCrawlEnd: false,
+    // React 19 entrypoints are CJS. needsInterop forces the default-export
+    // shim that browser-mode ESM imports require.
+    needsInterop: ['react', 'react-dom', 'react-dom/client'],
     esbuildOptions: {
       target: 'esnext',
     },
