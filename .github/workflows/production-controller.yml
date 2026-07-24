@@ -39,7 +39,7 @@ jobs:
       already_verified: ${{ steps.authorize.outputs.already_verified }}
       marker_recovery: ${{ steps.authorize.outputs.marker_recovery }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
@@ -61,6 +61,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # Retry helper for idempotent GET calls — transient GitHub API blips
+          # should never block production deployment.
+          __gh_get() {
+            local url="$1" jq_filter="$2" max_tries=3 delay=2 result
+            for ((try=1; try<=max_tries; try++)); do
+              result="$(gh api "$url" --jq "$jq_filter" 2>/dev/null)" && {
+                echo "$result"
+                return 0
+              }
+              if [ "$try" -lt "$max_tries" ]; then
+                echo "::warning::gh api $url failed (attempt $try/$max_tries), retrying in ${delay}s..."
+                sleep "$delay"
+                delay=$((delay * 2))
+              fi
+            done
+            echo "::error::gh api $url failed after $max_tries attempts." >&2
+            return 1
+          }
+
           {
             echo "authorized=false"
             echo "is_current=false"
@@ -102,7 +122,7 @@ jobs:
             exit 1
           fi
 
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          current_main_sha="$(__gh_get "repos/$REPOSITORY/commits/main" '.sha // empty')"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact current main while authorizing production."
             exit 1
@@ -248,7 +268,7 @@ jobs:
               exit 1
             fi
 
-            final_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+            final_main_sha="$(__gh_get "repos/$REPOSITORY/commits/main" '.sha // empty')"
             [[ "$final_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
               echo "::error::Could not resolve exact main at the production authorization boundary."
               exit 1
@@ -311,7 +331,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           fetch-depth: 1
@@ -376,7 +396,7 @@ jobs:
       auth_smoke_status: ${{ steps.auth-result.outputs.auth_smoke_status || steps.check-creds.outputs.auth_smoke_status }}
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           fetch-depth: 1
@@ -471,7 +491,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           persist-credentials: false
@@ -587,7 +607,7 @@ jobs:
             echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.current.outputs.is_current == 'true'
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}

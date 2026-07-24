@@ -30,7 +30,7 @@ describe('Separator', () => {
     it('renders horizontal by default', () => {
       render(<Separator data-testid='separator' />);
       const separator = screen.getByTestId('separator');
-      expect(separator.className).toContain('h-[1px]');
+      expect(separator.className).toContain('h-px');
       expect(separator.className).toContain('w-full');
     });
 
@@ -38,7 +38,7 @@ describe('Separator', () => {
       render(<Separator orientation='vertical' data-testid='separator' />);
       const separator = screen.getByTestId('separator');
       expect(separator.className).toContain('h-full');
-      expect(separator.className).toContain('w-[1px]');
+      expect(separator.className).toContain('w-px');
     });
 
     it('sets aria-orientation when not decorative', () => {

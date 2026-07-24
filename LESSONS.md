@@ -5,6 +5,16 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ---
 
+## Design system
+
+### Void stories and off-system chrome must not ship
+
+**Mistake:** Storybook/Chromatic "coverage" stories staged bare atoms on pure black or gray-900 void tiles, hand-rolled `bg-blue-600` CTAs, or design-studio leftovers that looked like product UI. Agents then copied that chrome into shipping surfaces, bypassing `@jovie/ui` and System B tokens while still going green on a11y/visual gates.
+
+**Rule:** One design system (System B), two languages (product + marketing editorial). Prefer `@jovie/ui` atoms first; app molecules only when product-specific (`PaySelector`, etc.). Forbidden: System A / `.linear-marketing` for new work, design-studio leftovers as product UI, hand-rolled buttons when package atoms exist, void Storybook atoms, demo/exp routes as templates. Guard: `scripts/storybook-story-quality-guard.mjs`. Map: `docs/design/COMPONENT_MAP.md`. Spec: root `DESIGN.md` TARGET vs STATE tables.
+
+---
+
 ## DSP / Provider Keys
 
 ### YouTube vs YouTube Music are distinct ProviderKeys

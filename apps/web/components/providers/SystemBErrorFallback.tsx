@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import {
   JOVIE_ICON_PATH,
   JOVIE_ICON_VIEW_BOX,
@@ -28,6 +27,16 @@ interface SystemBErrorFallbackProps {
   readonly role?: 'alert';
   readonly ariaLive?: 'assertive' | 'polite';
   readonly className?: string;
+}
+
+function actionClassName(
+  variant: SystemBErrorFallbackAction['variant'] = 'primary'
+): string {
+  return [
+    'system-b-error-fallback__action',
+    `system-b-error-fallback__action--${variant}`,
+    'focus-ring-transparent-offset',
+  ].join(' ');
 }
 
 function rootClassName(className: string | undefined): string {
@@ -68,33 +77,22 @@ export function SystemBErrorFallback({
                 <a
                   key={`${action.type}-${action.label}`}
                   href={action.href}
-                  className='system-b-error-fallback__action-link'
+                  className={actionClassName(action.variant)}
                 >
-                  <Button
-                    type='button'
-                    variant={
-                      action.variant === 'secondary' ? 'secondary' : 'primary'
-                    }
-                    size='sm'
-                  >
-                    {action.label}
-                  </Button>
+                  {action.label}
                 </a>
               );
             }
 
             return (
-              <Button
+              <button
                 key={`${action.type}-${action.label}`}
                 type='button'
-                variant={
-                  action.variant === 'secondary' ? 'secondary' : 'primary'
-                }
-                size='sm'
                 onClick={action.onClick}
+                className={actionClassName(action.variant)}
               >
                 {action.label || 'Action'}
-              </Button>
+              </button>
             );
           })}
         </div>

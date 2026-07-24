@@ -86,8 +86,10 @@ export const AppShellFrame = memo(function AppShellFrame({
             // `isolate` gives <main> its own stacking context so the negative-z
             // chat ambient layer below paints above main's background but
             // beneath the in-flow header/content (#13386).
-            'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--color-bg-surface-0)/90',
-            'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
+            'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
+            isShellChatV1
+              ? 'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
+              : 'lg:border-l lg:border-subtle'
           )}
         >
           {/* Full-bleed ambient wash on chat routes — spans the whole content

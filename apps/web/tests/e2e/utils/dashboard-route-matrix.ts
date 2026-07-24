@@ -608,8 +608,6 @@ export const EXCLUDED_ROUTES: Record<string, string> = {
   '/:username/:slug/sounds': 'Release sounds (dynamic)',
   '/:username/:slug/:trackSlug': 'Track page (dynamic)',
   '/:username/...slug': 'Catch-all profile route',
-  '/dev/*': 'Developer utilities',
-  '/exp/*': 'Experimental/concept pages',
 };
 
 const fastHealthPaths = new Set([
