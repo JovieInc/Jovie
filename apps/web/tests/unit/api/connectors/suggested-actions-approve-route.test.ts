@@ -180,7 +180,11 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
   it('approves via CAS with the exact update/where/returning shape and enqueues the workflow', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
     mockDbUpdateReturning.mockResolvedValueOnce([
-      { id: ACTION_ID, payload: BOOKING_PAYLOAD, kind: 'calendar_booking' },
+      {
+        id: ACTION_ID,
+        payload: BOOKING_PAYLOAD,
+        kind: 'calendar.create_event',
+      },
     ]);
     mockEnqueueApprovedActionWorkflow.mockResolvedValueOnce('enqueued');
     mockRecordInboxDecision.mockResolvedValueOnce({ id: 'feedback-1' });
@@ -189,7 +193,12 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toEqual({ ok: true, approvalId: ACTION_ID });
+    expect(body).toEqual({
+      ok: true,
+      approvalId: ACTION_ID,
+      kind: 'calendar.create_event',
+      enqueueResult: 'enqueued',
+    });
     expect(response.headers.get('Cache-Control')).toBe('no-store');
 
     // Exact CAS update shape: status transition + WHERE(id, userId, status='pending')
@@ -223,7 +232,7 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
       suggestedActionId: ACTION_ID,
       userId: USER_ID,
       verdict: 'approved',
-      cardKind: 'calendar_booking',
+      cardKind: 'calendar.create_event',
       surface: 'opportunity-inbox',
     });
 
@@ -231,20 +240,89 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
     expect(mockRecoverOrphanedApprovedAction).not.toHaveBeenCalled();
   });
 
+  it('skips calendar enqueue for non-calendar kinds', async () => {
+    mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
+    mockDbUpdateReturning.mockResolvedValueOnce([
+      { id: ACTION_ID, payload: { title: 'Other' }, kind: 'merch.create_drop' },
+    ]);
+
+    const response = await POST(makeRequest(), makeParams(ACTION_ID));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      ok: true,
+      approvalId: ACTION_ID,
+      kind: 'merch.create_drop',
+      enqueueResult: 'skipped',
+    });
+    expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
+    expect(mockRecordInboxDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ cardKind: 'merch.create_drop' })
+    );
+  });
+
+  it('drafts an authority page on approve without calendar enqueue or auto-publish', async () => {
+    mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
+    mockDbUpdateReturning
+      .mockResolvedValueOnce([
+        {
+          id: ACTION_ID,
+          kind: 'authority.create_page',
+          payload: {
+            platform: 'fandom',
+            artistName: 'Tim White',
+            graphContext: {
+              artistName: 'Tim White',
+              collabs: [
+                {
+                  name: 'Cosmic Gate',
+                  unlinkedMention: true,
+                  sourceUrl: 'https://edm.fandom.com/wiki/Cosmic_Gate',
+                },
+              ],
+            },
+          },
+        },
+      ])
+      // Second update: approved → executed with draft in executionResult
+      .mockResolvedValueOnce([{ id: ACTION_ID }]);
+
+    const response = await POST(makeRequest(), makeParams(ACTION_ID));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.kind).toBe('authority.create_page');
+    expect(body.published).toBe(false);
+    expect(body.humanGateRequired).toBe(false);
+    expect(body.draft.platform).toBe('fandom');
+    expect(body.draft.bodyMarkdown).toContain('Tim White');
+    expect(body.draft.bodyMarkdown).toContain('Cosmic Gate');
+    expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
+    expect(mockDbUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'executed',
+        executionResult: expect.objectContaining({
+          kind: 'authority.create_page',
+          published: false,
+        }),
+      })
+    );
+  });
+
   it('falls back to null cardKind when the CAS row has no kind', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
     mockDbUpdateReturning.mockResolvedValueOnce([
       { id: ACTION_ID, payload: null, kind: null },
     ]);
-    mockEnqueueApprovedActionWorkflow.mockResolvedValueOnce('enqueued');
 
-    await POST(makeRequest(), makeParams(ACTION_ID));
+    const response = await POST(makeRequest(), makeParams(ACTION_ID));
+    const body = await response.json();
 
-    expect(mockEnqueueApprovedActionWorkflow).toHaveBeenCalledWith({
-      userId: USER_ID,
-      approvalId: ACTION_ID,
-      eventPayload: null,
-    });
+    expect(response.status).toBe(200);
+    expect(body.enqueueResult).toBe('skipped');
+    expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
     expect(mockRecordInboxDecision).toHaveBeenCalledWith(
       expect.objectContaining({ cardKind: null })
     );
@@ -321,7 +399,11 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
   it('fails closed with 500 when the workflow enqueue throws after CAS already committed', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
     mockDbUpdateReturning.mockResolvedValueOnce([
-      { id: ACTION_ID, payload: BOOKING_PAYLOAD, kind: 'calendar_booking' },
+      {
+        id: ACTION_ID,
+        payload: BOOKING_PAYLOAD,
+        kind: 'calendar.create_event',
+      },
     ]);
     const enqueueError = new Error('workflow_runs insert failed');
     mockEnqueueApprovedActionWorkflow.mockRejectedValueOnce(enqueueError);
