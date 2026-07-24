@@ -58,7 +58,7 @@ export function DesktopTitlebar() {
               aria-label={sidebarToggleLabel}
               data-testid='electron-sidebar-toggle'
               className={cn(
-                'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-secondary-token',
+                'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tertiary-token',
                 'transition-colors duration-subtle',
                 'hover:bg-white/[0.06] hover:text-primary-token',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
