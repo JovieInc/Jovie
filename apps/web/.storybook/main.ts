@@ -257,23 +257,128 @@ const config: StorybookConfig = {
           find: '@jovie/ui',
           replacement: path.resolve(__dirname, '../../../packages/ui'),
         },
+        // Force real React packages. Next's compiled react
+        // (next/dist/compiled/react) is CJS-without-default-export and breaks
+        // the Storybook preview ESM graph ("does not provide an export named
+        // 'default'"), leaving the iframe spinner forever.
+        {
+          find: /^react$/,
+          replacement: require.resolve('react'),
+        },
+        {
+          find: /^react-dom$/,
+          replacement: require.resolve('react-dom'),
+        },
+        {
+          find: /^react\/jsx-runtime$/,
+          replacement: require.resolve('react/jsx-runtime'),
+        },
+        {
+          find: /^react\/jsx-dev-runtime$/,
+          replacement: require.resolve('react/jsx-dev-runtime'),
+        },
         { find: '@', replacement: path.resolve(__dirname, '..') },
         ...normalizedAlias,
       ],
+      dedupe: ['react', 'react-dom'],
     };
 
-    // Configure Vite to handle TypeScript and JSX properly
+    // Storybook 10 + modern packages need a current esbuild target.
+    // `es2020` makes esbuild hard-fail on object rest/destructuring in
+    // Storybook/Next packages ("Transforming destructuring ... is not supported"),
+    // which either spams the log or fails the preview build entirely.
     config.esbuild = {
       ...config.esbuild,
-      target: 'es2020',
-      loader: 'tsx',
-      include: /\.(ts|tsx|js|jsx)$/,
+      target: 'esnext',
     };
 
-    // Exclude @clerk/elements from dependency optimization to prevent package.json lookup warning
+    // Keep optimizeDeps on, but never hold browser requests until crawl end.
+    // In this monorepo the crawl is huge; holding deps leaves the iframe spinner
+    // forever while /sb-vite/deps/* never materializes.
     config.optimizeDeps = {
       ...config.optimizeDeps,
       exclude: [...(config.optimizeDeps?.exclude || []), '@clerk/elements'],
+      holdUntilCrawlEnd: false,
+      esbuildOptions: {
+        ...(config.optimizeDeps?.esbuildOptions || {}),
+        target: 'esnext',
+      },
+    };
+
+    // Absolute-path imports of next/dist/compiled/react bypass resolve.alias.
+    // Intercept them in resolveId so the preview gets real React ESM.
+    const reactPkg = require.resolve('react');
+    const reactDomPkg = require.resolve('react-dom');
+    const jsxRuntime = require.resolve('react/jsx-runtime');
+    const jsxDevRuntime = require.resolve('react/jsx-dev-runtime');
+    const rewriteNextReactPlugin = {
+      name: 'jovie-storybook-rewrite-next-react',
+      enforce: 'pre' as const,
+      resolveId(source: string) {
+        const normalized = source.replace(/\\/g, '/');
+        if (normalized.includes('next/dist/compiled/react-dom')) {
+          return reactDomPkg;
+        }
+        if (normalized.includes('next/dist/compiled/react/jsx-dev-runtime')) {
+          return jsxDevRuntime;
+        }
+        if (normalized.includes('next/dist/compiled/react/jsx-runtime')) {
+          return jsxRuntime;
+        }
+        if (
+          normalized.includes('next/dist/compiled/react/index.js') ||
+          normalized.endsWith('next/dist/compiled/react') ||
+          normalized.includes('next/dist/compiled/react.js')
+        ) {
+          return reactPkg;
+        }
+        return null;
+      },
+    };
+
+    // Vercel Workflow / WDK Vite plugins (from next.config withWorkflow) emit
+    // continuous page reloads of app/.well-known/workflow/* and can starve
+    // Storybook's optimized-deps generation. Strip them for local Storybook.
+    const stripWorkflowPlugins = (plugins: unknown): unknown[] => {
+      const list = Array.isArray(plugins) ? plugins : plugins ? [plugins] : [];
+      return list.filter(plugin => {
+        const name =
+          plugin &&
+          typeof plugin === 'object' &&
+          'name' in plugin &&
+          typeof (plugin as { name?: unknown }).name === 'string'
+            ? String((plugin as { name: string }).name).toLowerCase()
+            : '';
+        if (!name) return true;
+        return !(
+          name.includes('workflow') ||
+          name.includes('wdk') ||
+          name.includes('vercel-toolbar')
+        );
+      });
+    };
+    config.plugins = [
+      rewriteNextReactPlugin,
+      ...stripWorkflowPlugins(config.plugins),
+    ] as typeof config.plugins;
+
+    // Ignore workflow generated routes so HMR does not thrash the preview iframe.
+    config.server = {
+      ...config.server,
+      watch: {
+        ...(config.server &&
+        typeof config.server === 'object' &&
+        'watch' in config.server &&
+        config.server.watch &&
+        typeof config.server.watch === 'object'
+          ? config.server.watch
+          : {}),
+        ignored: [
+          '**/app/.well-known/workflow/**',
+          '**/.well-known/workflow/**',
+          '**/node_modules/**',
+        ],
+      },
     };
 
     // Suppress "use client" directive warnings in build output
