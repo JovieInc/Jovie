@@ -45,10 +45,30 @@ const config: StorybookConfig = {
     disableTelemetry: true,
   },
   viteFinal: async config => {
-    // Handle Node.js modules for browser compatibility
+    // Handle Node.js modules for browser compatibility.
+    // Chromatic extracts stories in a real browser. Client components that
+    // reference process.env.* crash extraction with
+    // "ReferenceError: process is not defined" (seen on Sidebar.stories).
+    // Define individual keys only — never replace the whole `process` object
+    // with a JSON string (that breaks process.env.FOO member access).
     config.define = {
       ...config.define,
       global: 'globalThis',
+      'process.env.NODE_ENV': JSON.stringify(
+        process.env.NODE_ENV || 'development'
+      ),
+      'process.env.NEXT_PUBLIC_APP_VERSION': JSON.stringify(
+        process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0-storybook'
+      ),
+      'process.env.NEXT_PUBLIC_BUILD_SHA': JSON.stringify(
+        process.env.NEXT_PUBLIC_BUILD_SHA || 'storybook'
+      ),
+      'process.env.NEXT_PUBLIC_CI': JSON.stringify(
+        process.env.NEXT_PUBLIC_CI || ''
+      ),
+      'process.env.NEXT_PUBLIC_DEMO_RECORDING': JSON.stringify(
+        process.env.NEXT_PUBLIC_DEMO_RECORDING || ''
+      ),
     };
 
     // Ensure TypeScript files are properly handled
