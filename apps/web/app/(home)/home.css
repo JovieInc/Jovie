@@ -1865,13 +1865,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-poster-hero__primary-cta:hover {
   border-color: color-mix(
     in oklab,
-    var(--linear-accent-blue) 88%,
-    var(--system-b-text-primary)
+    var(--linear-accent-blue) 90%,
+    var(--system-b-true-black)
   );
   background: color-mix(
     in oklab,
-    var(--linear-accent-blue) 88%,
-    var(--system-b-text-primary)
+    var(--linear-accent-blue) 90%,
+    var(--system-b-true-black)
   );
 }
 

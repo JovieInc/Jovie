@@ -5125,7 +5125,7 @@ function ReleaseRow({
             <Badge
               size='sm'
               tone='info'
-              className='shrink-0 text-(--linear-accent-blue)'
+              className='shrink-0'
               data-testid='shell-v1-picking-up'
             >
               {/* ui-casing-allow: design-locked momentum status */}
