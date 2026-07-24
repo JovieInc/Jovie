@@ -6,5 +6,5 @@
  * Kept so existing \@/components/atoms/Label imports keep working
  * during one-system consolidation (see docs/design/ONE_SYSTEM_DRIFT.md).
  */
-export { Label } from '@jovie/ui';
 export type { LabelProps } from '@jovie/ui';
+export { Label } from '@jovie/ui';
