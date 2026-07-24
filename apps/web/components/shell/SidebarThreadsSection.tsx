@@ -236,8 +236,8 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
       <span
         className={cn(
           'min-w-0 w-full justify-self-stretch overflow-hidden whitespace-nowrap text-left text-xs',
-          '[mask-image:linear-gradient(to_right,black_calc(100%-16px),transparent)]',
-          '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%-16px),transparent)]',
+          '[mask-image:linear-gradient(to_right,black_calc(100%-48px),transparent)]',
+          '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%-48px),transparent)]',
           unread && 'font-medium'
         )}
       >
