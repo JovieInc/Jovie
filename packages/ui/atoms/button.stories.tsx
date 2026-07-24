@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Button } from './button';
 
 const meta: Meta<typeof Button> = {
-  title: 'shadcn/Button',
+  title: 'UI/Atoms/Button',
   component: Button,
   parameters: {
     layout: 'centered',

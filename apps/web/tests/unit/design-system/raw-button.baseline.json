@@ -1,4 +1,4 @@
 {
-  "count": 637,
-  "note": "Raw <button> tags in apps/web/{components,app}. Ratchet only goes down \u2014 lower this when a PR converts raw buttons to the canonical Button. 713\u2192637 on 2026-07-20 (#11783 partial): admin/dev/shell/molecules/feedback/waitlist hot-zone wave converted safe raw buttons to @jovie/ui Button."
+  "count": 634,
+  "note": "Raw <button> tags in apps/web/{components,app}. Ratchet only goes down — lower this when a PR converts raw buttons to the canonical Button. 713→637 on 2026-07-20 (#11783 partial): admin/dev/shell/molecules/feedback/waitlist hot-zone wave converted safe raw buttons to @jovie/ui Button. 637→634 on 2026-07-23 (one-design-system-lock): re-measured exact count and tightened floor so agents cannot reintroduce slack."
 }

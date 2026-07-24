@@ -2,6 +2,9 @@
 /**
  * Generate docs/llms-design-manifest.txt — llms.txt-style design contract for AI agents.
  *
+ * Canon: one design system (System B), two languages (product + marketing editorial).
+ * Prefer @jovie/ui atoms; see docs/design/COMPONENT_MAP.md + root DESIGN.md.
+ *
  * Sources:
  *   - apps/web/styles/design-system.css (CSS custom properties)
  *   - packages/ui/atoms/* (shared UI primitives)
@@ -448,10 +451,13 @@ export function buildLlmsDesignManifest({
     '# Jovie Design System — AI Agent Contract',
     '',
     '> Machine-readable design contract for AI agents editing Jovie UI. Tokens come from `apps/web/styles/design-system.css`; shared primitives from `@jovie/ui`.',
+    '>',
+    '> **One system, two languages:** System B tokens only (product + marketing editorial). Historical System A is not a valid choice for new work. Prefer/forbid map: `docs/design/COMPONENT_MAP.md`.',
     '',
     '## Source of Truth',
     '',
     '- **Visual spec:** `DESIGN.md` (read before any UI edit)',
+    '- **Component map:** `docs/design/COMPONENT_MAP.md` (prefer `@jovie/ui`; forbid void stories / design-studio leftovers)',
     '- **Token registry:** `apps/web/styles/design-system.css`',
     '- **Token docs:** `docs/DESIGN_TOKENS.md`',
     "- **Shared primitives:** `packages/ui/atoms/*` via `import { ... } from '@jovie/ui'`",
@@ -468,6 +474,8 @@ export function buildLlmsDesignManifest({
     '- Prose width: `max-w-prose-canonical` (`--ds-prose-max` = 680px).',
     '- No emoji in UI — use Lucide icons or approved SVGs.',
     '- Title Case for labels/buttons; sentence case for body, tooltips, and toasts.',
+    '- System B only for new work — do not reintroduce System A / `.linear-marketing` / DM Sans; marketing uses `.system-b-marketing` editorial language on the same tokens.',
+    '- No void Storybook atoms, hand-rolled package-covered primitives, design-studio leftovers, or demo/exp chrome as shipping templates.',
     '',
     '## Canonical Tailwind Utilities',
     '',

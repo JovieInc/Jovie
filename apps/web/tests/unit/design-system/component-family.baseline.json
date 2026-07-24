@@ -1,9 +1,9 @@
 {
   "counts": {
-    "button": 41,
+    "button": 38,
     "palette": 4,
     "emptyState": 9,
     "shell": 21
   },
-  "note": "Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands. emptyState 14→9 on 2026-07-09 (GH-12638): wave-1 EmptyState consolidation deleted DspPresenceEmptyState, DspMatchEmptyState, InsightEmptyState, DemoEmptyState, StarterEmptyState; ReleaseTaskEmptyState + TableEmptyState now compose the molecule."
+  "note": "Component files per drift-prone family in apps/web/components. Ratchet only goes down — lower when you dedup, raise with a Linear ID for a genuinely-distinct new component. Flip WARN_ONLY=false in the test after wave-1 dedup lands. emptyState 14→9 on 2026-07-09 (GH-12638): wave-1 EmptyState consolidation deleted DspPresenceEmptyState, DspMatchEmptyState, InsightEmptyState, DemoEmptyState, StarterEmptyState; ReleaseTaskEmptyState + TableEmptyState now compose the molecule. button 41→38 on 2026-07-23 (one-design-system-lock): re-measured exact family count and tightened floor."
 }
