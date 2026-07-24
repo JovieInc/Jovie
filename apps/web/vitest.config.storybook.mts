@@ -6,6 +6,11 @@ import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
+// Absolute configDir used by @storybook/addon-vitest when it filters projects as
+// `storybook:${STORYBOOK_CONFIG_DIR}`. A bare name like "storybook" never matches
+// and the Storybook UI a11y/test panel fails with:
+//   No projects matched the filter "storybook:/…/.storybook"
+const storybookConfigDir = path.join(dirname, '.storybook');
 
 /**
  * Next's compiled React (next/dist/compiled/react*) is CJS without a default
@@ -57,14 +62,14 @@ export default defineConfig({
   plugins: [
     rewriteNextCompiledReactPlugin(),
     storybookTest({
-      configDir: path.join(dirname, '.storybook'),
+      configDir: storybookConfigDir,
       tags: {
         exclude: ['no-vitest'],
       },
     }),
   ],
   test: {
-    name: 'storybook',
+    name: `storybook:${storybookConfigDir}`,
     browser: {
       enabled: true,
       provider: playwright(),
