@@ -3,56 +3,71 @@ import { Button } from '@jovie/ui/atoms/button';
 import { Disc3, Plus } from 'lucide-react';
 import Image from 'next/image';
 
-const RELEASE_ROWS = [
-  {
-    id: 'never-say-a-word',
-    title: 'Never Say A Word',
-    artist: 'Tim White',
-    format: 'Single',
-    artwork: '/img/releases/never-say-a-word.jpg',
-    isPickingUp: true,
-  },
-  {
-    id: 'the-deep-end',
-    title: 'The Deep End',
-    artist: 'Cosmic Gate & Tim White',
-    format: 'Single',
-    artwork: '/img/releases/the-deep-end.jpg',
-    isPickingUp: false,
-  },
-  {
-    id: 'take-me-over',
-    title: 'Take Me Over',
-    artist: 'Tim White feat. Erica Gibson',
-    format: 'Single',
-    artwork: '/img/releases/take-me-over.jpg',
-    isPickingUp: false,
-  },
-  {
-    id: 'all-this-noise',
-    title: 'All This Noise',
-    artist: 'Tim White',
-    format: 'EP',
-    artwork: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
-    isPickingUp: false,
-  },
-  {
-    id: 'save-the-night',
-    title: 'Save The Night',
-    artist: 'Tim White',
-    format: 'Single',
-    artwork: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
-    isPickingUp: false,
-  },
-  {
-    id: 'trying-too-hard',
-    title: 'Trying Too Hard',
-    artist: 'Tim White',
-    format: 'Single',
-    artwork: '/img/releases/take-me-over.jpg',
-    isPickingUp: false,
-  },
-] as const;
+interface HomepageReleaseRow {
+  readonly id: string;
+  readonly title: string;
+  readonly artist: string;
+  readonly format: 'Single' | 'EP';
+  readonly artwork: string;
+  readonly isPickingUp: boolean;
+}
+
+function releaseRow(
+  id: string,
+  title: string,
+  artist: string,
+  format: HomepageReleaseRow['format'],
+  artwork: string,
+  isPickingUp = false
+): HomepageReleaseRow {
+  return { id, title, artist, format, artwork, isPickingUp };
+}
+
+const RELEASE_ROWS: readonly HomepageReleaseRow[] = [
+  releaseRow(
+    'never-say-a-word',
+    'Never Say A Word',
+    'Tim White',
+    'Single',
+    '/img/releases/never-say-a-word.jpg',
+    true
+  ),
+  releaseRow(
+    'the-deep-end',
+    'The Deep End',
+    'Cosmic Gate & Tim White',
+    'Single',
+    '/img/releases/the-deep-end.jpg'
+  ),
+  releaseRow(
+    'take-me-over',
+    'Take Me Over',
+    'Tim White feat. Erica Gibson',
+    'Single',
+    '/img/releases/take-me-over.jpg'
+  ),
+  releaseRow(
+    'all-this-noise',
+    'All This Noise',
+    'Tim White',
+    'EP',
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg'
+  ),
+  releaseRow(
+    'save-the-night',
+    'Save The Night',
+    'Tim White',
+    'Single',
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg'
+  ),
+  releaseRow(
+    'trying-too-hard',
+    'Trying Too Hard',
+    'Tim White',
+    'Single',
+    '/img/releases/take-me-over.jpg'
+  ),
+];
 
 export function HomepageHeroCommandCenter() {
   return (
