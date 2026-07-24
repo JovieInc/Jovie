@@ -102,7 +102,7 @@ export const WithFooter: Story = {
         <CardFooter>
           <button
             type='button'
-            className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700'
+            className='px-4 py-2 bg-primary-token text-base rounded-md hover:bg-blue-700'
           >
             Update Settings
           </button>

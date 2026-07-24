@@ -2,102 +2,82 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { AmountSelector } from './AmountSelector';
 
+/**
+ * AmountSelector is a tip/pay tile, not a free-floating badge.
+ * Always show it in a product composition (pay row / card), never as a lone
+ * circle on a void background.
+ */
 const meta: Meta<typeof AmountSelector> = {
   title: 'Atoms/AmountSelector',
   component: AmountSelector,
   parameters: {
     layout: 'centered',
+    backgrounds: { default: 'light' },
+    docs: {
+      description: {
+        component:
+          'Tip amount tile used inside PaySelector. Prefer the pay-row composition stories over bare args.',
+      },
+    },
   },
   tags: ['autodocs'],
-  argTypes: {
-    amount: {
-      control: { type: 'number', min: 1, max: 100 },
-    },
-    isSelected: {
-      control: { type: 'boolean' },
-    },
-    disabled: {
-      control: { type: 'boolean' },
-    },
-  },
+  decorators: [
+    Story => (
+      <div className='w-[22rem] rounded-3xl border border-black/6 bg-base p-6 text-primary-token shadow-sm dark:border-white/10'>
+        <Story />
+      </div>
+    ),
+  ],
 };
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {
-  args: {
-    amount: 5,
-    isSelected: false,
-    onClick: () => {},
-    disabled: false,
-  },
-};
+function PayAmountRow({
+  amounts = [5, 10, 20],
+  initialIndex = 1,
+  disabled = false,
+}: {
+  amounts?: number[];
+  initialIndex?: number;
+  disabled?: boolean;
+}) {
+  const [selected, setSelected] = useState(initialIndex);
 
-export const Selected: Story = {
-  args: {
-    amount: 10,
-    isSelected: true,
-    onClick: () => {},
-    disabled: false,
-  },
-};
-
-export const SmallAmount: Story = {
-  args: {
-    amount: 3,
-    isSelected: false,
-    onClick: () => {},
-    disabled: false,
-  },
-};
-
-export const LargeAmount: Story = {
-  args: {
-    amount: 25,
-    isSelected: false,
-    onClick: () => {},
-    disabled: false,
-  },
-};
-
-export const Interactive: Story = {
-  render: function InteractiveRender() {
-    const [selected, setSelected] = useState(5);
-    const amounts = [3, 5, 10];
-
-    return (
-      <div className='grid grid-cols-3 gap-3 w-64'>
-        {amounts.map(amount => (
+  return (
+    <div className='space-y-3'>
+      <div className='text-sm font-medium text-secondary-token'>
+        Choose amount
+      </div>
+      <div className='grid grid-cols-3 gap-3'>
+        {amounts.map((amount, index) => (
           <AmountSelector
             key={amount}
             amount={amount}
-            isSelected={selected === amount}
-            onClick={() => setSelected(amount)}
+            index={index}
+            isSelected={selected === index}
+            onClick={setSelected}
+            disabled={disabled}
           />
         ))}
       </div>
-    );
-  },
+    </div>
+  );
+}
+
+/** Canonical product composition — this is how the tile appears in product. */
+export const InPayRow: Story = {
+  render: () => <PayAmountRow />,
 };
 
-export const InDarkMode: Story = {
-  args: {
-    amount: 7,
-    isSelected: true,
-    onClick: () => {},
-    disabled: false,
-  },
-  parameters: {
-    backgrounds: { default: 'dark' },
-  },
+export const SelectedMiddle: Story = {
+  render: () => <PayAmountRow amounts={[5, 10, 20]} initialIndex={1} />,
 };
 
-export const Disabled: Story = {
-  args: {
-    amount: 5,
-    isSelected: false,
-    onClick: () => {},
-    disabled: true,
-  },
+export const CompactTips: Story = {
+  render: () => <PayAmountRow amounts={[3, 5, 10]} initialIndex={0} />,
+};
+
+export const DisabledRow: Story = {
+  render: () => <PayAmountRow disabled />,
 };
