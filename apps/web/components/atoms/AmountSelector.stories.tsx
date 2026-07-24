@@ -6,9 +6,16 @@ import { AmountSelector } from './AmountSelector';
  * AmountSelector is a tip/pay tile, not a free-floating badge.
  * Always show it in a product composition (pay row / card), never as a lone
  * circle on a void background.
+ *
+ * Story IDs (after #14796 + one-system lock):
+ * - Molecules/Pay/AmountSelector/InPayRow  ← canonical entry
+ * - Molecules/Pay/AmountSelector/SelectedMiddle
+ * - Molecules/Pay/AmountSelector/CompactTips
+ * - Molecules/Pay/AmountSelector/DisabledRow
+ * Old Atoms/AmountSelector/{Default,Selected,Interactive,InDarkMode} removed.
  */
 const meta: Meta<typeof AmountSelector> = {
-  title: 'Atoms/AmountSelector',
+  title: 'Molecules/Pay/AmountSelector',
   component: AmountSelector,
   parameters: {
     layout: 'centered',
@@ -16,7 +23,7 @@ const meta: Meta<typeof AmountSelector> = {
     docs: {
       description: {
         component:
-          'Tip amount tile used inside PaySelector. Prefer the pay-row composition stories over bare args.',
+          'Tip amount tile used inside PaySelector. Prefer the pay-row composition stories over bare args. Start with InPayRow.',
       },
     },
   },

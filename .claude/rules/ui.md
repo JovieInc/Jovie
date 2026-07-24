@@ -2,7 +2,25 @@
 
 Design system, component hierarchy, surfaces, taste rules. Always read `DESIGN.md` before making any visual decisions.
 
+## HARD AGENT RULES (non-negotiable)
+
+These are machine-enforced where possible (`pnpm design-system:gate`, design-system ratchets, Storybook quality guard). Violations block ship.
+
+1. **Single System B canon.** DESIGN.md System B is the **only** design system (founder 2026-06-18). Do not revive System A (`.linear-marketing`, design-studio product stories, DM Sans, parallel token trees). Marketing uses `.system-b-marketing`.
+2. **No new one-off atoms when `@jovie/ui` exists.** Before adding anything under `apps/web/components/**` named like `Button`, `Input`, `Badge`, `Dialog`, `Card`, `Select`, `Sheet`, `Tooltip`, etc., import/compose the `@jovie/ui` atom. Thin app wrappers that re-export `@jovie/ui` are OK; forks are not. Gate: `no-duplicate-ui-atom`.
+3. **No off-token colors.** Never land raw hex (`#fff`, `text-[#…]`, inline `#RRGGBB`) in product UI. Hex belongs only in token sources (`packages/ui/theme/**`, `apps/web/styles/design-system.css`, approved brand/DSP registries). Use semantic utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`, accent tokens).
+4. **No off-token motion.** Ban `hover:scale-*`, `group-hover:scale-*`, `transition-all`, and numeric `duration-N` in product UI. Use motion tokens only (`duration-subtle` / `duration-cinematic`, `ease-subtle` / `ease-cinematic`, plus the documented ladder in `.claude/rules/motion.md`). Decorative hover lift is forbidden.
+5. **Storybook composition required.** Stories must render real System B / product components on real surfaces — not bare atoms on pure black, not hand-rolled fake CTAs, not design-studio leftovers. Run `pnpm storybook:quality`. Prefer compositions over args-only void tiles.
+6. **Ratchets only go down.** `arbitrary-values`, `raw-button`, `button-canon`, `component-family`, and related baselines must never rise. If your PR reduces drift, lower the baseline in the same PR.
+7. **Agent gate is mandatory on UI PRs.** `pnpm design-system:gate` (and its vitest wrapper) must stay green. Do not `--no-verify`, do not weaken allowlists, do not add grandfather paths for new work.
+
 ## Component Architecture
+
+Product language + marketing editorial language share the same foundation. "System A"
+is historical — not a valid choice for new work. Prefer/forbid component map:
+[`docs/design/COMPONENT_MAP.md`](../../docs/design/COMPONENT_MAP.md). Generated agent
+contract: [`docs/llms-design-manifest.txt`](../../docs/llms-design-manifest.txt)
+(`pnpm ds:llms-manifest`).
 
 Components follow atomic design with feature-based grouping:
 
@@ -35,6 +53,8 @@ apps/web/components/
 - `atoms/` must NOT import from `molecules/` or `organisms/`
 - `molecules/` must NOT import from `organisms/`
 - `features/{x}/` must NOT import from `features/{y}/` — if a component is needed by 2+ features, **promote it** to the shared `atoms/`, `molecules/`, or `organisms/` layer
+- Prefer `@jovie/ui` atoms (Button, Input, Badge, Dialog, Card, Field, …) before app-level atoms — see [`docs/design/COMPONENT_MAP.md`](../../docs/design/COMPONENT_MAP.md)
+- Do **not** ship hand-rolled buttons/inputs when `@jovie/ui` covers them, design-studio leftovers as product UI, void Storybook atoms, or demo/exp chrome as production templates
 
 **Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`). Arbitrary Tailwind values (`w-[327px]`, `text-[#fff]`) are tracked by a drift ratchet (`apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts`) — the count may only go DOWN. Converge to tokens; never add new arbitrary values.
 

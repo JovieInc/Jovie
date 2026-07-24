@@ -18,10 +18,15 @@ import { OnboardingProfileReviewStep } from '@/features/dashboard/organisms/onbo
 import { ReleasesEmptyState } from '@/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState';
 import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix/ReleasesExperience';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
-import { getDesignStudioItem } from '@/lib/design-studio/registry';
 import type { InsightCategory } from '@/types/insights';
 import { DemoAuthShell } from './DemoAuthShell';
 import { DemoClientProviders } from './DemoClientProviders';
+import {
+  DemoLibrarySurface,
+  DemoLyricsSurface,
+  DemoMusicAiCommandSurface,
+  DemoTrackSurface,
+} from './DemoProductSurfaces';
 import { DemoReleaseLandingSurface } from './DemoReleaseLandingSurface';
 import { DemoReleasePresaveSurface } from './DemoReleasePresaveSurface';
 import { DemoReleasesExperience } from './DemoReleasesExperience';
@@ -159,26 +164,6 @@ function DemoReleasesShowcaseState({
   );
 }
 
-function DemoDesignStudioShowcase({
-  itemId,
-  testId,
-}: Readonly<{
-  itemId: string;
-  testId: string;
-}>) {
-  const item = getDesignStudioItem(itemId);
-
-  if (!item) {
-    throw new Error(`Missing Design Studio item: ${itemId}`);
-  }
-
-  return (
-    <div className='min-h-screen bg-surface-1 p-4 sm:p-6' data-testid={testId}>
-      {item.preview()}
-    </div>
-  );
-}
-
 export function DemoShowcaseSurface({
   surface,
 }: Readonly<DemoShowcaseSurfaceProps>) {
@@ -272,33 +257,13 @@ export function DemoShowcaseSurface({
     case 'tim-white-profile':
       return <DemoTimWhiteProfileSurface />;
     case 'music-ai-command':
-      return (
-        <DemoDesignStudioShowcase
-          itemId='music-ai-command-surface'
-          testId='demo-showcase-music-ai-command'
-        />
-      );
+      return <DemoMusicAiCommandSurface />;
     case 'shell-lyrics':
-      return (
-        <DemoDesignStudioShowcase
-          itemId='lyrics-view'
-          testId='demo-showcase-shell-lyrics'
-        />
-      );
+      return <DemoLyricsSurface />;
     case 'shell-library':
-      return (
-        <DemoDesignStudioShowcase
-          itemId='library-view'
-          testId='demo-showcase-shell-library'
-        />
-      );
+      return <DemoLibrarySurface />;
     case 'shell-track':
-      return (
-        <DemoDesignStudioShowcase
-          itemId='track-view'
-          testId='demo-showcase-shell-track'
-        />
-      );
+      return <DemoTrackSurface />;
     case 'onboarding-handle':
       return (
         <DemoOnboardingShowcase

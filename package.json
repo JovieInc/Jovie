@@ -219,7 +219,10 @@
     "gate-ladder:validate": "node scripts/gate-ladder/validate.mjs",
     "gate-ladder:list": "node scripts/gate-ladder/run.mjs --list",
     "gate-ladder:test": "node --test scripts/gate-ladder/gate-ladder.test.mjs",
-    "storybook:quality": "node scripts/storybook-story-quality-guard.mjs"
+    "storybook:quality": "node scripts/storybook-story-quality-guard.mjs",
+    "design-system:gate": "node scripts/design-system-agent-gate.mjs",
+    "design-system:gate:test": "node --test scripts/design-system-agent-gate.test.mjs",
+    "demo:real-ui": "node scripts/demo-real-ui-guard.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
