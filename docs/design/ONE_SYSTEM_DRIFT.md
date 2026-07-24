@@ -144,3 +144,7 @@ cd apps/web && pnpm exec vitest run \
 - [`docs/design-system/deprecation-map.md`](../design-system/deprecation-map.md)
 - `scripts/storybook-story-quality-guard.mjs`
 - PR #14796 — tip/pay composition + design-studio story deletion
+
+## Demo policy (Tim 2026-07-23)
+
+Demo must reflect **real product UI**. Simplified fixture data is OK. Invented chrome, design-studio stand-ins, and hand-rolled CTAs are not. Guard: `pnpm demo:real-ui`.
