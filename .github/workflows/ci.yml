@@ -433,6 +433,7 @@ jobs:
       run_test: ${{ steps.detect.outputs.run_test || 'false' }}
       run_test_performance: ${{ steps.detect.outputs.run_test_performance || 'false' }}
       run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || 'false' }}
+      run_ui_visual: ${{ steps.detect.outputs.run_ui_visual || 'false' }}
       run_public_lighthouse: ${{ steps.detect.outputs.run_public_lighthouse || 'false' }}
       run_dashboard_lighthouse: ${{ steps.detect.outputs.run_dashboard_lighthouse || 'false' }}
       run_onboarding_lighthouse: ${{ steps.detect.outputs.run_onboarding_lighthouse || 'false' }}
@@ -529,7 +530,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_ui_visual run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -567,7 +568,7 @@ jobs:
             echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
             echo "run_promptfoo_evals=false" >> "$GITHUB_OUTPUT"
             echo "run_golden_eval_set=false" >> "$GITHUB_OUTPUT"
-            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_ui_visual run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -577,7 +578,7 @@ jobs:
           if ! echo "$CHANGED_FILES" | grep -q -E '^\.github/' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_ui_visual run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -610,6 +611,17 @@ jobs:
             echo "run_storybook_a11y=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_storybook_a11y=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Merge-queue UI visual gates (ci-storybook-visual, ci-chromatic,
+          # ci-ui-playwright-visual). Superset of the Storybook a11y surface:
+          # adds design tokens, visual/axe Playwright specs, and the visual
+          # workflow files so every UI-relevant combined head gets evidence.
+          UI_VISUAL_PATTERN='^(apps/web/components/|apps/web/\.storybook/|apps/web/app/globals\.css|apps/web/styles/|apps/web/design/|apps/web/(tailwind|postcss)\.config\.|apps/web/vitest\.config\.storybook\.mts|apps/web/package\.json|packages/ui/|apps/web/tests/e2e/(.*visual.*|.*axe.*|a11y)\.spec\.ts|pnpm-lock\.yaml|\.github/workflows/(ci|visual-a11y|visual-regression|chromatic)\.yml)'
+          if echo "$CHANGED_FILES" | grep -q -E "$UI_VISUAL_PATTERN"; then
+            echo "run_ui_visual=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_ui_visual=false" >> "$GITHUB_OUTPUT"
           fi
 
           # Screenshot-only product exports live under public/product-screenshots and
@@ -706,6 +718,7 @@ jobs:
             echo "run_e2e=false" >> "$GITHUB_OUTPUT"
             echo "run_golden_path=false" >> "$GITHUB_OUTPUT"
             echo "run_build=false" >> "$GITHUB_OUTPUT"
+            echo "run_ui_visual=false" >> "$GITHUB_OUTPUT"
             echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
             echo "run_dashboard_lighthouse=false" >> "$GITHUB_OUTPUT"
             echo "run_admin_lighthouse=false" >> "$GITHUB_OUTPUT"
@@ -1540,6 +1553,177 @@ jobs:
         (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
     uses: ./.github/workflows/ios-ci.yml
+
+  # Storybook interaction + a11y gate for UI-surface combined heads. Static
+  # build proves the Storybook bundle compiles; vitest browser mode runs the
+  # interaction + axe story tests. The scheduled visual-a11y.yml lane remains
+  # the deep audit owner; this lane blocks regressions before they land.
+  ci-storybook-visual:
+    name: Storybook Visual + A11y (combined)
+    needs: [ci-path-changes, ci-merge-group-admission]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      ) &&
+      github.event_name == 'merge_group' &&
+      needs.ci-path-changes.outputs.run_ui_visual == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: { fetch-depth: 1 }
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+      - name: Build Storybook
+        run: pnpm --filter @jovie/web run build-storybook
+      - name: Run Storybook interaction + a11y tests
+        run: pnpm --filter @jovie/web run test:a11y
+
+  # Chromatic visual regression gate. Secret-bound: merge_group never includes
+  # fork heads, so CHROMATIC_PROJECT_TOKEN is never exposed to untrusted code
+  # (fork source PRs also get run_ui_visual=false from the ci-path-changes
+  # IS_FORK guard). The CLI builds Storybook itself, applies the root
+  # chromatic.config.json (onlyChanged → TurboSnap, zip), and exits non-zero
+  # on unreviewed visual changes.
+  ci-chromatic:
+    name: Chromatic Visual Regression (combined)
+    needs: [ci-path-changes, ci-merge-group-admission]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      ) &&
+      github.event_name == 'merge_group' &&
+      needs.ci-path-changes.outputs.run_ui_visual == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # TurboSnap (onlyChanged) needs full git history to diff baselines.
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Publish Storybook to Chromatic
+        # pnpm --filter exec runs from apps/web, while chromatic.config.json
+        # lives at the repo root — point the CLI at it explicitly.
+        run: pnpm --filter @jovie/web exec chromatic --config-file ../../chromatic.config.json
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+
+  # Fast secret-free visual smoke on the exact combined head: same mock-Clerk
+  # standalone build as ci-build-layout, then the DB-free axe keyboard/focus
+  # suite (a11y.spec.ts) and the mobile document-overflow probe
+  # (mobile-overflow.spec.ts). Both degrade deterministically without Neon:
+  # authenticated and seeded surfaces skip, public surfaces still gate.
+  # Scoped out (needs Neon): full page-level visual compare, axe-audit.spec.ts,
+  # and profile-mobile-viewport-stability.spec.ts — merge groups never
+  # provision Neon. TODO: promote a Neon-backed visual subset here only if it
+  # can reuse this combined-head build; until then the daily
+  # .github/workflows/visual-regression.yml owns that evidence.
+  ci-ui-playwright-visual:
+    name: UI Playwright Visual Smoke (combined)
+    needs: [ci-path-changes, ci-merge-group-admission]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      ) &&
+      github.event_name == 'merge_group' &&
+      needs.ci-path-changes.outputs.run_ui_visual == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+      - name: Build exact combined head
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          # Merge-group code is PR-controlled. This deterministic mock key is
+          # intentionally public and keeps the combined lane secret-free.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_PUBLIC_APP_URL: http://localhost:3240
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3240
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+      - name: Verify combined build output
+        run: |
+          set -euo pipefail
+          for required in \
+            apps/web/.next/BUILD_ID \
+            apps/web/.next/standalone/apps/web/server.js \
+            apps/web/.next/standalone/apps/web/.next/BUILD_ID; do
+            test -f "$required" || {
+              echo "::error::Combined build output missing $required"
+              exit 1
+            }
+          done
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+      - name: Run DB-free visual smoke (axe + mobile overflow)
+        run: |
+          set -euo pipefail
+          cd apps/web
+
+          # Create empty auth state so Playwright's auth-setup project doesn't crash.
+          # This lane only tests public surfaces (no Neon on merge groups).
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          export HOSTNAME=localhost
+          export NEXT_PUBLIC_APP_URL=http://localhost:3240
+
+          PORT=3240 node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          for attempt in $(seq 1 30); do
+            kill -0 "$SERVER_PID" 2>/dev/null || {
+              echo "::error::Combined-head standalone server died"
+              exit 1
+            }
+            if curl -sf http://localhost:3240 >/dev/null 2>&1; then
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                pnpm exec playwright test tests/e2e/a11y.spec.ts \
+                  --config=playwright.config.ts --project=chromium --reporter=line
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                pnpm exec playwright test tests/e2e/mobile-overflow.spec.ts \
+                  --config=playwright.config.smoke.mobile.ts --reporter=line
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Combined-head standalone server failed to start"
+          exit 1
+        env:
+          BASE_URL: http://localhost:3240
+          SMOKE_ONLY: '1'
+          CI: true
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+      - name: Upload combined visual failure evidence
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        continue-on-error: true
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: combined-ui-visual-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/
+          retention-days: 3
 
   ci-build-public:
     name: Build (public routes)
@@ -4407,8 +4591,8 @@ jobs:
   ci-merge-group-ready:
     name: ${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}
     # Combined heads require deterministic gates, five unit shards, one hosted
-    # build/layout workspace, and path-selected iOS evidence. Deep browser lanes
-    # never provision Neon from this event.
+    # build/layout workspace, and path-selected iOS + UI visual evidence. Deep
+    # browser lanes never provision Neon from this event.
     needs:
       [
         ci-path-changes,
@@ -4420,6 +4604,9 @@ jobs:
         ci-ios,
         ci-promptfoo-evals,
         ci-golden-eval-set,
+        ci-storybook-visual,
+        ci-chromatic,
+        ci-ui-playwright-visual,
         ci-secret-scan,
         drizzle-migration-guard,
       ]
@@ -4440,11 +4627,15 @@ jobs:
           IOS_RESULT="${{ needs.ci-ios.result }}"
           PROMPTFOO_RESULT="${{ needs.ci-promptfoo-evals.result }}"
           GOLDEN_EVAL_RESULT="${{ needs.ci-golden-eval-set.result }}"
+          STORYBOOK_VISUAL_RESULT="${{ needs.ci-storybook-visual.result }}"
+          CHROMATIC_RESULT="${{ needs.ci-chromatic.result }}"
+          UI_PLAYWRIGHT_VISUAL_RESULT="${{ needs.ci-ui-playwright-visual.result }}"
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           RUN_IOS="${{ needs.ci-path-changes.outputs.run_ios }}"
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
+          RUN_UI_VISUAL="${{ needs.ci-path-changes.outputs.run_ui_visual }}"
           {
             echo "### Merge group ready"
             echo
@@ -4462,6 +4653,9 @@ jobs:
             echo "| iOS Build + Test | $IOS_RESULT |"
             echo "| Promptfoo Evals (path-selected) | $PROMPTFOO_RESULT |"
             echo "| Golden Eval Set (path-selected) | $GOLDEN_EVAL_RESULT |"
+            echo "| Storybook Visual + A11y (path-selected) | $STORYBOOK_VISUAL_RESULT |"
+            echo "| Chromatic Visual Regression (path-selected) | $CHROMATIC_RESULT |"
+            echo "| UI Playwright Visual Smoke (path-selected) | $UI_PLAYWRIGHT_VISUAL_RESULT |"
             echo "| Secret Scan | $SECRET_RESULT |"
             echo "| Migration Guard | $MIGRATION_RESULT |"
             echo
@@ -4500,7 +4694,10 @@ jobs:
 
           for selected_gate in \
             "Promptfoo Evals:$RUN_PROMPTFOO:$PROMPTFOO_RESULT" \
-            "Golden Eval Set:$RUN_GOLDEN_EVAL:$GOLDEN_EVAL_RESULT"; do
+            "Golden Eval Set:$RUN_GOLDEN_EVAL:$GOLDEN_EVAL_RESULT" \
+            "Storybook Visual + A11y:$RUN_UI_VISUAL:$STORYBOOK_VISUAL_RESULT" \
+            "Chromatic Visual Regression:$RUN_UI_VISUAL:$CHROMATIC_RESULT" \
+            "UI Playwright Visual Smoke:$RUN_UI_VISUAL:$UI_PLAYWRIGHT_VISUAL_RESULT"; do
             name="${selected_gate%%:*}"
             selection_and_result="${selected_gate#*:}"
             selected="${selection_and_result%%:*}"
@@ -4516,9 +4713,11 @@ jobs:
           done
 
           echo "All required combined-head checks passed."
-  # Storybook a11y evidence lives exclusively in the scheduled visual-a11y.yml
-  # storybook-a11y lane; the duplicate manual ci-storybook-a11y job was removed
-  # (JOV-4326) so the evidence has a single owner.
+  # Storybook a11y evidence has exactly two owners: the path-selected
+  # merge-queue ci-storybook-visual lane (combined heads) and the scheduled
+  # visual-a11y.yml storybook-a11y lane (deep audit). The duplicate manual
+  # ci-storybook-a11y job was removed (JOV-4326) so manual evidence stays
+  # single-owner.
   ci-pr-ready:
     name: ${{ github.event_name == 'pull_request' && 'PR Ready' || 'PR Ready (source inactive)' }}
     # The source-branch aggregate is intentionally small and deterministic.
