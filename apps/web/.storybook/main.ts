@@ -18,6 +18,7 @@ const config: StorybookConfig = {
     '@storybook/addon-a11y',
     '@storybook/addon-vitest',
     '@chromatic-com/storybook',
+    '@storybook/addon-mcp',
   ],
   framework: {
     name: '@storybook/nextjs-vite',
@@ -257,23 +258,155 @@ const config: StorybookConfig = {
           find: '@jovie/ui',
           replacement: path.resolve(__dirname, '../../../packages/ui'),
         },
+        // Keep React as bare package IDs (not absolute CJS paths). Absolute
+        // require.resolve('react') forces Vite to serve raw /@fs CJS without
+        // default-export interop, which breaks browser-mode story tests
+        // ("does not provide an export named 'default'"). Bare IDs let
+        // optimizeDeps prebundle + interop correctly. next/dist/compiled/react
+        // is rewritten to bare 'react' below.
         { find: '@', replacement: path.resolve(__dirname, '..') },
         ...normalizedAlias,
       ],
+      dedupe: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
+      ],
     };
 
-    // Configure Vite to handle TypeScript and JSX properly
+    // Storybook 10 + modern packages need a current esbuild target.
+    // `es2020` makes esbuild hard-fail on object rest/destructuring in
+    // Storybook/Next packages ("Transforming destructuring ... is not supported"),
+    // which either spams the log or fails the preview build entirely.
     config.esbuild = {
       ...config.esbuild,
-      target: 'es2020',
-      loader: 'tsx',
-      include: /\.(ts|tsx|js|jsx)$/,
+      target: 'esnext',
     };
 
-    // Exclude @clerk/elements from dependency optimization to prevent package.json lookup warning
+    // Keep optimizeDeps on, but never hold browser requests until crawl end.
+    // In this monorepo the crawl is huge; holding deps leaves the iframe spinner
+    // forever while /sb-vite/deps/* never materializes.
     config.optimizeDeps = {
       ...config.optimizeDeps,
       exclude: [...(config.optimizeDeps?.exclude || []), '@clerk/elements'],
+      holdUntilCrawlEnd: false,
+      // React 19 CJS entries need default-export interop in the browser ESM graph.
+      needsInterop: [
+        ...new Set([
+          ...(config.optimizeDeps?.needsInterop || []),
+          'react',
+          'react-dom',
+          'react-dom/client',
+        ]),
+      ],
+      include: [
+        ...new Set([
+          ...(config.optimizeDeps?.include || []),
+          'react',
+          'react-dom',
+          'react/jsx-runtime',
+          'react/jsx-dev-runtime',
+          'react-dom/client',
+        ]),
+      ],
+      esbuildOptions: {
+        ...(config.optimizeDeps?.esbuildOptions || {}),
+        target: 'esnext',
+      },
+    };
+
+    // Absolute-path imports of next/dist/compiled/react bypass package resolution.
+    // Re-resolve through Vite so optimizeDeps + needsInterop still apply.
+    // Do NOT return bare 'react' (already-resolved) or absolute CJS paths
+    // (raw /@fs without default-export interop).
+    const rewriteNextReactPlugin = {
+      name: 'jovie-storybook-rewrite-next-react',
+      enforce: 'pre' as const,
+      async resolveId(
+        this: {
+          resolve: (
+            source: string,
+            importer: string | undefined,
+            options: { skipSelf?: boolean }
+          ) => Promise<{ id: string } | null>;
+        },
+        source: string,
+        importer: string | undefined
+      ) {
+        const normalized = source.replace(/\\/g, '/');
+        if (!normalized.includes('next/dist/compiled/react')) {
+          return null;
+        }
+
+        let bare: string | null = null;
+        if (normalized.includes('next/dist/compiled/react-dom')) {
+          bare = 'react-dom';
+        } else if (
+          normalized.includes('next/dist/compiled/react/jsx-dev-runtime')
+        ) {
+          bare = 'react/jsx-dev-runtime';
+        } else if (
+          normalized.includes('next/dist/compiled/react/jsx-runtime')
+        ) {
+          bare = 'react/jsx-runtime';
+        } else if (
+          normalized.includes('next/dist/compiled/react/index.js') ||
+          normalized.endsWith('next/dist/compiled/react') ||
+          normalized.includes('next/dist/compiled/react.js')
+        ) {
+          bare = 'react';
+        }
+
+        if (!bare) return null;
+
+        return this.resolve(bare, importer, { skipSelf: true });
+      },
+    };
+
+    // Vercel Workflow / WDK Vite plugins (from next.config withWorkflow) emit
+    // continuous page reloads of app/.well-known/workflow/* and can starve
+    // Storybook's optimized-deps generation. Strip them for local Storybook.
+    const stripWorkflowPlugins = (plugins: unknown): unknown[] => {
+      const list = Array.isArray(plugins) ? plugins : plugins ? [plugins] : [];
+      return list.filter(plugin => {
+        const name =
+          plugin &&
+          typeof plugin === 'object' &&
+          'name' in plugin &&
+          typeof (plugin as { name?: unknown }).name === 'string'
+            ? String((plugin as { name: string }).name).toLowerCase()
+            : '';
+        if (!name) return true;
+        return !(
+          name.includes('workflow') ||
+          name.includes('wdk') ||
+          name.includes('vercel-toolbar')
+        );
+      });
+    };
+    config.plugins = [
+      rewriteNextReactPlugin,
+      ...stripWorkflowPlugins(config.plugins),
+    ] as typeof config.plugins;
+
+    // Ignore workflow generated routes so HMR does not thrash the preview iframe.
+    config.server = {
+      ...config.server,
+      watch: {
+        ...(config.server &&
+        typeof config.server === 'object' &&
+        'watch' in config.server &&
+        config.server.watch &&
+        typeof config.server.watch === 'object'
+          ? config.server.watch
+          : {}),
+        ignored: [
+          '**/app/.well-known/workflow/**',
+          '**/.well-known/workflow/**',
+          '**/node_modules/**',
+        ],
+      },
     };
 
     // Suppress "use client" directive warnings in build output
