@@ -334,7 +334,6 @@ def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
     attestation_index = workflow.index("  attest-staging-build:")
     canary_index = workflow.index("  canary-health-gate:")
     alias_job_index = workflow.index("  alias-staging:")
-    migration_index = workflow.index("  migrate-production:")
     promote_index = workflow.index("  promote-production:")
 
     assert (
@@ -343,15 +342,13 @@ def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
         < attestation_index
         < canary_index
         < alias_job_index
-        < migration_index
         < promote_index
     )
     assert "vercel inspect" in workflow[wait_index:canary_index]
     assert "--wait" in workflow[wait_index:canary_index]
     assert (
         "needs: [deploy-staging, attest-staging-build, canary-health-gate, "
-        "alias-staging, production-head, migrate-production]"
-        in workflow[promote_index:]
+        "alias-staging, production-head]" in workflow[promote_index:]
     )
 
     source_workflow = CI_WORKFLOW.read_text()

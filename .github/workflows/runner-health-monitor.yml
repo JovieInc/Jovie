@@ -36,12 +36,10 @@ jobs:
     env:
       HEARTBEAT_MAX_AGE_SECONDS: '1500'
       HEARTBEAT_API_TIMEOUT_SECONDS: '20'
-      HEARTBEAT_JOB_POLL_ATTEMPTS: '3'
-      HEARTBEAT_JOB_POLL_INTERVAL_SECONDS: '2'
     steps:
       - name: Checkout main policy code
         continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: main
           persist-credentials: false

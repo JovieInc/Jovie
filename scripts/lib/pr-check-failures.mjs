@@ -14,6 +14,7 @@ export const AGENT_BRANCH_RE_LEGACY = /(^|\/)jov-\d+/i;
 
 export function isAgentBranch(headRefName) {
   if (!headRefName) return false;
+  if (headRefName.startsWith('gtmq_')) return false;
   return (
     AGENT_BRANCH_RE.test(headRefName) ||
     AGENT_BRANCH_RE_LEGACY.test(headRefName)

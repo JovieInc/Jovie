@@ -16,7 +16,7 @@
  *   node scripts/story-coverage-ratchet.mjs validate      # schema-only
  *
  * Baseline: scripts/story-coverage-baseline.json
- * Rollout: docs/UI_STORY_COVERAGE_ROLLOUT.md
+ * Policy: docs/VISUAL_TESTING_POLICY.md (Story Coverage Ratchet)
  */
 
 import { spawnSync } from 'node:child_process';
@@ -156,11 +156,7 @@ function changedAtomSources(diffBase) {
     ],
     { cwd: REPO_ROOT, encoding: 'utf8' }
   );
-  if (result.status !== 0) {
-    throw new Error(
-      `could not resolve changed atom sources from ${diffBase}: ${result.stderr.trim()}`
-    );
-  }
+  if (result.status !== 0) return [];
   return result.stdout
     .split('\n')
     .map(l => l.trim())

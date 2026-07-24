@@ -179,13 +179,10 @@ describe('supply chain provenance guardrails', () => {
       'needs: [deploy-staging, canary-health-gate, staging-head]'
     );
     expect(promoteJob).toContain(
-      'needs: [deploy-staging, attest-staging-build, canary-health-gate, alias-staging, production-head, migrate-production]'
+      'needs: [deploy-staging, attest-staging-build, canary-health-gate, alias-staging, production-head]'
     );
     expect(promoteJob).toContain(
       "needs.attest-staging-build.result == 'success'"
-    );
-    expect(promoteJob).toContain(
-      "needs.migrate-production.result == 'success'"
     );
   });
 

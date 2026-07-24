@@ -65,7 +65,7 @@ export function normalizeHandleCandidate(
   handle: string | null | undefined
 ): string {
   if (!handle) return '';
-  return normalizeUsername(handle.trim().replace(/^@+/, ''));
+  return normalizeUsername(handle.replace(/^@+/, '').trim());
 }
 
 /**

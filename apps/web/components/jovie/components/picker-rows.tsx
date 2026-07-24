@@ -15,7 +15,6 @@
 import {
   Calendar,
   CheckSquare,
-  Columns2,
   Image as ImageIcon,
   Link2Off,
   Link as LinkIcon,
@@ -45,7 +44,6 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Music,
   Users,
   CheckSquare,
-  Columns2,
   Settings,
   Calendar,
 };

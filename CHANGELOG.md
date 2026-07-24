@@ -6,19 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
-- [internal] **macOS desktop packaging accepts the secured XML parser:** Electron Builder's property-list dependency now supplies the MIME type required by the repository's security-patched xmldom floor, so signed and notarized desktop releases can reach artifact creation again.
-- **Desktop recovery stays quiet and actionable (JOV-4539):** the renderer-failure fallback now keeps just the recovery action and browser escape hatch on a calm System B canvas, without diagnostic runtime chrome or a heavy error card.
-- **macOS sign-in cancellation returns to Jovie:** if a native auth redirect leaves the hidden desktop window blank, canceling sign-in now restores the canonical sign-in shell instead of showing a black window.
-- [internal] **Desktop memory baseline evidence (JOV-2712):** the Electron shell can now capture bounded main/renderer RSS and macOS physical-footprint samples, record clean shutdown evidence, and classify growth regressions without claiming native leak proof when the platform tool is unavailable.
-- [internal] **Desktop packaging toolchain updated:** Electron Builder now uses 26.15.3 for current signing, notarization, and installer support.
-- **Profile rail edits no longer flicker back to stale data (JOV-4450):** concurrent optimistic bio/link changes keep the newest paint while dashboard/chat hydrations merge by CAS version and skip clobbering mid-save.
-- **Homepage hero focuses the next-move promise (JOV-4475):** approved music-forward headline and supporting line stay primary, Get started remains the sole conversion action, and See a live profile is quiet secondary proof on a truthful product screenshot.
-- [internal] **Manual Full E2E shards now run concurrently (JOV-4483):** all four hosted Preview shards can start together while retaining fail-fast behavior, shared Neon setup, Playwright workers, and cleanup.
-- [internal] **Merge-group visual CI harness repair:** the filtered web workspace can resolve the repository Chromatic config again, DB-free mobile overflow excludes only explicitly database-backed redirects, and a forward-only Storybook audit now requires five clean runs before newly opened UI PRs can be gated.
-- [internal] **Bounded `ci-fast` lane groups (JOV-4477):** independent typecheck and remaining fast-gate checks now run in two hosted groups while preserving the single required `ci-fast` result and complete lane diagnostics.
-- **Library now reads as one compact workspace:** one canonical header toolbar replaces the duplicate search and text-heavy controls, release dates are first-class row information, and the table/footer align to the shared app-shell grid without nested carding.
-- [internal] **Production release-route smoke readiness:** the authenticated canary now waits for the canonical releases-library redirect and meaningful main content instead of taking an immediate visibility snapshot during the streamed route transition.
-- **Unified app shell migration:** the authenticated app now uses one canonical customer/OV navigation model, header search, route-shaped loading states, chat home, Library filters, release/tour-date/profile rails, audio controls, and privacy-safe navigation telemetry. Better Auth production-artifact tests, route-specific readiness contracts, optimistic profile edit concurrency, and a 21-route performance matrix cover the migration end to end.
 - [internal] **Next.js security update (JOV-2569):** upgraded every application to Next.js 16.2.11, patching middleware authorization bypass, SSRF, Server Action disclosure and denial-of-service, cache-confusion, and image-optimization vulnerabilities.
 - [internal] **JavaScript, Ruby, and Python dependency audits now report zero known findings (JOV-2569):** patched Better Auth OAuth audience binding, Sharp/libvips image processing, Vitest browser file access, request parsing, archive handling, HTTP client, and Pytest vulnerabilities; CI Python tooling installs from a fully hashed lockfile, and automated lint repair bootstraps pnpm through Corepack.
 - **[internal] Audio analysis now has a canonical provider-neutral core (JOV-4385):** BPM and confidence units, traditional/Camelot/Open Key notation, analyzer provenance, input hashes, and bounded offline-worker requests are typed and mutation-tested without coupling the product model to a specific analyzer.
@@ -27,8 +14,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **App shell loading skeleton** matches `DESIGN_V1` so flag-on users no longer flash the legacy sidebar/header on first `/app` paint.
 
 - [internal] **Post-deploy probes now identify CLI-built production deployments (JOV-4366):** exact immutable build identity replaces optional Vercel source metadata while preserving project, deployment, origin, environment, and main-ancestry proofs.
-- **[internal] Audio playback has one canonical transition contract (JOV-3689):** loading, audible playback, buffering, seeking, stalls, interruptions, completion, and errors are defined in a typed, mutation-tested state machine for playback surfaces to adopt.
-- **[internal] Canonical audio contract foundation (JOV-3685):** one typed package now defines Jovie's MP3, WAV, FLAC, AIFF, AAC, and M4A format registry, MIME aliases, extensions, upload policies, and branded time/BPM units with mutation-tested invariants.
+- **Waveform trimming no longer interrupts preview audio (JOV-2929):** trim updates keep one media element alive, playhead and trim handles work from the keyboard, decode failures can be retried without collapsing the editor, and local play/seek latency is measured.
 - **[internal] Staging Better Auth Google OAuth credentials now reach the Vercel build and runtime deploy (#14659):** the release workflow allowlists and forwards both Google client keys, failing closed when either is absent.
 
 ## [26.7.0] - 2026-07-21
@@ -138,7 +124,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- **Profile previews now fully cover the mobile app shell (JOV-4464):** opening the full-screen profile preview no longer leaves the shell header painted above the drawer, while desktop right-rail layering stays unchanged.
 - [internal] **Hermes/OpenClaw agent config health**: adds a launchd-backed sentinel for recurring Telegram-dispatched agent failures, catching stale Hermes fallback models, paid OpenRouter fallbacks, and schema-clobbered OpenClaw `memorySearch` blocks before gateway churn.
 - **Smoother dashboard interactions (JOV-3800)**: opening a release, contact, or tour-date panel from chat now shows the details instantly instead of a brief loading state; settings pages no longer nudge when a change is being saved; and the calendar keeps its layout steady while it first loads.
 - [internal] Pre-push Biome gate scopes to changed files (mirroring CI) instead of a repo-wide `biome check .`, so pre-existing Biome drift on `main` no longer blocks `git push` from every worktree and stops training agents toward the `JOVIE_SKIP_PRE_PUSH_GATE=1` escape hatch (GitHub #12475).

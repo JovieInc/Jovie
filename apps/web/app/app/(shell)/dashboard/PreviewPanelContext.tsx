@@ -20,8 +20,6 @@ export interface PreviewPanelLink {
   category?: 'social' | 'music' | 'commerce' | 'other';
   isVisible: boolean;
   verificationStatus?: 'unverified' | 'pending' | 'verified';
-  /** Compare-and-swap token for link state mutations. */
-  version?: number;
 }
 
 export interface PreviewPanelData {
@@ -33,8 +31,6 @@ export interface PreviewPanelData {
   location: string | null;
   hometown: string | null;
   activeSinceYear: number | null;
-  /** Compare-and-swap token for dashboard profile edits. */
-  profileEditVersion?: number;
   links: PreviewPanelLink[];
   profilePath: string;
   dspConnections: {

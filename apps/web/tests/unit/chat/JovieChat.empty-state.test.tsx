@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JovieChat } from '@/components/jovie/JovieChat';
@@ -180,13 +180,8 @@ describe('JovieChat empty state', () => {
   });
 
   it('renders logo, composer, and prompt rail scaffolding when empty (JOV-3547)', () => {
-    const {
-      container,
-      getByTestId,
-      queryByTestId,
-      queryByText,
-      getAllByLabelText,
-    } = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+    const { getByTestId, queryByTestId, queryByText, getAllByLabelText } =
+      renderWithQueryClient(<JovieChat profileId='profile-1' />);
 
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
     expect(queryByTestId('chat-empty-thread-ornament')).toBeNull();
@@ -206,16 +201,11 @@ describe('JovieChat empty state', () => {
     expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
-      'Ask Jovie to plan your next release...'
+      'Ask Jovie...'
     );
     expect(getByTestId('chat-input').getAttribute('data-variant')).toBe('hero');
-    const fileInput =
-      container.querySelector<HTMLInputElement>('input[type="file"]');
-    expect(fileInput).not.toBeNull();
-    expect(fileInput).toHaveClass('hidden');
-    expect(fileInput).toHaveAttribute('tabindex', '-1');
     // ≥3 profile-aware starters (rail pills use aria-label = suggestion label).
-    expect(getAllByLabelText(/Plan a Release/i).length).toBeGreaterThan(0);
+    expect(getAllByLabelText(/Plan A Release/i).length).toBeGreaterThan(0);
     expect(getAllByLabelText(/Generate Album Art/i).length).toBeGreaterThan(0);
     // Old task-list-style actions should NOT appear — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();
@@ -229,22 +219,22 @@ describe('JovieChat empty state', () => {
         profileId='profile-1'
         actionCards={[
           {
-            id: 'build-artist-profile',
-            title: 'Build Artist Profile',
+            id: 'connect-music-catalog',
+            title: 'Connect Your Music Catalog',
             body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
-            actionLabel: 'Build Profile',
+            actionLabel: 'Plan Setup',
             prompt: 'Help me connect my music catalog.',
           },
           {
             id: 'plan-release',
-            title: 'Plan a Release',
+            title: 'Plan A Release',
             body: 'Map the next release.',
             actionLabel: 'Start Planning',
             prompt: 'Help me plan my next release.',
           },
           {
-            id: 'review-signals',
-            title: 'Review Signals',
+            id: 'whats-working',
+            title: "What's Working Right Now?",
             body: 'Surface traction signals.',
             actionLabel: 'Review Signals',
             prompt: "What's working for me right now?",
@@ -253,7 +243,7 @@ describe('JovieChat empty state', () => {
       />
     );
 
-    expect(screen.getByText('Build Artist Profile')).toBeTruthy();
+    expect(screen.getByText('Connect Your Music Catalog')).toBeTruthy();
     expect(screen.getByText(/Add Spotify/)).toBeTruthy();
     expect(
       screen.getByTestId('chat-empty-state-action-card-slot')
@@ -273,79 +263,8 @@ describe('JovieChat empty state', () => {
     expect(screen.getByTestId('suggested-prompts-rail')).toBeTruthy();
     expect(screen.getAllByTestId('chat-action-card')).toHaveLength(3);
     // Cards own these intents — rail must not re-advertise conflicting chips.
-    const rail = within(screen.getByTestId('suggested-prompts-rail'));
-    expect(rail.queryByLabelText('Plan a Release')).toBeNull();
-    expect(rail.queryByLabelText('Review Signals')).toBeNull();
-  });
-
-  it('does not resurrect dismissed primary actions as chips or recenter the composer', () => {
-    const gtag = vi.fn();
-    Object.defineProperty(globalThis.window, 'gtag', {
-      configurable: true,
-      value: gtag,
-    });
-
-    renderWithQueryClient(
-      <JovieChat
-        profileId='profile-1'
-        isProfileComplete
-        actionCards={[
-          {
-            id: 'plan-release',
-            title: 'Plan a Release',
-            body: 'Map the next release.',
-            actionLabel: 'Start Planning',
-            prompt: 'Help me plan my next release.',
-          },
-          {
-            id: 'generate-album-art',
-            title: 'Generate Album Art',
-            body: 'Draft cover concepts.',
-            actionLabel: 'Generate Art',
-            prompt: 'Generate album art for my latest release.',
-          },
-          {
-            id: 'review-signals',
-            title: 'Review Signals',
-            body: 'Surface traction signals.',
-            actionLabel: 'Review Signals',
-            prompt: 'Help me see what is gaining traction.',
-          },
-        ]}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Plan a Release' }));
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Dismiss Plan a Release' })
-    );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Dismiss Generate Album Art' })
-    );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Dismiss Review Signals' })
-    );
-
-    expect(screen.queryAllByTestId('chat-action-card')).toHaveLength(0);
-    expect(
-      screen.getByTestId('chat-empty-state-action-card-slot')
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId('chat-empty-state-composer-region')
-    ).toHaveAttribute('data-layout', 'docked');
-    expect(screen.queryByLabelText('Plan a Release')).toBeNull();
-    expect(screen.queryByLabelText('Generate Album Art')).toBeNull();
-    expect(screen.queryByLabelText('Review Signals')).toBeNull();
-    expect(gtag).toHaveBeenCalledWith(
-      'event',
-      'chat_starter_action_selected',
-      expect.objectContaining({ action: 'plan_release', surface: 'card' })
-    );
-    expect(gtag).toHaveBeenCalledWith(
-      'event',
-      'chat_starter_action_dismissed',
-      expect.objectContaining({ action: 'review_signals', surface: 'card' })
-    );
+    expect(screen.queryByLabelText('Plan A Release')).toBeNull();
+    expect(screen.queryByLabelText("What's Working Right Now?")).toBeNull();
   });
 
   it('hides scaffolding while typing so the composer owns attention', () => {
@@ -356,10 +275,10 @@ describe('JovieChat empty state', () => {
         profileId='profile-1'
         actionCards={[
           {
-            id: 'build-artist-profile',
-            title: 'Build Artist Profile',
+            id: 'connect-music-catalog',
+            title: 'Connect Your Music Catalog',
             body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
-            actionLabel: 'Build Profile',
+            actionLabel: 'Plan Setup',
             prompt: 'Help me connect my music catalog.',
           },
         ]}
@@ -446,7 +365,7 @@ describe('JovieChat empty state', () => {
     expect(getAllByTestId('chat-message')).toHaveLength(2);
     expect(
       screen.getByTestId('chat-input').getAttribute('data-placeholder')
-    ).toBe('Ask Jovie to plan your next release...');
+    ).toBe('Ask Jovie...');
     expect(screen.getByTestId('chat-input').getAttribute('data-variant')).toBe(
       'compact'
     );

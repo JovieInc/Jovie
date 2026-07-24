@@ -34,7 +34,6 @@ vi.mock('@/components/organisms/table', async importOriginal => {
     UnifiedTable: ({
       data,
       getRowClassName,
-      isLoading,
       onRowClick,
     }: {
       readonly data: EditableContact[];
@@ -42,7 +41,6 @@ vi.mock('@/components/organisms/table', async importOriginal => {
         row: EditableContact,
         index: number
       ) => string;
-      readonly isLoading?: boolean;
       readonly onRowClick?: (row: EditableContact) => void;
     }) => {
       const firstRowClassName = data[0]
@@ -52,7 +50,6 @@ vi.mock('@/components/organisms/table', async importOriginal => {
       return (
         <div
           data-first-row-class={firstRowClassName}
-          data-loading={String(isLoading)}
           data-testid='contacts-unified-table'
         >
           {data[0] ? (
@@ -148,26 +145,5 @@ describe('ContactsTable', () => {
     );
     expect(setHeaderActions).toHaveBeenCalled();
     expect(setTableMeta).toHaveBeenCalled();
-  });
-
-  it('forwards loading state to the table instead of showing a false empty state', () => {
-    render(
-      <ContactsTable
-        contacts={[]}
-        artistName='Tim White'
-        isLoading
-        onUpdate={() => undefined}
-        onSave={async () => undefined}
-        onDelete={() => undefined}
-        onAddContact={() => undefined}
-      />
-    );
-
-    expect(screen.getByTestId('contacts-table')).toBeInTheDocument();
-    expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
-      'data-loading',
-      'true'
-    );
-    expect(screen.queryByText('No Contacts Yet')).not.toBeInTheDocument();
   });
 });

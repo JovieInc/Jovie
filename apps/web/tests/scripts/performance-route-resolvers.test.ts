@@ -9,7 +9,7 @@ afterEach(() => {
 describe('performance-route-resolvers', () => {
   it('recovers when the release lookup hangs', async () => {
     vi.stubEnv('DATABASE_URL', 'postgres://test');
-    vi.stubEnv('E2E_BETTER_AUTH_USER_ID', 'ba_test_user');
+    vi.stubEnv('E2E_CLERK_USER_ID', 'clerk_test_user');
     vi.stubEnv('PERF_ROUTE_DB_TIMEOUT_MS', '10');
 
     const sqlMock = vi.fn((strings: TemplateStringsArray) => {

@@ -102,10 +102,9 @@ describe('ci-harness manifest', () => {
       expect(gate.remediation, gate.id).toMatch(/\S/);
       expect(gate.tier, gate.id).toMatch(/\S/);
     }
-    // Non-gate audit/deploy/cleanup jobs must not pollute PR Ready documentation.
+    // Non-gate deploy/cleanup jobs must not pollute PR Ready documentation.
     const nonGates = (manifest.jobs ?? []).filter(job => !job.mergeGate);
     expect(nonGates.map(job => job.name)).toEqual([
-      'UI Story Coverage Audit (shadow)',
       'Lighthouse (public routes manual)',
       'Lighthouse (dashboard manual)',
       'Lighthouse (onboarding manual)',
@@ -282,55 +281,6 @@ describe('ci-harness manifest', () => {
     expect(workflow).not.toMatch(
       /contains\(github\.event\.pull_request\.labels[^\n]*(?:deep-ci|launch-candidate|deploy-preview|testing)/
     );
-  });
-
-  it('runs manual Full E2E as four concurrent shared-Neon shards', () => {
-    const workflow = readFileSync(
-      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
-      'utf8'
-    );
-    const e2e = extractWorkflowJobBlock(workflow, 'ci-e2e-tests');
-    const neonDb = extractWorkflowJobBlock(workflow, 'neon-db');
-    const playwrightConfig = readFileSync(
-      resolve(REPO_ROOT, 'apps/web/playwright.config.ts'),
-      'utf8'
-    );
-
-    expect(e2e).toContain('name: Full E2E (Preview)');
-    expect(e2e).toContain('environment: Preview – jovie');
-    expect(e2e).toContain(
-      'needs: [ci-path-changes, ci-build-public, neon-db, ci-e2e-migrate]'
-    );
-    expect(e2e).toContain("github.event_name == 'workflow_dispatch'");
-    expect(e2e).toMatch(
-      /strategy:\n\s+fail-fast: true\n\s+# Run all four E2E shards concurrently; each reuses the shared Neon artifact\.\n\s+max-parallel: 4\n\s+matrix:\n\s+shard: \[1, 2, 3, 4\]/
-    );
-    expect(e2e).toContain('echo "SHARD_TOTAL=4" >> "$GITHUB_ENV"');
-    expect(e2e).toContain(
-      'echo "SHARD_INDEX=${{ matrix.shard }}" >> "$GITHUB_ENV"'
-    );
-    expect(e2e).toContain(
-      'name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
-    );
-    expect(e2e).toContain(
-      'connection_file: ${{ runner.temp }}/neon-db-connection/connection.json'
-    );
-    expect(e2e).toContain('RESOLVED_DB_SOURCE=neon-artifact');
-    expect(e2e).toContain('guard-playwright-artifacts.mjs');
-    expect(e2e).toContain('--shard=${SHARD_INDEX}/${SHARD_TOTAL}');
-    expect(e2e).toContain(
-      'uses: ./.github/actions/upload-safe-playwright-artifact'
-    );
-    expect(e2e).not.toContain('neon-create-branch-with-retry');
-    expect(neonDb).toContain('uses: ./.github/actions/neon-branch-cleanup');
-    expect(neonDb).toContain(
-      'name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
-    );
-
-    // The matrix cap changes process-level fan-out only; full-suite Playwright
-    // workers and the smoke override remain unchanged.
-    expect(playwrightConfig).toContain('return isSmokeOnly ? 8 : 4;');
-    expect(playwrightConfig).toContain('workers: getWorkers(),');
   });
 
   it('binds the production Sentry gate to its environment before reading secrets', () => {

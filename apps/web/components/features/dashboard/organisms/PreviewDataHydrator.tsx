@@ -50,7 +50,6 @@ function convertSocialLinksToPreviewLinks(
       platform: link.platform,
       platformType: toValidPlatformType(link.platformType),
       isVisible: link.isActive !== false,
-      version: link.version ?? 1,
     }));
 }
 
@@ -94,7 +93,6 @@ export function PreviewDataHydrator({
       location: selectedProfile.location ?? null,
       hometown: getHometownFromSettings(selectedProfile.settings) ?? null,
       activeSinceYear: selectedProfile.activeSinceYear ?? null,
-      profileEditVersion: selectedProfile.profileEditVersion,
       links: previewLinks,
       profilePath: `/${canonicalUsername}`,
       dspConnections: {

@@ -7,11 +7,12 @@ import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_KEYS,
   APP_FLAG_TO_STATSIG_GATE,
+  DESIGN_V1_ALIAS_FLAGS,
   LEGACY_STATSIG_GATE_KEYS,
   LOCAL_DEFAULT_ONLY_FLAGS,
 } from '@/lib/flags/contracts';
 
-const SOURCE_DIRECTORIES = ['app', 'components', 'hooks', 'lib', 'scripts'];
+const SOURCE_DIRECTORIES = ['app', 'components', 'hooks', 'lib'];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
 
 const SKIP_DIRECTORIES = new Set([
@@ -127,57 +128,42 @@ describe('feature flag registry integrity', () => {
   });
 
   it('does not include API chat-specific feature flags in the registry', () => {
-    const allowedChatEntries = new Set<string>([
+    const allowedShellRolloutEntries = new Set<string>([
+      'DESIGN_V1',
+      LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
+      'SHELL_CHAT_V1',
+      LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1,
+      'DESIGN_V1_CHAT_ENTITIES',
+      LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_CHAT_ENTITIES,
       // CHAT_JANK_MONITOR is a legitimate app-level instrumentation flag backed
       // by a Statsig gate; it is not an API-chat-only flag.
       'CHAT_JANK_MONITOR',
       LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR,
     ]);
     const chatFlagsInKeys = Object.keys(LEGACY_STATSIG_GATE_KEYS).filter(
-      key => /chat/i.test(key) && !allowedChatEntries.has(key)
+      key => /chat/i.test(key) && !allowedShellRolloutEntries.has(key)
     );
     const chatFlagsInValues = Object.values(LEGACY_STATSIG_GATE_KEYS).filter(
-      flag => /chat/i.test(flag) && !allowedChatEntries.has(flag)
+      flag => /chat/i.test(flag) && !allowedShellRolloutEntries.has(flag)
     );
 
     expect([...chatFlagsInKeys, ...chatFlagsInValues]).toEqual([]);
   });
 
-  it('keeps the retired design rollout family out of every runtime contract', () => {
-    const retiredFlags = [
-      'DESIGN_V1',
-      'SHELL_CHAT_V1',
-      'DESIGN_V1_RELEASES',
-      'DESIGN_V1_TASKS',
-      'DESIGN_V1_CHAT_ENTITIES',
-      'DESIGN_V1_LYRICS',
-      'DESIGN_V1_LIBRARY',
-      'DESIGN_V1_AUTH',
-      'DESIGN_V1_ONBOARDING',
-    ];
+  it('keeps DESIGN_V1 and aliases permanently enabled (no Statsig gate, default true)', () => {
+    // DESIGN_V1 is the only design. It must NOT be backed by a Statsig gate
+    // (so a misconfigured gate cannot turn off the new design in production).
+    // All entries live in LOCAL_DEFAULT_ONLY_FLAGS with default=true.
+    const statsigBackedFlags = new Set(Object.keys(APP_FLAG_TO_STATSIG_GATE));
 
-    for (const flagName of retiredFlags) {
-      expect(APP_FLAG_DEFAULTS).not.toHaveProperty(flagName);
-      expect(APP_FLAG_KEYS).not.toHaveProperty(flagName);
-      expect(APP_FLAG_TO_STATSIG_GATE).not.toHaveProperty(flagName);
-      expect(LEGACY_STATSIG_GATE_KEYS).not.toHaveProperty(flagName);
-      expect([...LOCAL_DEFAULT_ONLY_FLAGS]).not.toContain(flagName);
+    expect(statsigBackedFlags.has('DESIGN_V1')).toBe(false);
+    expect(LOCAL_DEFAULT_ONLY_FLAGS.has('DESIGN_V1')).toBe(true);
+    expect(APP_FLAG_DEFAULTS.DESIGN_V1).toBe(true);
 
-      const productionReferences = SOURCE_CORPUS.filter(({ source }) =>
-        source.includes(flagName)
-      ).map(({ relativePath }) => relativePath);
-      expect(productionReferences).toEqual([]);
-    }
-
-    for (const retiredShellMarker of [
-      'shellChatV1',
-      'data-shell-design',
-      'data-design-v1-auth',
-    ]) {
-      const productionReferences = SOURCE_CORPUS.filter(({ source }) =>
-        source.includes(retiredShellMarker)
-      ).map(({ relativePath }) => relativePath);
-      expect(productionReferences).toEqual([]);
+    for (const aliasFlag of DESIGN_V1_ALIAS_FLAGS) {
+      expect(statsigBackedFlags.has(aliasFlag)).toBe(false);
+      expect(LOCAL_DEFAULT_ONLY_FLAGS.has(aliasFlag)).toBe(true);
+      expect(APP_FLAG_DEFAULTS[aliasFlag]).toBe(true);
     }
   });
 
@@ -192,6 +178,11 @@ describe('feature flag registry integrity', () => {
     expect(docs).toContain('`ai_chat_disabled`');
     expect(docs).toContain('`ai_chat_force_light`');
     expect(docs).toContain('`profile_alert_optin_cta_variant`');
+
+    for (const aliasFlag of DESIGN_V1_ALIAS_FLAGS) {
+      const legacyGateKey = LEGACY_STATSIG_GATE_KEYS[aliasFlag];
+      expect(docs).not.toContain(`| \`${legacyGateKey}\` |`);
+    }
   });
 
   it('documents the server-only Statsig environment contract', () => {

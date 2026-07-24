@@ -63,7 +63,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout exact PR head
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
@@ -88,7 +88,7 @@ jobs:
           echo "sha256=$context_sha" >> "$GITHUB_OUTPUT"
 
       - name: Expose GitHub Actions cache runtime to BuildKit
-        uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
+        uses: crazy-max/ghaction-github-runtime@3cb05d89e1f492524af3d41a1c98c83bc3025124 # v3
 
       - name: Build twice and prove the dependency layer is cached
         shell: bash
@@ -220,7 +220,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout exact PR head
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
@@ -312,7 +312,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - name: Checkout exact main push
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -337,7 +337,7 @@ jobs:
     steps:
       - name: Checkout trusted runner routing policy
         continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: main
           fetch-depth: 1
@@ -355,8 +355,6 @@ jobs:
           GH_REPO: ${{ github.repository }}
           HEARTBEAT_MAX_AGE_SECONDS: '900'
           HEARTBEAT_API_TIMEOUT_SECONDS: '5'
-          HEARTBEAT_JOB_POLL_ATTEMPTS: '3'
-          HEARTBEAT_JOB_POLL_INTERVAL_SECONDS: '2'
           HEARTBEAT_EXPECTED_EVENT: ''
           HEARTBEAT_EXPECTED_SHA: ''
           HEARTBEAT_POLL_ATTEMPTS: '10'
@@ -410,7 +408,7 @@ jobs:
 
   # ── Centralized deterministic path-change detection ────────────────────
   # Source and combined heads compute their own exact diff. The former
-  # Vendor queue reuse actions are intentionally absent: native queue provenance
+  # Graphite reuse action is intentionally absent: native queue provenance
   # cannot rely on an external source-branch skip decision.
   ci-path-changes:
     name: Path Changes
@@ -449,7 +447,7 @@ jobs:
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           # Blobless partial clone: full commit graph for merge-base/diff
           # (names only), no historical file contents. Cuts the clone from
@@ -729,7 +727,7 @@ jobs:
       contents: read
     steps:
       - name: Check out trusted admission policy
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           # ALLGREEN prefix groups may use a prior synthetic commit as
           # merge_group.base_sha. The live default branch is the trusted policy
@@ -773,7 +771,7 @@ jobs:
       recommended_labels: ${{ steps.classify.outputs.recommended_labels }}
       matched_rule_ids: ${{ steps.classify.outputs.matched_rule_ids }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
           filter: blob:none
@@ -876,7 +874,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with: { fetch-depth: 1 }
       - name: Validate .env.example contains placeholders only
         run: |
@@ -921,7 +919,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           # Full history fetches every branch and tag, which made this fast gate
           # spend 5+ minutes in an effectively non-cancellable checkout. The
@@ -978,72 +976,21 @@ jobs:
       - name: Verify backup-file fixture coverage
         run: ./scripts/security/verify-gitleaks-coverage.sh
 
-  ci-fast-typecheck:
-    name: ci-fast (typecheck)
-    # JOV-4477: dedicated jobs keep structural Docker/Python action setup out of
-    # the typecheck path while preserving parallel hosted fan-out.
+  ci-fast:
+    name: ci-fast
+    # JOV-3464: fold cheap cluster into one job (checkout+install once).
+    # Lanes: biome, eslint server-boundaries, typecheck --force, guardrails,
+    # structural (path-gated). Per-lane PASS/FAIL via scripts/ci-fast-lanes.mjs
+    # (--continue semantics; never set -e out on first failure). Heavy lanes
+    # (build / Lighthouse / e2e / preview) stay separate.
     needs: [ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
+    # Setup (checkout + install, ~2m) + ci-fast lanes via scripts/ci-fast-lanes.mjs
+    # (biome, eslint-server-boundaries, typecheck, guardrails, ios-fast,
+    # structural) must fit without the job canceling a healthy run.
     timeout-minutes: 25
     if: >-
-      !cancelled() &&
-      needs.ci-path-changes.result == 'success' &&
-      (
-        github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
-      )
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Validate CI/release incident prevention contract
-        # This is intentionally outside the path-gated Structural Contract.
-        # The required prevention receipt must exist for every source PR and
-        # exact merge-group head, even when no contract file changed.
-        run: pnpm ci:incident-contract:validate
-      - name: Verify Node and tsx seed-loader compatibility
-        shell: bash
-        run: |
-          if ! output=$(node --import tsx --import ./apps/web/tests/eval/promptfoo/server-only-preload.mjs -e 'console.log("seed-loader-runtime-ok")' 2>&1); then
-            echo "::error title=Node/tsx runtime drift::The .nvmrc runtime cannot load the Promptfoo seed hook through tsx. Align the Node pin and seed-loader API before retrying CI."
-            printf '%s\n' "$output"
-            exit 1
-          fi
-          printf '%s\n' "$output"
-      - name: Cache Turbo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ hashFiles('turbo.json', '**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-      - name: Run ci-fast lanes
-        id: lanes
-        env:
-          CI_FAST_LANE_GROUP: typecheck
-          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || ((github.base_ref && format('origin/{0}', github.base_ref)) || '') }}
-          CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json
-        run: node scripts/ci-fast-lanes.mjs
-      - name: Upload ci-fast lane results
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ci-fast-lanes-typecheck-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ci-fast-lanes.json
-          retention-days: 7
-          if-no-files-found: warn
-
-  ci-fast-remaining:
-    name: ci-fast (remaining)
-    # JOV-4477: the structural Docker/Python actions stay isolated to the
-    # remaining group, where their path-gated lane can actually run.
-    needs: [ci-path-changes, ci-merge-group-admission]
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    if: >-
-      !cancelled() &&
+      always() &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
@@ -1054,7 +1001,7 @@ jobs:
       SHELLCHECK_OPTS: >-
         --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
       - uses: ./.github/actions/setup-node-pnpm
@@ -1092,7 +1039,7 @@ jobs:
           # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
           # desktop-release-guard / version-fanout-guard on PRs.
           git fetch origin "${{ github.base_ref }}" --no-tags
-          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|scripts/lib/(ci-|merge-queue)|scripts/lib/__tests__/(ci-fast-workflow-contract|merge-group-workflow-contract)\.test\.mjs|scripts/ci-|scripts/brand-scrub\.py|scripts/tests/test_(brand_scrub|agent_workflow_hygiene|vercel_prebuilt_deploy)\.py)'; then
+          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|scripts/lib/(ci-|merge-queue)|scripts/ci-|scripts/brand-scrub\.py|scripts/tests/test_(brand_scrub|agent_workflow_hygiene|vercel_prebuilt_deploy)\.py)'; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -1102,7 +1049,7 @@ jobs:
         uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
       - name: Set up Python (structural regression tests)
         if: steps.structural.outputs.skip != 'true'
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
       - name: Install pytest (structural regression tests)
@@ -1111,53 +1058,19 @@ jobs:
       - name: Run ci-fast lanes
         id: lanes
         env:
-          CI_FAST_LANE_GROUP: remaining
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || ((github.base_ref && format('origin/{0}', github.base_ref)) || '') }}
           CI_FAST_SKIP_STRUCTURAL: ${{ steps.structural.outputs.skip }}
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json
         run: node scripts/ci-fast-lanes.mjs
       - name: Upload ci-fast lane results
-        if: ${{ !cancelled() }}
+        if: always()
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ci-fast-lanes-remaining-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ci-fast-lanes-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-fast-lanes.json
           retention-days: 7
           if-no-files-found: warn
-
-  ci-fast:
-    name: ci-fast
-    # Preserve the required ci-fast context and fail closed for every dedicated
-    # child outcome, including failure, cancellation, and skipped groups.
-    needs:
-      [
-        ci-path-changes,
-        ci-merge-group-admission,
-        ci-fast-typecheck,
-        ci-fast-remaining,
-      ]
-    if: >-
-      always() &&
-      needs.ci-path-changes.result == 'success' &&
-      (
-        github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
-      )
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    steps:
-      - name: Require every ci-fast lane group to pass
-        env:
-          TYPECHECK_RESULT: ${{ needs.ci-fast-typecheck.result }}
-          REMAINING_RESULT: ${{ needs.ci-fast-remaining.result }}
-        run: |
-          set -euo pipefail
-          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then
-            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT"
-            exit 1
-          fi
-          echo "All ci-fast lane groups passed: typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT"
 
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
@@ -1192,7 +1105,7 @@ jobs:
       PROMPTFOO_DISABLE_UPDATE: '1'
       PROMPTFOO_NO_TESTCASE_ASSERT_WARNING: '1'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
       - name: Validate Promptfoo config
@@ -1229,7 +1142,7 @@ jobs:
       JOVIE_RUN_LIVE_HTTP_RATE_LIMIT_EVALS: '0'
       JOVIE_RUN_LIVE_HTTP_MODEL_ERROR_EVALS: '0'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run golden eval-set CI gate
@@ -1243,7 +1156,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Knip (unused files, deps & exports)
@@ -1264,7 +1177,7 @@ jobs:
     outputs:
       branch_name: ${{ steps.sanitize-branch.outputs.name }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -1392,7 +1305,7 @@ jobs:
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
       - name: Check for relevant changes
@@ -1431,7 +1344,7 @@ jobs:
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -1528,7 +1441,7 @@ jobs:
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 2
           persist-credentials: false
@@ -1659,7 +1572,7 @@ jobs:
           git reset --hard HEAD 2>/dev/null || true
           git clean -ffdx 2>/dev/null || true
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 2
           clean: true
@@ -1786,7 +1699,7 @@ jobs:
           git reset --hard HEAD 2>/dev/null || true
           git clean -ffdx 2>/dev/null || true
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           clean: true
           persist-credentials: false
@@ -1898,7 +1811,7 @@ jobs:
       matrix:
         width: [320, 390, 430]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -2113,7 +2026,7 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
@@ -2319,7 +2232,7 @@ jobs:
       group: neon-endpoint-pool-ci-lighthouse-dashboard-pr-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -2482,7 +2395,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -2617,7 +2530,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -2751,7 +2664,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -2886,7 +2799,7 @@ jobs:
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -3005,7 +2918,7 @@ jobs:
           git reset --hard HEAD 2>/dev/null || true
           git clean -ffdx 2>/dev/null || true
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0 # Full history for vitest --changed (names via commit graph)
           filter: blob:none # historical blobs lazy-fetch; saves ~30s × 5 shards/run
@@ -3127,7 +3040,7 @@ jobs:
       PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results/**/*.json
       PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/axe-a11y-results.json
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -3292,7 +3205,7 @@ jobs:
     timeout-minutes: 20
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -3446,7 +3359,7 @@ jobs:
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -3640,7 +3553,7 @@ jobs:
       group: neon-endpoint-pool-ci-golden-path-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -3845,7 +3758,7 @@ jobs:
       group: neon-endpoint-pool-ci-admin-smoke-${{ (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '0') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '4') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '8')) && '0' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '1') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '5') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '9')) && '1' || (endsWith(format('{0}', github.event.pull_request.number || github.run_number), '2') || endsWith(format('{0}', github.event.pull_request.number || github.run_number), '6')) && '2' || '3' }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -3974,7 +3887,7 @@ jobs:
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -4054,12 +3967,12 @@ jobs:
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
       fail-fast: true
-      # Run all four E2E shards concurrently; each reuses the shared Neon artifact.
-      max-parallel: 4
+      # Cap E2E shard concurrency (preview env + Playwright is heavy).
+      max-parallel: 2
       matrix:
         shard: [1, 2, 3, 4]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 2
           persist-credentials: false
@@ -4287,7 +4200,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
 
@@ -4347,7 +4260,7 @@ jobs:
           git reset --hard HEAD 2>/dev/null || true
           git clean -ffdx 2>/dev/null || true
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           clean: true
           persist-credentials: false
@@ -4717,7 +4630,7 @@ jobs:
           git reset --hard HEAD 2>/dev/null || true
           git clean -ffdx 2>/dev/null || true
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
           clean: true
@@ -5029,7 +4942,7 @@ jobs:
     timeout-minutes: 20
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 1
           persist-credentials: false

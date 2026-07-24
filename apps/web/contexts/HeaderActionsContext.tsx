@@ -7,15 +7,12 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
-import { OPEN_HEADER_SEARCH_EVENT } from '@/components/shell/header-search-events';
 import type {
   FilterField,
   FilterPill,
 } from '@/components/shell/pill-search.types';
-import { isFormElement } from '@/lib/utils/keyboard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -118,70 +115,20 @@ export function HeaderActionsProvider({
   const [headerSearchAdapter, setHeaderSearchAdapter] =
     useState<HeaderSearchAdapter | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const priorFocusRef = useRef<HTMLElement | null>(null);
-  const focusRestoreFrameRef = useRef<number | null>(null);
 
-  const openSearch = useCallback(() => {
-    if (focusRestoreFrameRef.current !== null) {
-      cancelAnimationFrame(focusRestoreFrameRef.current);
-      focusRestoreFrameRef.current = null;
-    }
-    const activeElement = document.activeElement;
-    priorFocusRef.current =
-      activeElement instanceof HTMLElement ? activeElement : null;
-    setIsSearchOpen(true);
-  }, []);
-  const closeSearch = useCallback(() => {
-    if (focusRestoreFrameRef.current !== null) {
-      cancelAnimationFrame(focusRestoreFrameRef.current);
-    }
-    setIsSearchOpen(false);
-    const priorFocus = priorFocusRef.current;
-    priorFocusRef.current = null;
-    focusRestoreFrameRef.current = requestAnimationFrame(() => {
-      focusRestoreFrameRef.current = null;
-      if (priorFocus?.isConnected) priorFocus.focus();
-    });
-  }, []);
-
-  useEffect(
-    () => () => {
-      if (focusRestoreFrameRef.current !== null) {
-        cancelAnimationFrame(focusRestoreFrameRef.current);
-      }
-    },
-    []
-  );
-
+  // When the active adapter changes (route swap, page unmount), make sure
+  // the search collapses back to the breadcrumb-first state — otherwise
+  // navigating from Releases to a non-search route would leave the header
+  // stuck in the open pill surface.
+  const adapterKey = headerSearchAdapter?.key ?? null;
   useEffect(() => {
-    function onOpenSearch() {
-      openSearch();
+    if (!adapterKey) {
+      setIsSearchOpen(false);
     }
+  }, [adapterKey]);
 
-    function onKeyDown(event: KeyboardEvent) {
-      if (
-        event.defaultPrevented ||
-        event.isComposing ||
-        event.key !== '/' ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.altKey ||
-        event.shiftKey ||
-        isFormElement(event.target)
-      ) {
-        return;
-      }
-      event.preventDefault();
-      openSearch();
-    }
-
-    globalThis.addEventListener(OPEN_HEADER_SEARCH_EVENT, onOpenSearch);
-    globalThis.addEventListener('keydown', onKeyDown);
-    return () => {
-      globalThis.removeEventListener(OPEN_HEADER_SEARCH_EVENT, onOpenSearch);
-      globalThis.removeEventListener('keydown', onKeyDown);
-    };
-  }, [openSearch]);
+  const openSearch = useCallback(() => setIsSearchOpen(true), []);
+  const closeSearch = useCallback(() => setIsSearchOpen(false), []);
 
   const state = useMemo(
     () => ({ headerActions, headerBadge, headerSearchAdapter, isSearchOpen }),

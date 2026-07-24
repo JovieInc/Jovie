@@ -47,7 +47,8 @@ export interface AdminPageProps<
 /**
  * Canonical shell for every admin page.
  *
- * Provides:
+ * Replaces the legacy `AdminToolPage` (header-in-card) and `AdminWorkspacePage`
+ * (always-on tabs) wrappers. Provides:
  * - Description + actions only when needed. Route title lives in the shell
  *   breadcrumb (`DashboardHeader`) — never re-rendered here (avoids the
  *   double-"Ops" regression class).
@@ -56,6 +57,9 @@ export interface AdminPageProps<
  *   owns the route title in the shell breadcrumb, so the tabs surface renders
  *   headerless to avoid duplicate page titles.
  * - `space-y-6` outer rhythm matching the canonical dashboard.
+ *
+ * Use this for new admin pages. Existing pages can migrate incrementally — the
+ * legacy `AdminToolPage`/`AdminWorkspacePage` wrappers re-export this shell.
  */
 export function AdminPage<
   TPrimary extends string = string,

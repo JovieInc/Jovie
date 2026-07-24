@@ -26,7 +26,6 @@ export type CommonDropdownItemType =
   | 'submenu' // Nested submenu
   | 'separator' // Visual divider
   | 'label' // Section header
-  | 'action-row' // Multiple sibling actions sharing one visual row
   | 'custom'; // Custom JSX content
 
 /**
@@ -45,11 +44,6 @@ export interface CommonDropdownBaseItem {
 export interface CommonDropdownActionItem extends CommonDropdownBaseItem {
   type: 'action';
   label: string;
-  /**
-   * Replaces the standard icon/label slots while preserving menu-item semantics.
-   * Must not contain interactive descendants; the Radix menu item owns interaction.
-   */
-  content?: ReactNode;
   icon?: LucideIcon | ReactNode;
   iconAfter?: LucideIcon | ReactNode; // For trailing icons/badges
   onClick: () => void;
@@ -66,17 +60,6 @@ export interface CommonDropdownActionItem extends CommonDropdownBaseItem {
     text: string;
     color?: string; // Hex color for badge background
   };
-}
-
-/**
- * Action row - sibling Radix menu items laid out in one visual row.
- *
- * Use this instead of putting buttons inside a custom item so every action
- * participates in roving focus without nested interactive controls.
- */
-export interface CommonDropdownActionRow extends CommonDropdownBaseItem {
-  type: 'action-row';
-  items: CommonDropdownActionItem[];
 }
 
 /**
@@ -168,7 +151,6 @@ export type CommonDropdownItem =
   | CommonDropdownSubmenu
   | CommonDropdownSeparator
   | CommonDropdownLabel
-  | CommonDropdownActionRow
   | CommonDropdownCustomItem;
 
 export type CommonDropdownFilterItem =
@@ -376,10 +358,4 @@ export function isCustomItem(
   item: CommonDropdownItem
 ): item is CommonDropdownCustomItem {
   return item.type === 'custom';
-}
-
-export function isActionRow(
-  item: CommonDropdownItem
-): item is CommonDropdownActionRow {
-  return item.type === 'action-row';
 }

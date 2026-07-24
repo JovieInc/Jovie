@@ -27,10 +27,11 @@ describe('agent-branch-pattern (open-agent-PR capacity)', () => {
     expect(isOpenAgentPrBranch('Tim/JOV-123_fix')).toBe(true);
   });
 
-  it('rejects non-agent branches', () => {
+  it('rejects non-agent and merge-queue synthetic branches', () => {
     expect(isOpenAgentPrBranch('feature/foo')).toBe(false);
     expect(isOpenAgentPrBranch('hotfix/prod')).toBe(false);
     expect(isOpenAgentPrBranch('main')).toBe(false);
+    expect(isOpenAgentPrBranch('gtmq_14279')).toBe(false);
     expect(isOpenAgentPrBranch('tim/not-a-ticket')).toBe(false);
     expect(isOpenAgentPrBranch('')).toBe(false);
     expect(isOpenAgentPrBranch(null)).toBe(false);
@@ -49,11 +50,13 @@ describe('agent-branch-pattern (open-agent-PR capacity)', () => {
       { headRefName: 'codex/a' },
       { headRefName: 'tim/jov-123_fix' },
       { headRefName: 'feature/human' },
+      { headRefName: 'gtmq_1' },
     ];
     const restShape = [
       { head: { ref: 'codex/a' } },
       { head: { ref: 'tim/jov-123_fix' } },
       { head: { ref: 'feature/human' } },
+      { head: { ref: 'gtmq_1' } },
     ];
     expect(countOpenAgentPrs(prListShape)).toBe(2);
     expect(countOpenAgentPrs(restShape)).toBe(2);

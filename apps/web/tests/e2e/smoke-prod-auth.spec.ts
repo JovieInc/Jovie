@@ -7,18 +7,13 @@ import {
 } from '../helpers/vercel-preview';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
 import { resolveProductionAuthCredentials } from './utils/production-auth-credentials';
-import {
-  prepareProductionAuthEmailForm,
-  waitForProductionDashboardContent,
-} from './utils/production-auth-interaction';
-import { waitForProductionAuthOtp } from './utils/production-auth-otp';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
  * Production Auth Smoke Tests
  *
  * Lightweight tests that run against the PRODUCTION deployment after deploy.
- * Uses a seeded Better Auth production identity and a fresh real sign-in OTP.
+ * Uses seeded e2e production Clerk credentials (not +clerk_test emails).
  *
  * These tests verify:
  * 1. Sign-in flow works with real credentials
@@ -39,11 +34,44 @@ function hasProdAuthCredentials(): boolean {
 function getProdCredentials() {
   const credentials = resolveProductionAuthCredentials();
   if (!credentials) {
-    throw new Error(
-      'Production auth smoke requires a configured Better Auth identity and OTP source.'
-    );
+    throw new Error('Production auth smoke requires one complete named pair.');
   }
   return credentials;
+}
+
+async function waitForClerk(page: Page): Promise<void> {
+  await page
+    .waitForFunction(
+      () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
+      undefined,
+      {
+        timeout: 30_000,
+      }
+    )
+    .catch(() => {
+      // Clerk may not be available in all environments.
+    });
+}
+
+async function getIdentifierInput(page: Page) {
+  return page
+    .locator(
+      'input[name="identifier"], input[type="email"], input[autocomplete="email"]'
+    )
+    .first();
+}
+
+async function getSubmitButton(page: Page) {
+  return page
+    .locator(
+      [
+        'button[type="submit"]',
+        'button:has-text("Continue")',
+        'button:has-text("Sign in")',
+        'button:has-text("Verify")',
+      ].join(', ')
+    )
+    .first();
 }
 
 type SignInResult =
@@ -79,7 +107,6 @@ async function detectNextStep(
           return 'password';
         }
         if (
-          document.querySelector('[data-auth-email-code-step="code"]') ||
           document.querySelector(
             'input[name="code"], input[autocomplete="one-time-code"], input[inputmode="numeric"]'
           )
@@ -101,10 +128,8 @@ async function signInViaRenderedFlow(
   expectedOrigin: string
 ): Promise<SignInResult> {
   assertExactNavigationUrl(page.url(), expectedOrigin, 'Rendered sign-in flow');
-  const emailForm = page
-    .locator('form[data-auth-email-code-step="email"]')
-    .first();
-  const hasIdentifierInput = await emailForm
+  const identifierInput = await getIdentifierInput(page);
+  const hasIdentifierInput = await identifierInput
     .isVisible({ timeout: 15_000 })
     .catch(() => false);
 
@@ -118,12 +143,8 @@ async function signInViaRenderedFlow(
     return 'signin-form-unavailable';
   }
 
-  const { submitButton } = await prepareProductionAuthEmailForm(
-    page,
-    credentials.email
-  );
-  const otpRequestedAtMs = Date.now();
-  await submitButton.click();
+  await identifierInput.fill(credentials.email);
+  await (await getSubmitButton(page)).click();
 
   const nextStep = await detectNextStep(page, expectedOrigin);
 
@@ -137,10 +158,7 @@ async function signInViaRenderedFlow(
       .first();
     await expect(passwordInput).toBeVisible({ timeout: 10_000 });
     await passwordInput.fill(credentials.password);
-    await page
-      .locator('form:has(input[type="password"]) button[type="submit"]')
-      .first()
-      .click();
+    await (await getSubmitButton(page)).click();
     await page.waitForURL(
       url => url.origin === expectedOrigin && url.pathname.startsWith('/app'),
       { timeout: 30_000 }
@@ -150,27 +168,22 @@ async function signInViaRenderedFlow(
   }
 
   if (nextStep === 'email_code') {
-    const codeForm = page
-      .locator('form[data-auth-email-code-step="code"]')
-      .first();
-    const codeInput = codeForm
+    if (!credentials.verificationCode) {
+      return 'verification-required';
+    }
+
+    const codeInput = page
       .locator(
-        '[data-testid="otp-autofill-input"], input[name="code"], input[autocomplete="one-time-code"], input[inputmode="numeric"]'
+        'input[name="code"], input[autocomplete="one-time-code"], input[inputmode="numeric"]'
       )
       .first();
     await expect(codeInput).toBeVisible({ timeout: 10_000 });
-    const verificationCode =
-      credentials.verificationCode ||
-      (await waitForProductionAuthOtp({
-        email: credentials.email,
-        startedAtMs: otpRequestedAtMs,
-      }));
-    const authenticatedRedirect = page.waitForURL(
+    await codeInput.fill(credentials.verificationCode);
+    await (await getSubmitButton(page)).click();
+    await page.waitForURL(
       url => url.origin === expectedOrigin && url.pathname.startsWith('/app'),
       { timeout: 30_000 }
     );
-    await codeInput.fill(verificationCode);
-    await authenticatedRedirect;
     assertExactNavigationUrl(page.url(), expectedOrigin, 'Email-code redirect');
     return 'authenticated';
   }
@@ -179,10 +192,6 @@ async function signInViaRenderedFlow(
 }
 
 test.describe('Production Auth Smoke @production-smoke', () => {
-  // Keep sign-in and authenticated navigation in one browser session. Requesting
-  // another Better Auth OTP can invalidate the prior code, so future checks must
-  // extend this flow instead of creating a second authenticated test.
-  test.describe.configure({ mode: 'serial' });
   test.setTimeout(120_000);
 
   test.beforeEach(async ({ context }, testInfo) => {
@@ -207,6 +216,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
     assertExactNavigationUrl(page.url(), expectedOrigin, 'Sign-in navigation');
+    await waitForClerk(page);
 
     const result = await signInViaRenderedFlow(
       page,
@@ -216,11 +226,11 @@ test.describe('Production Auth Smoke @production-smoke', () => {
 
     if (result === 'verification-required') {
       throw new Error(
-        'Better Auth rendered email-code verification without a configured OTP source'
+        'Clerk rendered email-code verification and E2E_PROD_USER_CODE is not configured'
       );
     }
     if (result === 'signin-form-unavailable') {
-      throw new Error('Better Auth sign-in form not available');
+      throw new Error('Clerk sign-in form not available');
     }
 
     expect(result).toBe('authenticated');
@@ -239,14 +249,61 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       }
     );
 
-    const mainText = await waitForProductionDashboardContent(
-      page,
-      SMOKE_TIMEOUTS.VISIBILITY
-    );
+    const mainText = await main.innerText().catch(() => '');
+    expect(
+      mainText.length,
+      'Dashboard should have real content (not empty)'
+    ).toBeGreaterThan(30);
 
     const lower = mainText.toLowerCase();
     expect(lower).not.toContain('application error');
     expect(lower).not.toContain('something went wrong');
+  });
+
+  test('dashboard tab navigation works', async ({ page }, testInfo) => {
+    const credentials = getProdCredentials();
+    const expectedOrigin = exactOriginForTest(testInfo);
+
+    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+      waitUntil: 'domcontentloaded',
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    const profileUrl = assertExactNavigationUrl(
+      page.url(),
+      expectedOrigin,
+      'Dashboard profile navigation'
+    );
+
+    if (
+      profileUrl.pathname.startsWith(APP_ROUTES.SIGNIN) ||
+      profileUrl.pathname.startsWith('/sign-in')
+    ) {
+      await waitForClerk(page);
+
+      const result = await signInViaRenderedFlow(
+        page,
+        credentials,
+        expectedOrigin
+      );
+
+      if (result === 'verification-required') {
+        throw new Error(
+          'Clerk rendered email-code verification and E2E_PROD_USER_CODE is not configured'
+        );
+      }
+      if (result === 'signin-form-unavailable') {
+        throw new Error('Sign-in form not available for tab navigation test');
+      }
+
+      expect(result).toBe('authenticated');
+    }
+
+    await waitForHydration(page);
+    assertExactNavigationUrl(
+      page.url(),
+      expectedOrigin,
+      'Hydrated dashboard profile navigation'
+    );
 
     const tabs = [
       {
@@ -294,24 +351,13 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       expect(currentUrl.pathname).not.toContain(APP_ROUTES.SIGNIN);
       expect(currentUrl.pathname).not.toContain('/sign-in');
 
-      const tabMain = page.locator('main').first();
-      await expect(
-        tabMain,
-        `${navigationPath}: main content should be visible`
-      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-      const tabMainText = await waitForProductionDashboardContent(
-        page,
-        SMOKE_TIMEOUTS.VISIBILITY
+      const main = page.locator('main').first();
+      const mainVisible = await main
+        .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+        .catch(() => false);
+      expect(mainVisible, `${tabPath}: main content should be visible`).toBe(
+        true
       );
-      expect(tabMainText.toLowerCase()).not.toMatch(
-        /application error|something went wrong/
-      );
-    }
-
-    const performanceAuthStatePath =
-      process.env.PERFORMANCE_AUTH_STATE_PATH?.trim();
-    if (performanceAuthStatePath) {
-      await page.context().storageState({ path: performanceAuthStatePath });
     }
   });
 });

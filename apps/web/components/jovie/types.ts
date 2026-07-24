@@ -6,11 +6,6 @@ import {
 } from 'ai';
 import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
 import type { ChatInsightSummary } from '@/types/insights';
-import {
-  CHAT_STARTER_ACTION_ORDER,
-  type ChatStarterActionId,
-  starterActionToSuggestion,
-} from './starter-actions';
 
 export interface ArtistContext {
   readonly displayName: string;
@@ -60,8 +55,6 @@ export interface JovieChatProps {
   readonly username?: string;
   /** Whether the user is in their first post-onboarding chat session */
   readonly isFirstSession?: boolean;
-  /** Whether profile setup is complete, used to suppress setup quick actions. */
-  readonly isProfileComplete?: boolean;
   /** Contextual, production-backed actions surfaced in an empty thread */
   readonly actionCards?: readonly ChatActionCard[];
   /**
@@ -75,7 +68,7 @@ export interface JovieChatProps {
 }
 
 export interface ChatActionCard {
-  readonly id: ChatStarterActionId;
+  readonly id: string;
   readonly title: string;
   readonly body: string;
   readonly actionLabel: string;
@@ -269,8 +262,6 @@ export const TOOL_LABELS: Record<string, string> = (() => {
 
 /** A chat suggestion card with icon, label, and prompt */
 export interface ChatSuggestion {
-  /** Canonical starter intent, when this suggestion belongs to the starter taxonomy. */
-  readonly actionId?: ChatStarterActionId;
   /** Lucide icon name used to render the icon */
   readonly icon: string;
   /** Short label displayed on the card */
@@ -279,8 +270,6 @@ export interface ChatSuggestion {
   readonly prompt: string;
   /** Accent color for the icon background */
   readonly accent: 'blue' | 'green' | 'purple' | 'orange';
-  /** Stable analytics vocabulary shared with the primary card. */
-  readonly telemetryKey?: string;
 }
 
 export interface StarterSuggestionContext {
@@ -299,8 +288,35 @@ export interface StarterSuggestionContext {
  * photo" actions — those belong in the profile switcher, not the chat
  * home.
  */
-export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] =
-  CHAT_STARTER_ACTION_ORDER.map(id => starterActionToSuggestion(id));
+export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
+  {
+    icon: 'Disc3',
+    label: 'Plan A Release',
+    prompt: 'Help me plan my next release.',
+    accent: 'green',
+  },
+  {
+    icon: 'Camera',
+    label: 'Generate Album Art',
+    prompt: 'Generate album art for my latest release.',
+    accent: 'purple',
+  },
+  {
+    icon: 'Eye',
+    label: 'Build Artist Profile',
+    prompt: 'Help me polish my artist profile.',
+    accent: 'purple',
+  },
+  {
+    icon: 'Link2',
+    // Shorter label avoids “What’s Working Fo…” truncation in the rail;
+    // full prompt remains available as the submitted text + pill title.
+    label: "What's Working Right Now?",
+    prompt:
+      "What's working for me right now? Help me see what's gaining traction.",
+    accent: 'blue',
+  },
+] as const;
 
 /**
  * Pitch generation suggestion shown only to paid-plan users.
@@ -324,14 +340,29 @@ export const FEEDBACK_SUGGESTION: ChatSuggestion = {
   accent: 'orange',
 };
 
-export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] =
-  CHAT_STARTER_ACTION_ORDER.map(id =>
-    starterActionToSuggestion(
-      id,
-      id === 'plan-release'
-        ? 'Help me plan my first release.'
-        : id === 'generate-album-art'
-          ? 'Generate album art for my next release.'
-          : undefined
-    )
-  );
+export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] = [
+  {
+    icon: 'Disc3',
+    label: 'Plan A Release',
+    prompt: 'Help me plan my first release.',
+    accent: 'green',
+  },
+  {
+    icon: 'Camera',
+    label: 'Generate Album Art',
+    prompt: 'Generate album art for my next release.',
+    accent: 'purple',
+  },
+  {
+    icon: 'Music',
+    label: 'Generate Pitch',
+    prompt: 'Walk me through pitching my music.',
+    accent: 'blue',
+  },
+  {
+    icon: 'Eye',
+    label: 'Build Artist Profile',
+    prompt: 'Help me build my artist profile.',
+    accent: 'purple',
+  },
+] as const;

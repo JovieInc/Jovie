@@ -11,7 +11,6 @@ import {
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import React, { useMemo } from 'react';
-import { NavBadge } from '@/components/atoms/NavBadge';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
 import { cn } from '@/lib/utils';
@@ -207,9 +206,12 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     getSidebarNavRowClassName({
       active,
       tight,
-      className: hasThreadActions ? 'pr-8' : undefined,
+      // Always reserve trailing gutter so long titles never crash into the
+      // seam / overflow menu. Extra pr when actions are present.
+      className: hasThreadActions ? 'pr-8' : 'pr-2.5',
     }),
-    'text-left',
+    // Button atom is inline-flex; force grid so the title column can shrink.
+    'grid w-full min-w-0 text-left',
     active
       ? undefined
       : unread
@@ -230,10 +232,12 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
                 : 'bg-white/25'
         )}
       />
+      {/* Soft edge fade > hard ellipsis: titles stay readable without mid-glyph chops. */}
       <span
         className={cn(
-          'min-w-0 truncate text-left justify-self-start',
-          'text-xs',
+          'min-w-0 w-full justify-self-stretch overflow-hidden whitespace-nowrap text-left text-xs',
+          '[mask-image:linear-gradient(to_right,black_calc(100%-48px),transparent)]',
+          '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%-48px),transparent)]',
           unread && 'font-medium'
         )}
       >
@@ -244,11 +248,16 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   return (
     <div
       className={cn(
-        'group/thread relative flex items-center',
+        'group/thread relative flex w-full min-w-0 items-center',
         tight ? 'h-6' : 'h-7'
       )}
     >
-      <Tooltip label={thread.title} side='right' block>
+      <Tooltip
+        label={thread.title}
+        side='right'
+        block
+        className='min-w-0 w-full'
+      >
         {thread.href ? (
           <Link
             href={thread.href}
@@ -334,11 +343,10 @@ export function SidebarThreadsSection({
           Chats
         </span>
         {unreadCount > 0 && (
-          <NavBadge
-            variant='count'
-            count={unreadCount}
-            aria-label={`${unreadCount} unread ${unreadCount === 1 ? 'chat' : 'chats'}`}
-          />
+          <span className='inline-flex items-center gap-1 text-2xs font-medium text-quaternary-token'>
+            <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/85' />
+            {unreadCount}
+          </span>
         )}
       </div>
 

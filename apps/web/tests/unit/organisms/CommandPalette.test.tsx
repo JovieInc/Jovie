@@ -14,11 +14,9 @@ import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataC
 import { CommandPalette } from '@/components/organisms/CommandPalette';
 
 const pushMock = vi.fn();
-const pathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock, replace: vi.fn() }),
-  usePathname: () => pathnameMock(),
 }));
 
 vi.mock('next/image', () => ({
@@ -84,7 +82,7 @@ vi.mock('@/lib/queries', async () => {
   };
 });
 
-function makeDashboard(isAdmin = false): DashboardData {
+function makeDashboard(): DashboardData {
   return {
     user: { id: 'user-1' },
     creatorProfiles: [],
@@ -93,7 +91,7 @@ function makeDashboard(isAdmin = false): DashboardData {
     sidebarCollapsed: false,
     hasSocialLinks: false,
     hasMusicLinks: false,
-    isAdmin,
+    isAdmin: false,
     tippingStats: {
       tipClicks: 0,
       tipsSubmitted: 0,
@@ -110,9 +108,9 @@ function makeDashboard(isAdmin = false): DashboardData {
   };
 }
 
-function withDashboard(node: ReactNode, isAdmin = false) {
+function withDashboard(node: ReactNode) {
   return (
-    <DashboardDataContext.Provider value={makeDashboard(isAdmin)}>
+    <DashboardDataContext.Provider value={makeDashboard()}>
       {node}
     </DashboardDataContext.Provider>
   );
@@ -134,66 +132,12 @@ describe('CommandPalette', () => {
     expect(input).toHaveFocus();
   });
 
-  it('continues to open on Ctrl+K independently of sidebar Search', () => {
-    render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', ctrlKey: true });
-    expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
-  });
-
   it('lists recent chats with safe fallback titles', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     expect(screen.getByText('Recent Chats')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
     expect(screen.getByText('Untitled chat')).toBeInTheDocument();
-  });
-
-  it('shows the admin workspace action and its shortcut', () => {
-    pathnameMock.mockReturnValue('/app');
-    render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-
-    const action = screen
-      .getAllByRole('option')
-      .find(el => el.textContent?.includes('Switch to OV'));
-    expect(action).toBeDefined();
-    expect(action).toHaveTextContent('⌥ ⇧ W');
-  });
-
-  it('routes the admin workspace action to the next workspace', () => {
-    pushMock.mockClear();
-    pathnameMock.mockReturnValue('/app');
-    render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-
-    const action = screen
-      .getAllByRole('option')
-      .find(el => el.textContent?.includes('Switch to OV'));
-    fireEvent.mouseDown(action!);
-
-    expect(pushMock).toHaveBeenCalledWith('/app/ov');
-  });
-
-  it('routes the admin workspace action from OV back to Jovie', () => {
-    pushMock.mockClear();
-    pathnameMock.mockReturnValue('/app/ov/ops');
-    render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-
-    const action = screen
-      .getAllByRole('option')
-      .find(el => el.textContent?.includes('Switch to Jovie'));
-    fireEvent.mouseDown(action!);
-
-    expect(pushMock).toHaveBeenCalledWith('/app');
-  });
-
-  it('does not leak the workspace action to non-admins', () => {
-    render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-
-    expect(screen.queryByText('Switch to OV')).not.toBeInTheDocument();
-    expect(screen.queryByText('Switch to Jovie')).not.toBeInTheDocument();
   });
 
   it('routes a recent-chat commit to the chat route', () => {

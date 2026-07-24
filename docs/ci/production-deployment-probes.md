@@ -54,18 +54,17 @@ must match the exact release commit.
    scans and removes it, and deletes the entire isolated tree and runner-local
    receipt.
 7. The public smoke job owns homepage, profile, critical-page, and SEO proof;
-   there is no duplicate homepage runner. Before promotion, authenticated smoke
-   signs in one exact allowlisted Better Auth identity with a fresh six-digit
-   OTP from the protected production verification store. The query is
-   read-only, identifier-bound, freshness-bounded, expiry-bounded, and refuses
-   every other identity. Missing identity or database access, stale or malformed
-   verification records, unavailable sign-in forms, and runtime verification
-   failures all stop promotion. The post-deploy job repeats the same proof and
-   emits `passed` only after Playwright succeeds; the verified-generation marker
-   copies that result-derived state rather than inferring success from
-   configuration presence. Every successful auth navigation and `/app` redirect
-   must retain the exact configured immutable origin; canonical or foreign
-   `/app` pages are explicit negative fixtures.
+   there is no duplicate homepage runner. Authenticated smoke is explicitly
+   optional until a complete credential pair exists. Once configured, runtime
+   verification challenges and unavailable sign-in forms fail instead of
+   skipping. The job emits `passed` only after Playwright succeeds, and the
+   verified-generation marker copies that result-derived state (or the explicit
+   `not-configured` state) rather than inferring success from credential
+   presence. Credentials are selected as one complete named pair: the primary
+   email/password pair (and only its verification code) or the complete legacy
+   pair. Values from different pairs are never combined. Every successful auth
+   navigation and `/app` redirect must retain the exact configured immutable
+   origin; canonical or foreign `/app` pages are explicit negative fixtures.
 8. The credential boundary is repo-wide. Staged-production probes bind the
    deploy result to a project-scoped `vercel inspect`; the reusable canary binds
    caller URL and deployment ID to the READY deployment returned for the
@@ -172,8 +171,7 @@ environment-only credential exchange, exact build verification, host-only
 cookie creation, semantic surface verification, masking, deadline, and cleanup.
 Deployment lookup is deadline-bounded, propagation-aware, and exact
 URL/ID/full-SHA aware. Auth evidence is result-derived, exact-origin bound, and
-limited to one allowlisted Better Auth identity with a fresh verification-store
-OTP. Both OAuth providers are exercised
+selected from one complete credential pair. Both OAuth providers are exercised
 through the real UI and catch-all only after alias ownership. Browser route
 installation is ordered. Vercel CLI secrets stay out of argv. Job permissions
 are explicit and minimal, and checkouts never persist credentials. Lighthouse
@@ -191,8 +189,7 @@ foreign `/app` redirects, pre-alias shared-staging topology, empty 204 pages,
 HTTP-200 not-found profiles, route-install races, dynamic-cookie
 artifacts, unsafe cookie files, protected-login SEO HTML, symlinks, FIFOs,
 non-regular entries, same-UID post-validation chmod/write/restore mutation,
-incomplete upload route maps, non-allowlisted identities, stale or expired OTP
-records, missing verification-store access, Vercel secret-bearing
+incomplete upload route maps, mixed credential pairs, Vercel secret-bearing
 argv, over-broad workflow permissions, interrupted marker recovery, zero
 assertion matches, and a valid exact authorized response.
 

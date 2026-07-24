@@ -159,18 +159,8 @@ describe('merge_group workflow contract', () => {
     );
     expect(admission).not.toContain('secrets.');
 
-    for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
-      const job = getJobBlock(CI_WORKFLOW, jobId);
-      expect(job, jobId).toContain('ci-merge-group-admission');
-      expect(job, jobId).toMatch(/if: >-\s+!cancelled\(\) &&/);
-      expect(job, jobId).not.toContain('always()');
-      expect(job, jobId).toContain("github.event_name != 'merge_group'");
-      expect(job, jobId).toContain(
-        "needs.ci-merge-group-admission.result == 'success'"
-      );
-    }
-
     for (const jobId of [
+      'ci-fast',
       'ci-unit-tests',
       'ci-build-layout',
       'ci-ios',
@@ -187,20 +177,7 @@ describe('merge_group workflow contract', () => {
     }
 
     const ciFast = getJobBlock(CI_WORKFLOW, 'ci-fast');
-    expect(ciFast).toContain('ci-fast-typecheck');
-    expect(ciFast).toContain('ci-fast-remaining');
-    expect(ciFast).toContain('always()');
-    expect(ciFast).toContain("needs.ci-path-changes.result == 'success'");
     expect(ciFast).toContain("github.event_name != 'merge_group'");
-    expect(ciFast).toContain(
-      "needs.ci-merge-group-admission.result == 'success'"
-    );
-    expect(ciFast).toContain('TYPECHECK_RESULT');
-    expect(ciFast).toContain('REMAINING_RESULT');
-    expect(ciFast).toContain(
-      '[[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]'
-    );
-    expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
     expect(units).toContain(
@@ -337,39 +314,6 @@ describe('merge_group workflow contract', () => {
     );
     expect(sourceReady).not.toContain('Graphite');
     expect(SECURITY_WORKFLOW).not.toMatch(/^\s*pull_request:/m);
-  });
-
-  it('coalesces a short release wave before exact authorization and mutation', () => {
-    const coalesce = getJobBlock(
-      PRODUCTION_CONTROLLER_WORKFLOW,
-      'coalesce-production'
-    );
-    const authorize = getJobBlock(
-      PRODUCTION_CONTROLLER_WORKFLOW,
-      'authorize-production'
-    );
-
-    expect(coalesce).toContain('timeout-minutes: 5');
-    expect(coalesce).toContain(
-      "github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'"
-    );
-    expect(coalesce).toContain("COALESCE_DELAY_SECONDS: '60'");
-    expect(coalesce).toContain('sleep "$COALESCE_DELAY_SECONDS"');
-    expect(coalesce).toContain('echo "is_current=false" >> "$GITHUB_OUTPUT"');
-    expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
-    expect(coalesce).toContain('commits/main');
-    expect(authorize).toContain('needs: [coalesce-production]');
-    expect(authorize).toContain(
-      "needs.coalesce-production.outputs.is_current == 'true'"
-    );
-    expect(PRODUCTION_CONTROLLER_WORKFLOW).toContain(
-      'group: production-mutation'
-    );
-    expect(PRODUCTION_CONTROLLER_WORKFLOW).toContain(
-      'cancel-in-progress: false'
-    );
-    expect(coalesce).not.toContain('vercel ');
-    expect(coalesce).not.toContain('secrets: inherit');
   });
 
   it('keeps merge groups out of manual evidence and deployment jobs', () => {

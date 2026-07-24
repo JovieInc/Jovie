@@ -2,7 +2,8 @@ import { Input } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 
 const meta: Meta<typeof Input> = {
-  title: 'Atoms/Input',
+  // Mirror of packages/ui — prefer UI/Atoms/Input there (ONE_SYSTEM_DRIFT batch 2 delete)
+  title: 'UI/Atoms/Input (app mirror — prefer package)',
   component: Input,
   tags: ['autodocs'],
   argTypes: {

@@ -33,36 +33,98 @@ export interface DashboardHeaderProps {
 
 const MOBILE_HEADER_PADDING = 'px-4 pb-2 pt-3';
 
-function HeaderTitle({
+function MobileHeader({
+  currentLabel,
+  breadcrumbSuffix,
+  action,
+  searchSurface,
+  isSearchActive,
+  mobileProfileSlot,
+}: {
+  readonly currentLabel: string;
+  readonly breadcrumbSuffix?: ReactNode;
+  readonly action?: ReactNode;
+  readonly searchSurface?: ReactNode;
+  readonly isSearchActive: boolean;
+  readonly mobileProfileSlot?: ReactNode;
+}) {
+  if (searchSurface && isSearchActive) {
+    return (
+      <div className={cn('hidden max-sm:flex', MOBILE_HEADER_PADDING)}>
+        {searchSurface}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        'hidden max-sm:flex items-center justify-between',
+        MOBILE_HEADER_PADDING
+      )}
+    >
+      <h1 className='text-base font-semibold leading-tight tracking-[-0.018em] text-primary-token'>
+        {breadcrumbSuffix ?? currentLabel}
+      </h1>
+      <div className='flex items-center gap-2'>
+        {searchSurface ? (
+          <div className='flex items-center'>{searchSurface}</div>
+        ) : null}
+        {action ? (
+          <div className='flex items-center gap-1 [&_button]:h-8 [&_button]:rounded-full [&_button]:shadow-none [&_button>svg]:h-4 [&_button>svg]:w-4'>
+            {action}
+          </div>
+        ) : searchSurface ? null : (
+          mobileProfileSlot
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BreadcrumbTrail({
   usesSectionTitleLayout,
   currentLabel,
   rootLabel,
   breadcrumbSuffix,
+  showInlineSearch,
+  searchSurface,
 }: {
   readonly usesSectionTitleLayout: boolean;
   readonly currentLabel: string;
   readonly rootLabel: string;
   readonly breadcrumbSuffix?: ReactNode;
+  readonly showInlineSearch: boolean;
+  readonly searchSurface?: ReactNode;
 }) {
   return (
     <>
-      {usesSectionTitleLayout ? null : (
+      {usesSectionTitleLayout ? (
+        <span className='truncate text-xs font-semibold tracking-tight text-primary-token'>
+          {currentLabel}
+        </span>
+      ) : (
         <>
-          <span className='max-sm:hidden shrink-0 text-2xs font-caption tracking-tight text-tertiary-token'>
+          <span className='shrink-0 text-2xs font-caption tracking-tight text-tertiary-token'>
             {rootLabel}
           </span>
-          <ChevronRight className='max-sm:hidden size-3 shrink-0 text-quaternary-token/85' />
+          <ChevronRight className='size-3 shrink-0 text-quaternary-token/85' />
+          {breadcrumbSuffix ? (
+            <div className='min-w-0 truncate text-xs font-semibold tracking-tight text-primary-token'>
+              {breadcrumbSuffix}
+            </div>
+          ) : (
+            <span className='truncate text-xs font-semibold tracking-tight text-primary-token'>
+              {currentLabel}
+            </span>
+          )}
         </>
       )}
-      <h1
-        className={cn(
-          'min-w-0 truncate font-semibold text-primary-token',
-          'text-base leading-tight tracking-[-0.018em]',
-          'sm:text-xs sm:leading-normal sm:tracking-tight'
-        )}
-      >
-        {breadcrumbSuffix ?? currentLabel}
-      </h1>
+      {showInlineSearch ? (
+        <div className='ml-1.5 flex min-w-0 items-center justify-start'>
+          {searchSurface}
+        </div>
+      ) : null}
     </>
   );
 }
@@ -96,19 +158,16 @@ export function DashboardHeader({
         className
       )}
     >
-      {/* Keep responsive chrome in one DOM owner. Breakpoint classes change
-          presentation without duplicating headings, search, or actions in the
-          accessibility tree. */}
-      <div
-        className={cn(
-          'relative flex w-full items-center gap-2',
-          MOBILE_HEADER_PADDING,
-          'sm:h-(--linear-app-header-height-compact) sm:px-app-header sm:py-0'
-        )}
-      >
-        {leading ? (
-          <div className='max-sm:hidden flex items-center'>{leading}</div>
-        ) : null}
+      <MobileHeader
+        currentLabel={currentLabel}
+        breadcrumbSuffix={breadcrumbSuffix}
+        action={action}
+        searchSurface={searchSurface}
+        isSearchActive={searchTakesOver}
+        mobileProfileSlot={mobileProfileSlot}
+      />
+      <div className='relative max-sm:hidden h-(--linear-app-header-height-compact) w-full items-center gap-2 px-2.5 sm:flex'>
+        {leading ? <div className='flex items-center'>{leading}</div> : null}
         {sidebarTrigger ? (
           <div className='max-lg:hidden items-center lg:flex'>
             {sidebarTrigger}
@@ -128,36 +187,19 @@ export function DashboardHeader({
               {searchSurface}
             </div>
           ) : (
-            <>
-              <HeaderTitle
-                usesSectionTitleLayout={usesSectionTitleLayout}
-                currentLabel={currentLabel}
-                rootLabel={rootLabel}
-                breadcrumbSuffix={breadcrumbSuffix}
-              />
-              {showInlineSearch ? (
-                <div className='ml-auto flex min-w-0 items-center justify-start sm:ml-1.5'>
-                  {searchSurface}
-                </div>
-              ) : null}
-            </>
+            <BreadcrumbTrail
+              usesSectionTitleLayout={usesSectionTitleLayout}
+              currentLabel={currentLabel}
+              rootLabel={rootLabel}
+              breadcrumbSuffix={breadcrumbSuffix}
+              showInlineSearch={showInlineSearch}
+              searchSurface={searchSurface}
+            />
           )}
         </div>
         {action ? (
-          <div
-            className={cn(
-              'ml-auto flex items-center gap-1',
-              searchTakesOver && 'max-sm:hidden',
-              'max-sm:[&_button]:h-8 max-sm:[&_button]:rounded-full max-sm:[&_button]:shadow-none max-sm:[&_button>svg]:h-4 max-sm:[&_button>svg]:w-4'
-            )}
-          >
-            {action}
-          </div>
-        ) : searchSurface ? null : (
-          <div className='flex items-center gap-2 sm:hidden'>
-            {mobileProfileSlot}
-          </div>
-        )}
+          <div className='ml-auto flex items-center gap-1'>{action}</div>
+        ) : null}
       </div>
     </header>
   );

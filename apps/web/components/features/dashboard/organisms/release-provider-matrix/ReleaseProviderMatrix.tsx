@@ -312,6 +312,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const [isGeneratingReleasePlan, setIsGeneratingReleasePlan] = useState(false);
   const router = useRouter();
   const albumArtFlagEnabled = useAppFlag('ALBUM_ART_GENERATION');
+  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1_RELEASES');
 
   const {
     rows,
@@ -419,8 +420,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   );
 
   // Table display preferences (column visibility, tracks toggle)
-  const { columnVisibility, groupByYear, showTracks, onShowTracksChange } =
-    useReleaseTablePreferences();
+  const {
+    columnVisibility,
+    rowHeight,
+    groupByYear,
+    showTracks,
+    onShowTracksChange,
+  } = useReleaseTablePreferences();
 
   // Derive releaseView from persisted showTracks preference
   const releaseView: ReleaseView = showTracks ? 'tracks' : 'releases';
@@ -958,7 +964,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           analyticsOverride={selectedSidebarData?.analytics ?? null}
           tracksOverride={selectedSidebarData?.tracks}
           showCredits={experienceMode === 'live'}
-          designV1
+          designV1={designV1ReleasesEnabled}
           onCanvasStatusUpdate={
             experienceAdapter?.onCanvasStatusUpdate ?? handleCanvasStatusUpdate
           }
@@ -999,6 +1005,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     canEditSmartLinks,
     handleCanvasStatusUpdate,
     releaseSidebarHandlers,
+    designV1ReleasesEnabled,
   ]);
 
   useRegisterRightPanel(sidebarPanel);
@@ -1076,13 +1083,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 onGenerateAlbumArt={handleGenerateAlbumArt}
                 onGeneratePitch={handleGeneratePitch}
                 columnVisibility={columnVisibility}
-                rowHeight={46}
+                rowHeight={designV1ReleasesEnabled ? 46 : rowHeight}
                 showTracks={showTracks}
                 groupByYear={groupByYear}
                 selectedReleaseId={editingRelease?.id}
                 selectedTrackId={editingTrack?.id}
                 tracksByReleaseId={tableTracksByReleaseId}
-                designV1
+                designV1={designV1ReleasesEnabled}
                 refreshingReleaseId={refreshingReleaseId}
                 flashedReleaseId={flashedReleaseId}
                 isSmartLinkLocked={isSmartLinkLocked}

@@ -10,34 +10,47 @@
 ## Surface Classification
 
 > **Direction (2026-06-18, founder-locked): one design system, two languages.**
-> Jovie is converging on a single token foundation, one color palette, and one core
-> typeface (Inter), expressed as a compact **product language** (operational, Linear-like)
-> and a more editorial **marketing language** (more spacing, larger type scale, more
-> cinematic motion — same tokens underneath). **System B is canonical.** The historical
-> "System A vs System B" split documented below is being **actively retired**: System A
-> surfaces are reskinned onto System B tokens with their editorial layouts preserved.
-> DM Sans was retired 2026-06-18 — Inter is the sole body/UI face; **Satoshi is the one
-> approved display exception** (hero / large display). This supersedes the earlier
-> "full retirement deferred 3 months" note. The table below reflects migration *state*,
-> not the target.
+> Jovie has a single token foundation, one color palette, and one core typeface (Inter),
+> expressed as a compact **product language** (operational, Linear-like) and a more
+> editorial **marketing language** (more spacing, larger type scale, more cinematic
+> motion — **same System B tokens underneath**). **System B is the only valid system
+> for new work.** The historical name "System A" means the old separate marketing stack
+> (`.linear-marketing`, DM Sans). It is **not a choice** for new pages, components, or
+> stories. DM Sans was retired 2026-06-18 — Inter is the sole body/UI face; **Satoshi is
+> the one approved display exception** (hero / large display).
+>
+> - **TARGET:** 100% System B (one system, two languages).
+> - **STATE:** historical migration notes + shrink-only holdouts below — never a second
+>   active system agents may pick.
 
-Jovie historically used two related but distinct design systems based on surface purpose
-(now converging — see the banner above):
+### Target (canonical — use this)
 
-| Surface | System | Mood | Routes |
-|---------|--------|------|--------|
-| Homepage / chat-intake | System B | Product surface, utility-first, inevitable | `(home)/*` |
-| Marketing (editorial) | System A | Cinematic, editorial, proof-led | `(marketing)/*`, blog, changelog, pricing, support |
-| Product app shell | System B | Compact, operational, tool-like | `app/*`, settings, admin, dashboard |
-| Auth / onboarding / waitlist | System B | Funnel-focused, product family | `(auth)/*`, `onboarding/*`, `waitlist/*` |
-| Public profiles | System B (public variant) | Expressive but product-native | `[username]/*` |
-| Legal / informational | System A (calmer variant) | Clean, readable | `(dynamic)/legal/*` |
+| Surface | Language (on System B tokens) | Mood | Routes |
+|---------|-------------------------------|------|--------|
+| Homepage / chat-intake | Product | Utility-first, inevitable | `(home)/*` |
+| Marketing (editorial) | Marketing editorial | Cinematic, proof-led | `(marketing)/*`, blog, changelog, pricing, support |
+| Product app shell | Product | Compact, operational, tool-like | `app/*`, settings, admin, dashboard |
+| Auth / onboarding / waitlist | Product | Funnel-focused, product family | `(auth)/*`, `onboarding/*`, `waitlist/*` |
+| Public profiles | Product (public variant) | Expressive but product-native | `[username]/*` |
+| Legal / informational | Marketing editorial (calmer) | Clean, readable | `(dynamic)/legal/*` |
 
-**Decision tree:** Everything → System B. Marketing/selling surfaces (blog, pricing, legal) use the editorial marketing language on System B tokens — System A is retired (founder-directed 2026-06-18, see banner above).
+**Decision tree:** Everything → System B tokens. Marketing/selling/legal surfaces use the **editorial marketing language** (Satoshi display + denser spacing/motion) on those tokens via `.system-b-marketing`. Never start a new surface on "System A" or `.linear-marketing`.
 
-Migration status: homepage migrated 2026-04-22; pricing, download, launch, artist-notifications, and pay since. **Full System A retirement is now in progress (founder-directed 2026-06-18), superseding the earlier 3-month deferral.** Remaining holdouts being reskinned onto System B tokens: `(marketing)/{about, ai, artist-profile, artist-profiles, blog, changelog, compare/[slug], alternatives/[slug], support, investors, voice, new}` and `(dynamic)/legal/*`. Each surface ships with its own `*-system-b-style-guard` test, and a global ratchet keeps the holdout list shrink-only.
+**Component map:** see [`docs/design/COMPONENT_MAP.md`](docs/design/COMPONENT_MAP.md) — prefer `@jovie/ui` atoms first; app molecules only when product-specific.
 
-See the [Surface Classification](#canonical-surface-split) section below for full route mapping.
+### State (historical / holdouts — shrink-only)
+
+| Fact | Status (as of 2026-07-21+) |
+|------|----------------------------|
+| Production marketing shell | On System B via `.system-b-marketing dark` (`app/(marketing)/layout.tsx`) |
+| `.linear-marketing` appliers in live `app/` + `components/` | **Empty** — shrink-only ratchet in `singular-system-b-ratchet.test.ts` (allowlist must stay empty) |
+| DM Sans live page load | Retired — Inter only (Satori/OG build asset cleanup tracked separately) |
+| CSS teardown of leftover `.linear-marketing*` rules | Cleanup wave — may shrink further; do not reintroduce |
+| Demo / exp / design-studio routes | **Holdouts** — shrink-only; not templates for product or marketing shipping (`app/demo/*`, `app/exp/*`, design-studio leftovers) |
+
+Do **not** invent new holdouts. Do **not** treat demo/exp chrome as the design system. Per-surface `*-system-b-style-guard` tests + global ratchets enforce convergence.
+
+See the [Canonical Surface Split](#canonical-surface-split) section below for full route mapping.
 
 ---
 
@@ -88,7 +101,7 @@ poster composition; Inter at 80px reads narrow and tech-y in this context.
 | semibold | 590 | Section headings, emphasis |
 | bold | 680 | Strong emphasis, rare |
 
-### Type Scale — Marketing (System A)
+### Type Scale — Marketing language (editorial; System B tokens)
 
 | Level | Size | Weight | Letter-spacing | Line-height | Usage |
 |-------|------|--------|----------------|-------------|-------|
@@ -102,7 +115,7 @@ poster composition; Inter at 80px reads narrow and tech-y in this context.
 | Caption | 13px | 510 | -0.13px (-1.0%) | 19.5px (1.5) | Captions, meta |
 | Label | 12px | 400 | — | 19.2px (1.6) | Labels, tags |
 
-### Type Scale — App (System B)
+### Type Scale — Product language (app / System B)
 
 | Level | Size | Weight | Usage |
 |-------|------|--------|-------|
@@ -336,9 +349,10 @@ Three input variables generate the entire palette:
 | Border strong | `rgba(255,255,255,0.10)` | — | Emphasis |
 | Accent | `#7170ff` | — | Same as light mode |
 
-### Marketing Colors (System A — Dark by Default)
+### Marketing Colors (editorial language on System B — dark by default)
 
 **No brand color.** Black, white, and gray are the brand. The restraint is the identity.
+Historical label "System A colors" referred to this palette when it lived on a separate stack; new work uses the same values through System B / `.system-b-marketing` tokens.
 
 | Token | Value | Usage |
 |-------|-------|-------|
@@ -537,17 +551,6 @@ the app feeling consistent even as new components land.
 
 These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
 
-### Interaction feedback
-
-- Press feedback uses the shared `--scale-press` token. The canonical value is
-  `0.98`: enough tactile response to register without visible shrink or jump.
-- Shared interactive primitives, including Button, apply the token once.
-  Feature code must not add its own `whileTap` scale or hardcoded active scale.
-- Hover and focus feedback do not scale controls. Use semantic surface, text,
-  border, opacity, or shadow changes that preserve geometry.
-- `prefers-reduced-motion: reduce` disables press transforms. Components that
-  intentionally opt out use the shared Button `static` contract.
-
 **Rule of thumb:** if the user's eye has to track the move (panel sliding in,
 surface growing), it's cinematic. If the user notices it only as feedback
 (button color change, focus ring), it's subtle. Never invent a third tier
@@ -575,63 +578,6 @@ Avoid in new code; prefer the intent tokens above.
 duration token (subtle, cinematic, and raw scale) drops to 0ms automatically.
 
 ---
-
-## App IA & Page Scaffold
-
-The authenticated product has one shell and one reviewed default navigation.
-`apps/web/components/features/dashboard/dashboard-nav/config.ts` is the code
-source of truth; this table records the founder-approved six entries rendered
-by the canonical customer shell. Settings and OV operator tools are contextual
-or mutually exclusive surfaces, not additions to this primary six-item IA.
-
-| Group | Item | Canonical destination | Behavior |
-|-------|------|-----------------------|----------|
-| Primary | Inbox | `/app` | Opens the opportunity and work queue |
-| Primary | Chat | `/app/chat` | Starts or resumes the conversation workspace |
-| Primary | Library | `/app/library` | Opens releases, audio, video, images, and files |
-| Primary | Contacts | `/app/contacts` | Opens the artist contact workspace |
-| Primary | Calendar | `/app/calendar` | Opens release dates, events, and calendar moments |
-| Primary | Tasks | `/app/tasks` | Opens the task workspace |
-
-Any permanent IA change must update `primaryNavigation`, its exact structure
-test, this table, and the route coverage test in the same change. Desktop and
-mobile navigation derive from the same ordered item identities.
-
-### Five Page Types
-
-| Type | Canonical scaffold | First action contract | Route rule |
-|------|--------------------|-----------------------|------------|
-| Inbox / work queue | Shell root + opportunity stack | The first actionable card exposes its decision; do not add a competing page-level CTA | `/app` is the signed-in home |
-| Conversation | Chat workspace + composer | Focus the composer or the next required prompt; the composer owns the primary action | `/app/chat` and `/app/chat/[id]` |
-| Collection / workspace | `PageShell` + `DashboardWorkspacePanel` + `PageToolbar` + framed content | Put at most one primary pill CTA at the toolbar end; filters, display, and navigation stay secondary/ghost | Use the canonical workspace route, never a new alias stub |
-| Entity detail | `EntitySidebarShell` inside the current workspace | Put the next entity action in the rail header or first rail section | Entity detail is rail-only; selecting a row must not create a second page scaffold or page-level entity route |
-| Settings | Settings shell/sidebar + `SettingsSection` | The first editable control begins the flow; one save/confirm action owns primary emphasis | Use the canonical `/app/settings/*` route |
-
-The **first-action contract** means the first viewport communicates exactly one
-next useful action. A page may have many available controls, but it must not
-present multiple primary pills, duplicate the same CTA across header/body/footer,
-or hide the first action behind redundant explanatory chrome. Empty, loading,
-error, and populated states reserve the same action slot so the action does not
-shift.
-
-### Route Canon
-
-- Canonical routes render their scaffold inside the shared authenticated shell.
-- Compatibility redirects are a shrink-only, explicitly baselined exception;
-  new `page.tsx` redirect stubs are blocked.
-- Search is the unified shell-header input, not a duplicate search page route
-  or command-palette popup.
-- Release rows and other entity rows open the right detail rail; task workflows
-  that are true multi-step workspaces retain their reviewed canonical route.
-- Reuse the canonical `EmptyState` family. New bespoke `*EmptyState.tsx`
-  components are blocked; compose an existing primitive or add a state variant.
-
-### IA Decisions
-
-| Date | Decision | Operating trigger |
-|------|----------|-------------------|
-| 2026-07-22 | **EVENT: One authenticated app shell.** Header, sidebar, content frame, and right rail are one system; routes may not introduce a parallel shell. | Ship now: extend the shared shell. Re-evaluate only for a mutually exclusive security boundary that cannot share authenticated navigation. Then: document that boundary before introducing another shell. |
-| 2026-07-22 | **Inbox is home.** `/app` renders the opportunity Inbox and Inbox is the first canonical customer navigation entry. | Ship now: keep `/app` as Inbox. Re-evaluate when 30 days of production navigation telemetry shows more than 25% of signed-in home visits immediately leave without an Inbox action. Then: test a different home entry while preserving one shell and one canonical `/app` route. |
 
 ## Component Patterns
 
@@ -881,30 +827,35 @@ mark intentional marketing sentence-case headlines with
 
 ## Canonical Surface Split
 
-| Surface | Routes / entrypoints | Layout / shell | Design system |
-|---------|---------------------|----------------|---------------|
-| Homepage / chat-intake | `(home)/*`, `components/homepage/*` | `(home)/layout.tsx` with `MarketingHeader` (minimal) + `MarketingFooter` | System B |
-| Secondary marketing | `(marketing)/blog/*`, `changelog/*`, `support/*`, `pricing/*`, `launch/*`, `ai/*`, `engagement-engine/*`, `investors/*`, `tips/*` | `(marketing)/layout.tsx` + page-specific nested layouts | System A (calmer) |
-| Legal / informational | `(dynamic)/legal/*` | Legal layout | System A (informational) |
-| Product app shell | `app/(shell)/*` | Authenticated app shell | System B |
-| Auth funnel | `(auth)/*` | `AuthLayout` | System B |
-| Onboarding funnel | `onboarding/*` | `AuthLayout` with onboarding provider | System B |
-| Waitlist funnel | `waitlist/*` | `AuthLayout` | System B |
-| Public product surfaces | `[username]/*` (claim, contact, listen, tip, tour, shop, subscribe, notifications, releases) | Username public layouts | System B (public variant) |
+| Surface | Routes / entrypoints | Layout / shell | Language (System B tokens) |
+|---------|---------------------|----------------|----------------------------|
+| Homepage / chat-intake | `(home)/*`, `components/homepage/*` | `(home)/layout.tsx` with `MarketingHeader` (minimal) + `MarketingFooter` | Product |
+| Secondary marketing | `(marketing)/blog/*`, `changelog/*`, `support/*`, `pricing/*`, `launch/*`, `ai/*`, `engagement-engine/*`, `investors/*`, `tips/*` | `(marketing)/layout.tsx` (`.system-b-marketing dark`) + page-specific nested layouts | Marketing editorial |
+| Legal / informational | `(dynamic)/legal/*` | Legal layout on System B tokens | Marketing editorial (calmer) |
+| Product app shell | `app/(shell)/*` | Authenticated app shell | Product |
+| Auth funnel | `(auth)/*` | `AuthLayout` | Product |
+| Onboarding funnel | `onboarding/*` | `AuthLayout` with onboarding provider | Product |
+| Waitlist funnel | `waitlist/*` | `AuthLayout` | Product |
+| Public product surfaces | `[username]/*` (claim, contact, listen, tip, tour, shop, subscribe, notifications, releases) | Username public layouts | Product (public variant) |
+| Demo / exp / design-studio (holdouts) | `app/demo/*`, `app/exp/*`, quarantined design-studio | Not shipping templates | Shrink-only; do not copy |
 
 ### Rules
 
 **Do:**
-- Use System A for acquisition, storytelling, launch, and public informational pages
-- Use System B for sign-in, account setup, waitlist, dashboard, settings, admin
+- Ship every new page/component/story on **System B tokens**
+- Use the **marketing editorial language** (Satoshi display, dark-first, more air) for acquisition, storytelling, launch, and public informational pages — still System B, via `.system-b-marketing`
+- Use the **product language** for sign-in, account setup, waitlist, dashboard, settings, admin
 - Treat public creator pages as public product surfaces
-- Document any intentional cross-system borrowing in PR notes
+- Prefer `@jovie/ui` atoms; see [`docs/design/COMPONENT_MAP.md`](docs/design/COMPONENT_MAP.md)
 
 **Don't:**
+- Choose "System A" for new work, or reintroduce `.linear-marketing` / DM Sans
 - Use homepage section primitives on auth, onboarding, dashboard, or settings
 - Use dashboard/sidebar/table composition on marketing pages
 - Treat all public pages as marketing pages
 - Assume pages under the marketing shell should look like the homepage hero
+- Copy demo/exp/design-studio chrome into product or marketing shipping surfaces
+- Ship void Storybook atoms, hand-rolled buttons, or off-system gray tiles
 
 ---
 
@@ -913,19 +864,18 @@ mark intentional marketing sentence-case headlines with
 | File | Responsibility |
 |------|----------------|
 | `apps/web/styles/design-system.css` | **Canonical token source** — all width, surface, and color values in this doc mirror CSS here |
-| `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
+| `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens (editorial language; System B shell) |
 | `apps/web/styles/theme.css` | Feature accents & animations only |
 | `apps/web/app/globals.css` | Tailwind registration + shared utilities |
 | `apps/web/tailwind.config.js` | Tailwind v4 token mapping |
-| `apps/web/app/(marketing)/layout.tsx` | Marketing shell |
+| `docs/design/COMPONENT_MAP.md` | Canonical component prefer/forbid map for agents |
+| `docs/llms-design-manifest.txt` | Generated agent contract (`pnpm ds:llms-manifest`) |
+| `apps/web/app/(marketing)/layout.tsx` | Marketing shell (`.system-b-marketing`) |
 | `apps/web/components/site/MarketingHeader.tsx` | Marketing header |
 | `apps/web/components/site/MarketingFooter.tsx` | Marketing footer |
 | `apps/web/components/features/auth/AuthLayout.tsx` | Product-funnel shell |
-| `apps/web/components/features/dashboard/dashboard-nav/config.ts` | Reviewed authenticated-shell navigation and rollout insertions |
-| `apps/web/components/shell/SidebarNavItem.tsx` | Canonical sidebar row and icon chrome |
-| `apps/web/components/organisms/table/molecules/PageToolbar.tsx` | Canonical workspace toolbar and action hierarchy |
-| `apps/web/components/homepage/*` | Homepage chat-intake implementation (System B) |
-| `apps/web/components/features/home/*` | Legacy marketing-home components (still used by `(marketing)/new/*`) |
+| `apps/web/components/homepage/*` | Homepage chat-intake implementation (System B product language) |
+| `apps/web/components/features/home/*` | Legacy marketing-home components (still used by `(marketing)/new/*` — shrink toward shared System B) |
 | `apps/web/app/(home)/layout.tsx` | Homepage shell — `MarketingHeader` (minimal) + `MarketingFooter` |
 
 ---
@@ -939,7 +889,7 @@ mark intentional marketing sentence-case headlines with
 | 2026-03-23 | Theme base hue: 282 | Match Linear's March 2026 refresh (shifted from 272) |
 | 2026-03-23 | Font weight book: 450 | Linear's default UI weight (was incorrectly set to 400) |
 | 2026-03-23 | Two accent colors: #7170ff (app) + #5E6AD2 (marketing CTA) | Linear uses different accent colors for app vs marketing surfaces. **Superseded 2026-04-11** by the neutral-CTA rule ("No brand color (Apple approach)"): CTAs are white-on-black; accent colors are supporting cast for feature differentiation only. |
-| 2026-03-23 | Marketing always dark | Linear's marketing pages are dark-only; System A follows this |
+| 2026-03-23 | Marketing always dark | Linear's marketing pages are dark-only; the editorial marketing language follows this (now on System B / `.system-b-marketing`) |
 | 2026-03-25 | Remove `color-mix()` from content surfaces | Flat `var(--linear-app-content-surface)` renders more cleanly and avoids compositing artifacts |
 | 2026-03-25 | Right panel inside `<main>` content card | Matches Linear's unified card layout — sidebar and panel share one card with a thin left-border divider |
 | 2026-03-25 | Sidebar: no border, radius, shadow, or backdrop-blur | Flat sidebar sits flush against page background — matches Linear's design (v26.4.72) |
@@ -956,4 +906,6 @@ mark intentional marketing sentence-case headlines with
 | 2026-04-11 | Ban emoji-on-colored-square icons | Replaced with accent color on card title text. Icon-on-square reads as AI slop and cheapens the brand. |
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |
 | 2026-06-18 | **Unify on one design system, two languages.** Retire System A; conform whole app to System B tokens. | Founder-directed (supersedes the 2026-04-22 "defer 3 months" note). Target = one token foundation, one palette, one core typeface (Inter), expressed as a compact product language + an editorial marketing language. Aligns with gbrain "design system review" canon ("not two design systems — one system, two languages"). Editorial layouts are preserved; surfaces are reskinned onto System B tokens, each with a `*-system-b-style-guard` test + a global shrink-only ratchet. |
+| 2026-07-21 | `.linear-marketing` live appliers reach empty | Marketing shell and residual holdouts (playlists, brand, not-found, pitch, MarketingScrollUnlock) on `.system-b-marketing`. CSS teardown of dead `.linear-marketing*` rules is a later cleanup wave; allowlist stays empty. |
+| 2026-07-23 | Docs lock: TARGET table is 100% System B; STATE is historical/holdouts only | Removes agent-readable language that treated System A as a valid choice for new work. Component map + void-story / off-system shipping ban cross-linked. |
 | 2026-06-18 | Retire DM Sans; Inter is the sole body/UI face; Satoshi kept for display only | One core typeface for the unified system. Satoshi remains the single approved display exception (hero / large editorial headings), generalizing the 2026-04-28 homepage-hero exception. DM Sans `next/font` load removed from `app/layout.tsx`; `--font-body` and `--marketing-font-body` repoint to Inter. |

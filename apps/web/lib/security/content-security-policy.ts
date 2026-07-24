@@ -86,8 +86,6 @@ const STATIC_CSP_PARTS = {
     'https://vercel.live',
     'https://challenges.cloudflare.com',
     'https://r2.leadsy.ai',
-    // Leadsy dynamically injects scripts from this CloudFront domain (JOVIE-WEB-R7)
-    'https://ddwl4m2hdecbv.cloudfront.net',
     'https://tag.trovo-tag.com',
     // Google Analytics 4 / gtag.js (JOV-3664)
     'https://www.googletagmanager.com',
@@ -115,7 +113,6 @@ const STATIC_CSP_PARTS = {
     'wss://ws-us3.pusher.com',
     'https://r2.leadsy.ai',
     'https://wvbknd.leadsy.ai',
-    'https://api.instantly.ai',
     // Google OAuth + AI Connector APIs (JOV-2230)
     'https://accounts.google.com',
     'https://oauth2.googleapis.com',

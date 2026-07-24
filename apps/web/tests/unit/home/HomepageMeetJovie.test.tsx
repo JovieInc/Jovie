@@ -1,16 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
-  type HomepageArtistProfileCards,
-  HomepageArtistProfiles,
-} from '@/components/homepage/HomepageArtistProfiles';
-import { HomepageMeetJovie } from '@/components/homepage/HomepageMeetJovie';
+  HomepageMeetJovie,
+  type HomepageMeetJovieCards,
+} from '@/components/homepage/HomepageMeetJovie';
 
-const CARDS: HomepageArtistProfileCards = [
+const CARDS: HomepageMeetJovieCards = [
   {
     id: 'drive-streams',
     title: 'Drive Streams',
-    body: 'Put the latest release first.',
     image: {
       publicUrl: '/artist-streams.png',
       width: 660,
@@ -21,7 +19,6 @@ const CARDS: HomepageArtistProfileCards = [
   {
     id: 'capture-fans',
     title: 'Capture Fans',
-    body: 'Build a list you can use again.',
     image: {
       publicUrl: '/artist-fans.png',
       width: 660,
@@ -32,7 +29,6 @@ const CARDS: HomepageArtistProfileCards = [
   {
     id: 'get-paid',
     title: 'Get Paid',
-    body: 'Make direct support feel native.',
     image: {
       publicUrl: '/artist-pay.png',
       width: 660,
@@ -43,34 +39,17 @@ const CARDS: HomepageArtistProfileCards = [
 ];
 
 describe('HomepageMeetJovie', () => {
-  it('renders a compact text-only brand thesis', () => {
-    const { container } = render(<HomepageMeetJovie />);
+  it('renders the Meet Jovie intro and all three outcome cards', () => {
+    render(<HomepageMeetJovie cards={CARDS} />);
 
     expect(
-      screen.getByRole('heading', {
-        level: 2,
-        name: 'Jovie is the AI workspace for artists.',
-      })
-    ).toBeInTheDocument();
-    expect(screen.getByText('Meet Jovie')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Built around your catalog, audience, and artist presence.'
-      )
-    ).toBeInTheDocument();
-    expect(container.querySelectorAll('img, ul, button')).toHaveLength(0);
-  });
-});
-
-describe('HomepageArtistProfiles', () => {
-  it('moves all three profile outcomes into Artist Profiles', () => {
-    render(<HomepageArtistProfiles cards={CARDS} />);
-
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'Artist Profiles' })
+      screen.getByRole('heading', { level: 2, name: 'Meet Jovie' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('list', { name: 'Jovie Artist Profile Outcomes' })
+      screen.getByText(/AI artist workspace that surfaces opportunities/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('list', { name: 'Outcomes Jovie Delivers' })
     ).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
 
@@ -79,16 +58,17 @@ describe('HomepageArtistProfiles', () => {
         screen.getByRole('heading', { level: 3, name: title })
       ).toBeInTheDocument();
     }
-
-    for (const body of CARDS.map(card => card.body)) {
-      expect(screen.getByText(body)).toBeInTheDocument();
-    }
   });
 
-  it('preserves registry-backed image geometry without carousel controls', () => {
-    render(<HomepageArtistProfiles cards={CARDS} />);
+  it('renders carousel controls and preserves registry-backed image geometry', () => {
+    render(<HomepageMeetJovie cards={CARDS} />);
 
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Previous Outcomes' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Next Outcomes' })
+    ).toBeInTheDocument();
 
     const images = screen.getAllByRole('img');
     expect(images).toHaveLength(3);

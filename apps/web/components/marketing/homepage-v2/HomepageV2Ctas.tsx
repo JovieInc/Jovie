@@ -97,7 +97,6 @@ export function HomepageV2FinalCta() {
       >
         <div className='homepage-final-cta-copy system-b-mounted-home-footer-cta-copy mx-auto'>
           <h2
-            data-homepage-section-heading
             data-testid='homepage-v2-final-cta-heading'
             className='homepage-final-cta-heading system-b-mounted-home-footer-cta-heading text-balance'
           >

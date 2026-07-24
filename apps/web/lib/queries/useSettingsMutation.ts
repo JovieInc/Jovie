@@ -45,14 +45,12 @@ interface SettingsUpdateResponse {
 }
 
 interface SettingsMutationOptions {
-  /** Immutable ID of the profile selected in the dashboard shell. */
-  profileId: string | undefined;
   /** Suppress success toasts for obvious visual changes (e.g. theme toggles). */
   silentSuccess?: boolean;
 }
 
 const updateSettings = createMutationFn<
-  SettingsUpdateInput & { profileId: string },
+  SettingsUpdateInput,
   SettingsUpdateResponse
 >('/api/dashboard/profile', 'PUT');
 
@@ -62,10 +60,7 @@ const updateSettings = createMutationFn<
  * @example
  * ```tsx
  * function ThemeSelector() {
- *   const { selectedProfile } = useDashboardData();
- *   const { mutate: updateTheme, isPending } = useUpdateSettingsMutation({
- *     profileId: selectedProfile?.id,
- *   });
+ *   const { mutate: updateTheme, isPending } = useUpdateSettingsMutation();
  *
  *   const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
  *     updateTheme({ updates: { theme: { preference: theme } } });
@@ -78,10 +73,7 @@ const updateSettings = createMutationFn<
  * @example
  * ```tsx
  * function NotificationToggle() {
- *   const { selectedProfile } = useDashboardData();
- *   const { mutate: updateSettings, isPending } = useUpdateSettingsMutation({
- *     profileId: selectedProfile?.id,
- *   });
+ *   const { mutate: updateSettings, isPending } = useUpdateSettingsMutation();
  *
  *   const handleToggle = (enabled: boolean) => {
  *     updateSettings({
@@ -93,16 +85,13 @@ const updateSettings = createMutationFn<
  * }
  * ```
  */
-export function useUpdateSettingsMutation(options: SettingsMutationOptions) {
+export function useUpdateSettingsMutation(
+  options: SettingsMutationOptions = {}
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (variables: SettingsUpdateInput) => {
-      if (!options.profileId) {
-        throw new Error('Missing profile id; please refresh and try again.');
-      }
-      return updateSettings({ ...variables, profileId: options.profileId });
-    },
+    mutationFn: updateSettings,
 
     onSuccess: (_data, variables) => {
       if (!options.silentSuccess) {
@@ -148,15 +137,12 @@ export function useUpdateSettingsMutation(options: SettingsMutationOptions) {
  *
  * @example
  * ```tsx
- * const { updateTheme, isPending } = useThemeMutation(selectedProfile?.id);
+ * const { updateTheme, isPending } = useThemeMutation();
  * updateTheme('dark');
  * ```
  */
-export function useThemeMutation(profileId: string | undefined) {
-  const mutation = useUpdateSettingsMutation({
-    profileId,
-    silentSuccess: true,
-  });
+export function useThemeMutation() {
+  const mutation = useUpdateSettingsMutation({ silentSuccess: true });
 
   return {
     updateTheme: (
@@ -178,15 +164,12 @@ export function useThemeMutation(profileId: string | undefined) {
  *
  * @example
  * ```tsx
- * const { setHighContrast, isPending } = useHighContrastMutation(selectedProfile?.id);
+ * const { setHighContrast, isPending } = useHighContrastMutation();
  * setHighContrast(true, 'dark');
  * ```
  */
-export function useHighContrastMutation(profileId: string | undefined) {
-  const mutation = useUpdateSettingsMutation({
-    profileId,
-    silentSuccess: true,
-  });
+export function useHighContrastMutation() {
+  const mutation = useUpdateSettingsMutation({ silentSuccess: true });
 
   return {
     setHighContrast: (
@@ -208,12 +191,12 @@ export function useHighContrastMutation(profileId: string | undefined) {
  *
  * @example
  * ```tsx
- * const { updateNotifications, isPending } = useNotificationSettingsMutation(selectedProfile?.id);
+ * const { updateNotifications, isPending } = useNotificationSettingsMutation();
  * updateNotifications({ marketing_emails: false });
  * ```
  */
-export function useNotificationSettingsMutation(profileId: string | undefined) {
-  const mutation = useUpdateSettingsMutation({ profileId });
+export function useNotificationSettingsMutation() {
+  const mutation = useUpdateSettingsMutation();
 
   const updateNotifications = useCallback(
     (settings: SettingsUpdateInput['updates']['settings']) => {
@@ -244,12 +227,12 @@ export function useNotificationSettingsMutation(profileId: string | undefined) {
  *
  * @example
  * ```tsx
- * const { updateAnalyticsFilterAsync, isPending } = useAnalyticsFilterMutation(selectedProfile?.id);
+ * const { updateAnalyticsFilterAsync, isPending } = useAnalyticsFilterMutation();
  * await updateAnalyticsFilterAsync(true); // Exclude self from analytics
  * ```
  */
-export function useAnalyticsFilterMutation(profileId: string | undefined) {
-  const mutation = useUpdateSettingsMutation({ profileId });
+export function useAnalyticsFilterMutation() {
+  const mutation = useUpdateSettingsMutation();
 
   return {
     updateAnalyticsFilter: (excludeSelf: boolean) => {

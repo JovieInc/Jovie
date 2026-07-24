@@ -82,6 +82,35 @@ describe('SidebarThreadsSection', () => {
     });
   });
 
+  it('soft-fades long chat titles instead of hard-clipping mid-glyph', () => {
+    render(
+      <SidebarThreadsSection
+        threads={[
+          {
+            id: 'long-title',
+            href: '/app/chat/long-title',
+            title: 'Ask Jovie about my audience growth plan for Q3',
+            status: 'complete',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+          },
+        ]}
+        activeThreadId={null}
+        tight
+        collapsed={false}
+      />
+    );
+
+    const title = screen.getByText(
+      'Ask Jovie about my audience growth plan for Q3'
+    );
+    expect(title).toHaveClass('overflow-hidden');
+    expect(title).toHaveClass('min-w-0');
+    expect(title).toHaveClass('whitespace-nowrap');
+    expect(title.className).toMatch(/mask-image:linear-gradient/);
+    // Must NOT hard-truncate with ellipsis mid-word presentation.
+    expect(title).not.toHaveClass('truncate');
+  });
+
   it('shows an all chats link when chats are present', () => {
     render(
       <SidebarThreadsSection
@@ -99,21 +128,6 @@ describe('SidebarThreadsSection', () => {
 
     expect(allThreadsLink).toHaveAttribute('href', APP_ROUTES.CHATS);
     expect(allThreadsLink).toHaveAttribute('aria-current', 'page');
-  });
-
-  it('announces the unread chat count through the canonical nav badge', () => {
-    render(
-      <SidebarThreadsSection
-        threads={[threads[0], { ...threads[1], unread: true }]}
-        activeThreadId={null}
-        tight
-        collapsed={false}
-      />
-    );
-
-    const unreadBadge = screen.getByLabelText('1 unread chat');
-    expect(unreadBadge).toHaveTextContent('1');
-    expect(unreadBadge).toHaveAttribute('data-nav-badge', 'count');
   });
 
   it('renders selectable button rows when no href is provided', () => {

@@ -2,7 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AuthShell } from '@/components/organisms/AuthShell';
@@ -10,14 +10,17 @@ import { APP_ROUTES } from '@/constants/routes';
 import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
+import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({ toggle: vi.fn() }),
 }));
 
 vi.mock('@/components/organisms/PersistentAudioBar', () => ({
-  PersistentAudioBar: () => (
-    <div data-testid='fixture-audio-player'>Audio Player</div>
+  PersistentAudioBar: ({ variant }: { variant?: string }) => (
+    <div data-testid='fixture-audio-player' data-variant={variant}>
+      Audio Player
+    </div>
   ),
 }));
 
@@ -106,14 +109,16 @@ const dashboardData: DashboardData = {
   },
 };
 
-function renderShell() {
+function renderShell(designV1: boolean) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+      <AppFlagProvider
+        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: designV1 }}
+      >
         <DashboardDataProvider value={dashboardData}>
           <TooltipProvider>
             <ShellSidebarOverrideProvider>
@@ -128,14 +133,21 @@ function renderShell() {
   );
 }
 
-describe('canonical shell slot parity', () => {
-  it('renders all six AppShellFrame slots through the single production path', () => {
-    renderShell();
+describe('shell variant parity (legacy vs shellChatV1)', () => {
+  beforeEach(() => {
+    localStorage.removeItem(FF_OVERRIDES_KEY);
+  });
+
+  it.each([
+    ['legacy', false],
+    ['shellChatV1', true],
+  ] as const)('renders all six AppShellFrame slots for the %s variant', (variantName, designV1) => {
+    renderShell(designV1);
 
     const frame = screen
       .getByTestId('app-shell-sidebar-mount')
       .closest('[data-app-shell-frame]');
-    expect(frame).toHaveAttribute('data-app-shell-frame', 'true');
+    expect(frame).toHaveAttribute('data-shell-design', variantName);
 
     expect(
       screen
@@ -149,17 +161,30 @@ describe('canonical shell slot parity', () => {
     expect(scrollPane).toContainElement(screen.getByText('Main Content'));
 
     const rightRail = screen.getByTestId('app-shell-right-rail');
+    expect(rightRail).toHaveAttribute('data-shell-design', variantName);
     expect(rightRail).toContainElement(
       screen.getByTestId('fixture-right-panel')
     );
 
-    expect(screen.getByTestId('fixture-audio-player')).toBeInTheDocument();
+    expect(screen.getByTestId('fixture-audio-player')).toHaveAttribute(
+      'data-variant',
+      variantName
+    );
 
     expect(screen.getByTestId('fixture-mobile-tabs')).toBeInTheDocument();
   });
 
-  it('keeps the real UnifiedSidebar collapse control reachable', () => {
-    renderShell();
+  it('keeps the sidebar toggle reachable in both variants (header trigger or in-sidebar collapse control)', () => {
+    renderShell(false);
+    expect(
+      within(screen.getByTestId('fixture-header')).getByRole('button', {
+        name: 'Toggle Sidebar',
+      })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the real UnifiedSidebar collapse control reachable when shellChatV1 is open', () => {
+    renderShell(true);
     expect(
       within(screen.getByTestId('fixture-header')).queryByRole('button', {
         name: 'Toggle Sidebar',

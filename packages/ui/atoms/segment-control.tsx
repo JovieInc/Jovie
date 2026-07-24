@@ -117,10 +117,6 @@ export interface SegmentControlProps<T extends string = string>
    */
   readonly triggerClassName?: string;
   /**
-   * Additional class name for the tablist layout
-   */
-  readonly listClassName?: string;
-  /**
    * Additional class name for the active indicator in linear pill mode
    */
   readonly indicatorClassName?: string;
@@ -160,7 +156,6 @@ export function SegmentControl<T extends string = string>({
   layout = 'fill',
   'aria-label': ariaLabel,
   className,
-  listClassName,
   triggerClassName,
   indicatorClassName,
 }: SegmentControlProps<T>) {
@@ -262,8 +257,7 @@ export function SegmentControl<T extends string = string>({
         aria-label={ariaLabel}
         className={cn(
           'relative flex items-center',
-          layout === 'fill' ? 'w-full' : 'w-fit max-w-full',
-          listClassName
+          layout === 'fill' ? 'w-full' : 'w-fit max-w-full'
         )}
       >
         {variant === 'linear-pill' && indicatorLayout ? (

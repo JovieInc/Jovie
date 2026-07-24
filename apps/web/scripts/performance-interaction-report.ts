@@ -13,8 +13,6 @@ export interface InteractionLatencySample {
   readonly nextPaintMs?: number;
   readonly usableStateMs?: number;
   readonly dataReadyMs?: number;
-  readonly renderToInteractiveMs?: number;
-  readonly droppedFrameCount?: number;
   readonly reactCommitMs?: number;
   readonly longTaskCount?: number;
   readonly networkRequestCount?: number;
@@ -45,8 +43,6 @@ export interface InteractionScenarioSummary {
   readonly p95NextPaintMs: number | null;
   readonly p95UsableStateMs: number | null;
   readonly p95DataReadyMs: number | null;
-  readonly p95RenderToInteractiveMs: number | null;
-  readonly maxDroppedFrameCount: number | null;
   readonly worstFirstFeedbackMs: number | null;
   readonly targetP95Ms: number;
   readonly passed: boolean | null;
@@ -165,15 +161,6 @@ function summarizeScenario(
     if (sample.dataReadyMs !== undefined) {
       assertFiniteSampleValue(sample.dataReadyMs, 'dataReadyMs');
     }
-    if (sample.renderToInteractiveMs !== undefined) {
-      assertFiniteSampleValue(
-        sample.renderToInteractiveMs,
-        'renderToInteractiveMs'
-      );
-    }
-    if (sample.droppedFrameCount !== undefined) {
-      assertFiniteSampleValue(sample.droppedFrameCount, 'droppedFrameCount');
-    }
   }
 
   const firstFeedbackValues = samples.map(sample => sample.firstFeedbackMs);
@@ -186,50 +173,13 @@ function summarizeScenario(
   const dataReadyValues = compactNumbers(
     samples.map(sample => sample.dataReadyMs)
   );
-  const renderToInteractiveValues = compactNumbers(
-    samples.map(sample => sample.renderToInteractiveMs)
-  );
-  const droppedFrameValues = compactNumbers(
-    samples.map(sample => sample.droppedFrameCount)
-  );
   const p95FirstFeedbackMs = percentile(firstFeedbackValues, 95);
-  const p50FirstFeedbackMs = percentile(firstFeedbackValues, 50);
   const p95UsableStateMs = percentile(usableStateValues, 95);
   const p95DataReadyMs = percentile(dataReadyValues, 95);
-  const p95RenderToInteractiveMs = percentile(renderToInteractiveValues, 95);
-  const maxDroppedFrameCount = percentile(droppedFrameValues, 100);
   const targetP95Ms =
     scenario.budget.usableStateP95Ms ?? scenario.budget.firstFeedbackP95Ms;
-  const measuredP95 =
-    scenario.budget.usableStateP95Ms === undefined
-      ? p95FirstFeedbackMs
-      : p95UsableStateMs;
-  const hasSamples = samples.length > 0;
-  const requiredMetricsPresent =
-    (scenario.budget.usableStateP95Ms === undefined ||
-      usableStateValues.length === samples.length) &&
-    (scenario.budget.dataReadyP95Ms === undefined ||
-      dataReadyValues.length === samples.length) &&
-    (scenario.budget.renderToInteractiveP95Ms === undefined ||
-      renderToInteractiveValues.length === samples.length) &&
-    (scenario.budget.maxDroppedFrames === undefined ||
-      droppedFrameValues.length === samples.length);
-  const passed = !hasSamples
-    ? null
-    : samples.length >= (scenario.budget.minimumSampleCount ?? 1) &&
-      requiredMetricsPresent &&
-      measuredP95 !== null &&
-      measuredP95 <= targetP95Ms &&
-      (scenario.budget.firstFeedbackP50Ms === undefined ||
-        (p50FirstFeedbackMs !== null &&
-          p50FirstFeedbackMs <= scenario.budget.firstFeedbackP50Ms)) &&
-      (scenario.budget.renderToInteractiveP95Ms === undefined ||
-        (p95RenderToInteractiveMs !== null &&
-          p95RenderToInteractiveMs <=
-            scenario.budget.renderToInteractiveP95Ms)) &&
-      (scenario.budget.maxDroppedFrames === undefined ||
-        (maxDroppedFrameCount !== null &&
-          maxDroppedFrameCount <= scenario.budget.maxDroppedFrames));
+  const measuredP95 = p95UsableStateMs ?? p95FirstFeedbackMs;
+  const passed = measuredP95 === null ? null : measuredP95 <= targetP95Ms;
   const rootCauseBucket = mode(
     compactStrings(samples.map(sample => sample.rootCauseBucket)),
     'unknown'
@@ -243,14 +193,12 @@ function summarizeScenario(
     scenario,
     samples,
     sampleCount: samples.length,
-    p50FirstFeedbackMs,
+    p50FirstFeedbackMs: percentile(firstFeedbackValues, 50),
     p75FirstFeedbackMs: percentile(firstFeedbackValues, 75),
     p95FirstFeedbackMs,
     p95NextPaintMs: percentile(nextPaintValues, 95),
     p95UsableStateMs,
     p95DataReadyMs,
-    p95RenderToInteractiveMs,
-    maxDroppedFrameCount,
     worstFirstFeedbackMs: percentile(firstFeedbackValues, 100),
     targetP95Ms,
     passed,

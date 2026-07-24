@@ -261,21 +261,17 @@ describe('PersistentAudioBar', () => {
 
     render(<PersistentAudioBar />);
 
-    expect(screen.getAllByText('Midnight Drive').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('DJ Cool · Night Vibes').length).toBeGreaterThan(
-      0
-    );
+    expect(screen.getByText('Midnight Drive')).toBeInTheDocument();
+    expect(screen.getByText('DJ Cool · Night Vibes')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Pause playback' })
     ).toBeInTheDocument();
-    for (const artwork of screen.getAllByTestId('artwork-img')) {
-      expect(artwork).toHaveAttribute('src', 'https://cdn.example.com/art.jpg');
-    }
+    expect(screen.getByTestId('artwork-img')).toHaveAttribute(
+      'src',
+      'https://cdn.example.com/art.jpg'
+    );
     expect(
-      within(screen.getByTestId('audio-surface-expanded-shell')).getByRole(
-        'button',
-        { name: 'Dismiss Player' }
-      )
+      screen.getByRole('button', { name: 'Dismiss Player' })
     ).toBeInTheDocument();
   });
 
@@ -309,12 +305,7 @@ describe('PersistentAudioBar', () => {
 
     render(<PersistentAudioBar />);
 
-    await user.click(
-      within(screen.getByTestId('audio-surface-expanded-shell')).getByRole(
-        'button',
-        { name: 'Dismiss Player' }
-      )
-    );
+    await user.click(screen.getByRole('button', { name: 'Dismiss Player' }));
 
     expect(stop).toHaveBeenCalled();
   });
@@ -347,14 +338,12 @@ describe('PersistentAudioBar', () => {
 
     render(<PersistentAudioBar />);
 
-    const mobileSurface = screen.getAllByRole('region', {
-      name: 'Audio Player',
-    })[1];
-    const artwork = within(mobileSurface).getByTestId('artwork-img');
+    const img = screen.getByTestId('artwork-img');
+    expect(img).toBeInTheDocument();
 
-    fireEvent.error(artwork);
+    fireEvent.error(img);
 
-    expect(within(mobileSurface).queryByTestId('artwork-img')).toBeNull();
+    expect(screen.queryByTestId('artwork-img')).not.toBeInTheDocument();
   });
 
   it('renders placeholder when artworkUrl is null', () => {
@@ -390,17 +379,17 @@ describe('PersistentAudioBar', () => {
     render(<PersistentAudioBar />);
 
     expect(
-      screen.getAllByRole('region', { name: 'Audio Player' })
-    ).toHaveLength(2);
+      screen.getByRole('region', { name: 'Audio Player' })
+    ).toBeInTheDocument();
   });
 
-  it('renders the extracted canonical audio bar when requested', () => {
+  it('renders the extracted shell V1 audio bar when requested', () => {
     setPlaying({
       artistName: 'DJ Cool',
       artworkUrl: 'https://cdn.example.com/art.jpg',
     });
 
-    render(<PersistentAudioBar />);
+    render(<PersistentAudioBar variant='shellChatV1' />);
 
     expect(getExpandedShellMinimizeButton()).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Loop: off' })).toBeNull();
@@ -419,34 +408,7 @@ describe('PersistentAudioBar', () => {
     );
   });
 
-  it('wires the canonical expanded dismiss control to stop exactly once', async () => {
-    const user = userEvent.setup();
-    setPlaying({ artistName: 'DJ Cool' });
-
-    render(<PersistentAudioBar />);
-
-    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
-    await user.click(
-      within(expandedSurface).getByRole('button', { name: 'Dismiss Player' })
-    );
-
-    expect(stop).toHaveBeenCalledOnce();
-  });
-
-  it('keeps the canonical expanded height stable from idle to playing', () => {
-    setPlaying({ isPlaying: false, playbackStatus: 'idle' });
-    const { rerender } = render(<PersistentAudioBar />);
-    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
-    const reservedHeight = 'var(--app-shell-audio-bar-max-height)';
-    expect(expandedSurface.style.maxHeight).toBe(reservedHeight);
-
-    setPlaying();
-    rerender(<PersistentAudioBar />);
-
-    expect(expandedSurface.style.maxHeight).toBe(reservedHeight);
-  });
-
-  it('wires canonical queue transport to the shared audio player', async () => {
+  it('wires shell V1 queue transport to the shared audio player', async () => {
     const user = userEvent.setup();
     setPlaying({
       artistName: 'DJ Cool',
@@ -456,7 +418,7 @@ describe('PersistentAudioBar', () => {
       queueIndex: 1,
     });
 
-    render(<PersistentAudioBar />);
+    render(<PersistentAudioBar variant='shellChatV1' />);
 
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await user.click(screen.getByRole('button', { name: 'Previous' }));
@@ -465,7 +427,7 @@ describe('PersistentAudioBar', () => {
     expect(playPrevious).toHaveBeenCalledTimes(1);
   });
 
-  it('hides canonical queue transport when the queue has no neighbors', () => {
+  it('hides shell V1 queue transport when the queue has no neighbors', () => {
     setPlaying({
       artistName: 'DJ Cool',
       hasNext: false,
@@ -474,20 +436,20 @@ describe('PersistentAudioBar', () => {
       queueIndex: 0,
     });
 
-    render(<PersistentAudioBar />);
+    render(<PersistentAudioBar variant='shellChatV1' />);
 
     expect(screen.queryByRole('button', { name: 'Next' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Previous' })).toBeNull();
   });
 
-  it('wires canonical waveform seeking to the shared audio player', () => {
+  it('wires shell V1 waveform seeking to the shared audio player', () => {
     setPlaying({
       artistName: 'DJ Cool',
       currentTime: 10,
       duration: 30,
     });
 
-    render(<PersistentAudioBar />);
+    render(<PersistentAudioBar variant='shellChatV1' />);
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
     const waveformSeek = within(expandedSurface).getByRole('slider', {
@@ -499,15 +461,15 @@ describe('PersistentAudioBar', () => {
     expect(seek).toHaveBeenCalledWith(18);
   });
 
-  it('links the canonical lyrics button to the active track when the canonical shell is active', async () => {
+  it('links the shell V1 lyrics button to the active track when DESIGN_V1 is enabled', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
     pathname = '/app/chat/thread-1';
     searchParams = new URLSearchParams('panel=profile');
 
     render(
-      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <PersistentAudioBar />
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
       </AppFlagProvider>
     );
 
@@ -520,14 +482,14 @@ describe('PersistentAudioBar', () => {
     );
   });
 
-  it('closes the canonical lyrics button back to the last non-lyrics route', async () => {
+  it('closes the shell V1 lyrics button back to the last non-lyrics route', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
     pathname = APP_ROUTES.RELEASES;
 
     const { rerender } = render(
-      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <PersistentAudioBar />
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
       </AppFlagProvider>
     );
 
@@ -536,8 +498,8 @@ describe('PersistentAudioBar', () => {
       `from=${encodeURIComponent(APP_ROUTES.RELEASES)}`
     );
     rerender(
-      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <PersistentAudioBar />
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
       </AppFlagProvider>
     );
 
@@ -546,14 +508,14 @@ describe('PersistentAudioBar', () => {
     expect(push).toHaveBeenCalledWith(APP_ROUTES.RELEASES);
   });
 
-  it('prefers the explicit lyrics return route when closing from the canonical player', async () => {
+  it('prefers the explicit lyrics return route when closing from the shell V1 player', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
     pathname = APP_ROUTES.CHAT;
 
     const { rerender } = render(
-      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <PersistentAudioBar />
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
       </AppFlagProvider>
     );
 
@@ -562,8 +524,8 @@ describe('PersistentAudioBar', () => {
       'from=%2Fapp%2Freleases%3Ftab%3Dscheduled'
     );
     rerender(
-      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <PersistentAudioBar />
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
       </AppFlagProvider>
     );
 
@@ -572,12 +534,26 @@ describe('PersistentAudioBar', () => {
     expect(push).toHaveBeenCalledWith('/app/releases?tab=scheduled');
   });
 
-  it('keeps the canonical lyrics button hidden when the active track has no lyrics', () => {
+  it('keeps the shell V1 lyrics button hidden when the active track has no lyrics', () => {
     setPlaying({ artistName: 'DJ Cool', hasLyrics: false });
 
     render(
-      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <PersistentAudioBar />
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    expect(screen.queryByRole('button', { name: 'Lyrics' })).toBeNull();
+  });
+
+  it('keeps the shell V1 lyrics button hidden when DESIGN_V1 is disabled', () => {
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(
+      <AppFlagProvider
+        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: false }}
+      >
+        <PersistentAudioBar variant='shellChatV1' />
       </AppFlagProvider>
     );
 
@@ -588,7 +564,7 @@ describe('PersistentAudioBar', () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool' });
 
-    render(<PersistentAudioBar />);
+    render(<PersistentAudioBar variant='shellChatV1' />);
 
     await user.click(getExpandedShellMinimizeButton());
 
@@ -613,7 +589,7 @@ describe('PersistentAudioBar', () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool' });
 
-    render(<PersistentAudioBar />);
+    render(<PersistentAudioBar variant='shellChatV1' />);
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
     const compactSurface = screen.getByTestId('audio-surface-compact-shell');
@@ -630,18 +606,18 @@ describe('PersistentAudioBar', () => {
   it('docks the expanded shell without elevated card shadow chrome', () => {
     setPlaying({ artistName: 'DJ Cool' });
 
-    render(<PersistentAudioBar />);
+    render(<PersistentAudioBar variant='shellChatV1' />);
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
     expect(expandedSurface.className).toContain('border-t');
     expect(expandedSurface.className).not.toMatch(/shadow-\[/);
   });
 
-  it('publishes compact canonical chrome state while minimized and clears on unmount', async () => {
+  it('publishes compact shell V1 chrome state while minimized and clears on unmount', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool' });
 
-    const { unmount } = render(<PersistentAudioBar />);
+    const { unmount } = render(<PersistentAudioBar variant='shellChatV1' />);
 
     expect(getAudioChromeSnapshot()).toEqual({
       activeTrackId: 'track-1',
@@ -668,13 +644,13 @@ describe('PersistentAudioBar', () => {
     });
   });
 
-  it('handles canonical active-track keyboard shortcuts', () => {
+  it('handles shell V1 active-track keyboard shortcuts', () => {
     setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
     pathname = APP_ROUTES.CHAT;
 
     render(
-      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <PersistentAudioBar />
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
       </AppFlagProvider>
     );
 
@@ -707,8 +683,8 @@ describe('PersistentAudioBar', () => {
     pathname = APP_ROUTES.CHAT;
 
     const { rerender } = render(
-      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <PersistentAudioBar />
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
       </AppFlagProvider>
     );
 
@@ -717,8 +693,8 @@ describe('PersistentAudioBar', () => {
       `from=${encodeURIComponent(APP_ROUTES.CHAT)}`
     );
     rerender(
-      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <PersistentAudioBar />
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
       </AppFlagProvider>
     );
 
@@ -729,10 +705,10 @@ describe('PersistentAudioBar', () => {
     );
   });
 
-  it('cinematically reveals the canonical bar into place on first play', async () => {
+  it('cinematically reveals the shell V1 bar into place on first play', async () => {
     setPlaying({ artistName: 'DJ Cool' });
 
-    render(<PersistentAudioBar />);
+    render(<PersistentAudioBar variant='shellChatV1' />);
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
 
@@ -752,7 +728,7 @@ describe('PersistentAudioBar', () => {
   it('keeps the reserved bar height across the reveal so nothing shifts', async () => {
     setPlaying({ artistName: 'DJ Cool' });
 
-    render(<PersistentAudioBar />);
+    render(<PersistentAudioBar variant='shellChatV1' />);
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
     const reservedHeight = 'var(--app-shell-audio-bar-max-height)';
@@ -766,11 +742,11 @@ describe('PersistentAudioBar', () => {
     expect(expandedSurface.style.maxHeight).toBe(reservedHeight);
   });
 
-  it('snaps the canonical bar revealed without a translate frame under reduced motion', () => {
+  it('snaps the shell V1 bar revealed without a translate frame under reduced motion', () => {
     mockPrefersReducedMotion = true;
     setPlaying({ artistName: 'DJ Cool' });
 
-    render(<PersistentAudioBar />);
+    render(<PersistentAudioBar variant='shellChatV1' />);
 
     const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
 

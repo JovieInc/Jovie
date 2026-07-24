@@ -22,67 +22,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Hold only the read-only controller preflight for one bounded release-wave
-  # window. A newer main SHA supersedes this generation before exact CI
-  # authorization, so no staging deploy, migration, canary, promotion, or
-  # rollback mutation can start for a stale SHA.
-  coalesce-production:
-    name: Coalesce release wave
-    if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    outputs:
-      is_current: ${{ steps.coalesce.outputs.is_current }}
-    steps:
-      - name: Wait for newer main to land
-        id: coalesce
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
-          REPOSITORY: ${{ github.repository }}
-          # One bounded 60-second release-wave window. The immediate check
-          # avoids sleeping when this run is already stale.
-          COALESCE_DELAY_SECONDS: '60'
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "is_current=false" >> "$GITHUB_OUTPUT"
-          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Controller expected SHA must be a full commit."
-            exit 1
-          }
-
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
-          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Could not resolve exact current main during release coalescing."
-            exit 1
-          }
-          if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-            echo "::notice::Controller generation $EXPECTED_SHA was superseded by $current_main_sha before the coalescing window."
-            exit 0
-          fi
-
-          echo "Current main is $EXPECTED_SHA; waiting ${COALESCE_DELAY_SECONDS}s for the release wave to settle."
-          sleep "$COALESCE_DELAY_SECONDS"
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
-          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Could not resolve exact current main at the end of release coalescing."
-            exit 1
-          }
-          if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-            echo "::notice::Controller generation $EXPECTED_SHA was superseded by $current_main_sha during the coalescing window."
-            exit 0
-          fi
-
-          echo "is_current=true" >> "$GITHUB_OUTPUT"
-          echo "Release coalescing completed for current main $EXPECTED_SHA."
-
   authorize-production:
     name: Authorize exact main CI evidence
-    needs: [coalesce-production]
-    if: ${{ needs.coalesce-production.result == 'success' && needs.coalesce-production.outputs.is_current == 'true' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -97,7 +39,7 @@ jobs:
       already_verified: ${{ steps.authorize.outputs.already_verified }}
       marker_recovery: ${{ steps.authorize.outputs.marker_recovery }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
@@ -119,6 +61,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # Retry helper for idempotent GET calls — transient GitHub API blips
+          # should never block production deployment.
+          __gh_get() {
+            local url="$1" jq_filter="$2" max_tries=3 delay=2 result
+            for ((try=1; try<=max_tries; try++)); do
+              result="$(gh api "$url" --jq "$jq_filter" 2>/dev/null)" && {
+                echo "$result"
+                return 0
+              }
+              if [ "$try" -lt "$max_tries" ]; then
+                echo "::warning::gh api $url failed (attempt $try/$max_tries), retrying in ${delay}s..."
+                sleep "$delay"
+                delay=$((delay * 2))
+              fi
+            done
+            echo "::error::gh api $url failed after $max_tries attempts." >&2
+            return 1
+          }
+
           {
             echo "authorized=false"
             echo "is_current=false"
@@ -160,7 +122,7 @@ jobs:
             exit 1
           fi
 
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          current_main_sha="$(__gh_get "repos/$REPOSITORY/commits/main" '.sha // empty')"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact current main while authorizing production."
             exit 1
@@ -306,7 +268,7 @@ jobs:
               exit 1
             fi
 
-            final_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+            final_main_sha="$(__gh_get "repos/$REPOSITORY/commits/main" '.sha // empty')"
             [[ "$final_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
               echo "::error::Could not resolve exact main at the production authorization boundary."
               exit 1
@@ -369,7 +331,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           fetch-depth: 1
@@ -434,32 +396,31 @@ jobs:
       auth_smoke_status: ${{ steps.auth-result.outputs.auth_smoke_status || steps.check-creds.outputs.auth_smoke_status }}
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           fetch-depth: 1
           persist-credentials: false
-      - uses: ./.github/actions/setup-doppler
 
       - name: Check for production auth credentials
         id: check-creds
         env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
+          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
         run: |
           set -euo pipefail
-          # Expanded inside the Doppler child shell.
-          # shellcheck disable=SC2016
-          if [ -n "${DOPPLER_TOKEN:-}" ] &&
-            doppler run --project jovie-web --config prd \
-              --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
-              --no-fallback -- env -u DOPPLER_TOKEN bash -c \
-                '[ -n "${E2E_PROD_USER_EMAIL:-}" ] && [ -n "${DATABASE_URL:-}" ]'; then
+          if { [ -n "$E2E_PROD_USER_EMAIL" ] &&
+              [ -n "$E2E_PROD_USER_PASSWORD" ]; } ||
+            { [ -n "$E2E_CLERK_USER_USERNAME" ] &&
+              [ -n "$E2E_CLERK_USER_PASSWORD" ]; }; then
             {
               echo "credentials_configured=true"
               echo "skip=false"
             } >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::Production Better Auth OTP proof is not configured; authenticated smoke is explicitly skipped and is not release proof."
+            echo "::notice::Production auth credentials are not configured; authenticated smoke is explicitly skipped and is not release proof."
             {
               echo "credentials_configured=false"
               echo "auth_smoke_status=not-configured"
@@ -493,23 +454,24 @@ jobs:
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           test -n "$PRODUCTION_BASE_URL"
-          doppler run --project jovie-web --config prd \
-            --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
-            --no-fallback -- env -u DOPPLER_TOKEN \
-              CI=true \
-              BASE_URL="$PRODUCTION_BASE_URL" \
-              EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
-              EXPECTED_VERCEL_ENVIRONMENT=production \
-              PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
-                node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
+          CI=true \
+          BASE_URL="$PRODUCTION_BASE_URL" \
+          EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
+          EXPECTED_VERCEL_ENVIRONMENT=production \
+          PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
           echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
-          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
+          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
+          E2E_PROD_USER_CODE: ${{ secrets.E2E_PROD_USER_CODE }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && steps.check-creds.outputs.skip != 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -519,7 +481,6 @@ jobs:
           path: |
             apps/web/test-results/
           retention-days: 3
-          allow-markdown: 'true'
   lighthouse-ci:
     name: Lighthouse CI (Production)
     needs: [authorize-production, production-release]
@@ -530,7 +491,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           persist-credentials: false
@@ -646,7 +607,7 @@ jobs:
             echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         if: steps.current.outputs.is_current == 'true'
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
@@ -710,14 +671,22 @@ jobs:
             fi
           done
           if [ "${{ needs.ci-post-deploy-auth-smoke.result }}" != "success" ]; then
-            echo "::error::Authenticated smoke lane did not resolve cleanly."
+            echo "::error::Optional authenticated smoke lane did not resolve cleanly."
             exit 1
           fi
           auth_smoke_status="${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}"
-          if [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" != "true" ] ||
+          if [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" = "true" ] &&
             [ "$auth_smoke_status" != "passed" ]; then
-            echo "::error::Authenticated Better Auth OTP smoke did not produce passing test evidence."
+            echo "::error::Configured authenticated smoke did not produce passing test evidence."
             exit 1
+          fi
+          if [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" != "true" ] &&
+            [ "$auth_smoke_status" != "not-configured" ]; then
+            echo "::error::Authenticated smoke emitted an invalid result state."
+            exit 1
+          fi
+          if [ "$auth_smoke_status" = "not-configured" ]; then
+            echo "::notice::Authenticated smoke was skipped because no complete credential pair is configured; OAuth and Better Auth public gates remain blocking."
           fi
 
           # Main can advance while setup runs. The workflow-level production

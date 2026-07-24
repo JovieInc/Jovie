@@ -6,9 +6,9 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { APP_ROUTES } from '@/constants/routes';
+import { AppFlagProvider, useAppFlag } from '@/lib/flags/client';
+import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
-import { recordUxLatency } from '@/lib/monitoring/interaction-latency';
 
 const mockSetTheme = vi.fn();
 
@@ -27,13 +27,18 @@ vi.mock('@/lib/flags/contracts', () => ({
     HERO_SPOTIFY: 'code:HERO_SPOTIFY',
     BILLING_UPGRADE: 'code:BILLING_UPGRADE',
     SPOTIFY_OAUTH: 'code:SPOTIFY_OAUTH',
+    DESIGN_V1: 'code:DESIGN_V1',
+    SHELL_CHAT_V1: 'code:DESIGN_V1',
   },
   APP_FLAG_DEFAULTS: {
     CLAIM_HANDLE: false,
     HERO_SPOTIFY: false,
     BILLING_UPGRADE: false,
     SPOTIFY_OAUTH: false,
+    DESIGN_V1: false,
+    SHELL_CHAT_V1: false,
   },
+  DESIGN_V1_ALIAS_FLAGS: ['SHELL_CHAT_V1'],
 }));
 
 import { DevToolbar } from '@/components/features/dev/DevToolbar';
@@ -43,20 +48,30 @@ const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
 const TOOLBAR_OPEN_KEY = '__dev_toolbar_open';
 
 function renderToolbar(
-  props?: Partial<{
-    env: string;
-    sha: string;
-    version: string;
-    defaultHidden: boolean;
-  }>
+  props?: Partial<{ env: string; sha: string; version: string }>
 ) {
   return render(
     <DevToolbar
       env={props?.env ?? 'development'}
       sha={props?.sha ?? 'abc1234'}
       version={props?.version ?? '1.0.0'}
-      defaultHidden={props?.defaultHidden}
     />
+  );
+}
+
+function ShellChatFlagProbe() {
+  const enabled = useAppFlag('SHELL_CHAT_V1');
+  return <div data-testid='shell-chat-v1-probe'>{enabled ? 'new' : 'old'}</div>;
+}
+
+function renderToolbarBesideFlagProvider() {
+  return render(
+    <>
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <ShellChatFlagProbe />
+      </AppFlagProvider>
+      <DevToolbar env='development' sha='abc1234' version='1.0.0' />
+    </>
   );
 }
 
@@ -76,7 +91,6 @@ describe('DevToolbar', () => {
 
   afterEach(() => {
     cleanup();
-    vi.unstubAllGlobals();
     document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
   });
 
@@ -99,15 +113,6 @@ describe('DevToolbar', () => {
     it('shows the full toolbar when no localStorage key is set (first visit)', () => {
       renderToolbar();
       expect(screen.getByText('development')).toBeInTheDocument();
-    });
-
-    it('defaults chat usage to the minimally intrusive Dev pill', () => {
-      renderToolbar({ defaultHidden: true });
-
-      expect(
-        screen.getByRole('button', { name: 'Show Dev Toolbar' })
-      ).toBeInTheDocument();
-      expect(screen.queryByText('development')).not.toBeInTheDocument();
     });
 
     it('shows the "Dev" pill when localStorage says hidden', () => {
@@ -167,83 +172,6 @@ describe('DevToolbar', () => {
       expect(
         document.documentElement.style.getPropertyValue('--dev-toolbar-height')
       ).toBe('0px');
-    });
-  });
-
-  describe('flag drawer containment', () => {
-    it('removes collapsed drawer controls from accessibility traversal', () => {
-      renderToolbar();
-
-      expect(
-        screen.queryByRole('textbox', { name: 'Search Flags' })
-      ).not.toBeInTheDocument();
-      expect(screen.queryByText('claim handle')).not.toBeInTheDocument();
-    });
-
-    it('contains expanded controls in a viewport-bound scroll region', () => {
-      renderToolbar();
-
-      fireEvent.click(
-        screen.getByRole('button', { name: 'Expand Dev Toolbar' })
-      );
-
-      const drawer = screen.getByTestId('dev-toolbar-flag-drawer');
-      const bottomBar = screen.getByTestId('dev-toolbar-bottom-bar');
-
-      expect(drawer).toHaveClass('overflow-y-auto');
-      expect(drawer).toHaveStyle({
-        maxHeight: 'min(400px, calc(100dvh - 7rem))',
-      });
-      expect(bottomBar).toHaveClass('overflow-x-auto');
-      expect(
-        screen.getByRole('textbox', { name: 'Search Flags' })
-      ).toBeInTheDocument();
-    });
-
-    it('tracks expanded height changes so the app shell keeps actions clear', () => {
-      const observe = vi.fn();
-      const disconnect = vi.fn();
-      class ResizeObserverMock {
-        observe = observe;
-        disconnect = disconnect;
-        unobserve = vi.fn();
-      }
-      vi.stubGlobal('ResizeObserver', ResizeObserverMock);
-
-      renderToolbar();
-
-      expect(observe).toHaveBeenCalledWith(screen.getByTestId('dev-toolbar'));
-    });
-  });
-
-  describe('UX latency telemetry', () => {
-    it('keeps a fixed five-metric strip for empty and populated samples', async () => {
-      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
-      renderToolbar();
-
-      const strip = screen.getByTestId('dev-toolbar-latency');
-      expect(strip).toHaveClass('h-12');
-      expect(strip.querySelectorAll('[data-metric]')).toHaveLength(5);
-      expect(screen.getAllByText(/P50 — · P95 —/)).toHaveLength(5);
-
-      recordUxLatency('chat_first_token', 125);
-      recordUxLatency('chat_first_token', 300);
-
-      await waitFor(() => {
-        expect(
-          strip.querySelector('[data-metric="chat_first_token"]')
-        ).toHaveTextContent('P50 125ms · P95 300ms');
-      });
-      expect(strip).toHaveClass('h-12');
-      expect(strip.querySelectorAll('[data-metric]')).toHaveLength(5);
-    });
-
-    it('does not render latency chrome while the toolbar is collapsed', () => {
-      renderToolbar();
-
-      expect(
-        screen.queryByTestId('dev-toolbar-latency')
-      ).not.toBeInTheDocument();
     });
   });
 
@@ -406,13 +334,13 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      // All registered code flags are visible before filtering.
-      expect(screen.getByText('4 of 4')).toBeInTheDocument();
+      // Should show "5 of 5" initially (all 5 code flags)
+      expect(screen.getByText('5 of 5')).toBeInTheDocument();
 
       const searchInput = screen.getByPlaceholderText('Search flags...');
       fireEvent.change(searchInput, { target: { value: 'claim' } });
 
-      expect(screen.getByText('1 of 4')).toBeInTheDocument();
+      expect(screen.getByText('1 of 5')).toBeInTheDocument();
     });
 
     it('clears search when clear button is clicked', () => {
@@ -422,11 +350,11 @@ describe('DevToolbar', () => {
       const searchInput = screen.getByPlaceholderText('Search flags...');
       fireEvent.change(searchInput, { target: { value: 'claim' } });
 
-      expect(screen.getByText('1 of 4')).toBeInTheDocument();
+      expect(screen.getByText('1 of 5')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Clear Search' }));
 
-      expect(screen.getByText('4 of 4')).toBeInTheDocument();
+      expect(screen.getByText('5 of 5')).toBeInTheDocument();
     });
 
     it('does not show clear button when search is empty', () => {
@@ -447,6 +375,8 @@ describe('DevToolbar', () => {
 
       expect(screen.getByText('claim handle')).toBeInTheDocument();
       expect(screen.getByText('spotify oauth')).toBeInTheDocument();
+      expect(screen.getByText('design v1')).toBeInTheDocument();
+      expect(screen.queryByText('shell chat v1')).not.toBeInTheDocument();
     });
 
     it('shows source label for each non-overridden flag', () => {
@@ -454,17 +384,107 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       const sourceLabels = screen.getAllByText(/^code$/);
-      expect(sourceLabels.length).toBe(4); // all code flags
+      expect(sourceLabels.length).toBe(5); // all code flags
     });
   });
 
-  describe('design studio shortcut', () => {
-    it('keeps the Design Studio shortcut available without a rollout toggle', () => {
+  // ─── New Design Toggle ─────────────────────────────────────
+
+  describe('new design toggle', () => {
+    it('renders in the collapsed bottom bar without opening the flag list', () => {
       renderToolbar();
+
+      const toggle = screen.getByRole('button', { name: /New Design/ });
+      expect(toggle).toBeInTheDocument();
+      expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      expect(
+        screen.getByRole('button', { name: 'Expand Dev Toolbar' })
+      ).toBeInTheDocument();
+    });
+
+    it('sets the DESIGN_V1 override on click', () => {
+      renderToolbar();
+
+      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
+
+      expect(
+        JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}')
+      ).toEqual({
+        'code:DESIGN_V1': true,
+      });
+    });
+
+    it('clears the DESIGN_V1 override when toggled back to the server default', () => {
+      // Server default for DESIGN_V1 is false. When the user has an
+      // override of `true` and toggles back, the result (false) matches
+      // the server default, so we remove the override entirely instead of
+      // recording a no-op `false` value. Keeps the override count honest.
+      setLocalOverrides({ 'code:DESIGN_V1': true });
+      renderToolbar();
+
+      const toggle = screen.getByRole('button', { name: /New Design/ });
+      expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+      fireEvent.click(toggle);
+
+      expect(
+        JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}')
+      ).toEqual({});
+    });
+
+    it('drops the override badge when DESIGN_V1 is toggled back to default', () => {
+      // Companion to the test above: the user-meaningful override count
+      // returns to zero when an override is cleared, so the collapsed
+      // badge should disappear (no "0 overrides" pill flicker).
+      setLocalOverrides({ 'code:DESIGN_V1': true });
+      renderToolbar();
+
+      expect(screen.getByText('1 override')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
+
+      // Pill in the bar disappears AND the inline "(override)" hint inside
+      // the New Design button is gone now that the override matches default.
+      expect(screen.queryByText('1 override')).not.toBeInTheDocument();
+      expect(screen.queryByText('(override)')).not.toBeInTheDocument();
+    });
+
+    it('updates the collapsed override badge after toggling', () => {
+      renderToolbar();
+
+      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
+
+      expect(screen.getByText('1 override')).toBeInTheDocument();
+    });
+
+    it('keeps the Design Studio shortcut hidden until DESIGN_V1 is on', () => {
+      renderToolbar();
+
+      expect(
+        screen.queryByRole('link', { name: 'Design Studio' })
+      ).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
 
       expect(
         screen.getByRole('link', { name: 'Design Studio' })
       ).toHaveAttribute('href', '/exp/page-builder');
+    });
+
+    it('syncs the override to shell flag consumers outside the toolbar', async () => {
+      renderToolbarBesideFlagProvider();
+
+      expect(screen.getByTestId('shell-chat-v1-probe')).toHaveTextContent(
+        'old'
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('shell-chat-v1-probe')).toHaveTextContent(
+          'new'
+        );
+      });
     });
   });
 
@@ -748,7 +768,7 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       const adminLink = screen.getByRole('link', { name: 'Admin Panel' });
-      expect(adminLink).toHaveAttribute('href', APP_ROUTES.OV);
+      expect(adminLink).toHaveAttribute('href', '/app/admin');
     });
   });
 

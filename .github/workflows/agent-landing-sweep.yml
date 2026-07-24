@@ -20,7 +20,7 @@
 # 5. Scope judge = success
 # 6. CodeRabbit not blocking (no CHANGES_REQUESTED)
 # 7. CI harness risk classifier does not block unattended auto-merge
-# 8. Queue pressure guard: defers when native merge-queue depth hits the configured cap
+# 8. Queue pressure guard: defers when merge-queue depth hits GRAPHITE_QUEUE_POLICY.maxQueueDepth
 #
 # RELATIONSHIP TO agent-pipeline.yml:
 # This workflow is idempotent. Enabling auto-merge on an already-queued PR is
@@ -61,7 +61,7 @@ jobs:
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
       - name: Checkout main policy code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: main
           persist-credentials: false
@@ -147,9 +147,9 @@ jobs:
             echo "Labels: ${LABELS:-none}"
             echo "Already in merge queue: $PR_QUEUED"
 
-            # Skip if native queue intent is already recorded (idempotency guard)
+            # Skip if already enqueued in Graphite (idempotency guard)
             if [[ "$PR_QUEUED" == "true" ]]; then
-              echo "Native merge-queue enrollment already requested. Skipping."
+              echo "Already in Graphite merge queue. Skipping."
               SKIPPED=$((SKIPPED + 1))
               continue
             fi
@@ -241,9 +241,9 @@ jobs:
               continue
             fi
 
-            # The label records intent; the native auto-enroll controller owns admission.
+            # Graphite enqueues by label; native auto-merge retired
             if gh pr edit "$PR_NUMBER" --add-label "merge-queue"; then
-              echo "Requested native merge-queue enrollment for PR #$PR_NUMBER."
+              echo "Added PR #$PR_NUMBER to the Graphite merge queue."
               LANDED=$((LANDED + 1))
             else
               echo "::warning::Failed to add merge-queue label to PR #$PR_NUMBER — not enqueued."

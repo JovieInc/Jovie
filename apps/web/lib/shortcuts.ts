@@ -16,7 +16,7 @@ function makeHint(id: string): ShortcutHint {
 
 export const SHORTCUTS = {
   search: makeHint('command-menu'),
-  searchSlash: makeHint('current-view-search'),
+  searchSlash: makeHint('player-search-slash'),
   toggleSidebar: makeHint('player-toggle-sidebar'),
   toggleSidebarTab: makeHint('player-toggle-sidebar-tab'),
   toggleBar: makeHint('player-toggle-bar'),

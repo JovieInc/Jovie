@@ -6,7 +6,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import { ArrowLeft, Copy, LogOut, RefreshCw, Settings } from 'lucide-react';
+import { ArrowLeft, Copy, RefreshCw, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -14,7 +14,6 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { toast } from '@/components/feedback';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
-import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
 import {
   Sidebar,
   SidebarContent,
@@ -39,11 +38,10 @@ import {
   userSettingsNavigation,
 } from '@/features/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
+import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
-import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
-import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { env } from '@/lib/env-client';
@@ -54,16 +52,11 @@ import {
 } from '@/lib/hooks/useVersionMonitor';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
-import type { AppShellSection } from '@/types/app-shell';
-import {
-  isOperatorNavigationHrefActive,
-  OPERATOR_NAV_SECTIONS,
-} from './operator-navigation';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 
 export interface UnifiedSidebarProps {
-  readonly section: AppShellSection;
+  readonly section: 'admin' | 'dashboard' | 'library' | 'settings';
   /** Brand skin for the shell chrome. 'ov' is the internal/admin skin (JOV-4083). */
   readonly variant?: BrandVariant;
 }
@@ -75,18 +68,15 @@ const VERSION_NOTIFICATION_DELAY_MS = 10_000;
 function SettingsNavGroup({
   items,
   pathname,
-  isItemActive,
 }: Readonly<{
-  items: readonly NavItem[];
+  items: NavItem[];
   pathname: string;
-  isItemActive?: (item: NavItem) => boolean;
 }>) {
   return (
     <SidebarMenu>
       {items.map(item => {
         const isActive =
-          isItemActive?.(item) ??
-          (pathname === item.href || pathname.startsWith(`${item.href}/`));
+          pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <ContextMenu key={item.id}>
             <ContextMenuTrigger asChild>
@@ -131,31 +121,6 @@ function SettingsNavGroup({
         );
       })}
     </SidebarMenu>
-  );
-}
-
-/** Dedicated operator navigation; customer DashboardNav stays customer-only. */
-function OperatorNavigation({ pathname }: { readonly pathname: string }) {
-  return (
-    <nav
-      aria-label='OV Navigation'
-      className='flex flex-1 flex-col gap-4 overflow-hidden pt-1'
-    >
-      {OPERATOR_NAV_SECTIONS.map(section => (
-        <div key={section.label}>
-          <span className='mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
-            {section.label}
-          </span>
-          <SettingsNavGroup
-            items={section.items}
-            pathname={pathname}
-            isItemActive={item =>
-              isOperatorNavigationHrefActive(pathname, item.href)
-            }
-          />
-        </div>
-      ))}
-    </nav>
   );
 }
 
@@ -232,8 +197,7 @@ function SettingsNavigation({
 /** Logo (clean header) or back button for settings/library */
 function SidebarHeaderNav({
   isRouteSidebar,
-  isOperatorSection,
-  canSwitchWorkspaces,
+  isAdmin,
   hasMultipleProfiles,
   isDemoRoute,
   variant = 'jovie',
@@ -241,8 +205,7 @@ function SidebarHeaderNav({
   routeBackLabel = 'Back to App',
 }: Readonly<{
   isRouteSidebar: boolean;
-  isOperatorSection: boolean;
-  canSwitchWorkspaces: boolean;
+  isAdmin: boolean;
   hasMultipleProfiles: boolean;
   isDemoRoute: boolean;
   variant?: BrandVariant;
@@ -296,15 +259,7 @@ function SidebarHeaderNav({
             </div>
           );
         }
-        if (canSwitchWorkspaces) {
-          return (
-            <WorkspaceSelector
-              currentWorkspaceId={variant === 'ov' ? 'ov' : 'customer'}
-              workspaces={APP_SHELL_WORKSPACES}
-            />
-          );
-        }
-        if (hasMultipleProfiles && !isOperatorSection) {
+        if (hasMultipleProfiles && !isAdmin) {
           return <ProfileSwitcher />;
         }
         // Clean header: brand logo + wordmark for identity (matches Linear's
@@ -415,28 +370,6 @@ function ShellSidebarInstallBanner() {
   );
 }
 
-function OperatorSessionControls() {
-  const { signOut } = useAuthSafe();
-  const handleSignOut = useCallback(async () => {
-    await signOut({ redirectUrl: '/' });
-  }, [signOut]);
-
-  return (
-    <div className='px-2.5 py-0.5'>
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton tooltip='Sign Out' onClick={handleSignOut}>
-            <LogOut className='size-3.5' aria-hidden='true' />
-            <span className='truncate group-data-[collapsible=icon]:hidden'>
-              Sign Out
-            </span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
-    </div>
-  );
-}
-
 /**
  * UnifiedSidebar - Single sidebar component for all post-auth sections
  *
@@ -450,17 +383,19 @@ export function UnifiedSidebar({
   section,
   variant = 'jovie',
 }: UnifiedSidebarProps) {
-  const { creatorProfiles, isAdmin: canSwitchWorkspaces } = useDashboardData();
+  const { creatorProfiles } = useDashboardData();
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const sidebarOverride = useShellSidebarOverride();
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
-  const isOperatorSection = section === 'admin' || section === 'ov';
-  const isRouteSidebar = isInSettings || sidebarOverride !== null;
-  const usesStandardAppNavigation = !isOperatorSection && !isRouteSidebar;
+  const isAdmin = section === 'admin';
+  const isInLibrary = section === 'library';
+  const isRouteSidebar = isInSettings || isInLibrary;
+  const isDashboardOrAdmin = section === 'dashboard' || section === 'admin';
   const hasMultipleProfiles = creatorProfiles.length >= 2;
 
-  const { profileHref } = useProfileData(usesStandardAppNavigation);
+  const { profileHref } = useProfileData(isDashboardOrAdmin);
 
   return (
     <Sidebar
@@ -484,8 +419,7 @@ export function UnifiedSidebar({
       >
         <SidebarHeaderNav
           isRouteSidebar={isRouteSidebar}
-          isOperatorSection={isOperatorSection}
-          canSwitchWorkspaces={canSwitchWorkspaces}
+          isAdmin={isAdmin}
           hasMultipleProfiles={hasMultipleProfiles}
           isDemoRoute={isDemoRoute}
           variant={variant}
@@ -496,13 +430,11 @@ export function UnifiedSidebar({
 
       <SidebarContent className='min-h-0 flex-1 px-2.5 pb-2.5 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
-          <SidebarGroupContent className='flex min-h-0 flex-1 flex-col'>
-            {section === 'ov' ? (
-              <OperatorNavigation pathname={pathname} />
-            ) : isInSettings ? (
+          <SidebarGroupContent className='flex-1'>
+            {isInSettings ? (
               <SettingsNavigation pathname={pathname} section={section} />
-            ) : sidebarOverride ? (
-              sidebarOverride.content
+            ) : isInLibrary ? (
+              (sidebarOverride?.content ?? null)
             ) : (
               <DashboardNav />
             )}
@@ -510,11 +442,7 @@ export function UnifiedSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      {isRouteSidebar ? null : section === 'ov' ? (
-        <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
-          <OperatorSessionControls />
-        </SidebarFooter>
-      ) : (
+      {isRouteSidebar ? null : (
         // SidebarFooter is shrink-0; with the restored full-height flex chain
         // (sidebar peer + shell mount both h-full), SidebarContent's flex-1
         // absorbs free space so Settings + Now Playing + banners pin bottom.
@@ -522,7 +450,7 @@ export function UnifiedSidebar({
           {/* Bottom Settings button opens the existing user menu via UserButton.
               Uses Sidebar atoms for native feel (icon + label, tooltip in icon mode).
               Placed above Now Playing / audio area. */}
-          <div className='min-h-(--app-shell-footer-row-height) border-t border-(--app-shell-frame-seam) px-2.5 py-0.5'>
+          <div className='px-2.5 py-0.5'>
             <SidebarMenu>
               <SidebarMenuItem>
                 <UserButton
@@ -543,7 +471,11 @@ export function UnifiedSidebar({
 
           <SidebarBottomNowPlayingBridge />
           {isDemoRoute ? null : <SidebarUpgradeBanner />}
-          <ShellSidebarInstallBanner />
+          {shellChatV1Enabled ? (
+            <ShellSidebarInstallBanner />
+          ) : (
+            <SidebarInstallBanner />
+          )}
         </SidebarFooter>
       )}
     </Sidebar>

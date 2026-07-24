@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
-import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import {
   buildDisplayUrl,
   buildMailtoHref,
@@ -228,8 +227,6 @@ function PayloadBlock(props: Readonly<{ label: string; value: string }>) {
 export default async function AdminShareStudioPage({
   searchParams,
 }: ShareStudioPageProps) {
-  await requireCurrentAdminPageAccess();
-
   const params = await searchParams;
   const data = await loadShareStudioData(params);
 

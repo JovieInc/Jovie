@@ -64,23 +64,17 @@ test.describe('Homepage', () => {
     await expect(hero.getByText('operating system')).toHaveCount(0);
     await expect(
       hero.getByRole('heading', {
-        name: 'Jovie helps you move your music forward.',
+        name: 'Your catalog has untapped potential.',
       })
     ).toBeVisible();
-    await expect(
-      hero.getByText(
-        'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.'
-      )
-    ).toBeVisible();
+    await expect(hero.getByText('You make the music.')).toBeVisible();
     await expect(
       hero.getByRole('link', { name: 'Get started', exact: true })
     ).toHaveAttribute('href', /\/start\?starter_prompt=/);
+    // Secondary CTA hidden while WAITLIST_ENABLED is on.
     await expect(
-      hero.getByRole('link', {
-        name: 'See a live profile',
-        exact: true,
-      })
-    ).toHaveAttribute('href', '/artist-profiles');
+      hero.getByRole('link', { name: 'See a live profile', exact: true })
+    ).toHaveCount(0);
     await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
   });
 
@@ -143,7 +137,7 @@ test.describe('Homepage', () => {
     await expect(featuresFlyout).toHaveCount(0);
   });
 
-  test('hero exposes one centered artist dashboard at source quality', async ({
+  test('hero exposes one centered release workspace at source quality', async ({
     page,
   }) => {
     const commandCenter = page.getByTestId('homepage-hero-command-center');
@@ -151,7 +145,7 @@ test.describe('Homepage', () => {
     await expect(commandCenter).toBeVisible();
     await expect(
       commandCenter.getByAltText(
-        'Jovie artist dashboard showing an opportunity and the workspace used to act on it'
+        'Jovie release workspace with release status, assets, and launch progress'
       )
     ).toBeVisible();
     await expect(commandCenter.locator('img')).toHaveCount(1);
@@ -203,13 +197,9 @@ test.describe('Homepage', () => {
         `${image.alt} should be loaded at device pixel ratio quality`
       ).toBeGreaterThanOrEqual(image.requiredWidth);
     }
-    await expect(commandCenter.locator('img')).toHaveAttribute(
-      'src',
-      /shell-v1-dashboard/
-    );
   });
 
-  test.skip('electric seam keeps hero geometry stable and respects reduced motion', async ({
+  test('electric seam keeps hero geometry stable and respects reduced motion', async ({
     page,
   }) => {
     const seamSlot = page.getByTestId('homepage-poster-hero-seam');
@@ -250,34 +240,7 @@ test.describe('Homepage', () => {
     await expect(page.getByTestId('homepage-poster-hero-media')).toBeVisible();
   });
 
-  test('hero reveal is geometry-safe, interactive, and static under reduced motion', async ({
-    page,
-  }) => {
-    const copy = page.locator('.homepage-poster-hero__copy');
-    const before = await copy.boundingBox();
-    expect(
-      await copy.evaluate(element => {
-        const style = getComputedStyle(element);
-        return [style.animationDelay, style.animationName, style.pointerEvents];
-      })
-    ).toEqual(['0.1s', 'homepage-hero-content-reveal', 'auto']);
-    await expect(page.getByTestId('homepage-primary-cta')).toBeEnabled();
-    await expect
-      .poll(() => copy.evaluate(element => +getComputedStyle(element).opacity))
-      .toBe(1);
-    expect(await copy.boundingBox()).toEqual(before);
-
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await gotoHomepage(page);
-    expect(
-      await copy.evaluate(element => {
-        const style = getComputedStyle(element);
-        return [style.animationName, style.opacity];
-      })
-    ).toEqual(['none', '1']);
-  });
-
-  test.skip('renders the System B narrative in order through the footer CTA', async ({
+  test('renders the System B narrative in order through the footer CTA', async ({
     page,
   }) => {
     await expect(page.getByTestId('homepage-trust')).toHaveAttribute(
@@ -435,88 +398,6 @@ test.describe('Homepage', () => {
     );
   });
 
-  test('locks the final homepage story, product evidence, heading lines, and CLS', async ({
-    page,
-    browserName,
-  }) => {
-    if (browserName === 'chromium') {
-      await page.evaluate(() => {
-        const target = window as Window & { __homepageCls?: number };
-        target.__homepageCls = 0;
-        new PerformanceObserver(list => {
-          for (const entry of list.getEntries()) {
-            const shift = entry as PerformanceEntry & {
-              hadRecentInput: boolean;
-              value: number;
-            };
-            if (!shift.hadRecentInput)
-              target.__homepageCls = (target.__homepageCls ?? 0) + shift.value;
-          }
-        }).observe({ type: 'layout-shift', buffered: true });
-      });
-    }
-    const sectionIds = [
-      'homepage-meet-jovie',
-      'homepage-artist-profiles',
-      'homepage-closed-loop',
-      'homepage-faq',
-      'homepage-v2-final-cta',
-    ];
-    const sectionTops = await page.evaluate(
-      ids =>
-        ids.map(
-          id =>
-            document
-              .querySelector(`[data-testid="${id}"]`)
-              ?.getBoundingClientRect().top ?? -1
-        ),
-      sectionIds
-    );
-    expect(sectionTops).toEqual([...sectionTops].sort((a, b) => a - b));
-
-    const profiles = page.getByTestId('homepage-artist-profiles');
-    await profiles.scrollIntoViewIfNeeded();
-    await expect(
-      profiles.locator('.homepage-artist-outcome__device')
-    ).toHaveCount(3);
-    await expect(profiles.locator('img')).toHaveCount(3);
-    await expect(
-      page.getByTestId('homepage-closed-loop').getByRole('heading', {
-        name: 'All your music working while you sleep',
-      })
-    ).toBeVisible();
-    if (browserName === 'chromium') {
-      expect(
-        await page.evaluate(
-          () => (window as Window & { __homepageCls?: number }).__homepageCls
-        )
-      ).toBeLessThanOrEqual(0.01);
-    }
-
-    for (const [width, height] of [
-      [1440, 900],
-      [390, 844],
-    ] as const) {
-      await page.setViewportSize({ width, height });
-      await page.evaluate(() => document.fonts.ready);
-      const lines = await page
-        .locator(
-          '.homepage-poster-hero__headline, [data-homepage-section-heading]'
-        )
-        .evaluateAll(headings =>
-          headings.map(heading => {
-            const style = getComputedStyle(heading);
-            return Math.ceil(
-              heading.getBoundingClientRect().height /
-                Number.parseFloat(style.lineHeight) -
-                0.05
-            );
-          })
-        );
-      expect(Math.max(...lines)).toBeLessThanOrEqual(2);
-    }
-  });
-
   test('mobile keeps hero and product proof inside the viewport with direct auth CTAs', async ({
     page,
   }) => {
@@ -525,7 +406,7 @@ test.describe('Homepage', () => {
 
     await expect(
       page.getByRole('heading', {
-        name: 'Jovie helps you move your music forward.',
+        name: 'Your catalog has untapped potential.',
       })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,

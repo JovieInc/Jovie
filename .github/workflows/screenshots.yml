@@ -56,7 +56,7 @@ jobs:
       E2E_CLERK_USER_ID: user_test
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -204,13 +204,13 @@ jobs:
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Updated existing PR #$EXISTING_PR via force-push"
-            # Re-apply native queue intent after the screenshot update.
-            # The native auto-enroll controller owns authoritative admission.
+            # Re-apply merge-queue label (idempotent; Graphite enqueues by label)
+            # Graphite enqueues by label; native auto-merge retired
             gh pr edit --add-label "merge-queue" "$EXISTING_PR" || { echo "::error::Failed to add merge-queue label to $EXISTING_PR"; exit 1; }
           else
             PR_URL=$(gh pr create \
               --title "chore: update product screenshots" \
               --body "Auto-generated screenshot update triggered by ${GITHUB_SHA::8}.")
-            # The label records intent; the native auto-enroll controller owns admission.
+            # Graphite enqueues by label; native auto-merge retired
             gh pr edit --add-label "merge-queue" "$PR_URL" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
           fi
