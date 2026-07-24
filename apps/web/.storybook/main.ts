@@ -18,7 +18,6 @@ const config: StorybookConfig = {
     '@storybook/addon-a11y',
     '@storybook/addon-vitest',
     '@chromatic-com/storybook',
-    '@storybook/addon-mcp',
   ],
   framework: {
     name: '@storybook/nextjs-vite',
@@ -409,9 +408,18 @@ const config: StorybookConfig = {
       },
     };
 
-    // Suppress "use client" directive warnings in build output
+    // Pin the FINAL production transpile target. viteFinal is the last hook over
+    // the Vite config, and Storybook's build step otherwise falls back to Vite's
+    // browser default (es2020), which hard-fails on object rest/destructuring in
+    // Storybook 10 + modern Next packages ("Transforming destructuring ... is not
+    // supported"). config.esbuild.target / optimizeDeps.esbuildOptions.target
+    // (set above) only cover dev prebundling, NOT the build-storybook transpile —
+    // so build.target must be set here too or `pnpm build-storybook` breaks in the
+    // merge queue. Merge onto ...config.build so upstream build settings and the
+    // rollupOptions.onwarn "use client" filter below are preserved.
     config.build = {
       ...config.build,
+      target: 'esnext',
       rollupOptions: {
         ...config.build?.rollupOptions,
         onwarn(warning, warn) {
