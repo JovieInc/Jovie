@@ -61,7 +61,7 @@ export const White: Story = {
   },
   decorators: [
     Story => (
-      <div className='bg-black p-4'>
+      <div className='bg-base p-4'>
         <Story />
       </div>
     ),
@@ -110,7 +110,7 @@ export const AllTones: Story = {
         <BrandLogo size={48} tone='auto' />
         <span className='text-xs text-secondary-token'>Auto</span>
       </div>
-      <div className='flex flex-col items-center gap-2 rounded-lg bg-black p-4'>
+      <div className='flex flex-col items-center gap-2 rounded-lg bg-base p-4'>
         <BrandLogo size={48} tone='white' />
         <span className='text-xs text-white'>White</span>
       </div>

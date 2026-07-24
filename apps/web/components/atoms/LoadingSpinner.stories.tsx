@@ -27,7 +27,7 @@ export const Sizes: Story = {
 
 export const Tones: Story = {
   render: () => (
-    <div className='flex items-center gap-6 bg-black p-6'>
+    <div className='flex items-center gap-6 bg-base p-6'>
       <LoadingSpinner tone='inverse' />
       <LoadingSpinner tone='muted' />
       <LoadingSpinner />
