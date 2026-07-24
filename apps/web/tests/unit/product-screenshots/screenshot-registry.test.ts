@@ -183,13 +183,13 @@ describe('screenshot registry', () => {
     }
   });
 
-  it('opens the Shell v1 releases hero screenshot as a clean table view', () => {
+  it('opens the Shell v1 releases hero screenshot on a seeded release detail rail', () => {
     const scenario = SCREENSHOT_SCENARIOS.find(
       currentScenario => currentScenario.id === 'shell-v1-releases-desktop'
     );
 
     expect(scenario?.route).toBe(
-      '/exp/shell-v1?view=releases&capture=marketing&player=off'
+      '/exp/shell-v1?view=releases&release=the-deep-end&capture=marketing'
     );
     expect(scenario?.interaction).toBe('open-shell-releases');
     expect(scenario?.publicExportPath).toBe('shell-v1-releases.png');

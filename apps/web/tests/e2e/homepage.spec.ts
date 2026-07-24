@@ -67,7 +67,7 @@ test.describe('Homepage', () => {
     await expect(hero.getByText('operating system')).toHaveCount(0);
     await expect(
       hero.getByRole('heading', {
-        name: 'You make the music. Jovie runs the business.',
+        name: /You make the music\.\s+Jovie runs the business\./,
       })
     ).toBeVisible();
     await expect(
@@ -111,7 +111,7 @@ test.describe('Homepage', () => {
       '/signin'
     );
     await expect(
-      header.getByRole('link', { name: 'Get started' })
+      header.getByRole('link', { name: 'Claim your free profile' })
     ).toHaveAttribute('href', /\/start\?starter_prompt=/);
 
     await page.evaluate(() =>
@@ -130,7 +130,7 @@ test.describe('Homepage', () => {
       Number.parseFloat(getComputedStyle(element).borderRadius)
     );
     const ctaHeight = await header
-      .getByRole('link', { name: 'Get started' })
+      .getByRole('link', { name: 'Claim your free profile' })
       .evaluate(element => element.getBoundingClientRect().height);
     expect(floatingRadius).toBe(22);
     expect(ctaHeight).toBe(36);
@@ -146,33 +146,36 @@ test.describe('Homepage', () => {
     await expect(featuresFlyout).toHaveCount(0);
   });
 
-  test('hero exposes one centered release workspace at source quality', async ({
+  test('hero exposes one centered Releases table at source quality', async ({
     page,
   }) => {
     const commandCenter = page.getByTestId('homepage-hero-command-center');
 
     await expect(commandCenter).toBeVisible();
     await expect(
-      commandCenter.getByAltText(
-        'Jovie Releases table with real catalog rows and release status'
-      )
+      commandCenter.getByRole('table', { name: 'Releases' })
     ).toBeVisible();
-    await expect(commandCenter.locator('img')).toHaveCount(1);
-    await expect(commandCenter.getByRole('button')).toHaveCount(0);
-    await page.waitForFunction(() => {
-      const commandCenterEl = document.querySelector(
-        '[data-testid="homepage-hero-command-center"]'
-      );
-      const image = commandCenterEl?.querySelector<HTMLImageElement>('img');
-      if (!image) return false;
-      const rect = image.getBoundingClientRect();
-      const imageCenter = rect.left + rect.width / 2;
-      return (
-        image.complete &&
-        image.naturalWidth > 0 &&
-        Math.abs(imageCenter - window.innerWidth / 2) < 12
-      );
-    });
+    await expect(commandCenter.getByRole('row')).toHaveCount(7);
+    await expect(commandCenter.getByText('Never Say A Word')).toBeVisible();
+    await expect(
+      commandCenter.getByText('Cosmic Gate & Tim White')
+    ).toBeVisible();
+    await expect(
+      commandCenter.getByTestId('homepage-release-picking-up')
+    ).toHaveCount(1);
+    await expect(
+      commandCenter.getByRole('button', { name: 'New release' })
+    ).toBeVisible();
+
+    const commandCenterBounds = await commandCenter.boundingBox();
+    expect(commandCenterBounds).not.toBeNull();
+    expect(
+      Math.abs(
+        (commandCenterBounds?.x ?? 0) +
+          (commandCenterBounds?.width ?? 0) / 2 -
+          (page.viewportSize()?.width ?? 0) / 2
+      )
+    ).toBeLessThan(12);
 
     const visibleImageQuality = await commandCenter
       .locator('img')
@@ -188,8 +191,6 @@ test.describe('Homepage', () => {
               ) || img.naturalWidth;
             return {
               alt: img.alt,
-              clientWidth: rect.width,
-              naturalWidth: img.naturalWidth,
               sourceWidth,
               visible:
                 rect.width > 0 && rect.right > 0 && rect.left < innerWidth,
@@ -199,7 +200,7 @@ test.describe('Homepage', () => {
           .filter(image => image.visible)
       );
 
-    expect(visibleImageQuality).toHaveLength(1);
+    expect(visibleImageQuality).toHaveLength(6);
     for (const image of visibleImageQuality) {
       expect(
         image.sourceWidth,
@@ -211,7 +212,7 @@ test.describe('Homepage', () => {
       .locator('[data-product-pane]')
       .evaluate(element => ({
         backgroundColor: getComputedStyle(element).backgroundColor,
-        borderColor: getComputedStyle(element).borderColor,
+        borderColor: getComputedStyle(element).borderTopColor,
         bottomFade: getComputedStyle(element, '::before').backgroundImage,
       }));
     expect(paneTreatment.backgroundColor).toBe('rgb(0, 0, 0)');
@@ -269,9 +270,9 @@ test.describe('Homepage', () => {
       'inline-strip'
     );
     await expect(trustStrip).toHaveAttribute('data-logo-count', '4');
-    await expect(
-      trustStrip.locator('.homepage-trust-logo-slot')
-    ).toHaveCount(4);
+    await expect(trustStrip.locator('.homepage-trust-logo-slot')).toHaveCount(
+      4
+    );
     await expect(page.getByTestId('homepage-story-stack')).toHaveAttribute(
       'data-proof-transition',
       'true'
@@ -431,7 +432,7 @@ test.describe('Homepage', () => {
 
     await expect(
       page.getByRole('heading', {
-        name: 'You make the music. Jovie runs the business.',
+        name: /You make the music\.\s+Jovie runs the business\./,
       })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
@@ -459,7 +460,7 @@ test.describe('Homepage', () => {
       0
     );
     await expect(
-      header.getByRole('link', { name: 'Get started', exact: true })
+      header.getByRole('link', { name: 'Claim your free profile', exact: true })
     ).toHaveCount(0);
     await expect(
       header.getByRole('link', { name: 'Log in', exact: true })
@@ -467,7 +468,7 @@ test.describe('Homepage', () => {
 
     const headlineLineCount = await page
       .getByRole('heading', {
-        name: 'You make the music. Jovie runs the business.',
+        name: /You make the music\.\s+Jovie runs the business\./,
       })
       .evaluate(element => {
         const style = getComputedStyle(element);

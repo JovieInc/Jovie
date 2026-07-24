@@ -33,7 +33,6 @@
 // Format: `⌘K`, `⌥/`, `Hold ⌘J`, `[`, `Esc`. Use `⌘` not `Cmd`, `⌥` not
 // `Alt`, for visual density.
 
-import { Badge } from '@jovie/ui/atoms/badge';
 import {
   Activity,
   Archive,
@@ -4875,17 +4874,6 @@ function ReleasesView({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
-  const pickingUpReleaseId = useMemo(
-    () =>
-      releases.reduce<Release | null>(
-        (leader, release) =>
-          leader === null || release.weeklyDelta > leader.weeklyDelta
-            ? release
-            : leader,
-        null
-      )?.id ?? null,
-    [releases]
-  );
 
   // While the user is keyboard-navigating, suppress mouse-hover styles
   // so only the focused row reads as active. Mouse movement re-enables
@@ -4963,7 +4951,6 @@ function ReleasesView({
               currentTimeSec={r.id === playingId ? currentTimeSec : 0}
               isSelected={r.id === selectedId}
               isFocused={i === focusedIndex}
-              isPickingUp={r.id === pickingUpReleaseId}
               drawerOpen={drawerOpen}
               kbActive={keyboardNav}
               rowRef={el => {
@@ -5000,7 +4987,6 @@ function ReleaseRow({
   currentTimeSec: _currentTimeSec,
   isSelected,
   isFocused,
-  isPickingUp,
   drawerOpen,
   kbActive,
   rowRef,
@@ -5018,7 +5004,6 @@ function ReleaseRow({
   currentTimeSec: number;
   isSelected: boolean;
   isFocused: boolean;
-  isPickingUp: boolean;
   drawerOpen: boolean;
   kbActive?: boolean;
   rowRef?: (el: HTMLLIElement | null) => void;
@@ -5030,9 +5015,6 @@ function ReleaseRow({
   onOpenThread?: (id: string) => void;
 }) {
   const runningThread = findRunningThreadFor('release', release.id, THREADS);
-  const releaseStatus = statusFromRelease(release);
-  const releaseStatusLabel =
-    releaseStatus.charAt(0).toUpperCase() + releaseStatus.slice(1);
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section owns keyboard navigation; row listener mirrors click for Sonar.
     <li
@@ -5108,30 +5090,13 @@ function ReleaseRow({
         {release.agent !== 'idle' && <AgentPulse />}
       </div>
 
-      {/* Title (with release status) / artist */}
+      {/* Title (with type badge) / artist */}
       <div className='min-w-0'>
         <div className='flex items-center gap-1.5 min-w-0'>
           <span className='truncate text-app font-caption leading-tight tracking-tight text-primary-token'>
             {release.title}
           </span>
-          <span className='inline-flex shrink-0 items-center gap-1 text-2xs text-tertiary-token'>
-            <span
-              aria-hidden='true'
-              className='h-1 w-1 rounded-full bg-white/35'
-            />
-            {releaseStatusLabel}
-          </span>
-          {isPickingUp ? (
-            <Badge
-              size='sm'
-              tone='info'
-              className='shrink-0'
-              data-testid='shell-v1-picking-up'
-            >
-              {/* ui-casing-allow: design-locked momentum status */}
-              picking up
-            </Badge>
-          ) : null}
+          <TypeBadge label={release.type} />
         </div>
         <div className='truncate text-2xs text-tertiary-token leading-tight mt-0.5'>
           <button

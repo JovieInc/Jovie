@@ -27,7 +27,7 @@ export function getHomepageFrontDoorCtaContract(
   if (waitlistEnabled) {
     return {
       primary: {
-        label: 'Get started',
+        label: 'Claim your free profile',
         href: buildHomepageStartHref(HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT),
       },
       secondary: null,

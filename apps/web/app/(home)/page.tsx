@@ -50,9 +50,6 @@ const HomeComposerHero = dynamic(
     })),
   { ssr: true }
 );
-const HERO_PRODUCT_IMAGES = {
-  product: getMarketingExportImage('shell-v1-releases-desktop'),
-};
 const WORKSPACE_SCREENSHOT = getMarketingExportImage(
   HOMEPAGE_LAUNCH_COPY.workspace.screenshotKey
 );
@@ -231,7 +228,7 @@ function HomepageHero() {
             className='homepage-poster-hero__electric-seam'
           />
         }
-        media={<HomepageHeroCommandCenter images={HERO_PRODUCT_IMAGES} />}
+        media={<HomepageHeroCommandCenter />}
       />
       <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
         <HomeTrustSection

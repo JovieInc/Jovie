@@ -420,7 +420,8 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'shell-v1-releases-desktop',
       title: 'Shell v1 — Releases',
-      route: '/exp/shell-v1?view=releases&capture=marketing&player=off',
+      route:
+        '/exp/shell-v1?view=releases&release=the-deep-end&capture=marketing',
       waitFor: '.shell-v1',
       interaction: 'open-shell-releases',
       publicExportPath: 'shell-v1-releases.png',

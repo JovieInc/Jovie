@@ -49,7 +49,7 @@ describe('HomepageIntent', () => {
     render(<HomepageIntent />);
     expect(
       screen.getByRole('heading', {
-        name: 'You make the music. Jovie runs the business.',
+        name: /You make the music\.\s+Jovie runs the business\./,
       })
     ).toBeTruthy();
     expect(
