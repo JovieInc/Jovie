@@ -48,7 +48,11 @@ describe('design-system agent gate', () => {
   }, 60_000);
 
   it('unit fixture suite for the gate stays green', () => {
-    const testFile = join(REPO_ROOT, 'scripts', 'design-system-agent-gate.test.mjs');
+    const testFile = join(
+      REPO_ROOT,
+      'scripts',
+      'design-system-agent-gate.test.mjs'
+    );
     expect(existsSync(testFile)).toBe(true);
     const result = spawnSync(process.execPath, ['--test', testFile], {
       cwd: REPO_ROOT,

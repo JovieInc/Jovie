@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -87,7 +87,10 @@ test('flags new duplicate @jovie/ui atom filenames that do not re-export', () =>
     index,
     { isAdded: true }
   );
-  assert.equal(dup.some(f => f.rule === 'no-duplicate-ui-atom'), true);
+  assert.equal(
+    dup.some(f => f.rule === 'no-duplicate-ui-atom'),
+    true
+  );
 
   const wrap = evaluateFile(
     'apps/web/components/atoms/Badge.tsx',
@@ -95,7 +98,10 @@ test('flags new duplicate @jovie/ui atom filenames that do not re-export', () =>
     index,
     { isAdded: true }
   );
-  assert.equal(wrap.some(f => f.rule === 'no-duplicate-ui-atom'), false);
+  assert.equal(
+    wrap.some(f => f.rule === 'no-duplicate-ui-atom'),
+    false
+  );
 });
 
 test('flags System A / design-studio story imports', () => {
@@ -125,7 +131,10 @@ test('evaluateDesignSystemAgentGate scans supplied fixture files', () => {
       recursive: true,
     });
     mkdirSync(join(root, 'packages/ui/atoms'), { recursive: true });
-    writeFileSync(join(root, 'packages/ui/atoms/button.tsx'), 'export const Button = () => null;\n');
+    writeFileSync(
+      join(root, 'packages/ui/atoms/button.tsx'),
+      'export const Button = () => null;\n'
+    );
     writeFileSync(
       abs,
       `export function OffSystem() {\n  return <div className="text-[#cafe00] hover:scale-110 transition-all duration-500" />;\n}\n`
@@ -140,7 +149,9 @@ test('evaluateDesignSystemAgentGate scans supplied fixture files', () => {
     });
 
     assert.equal(result.ok, false);
-    assert.ok(result.findings.some(f => f.rule === 'no-raw-hex-outside-tokens'));
+    assert.ok(
+      result.findings.some(f => f.rule === 'no-raw-hex-outside-tokens')
+    );
     assert.ok(result.findings.some(f => f.rule === 'no-banned-motion-classes'));
   } finally {
     rmSync(root, { recursive: true, force: true });

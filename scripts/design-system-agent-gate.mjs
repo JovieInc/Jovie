@@ -215,18 +215,20 @@ function walkFiles(dir, filter = () => true) {
  * @param {string} root
  * @param {string[]} [baseCandidates]
  */
-export function resolveGitBase(root = ROOT, baseCandidates = ['origin/main', 'main']) {
+export function resolveGitBase(
+  root = ROOT,
+  baseCandidates = ['origin/main', 'main']
+) {
   for (const candidate of baseCandidates) {
     try {
       execFileSync('git', ['rev-parse', '--verify', candidate], {
         cwd: root,
         stdio: 'pipe',
       });
-      const mergeBase = execFileSync(
-        'git',
-        ['merge-base', 'HEAD', candidate],
-        { cwd: root, encoding: 'utf8' }
-      ).trim();
+      const mergeBase = execFileSync('git', ['merge-base', 'HEAD', candidate], {
+        cwd: root,
+        encoding: 'utf8',
+      }).trim();
       if (mergeBase) return mergeBase;
     } catch {
       // try next
@@ -362,7 +364,12 @@ function matchAll(text, re) {
  * @param {{ isAdded: boolean }} opts
  * @returns {{ file: string, rule: string, detail: string }[]}
  */
-export function evaluateFile(fileRel, text, atomIndex, opts = { isAdded: false }) {
+export function evaluateFile(
+  fileRel,
+  text,
+  atomIndex,
+  opts = { isAdded: false }
+) {
   /** @type {{ file: string, rule: string, detail: string }[]} */
   const findings = [];
   const normalized = fileRel.replaceAll('\\', '/');
@@ -373,7 +380,9 @@ export function evaluateFile(fileRel, text, atomIndex, opts = { isAdded: false }
   if (!isHexAllowed(normalized) && SOURCE_EXT.test(normalized)) {
     const hexHits = matchAll(text, RAW_HEX_RE);
     // Ignore pure hash comments like #region and markdown anchors roughly:
-    const real = hexHits.filter(hit => /#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})\b/.test(hit));
+    const real = hexHits.filter(hit =>
+      /#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})\b/.test(hit)
+    );
     if (real.length > 0) {
       findings.push({
         file: normalized,
@@ -475,9 +484,7 @@ export function evaluateDesignSystemAgentGate(options = {}) {
   const mode = options.mode ?? 'changed';
   const atomNames = options.atomNames ?? listUiAtomNames(root);
   const atomIndex = buildAtomCollisionIndex(atomNames);
-  const read =
-    options.readFile ??
-    (abs => readFileSync(abs, 'utf8'));
+  const read = options.readFile ?? (abs => readFileSync(abs, 'utf8'));
 
   /** @type {string[]} */
   let targets = [];
@@ -497,11 +504,8 @@ export function evaluateDesignSystemAgentGate(options = {}) {
     // still need added semantics; without git, skip collision-on-added unless
     // caller supplied addedFiles.
   } else {
-    const discovered =
-      options.changedFiles ??
-      listChangedFiles(root).changed;
-    const discoveredAdded =
-      options.addedFiles ?? listChangedFiles(root).added;
+    const discovered = options.changedFiles ?? listChangedFiles(root).changed;
+    const discoveredAdded = options.addedFiles ?? listChangedFiles(root).added;
     addedSet = new Set(discoveredAdded.map(f => f.replaceAll('\\', '/')));
     targets = discovered
       .map(f => f.replaceAll('\\', '/'))
