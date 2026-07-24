@@ -9,8 +9,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const config: StorybookConfig = {
   stories: [
     '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
-    // packages/ui primitives (atoms, etc.) live outside apps/web; the glob is
-    // relative to this .storybook dir → repo-root packages/ui.
+    // packages/ui atoms — highest-reuse surface; must enter Chromatic/Storybook
+    // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
     '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
   ],
   addons: [
@@ -423,11 +423,6 @@ const config: StorybookConfig = {
     // Suppress "use client" directive warnings in build output
     config.build = {
       ...config.build,
-      // Vite's default target includes safari14, for which esbuild cannot
-      // lower the object-rest destructuring used in @jovie/ui components —
-      // the final chunk transpile fails with "Transforming destructuring …
-      // is not supported yet". es2020 keeps that syntax as-is.
-      target: 'es2020',
       rollupOptions: {
         ...config.build?.rollupOptions,
         onwarn(warning, warn) {
