@@ -96,7 +96,13 @@ function getTriggerChild({
     const onlyChild = Children.only(children);
     if (isElementWithClassName(onlyChild)) {
       return cloneElement(onlyChild, {
-        className: cn(onlyChild.props.className, className),
+        // Width constraints only — do not force flex/grid; the child owns layout
+        // (sidebar thread rows are CSS grid; flex would break title shrink).
+        className: cn(
+          onlyChild.props.className,
+          block && 'w-full min-w-0',
+          className
+        ),
         ref: (node: HTMLElement | null) => {
           triggerRef?.(node);
           const existingRef = onlyChild.props.ref;
@@ -125,7 +131,7 @@ function getTriggerChild({
   return (
     <span
       ref={triggerRef}
-      className={cn(block ? 'flex w-full' : 'inline-flex', className)}
+      className={cn(block ? 'flex w-full min-w-0' : 'inline-flex', className)}
     >
       {children}
     </span>
