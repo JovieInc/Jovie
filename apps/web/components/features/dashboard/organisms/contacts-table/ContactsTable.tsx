@@ -7,6 +7,7 @@ import {
   convertToCommonDropdownItems,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbar,
+  rowState,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -15,7 +16,6 @@ import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/Dashboar
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
-import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { ContactRole } from '@/types/contacts';
 import { ContactDetailSidebar } from './ContactDetailSidebar';
@@ -25,7 +25,6 @@ import { buildContactActions } from './contact-actions';
 interface ContactsTableProps {
   readonly contacts: EditableContact[];
   readonly artistName: string;
-  readonly isLoading?: boolean;
   readonly onUpdate: (id: string, updates: Partial<EditableContact>) => void;
   readonly onSave: (contact: EditableContact) => Promise<string | undefined>;
   readonly onDelete: (contact: EditableContact) => void;
@@ -35,7 +34,6 @@ interface ContactsTableProps {
 export const ContactsTable = memo(function ContactsTable({
   contacts,
   artistName,
-  isLoading = false,
   onUpdate,
   onSave,
   onDelete,
@@ -109,7 +107,8 @@ export const ContactsTable = memo(function ContactsTable({
           ariaLabel='Add contact'
           onClick={() => onAddContactRef.current()}
           icon={<Plus className='h-3.5 w-3.5' />}
-          label='Add Contact'
+          iconOnly
+          tooltipLabel='Add contact'
         />
       </DashboardHeaderActionGroup>
     ),
@@ -171,38 +170,6 @@ export const ContactsTable = memo(function ContactsTable({
     onDelete(selectedContact);
   }, [selectedContact, onDelete]);
 
-  const sidebarPanel = useMemo(
-    () => (
-      <ContactDetailSidebar
-        contact={selectedContact}
-        isOpen={isSidebarOpen}
-        onClose={handleClose}
-        onUpdate={handleUpdate}
-        onSave={handleSave}
-        onDelete={handleDelete}
-        contextMenuItems={
-          selectedContact
-            ? convertToCommonDropdownItems(getContextMenuItems(selectedContact))
-            : undefined
-        }
-      />
-    ),
-    [
-      getContextMenuItems,
-      handleClose,
-      handleDelete,
-      handleSave,
-      handleUpdate,
-      isSidebarOpen,
-      selectedContact,
-    ]
-  );
-
-  // The shell owns desktop rail allocation, so Contacts registers its detail
-  // surface there instead of mounting a route-local sibling beside the table.
-  // RightDrawer preserves the existing mobile sheet behavior.
-  useRegisterRightPanel(sidebarPanel);
-
   // Arrow keys update sidebar when it's already open
   const handleFocusedRowChange = useCallback(
     (index: number) => {
@@ -213,7 +180,14 @@ export const ContactsTable = memo(function ContactsTable({
     [selectedContactId, contacts]
   );
 
-  const isEmpty = !isLoading && contacts.length === 0;
+  const getRowClassName = useCallback(
+    (contact: EditableContact) => {
+      return selectedContactId === contact.id ? rowState.selected : '';
+    },
+    [selectedContactId]
+  );
+
+  const isEmpty = contacts.length === 0;
 
   return (
     <div className='flex h-full min-h-0 flex-row' data-testid='contacts-table'>
@@ -240,22 +214,26 @@ export const ContactsTable = memo(function ContactsTable({
           {isEmpty ? (
             <EmptyState
               icon={<UserPlus className='h-6 w-6' aria-hidden='true' />}
-              heading='No Contacts'
-              description='Add a contact to manage bookings, management, and press.'
+              heading='No Contacts Yet'
+              description='Add bookings, management, and press contacts so fans and industry know who to reach.'
               action={{
-                label: 'Add Contact',
-                onClick: () => onAddContact(),
+                label: 'Add Bookings Contact',
+                onClick: () => onAddContact('bookings'),
+              }}
+              secondaryAction={{
+                label: 'Add Management Contact',
+                onClick: () => onAddContact('management'),
               }}
             />
           ) : (
             <UnifiedTable
               data={contacts}
               columns={columns}
-              isLoading={isLoading}
+              isLoading={false}
               getRowId={contact => contact.id}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
               className='text-app'
-              isRowSelected={contact => selectedContactId === contact.id}
+              getRowClassName={getRowClassName}
               onRowClick={handleRowClick}
               onFocusedRowChange={handleFocusedRowChange}
               getContextMenuItems={getContextMenuItems}
@@ -263,6 +241,21 @@ export const ContactsTable = memo(function ContactsTable({
           )}
         </div>
       </div>
+
+      {/* Right sidebar */}
+      <ContactDetailSidebar
+        contact={selectedContact}
+        isOpen={isSidebarOpen}
+        onClose={handleClose}
+        onUpdate={handleUpdate}
+        onSave={handleSave}
+        onDelete={handleDelete}
+        contextMenuItems={
+          selectedContact
+            ? convertToCommonDropdownItems(getContextMenuItems(selectedContact))
+            : undefined
+        }
+      />
     </div>
   );
 });

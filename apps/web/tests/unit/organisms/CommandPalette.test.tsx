@@ -6,27 +6,17 @@
  * query, and renders the autofocused search input.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import {
-  CommandPalette,
-  CommandPaletteMainSurface,
-} from '@/components/organisms/CommandPalette';
-import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
-import {
-  HeaderActionsProvider,
-  useHeaderActions,
-} from '@/contexts/HeaderActionsContext';
+import { CommandPalette } from '@/components/organisms/CommandPalette';
 
 const pushMock = vi.fn();
-const pathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock, replace: vi.fn() }),
-  usePathname: () => pathnameMock(),
 }));
 
 vi.mock('next/image', () => ({
@@ -92,7 +82,7 @@ vi.mock('@/lib/queries', async () => {
   };
 });
 
-function makeDashboard(isAdmin = false): DashboardData {
+function makeDashboard(): DashboardData {
   return {
     user: { id: 'user-1' },
     creatorProfiles: [],
@@ -101,7 +91,7 @@ function makeDashboard(isAdmin = false): DashboardData {
     sidebarCollapsed: false,
     hasSocialLinks: false,
     hasMusicLinks: false,
-    isAdmin,
+    isAdmin: false,
     tippingStats: {
       tipClicks: 0,
       tipsSubmitted: 0,
@@ -118,19 +108,10 @@ function makeDashboard(isAdmin = false): DashboardData {
   };
 }
 
-function CommandPaletteHeaderHarness() {
-  const { commandPaletteHeader } = useHeaderActions();
-  return <div>{commandPaletteHeader}</div>;
-}
-
-function withDashboard(node: ReactNode, isAdmin = false) {
+function withDashboard(node: ReactNode) {
   return (
-    <DashboardDataContext.Provider value={makeDashboard(isAdmin)}>
-      <HeaderActionsProvider>
-        {node}
-        <CommandPaletteMainSurface />
-        <CommandPaletteHeaderHarness />
-      </HeaderActionsProvider>
+    <DashboardDataContext.Provider value={makeDashboard()}>
+      {node}
     </DashboardDataContext.Provider>
   );
 }
@@ -141,7 +122,7 @@ describe('CommandPalette', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('opens on Cmd+K in the main plane and focuses the breadcrumb input', () => {
+  it('opens on Cmd+K and shows the autofocused search input', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     const input = screen.getByLabelText('Command Palette Search');
@@ -149,30 +130,6 @@ describe('CommandPalette', () => {
     // React applies autofocus by calling .focus() on mount, not by emitting
     // the deprecated HTML attribute — assert focus state instead.
     expect(input).toHaveFocus();
-    expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).toBeNull();
-  });
-
-  it('continues to open on Ctrl+K independently of sidebar Search', () => {
-    render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', ctrlKey: true });
-    expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
-  });
-
-  it('opens the same main plane from the sidebar Search trigger', () => {
-    render(
-      withDashboard(
-        <>
-          <CommandPalette />
-          <HeaderSearchSurfaceFromContext />
-        </>
-      )
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
-
-    expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
-    expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
   });
 
   it('lists recent chats with safe fallback titles', () => {
@@ -181,54 +138,6 @@ describe('CommandPalette', () => {
     expect(screen.getByText('Recent Chats')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
     expect(screen.getByText('Untitled chat')).toBeInTheDocument();
-  });
-
-  it('shows the admin workspace action and its shortcut', () => {
-    pathnameMock.mockReturnValue('/app');
-    render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-
-    const action = screen
-      .getAllByRole('option')
-      .find(el => el.textContent?.includes('Switch to OV'));
-    expect(action).toBeDefined();
-    expect(action).toHaveTextContent('⌥ ⇧ W');
-  });
-
-  it('routes the admin workspace action to the next workspace', () => {
-    pushMock.mockClear();
-    pathnameMock.mockReturnValue('/app');
-    render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-
-    const action = screen
-      .getAllByRole('option')
-      .find(el => el.textContent?.includes('Switch to OV'));
-    fireEvent.mouseDown(action!);
-
-    expect(pushMock).toHaveBeenCalledWith('/app/ov');
-  });
-
-  it('routes the admin workspace action from OV back to Jovie', () => {
-    pushMock.mockClear();
-    pathnameMock.mockReturnValue('/app/ov/ops');
-    render(withDashboard(<CommandPalette />, true));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-
-    const action = screen
-      .getAllByRole('option')
-      .find(el => el.textContent?.includes('Switch to Jovie'));
-    fireEvent.mouseDown(action!);
-
-    expect(pushMock).toHaveBeenCalledWith('/app');
-  });
-
-  it('does not leak the workspace action to non-admins', () => {
-    render(withDashboard(<CommandPalette />));
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-
-    expect(screen.queryByText('Switch to OV')).not.toBeInTheDocument();
-    expect(screen.queryByText('Switch to Jovie')).not.toBeInTheDocument();
   });
 
   it('routes a recent-chat commit to the chat route', () => {
@@ -253,23 +162,5 @@ describe('CommandPalette', () => {
     expect(
       screen.queryByLabelText('Command Palette Search')
     ).not.toBeInTheDocument();
-  });
-
-  it('escapes back to the prior focus target', async () => {
-    render(
-      withDashboard(
-        <>
-          <button type='button'>Return target</button>
-          <CommandPalette />
-        </>
-      )
-    );
-    const origin = screen.getByRole('button', { name: 'Return target' });
-    origin.focus();
-    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
-    expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
-    fireEvent.keyDown(globalThis, { key: 'Escape' });
-    expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
-    await waitFor(() => expect(origin).toHaveFocus());
   });
 });

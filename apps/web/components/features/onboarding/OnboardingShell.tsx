@@ -3,12 +3,10 @@
 import { Skeleton } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
-import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { track } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
-import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import {
   getBrowserTurnstileHostname,
   resolveTurnstileSiteKey,
@@ -37,14 +35,14 @@ interface OnboardingShellProps {
   readonly sessionLabel: string;
   /** ID for a homepage-captured starter prompt stored in localStorage. */
   readonly intentId?: string;
-  /** Validated URL-provided context for an automatic first message. */
-  readonly starterHandoff?: StartEntryHandoff | null;
+  /** Optional URL-provided starter prompt for deterministic demo runs. */
+  readonly starterPrompt?: string;
 }
 
 export function OnboardingShell({
   intentId,
   sessionLabel,
-  starterHandoff,
+  starterPrompt,
 }: OnboardingShellProps) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [profileBuilderState, setProfileBuilderState] =
@@ -162,6 +160,7 @@ export function OnboardingShell({
   return (
     <SidebarProvider defaultOpen={false}>
       <AppShellFrame
+        variant='shellChatV1'
         sidebar={null}
         containerClassName='[color-scheme:dark]'
         contentClassName='overflow-hidden!'
@@ -170,17 +169,11 @@ export function OnboardingShell({
             className='relative flex min-h-0 flex-1'
             data-onboarding-session={sessionLabel}
           >
-            <div
-              className='absolute right-3 top-3 z-30 sm:right-4 sm:top-4'
-              data-testid='onboarding-sign-in-header'
-            >
-              <MarketingSignInLink variant='ghost' />
-            </div>
             <OnboardingChat
               intentId={intentId}
               onConversationActivity={handleConversationActivity}
               onProfileBuilderChange={setProfileBuilderState}
-              starterHandoff={starterHandoff}
+              starterPrompt={starterPrompt}
               turnstileToken={turnstileToken}
               turnstileStatus={turnstileState.status}
               turnstilePanel={turnstilePanel}

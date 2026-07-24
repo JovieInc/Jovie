@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  MERGE_QUEUE_POLICY,
+  GRAPHITE_QUEUE_POLICY,
   MERGE_QUEUE_REPO_PATHS,
   validateLiveMergeQueueRuleset,
   validateMergeQueueEnrollHotPath,
@@ -18,10 +18,10 @@ function configuredBackend() {
   // Match the live repository variable/ruleset for bare local and CI callers.
   const backend =
     process.env.MERGE_QUEUE_BACKEND?.trim() || DEFAULT_MERGE_QUEUE_BACKEND;
-  if (backend !== 'native') {
+  if (backend !== 'graphite' && backend !== 'native') {
     throw new Error(`Unknown MERGE_QUEUE_BACKEND: ${backend}`);
   }
-  return /** @type {'native'} */ (backend);
+  return backend;
 }
 
 function readRepoFile(relativePath) {
@@ -32,7 +32,10 @@ function loadLiveRuleset() {
   try {
     const json = execFileSync(
       'gh',
-      ['api', `repos/JovieInc/Jovie/rulesets/${MERGE_QUEUE_POLICY.rulesetId}`],
+      [
+        'api',
+        `repos/JovieInc/Jovie/rulesets/${GRAPHITE_QUEUE_POLICY.rulesetId}`,
+      ],
       {
         encoding: 'utf8',
         env: {
@@ -52,7 +55,7 @@ function loadLiveRuleset() {
 
 function printPolicySummary() {
   console.log(`${configuredBackend()} merge-queue policy (source-of-record):`);
-  for (const [key, value] of Object.entries(MERGE_QUEUE_POLICY)) {
+  for (const [key, value] of Object.entries(GRAPHITE_QUEUE_POLICY)) {
     console.log(`  ${key}: ${JSON.stringify(value)}`);
   }
 }
@@ -152,7 +155,7 @@ async function main() {
       printPolicySummary();
       break;
     case 'max-queue-depth':
-      console.log(String(MERGE_QUEUE_POLICY.maxQueueDepth));
+      console.log(String(GRAPHITE_QUEUE_POLICY.maxQueueDepth));
       break;
     default:
       console.error(

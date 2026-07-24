@@ -51,8 +51,7 @@ interface ChatPitchCardProps {
 function CopyButton({
   text,
   platform,
-  ariaLabel,
-}: Readonly<{ text: string; platform: string; ariaLabel?: string }>) {
+}: Readonly<{ text: string; platform: string }>) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
@@ -80,7 +79,7 @@ function CopyButton({
       size='icon'
       onClick={handleCopy}
       className='h-6 w-6 rounded-md focus-ring'
-      aria-label={ariaLabel ?? `Copy ${platform} pitch`}
+      aria-label={`Copy ${platform} pitch`}
     >
       <CopyToggleIcon copied={copied} size='system-b-chat-pitch-copy-icon' />
     </Button>
@@ -194,11 +193,7 @@ export function ChatPitchCard({
             <span className='system-b-chat-pitch-full-draft-label'>
               Full draft
             </span>
-            <CopyButton
-              text={copyText}
-              platform='Pitch'
-              ariaLabel='Copy full pitch draft'
-            />
+            <CopyButton text={copyText} platform='Pitch' />
           </div>
         </div>
       </ChatGenerationArtifactSurface>

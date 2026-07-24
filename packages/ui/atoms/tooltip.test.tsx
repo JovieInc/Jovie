@@ -16,7 +16,6 @@ const TestTooltip = ({
   defaultOpen,
   children = 'Tooltip content',
   showArrow = false,
-  contentVariant,
   side = 'top' as const,
   sideOffset,
 }: {
@@ -26,19 +25,13 @@ const TestTooltip = ({
   showArrow?: boolean;
   side?: 'top' | 'right' | 'bottom' | 'left';
   sideOffset?: number;
-  contentVariant?: 'compact' | 'rich';
 }) => (
   <TooltipProvider delayDuration={0}>
     <Tooltip open={open} defaultOpen={defaultOpen}>
       <TooltipTrigger>
         <button type='button'>Hover me</button>
       </TooltipTrigger>
-      <TooltipContent
-        contentVariant={contentVariant}
-        showArrow={showArrow}
-        side={side}
-        sideOffset={sideOffset}
-      >
+      <TooltipContent showArrow={showArrow} side={side} sideOffset={sideOffset}>
         {children}
       </TooltipContent>
     </Tooltip>
@@ -194,7 +187,8 @@ describe('Tooltip', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
       expect(content.className).toContain('z-[150]');
-      expect(content.className).toContain('rounded-xl');
+      // Radius on the System B scale (--radius-default = 4px), 12px type.
+      expect(content.className).toContain('rounded-(--radius-default)');
       expect(content.className).toContain('text-xs');
     });
 
@@ -203,32 +197,8 @@ describe('Tooltip', () => {
       const content = screen.getByTestId('tooltip-content');
       expect(content.className).toContain('bg-surface-0');
       expect(content.className).toContain('text-primary-token');
-      expect(content.className).toContain('border-default');
+      expect(content.className).toContain('border-subtle');
       expect(content.className).toContain('shadow-popover');
-    });
-
-    it('uses a pill only for the explicit compact one-line contract', () => {
-      render(
-        <TestTooltip open={true} contentVariant='compact'>
-          Save
-        </TestTooltip>
-      );
-      const content = screen.getByTestId('tooltip-content');
-      expect(content.className).toContain('rounded-full');
-      expect(content.className).toContain('whitespace-nowrap');
-      expect(content.className).not.toContain('max-w-56');
-    });
-
-    it('uses the shared rounded rectangle for wrapped content', () => {
-      render(
-        <TestTooltip open={true} contentVariant='rich'>
-          A clear two-line explanation that must wrap safely in the overlay.
-        </TestTooltip>
-      );
-      const content = screen.getByTestId('tooltip-content');
-      expect(content.className).toContain('rounded-xl');
-      expect(content.className).toContain('max-w-56');
-      expect(content.className).toContain('break-words');
     });
 
     it('never hard-clips content mid-glyph (no overflow-hidden; wraps within max width)', () => {

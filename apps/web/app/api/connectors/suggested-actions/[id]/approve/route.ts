@@ -3,9 +3,7 @@
  *
  * CAS-only approve endpoint.
  * Atomically transitions suggested_actions row: pending → approved.
- * On success, executable connector actions insert a workflow_runs row.
- * Brand-deal buyer approvals are decision-only: they authorize internal
- * campaign preparation and never enter the calendar executor.
+ * On success, inserts a workflow_runs row to execute the approved action.
  *
  * Design: The CAS update and workflow_runs insert are two sequential writes.
  * db.transaction() is forbidden per .claude/rules/db.md; transactional atomicity
@@ -16,14 +14,8 @@
  */
 
 import { and, eq } from 'drizzle-orm';
-import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
-import { CACHE_TAGS } from '@/lib/cache/tags';
-import {
-  BRAND_DEAL_OPPORTUNITY_KIND,
-  parseBrandDealOpportunity,
-} from '@/lib/connectors/brand-deal-opportunity';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
 import {
   enqueueApprovedActionWorkflow,
@@ -70,7 +62,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
         id: suggestedActions.id,
         payload: suggestedActions.payload,
         kind: suggestedActions.kind,
-        signalType: suggestedActions.signalType,
       });
 
     if (updated.length === 0) {
@@ -79,38 +70,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
         userId,
       });
 
-      if (recovery === 'decision-only') {
-        revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-        return NextResponse.json(
-          {
-            ok: true,
-            approvalId: id,
-            status: 'approved-for-preparation',
-          },
-          { status: 200, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      if (recovery === 'invalid-decision-only') {
-        await db
-          .update(suggestedActions)
-          .set({ status: 'failed' })
-          .where(
-            and(
-              eq(suggestedActions.id, id),
-              eq(suggestedActions.userId, userId),
-              eq(suggestedActions.status, 'approved')
-            )
-          );
-        revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-        return NextResponse.json(
-          { error: 'brand-deal-evidence-unverified' },
-          { status: 422, headers: NO_STORE_HEADERS }
-        );
-      }
-
       if (recovery === 'enqueued' || recovery === 'already-queued') {
-        revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
         return NextResponse.json(
           {
             ok: true,
@@ -141,59 +101,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
     // Include event payload so the cron executor can call Google Calendar
     // without a second DB round-trip to reload the suggested_action row.
     const eventPayload = updated[0].payload as BookingPayload | null;
-    const approvedKind = updated[0].kind;
-    const isBrandDealDecision =
-      approvedKind === BRAND_DEAL_OPPORTUNITY_KIND ||
-      updated[0].signalType === 'brand_deal';
-
-    if (isBrandDealDecision) {
-      if (!parseBrandDealOpportunity(approvedKind, updated[0].payload)) {
-        await db
-          .update(suggestedActions)
-          .set({ status: 'failed' })
-          .where(
-            and(
-              eq(suggestedActions.id, id),
-              eq(suggestedActions.userId, userId),
-              eq(suggestedActions.status, 'approved')
-            )
-          );
-        logger.warn('[approve] invalid brand-deal provenance failed closed', {
-          approvalId: id,
-          userId,
-        });
-        revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-        return NextResponse.json(
-          { error: 'brand-deal-evidence-unverified' },
-          { status: 422, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      logger.info(
-        '[approve] brand-deal buyer approved for internal preparation',
-        {
-          approvalId: id,
-          userId,
-        }
-      );
-      void recordInboxDecision({
-        suggestedActionId: id,
-        userId,
-        verdict: 'approved',
-        cardKind: approvedKind,
-        surface: 'opportunity-inbox',
-      });
-      revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-
-      return NextResponse.json(
-        {
-          ok: true,
-          approvalId: id,
-          status: 'approved-for-preparation',
-        },
-        { status: 200, headers: NO_STORE_HEADERS }
-      );
-    }
 
     const enqueueResult = await enqueueApprovedActionWorkflow({
       userId,
@@ -215,7 +122,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
       cardKind: updated[0]?.kind ?? null,
       surface: 'opportunity-inbox',
     });
-    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
 
     return NextResponse.json(
       { ok: true, approvalId: id },

@@ -55,7 +55,7 @@ describe('useDashboardProfileQuery', () => {
     it('fetches profile data successfully', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ profile: mockProfile }),
+        json: () => Promise.resolve(mockProfile),
       });
 
       const { result } = renderHook(() => useDashboardProfileQuery(), {
@@ -69,9 +69,6 @@ describe('useDashboardProfileQuery', () => {
       });
 
       expect(result.current.data).toEqual(mockProfile);
-      expect(queryClient.getQueryData(queryKeys.user.profile())).toEqual(
-        mockProfile
-      );
       expect(mockFetch).toHaveBeenCalledWith(
         '/api/dashboard/profile',
         expect.any(Object)
@@ -261,12 +258,9 @@ describe('useDashboardProfileQuery', () => {
         json: () => Promise.resolve(mockProfile),
       });
 
-      const { result } = renderHook(
-        () => useUpdateVenmoMutation(mockProfile.id),
-        {
-          wrapper,
-        }
-      );
+      const { result } = renderHook(() => useUpdateVenmoMutation(), {
+        wrapper,
+      });
 
       result.current.mutate({ venmo_handle: 'myvenmo' });
 
@@ -275,10 +269,7 @@ describe('useDashboardProfileQuery', () => {
           '/api/dashboard/profile',
           expect.objectContaining({
             method: 'PUT',
-            body: JSON.stringify({
-              profileId: mockProfile.id,
-              updates: { venmo_handle: 'myvenmo' },
-            }),
+            body: JSON.stringify({ updates: { venmo_handle: 'myvenmo' } }),
           })
         );
       });
@@ -290,12 +281,9 @@ describe('useDashboardProfileQuery', () => {
         json: () => Promise.resolve(mockProfile),
       });
 
-      const { result } = renderHook(
-        () => useUpdateVenmoMutation(mockProfile.id),
-        {
-          wrapper,
-        }
-      );
+      const { result } = renderHook(() => useUpdateVenmoMutation(), {
+        wrapper,
+      });
 
       result.current.mutate({ venmo_handle: null });
 
@@ -303,10 +291,7 @@ describe('useDashboardProfileQuery', () => {
         expect(mockFetch).toHaveBeenCalledWith(
           '/api/dashboard/profile',
           expect.objectContaining({
-            body: JSON.stringify({
-              profileId: mockProfile.id,
-              updates: { venmo_handle: null },
-            }),
+            body: JSON.stringify({ updates: { venmo_handle: null } }),
           })
         );
       });
@@ -321,12 +306,9 @@ describe('useDashboardProfileQuery', () => {
           Promise.resolve({ ...mockProfile, venmo_handle: 'newhandle' }),
       });
 
-      const { result } = renderHook(
-        () => useUpdateVenmoMutation(mockProfile.id),
-        {
-          wrapper,
-        }
-      );
+      const { result } = renderHook(() => useUpdateVenmoMutation(), {
+        wrapper,
+      });
 
       result.current.mutate({ venmo_handle: 'newhandle' });
 
@@ -338,22 +320,6 @@ describe('useDashboardProfileQuery', () => {
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: queryKeys.user.profile(),
       });
-    });
-
-    it('does not issue a compatibility write without an explicit profile id', async () => {
-      queryClient.setQueryData(queryKeys.user.profile(), {
-        profile: mockProfile,
-      });
-      const { result } = renderHook(() => useUpdateVenmoMutation(undefined), {
-        wrapper,
-      });
-
-      result.current.mutate({ venmo_handle: 'myvenmo' });
-
-      await waitFor(() => {
-        expect(result.current.isError).toBe(true);
-      });
-      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 });

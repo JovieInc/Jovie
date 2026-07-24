@@ -144,8 +144,8 @@ describe('Sidebar row alignment', () => {
   it('keeps settings sidebar rows byte-identical to shell nav-row chrome', () => {
     // Settings-vs-shell parity (#12025): the settings sidebar must derive its
     // rows from the canonical shell helper. Its only allowed divergence is
-    // structural — no icon column (single-column grid) — never
-    // padding/density/active/hover treatment.
+    // structural — no icon column (single-column grid) and hidden icon guide
+    // lines — never padding/density/active/hover treatment.
     const settingsRow = getSettingsSidebarRowClassName(false);
     const settingsActiveRow = getSettingsSidebarRowClassName(true);
     const shellRow = getSidebarNavRowClassName({});
@@ -169,16 +169,16 @@ describe('Sidebar row alignment', () => {
 
     // Same active treatment as the shell sidebar.
     expect(settingsActiveRow).toContain('bg-sidebar-accent-active');
-    expect(settingsActiveRow).toContain('text-white');
+    expect(settingsActiveRow).toContain('text-primary-token');
     expect(settingsActiveRow).toContain('font-medium');
 
-    // Allowed structural divergence: icon-less single-column grid. `cn()` runs
-    // tailwind-merge, so the settings override must fully replace the shell's
-    // icon-column grid template.
+    // Allowed structural divergence: icon-less single-column grid with the
+    // icon guide lines hidden. `cn()` runs tailwind-merge, so the settings
+    // override must fully replace the shell's icon-column grid template.
     expect(settingsRow).toContain('grid-cols-[minmax(0,1fr)]');
-    expect(settingsRow).not.toContain(
-      'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]'
-    );
+    expect(settingsRow).toContain('before:hidden');
+    expect(settingsRow).toContain('after:hidden');
+    expect(settingsRow).not.toContain('grid-cols-[22px_minmax(0,1fr)_34px]');
   });
 
   it('keeps nav-row chrome borderless in resting, hover, and active states', () => {
@@ -206,11 +206,9 @@ describe('Sidebar row alignment', () => {
     expect(rowClassName).toContain('h-7');
     expect(rowClassName).toContain('px-2.5');
     expect(rowClassName).toContain('gap-x-2.5');
-    expect(rowClassName).toContain(
-      'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]'
-    );
-    expect(rowClassName).not.toContain('before:');
-    expect(rowClassName).not.toContain('after:');
+    expect(rowClassName).toContain('grid-cols-[22px_minmax(0,1fr)_34px]');
+    expect(rowClassName).toContain('before:left-6');
+    expect(rowClassName).toContain('after:left-10');
     expect(rowClassName).toContain('text-xs');
     expect(rowClassName).toContain('font-normal');
     expect(rowClassName).toContain('hover:bg-sidebar-accent');
@@ -220,14 +218,12 @@ describe('Sidebar row alignment', () => {
       'text-sidebar-muted/65'
     );
     expect(activeRowClassName).toContain('bg-sidebar-accent-active');
-    expect(activeRowClassName).toContain('text-white');
+    expect(activeRowClassName).toContain('text-primary-token');
     expect(activeRowClassName).toContain('font-medium');
-    expect(activeRowClassName).toContain('shadow-none');
-    expect(activeRowClassName).not.toContain('inset_2px_0');
     expect(iconClassName).toContain('h-3.5');
     expect(iconClassName).toContain('text-sidebar-muted/70');
     expect(getSidebarNavIconClassName({ active: true })).toContain(
-      'text-accent-teal!'
+      'text-primary-token'
     );
   });
 });

@@ -7,7 +7,12 @@ import { EntityChip } from './EntityChip';
 import { EntityChipPopover } from './EntityChipPopover';
 
 const mockEntityPanelState = vi.hoisted(() => ({
+  designV1Enabled: false,
   entityPanel: null as null | { open: (payload: unknown) => void },
+}));
+
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: () => mockEntityPanelState.designV1Enabled,
 }));
 
 vi.mock('@/app/app/(shell)/chat/ChatEntityPanelContext', () => ({
@@ -39,6 +44,7 @@ function renderPopover(children?: ReactNode) {
 
 describe('EntityChipPopover', () => {
   beforeEach(() => {
+    mockEntityPanelState.designV1Enabled = false;
     mockEntityPanelState.entityPanel = null;
   });
 
@@ -151,6 +157,7 @@ describe('EntityChipPopover', () => {
   it('renders the release panel action with System B casing and primitives', async () => {
     const user = userEvent.setup();
     const openEntityPanel = vi.fn();
+    mockEntityPanelState.designV1Enabled = true;
     mockEntityPanelState.entityPanel = { open: openEntityPanel };
 
     renderPopover();
@@ -169,30 +176,6 @@ describe('EntityChipPopover', () => {
       label: 'Sober',
       source: 'manual',
       focusKey: 'release:rel_1:Sober',
-    });
-  });
-
-  it('opens an event chip in the typed tour-date rail', async () => {
-    const user = userEvent.setup();
-    const openEntityPanel = vi.fn();
-    mockEntityPanelState.entityPanel = { open: openEntityPanel };
-
-    fastRender(
-      <EntityChipPopover kind='event' id='evt_1' label='Brooklyn Bowl'>
-        <span>Brooklyn Bowl</span>
-      </EntityChipPopover>
-    );
-    await user.click(screen.getByTestId('entity-chip-popover-trigger'));
-    await user.click(
-      await screen.findByRole('button', { name: /Open Event/i })
-    );
-
-    expect(openEntityPanel).toHaveBeenCalledWith({
-      kind: 'tour-date',
-      id: 'evt_1',
-      label: 'Brooklyn Bowl',
-      source: 'manual',
-      focusKey: 'event:evt_1:Brooklyn Bowl',
     });
   });
 

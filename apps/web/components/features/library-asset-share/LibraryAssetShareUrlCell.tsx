@@ -49,7 +49,7 @@ export function LibraryAssetShareUrlCell({
       </span>
       <Button
         type='button'
-        variant='secondary'
+        variant='outline'
         size='icon'
         onClick={event => {
           handleCopy(event).catch(() => {});

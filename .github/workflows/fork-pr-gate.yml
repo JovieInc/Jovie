@@ -71,7 +71,7 @@ jobs:
       pull-requests: read
     steps:
       - name: Check out trusted queue policy
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           # Never execute policy code from the synthetic PR-controlled head.
           ref: ${{ github.event.merge_group.base_sha }}
@@ -124,7 +124,6 @@ jobs:
     # through the API and sets a commit status; it never checks out head code.
     # It gives fork PRs the bot credential required to update the required gate.
     if: >-
-      (github.event_name == 'pull_request') ||
       (github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]') ||
       (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == true)
     runs-on: ubuntu-latest

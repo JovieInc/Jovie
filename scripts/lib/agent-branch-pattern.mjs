@@ -38,7 +38,7 @@ export const AGENT_OPEN_PR_JOV_RE = /^[^/]+\/jov-[0-9]+([_-].+)?$/i;
  * behaviorally identical to {@link isOpenAgentPrBranch}.
  */
 export const AGENT_OPEN_PR_BRANCH_JQ_TEST =
-  '(test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i"))';
+  '(test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i")) and (startswith("gtmq_") | not)';
 
 /**
  * @param {unknown} ref
@@ -46,6 +46,7 @@ export const AGENT_OPEN_PR_BRANCH_JQ_TEST =
  */
 export function isOpenAgentPrBranch(ref) {
   if (typeof ref !== 'string' || ref.length === 0) return false;
+  if (ref.startsWith('gtmq_')) return false;
   return AGENT_OPEN_PR_PREFIX_RE.test(ref) || AGENT_OPEN_PR_JOV_RE.test(ref);
 }
 

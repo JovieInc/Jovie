@@ -5,8 +5,7 @@ export type OpportunityInboxCardStatus = 'pending';
 export type OpportunityInboxCardCategory =
   | 'suggestion'
   | 'tour_date'
-  | 'report'
-  | 'brand_deal';
+  | 'report';
 
 export interface OpportunityInboxReportBreakdownItem {
   readonly label: string;
@@ -43,8 +42,6 @@ export interface OpportunityInboxCardViewModel {
   readonly primaryActionLabel: string;
   readonly status: OpportunityInboxCardStatus;
   readonly category: OpportunityInboxCardCategory;
-  /** Server-computed score used to rank verified brand-deal decisions. */
-  readonly brandDealRankingScore?: number;
   /** Present only when category === 'report'. */
   readonly report?: OpportunityInboxReportData;
 }

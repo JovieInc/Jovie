@@ -50,30 +50,6 @@ describe('classifyOpportunitySignalType', () => {
         rationale: null,
       })
     ).toBe('new_profile_match');
-    expect(
-      classifyOpportunitySignalType({
-        kind: 'brand_deal.opportunity',
-        payload: {},
-        rationale: null,
-      })
-    ).toBe('brand_deal');
-  });
-
-  it('does not treat sponsor or UGC aliases as executable brand deals', () => {
-    expect(
-      classifyOpportunitySignalType({
-        kind: 'sponsor.opportunity',
-        payload: {},
-        rationale: null,
-      })
-    ).toBe('other');
-    expect(
-      classifyOpportunitySignalType({
-        kind: 'ugc.booking',
-        payload: {},
-        rationale: null,
-      })
-    ).toBe('other');
   });
 
   it('classifies songs from payload text', () => {
@@ -153,7 +129,6 @@ describe('OPPORTUNITY_SIGNAL_TYPE_META', () => {
     expect(OPPORTUNITY_SIGNAL_TYPE_META.new_profile_match.label).toBe(
       'Profile Match'
     );
-    expect(OPPORTUNITY_SIGNAL_TYPE_META.brand_deal.label).toBe('Brand Deal');
     expect(OPPORTUNITY_SIGNAL_TYPE_META.other.label).toBe('Suggestion');
   });
 });

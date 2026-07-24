@@ -41,17 +41,19 @@ function AuthReturnContent() {
   return (
     <main className='grid min-h-dvh place-items-center bg-base px-6 text-primary-token'>
       <section className='w-full max-w-sm rounded-2xl border border-subtle bg-surface-1 px-6 py-7 text-center shadow-card'>
-        {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- Approved conversational return phrase. */}
-        <h1 className='text-xl font-semibold leading-7'>Return to Jovie</h1>
+        <p className='text-sm leading-5 text-tertiary-token'>Jovie Desktop</p>
+        <h1 className='mt-2 text-xl font-semibold leading-7'>
+          Return To The App
+        </h1>
         <p className='mt-3 text-sm leading-5 text-secondary-token'>
-          Authentication is complete. Return to Jovie.
+          Authentication is complete. Continue in the Jovie desktop app.
         </p>
         {deepLink ? (
           <Link
             href={deepLink}
             className='focus-ring-transparent-offset mt-6 inline-flex h-10 w-full items-center justify-center rounded-full bg-btn-primary px-4 text-sm font-medium text-btn-primary-foreground transition-opacity duration-subtle hover:opacity-95'
           >
-            Return to Jovie
+            Open Jovie
           </Link>
         ) : null}
       </section>

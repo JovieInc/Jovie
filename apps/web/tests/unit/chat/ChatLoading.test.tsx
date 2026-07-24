@@ -23,7 +23,7 @@ vi.mock('@/components/molecules/LoadingSkeleton', () => ({
 describe('ChatLoading (chat home)', () => {
   it('renders without errors', async () => {
     const { default: ChatLoading } = await import(
-      '@/app/app/(shell)/chat/ChatLoadingState'
+      '@/app/app/(shell)/chat/loading'
     );
     const { container } = render(<ChatLoading />);
     expect(container.firstChild).toBeTruthy();
@@ -31,7 +31,7 @@ describe('ChatLoading (chat home)', () => {
 
   it('renders the workspace surface wrapper', async () => {
     const { default: ChatLoading } = await import(
-      '@/app/app/(shell)/chat/ChatLoadingState'
+      '@/app/app/(shell)/chat/loading'
     );
     render(<ChatLoading />);
     expect(screen.getByTestId('chat-workspace-surface')).toBeTruthy();
@@ -39,7 +39,7 @@ describe('ChatLoading (chat home)', () => {
 
   it('renders centered layout matching empty state', async () => {
     const { default: ChatLoading } = await import(
-      '@/app/app/(shell)/chat/ChatLoadingState'
+      '@/app/app/(shell)/chat/loading'
     );
     const { container } = render(<ChatLoading />);
     const centeredContainer = container.querySelector(
@@ -50,7 +50,7 @@ describe('ChatLoading (chat home)', () => {
 
   it('does not render ChatMessageSkeleton', async () => {
     const { default: ChatLoading } = await import(
-      '@/app/app/(shell)/chat/ChatLoadingState'
+      '@/app/app/(shell)/chat/loading'
     );
     render(<ChatLoading />);
     expect(screen.queryByTestId('chat-message-skeleton')).toBeNull();
@@ -58,7 +58,7 @@ describe('ChatLoading (chat home)', () => {
 
   it('sets aria-busy for accessibility', async () => {
     const { default: ChatLoading } = await import(
-      '@/app/app/(shell)/chat/ChatLoadingState'
+      '@/app/app/(shell)/chat/loading'
     );
     render(<ChatLoading />);
     expect(screen.getByTestId('chat-loading').getAttribute('aria-busy')).toBe(
@@ -68,16 +68,42 @@ describe('ChatLoading (chat home)', () => {
 
   it('does not expose disabled controls as the loading composer', async () => {
     const { default: ChatLoading } = await import(
-      '@/app/app/(shell)/chat/ChatLoadingState'
+      '@/app/app/(shell)/chat/loading'
     );
     render(<ChatLoading />);
 
     expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.queryByRole('button')).toBeNull();
-    // Product-voice placeholder is decorative under the busy shell.
-    const placeholder = screen.getByText(
-      'Ask Jovie to plan your next release...'
+    expect(screen.getByText('What are you working on?')).toHaveAttribute(
+      'aria-hidden',
+      'true'
     );
-    expect(placeholder.closest('[aria-hidden="true"]')).not.toBeNull();
+  });
+});
+
+describe('ChatConversationLoading (chat/[id])', () => {
+  it('renders without errors', async () => {
+    const { default: ChatConversationLoading } = await import(
+      '@/app/app/(shell)/chat/[id]/loading'
+    );
+    const { container } = render(<ChatConversationLoading />);
+    expect(container.firstChild).toBeTruthy();
+  });
+
+  it('renders ChatMessageSkeleton for conversation view', async () => {
+    const { default: ChatConversationLoading } = await import(
+      '@/app/app/(shell)/chat/[id]/loading'
+    );
+    render(<ChatConversationLoading />);
+    expect(screen.getByTestId('chat-message-skeleton')).toBeTruthy();
+  });
+
+  it('renders a bottom input skeleton', async () => {
+    const { default: ChatConversationLoading } = await import(
+      '@/app/app/(shell)/chat/[id]/loading'
+    );
+    render(<ChatConversationLoading />);
+    expect(
+      screen.getByTestId('chat-conversation-composer-skeleton')
+    ).toBeTruthy();
   });
 });

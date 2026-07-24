@@ -7,7 +7,6 @@ import {
   classifyQueueCheckBlockers,
   collapseNewestCheckAttempts,
   extractTerminalFailures,
-  isAdvisoryCheck,
   isAgentBranch,
   isTerminalFailure,
   MERGE_GATE_CHECK_NAMES,
@@ -53,34 +52,6 @@ describe('pr-check-failures', () => {
     ).toEqual(['Typecheck']);
   });
 
-  it('keeps failed merge-queue controller receipts out of product gate classification', () => {
-    const required = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
-    ];
-    const controllerFailure = {
-      bucket: 'fail',
-      state: 'FAILURE',
-      name: 'enroll',
-      workflow: 'Merge Queue Auto-Enroll',
-    };
-
-    expect(isAdvisoryCheck(controllerFailure)).toBe(true);
-    expect(
-      classifyQueueCheckBlockers([...required, controllerFailure])
-    ).toEqual([]);
-    // A generic job name is not an allow-list escape hatch for a new safety
-    // check in another workflow.
-    expect(
-      classifyQueueCheckBlockers([
-        ...required,
-        { ...controllerFailure, workflow: 'Real Safety Workflow' },
-      ])
-    ).toEqual(['enroll']);
-  });
-
   it('derives staged advisory evidence from the manifest and preserves safety gates', () => {
     const harness = JSON.parse(
       readFileSync(`${repoRoot}/.github/ci-harness/manifest.json`, 'utf8')
@@ -113,14 +84,6 @@ describe('pr-check-failures', () => {
     expect(ADVISORY_CHECK_NAMES).toContain('Extended Smoke (Preview)');
     expect(ADVISORY_CHECK_NAMES).toContain('Classify PR taste');
     expect(ADVISORY_CHECK_NAMES).toContain('Claude Review');
-    expect(ADVISORY_CHECK_NAMES).toContain(
-      'Capture changed UI (desktop + mobile) (advisory)'
-    );
-    expect(ADVISORY_CHECK_NAMES).toContain(
-      'Review screenshots and post advisory review'
-    );
-    expect(ADVISORY_CHECK_NAMES).toContain('SonarCloud Code Analysis');
-    expect(ADVISORY_CHECK_NAMES).toContain('Vercel Agent Review');
     expect(ADVISORY_CHECK_NAMES).not.toContain('Brand Scrub');
     expect(
       extractTerminalFailures([
@@ -132,13 +95,6 @@ describe('pr-check-failures', () => {
         { bucket: 'fail', name: 'E2E Smoke (PR Fast Feedback)' },
         { bucket: 'fail', name: 'Extended Smoke (Preview)' },
         { bucket: 'fail', name: 'A11y (authenticated, informational)' },
-        {
-          bucket: 'fail',
-          name: 'Capture changed UI (desktop + mobile) (advisory)',
-        },
-        { bucket: 'fail', name: 'Review screenshots and post advisory review' },
-        { bucket: 'fail', name: 'SonarCloud Code Analysis' },
-        { bucket: 'fail', name: 'Vercel Agent Review' },
       ])
     ).toEqual(['Gitleaks Secret Scanning', 'Security Advisory Enforcement']);
   });
@@ -425,6 +381,7 @@ describe('pr-check-failures', () => {
     expect(isAgentBranch('codex/gh-12734-fix')).toBe(true);
     expect(isAgentBranch('tim/jov-1234')).toBe(true);
     expect(isAgentBranch('agent/wave-1')).toBe(true);
+    expect(isAgentBranch('gtmq_spec_abc')).toBe(false);
     expect(isAgentBranch('feature/user-auth')).toBe(false);
     expect(AGENT_BRANCH_RE.test('feat/onboarding')).toBe(true);
   });

@@ -20,21 +20,16 @@ export function ChatEmptyStateComposerRegion({
   above,
   children,
   greetingName,
-  hideWelcomeHeader = false,
-  stableDocked = false,
 }: {
   readonly above?: ReactNode;
   readonly children: ReactNode;
   readonly greetingName?: string | null;
-  readonly hideWelcomeHeader?: boolean;
-  /** Keep composer geometry docked when transient empty-state affordances hide. */
-  readonly stableDocked?: boolean;
 }) {
   const trimmedName = greetingName?.trim();
   const greeting = trimmedName ? `Hi, ${trimmedName}` : 'Hi there';
-  const showWelcomeHeader = !above && !hideWelcomeHeader;
+  const showWelcomeHeader = !above;
 
-  if (above || stableDocked) {
+  if (above) {
     return (
       <div
         className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative flex min-h-full flex-col px-1 py-4 sm:py-5`}
@@ -46,7 +41,7 @@ export function ChatEmptyStateComposerRegion({
           className='min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-3'
           data-testid='chat-empty-state-above-scroll'
         >
-          {above ?? <div className='h-full' aria-hidden='true' />}
+          {above}
         </div>
         {/* Bottom-docked composer + quick-action chips (passed as children) */}
         <div

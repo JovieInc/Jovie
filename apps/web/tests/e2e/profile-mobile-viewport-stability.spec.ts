@@ -625,7 +625,7 @@ async function collectMockHomeReleaseCardLayout(
 
     const firstLi = carousel.querySelector(':scope > li');
     // A peer card in the same track (entity card or alerts card) used to
-    // verify the PAC card shares the fixed 9:4 carousel geometry.
+    // verify the PAC card shares the fixed 3:4 carousel geometry.
     const peerLi = [...carousel.querySelectorAll(':scope > li')].find(
       li => li !== firstLi
     );
@@ -700,7 +700,7 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
         `${viewport.label} featured release card should be the first carousel card`
       ).toBe(true);
 
-      // Same fixed 9:4 geometry as every other card in the track.
+      // Same fixed 3:4 geometry as every other card in the track.
       if (layout.peerCard) {
         expect(
           Math.abs(layout.pacBox.height - layout.peerCard.height),
@@ -712,8 +712,8 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
         ).toBeLessThanOrEqual(2);
       }
       expect(
-        Math.abs(layout.pacBox.width / layout.pacBox.height - 2.25),
-        `${viewport.label} featured card should keep the 9:4 card aspect`
+        Math.abs(layout.pacBox.width / layout.pacBox.height - 0.75),
+        `${viewport.label} featured card should keep the 3:4 card aspect`
       ).toBeLessThanOrEqual(0.02);
 
       if (layout.hero) {

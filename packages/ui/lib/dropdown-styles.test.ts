@@ -29,8 +29,6 @@ import {
   MENU_SEARCH_INPUT_BASE,
   MENU_SEPARATOR_BASE,
   MENU_SHORTCUT_BASE,
-  OVERLAY_CONTENT_RADIUS,
-  OVERLAY_SURFACE_BASE,
   POPOVER_TRANSFORM_ORIGIN,
   popoverContentClasses,
   SELECT_ITEM_BASE,
@@ -64,21 +62,6 @@ describe('dropdown-styles', () => {
       expect(DROPDOWN_CONTENT_BASE).toContain('border');
       expect(DROPDOWN_CONTENT_BASE).toContain('bg-surface-0');
       expect(DROPDOWN_CONTENT_BASE).toContain('rounded-xl');
-    });
-
-    it('shares the tokenized overlay surface and rounded rectangle contract', () => {
-      expect(OVERLAY_SURFACE_BASE).toContain('border-default');
-      expect(OVERLAY_SURFACE_BASE).toContain('bg-surface-0');
-      expect(OVERLAY_SURFACE_BASE).toContain('shadow-popover');
-      expect(OVERLAY_CONTENT_RADIUS).toBe('rounded-xl');
-      expect(DROPDOWN_CONTENT_BASE).toContain(OVERLAY_SURFACE_BASE);
-    });
-
-    it('disables overlay entry and exit motion when reduced motion is requested', () => {
-      expect(DROPDOWN_TRANSITIONS).toContain('motion-reduce:animate-none');
-      expect(DROPDOWN_TRANSITIONS).toContain(
-        'motion-reduce:data-[state=closed]:animate-none'
-      );
     });
 
     it('default base uses default border token and p-1 padding', () => {

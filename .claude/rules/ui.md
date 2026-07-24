@@ -2,7 +2,25 @@
 
 Design system, component hierarchy, surfaces, taste rules. Always read `DESIGN.md` before making any visual decisions.
 
+## HARD AGENT RULES (non-negotiable)
+
+These are machine-enforced where possible (`pnpm design-system:gate`, design-system ratchets, Storybook quality guard). Violations block ship.
+
+1. **Single System B canon.** DESIGN.md System B is the **only** design system (founder 2026-06-18). Do not revive System A (`.linear-marketing`, design-studio product stories, DM Sans, parallel token trees). Marketing uses `.system-b-marketing`.
+2. **No new one-off atoms when `@jovie/ui` exists.** Before adding anything under `apps/web/components/**` named like `Button`, `Input`, `Badge`, `Dialog`, `Card`, `Select`, `Sheet`, `Tooltip`, etc., import/compose the `@jovie/ui` atom. Thin app wrappers that re-export `@jovie/ui` are OK; forks are not. Gate: `no-duplicate-ui-atom`.
+3. **No off-token colors.** Never land raw hex (`#fff`, `text-[#…]`, inline `#RRGGBB`) in product UI. Hex belongs only in token sources (`packages/ui/theme/**`, `apps/web/styles/design-system.css`, approved brand/DSP registries). Use semantic utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`, accent tokens).
+4. **No off-token motion.** Ban `hover:scale-*`, `group-hover:scale-*`, `transition-all`, and numeric `duration-N` in product UI. Use motion tokens only (`duration-subtle` / `duration-cinematic`, `ease-subtle` / `ease-cinematic`, plus the documented ladder in `.claude/rules/motion.md`). Decorative hover lift is forbidden.
+5. **Storybook composition required.** Stories must render real System B / product components on real surfaces — not bare atoms on pure black, not hand-rolled fake CTAs, not design-studio leftovers. Run `pnpm storybook:quality`. Prefer compositions over args-only void tiles.
+6. **Ratchets only go down.** `arbitrary-values`, `raw-button`, `button-canon`, `component-family`, and related baselines must never rise. If your PR reduces drift, lower the baseline in the same PR.
+7. **Agent gate is mandatory on UI PRs.** `pnpm design-system:gate` (and its vitest wrapper) must stay green. Do not `--no-verify`, do not weaken allowlists, do not add grandfather paths for new work.
+
 ## Component Architecture
+
+Product language + marketing editorial language share the same foundation. "System A"
+is historical — not a valid choice for new work. Prefer/forbid component map:
+[`docs/design/COMPONENT_MAP.md`](../../docs/design/COMPONENT_MAP.md). Generated agent
+contract: [`docs/llms-design-manifest.txt`](../../docs/llms-design-manifest.txt)
+(`pnpm ds:llms-manifest`).
 
 Components follow atomic design with feature-based grouping:
 
@@ -35,6 +53,8 @@ apps/web/components/
 - `atoms/` must NOT import from `molecules/` or `organisms/`
 - `molecules/` must NOT import from `organisms/`
 - `features/{x}/` must NOT import from `features/{y}/` — if a component is needed by 2+ features, **promote it** to the shared `atoms/`, `molecules/`, or `organisms/` layer
+- Prefer `@jovie/ui` atoms (Button, Input, Badge, Dialog, Card, Field, …) before app-level atoms — see [`docs/design/COMPONENT_MAP.md`](../../docs/design/COMPONENT_MAP.md)
+- Do **not** ship hand-rolled buttons/inputs when `@jovie/ui` covers them, design-studio leftovers as product UI, void Storybook atoms, or demo/exp chrome as production templates
 
 **Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`). Arbitrary Tailwind values (`w-[327px]`, `text-[#fff]`) are tracked by a drift ratchet (`apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts`) — the count may only go DOWN. Converge to tokens; never add new arbitrary values.
 
@@ -116,21 +136,6 @@ The `DashboardHeader` breadcrumb already renders the page name prominently. Do N
 **Allowed:** `<PageToolbar start={<span>3 matched platforms</span>} end={<ActionButton />} />`
 **Banned:** `<PageToolbar start={<span>Earnings</span>} />` — duplicates the breadcrumb
 
-A `PageToolbar` may contain **at most one primary pill CTA**, and that primary
-action belongs in `end={}`. The canonical `Button` is pill-shaped and defaults
-to `variant='primary'`, so an omitted variant counts as primary. Filters,
-display controls, navigation, cancel, and overflow actions must use secondary,
-tertiary, ghost, or `PageToolbarActionButton` treatment.
-
-### One Workspace Left Seam
-
-Authenticated workspace primitives use the canonical `px-3` seam for the
-header/breadcrumb, `PageToolbar`, table/list header cells, first-column cells,
-and status/footer rows. Do not recreate the seam with `px-3.5` or route-local
-padding. Optional selection columns may occupy their own reserved track, but
-the primary content column must return to the shared seam when that track is
-absent.
-
 ## Taste Rules (Hard Invariants)
 
 ### No Emoji in UI — Use Icons
@@ -139,13 +144,6 @@ absent.
 - Emoji looks cheap and undesigned — always use proper SVG icons instead.
 - For decorative indicators, use small SVG icon components (Lucide icons or inline SVGs).
 - Applies to marketing pages, dashboards, mockups, and all user-facing surfaces.
-
-### Icon and Text Alignment
-
-- **Geometric centering is the default** for icon-and-text pairs and icon controls. Lucide and arbitrary web SVGs do not provide a guaranteed typographic baseline.
-- Use **baseline alignment only when both paired assets expose compatible, meaningful baselines**. System symbols with baseline metadata are the exception, not a reason to baseline-align arbitrary SVGs.
-- A **1–2px optical correction** is allowed only after screenshot evidence across the affected sizes and both themes. It must live in the shared primitive, helper, or token that owns the pair.
-- Never add an optical correction as a call-site margin or translate utility. It must be static, preserve layout and hit-target geometry, and must not appear on hover.
 
 ### Text Casing Rules
 
@@ -196,8 +194,6 @@ Before adding a title, header, card wrapper, or label to a component, **read the
 | `Card` with `CardHeader` | `CardTitle` | Nested Card or redundant heading inside `CardContent` |
 | `DrawerSurfaceCard` | Card surface + optional header | Do not nest another `Card` inside; use `variant='flat'` for inner elements |
 | `DashboardHeader` breadcrumb | Page name | `PageToolbar start=` repeating the page name |
-| `PageToolbar` | Contextual action cluster | More than one primary pill CTA, or the same CTA repeated in page content |
-| `SidebarNavItem` | Shell nav row, icon, active, focus, collapsed, and density chrome | Bespoke link/button classes that recreate sidebar navigation chrome |
 
 **Checklist (run before every UI component PR):**
 
@@ -205,21 +201,11 @@ Before adding a title, header, card wrapper, or label to a component, **read the
 2. **Grep for repeated text** — search the route tree for your title/label string. If the same label appears 3+ times on one screen, deduplicate.
 3. **Check surface nesting** — if the parent is already a Card, Sheet, or `DrawerSurfaceCard`, do not wrap children in another Card. Use `variant='flat'` or plain `div`.
 4. **One heading per visual section** — a section gets exactly one title. If the container already renders one, your component renders zero.
-5. **One primary toolbar action** — a `PageToolbar` gets zero or one primary
-   pill CTA. Demote every supporting action.
-
-**SidebarNavItem invariant:** every authenticated-shell sidebar row—link or
-button—must compose `SidebarNavItem` or its exported
-`getSidebarNavRowClassName` and `getSidebarNavIconClassName` helpers. Active,
-focus, collapsed, nested, and density chrome belong to that primitive. Do not
-copy its class string or create route-specific sidebar row styling.
 
 **Banned patterns:**
 - `EntitySidebarShell title="X"` → child renders `<CardHeader><CardTitle>X</CardTitle></CardHeader>` (double title)
 - `Sheet` body wrapped in `Card` when Sheet already provides the surface (redundant carding)
 - Same CTA label (e.g., "Get notified") appearing in header, body, AND footer of one screen
-- Two primary pill buttons inside one `PageToolbar`
-- A shell navigation link or button with bespoke row/icon chrome instead of the `SidebarNavItem` primitive/helpers
 
 This is the subtraction principle applied specifically to container boundaries. When in doubt, remove the inner chrome.
 
@@ -227,7 +213,7 @@ This is the subtraction principle applied specifically to container boundaries. 
 
 - Hover states must not move layout or shift components without a product reason.
 - Do **NOT** use `translate`, `scale`, lift-on-hover, or floating-card motion on buttons, cards, screenshots, auth surfaces, or marketing panels as a default polish move.
-- Press/click compression is opt-in and uses the shared `--scale-press` token (`0.98`) only when an action has no immediate visible response. Dropdowns, accordions, tabs, toggles, and rail controls already communicate their state change and must not scale. Shared controls must disable the transform under reduced motion.
+- Press/click feedback may use a subtle `scale(0.96)` when it is tactile and interruptible; provide a static opt-out when the motion would distract.
 - Menus, panels, drawers, and sidebars may use intentional `translate`/`scale` motion for open/close because the movement communicates spatial state.
 - Prefer background-color, border-color, text-color, opacity, or shadow changes for hover feedback.
 - If motion is necessary because the UI is directly manipulating something spatial, it must be intentional and clearly tied to that interaction.

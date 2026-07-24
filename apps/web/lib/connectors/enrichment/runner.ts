@@ -17,11 +17,10 @@ const EMPTY_RESULT: ConnectorEnrichmentRunResult = {
  * Turns synced external_objects into context_facts + memory graph observations.
  */
 export async function runConnectorEnrichment(
-  userId: string,
-  options: { readonly gmailAccountId?: string } = {}
+  userId: string
 ): Promise<ConnectorEnrichmentRunResult> {
   try {
-    const context = await resolveConnectorEnrichmentContext(userId, options);
+    const context = await resolveConnectorEnrichmentContext(userId);
     if (!context) {
       logger.info('[connector-enrichment] Skipping — no connected scope', {
         userId,

@@ -84,13 +84,7 @@ export function useTableKeyboardNav<TData>({
   useEffect(() => {
     if (focusedIndex >= 0 && enabled) {
       const rowElement = rowRefsMap.get(focusedIndex);
-      const prefersReducedMotion = window.matchMedia?.(
-        '(prefers-reduced-motion: reduce)'
-      ).matches;
-      rowElement?.scrollIntoView?.({
-        block: 'nearest',
-        behavior: prefersReducedMotion ? 'auto' : 'smooth',
-      });
+      rowElement?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
   }, [focusedIndex, enabled, rowRefsMap]);
 

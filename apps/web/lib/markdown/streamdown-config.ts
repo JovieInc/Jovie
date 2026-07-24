@@ -1,22 +1,10 @@
-import { createElement } from 'react';
-import type { Components, StreamdownProps } from 'streamdown';
+import type { StreamdownProps } from 'streamdown';
 
 import { cn } from '@/lib/utils';
 
 const SAFE_PROTOCOL_PATTERN = /^(https?:|mailto:|tel:|\/|#)/i;
 
 const CHAT_MARKDOWN_STYLES = 'system-b-chat-markdown text-primary-token';
-
-/**
- * Entity mentions split an otherwise ordinary sentence into multiple markdown
- * segments. Rendering each segment as a default paragraph makes the mention
- * look detached and can strand the following word on its own line. This is
- * deliberately limited to the inline-message path; full markdown keeps the
- * default block anatomy.
- */
-const INLINE_MARKDOWN_COMPONENTS: Components = {
-  p: ({ children }) => createElement('span', null, children),
-};
 
 const urlTransform: NonNullable<StreamdownProps['urlTransform']> = url => {
   if (!url || !SAFE_PROTOCOL_PATTERN.test(url)) {
@@ -86,23 +74,19 @@ export const CHAT_MARKDOWN_STATIC_CONFIG: StreamdownProps = {
 
 export function getChatMarkdownStreamdownConfig(
   isStreaming: boolean,
-  className?: string,
-  inline = false
+  className?: string
 ): StreamdownProps {
   const baseConfig = isStreaming
     ? CHAT_MARKDOWN_STREAMING_CONFIG
     : CHAT_MARKDOWN_STATIC_CONFIG;
 
-  if (!className && !inline) {
+  if (!className) {
     return baseConfig;
   }
 
   return {
     ...baseConfig,
-    className: className
-      ? cn(CHAT_MARKDOWN_STYLES, className)
-      : CHAT_MARKDOWN_STYLES,
-    ...(inline ? { components: INLINE_MARKDOWN_COMPONENTS } : {}),
+    className: cn(CHAT_MARKDOWN_STYLES, className),
   };
 }
 

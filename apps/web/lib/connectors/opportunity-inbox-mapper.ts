@@ -1,9 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
 import {
-  formatBrandDealOpportunityMetadata,
-  parseBrandDealOpportunity,
-} from './brand-deal-opportunity';
-import {
   isReportKind,
   parseReportMeasurement,
 } from './opportunity-inbox-report';
@@ -32,7 +28,6 @@ interface SuggestedActionRow {
 
 const PRIMARY_ACTION_LABEL_BY_KIND: Readonly<Record<string, string>> = {
   'calendar.create_event': 'Add to calendar',
-  'brand_deal.opportunity': 'Approve buyer',
 };
 
 function primaryActionLabelFor(
@@ -85,13 +80,10 @@ export function mapSuggestedActionToInboxCard(
   const report = isReportKind(row.kind)
     ? parseReportMeasurement(row.payload)
     : null;
-  const brandDeal = parseBrandDealOpportunity(row.kind, row.payload);
   const signalType = classifyOpportunitySignalType(row);
   const category: OpportunityInboxCardCategory = report
     ? 'report'
-    : brandDeal
-      ? 'brand_deal'
-      : classifySuggestedActionCategory(row);
+    : classifySuggestedActionCategory(row);
   return {
     id: row.id,
     signalType,
@@ -100,19 +92,14 @@ export function mapSuggestedActionToInboxCard(
     typeLabel:
       category === 'report'
         ? 'Report'
-        : category === 'brand_deal'
-          ? 'Brand Deal'
-          : OPPORTUNITY_SIGNAL_TYPE_META[signalType].label,
+        : OPPORTUNITY_SIGNAL_TYPE_META[signalType].label,
     createdAt: row.createdAt.toISOString(),
     title: titleFromPayload(row.payload, category),
-    why: brandDeal
-      ? formatBrandDealOpportunityMetadata(brandDeal)
-      : whyFromRow(row, category),
+    why: whyFromRow(row, category),
     primaryActionLabel:
       report?.nextStep?.label ?? primaryActionLabelFor(row.kind, category),
     status: 'pending',
     category,
-    ...(brandDeal ? { brandDealRankingScore: brandDeal.rankingScore } : {}),
     ...(report ? { report } : {}),
   };
 }
@@ -139,29 +126,13 @@ export function buildOpportunityInboxData(
   rows: readonly SuggestedActionRow[],
   tourDates?: OpportunityInboxTourDates
 ): OpportunityInboxData {
-  const cards = rows.flatMap(row => {
-    const signalType = classifyOpportunitySignalType(row);
-    if (
-      signalType === 'brand_deal' &&
-      !parseBrandDealOpportunity(row.kind, row.payload)
-    ) {
-      return [];
-    }
-    return [mapSuggestedActionToInboxCard(row)];
-  });
+  const cards = rows.map(mapSuggestedActionToInboxCard);
   // Report-back cards surface at the top of the inbox (GH #13178) so the
   // measurement loop visibly closes; relative order is otherwise preserved.
   const reportCards = cards.filter(card => card.category === 'report');
-  const brandDealCards = cards
-    .filter(card => card.category === 'brand_deal')
-    .sort(
-      (a, b) => (b.brandDealRankingScore ?? 0) - (a.brandDealRankingScore ?? 0)
-    );
-  const otherCards = cards.filter(
-    card => card.category !== 'report' && card.category !== 'brand_deal'
-  );
+  const otherCards = cards.filter(card => card.category !== 'report');
   return {
-    cards: [...reportCards, ...brandDealCards, ...otherCards],
+    cards: [...reportCards, ...otherCards],
     emptyActionCards: DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS,
     ...(tourDates ? { tourDates } : {}),
   };

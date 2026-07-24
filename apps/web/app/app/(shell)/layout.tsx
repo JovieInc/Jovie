@@ -2,33 +2,28 @@ import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
-import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
+import { CinematicAppBoot } from '@/components/organisms/CinematicAppBoot';
 import { PersistentAudioBar } from '@/components/organisms/PersistentAudioBar';
 import { NuqsProvider } from '@/components/providers/NuqsProvider';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
-import {
-  APP_SHELL_MODE_HEADER,
-  parseTrustedAppShellMode,
-} from '@/lib/app-shell/mode';
 import { canAccessAppShell } from '@/lib/auth/access-route-redirect';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { resolveUserState } from '@/lib/auth/gate';
-import ChatLoading from './chat/ChatLoadingState';
+import { getAppFlagValue } from '@/lib/flags/server';
+import ChatLoading from './chat/loading';
 import { DashboardShellContent } from './DashboardShellContent';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
 import { LibraryLoadingState } from './library/LibrarySurface';
-import { requireAppShellModeAccess } from './shell-mode';
 import {
   isChatShellRoute,
   isLibraryShellRoute,
   isLyricsShellRoute,
   isReleasesShellRoute,
   isTasksShellRoute,
-  resolveAppShellLoadingPath,
   resolveAppShellRequestPath,
 } from './shell-route-matches';
 
@@ -77,14 +72,6 @@ export default async function AppShellLayout({
       headerStore.get('x-matched-path'),
       headerStore.get('x-invoke-path')
     );
-    const loadingPathname = resolveAppShellLoadingPath(
-      nextUrlHeader,
-      headerStore.get('x-matched-path'),
-      headerStore.get('x-invoke-path')
-    );
-    const mode = parseTrustedAppShellMode(
-      headerStore.get(APP_SHELL_MODE_HEADER)
-    );
 
     if (!auth.userId) {
       redirect(
@@ -93,11 +80,6 @@ export default async function AppShellLayout({
         })
       );
     }
-
-    // OV authorization is resolved before the shared shell/data tree is
-    // returned. This keeps unauthorized RSC responses free of admin content
-    // and gives the client its mode on the first render (no customer flash).
-    await requireAppShellModeAccess(mode);
 
     const authResult = await resolveUserState({
       knownClerkUserId: auth.userId,
@@ -111,32 +93,40 @@ export default async function AppShellLayout({
       );
     }
 
-    const audioPlayer = <PersistentAudioBar />;
+    // Resolve the shell variant up front so the Suspense fallback skeleton
+    // matches the post-resolve AppShellFrame layout. Without this, flag-on
+    // users would flash a 'legacy' skeleton then snap to the rounded
+    // 'shellChatV1' frame once DashboardShellContent resolves.
+    const shellChatV1 = await getAppFlagValue('DESIGN_V1', {
+      userId: auth.userId,
+    });
+    const shellVariant = shellChatV1 ? 'shellChatV1' : 'legacy';
+    const audioPlayer = <PersistentAudioBar variant={shellVariant} />;
 
     // Pick the route-specific skeleton main slot.
     let routeMain: React.ReactNode = undefined;
-    if (isChatShellRoute(loadingPathname)) {
+    if (isChatShellRoute(pathname)) {
       routeMain = <ChatLoading />;
-    } else if (isReleasesShellRoute(loadingPathname)) {
+    } else if (isReleasesShellRoute(pathname)) {
       routeMain = <ReleaseTableSkeleton showHeader={false} />;
-    } else if (isLibraryShellRoute(loadingPathname)) {
+    } else if (isLibraryShellRoute(pathname)) {
       routeMain = <LibraryLoadingState />;
-    } else if (isLyricsShellRoute(loadingPathname)) {
+    } else if (isLyricsShellRoute(pathname)) {
       routeMain = <LyricsRouteSkeleton />;
-    } else if (isTasksShellRoute(loadingPathname)) {
+    } else if (isTasksShellRoute(pathname)) {
       routeMain = <TasksRouteSkeleton />;
     }
 
-    // This fallback is for the first authenticated shell boot. The shell
-    // segment intentionally has no loading.tsx: App Router then keeps the
-    // current authenticated route visible for warm navigation instead of
-    // replacing it with a route-shaped skeleton. Route-specific main slots
-    // keep the first-boot geometry stable without creating a second layout.
+    // CinematicAppBoot internally renders <AppShellSkeleton main={routeMain}
+    // variant={shellVariant} /> unless this is the FIRST shell mount of the
+    // tab AND prefers-reduced-motion is off, in which case it plays a 2.4s
+    // cinematic timeline before the underlying tree resolves. Per-tab gate
+    // via sessionStorage flag `jovie:cinematic-boot-played`.
     const shellFallback = (
-      <AppShellSkeleton
+      <CinematicAppBoot
         main={routeMain}
         audioPlayer={audioPlayer}
-        brandVariant={mode === 'ov' ? 'ov' : 'jovie'}
+        variant={shellVariant}
       />
     );
 
@@ -145,19 +135,15 @@ export default async function AppShellLayout({
     // is not worth adding a blocking DB query to the critical path of every
     // dashboard page load for every user.
 
-    // Stream the first shell boot while DashboardShellContent resolves
-    // dashboard data + feature flags.
+    // Stream the shell: the route-aware skeleton renders at first byte while
+    // DashboardShellContent resolves dashboard data + feature flags.
     // Mount NuqsProvider at the shell layer so every client component under
     // /app/(shell)/* (e.g. DashboardAudienceClient) has a NuqsAdapter context
     // during SSR and hydration, regardless of how CoreProviders resolves above.
     return (
       <NuqsProvider>
         <Suspense fallback={shellFallback}>
-          <DashboardShellContent
-            userId={auth.userId}
-            pathname={pathname}
-            mode={mode}
-          >
+          <DashboardShellContent userId={auth.userId} pathname={pathname}>
             {children}
           </DashboardShellContent>
         </Suspense>
@@ -172,20 +158,20 @@ export default async function AppShellLayout({
     // as it would break context provider expectations (DashboardDataProvider, etc.)
     return (
       <div className='min-h-screen bg-base flex items-center justify-center px-6'>
-        <div className='w-full max-w-md'>
+        <div className='w-full max-w-lg space-y-4'>
           <ErrorBanner
             title='Dashboard failed to load'
-            description='We could not load your workspace data. Try again, or return to Jovie.'
+            description='We could not load your workspace data; refresh to try again or return to your profile.'
             actions={[
-              {
-                label: 'Retry',
-                href: APP_ROUTES.DASHBOARD,
-                variant: 'primary',
-              },
-              { label: 'Return to Jovie', href: '/', variant: 'secondary' },
+              { label: 'Retry', href: APP_ROUTES.DASHBOARD },
+              { label: 'Go To My Profile', href: '/' },
             ]}
             testId='dashboard-error'
           />
+          <p className='text-sm text-secondary-token text-center'>
+            If this keeps happening, please reach out to support so we can help
+            restore access.
+          </p>
         </div>
       </div>
     );

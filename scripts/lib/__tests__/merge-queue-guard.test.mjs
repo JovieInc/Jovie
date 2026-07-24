@@ -456,7 +456,7 @@ describe('aggregate required checks', () => {
     // The duplicate manual ci-storybook-a11y job was removed (JOV-4326); the
     // scheduled visual-a11y.yml storybook-a11y lane is the single owner.
     expect(ciWorkflowYaml).not.toContain('ci-storybook-a11y:');
-    expect(storybookBlock).toMatch(/pnpm --filter @jovie\/web test:a11y/);
+    expect(storybookBlock).toMatch(/pnpm --filter web test:a11y/);
     expect(prReadyBlock).not.toMatch(/ci-storybook-a11y|STORYBOOK_A11Y_RESULT/);
     expect(visualWorkflowYaml).not.toMatch(/^\s+pull_request:/m);
     expect(visualWorkflowYaml).not.toMatch(/^\s+push:/m);
@@ -504,7 +504,39 @@ describe('aggregate required checks', () => {
     });
   });
 
-  it('fails closed when native source wiring omits the queue event and retains a bypass actor', () => {
+  it('validates the legacy Graphite ruleset shape only when explicitly selected', () => {
+    const liveRuleset = {
+      bypass_actors: [
+        {
+          actor_id: 158384,
+          actor_type: 'Integration',
+          bypass_mode: 'always',
+        },
+      ],
+      rules: [
+        { type: 'pull_request' },
+        {
+          type: 'required_status_checks',
+          parameters: [
+            { context: 'PR Ready' },
+            { context: 'Migration Guard' },
+            { context: 'Fork PR Gate', integration_id: 2934433 },
+            { context: 'PR Size Guard' },
+          ],
+        },
+        { type: 'non_fast_forward' },
+        { type: 'required_linear_history' },
+      ],
+    };
+
+    const result = validateLiveMergeQueueRuleset(liveRuleset, {
+      backend: 'graphite',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.hasGraphiteBypass).toBe(true);
+  });
+
+  it('fails closed when native source wiring omits the queue event and retains Graphite bypass', () => {
     const unsafe = validateMergeQueueRepoConfig({
       backend: 'native',
       branchProtectionYaml: `
@@ -526,7 +558,7 @@ describe('aggregate required checks', () => {
     );
   });
 
-  it('validates native live ruleset shape and rejects bypass residue', () => {
+  it('validates native live ruleset shape and rejects Graphite bypass residue', () => {
     const requiredStatusChecks = {
       type: 'required_status_checks',
       parameters: {
@@ -554,7 +586,7 @@ describe('aggregate required checks', () => {
 
     expect(result).toMatchObject({
       ok: true,
-      hasBypassActors: false,
+      hasGraphiteBypass: false,
       hasNativeMergeQueue: true,
     });
 
@@ -620,7 +652,7 @@ describe('aggregate required checks', () => {
     );
   });
 
-  it('rejects retired or unknown backend names', () => {
+  it('rejects unknown backend names instead of falling back to Graphite', () => {
     const result = validateLiveMergeQueueRuleset(
       { bypass_actors: [], rules: [] },
       { backend: 'other' }

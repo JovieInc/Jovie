@@ -160,7 +160,7 @@ describe('TipSection', () => {
 
     // Click the continue button to trigger payment
     const continueButton = screen.getByRole('button', {
-      name: /Pay \$5 with Venmo/i,
+      name: /Continue with Venmo for \$5/i,
     });
     fireEvent.click(continueButton);
 
@@ -226,7 +226,7 @@ describe('TipSection', () => {
 
     // Venmo payment flow should be available directly via the PaySelector continue button
     expect(
-      screen.getByRole('button', { name: /Pay \$10 with Venmo/i })
+      screen.getByRole('button', { name: /Continue with Venmo/i })
     ).toBeInTheDocument();
   });
 });

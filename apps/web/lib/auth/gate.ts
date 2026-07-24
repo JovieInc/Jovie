@@ -486,20 +486,6 @@ async function resolveAuthIdentity(knownAppUserId?: string): Promise<{
   clerkUserId: string | null;
   email: string | null;
 }> {
-  // The secretless visual-capture runtime carries a Better Auth identity in
-  // test cookies, but has no persisted app `users.id`. In that deliberately
-  // synthetic mode it must win over a caller's cached app-id hint. Normal
-  // sessions retain the known-id fast path below.
-  if (canUseE2ETestAuthFallback()) {
-    const bypassSession = await getCachedDevTestAuthSession();
-    if (bypassSession) {
-      return {
-        clerkUserId: bypassSession.clerkUserId,
-        email: bypassSession.email,
-      };
-    }
-  }
-
   if (knownAppUserId) {
     const [appUser] = await db
       .select({
@@ -521,7 +507,7 @@ async function resolveAuthIdentity(knownAppUserId?: string): Promise<{
   const bypassSession = await getCachedDevTestAuthSession();
   if (bypassSession) {
     return {
-      clerkUserId: bypassSession.clerkUserId,
+      clerkUserId: bypassSession.dbUserId,
       email: bypassSession.email,
     };
   }

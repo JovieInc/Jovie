@@ -58,8 +58,6 @@ const imageUploads =
   );
 const markdownUploads = [
   'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
-  'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',
-  'production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}',
   'visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}',
 ];
 const protectedJobs: Record<string, string[]> = {
@@ -71,7 +69,6 @@ const protectedJobs: Record<string, string[]> = {
   'e2e-full-matrix.yml': ['e2e-full-matrix'],
   'nightly-tests.yml': ['e2e-tests'],
   'nightly-testing-agent.yml': ['deterministic', 'report'],
-  'postdeploy-probes.yml': ['auth-smoke'],
   'production-controller.yml': ['ci-post-deploy-auth-smoke'],
   'production-release.yml': ['alias-staging', 'production-oauth-gate'],
   'synthetic-monitoring.yml': ['synthetic-test'],
@@ -84,9 +81,8 @@ const producerCounts: Record<string, number> = {
   'e2e-full-matrix.yml': 2,
   'nightly-testing-agent.yml': 2,
   'nightly-tests.yml': 4,
-  'postdeploy-probes.yml': 1,
   'production-controller.yml': 1,
-  'production-release.yml': 3,
+  'production-release.yml': 2,
   'screenshots.yml': 1,
   'synthetic-monitoring.yml': 6,
   'visual-regression.yml': 5,
@@ -807,39 +803,6 @@ describe('Playwright artifact secret boundary', () => {
       expect(audit.violations, `${job.file}:${job.id}`).toEqual([]);
     }
 
-    for (const [file, jobId, artifactName] of [
-      [
-        'postdeploy-probes.yml',
-        'auth-smoke',
-        'postdeploy-auth-smoke-${{ github.run_id }}',
-      ],
-      [
-        'production-controller.yml',
-        'ci-post-deploy-auth-smoke',
-        'post-deploy-auth-smoke-${{ github.run_id }}',
-      ],
-    ] as const) {
-      const workflow = readFileSync(join(workflowsRoot, file), 'utf8');
-      const job = workflowJobBlocks(workflow).find(block => block.id === jobId);
-      expect(job, `${file}:${jobId}`).toBeDefined();
-      if (!job) continue;
-      const producer = workflowStepBlocks(job.source).find(block =>
-        block.startsWith('      - name: Run production auth smoke tests\n')
-      );
-      const uploader = workflowStepBlocks(job.source).find(block =>
-        block.includes(safeUploadAction)
-      );
-      expect(producer, `${file}:${jobId}:producer`).toBeDefined();
-      expect(uploader, `${file}:${jobId}:uploader`).toBeDefined();
-      if (!producer || !uploader) continue;
-      expect(producer).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
-      expect(yamlPropertyBlock(job.source, 'env', 4)).not.toContain(
-        'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
-      );
-      expect(uploader).toContain(`name: ${artifactName}`);
-      expect(uploader).toContain("allow-markdown: 'true'");
-    }
-
     const fixtureCheckout = `      - uses: actions/checkout@0123456789abcdef
         with:
           persist-credentials: false`;
@@ -1225,7 +1188,7 @@ ${fixtureCheckout}
     );
     expect(
       productionRelease.match(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/g)
-    ).toHaveLength(3);
+    ).toHaveLength(2);
     const action = readFileSync(
       join(githubRoot, 'actions/upload-safe-playwright-artifact/action.yml'),
       'utf8'
@@ -1382,60 +1345,6 @@ ${fixtureCheckout}
     );
   });
 
-  it('requires step-scoped Markdown allowance for every production smoke producer', () => {
-    const expected = [
-      'postdeploy-probes.yml:auth-smoke:Run production auth smoke tests',
-      'production-controller.yml:ci-post-deploy-auth-smoke:Run production auth smoke tests',
-      'production-release.yml:promote-production:Prove canonical navigation budgets on exact staged build',
-    ];
-    const discovered = readdirSync(workflowsRoot)
-      .filter(name => /\.ya?ml$/.test(name))
-      .flatMap(file => {
-        const source = readFileSync(join(workflowsRoot, file), 'utf8');
-        return workflowJobBlocks(source).flatMap(job =>
-          workflowStepBlocks(job.source)
-            .filter(
-              step =>
-                step.includes(
-                  'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs"'
-                ) && step.includes('tests/e2e/smoke-prod-auth.spec.ts')
-            )
-            .map(step => ({
-              file,
-              job: job.id,
-              step: step.match(/^      - name: (.+)$/m)?.[1] ?? '',
-            }))
-        );
-      })
-      .map(({ file, job, step }) => `${file}:${job}:${step}`)
-      .sort();
-
-    expect(discovered).toEqual([...expected].sort());
-
-    for (const item of expected) {
-      const [file, jobId, stepName] = item.split(':');
-      const source = readFileSync(join(workflowsRoot, file!), 'utf8');
-      const job = workflowJobBlocks(source).find(({ id }) => id === jobId);
-      expect(job, item).toBeDefined();
-      if (!job) continue;
-      const producer = workflowStepBlocks(job.source).find(step =>
-        step.startsWith(`      - name: ${stepName}\n`)
-      );
-      expect(producer, item).toBeDefined();
-      if (!producer) continue;
-
-      expect(yamlPropertyBlock(producer, 'env', 8), item).toContain(
-        "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
-      );
-      expect(yamlPropertyBlock(job.source, 'env', 4), item).not.toContain(
-        'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
-      );
-      expect(yamlPropertyBlock(source, 'env', 0), item).not.toContain(
-        'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
-      );
-    }
-  });
-
   it('detects structured, attachment, labeled, and exact environment secrets', () => {
     const cases = [
       [
@@ -1548,7 +1457,6 @@ ${fixtureCheckout}
     write(join(policy, 'safe.md'), '# Safe diagnostics');
     write(join(policy, 'credential.md'), 'DATABASE_URL=fake-password');
     write(join(policy, 'artifact.bin'), 'opaque');
-    write(join(policy, 'artifact.trace'), 'opaque');
     for (const extension of 'avi har html mkv mov mp4 webm zip'.split(' '))
       write(join(policy, `artifact.${extension}`), 'unsafe');
     const findings = inspectPlaywrightArtifacts(
@@ -1565,10 +1473,6 @@ ${fixtureCheckout}
     });
     expect(findings).toContainEqual({
       path: join(policy, 'artifact.bin'),
-      category: 'unknown-binary',
-    });
-    expect(findings).toContainEqual({
-      path: join(policy, 'artifact.trace'),
       category: 'unknown-binary',
     });
     expect(

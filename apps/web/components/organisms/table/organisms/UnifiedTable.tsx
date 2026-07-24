@@ -136,14 +136,6 @@ export interface UnifiedTableProps<TData> {
   readonly getRowClassName?: (row: TData, index: number) => string;
 
   /**
-   * Returns whether a row is selected when selection is owned by a consumer
-   * (for example, a persistent details rail rather than TanStack's checkbox
-   * selection state). The shared row then exposes the selection to assistive
-   * technology and applies the canonical selected treatment.
-   */
-  readonly isRowSelected?: (row: TData, index: number) => boolean;
-
-  /**
    * Get a stable test ID for a row when callers need selector-level targeting.
    */
   readonly getRowTestId?: (row: TData, index: number) => string | undefined;
@@ -356,7 +348,6 @@ export function UnifiedTable<TData>({
   onRowContextMenu,
   getContextMenuItems,
   getRowClassName,
-  isRowSelected,
   getRowTestId,
   className,
   containerClassName,
@@ -396,17 +387,17 @@ export function UnifiedTable<TData>({
   );
 
   // Internal focused row state (uncontrolled mode)
-  // Roving tabindex needs a deterministic first stop. Focus-visible styling
-  // remains CSS-driven, so this does not paint a focus ring before keyboard
-  // focus actually reaches the table.
-  const [internalFocusedIndex, setInternalFocusedIndex] = useState<number>(0);
+  const [internalFocusedIndex, setInternalFocusedIndex] = useState<number>(-1);
 
   // Use controlled or uncontrolled focus
-  const requestedFocusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
+  const focusedIndex = controlledFocusedIndex ?? internalFocusedIndex;
   const setFocusedIndex = useCallback(
     (index: number) => {
-      setInternalFocusedIndex(index);
-      onFocusedRowChange?.(index);
+      if (onFocusedRowChange) {
+        onFocusedRowChange(index);
+      } else {
+        setInternalFocusedIndex(index);
+      }
     },
     [onFocusedRowChange]
   );
@@ -464,11 +455,6 @@ export function UnifiedTable<TData>({
   });
 
   const { rows } = table.getRowModel();
-
-  const focusedIndex = Math.max(
-    0,
-    Math.min(requestedFocusedIndex, rows.length - 1)
-  );
 
   const groupingEnabled = Boolean(groupingConfig);
   const groupingSourceData = useMemo(
@@ -544,7 +530,6 @@ export function UnifiedTable<TData>({
           shouldEnableKeyboardNav={shouldEnableKeyboardNav}
           shouldVirtualize={false}
           focusedIndex={focusedIndex}
-          isSelected={isRowSelected?.(rowData, index)}
           onRowClick={onRowClick}
           onRowContextMenu={onRowContextMenu}
           onKeyDown={handleKeyDown}
@@ -599,7 +584,6 @@ export function UnifiedTable<TData>({
       handleKeyDown,
       setFocusedIndex,
       getRowClassName,
-      isRowSelected,
       getRowTestId,
       onRowShiftClick,
       getExpandableRowId,
@@ -738,7 +722,6 @@ export function UnifiedTable<TData>({
           getContextMenuItems={getContextMenuItems}
           onRowShiftClick={onRowShiftClick}
           getRowClassName={getRowClassName}
-          isRowSelected={isRowSelected}
           getRowTestId={getRowTestId}
           renderRow={renderRow}
           getRowId={getRowId}
@@ -763,7 +746,7 @@ export function UnifiedTable<TData>({
                     <LoadingSpinner
                       size='sm'
                       tone='muted'
-                      label='Loading More'
+                      label='Loading more'
                     />
                     {' Loading more...'}
                   </span>

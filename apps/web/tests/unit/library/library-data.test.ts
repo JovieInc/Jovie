@@ -5,7 +5,6 @@ import {
   buildLibraryReleaseAssets,
   formatLibraryDuration,
   formatLibraryReleaseDate,
-  formatLibraryReleaseDateTitle,
   getLibraryAspectRatioClass,
   getLibraryAssetAspectRatio,
   getLibraryDrawerHeroClass,
@@ -191,8 +190,7 @@ describe('library data', () => {
   });
 
   it('formats release dates without local timezone drift', () => {
-    expect(formatLibraryReleaseDate('2026-04-28T00:00:00.000Z')).toBe('Apr 28');
-    expect(formatLibraryReleaseDateTitle('2026-04-28T00:00:00.000Z')).toBe(
+    expect(formatLibraryReleaseDate('2026-04-28T00:00:00.000Z')).toBe(
       'Apr 28, 2026'
     );
     expect(formatLibraryReleaseDate(null)).toBe('No Release Date');

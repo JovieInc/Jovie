@@ -63,20 +63,6 @@ describe('ChatEmptyStateComposerRegion', () => {
     expect(screen.queryByTestId('chat-empty-state-greeting')).toBeNull();
   });
 
-  it('allows a public entry flow to provide its own centered welcome', () => {
-    render(
-      <ChatEmptyStateComposerRegion hideWelcomeHeader>
-        <div data-testid='public-entry'>Public entry</div>
-      </ChatEmptyStateComposerRegion>
-    );
-
-    const region = screen.getByTestId('chat-empty-state-composer-region');
-    expect(region.getAttribute('data-layout')).toBe('centered');
-    expect(screen.getByTestId('public-entry')).toBeTruthy();
-    expect(screen.queryByTestId('chat-empty-state-logo')).toBeNull();
-    expect(screen.queryByTestId('chat-empty-state-greeting')).toBeNull();
-  });
-
   it('docks the composer below a scrollable above slot (no mid-viewport absolute clip)', () => {
     render(
       <ChatEmptyStateComposerRegion
@@ -107,18 +93,5 @@ describe('ChatEmptyStateComposerRegion', () => {
     expect(composer.getAttribute('data-dock')).toBe('bottom');
     expect(composer.className).toContain('shrink-0');
     expect(screen.getByTestId('composer-child')).toBeTruthy();
-  });
-
-  it('keeps a stable dock while an empty-state affordance is temporarily hidden', () => {
-    render(
-      <ChatEmptyStateComposerRegion stableDocked>
-        <div data-testid='composer-child' />
-      </ChatEmptyStateComposerRegion>
-    );
-
-    expect(
-      screen.getByTestId('chat-empty-state-composer-region')
-    ).toHaveAttribute('data-layout', 'docked');
-    expect(screen.getByTestId('chat-empty-state-above-scroll')).toBeTruthy();
   });
 });

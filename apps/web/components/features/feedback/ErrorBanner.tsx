@@ -9,14 +9,9 @@ import { toast } from '@/components/feedback';
 import { cn } from '@/lib/utils';
 
 export interface ErrorBannerAction {
-  readonly label: string;
-  readonly onClick?: () => void;
-  readonly href?: string;
-  /**
-   * Error states have one recovery path. Additional exits remain quiet so the
-   * alert does not give equal visual weight to every action.
-   */
-  readonly variant?: 'primary' | 'secondary';
+  label: string;
+  onClick?: () => void;
+  href?: string;
 }
 
 export interface ErrorBannerProps {
@@ -62,38 +57,40 @@ export function ErrorBanner({
         toast.error('Failed to copy error details');
       });
   };
-  const actionClass = 'w-full sm:w-auto';
+  const actionClass =
+    'inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-error-subtle';
 
   const renderAction = (action: ErrorBannerAction, index: number) => {
-    const variant = action.variant ?? (index === 0 ? 'primary' : 'secondary');
-
     if (action.href) {
       const isInternal = action.href.startsWith('/');
 
       if (isInternal && !action.onClick) {
         return (
-          <Button
+          <Link
             key={`${action.label}-${index}`}
-            asChild
-            variant={variant}
-            className={actionClass}
+            href={action.href}
+            className={cn(
+              actionClass,
+              'border border-error/50 bg-error/15 text-error-foreground shadow-lg hover:bg-error/25 hover:border-error/70'
+            )}
           >
-            <Link href={action.href}>{action.label}</Link>
-          </Button>
+            {action.label}
+          </Link>
         );
       }
 
       return (
-        <Button
+        <a
           key={`${action.label}-${index}`}
-          asChild
-          variant={variant}
-          className={actionClass}
+          href={action.href}
+          onClick={action.onClick}
+          className={cn(
+            actionClass,
+            'border border-error/50 bg-error/15 text-error-foreground shadow-lg hover:bg-error/25 hover:border-error/70'
+          )}
         >
-          <a href={action.href} onClick={action.onClick}>
-            {action.label}
-          </a>
-        </Button>
+          {action.label}
+        </a>
       );
     }
 
@@ -101,9 +98,12 @@ export function ErrorBanner({
       <Button
         key={`${action.label}-${index}`}
         type='button'
-        variant={variant}
+        variant='ghost'
         onClick={action.onClick}
-        className={actionClass}
+        className={cn(
+          actionClass,
+          'h-auto border border-error/50 bg-error/15 text-error-foreground shadow-lg hover:bg-error/25 hover:border-error/70'
+        )}
       >
         {action.label || 'Action'}
       </Button>

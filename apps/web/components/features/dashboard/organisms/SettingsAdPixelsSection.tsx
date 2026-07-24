@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Button, Input } from '@jovie/ui';
+import { Badge, Button, Input, Switch } from '@jovie/ui';
 import { ExternalLink, Eye, EyeOff } from 'lucide-react';
 import {
   type FormEvent,
@@ -455,16 +455,20 @@ export function SettingsAdPixelsSection({
       <SettingsPanel
         title='Pixel tracking'
         description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
+        actions={
+          <div className='flex items-center gap-2'>
+            <span className='text-app font-caption tracking-normal text-secondary-token'>
+              {pixelData.enabled ? 'Enabled' : 'Disabled'}
+            </span>
+            <Switch
+              checked={pixelData.enabled}
+              onCheckedChange={checked => handleInputChange('enabled', checked)}
+              aria-label='Enable pixel tracking'
+            />
+          </div>
+        }
       >
         <div className='space-y-3 px-4 py-4 sm:px-5'>
-          <SettingsToggleRow
-            title='Enable pixel tracking'
-            description='Route fan actions to your Facebook, Google, and TikTok pixels for conversion tracking.'
-            checked={pixelData.enabled}
-            onCheckedChange={checked => handleInputChange('enabled', checked)}
-            ariaLabel='Enable pixel tracking'
-          />
-
           <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
             <p className='text-app leading-[18px] text-secondary-token'>
               Configure each retargeting destination independently.

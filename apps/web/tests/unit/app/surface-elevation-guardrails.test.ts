@@ -231,6 +231,10 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'app/app/(shell)/layout.tsx'),
       'utf-8'
     );
+    const appShellLoading = readFileSync(
+      join(ROOT, 'app/app/(shell)/loading.tsx'),
+      'utf-8'
+    );
 
     expect(tasksPage).toContain('PageShell');
     expect(dashboardPanel).toContain("frame = 'content-container'");
@@ -239,7 +243,7 @@ describe('surface elevation guardrails', () => {
     expect(tasksPage).not.toMatch(/<UnifiedTable\b/);
     expect(shellRouteMatches).toContain('isTasksShellRoute');
     expect(appShellLayout).toContain('TasksRouteSkeleton');
-    expect(appShellLayout).toContain('TasksRouteSkeleton');
+    expect(appShellLoading).toContain('TasksRouteSkeleton');
   });
 
   it('keeps presence and earnings inside framed content panels', () => {
@@ -341,8 +345,8 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'app/app/(shell)/library/LibrarySurface.tsx'),
       'utf-8'
     );
-    const appShellLayout = readFileSync(
-      join(ROOT, 'app/app/(shell)/layout.tsx'),
+    const appShellLoading = readFileSync(
+      join(ROOT, 'app/app/(shell)/loading.tsx'),
       'utf-8'
     );
 
@@ -350,8 +354,8 @@ describe('surface elevation guardrails', () => {
     expect(librarySurface).toContain("key: 'library'");
     expect(librarySurface).toContain('Filter Library');
     expect(librarySurface).not.toContain('OPEN_COMMAND_PALETTE_EVENT');
-    expect(appShellLayout).toContain('isLibraryShellRoute');
-    expect(appShellLayout).toContain('LibraryLoadingState');
+    expect(appShellLoading).toContain('isLibraryShellRoute');
+    expect(appShellLoading).toContain('LibraryLoadingState');
   });
 
   it('routes task filters through the shared header search contract', () => {

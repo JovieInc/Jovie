@@ -67,6 +67,7 @@ const CANONICAL_TEMPLATE = {
 
 const MERGE_QUEUE_LABEL_POLICY = {
   nativeForbidsLegacyLabel: true,
+  graphiteExplicitlyAllowsLegacyLabel: true,
 };
 
 const CANONICAL_SCAFFOLD_PROOF = {
@@ -116,7 +117,9 @@ export function validateIncidentLedger(ledger) {
     JSON.stringify(ledger.mergeQueueLabelPolicy) !==
     JSON.stringify(MERGE_QUEUE_LABEL_POLICY)
   ) {
-    errors.push('ledger must declare the native merge-queue label policy');
+    errors.push(
+      'ledger must declare the native/Graphite merge-queue label policy'
+    );
   }
 
   const seen = new Set();
@@ -203,12 +206,12 @@ export function validateIncidentLedger(ledger) {
 }
 
 export function validateMergeQueueBackendLabels(backend, labels) {
-  if (backend !== 'native') {
-    return ['merge queue backend must be native'];
-  }
   const hasLegacyLabel = labels.includes('merge-queue');
-  if (hasLegacyLabel) {
+  if (backend === 'native' && hasLegacyLabel) {
     return ['native merge queue must reject legacy merge-queue labels'];
+  }
+  if (backend !== 'native' && backend !== 'graphite') {
+    return ['merge queue backend must be native or graphite'];
   }
   return [];
 }

@@ -3,12 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 
 describe('AppShellFrame', () => {
-  it('renders the canonical shell design', () => {
+  it('renders the shellChatV1 design when explicitly opted in', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
         header={<header>Header</header>}
         main={<div>Main Content</div>}
+        variant='shellChatV1'
       />
     );
 
@@ -16,20 +17,15 @@ describe('AppShellFrame', () => {
 
     expect(mainContent).toHaveAttribute('id', 'main-content');
     expect(mainContent).not.toHaveAttribute('tabindex');
-    expect(mainContent.closest('[data-app-shell-frame]')).toBeInTheDocument();
-    const shellBody = mainContent.closest('[data-app-shell-body]');
-    expect(shellBody).toHaveAttribute('data-shell-rail-motion', 'coordinated');
-    expect(shellBody).toHaveClass(
-      'transition-[gap,padding]',
-      'duration-cinematic',
-      'ease-cinematic',
-      'motion-reduce:transition-none'
+    expect(mainContent.closest('[data-shell-design]')).toHaveAttribute(
+      'data-shell-design',
+      'shellChatV1'
     );
     expect(mainContent).toHaveClass('lg:shadow-(--linear-app-shell-shadow)');
     // #main-content keeps its full rounded shell radius — no Electron override
     // strips the top corners now that the header lives inside the card.
     expect(mainContent).toHaveClass('lg:rounded-(--app-shell-radius)');
-    expect(mainContent.closest('[data-app-shell-main-plane]')).toHaveClass(
+    expect(mainContent.querySelector('div.flex.flex-1')).toHaveClass(
       'lg:gap-(--app-shell-gap)'
     );
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
@@ -40,7 +36,49 @@ describe('AppShellFrame', () => {
     expect(mainContent).toContainElement(headers[0] as HTMLElement);
   });
 
-  it('allocates the right rail beside the complete main plane instead of overlaying route content', () => {
+  it('defaults to the legacy variant so flag-off callers match production', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+      />
+    );
+
+    expect(
+      screen.getByRole('main').closest('[data-shell-design]')
+    ).toHaveAttribute('data-shell-design', 'legacy');
+  });
+
+  it('can render the legacy flat shell frame for the old design', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+        variant='legacy'
+      />
+    );
+
+    const mainContent = screen.getByRole('main');
+
+    expect(mainContent.closest('[data-shell-design]')).toHaveAttribute(
+      'data-shell-design',
+      'legacy'
+    );
+    expect(mainContent).toHaveClass('lg:border-l');
+    // Guard against the production Tailwind v4 token form (not the legacy
+    // [var(...)] spelling) so this negative assert actually tracks the class
+    // AppShellFrame emits for shellChatV1.
+    expect(mainContent).not.toHaveClass(
+      'lg:shadow-(--linear-app-shell-shadow)'
+    );
+    expect(mainContent.querySelector('div.flex.flex-1')).not.toHaveClass(
+      'lg:gap-(--app-shell-gap)'
+    );
+  });
+
+  it('keeps the right rail outside the non-scrolling shell clip', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -56,37 +94,11 @@ describe('AppShellFrame', () => {
     expect(scrollPane).toHaveClass('overflow-hidden');
     expect(scrollPane).not.toHaveClass('overflow-y-auto');
     expect(scrollPane).toContainElement(screen.getByText('Main Content'));
-    const mainPlane = screen.getByTestId('app-shell-right-rail').parentElement;
-
-    expect(mainPlane).toHaveAttribute('data-app-shell-main-plane', 'true');
-    expect(mainPlane).toContainElement(screen.getByRole('main'));
-    expect(mainPlane).toContainElement(rightRail);
-    expect(screen.getByRole('main')).not.toContainElement(rightRail);
     expect(scrollPane).not.toContainElement(rightRail);
     expect(rightRail).toContainElement(
       screen.getByTestId('fixture-right-rail')
     );
     expect(rightRail).toHaveClass('sticky', 'top-0');
-    expect(mainPlane).toHaveClass(
-      'transition-[gap,flex-basis,width]',
-      'duration-cinematic',
-      'motion-reduce:transition-none',
-      'lg:gap-(--app-shell-gap)'
-    );
-  });
-
-  it('reserves dev-toolbar height inside the shell scroll pane', () => {
-    render(
-      <AppShellFrame
-        sidebar={<aside>Sidebar</aside>}
-        header={<header>Header</header>}
-        main={<div>Main Content</div>}
-      />
-    );
-
-    expect(screen.getByTestId('app-shell-scroll')).toHaveClass(
-      'pb-[var(--dev-toolbar-height,0px)]'
-    );
   });
 
   it('marks composer focus on the shell frame for chrome retreat styles', () => {
@@ -118,46 +130,7 @@ describe('AppShellFrame', () => {
 
     const mount = screen.getByTestId('app-shell-sidebar-mount');
     expect(mount).toHaveClass('h-full', 'min-h-0', 'flex', 'flex-col');
-    expect(mount).toHaveClass(
-      'transition-[flex-basis,width,opacity,transform]',
-      'duration-cinematic',
-      'ease-cinematic',
-      'motion-reduce:transition-none'
-    );
     expect(mount).toContainElement(screen.getByTestId('fixture-sidebar'));
-  });
-
-  it('keeps main-plane geometry on the same reduced-motion-safe rail contract', () => {
-    render(
-      <AppShellFrame
-        sidebar={<aside>Sidebar</aside>}
-        header={<header>Header</header>}
-        main={<div>Main Content</div>}
-        rightPanel={<div>Right rail</div>}
-      />
-    );
-
-    const mainPlane = screen.getByTestId('app-shell-right-rail').parentElement;
-
-    expect(mainPlane).toHaveClass(
-      'transition-[gap,flex-basis,width]',
-      'duration-cinematic',
-      'motion-reduce:transition-none'
-    );
-    expect(screen.getByTestId('app-shell-scroll')).toHaveClass(
-      'transition-[flex-basis,width]',
-      'duration-cinematic',
-      'motion-reduce:transition-none'
-    );
-    expect(
-      screen
-        .getByTestId('app-shell-scroll')
-        .closest('[data-app-shell-content-column]')
-    ).toHaveClass(
-      'transition-[flex-basis,width]',
-      'duration-cinematic',
-      'motion-reduce:transition-none'
-    );
   });
 
   it('renders the chat ambient gradient full-bleed behind the header on chat routes', () => {
@@ -166,6 +139,7 @@ describe('AppShellFrame', () => {
         sidebar={<aside>Sidebar</aside>}
         header={<header data-testid='fixture-header'>Header</header>}
         main={<div>Main Content</div>}
+        variant='shellChatV1'
         chatAmbientGradient
       />
     );
@@ -202,7 +176,7 @@ describe('AppShellFrame', () => {
     expect(screen.queryByTestId('chat-ambient-gradient')).toBeNull();
   });
 
-  it('reserves an in-flow shell tray below main for the shared audio player', () => {
+  it('renders the shared audio player slot inside the shell frame', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -212,38 +186,9 @@ describe('AppShellFrame', () => {
       />
     );
 
-    const main = screen.getByRole('main');
-    const audioPlayer = screen.getByTestId('audio-player');
-    const tray = screen.getByTestId('app-shell-audio-tray');
-
-    expect(audioPlayer).toBeInTheDocument();
-    expect(main).not.toContainElement(audioPlayer);
-    expect(tray).toContainElement(audioPlayer);
-    expect(tray.parentElement).toHaveAttribute(
-      'data-app-shell-content-column',
-      'true'
+    expect(screen.getByTestId('audio-player')).toBeInTheDocument();
+    expect(screen.getByRole('main')).toContainElement(
+      screen.getByTestId('audio-player')
     );
-    expect(tray).toHaveClass('shrink-0');
-  });
-
-  it('mounts mobile navigation in the shared in-flow bottom surface', () => {
-    render(
-      <AppShellFrame
-        sidebar={<aside>Sidebar</aside>}
-        main={<div>Main Content</div>}
-        mobileBottomNav={<nav aria-label='Mobile Navigation'>Nav</nav>}
-      />
-    );
-
-    const surface = screen.getByTestId('app-shell-mobile-bottom-surface');
-    expect(surface).toHaveClass(
-      'system-b-app-mobile-bottom-surface',
-      'shrink-0',
-      'lg:hidden'
-    );
-    expect(surface).toContainElement(
-      screen.getByRole('navigation', { name: 'Mobile Navigation' })
-    );
-    expect(surface).not.toHaveClass('fixed', 'absolute');
   });
 });

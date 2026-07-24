@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useMemo } from 'react';
-import { UNKNOWN_INBOX_NAVIGATION_AVAILABILITY } from '@/lib/inbox/navigation-availability';
 import { UNKNOWN_AVATAR_QUALITY } from '@/lib/profile/avatar-quality';
 import type { DashboardData } from './actions';
 
@@ -20,8 +19,6 @@ function normalizeDashboardData(value: DashboardData): DashboardData {
     ...value,
     avatarQuality: value.avatarQuality ?? UNKNOWN_AVATAR_QUALITY,
     bioLinkActivation: value.bioLinkActivation ?? null,
-    inboxNavigation:
-      value.inboxNavigation ?? UNKNOWN_INBOX_NAVIGATION_AVAILABILITY,
     profileCompletion: value.profileCompletion ?? EMPTY_PROFILE_COMPLETION,
   };
 }

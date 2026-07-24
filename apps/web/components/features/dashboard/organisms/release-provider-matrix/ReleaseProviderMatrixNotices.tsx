@@ -47,12 +47,13 @@ export function ReleaseImportProgressNotice({
   readonly importedCount: number;
   readonly totalCount: number;
 }) {
+  if (!visible) {
+    return null;
+  }
+
   return (
-    <div
-      className='mx-3 lg:mx-4 mt-3 min-h-15'
-      data-testid='release-import-progress-slot'
-    >
-      <Suspense fallback={<div className='h-15' aria-hidden />}>
+    <div className='mx-3 lg:mx-4 mt-3'>
+      <Suspense fallback={null}>
         <ImportProgressBanner
           artistName={artistName}
           importedCount={importedCount}

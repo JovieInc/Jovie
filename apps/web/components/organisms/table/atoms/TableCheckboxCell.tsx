@@ -80,7 +80,7 @@ function TanStackHeaderCheckbox({
       }
     >
       <Checkbox
-        aria-label='Select All Rows'
+        aria-label='Select all rows'
         checked={
           normalizedState === 'indeterminate'
             ? 'indeterminate'

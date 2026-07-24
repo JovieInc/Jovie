@@ -3,7 +3,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { unstable_noStore as noStore, revalidateTag } from 'next/cache';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { tourDates } from '@/lib/db/schema/tour';
 import { trackServerEvent } from '@/lib/server-analytics';
@@ -60,7 +59,6 @@ async function requireAuthedProfile(): Promise<AuthedProfile | null> {
 
 function invalidateEventsCache(authed: AuthedProfile): void {
   revalidateTag(`tour-dates:${authed.userId}:${authed.profileId}`, 'max');
-  revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
 }
 
 function isValidEventId(id: string): boolean {

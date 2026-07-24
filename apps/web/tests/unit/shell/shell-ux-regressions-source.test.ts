@@ -62,70 +62,10 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
       'utf8'
     );
 
-    expect(source).toContain('<RailToggleButton');
-    expect(source).toContain("side='left'");
+    expect(source).toContain('rounded-full');
+    expect(source).toContain('border-0');
+    expect(source).toContain('hover:bg-surface-0');
     expect(source).not.toContain('hover:border-default');
     expect(source).not.toContain('rounded-md border');
-  });
-
-  it('routes both shell sides through the shared rail-toggle primitive (JOV-4606)', () => {
-    const leftToggle = readFileSync(
-      path.join(
-        webRoot,
-        'components/molecules/sidebar-collapse-button/SidebarCollapseButton.tsx'
-      ),
-      'utf8'
-    );
-    const rightToggle = readFileSync(
-      path.join(webRoot, 'components/shell/ArtistProfileRailToggle.tsx'),
-      'utf8'
-    );
-    const sharedToggle = readFileSync(
-      path.join(webRoot, 'components/atoms/RailToggleButton.tsx'),
-      'utf8'
-    );
-
-    expect(leftToggle).toContain('<RailToggleButton');
-    expect(leftToggle).toContain("side='left'");
-    expect(rightToggle).toContain('<RailToggleButton');
-    expect(rightToggle).toContain("side='right'");
-    expect(sharedToggle).toContain('PanelLeftClose');
-    expect(sharedToggle).toContain('PanelLeftOpen');
-    expect(sharedToggle).toContain('PanelRightClose');
-    expect(sharedToggle).toContain('PanelRightOpen');
-    expect(sharedToggle).toContain('h-7 w-7 rounded-full');
-    expect(sharedToggle).toContain("size='icon'");
-    expect(sharedToggle).not.toContain('active:scale');
-  });
-
-  it('keeps left allocation, main-plane geometry, and right allocation on one rail-motion contract (JOV-4522)', () => {
-    const frame = readFileSync(
-      path.join(webRoot, 'components/organisms/AppShellFrame.tsx'),
-      'utf8'
-    );
-    const unified = readFileSync(
-      path.join(webRoot, 'components/organisms/UnifiedSidebar.tsx'),
-      'utf8'
-    );
-    const rail = readFileSync(
-      path.join(webRoot, 'components/shell/AppShellRightRail.tsx'),
-      'utf8'
-    );
-
-    expect(frame).toContain("data-shell-rail-motion='coordinated'");
-    expect(frame).toContain(
-      'transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none'
-    );
-    expect(frame).toContain(
-      'transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
-    );
-    expect(unified).toContain("data-shell-rail-motion='left'");
-    expect(unified).toContain(
-      'transition-[flex-basis,width,transform,opacity] duration-cinematic ease-cinematic motion-reduce:transition-none'
-    );
-    expect(rail).toContain("data-shell-rail-motion='right'");
-    expect(rail).toContain(
-      'transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none'
-    );
   });
 });

@@ -24,57 +24,6 @@ const threads: SidebarThread[] = [
 ];
 
 describe('SidebarThreadsSection', () => {
-  it('uses the full middle track at rest and layers chat actions over a visible cross-engine faded edge', () => {
-    const title =
-      'Reply with exactly one short sentence confirming the artist release plan';
-
-    render(
-      <SidebarThreadsSection
-        threads={[
-          {
-            id: 'thread-long-title',
-            href: '/app/chat/thread-long-title',
-            title,
-            status: 'complete',
-            updatedAt: '2026-05-12T00:00:00.000Z',
-          },
-        ]}
-        activeThreadId={null}
-        onThreadContextMenu={vi.fn()}
-        tight
-        collapsed={false}
-      />
-    );
-
-    const label = screen.getByText(title);
-
-    expect(label).toHaveClass(
-      'w-full',
-      'justify-self-stretch',
-      'overflow-hidden'
-    );
-    expect(label).not.toHaveClass('justify-self-start', 'truncate');
-    expect(label.className).toContain(
-      'mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)'
-    );
-    expect(label.className).toContain(
-      '-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)'
-    );
-    const row = screen.getByRole('link', { name: title });
-    const action = screen.getByRole('button', {
-      name: `Chat Actions for ${title}`,
-    });
-
-    expect(row).toHaveClass('grid-cols-[22px_minmax(0,1fr)]');
-    expect(row).not.toHaveClass(
-      'grid-cols-[22px_minmax(0,1fr)_20px]',
-      'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]',
-      'pr-8'
-    );
-    expect(action).toHaveClass('right-2.5', 'group-hover/thread:bg-surface-0');
-    expect(action).toHaveClass('absolute', 'opacity-0');
-  });
-
   it('renders dense thread links with canonical shell row state', () => {
     render(
       <SidebarThreadsSection
@@ -94,10 +43,7 @@ describe('SidebarThreadsSection', () => {
     expect(activeThread).toHaveAttribute('aria-current', 'page');
     expect(activeThread).toHaveClass('h-6');
     expect(activeThread).toHaveClass('bg-sidebar-accent-active');
-    expect(activeThread).toHaveClass('text-white');
-    expect(activeThread).not.toHaveClass(
-      'shadow-[inset_2px_0_0_0_var(--color-accent)]'
-    );
+    expect(activeThread).toHaveClass('text-primary-token');
     expect(inactiveThread).toHaveClass('text-secondary-token');
     expect(inactiveThread).toHaveClass('hover:bg-surface-1');
     expect(inactiveThread).toHaveClass('focus-visible:ring-2');
@@ -133,6 +79,35 @@ describe('SidebarThreadsSection', () => {
     });
   });
 
+  it('soft-fades long chat titles instead of hard-clipping mid-glyph', () => {
+    render(
+      <SidebarThreadsSection
+        threads={[
+          {
+            id: 'long-title',
+            href: '/app/chat/long-title',
+            title: 'Ask Jovie about my audience growth plan for Q3',
+            status: 'complete',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+          },
+        ]}
+        activeThreadId={null}
+        tight
+        collapsed={false}
+      />
+    );
+
+    const title = screen.getByText(
+      'Ask Jovie about my audience growth plan for Q3'
+    );
+    expect(title).toHaveClass('overflow-hidden');
+    expect(title).toHaveClass('min-w-0');
+    expect(title).toHaveClass('whitespace-nowrap');
+    expect(title.className).toMatch(/mask-image:linear-gradient/);
+    // Must NOT hard-truncate with ellipsis mid-word presentation.
+    expect(title).not.toHaveClass('truncate');
+  });
+
   it('shows an all chats link when chats are present', () => {
     render(
       <SidebarThreadsSection
@@ -150,21 +125,6 @@ describe('SidebarThreadsSection', () => {
 
     expect(allThreadsLink).toHaveAttribute('href', APP_ROUTES.CHATS);
     expect(allThreadsLink).toHaveAttribute('aria-current', 'page');
-  });
-
-  it('announces the unread chat count through the canonical nav badge', () => {
-    render(
-      <SidebarThreadsSection
-        threads={[threads[0], { ...threads[1], unread: true }]}
-        activeThreadId={null}
-        tight
-        collapsed={false}
-      />
-    );
-
-    const unreadBadge = screen.getByLabelText('1 unread chat');
-    expect(unreadBadge).toHaveTextContent('1');
-    expect(unreadBadge).toHaveAttribute('data-nav-badge', 'count');
   });
 
   it('renders selectable button rows when no href is provided', () => {

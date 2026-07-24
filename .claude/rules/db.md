@@ -32,7 +32,6 @@ Scripts and migrations use the HTTP driver for stateless one-off operations. The
 
 - **NEVER** introduce new direct `db.transaction()` usage in app code without explicit human approval.
 - Existing transaction-based RLS/session helpers are legacy exceptions and must not be copied into new call-sites.
-- Transaction callbacks contain database work only. Authenticate first, then finish external I/O, retries, and image processing before opening the transaction; pass precomputed values into the database helper.
 - If you need transaction-scoped session state, use an approved wrapper or escalate before adding new transaction logic.
 - For atomicity, use Drizzle's batch operations: `db.insert().values([...items])`.
 - If you need true ACID transactions, document the requirement and discuss alternatives.

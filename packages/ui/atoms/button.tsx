@@ -166,9 +166,6 @@ export interface ButtonProps
   readonly size?: ButtonSize | DeprecatedButtonSize | null;
   readonly asChild?: boolean;
   readonly loading?: boolean;
-  /** Enables subtle tactile compression for actions without another immediate cue. */
-  readonly pressFeedback?: boolean;
-  /** @deprecated Prefer leaving pressFeedback unset. */
   readonly static?: boolean;
   readonly destructive?: boolean;
 }
@@ -216,7 +213,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       size,
       asChild = false,
       loading = false,
-      pressFeedback = false,
       static: isStatic = false,
       destructive = false,
       disabled,
@@ -227,7 +223,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const Comp = asChild ? Slot : 'button';
     const isDisabled = disabled || loading;
-    const hasPressFeedback = pressFeedback && !isStatic && !isDisabled;
     const dataState = getDataState(loading, isDisabled);
     const normalizedVariant = normalizeButtonVariant({
       variant,
@@ -245,8 +240,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         normalizedVariant.destructive &&
           DESTRUCTIVE_CLASSES[normalizedVariant.variant],
         className,
-        hasPressFeedback &&
-          'active:scale-[var(--scale-press)] motion-reduce:active:scale-100',
+        !isStatic && !isDisabled && 'active:scale-[0.96]',
         isDisabled && 'pointer-events-none'
       ),
       'aria-disabled': isDisabled || undefined,
@@ -255,8 +249,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       'data-variant': normalizedVariant.variant,
       'data-size': normalizedSize,
       'data-destructive': normalizedVariant.destructive ? 'true' : undefined,
-      'data-press-feedback': hasPressFeedback ? 'true' : undefined,
-      'data-static': isStatic ? 'true' : undefined,
     };
 
     // In asChild mode (Radix Slot), React.Children.only requires a single child.

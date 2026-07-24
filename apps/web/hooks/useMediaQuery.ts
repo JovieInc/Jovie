@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useSyncExternalStore } from 'react';
+import { useState } from 'react';
+import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
 
 interface UseMediaQueryOptions {
   defaultValue?: boolean;
@@ -11,35 +12,38 @@ export function useMediaQuery(
   options: UseMediaQueryOptions = {}
 ): boolean {
   const { defaultValue = false } = options;
-
-  const subscribe = useCallback(
-    (onStoreChange: () => void) => {
-      if (typeof globalThis.matchMedia !== 'function') {
-        return () => {};
-      }
-
-      const mediaQueryList = globalThis.matchMedia(query);
-      mediaQueryList.addEventListener('change', onStoreChange);
-
-      return () => {
-        mediaQueryList.removeEventListener('change', onStoreChange);
-      };
-    },
-    [query]
-  );
-
-  const getSnapshot = useCallback(() => {
-    if (typeof globalThis.matchMedia !== 'function') {
-      return defaultValue;
+  const [matches, setMatches] = useState<boolean>(() => {
+    if (
+      typeof globalThis !== 'undefined' &&
+      typeof globalThis.matchMedia === 'function'
+    ) {
+      return globalThis.matchMedia(query).matches;
     }
 
-    return globalThis.matchMedia(query).matches;
-  }, [defaultValue, query]);
+    return defaultValue;
+  });
 
-  // React uses this snapshot for SSR and its first hydration render. Reading
-  // matchMedia during that render lets a mobile client choose a different
-  // shell tree than the server, which causes recoverable hydration failures.
-  const getServerSnapshot = useCallback(() => defaultValue, [defaultValue]);
+  useIsomorphicLayoutEffect(() => {
+    if (
+      typeof window === 'undefined' ||
+      typeof globalThis.matchMedia !== 'function'
+    ) {
+      return undefined;
+    }
 
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+    const mediaQueryList = globalThis.matchMedia(query);
+    setMatches(mediaQueryList.matches);
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      setMatches(event.matches);
+    };
+
+    mediaQueryList.addEventListener('change', handleChange);
+
+    return () => {
+      mediaQueryList.removeEventListener('change', handleChange);
+    };
+  }, [query]);
+
+  return matches;
 }

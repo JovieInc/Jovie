@@ -15,7 +15,6 @@ import {
   getTaskPriorityVisual,
   getTaskStageVisual,
   isTaskAgentWorking,
-  TASK_STATUS_LABEL_CLASSNAME,
 } from './task-presentation';
 
 interface TaskListRowProps {
@@ -175,7 +174,7 @@ export const TaskListRow = memo(function TaskListRow({
       isSelected={isSelected}
       interaction='task-row-group'
       className={cn(
-        'group/row flex h-full w-full items-center gap-2.5 px-3 py-1 transition-[opacity] duration-subtle ease-subtle',
+        'group/row flex h-full items-center gap-3 px-3 py-1.5 transition-[opacity] duration-subtle ease-subtle',
         isDone && !isSelected && 'opacity-75',
         isCancelled && !isSelected && 'opacity-60'
       )}
@@ -203,17 +202,12 @@ export const TaskListRow = memo(function TaskListRow({
         <div
           data-testid={`task-list-row-meta-${task.id}`}
           className={cn(
-            'flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 overflow-hidden text-3xs leading-none text-secondary-token',
-            !hideTitle && 'mt-px'
+            'flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 overflow-hidden text-3xs leading-none text-secondary-token',
+            !hideTitle && 'mt-0.5'
           )}
         >
           {dueIso ? <DueChip dueIso={dueIso} muted={isMuted} /> : null}
-          <span
-            className={cn(
-              'shrink-0 truncate text-tertiary-token',
-              TASK_STATUS_LABEL_CLASSNAME
-            )}
-          >
+          <span className='shrink-0 truncate text-tertiary-token'>
             {stage.label}
           </span>
           <span className='shrink-0 truncate font-semibold text-tertiary-token'>

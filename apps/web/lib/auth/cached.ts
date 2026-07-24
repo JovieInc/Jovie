@@ -10,7 +10,6 @@ import {
 } from '@/lib/auth/dev-test-auth.server';
 import type { JovieUser } from '@/lib/auth/jovie-user';
 import { toJovieUser } from '@/lib/auth/jovie-user';
-import { checkUserStatus } from '@/lib/auth/status-checker';
 import { attachSentryContext } from '@/lib/sentry/set-user-context';
 
 /**
@@ -75,10 +74,7 @@ function isMissingAuthRequestContext(error: unknown): boolean {
 async function readBetterAuthSession(): Promise<AuthResult> {
   try {
     const headerStore = await headers();
-    const session = await auth.api.getSession({
-      headers: headerStore,
-      query: { disableCookieCache: true },
-    });
+    const session = await auth.api.getSession({ headers: headerStore });
     if (!session) {
       return NULL_AUTH_RESULT;
     }
@@ -93,9 +89,6 @@ async function readBetterAuthSession(): Promise<AuthResult> {
         sessionId: session.session.id,
         orgId: null,
       };
-    }
-    if (checkUserStatus(appUser.userStatus, appUser.deletedAt).isBlocked) {
-      return NULL_AUTH_RESULT;
     }
 
     await attachSentryContext(appUser.id);
@@ -182,18 +175,8 @@ export const getCachedCurrentUser = cache(
 
     try {
       const headerStore = await headers();
-      const session = await auth.api.getSession({
-        headers: headerStore,
-        query: { disableCookieCache: true },
-      });
+      const session = await auth.api.getSession({ headers: headerStore });
       if (!session) {
-        return null;
-      }
-      const appUser = await getAppUserByBetterAuthId(session.user.id);
-      if (
-        !appUser ||
-        checkUserStatus(appUser.userStatus, appUser.deletedAt).isBlocked
-      ) {
         return null;
       }
 

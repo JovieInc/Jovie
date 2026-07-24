@@ -1,11 +1,9 @@
 'use client';
-import { Button } from '@jovie/ui';
 import { Plus } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
-  type PreviewPanelData,
   type PreviewPanelLink,
   usePreviewPanelData,
   usePreviewPanelState,
@@ -26,13 +24,6 @@ import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
 import {
-  beginPreviewPanelEdit,
-  endPreviewPanelEdit,
-} from '@/lib/profile/preview-panel-optimistic';
-import {
-  FetchError,
-  fetchWithTimeout,
-  type ProfileUpdateInput,
   useDeletePressPhotoMutation,
   useDspMatchesQuery,
   usePressPhotosQuery,
@@ -118,131 +109,29 @@ function resolveCategoryFromTab(
 
 let tempLinkIdCounter = 0;
 
-type EditableProfileField = 'bio' | 'location' | 'hometown' | 'genres';
-type EditableProfileValue = PreviewPanelData[EditableProfileField];
-type EditableProfileUpdate = Pick<
-  ProfileUpdateInput['updates'],
-  EditableProfileField
->;
-type SaveProfileField = (
-  field: EditableProfileField,
-  previewValue: EditableProfileValue,
-  updates: EditableProfileUpdate,
-  errorMessage: string
-) => void;
-type FieldOperationState = 'pending' | 'succeeded' | 'failed';
-interface FieldOperation {
-  readonly generation: number;
-  readonly previewValue: EditableProfileValue;
-  state: FieldOperationState;
-}
-interface FieldOperationLedger {
-  baseline: EditableProfileValue;
-  readonly operations: Map<number, FieldOperation>;
-}
-interface QueuedFieldSave {
-  readonly profileId: string;
-  readonly field: EditableProfileField;
-  readonly generation: number;
-  readonly previewValue: EditableProfileValue;
-  readonly updates: EditableProfileUpdate;
-  readonly errorMessage: string;
-  readonly epoch: number;
-}
-
-type ProfileRailMutationStatus =
-  | { state: 'idle' | 'saving' | 'saved' }
-  | { state: 'error'; message: string; retry: () => void };
-
-const IDLE_MUTATION_STATUS: ProfileRailMutationStatus = { state: 'idle' };
-
-function ProfileRailMutationStatusRow({
-  status,
-}: {
-  readonly status: ProfileRailMutationStatus;
-}) {
-  return (
-    <div
-      data-testid='profile-rail-mutation-status'
-      data-state={status.state}
-      role='status'
-      aria-live='polite'
-      aria-atomic='true'
-      className='flex h-7 shrink-0 items-center justify-end gap-1.5 overflow-hidden whitespace-nowrap text-2xs text-tertiary-token'
-    >
-      {status.state === 'saving' ? 'Saving…' : null}
-      {status.state === 'saved' ? 'Saved' : null}
-      {status.state === 'error' ? (
-        <>
-          <span>{status.message}</span>
-          <Button
-            type='button'
-            variant='link'
-            size='sm'
-            className='h-auto min-h-0 px-0 py-0 text-2xs'
-            onClick={status.retry}
-          >
-            Retry
-          </Button>
-        </>
-      ) : null}
-      {status.state === 'idle' ? (
-        <span className='invisible' aria-hidden='true'>
-          Saved
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 function createTempLinkId(): string {
   tempLinkIdCounter += 1;
   return `temp-${Date.now()}-${tempLinkIdCounter}`;
 }
 
-async function enqueuePlatformMutation<T>(
-  queues: Map<string, Promise<unknown>>,
-  platform: string,
-  operation: () => Promise<T>
-): Promise<T> {
-  const previous = queues.get(platform) ?? Promise.resolve();
-  const current = previous.catch(() => undefined).then(operation);
-  queues.set(platform, current);
-  try {
-    return await current;
-  } finally {
-    if (queues.get(platform) === current) queues.delete(platform);
-  }
-}
-
 /** Persist a detected link to the server. Returns the server-assigned linkId. */
 async function confirmLinkOnServer(
   profileId: string,
-  link: DetectedLink,
-  expectedVersion?: number
-): Promise<{ linkId: string; version: number }> {
-  return fetchWithTimeout<{ linkId: string; version: number }>(
-    '/api/chat/confirm-link',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        profileId,
-        platform: link.platform.id,
-        url: link.originalUrl,
-        normalizedUrl: link.normalizedUrl,
-        expectedVersion,
-      }),
-    }
-  );
-}
-
-function getConflictVersion(error: unknown): number | undefined {
-  if (!(error instanceof FetchError) || error.status !== 409) return undefined;
-  const currentVersion = error.parsedBody?.currentVersion;
-  return typeof currentVersion === 'number' && Number.isInteger(currentVersion)
-    ? currentVersion
-    : undefined;
+  link: DetectedLink
+): Promise<string> {
+  const response = await fetch('/api/chat/confirm-link', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      profileId,
+      platform: link.platform.id,
+      url: link.originalUrl,
+      normalizedUrl: link.normalizedUrl,
+    }),
+  });
+  if (!response.ok) throw new Error('Failed to add link');
+  const { linkId } = (await response.json()) as { linkId: string };
+  return linkId;
 }
 
 /** Convert preview-panel links into the LegacySocialLink shape the public surface expects. */
@@ -272,180 +161,6 @@ export function ProfileContactSidebar() {
   const previewDataRef = useRef(previewData);
   previewDataRef.current = previewData;
 
-  const mountedRef = useRef(true);
-  const operationEpochRef = useRef(0);
-  const fieldGenerationRef = useRef<Record<EditableProfileField, number>>({
-    bio: 0,
-    location: 0,
-    hometown: 0,
-    genres: 0,
-  });
-  const fieldOperationLedgersRef = useRef<
-    Partial<Record<EditableProfileField, FieldOperationLedger>>
-  >({});
-  const queuedFieldSavesRef = useRef<
-    Map<EditableProfileField, QueuedFieldSave>
-  >(new Map());
-  const profileSaveWorkerRunningRef = useRef(false);
-  const selectedProfileIdRef = useRef(selectedProfile?.id);
-  const profileVersionRef = useRef<number | undefined>(
-    previewData?.profileEditVersion ?? selectedProfile?.profileEditVersion
-  );
-  const linkGenerationRef = useRef<Map<string, number>>(new Map());
-  const linkVersionByPlatformRef = useRef<Map<string, number>>(new Map());
-  const linkPlatformQueueRef = useRef<Map<string, Promise<unknown>>>(new Map());
-  const pendingOperationCountRef = useRef(0);
-  const activeMutationErrorRef = useRef<Extract<
-    ProfileRailMutationStatus,
-    { state: 'error' }
-  > | null>(null);
-  const [mutationStatus, setMutationStatus] =
-    useState<ProfileRailMutationStatus>(IDLE_MUTATION_STATUS);
-
-  const releaseOutstandingPreviewEdits = useCallback(() => {
-    const outstanding = pendingOperationCountRef.current;
-    pendingOperationCountRef.current = 0;
-    for (let i = 0; i < outstanding; i += 1) {
-      endPreviewPanelEdit();
-    }
-  }, []);
-
-  useEffect(() => {
-    const queuedFieldSaves = queuedFieldSavesRef.current;
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      operationEpochRef.current += 1;
-      queuedFieldSaves.clear();
-      // Drop the global hydrate gate so unmount cannot pin hydrators forever.
-      const outstanding = pendingOperationCountRef.current;
-      pendingOperationCountRef.current = 0;
-      for (let i = 0; i < outstanding; i += 1) {
-        endPreviewPanelEdit();
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const nextProfileId = selectedProfile?.id;
-    if (selectedProfileIdRef.current === nextProfileId) return;
-
-    selectedProfileIdRef.current = nextProfileId;
-    operationEpochRef.current += 1;
-    profileVersionRef.current = selectedProfile?.profileEditVersion;
-    queuedFieldSavesRef.current.clear();
-    fieldOperationLedgersRef.current = {};
-    fieldGenerationRef.current = {
-      bio: 0,
-      location: 0,
-      hometown: 0,
-      genres: 0,
-    };
-    linkGenerationRef.current.clear();
-    linkVersionByPlatformRef.current.clear();
-    linkPlatformQueueRef.current.clear();
-    releaseOutstandingPreviewEdits();
-    activeMutationErrorRef.current = null;
-    setMutationStatus(IDLE_MUTATION_STATUS);
-  }, [
-    releaseOutstandingPreviewEdits,
-    selectedProfile?.id,
-    selectedProfile?.profileEditVersion,
-  ]);
-
-  useEffect(() => {
-    // CAS tokens only move forward for a given profile. Stale hydrations must
-    // not rewind the token mid-flight or concurrent saves will thrash on 409s.
-    const nextVersion =
-      previewData?.profileEditVersion ?? selectedProfile?.profileEditVersion;
-    if (nextVersion === undefined) return;
-    const currentVersion = profileVersionRef.current;
-    if (currentVersion === undefined || nextVersion > currentVersion) {
-      profileVersionRef.current = nextVersion;
-    }
-  }, [previewData?.profileEditVersion, selectedProfile?.profileEditVersion]);
-
-  useEffect(() => {
-    linkVersionByPlatformRef.current.clear();
-    for (const link of previewData?.links ?? []) {
-      if (link.version !== undefined) {
-        linkVersionByPlatformRef.current.set(link.platform, link.version);
-      }
-    }
-  }, [previewData?.links]);
-
-  const patchPreviewData = useCallback(
-    (updater: (current: PreviewPanelData) => PreviewPanelData) => {
-      const current = previewDataRef.current;
-      if (!current) return null;
-      const next = updater(current);
-      previewDataRef.current = next;
-      setPreviewData(next);
-      return next;
-    },
-    [setPreviewData]
-  );
-
-  const beginMutationStatus = useCallback(() => {
-    pendingOperationCountRef.current += 1;
-    beginPreviewPanelEdit();
-    activeMutationErrorRef.current = null;
-    if (mountedRef.current) setMutationStatus({ state: 'saving' });
-  }, []);
-
-  const completeMutationSuccess = useCallback(() => {
-    pendingOperationCountRef.current = Math.max(
-      0,
-      pendingOperationCountRef.current - 1
-    );
-    endPreviewPanelEdit();
-    if (!mountedRef.current) return;
-    if (activeMutationErrorRef.current) {
-      setMutationStatus(activeMutationErrorRef.current);
-      return;
-    }
-    setMutationStatus({
-      state: pendingOperationCountRef.current > 0 ? 'saving' : 'saved',
-    });
-  }, []);
-
-  const completeMutationError = useCallback(
-    (message: string, retry: () => void) => {
-      pendingOperationCountRef.current = Math.max(
-        0,
-        pendingOperationCountRef.current - 1
-      );
-      endPreviewPanelEdit();
-      if (!mountedRef.current) return;
-      const errorStatus = { state: 'error', message, retry } as const;
-      activeMutationErrorRef.current = errorStatus;
-      setMutationStatus(errorStatus);
-    },
-    []
-  );
-
-  const reconcileFieldOperations = useCallback(
-    (field: EditableProfileField) => {
-      const ledger = fieldOperationLedgersRef.current[field];
-      if (!ledger) return;
-
-      const operations = [...ledger.operations.values()].sort(
-        (left, right) => right.generation - left.generation
-      );
-      const visibleOperation = operations.find(
-        operation => operation.state !== 'failed'
-      );
-      const visibleValue = visibleOperation?.previewValue ?? ledger.baseline;
-      patchPreviewData(data => ({ ...data, [field]: visibleValue }));
-
-      if (!operations.some(operation => operation.state === 'pending')) {
-        ledger.baseline = visibleValue;
-        ledger.operations.clear();
-      }
-    },
-    [patchPreviewData]
-  );
-
   // Tab state
   const [selectedCategory, setSelectedCategory] = useState<
     CategoryOption | 'about'
@@ -466,7 +181,7 @@ export function ProfileContactSidebar() {
   );
 
   // Mutations for profile editing
-  const profileMutation = useProfileSaveMutation(selectedProfile?.id);
+  const profileMutation = useProfileSaveMutation();
   const pressPhotoUploadMutation = usePressPhotoUploadMutation(
     selectedProfile?.id
   );
@@ -488,10 +203,6 @@ export function ProfileContactSidebar() {
   // after the add completes to avoid orphaned server records.
   const pendingAddsRef = useRef<Set<string>>(new Set());
   const deletedWhilePendingRef = useRef<Set<string>>(new Set());
-
-  const saveProfileFieldRef = useRef<SaveProfileField>(() => {});
-  const removeLinkRef = useRef<(linkId: string) => void>(() => {});
-  const addLinkRef = useRef<(link: DetectedLink) => void>(() => {});
 
   // Resolve category to ensure it's a valid tab value
   const resolvedCategory = useMemo(() => {
@@ -547,193 +258,79 @@ export function ProfileContactSidebar() {
     [deletePressPhotoMutation]
   );
 
-  const drainProfileSaveQueue = useCallback(async () => {
-    if (profileSaveWorkerRunningRef.current) return;
-    profileSaveWorkerRunningRef.current = true;
-
-    try {
-      while (queuedFieldSavesRef.current.size > 0) {
-        const nextEntry = queuedFieldSavesRef.current.entries().next().value;
-        if (!nextEntry) break;
-        const [field, queuedSave] = nextEntry;
-        queuedFieldSavesRef.current.delete(field);
-
-        try {
-          const result = await profileMutation.mutateAsync({
-            profileId: queuedSave.profileId,
-            expectedVersion: profileVersionRef.current,
-            updates: queuedSave.updates,
-          });
-
-          const operation = fieldOperationLedgersRef.current[
-            field
-          ]?.operations.get(queuedSave.generation);
-          if (
-            mountedRef.current &&
-            operationEpochRef.current === queuedSave.epoch &&
-            operation
-          ) {
-            profileVersionRef.current = result.profile.profileEditVersion;
-            operation.state = 'succeeded';
-            patchPreviewData(data => ({
-              ...data,
-              profileEditVersion: result.profile.profileEditVersion,
-            }));
-            reconcileFieldOperations(field);
-            completeMutationSuccess();
-          }
-        } catch (error) {
-          const conflictVersion = getConflictVersion(error);
-          const operation = fieldOperationLedgersRef.current[
-            field
-          ]?.operations.get(queuedSave.generation);
-          const canReconcile =
-            mountedRef.current &&
-            operationEpochRef.current === queuedSave.epoch &&
-            operation;
-          if (!canReconcile) {
-            continue;
-          }
-          if (conflictVersion !== undefined) {
-            profileVersionRef.current = conflictVersion;
-          }
-
-          operation.state = 'failed';
-          reconcileFieldOperations(field);
-          const isLatestIntent =
-            fieldGenerationRef.current[field] === queuedSave.generation;
-          if (!isLatestIntent) {
-            completeMutationSuccess();
-            continue;
-          }
-
-          const retry = () =>
-            saveProfileFieldRef.current(
-              field,
-              queuedSave.previewValue,
-              queuedSave.updates,
-              queuedSave.errorMessage
-            );
-          completeMutationError(queuedSave.errorMessage, retry);
-          toast.error(queuedSave.errorMessage);
-        }
-      }
-    } finally {
-      profileSaveWorkerRunningRef.current = false;
-      if (queuedFieldSavesRef.current.size > 0) {
-        void drainProfileSaveQueue();
-      }
-    }
-  }, [
-    completeMutationError,
-    completeMutationSuccess,
-    patchPreviewData,
-    profileMutation,
-    reconcileFieldOperations,
-  ]);
-
-  const saveProfileField = useCallback<SaveProfileField>(
-    (field, previewValue, updates, errorMessage) => {
-      if (!selectedProfile) return;
-      const current = previewDataRef.current;
-      if (!current) return;
-
-      const generation = fieldGenerationRef.current[field] + 1;
-      fieldGenerationRef.current[field] = generation;
-      const epoch = operationEpochRef.current;
-      let ledger = fieldOperationLedgersRef.current[field];
-      if (!ledger || ledger.operations.size === 0) {
-        ledger = { baseline: current[field], operations: new Map() };
-        fieldOperationLedgersRef.current[field] = ledger;
-      }
-      ledger.operations.set(generation, {
-        generation,
-        previewValue,
-        state: 'pending',
-      });
-
-      const superseded = queuedFieldSavesRef.current.get(field);
-      if (superseded) {
-        const supersededOperation = ledger.operations.get(
-          superseded.generation
-        );
-        if (supersededOperation) supersededOperation.state = 'failed';
-        completeMutationSuccess();
-      }
-
-      queuedFieldSavesRef.current.set(field, {
-        profileId: selectedProfile.id,
-        field,
-        generation,
-        previewValue,
-        updates,
-        errorMessage,
-        epoch,
-      });
-      patchPreviewData(data => ({ ...data, [field]: previewValue }));
-      beginMutationStatus();
-      void drainProfileSaveQueue();
-    },
-    [
-      beginMutationStatus,
-      completeMutationSuccess,
-      drainProfileSaveQueue,
-      patchPreviewData,
-      selectedProfile,
-    ]
-  );
-  saveProfileFieldRef.current = saveProfileField;
-
   // Handle bio change — save to server and instantly update sidebar
   const handleBioChange = useCallback(
     (value: string) => {
-      saveProfileField(
-        'bio',
-        value || null,
-        { bio: value },
-        'Failed to update bio'
+      if (!selectedProfile || !previewData) return;
+      setPreviewData({ ...previewData, bio: value || null });
+      profileMutation.mutate(
+        { updates: { bio: value } },
+        {
+          onError: () => {
+            setPreviewData({ ...previewData, bio: previewData.bio });
+            toast.error('Failed to update bio');
+          },
+        }
       );
     },
-    [saveProfileField]
+    [selectedProfile, previewData, setPreviewData, profileMutation]
   );
 
   // Handle location change — save to server and instantly update sidebar
   const handleLocationChange = useCallback(
     (value: string | null) => {
-      saveProfileField(
-        'location',
-        value,
-        { location: value },
-        'Failed to update location'
+      if (!selectedProfile || !previewData) return;
+      setPreviewData({ ...previewData, location: value });
+      profileMutation.mutate(
+        { updates: { location: value } },
+        {
+          onError: () => {
+            setPreviewData({ ...previewData, location: previewData.location });
+            toast.error('Failed to update location');
+          },
+        }
       );
     },
-    [saveProfileField]
+    [selectedProfile, previewData, setPreviewData, profileMutation]
   );
 
   // Handle hometown change — save to server and instantly update sidebar
   const handleHometownChange = useCallback(
     (value: string | null) => {
-      saveProfileField(
-        'hometown',
-        value,
-        { hometown: value },
-        'Failed to update hometown'
+      if (!selectedProfile || !previewData) return;
+      setPreviewData({ ...previewData, hometown: value });
+      profileMutation.mutate(
+        { updates: { hometown: value } },
+        {
+          onError: () => {
+            setPreviewData({
+              ...previewData,
+              hometown: previewData.hometown,
+            });
+            toast.error('Failed to update hometown');
+          },
+        }
       );
     },
-    [saveProfileField]
+    [selectedProfile, previewData, setPreviewData, profileMutation]
   );
 
   // Handle genres change — save to server and instantly update sidebar
   const handleGenresChange = useCallback(
     (value: string[]) => {
-      saveProfileField(
-        'genres',
-        value,
-        { genres: value },
-        'Failed to update genres'
+      if (!selectedProfile || !previewData) return;
+      setPreviewData({ ...previewData, genres: value });
+      profileMutation.mutate(
+        { updates: { genres: value } },
+        {
+          onError: () => {
+            setPreviewData({ ...previewData, genres: previewData.genres });
+            toast.error('Failed to update genres');
+          },
+        }
       );
     },
-    [saveProfileField]
+    [selectedProfile, previewData, setPreviewData, profileMutation]
   );
 
   // Existing platform IDs for filtering suggestions
@@ -749,7 +346,6 @@ export function ProfileContactSidebar() {
   const reconcileAfterPersist = useCallback(
     (
       linkId: string,
-      version: number,
       optimisticId: string,
       platformName: string,
       profileId: string
@@ -757,28 +353,27 @@ export function ProfileContactSidebar() {
       if (deletedWhilePendingRef.current.has(optimisticId)) {
         deletedWhilePendingRef.current.delete(optimisticId);
         if (linkId) {
-          void removeLinkMutation
-            .mutateAsync({ profileId, linkId, expectedVersion: version })
-            .catch(() => undefined);
+          removeLinkMutation.mutate(
+            { profileId, linkId },
+            { onError: () => {} }
+          );
         }
         return;
       }
       if (linkId) {
         const current = previewDataRef.current;
         if (current) {
-          patchPreviewData(data => ({
-            ...data,
-            links: data.links
-              .filter(l => l.id !== linkId || l.id === optimisticId)
-              .map(l =>
-                l.id === optimisticId ? { ...l, id: linkId, version } : l
-              ),
-          }));
+          setPreviewData({
+            ...current,
+            links: current.links.map(l =>
+              l.id === optimisticId ? { ...l, id: linkId } : l
+            ),
+          });
         }
       }
-      if (mountedRef.current) toast.success(`${platformName} link added`);
+      toast.success(`${platformName} link added`);
     },
-    [patchPreviewData, removeLinkMutation]
+    [removeLinkMutation, setPreviewData]
   );
 
   // Revert optimistic add on failure
@@ -786,19 +381,18 @@ export function ProfileContactSidebar() {
     (optimisticId: string) => {
       if (deletedWhilePendingRef.current.has(optimisticId)) {
         deletedWhilePendingRef.current.delete(optimisticId);
-        return false;
+        return;
       }
       const current = previewDataRef.current;
       if (current) {
-        patchPreviewData(data => ({
-          ...data,
-          links: data.links.filter(l => l.id !== optimisticId),
-        }));
+        setPreviewData({
+          ...current,
+          links: current.links.filter(l => l.id !== optimisticId),
+        });
       }
-      if (mountedRef.current) toast.error('Failed to add link');
-      return true;
+      toast.error('Failed to add link');
     },
-    [patchPreviewData]
+    [setPreviewData]
   );
 
   // Handle adding a new link (opens smart input)
@@ -853,13 +447,11 @@ export function ProfileContactSidebar() {
   // Handle smart add — receives a detected link from SidebarLinkInput
   const handleSmartAddLink = useCallback(
     async (link: DetectedLink) => {
-      if (!selectedProfile) return;
-      const current = previewDataRef.current;
-      if (!current) return;
+      if (!selectedProfile || !previewData) return;
 
       // Prevent duplicate platforms (except YouTube which can have multiple channels)
       if (link.platform.id !== 'youtube') {
-        const existingLink = current.links.find(
+        const existingLink = previewData.links.find(
           l => l.platform === link.platform.id
         );
         if (existingLink) {
@@ -868,11 +460,6 @@ export function ProfileContactSidebar() {
           return;
         }
       }
-
-      linkGenerationRef.current.set(
-        link.platform.id,
-        (linkGenerationRef.current.get(link.platform.id) ?? 0) + 1
-      );
 
       // Optimistically add to sidebar
       const optimisticLink: PreviewPanelLink = {
@@ -883,10 +470,10 @@ export function ProfileContactSidebar() {
         isVisible: true,
       };
 
-      patchPreviewData(data => ({
-        ...data,
-        links: [...data.links, optimisticLink],
-      }));
+      setPreviewData({
+        ...previewData,
+        links: [...previewData.links, optimisticLink],
+      });
 
       setIsAddingLink(false);
 
@@ -899,95 +486,46 @@ export function ProfileContactSidebar() {
 
       // Save to server via confirm-link endpoint
       pendingAddsRef.current.add(optimisticLink.id);
-      const epoch = operationEpochRef.current;
-      beginMutationStatus();
       try {
-        const { linkId, version } = await enqueuePlatformMutation(
-          linkPlatformQueueRef.current,
-          link.platform.id,
-          () =>
-            confirmLinkOnServer(
-              selectedProfile.id,
-              link,
-              linkVersionByPlatformRef.current.get(link.platform.id)
-            )
+        const linkId = await confirmLinkOnServer(selectedProfile.id, link);
+        reconcileAfterPersist(
+          linkId,
+          optimisticLink.id,
+          link.platform.name,
+          selectedProfile.id
         );
-        linkVersionByPlatformRef.current.set(link.platform.id, version);
-        if (operationEpochRef.current === epoch) {
-          reconcileAfterPersist(
-            linkId,
-            version,
-            optimisticLink.id,
-            link.platform.name,
-            selectedProfile.id
-          );
-        } else if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
-          deletedWhilePendingRef.current.delete(optimisticLink.id);
-          void removeLinkMutation
-            .mutateAsync({
-              profileId: selectedProfile.id,
-              linkId,
-              expectedVersion: version,
-            })
-            .catch(() => undefined);
-        }
-        completeMutationSuccess();
-      } catch (error) {
-        const conflictVersion = getConflictVersion(error);
-        if (conflictVersion !== undefined) {
-          linkVersionByPlatformRef.current.set(
-            link.platform.id,
-            conflictVersion
-          );
-        }
-        if (mountedRef.current && operationEpochRef.current === epoch) {
-          const reverted = revertOptimisticAdd(optimisticLink.id);
-          if (reverted) {
-            completeMutationError('Failed to add link', () =>
-              addLinkRef.current(link)
-            );
-          } else {
-            completeMutationSuccess();
-          }
-        } else {
-          completeMutationSuccess();
-        }
+      } catch {
+        revertOptimisticAdd(optimisticLink.id);
       } finally {
         pendingAddsRef.current.delete(optimisticLink.id);
       }
     },
     [
       selectedProfile,
+      previewData,
+      setPreviewData,
       resolvedCategory,
       reconcileAfterPersist,
       revertOptimisticAdd,
-      removeLinkMutation,
-      patchPreviewData,
-      beginMutationStatus,
-      completeMutationError,
-      completeMutationSuccess,
     ]
   );
-  addLinkRef.current = link => {
-    void handleSmartAddLink(link);
-  };
 
   // Handle removing a link
   const handleRemoveLink = useCallback(
     (linkId: string) => {
-      if (!selectedProfile) return;
-      const current = previewDataRef.current;
-      if (!current) return;
+      if (!previewData || !selectedProfile) return;
 
-      const removedIndex = current.links.findIndex(l => l.id === linkId);
-      const removedLink = current.links[removedIndex];
+      const removedLink = previewData.links.find(l => l.id === linkId);
       if (!removedLink) return;
 
+      // Snapshot current links before optimistic removal for rollback
+      const previousLinks = previewData.links;
+
       // Optimistically remove from sidebar
-      patchPreviewData(data => ({
-        ...data,
-        links: data.links.filter(l => l.id !== linkId),
-      }));
+      setPreviewData({
+        ...previewData,
+        links: previewData.links.filter(l => l.id !== linkId),
+      });
 
       // If the add is still in flight, mark for server delete after it completes
       if (linkId.startsWith('temp-') && pendingAddsRef.current.has(linkId)) {
@@ -1003,92 +541,25 @@ export function ProfileContactSidebar() {
         return;
       }
 
-      const generation =
-        (linkGenerationRef.current.get(removedLink.platform) ?? 0) + 1;
-      linkGenerationRef.current.set(removedLink.platform, generation);
-      const epoch = operationEpochRef.current;
-      beginMutationStatus();
-
-      void enqueuePlatformMutation(
-        linkPlatformQueueRef.current,
-        removedLink.platform,
-        () =>
-          removeLinkMutation.mutateAsync({
-            profileId: selectedProfile.id,
-            linkId,
-            expectedVersion: removedLink.version ?? 1,
-          })
-      ).then(
-        result => {
-          linkVersionByPlatformRef.current.set(
-            removedLink.platform,
-            result.version ?? (removedLink.version ?? 1) + 1
-          );
-          const isCurrent =
-            mountedRef.current &&
-            operationEpochRef.current === epoch &&
-            linkGenerationRef.current.get(removedLink.platform) === generation;
-          completeMutationSuccess();
-          if (isCurrent) toast.success('Link removed');
-        },
-        error => {
-          const conflictVersion = getConflictVersion(error);
-          const restoredLink =
-            conflictVersion === undefined
-              ? removedLink
-              : { ...removedLink, version: conflictVersion };
-          if (conflictVersion !== undefined) {
-            linkVersionByPlatformRef.current.set(
-              removedLink.platform,
-              conflictVersion
-            );
-          }
-          const isCurrent =
-            mountedRef.current &&
-            operationEpochRef.current === epoch &&
-            linkGenerationRef.current.get(removedLink.platform) === generation;
-          if (!isCurrent) {
-            patchPreviewData(data => {
-              if (data.links.some(link => link.id === restoredLink.id)) {
-                return data;
-              }
-              const links = [...data.links];
-              links.splice(
-                Math.min(removedIndex, links.length),
-                0,
-                restoredLink
-              );
-              return { ...data, links };
-            });
-            completeMutationSuccess();
-            return;
-          }
-
-          patchPreviewData(data => {
-            if (data.links.some(link => link.id === restoredLink.id)) {
-              return data;
+      removeLinkMutation.mutate(
+        { profileId: selectedProfile.id, linkId },
+        {
+          onSuccess: () => {
+            toast.success('Link removed');
+          },
+          onError: () => {
+            // Revert on failure — read current previewData from ref to avoid stale closure
+            const current = previewDataRef.current;
+            if (current) {
+              setPreviewData({ ...current, links: previousLinks });
             }
-            const links = [...data.links];
-            links.splice(Math.min(removedIndex, links.length), 0, restoredLink);
-            return { ...data, links };
-          });
-          completeMutationError('Failed to remove link', () =>
-            removeLinkRef.current(linkId)
-          );
-          toast.error('Failed to remove link');
+            toast.error('Failed to remove link');
+          },
         }
       );
     },
-    [
-      beginMutationStatus,
-      completeMutationError,
-      completeMutationSuccess,
-      patchPreviewData,
-      removeLinkMutation,
-      selectedProfile,
-    ]
+    [previewData, selectedProfile, setPreviewData, removeLinkMutation]
   );
-  removeLinkRef.current = handleRemoveLink;
 
   // Header parts hook needs to be called unconditionally
   const { overflowActions: baseOverflowActions } = useProfileHeaderParts({
@@ -1130,7 +601,6 @@ export function ProfileContactSidebar() {
       <EntitySidebarShell
         isOpen={isOpen}
         ariaLabel='Profile Contact'
-        data-testid='profile-contact-sidebar-skeleton'
         headerMode='minimal'
         hideMinimalHeaderBar
         contentBleed
@@ -1196,7 +666,6 @@ export function ProfileContactSidebar() {
       <EntitySidebarShell
         isOpen={isOpen}
         ariaLabel='Profile Preview'
-        data-testid='profile-contact-sidebar'
         headerMode='minimal'
         hideMinimalHeaderBar
         contentBleed
@@ -1216,7 +685,6 @@ export function ProfileContactSidebar() {
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Profile Contact'
-      data-testid='profile-contact-sidebar'
       headerMode='minimal'
       hideMinimalHeaderBar
       entityHeaderSurface='flat'
@@ -1261,7 +729,6 @@ export function ProfileContactSidebar() {
         }
         contentClassName='pt-2'
       >
-        <ProfileRailMutationStatusRow status={mutationStatus} />
         {resolvedCategory === 'about' ? (
           <ProfileAboutTab
             bio={bio}

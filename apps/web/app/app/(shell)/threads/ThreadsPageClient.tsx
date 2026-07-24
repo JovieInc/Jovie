@@ -177,6 +177,10 @@ export function ChatsPageClient() {
               onRetry={() => {
                 refetch();
               }}
+              secondaryAction={{
+                label: 'Refresh Page',
+                onClick: () => globalThis.location.reload(),
+              }}
             />
           ) : filteredThreads.length === 0 ? (
             <div className='grid min-h-72 place-items-center rounded-2xl border border-dashed border-subtle bg-surface-0 px-6 py-10 text-center'>
@@ -204,6 +208,7 @@ export function ChatsPageClient() {
                   thread={thread}
                   active={false}
                   unread={!!thread.unread}
+                  hasThreadActions
                   onThreadContextMenu={onThreadContextMenu}
                 />
               ))}

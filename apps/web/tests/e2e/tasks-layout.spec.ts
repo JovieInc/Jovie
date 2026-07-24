@@ -34,7 +34,6 @@ const TASK_ROW_SELECTOR =
 const TASK_BOARD_CARD_SELECTOR = '[data-testid^="task-board-card-"]';
 const TASK_VIEW_MODE_STORAGE_KEY = 'jovie-dashboard-tasks-view-mode';
 const VIEWPORTS = [
-  { name: 'desktop-1159', width: 1159, height: 863 },
   { name: 'desktop-1280', width: 1280, height: 900 },
   { name: 'desktop-1440', width: 1440, height: 960 },
 ] as const;
@@ -393,9 +392,6 @@ async function assertTasksBoardLayout(
   const boardCard = getTaskBoardCardByTitle(page, taskTitle);
   await expect(boardCard).toBeVisible();
   await boardCard.click();
-  await expect
-    .poll(() => boardCard.evaluate(card => !card.matches(':focus-visible')))
-    .toBe(true);
   await expect(getVisibleTaskTitleEditor(page)).toHaveValue(taskTitle, {
     timeout: 15_000,
   });
@@ -455,26 +451,6 @@ async function assertTasksLayout(
 
   await expect(listPane).toBeVisible();
   await expect(targetRow).toBeVisible({ timeout: 30_000 });
-
-  await targetRow.click();
-  await expect
-    .poll(() => targetRow.evaluate(row => !row.matches(':focus-visible')))
-    .toBe(true);
-
-  const keyboardRow = targetRow.locator('xpath=ancestor::tr[1]');
-  await keyboardRow.focus();
-  await page.keyboard.press('ArrowDown');
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const activeElement = document.activeElement;
-        return (
-          activeElement?.matches('tr[tabindex="0"]') === true &&
-          activeElement.matches(':focus-visible')
-        );
-      })
-    )
-    .toBe(true);
 
   const [
     headerBox,

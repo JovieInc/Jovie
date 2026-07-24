@@ -27,8 +27,6 @@ export interface VirtualizedTableRowProps<TData> {
   readonly shouldVirtualize: boolean;
   readonly virtualStart?: number;
   readonly focusedIndex: number;
-  /** Consumer-owned selected state, composed with TanStack selection. */
-  readonly isSelected?: boolean;
   readonly onRowClick?: (row: TData) => void;
   readonly onRowContextMenu?: (row: TData, event: React.MouseEvent) => void;
   readonly onKeyDown: (
@@ -71,7 +69,6 @@ function VirtualizedTableRowComponent<TData>({
   shouldVirtualize,
   virtualStart,
   focusedIndex,
-  isSelected = false,
   onRowClick,
   onRowContextMenu,
   onKeyDown,
@@ -84,7 +81,7 @@ function VirtualizedTableRowComponent<TData>({
 }: VirtualizedTableRowProps<TData> &
   Omit<React.ComponentPropsWithoutRef<'tr'>, ManagedTrProps>) {
   const rowData = row.original as TData;
-  const isRowSelected = (row.getIsSelected?.() ?? false) || isSelected;
+  const isRowSelected = row.getIsSelected?.() ?? false;
 
   // Keep a ref to the forwarded onContextMenu so we can compose it without
   // breaking memoisation of handleContextMenu.
@@ -101,8 +98,9 @@ function VirtualizedTableRowComponent<TData>({
       } else {
         onRowClick?.(rowData);
       }
+      onFocusChange(rowIndex);
     },
-    [onRowClick, onRowShiftClick, rowData, rowIndex]
+    [onRowClick, onRowShiftClick, rowData, onFocusChange, rowIndex]
   );
 
   const handleKeyDown = useCallback(
@@ -110,17 +108,11 @@ function VirtualizedTableRowComponent<TData>({
     [onKeyDown, rowIndex, rowData]
   );
 
-  const handleFocusChange = useCallback(
-    (event: React.FocusEvent<HTMLTableRowElement>) => {
-      if (
-        shouldEnableKeyboardNav &&
-        event.currentTarget.matches(':focus-visible')
-      ) {
-        onFocusChange(rowIndex);
-      }
-    },
-    [shouldEnableKeyboardNav, onFocusChange, rowIndex]
-  );
+  const handleFocusChange = useCallback(() => {
+    if (shouldEnableKeyboardNav) {
+      onFocusChange(rowIndex);
+    }
+  }, [shouldEnableKeyboardNav, onFocusChange, rowIndex]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent<HTMLTableRowElement>) => {
@@ -156,19 +148,14 @@ function VirtualizedTableRowComponent<TData>({
       ref={handleRef}
       data-index={rowIndex}
       data-testid={getRowTestId?.(rowData, rowIndex)}
-      tabIndex={
-        shouldEnableKeyboardNav
-          ? focusedIndex === rowIndex
-            ? 0
-            : -1
-          : undefined
-      }
+      tabIndex={shouldEnableKeyboardNav ? 0 : undefined}
       aria-selected={isRowSelected || htmlProps['aria-selected']}
       className={cn(
         presets.tableRow,
         onRowClick && 'cursor-pointer',
         shouldEnableKeyboardNav && rowState.focusVisible,
         isRowSelected && rowState.selected,
+        focusedIndex === rowIndex && !isRowSelected && rowState.focused,
         getRowClassName?.(rowData, rowIndex)
       )}
       onClick={handleClick}

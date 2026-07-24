@@ -11,8 +11,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { navigationInputMethodFromClick } from '@/lib/tracking/navigation-telemetry';
-import type { NavigationInputMethod } from '@/lib/tracking/navigation-telemetry-contract';
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -30,31 +28,11 @@ export type LiquidGlassMenuItem = {
 export interface LiquidGlassMenuProps {
   readonly primaryItems: LiquidGlassMenuItem[];
   readonly expandedItems: LiquidGlassMenuItem[];
-  /** Non-primary account destinations rendered after the canonical app IA. */
-  readonly utilityItems?: LiquidGlassMenuItem[];
   /** Optional admin items - shown in a separate section with header */
   readonly adminItems?: LiquidGlassMenuItem[];
   readonly onSearchClick?: () => void;
   readonly onSignOut?: () => void;
-  readonly navigationLabel?: string;
-  readonly expandedNavigationLabel?: string;
   readonly className?: string;
-  /**
-   * Render inside the authenticated shell's shared bottom surface instead of
-   * creating a second fixed/elevated layer.
-   */
-  readonly inFlow?: boolean;
-  readonly onItemActivate?: (
-    item: LiquidGlassMenuItem,
-    inputMethod: NavigationInputMethod
-  ) => void;
-  readonly onExpandedItemsVisible?: (
-    items: readonly LiquidGlassMenuItem[]
-  ) => void;
-  readonly isItemActive?: (
-    item: LiquidGlassMenuItem,
-    pathname: string
-  ) => boolean;
 }
 
 // ============================================================================
@@ -192,31 +170,17 @@ function Badge({
 function MenuItemLink({
   item,
   active,
-  onActivate,
 }: {
   readonly item: LiquidGlassMenuItem;
   readonly active: boolean;
-  readonly onActivate?: (inputMethod: NavigationInputMethod) => void;
 }) {
   const Icon = item.icon;
 
   return (
     <Link
       href={item.href}
-      onClick={event => {
-        if (
-          event.button === 0 &&
-          !event.metaKey &&
-          !event.ctrlKey &&
-          !event.shiftKey &&
-          !event.altKey
-        ) {
-          onActivate?.(navigationInputMethodFromClick(event.detail));
-        }
-      }}
-      aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption transition-[background-color,color] duration-subtle ease-subtle active:bg-surface-2',
+        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption transition-[background-color,color] duration-subtle ease-subtle active:bg-surface-2',
         active
           ? 'bg-bg-surface-2 text-primary-token'
           : 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
@@ -242,63 +206,27 @@ function MenuItemLink({
 export function LiquidGlassMenu({
   primaryItems,
   expandedItems,
-  utilityItems = [],
   adminItems,
   onSearchClick,
   onSignOut,
-  navigationLabel = 'Dashboard Tabs',
-  expandedNavigationLabel = 'Expanded Navigation Menu',
   className,
-  inFlow = false,
-  onItemActivate,
-  onExpandedItemsVisible,
-  isItemActive,
 }: LiquidGlassMenuProps): React.JSX.Element {
   const pathname = usePathname();
   const [isExpanded, setIsExpanded] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const expandedMenuRef = useRef<HTMLElement>(null);
-  const moreButtonRef = useRef<HTMLButtonElement>(null);
-  const previousPathnameRef = useRef(pathname);
 
-  const closeMenu = useCallback(() => {
+  const closeMenu = useCallback(() => setIsExpanded(false), []);
+  const toggleMenu = useCallback(() => setIsExpanded(prev => !prev), []);
+
+  useCloseOnEscapeOrOutside(menuRef, isExpanded, closeMenu);
+
+  // Close on route change
+  useEffect(() => {
     setIsExpanded(false);
-  }, []);
-  const closeMenuAndRestoreFocus = useCallback(() => {
-    closeMenu();
-    globalThis.requestAnimationFrame(() => moreButtonRef.current?.focus());
-  }, [closeMenu]);
-  const toggleMenu = useCallback(() => {
-    if (isExpanded) {
-      closeMenuAndRestoreFocus();
-      return;
-    }
-    setIsExpanded(true);
-  }, [closeMenuAndRestoreFocus, isExpanded]);
+  }, [pathname]);
 
-  useCloseOnEscapeOrOutside(menuRef, isExpanded, closeMenuAndRestoreFocus);
-
-  // Move keyboard focus into the menu as soon as it opens.
-  useEffect(() => {
-    if (!isExpanded) return;
-    onExpandedItemsVisible?.([...expandedItems, ...utilityItems]);
-    expandedMenuRef.current
-      ?.querySelector<HTMLElement>('a[href], button:not([disabled])')
-      ?.focus();
-  }, [expandedItems, isExpanded, onExpandedItemsVisible, utilityItems]);
-
-  // Close on route change without stealing focus from the destination page.
-  useEffect(() => {
-    if (previousPathnameRef.current === pathname) return;
-    previousPathnameRef.current = pathname;
-    if (isExpanded) closeMenu();
-  }, [closeMenu, isExpanded, pathname]);
-
-  const isActive = (item: LiquidGlassMenuItem) => {
-    if (isItemActive) return isItemActive(item, pathname);
-    if (item.href === '/app') return pathname === item.href;
-    return pathname === item.href || pathname.startsWith(`${item.href}/`);
-  };
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
 
   const allMenuItems = [...primaryItems, ...expandedItems];
   const hasAdminItems = adminItems && adminItems.length > 0;
@@ -306,125 +234,103 @@ export function LiquidGlassMenu({
   return (
     <div
       ref={menuRef}
-      data-mobile-navigation='true'
-      data-layout={inFlow ? 'in-flow' : 'overlay'}
-      className={cn(
-        inFlow
-          ? 'relative z-0 shrink-0 lg:hidden'
-          : 'fixed bottom-0 inset-x-0 z-40 lg:hidden',
-        className
-      )}
+      className={cn('fixed bottom-0 inset-x-0 z-40 lg:hidden', className)}
     >
-      {/* Closed menu content is unmounted so hidden links cannot receive focus. */}
-      {isExpanded ? (
-        <div className='absolute inset-x-0 bottom-full'>
-          {/* Backdrop */}
-          <div
-            className='fixed inset-0 z-50 bg-black/20 backdrop-blur-sm'
-            onClick={closeMenuAndRestoreFocus}
-            aria-hidden='true'
-          />
+      {/* Expanded menu overlay */}
+      <div
+        className={cn(
+          'absolute inset-x-0 bottom-full transition-[opacity] duration-cinematic ease-out',
+          isExpanded
+            ? 'opacity-100 pointer-events-auto'
+            : 'opacity-0 pointer-events-none'
+        )}
+      >
+        {/* Backdrop */}
+        <div
+          className={cn(
+            'fixed inset-0 z-50 bg-black/20 backdrop-blur-sm transition-opacity duration-cinematic',
+            isExpanded ? 'opacity-100' : 'opacity-0'
+          )}
+          onClick={closeMenu}
+          aria-hidden='true'
+        />
 
-          {/* Expanded menu */}
-          <div
-            className='relative z-50 mx-3 mb-2 overflow-hidden rounded-xl'
-            style={{
-              background: 'var(--liquid-glass-bg-solid)',
-              boxShadow: 'var(--liquid-glass-shadow-elevated)',
-              border: '1px solid var(--liquid-glass-border)',
-            }}
+        {/* Expanded menu */}
+        <div
+          className={cn(
+            'relative z-50 mx-3 mb-2 overflow-hidden rounded-xl transition-opacity duration-cinematic ease-cinematic',
+            isExpanded ? 'opacity-100' : 'opacity-0'
+          )}
+          style={{
+            background: 'var(--liquid-glass-bg-solid)',
+            boxShadow: 'var(--liquid-glass-shadow-elevated)',
+            border: '1px solid var(--liquid-glass-border)',
+          }}
+        >
+          <GlassHighlight />
+          <GlassBlur intense />
+
+          <nav
+            className='relative z-10 py-2 max-h-[70svh] overflow-y-auto overscroll-contain'
+            aria-label='Expanded Navigation Menu'
           >
-            <GlassHighlight />
-            <GlassBlur intense />
+            {/* Menu items */}
+            <div className='px-2'>
+              {allMenuItems.map(item => (
+                <MenuItemLink
+                  key={item.id}
+                  item={item}
+                  active={isActive(item.href)}
+                />
+              ))}
 
-            <nav
-              ref={expandedMenuRef}
-              className='relative z-10 max-h-[70svh] overflow-y-auto overscroll-contain py-2'
-              aria-label={expandedNavigationLabel}
-            >
-              {/* Menu items */}
-              <div className='px-2'>
-                {allMenuItems.map(item => (
-                  <MenuItemLink
-                    key={item.id}
-                    item={item}
-                    active={isActive(item)}
-                    onActivate={inputMethod =>
-                      onItemActivate?.(item, inputMethod)
-                    }
-                  />
-                ))}
+              {/* Admin section */}
+              {hasAdminItems && (
+                <>
+                  <div className='my-2 mx-1 border-t border-default/30' />
+                  <p className='px-3 py-1.5 text-app font-caption tracking-normal text-secondary-token'>
+                    Admin
+                  </p>
+                  {adminItems.map(item => (
+                    <MenuItemLink
+                      key={item.id}
+                      item={item}
+                      active={isActive(item.href)}
+                    />
+                  ))}
+                </>
+              )}
 
-                {utilityItems.length > 0 ? (
-                  <>
-                    <div className='my-2 mx-1 border-t border-default/30' />
-                    {utilityItems.map(item => (
-                      <MenuItemLink
-                        key={item.id}
-                        item={item}
-                        active={isActive(item)}
-                        onActivate={inputMethod =>
-                          onItemActivate?.(item, inputMethod)
-                        }
-                      />
-                    ))}
-                  </>
-                ) : null}
-
-                {/* Admin section */}
-                {hasAdminItems && (
-                  <>
-                    <div className='my-2 mx-1 border-t border-default/30' />
-                    <p className='px-3 py-1.5 text-app font-caption tracking-normal text-secondary-token'>
-                      Admin
-                    </p>
-                    {adminItems.map(item => (
-                      <MenuItemLink
-                        key={item.id}
-                        item={item}
-                        active={isActive(item)}
-                        onActivate={inputMethod =>
-                          onItemActivate?.(item, inputMethod)
-                        }
-                      />
-                    ))}
-                  </>
-                )}
-
-                {/* Sign out */}
-                {onSignOut && (
-                  <>
-                    <div className='my-2 mx-1 border-t border-default/30' />
-                    <button
-                      type='button'
-                      onClick={onSignOut}
-                      className='flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption text-secondary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token active:bg-surface-2'
-                    >
-                      <LogOut
-                        className='size-5 shrink-0 text-tertiary-token'
-                        aria-hidden='true'
-                      />
-                      <span className='flex-1 text-left'>Sign out</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </nav>
-          </div>
+              {/* Sign out */}
+              {onSignOut && (
+                <>
+                  <div className='my-2 mx-1 border-t border-default/30' />
+                  <button
+                    type='button'
+                    onClick={onSignOut}
+                    className='flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption text-secondary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token active:bg-surface-2'
+                  >
+                    <LogOut
+                      className='size-5 shrink-0 text-tertiary-token'
+                      aria-hidden='true'
+                    />
+                    <span className='flex-1 text-left'>Sign out</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </nav>
         </div>
-      ) : null}
+      </div>
 
       {/* Bottom tab bar */}
       <nav
-        aria-label={navigationLabel}
+        aria-label='Dashboard Tabs'
         className='relative z-50'
         style={{
-          background: inFlow ? 'transparent' : 'var(--liquid-glass-bg-solid)',
-          boxShadow:
-            inFlow || isExpanded ? 'none' : 'var(--liquid-glass-shadow)',
-          borderTop: inFlow
-            ? '1px solid transparent'
-            : '1px solid var(--liquid-glass-border)',
+          background: 'var(--liquid-glass-bg-solid)',
+          boxShadow: isExpanded ? 'none' : 'var(--liquid-glass-shadow)',
+          borderTop: '1px solid var(--liquid-glass-border)',
         }}
       >
         <GlassHighlight subtle rounded={false} />
@@ -434,29 +340,15 @@ export function LiquidGlassMenu({
           {/* Primary nav items with labels */}
           {primaryItems.slice(0, 4).map(item => {
             const Icon = item.icon;
-            const active = isActive(item);
+            const active = isActive(item.href);
 
             return (
               <Link
                 key={item.id}
                 href={item.href}
-                onClick={event => {
-                  if (
-                    event.button === 0 &&
-                    !event.metaKey &&
-                    !event.ctrlKey &&
-                    !event.shiftKey &&
-                    !event.altKey
-                  ) {
-                    onItemActivate?.(
-                      item,
-                      navigationInputMethodFromClick(event.detail)
-                    );
-                  }
-                }}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
+                  'relative flex min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
                   active
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'
@@ -488,13 +380,12 @@ export function LiquidGlassMenu({
 
           {/* More menu toggle with label */}
           <button
-            ref={moreButtonRef}
             type='button'
             onClick={toggleMenu}
             aria-label={isExpanded ? 'Close menu' : 'More options'}
             aria-expanded={isExpanded}
             className={cn(
-              'relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
+              'relative flex min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
               isExpanded
                 ? 'text-primary-token'
                 : 'text-tertiary-token hover:text-secondary-token'
@@ -517,7 +408,7 @@ export function LiquidGlassMenu({
               type='button'
               onClick={onSearchClick}
               aria-label='Search'
-              className='relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-secondary-token active:text-primary-token'
+              className='relative flex min-w-16 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-secondary-token active:text-primary-token'
             >
               <Search className='h-5 w-5' aria-hidden='true' />
               <span className='sr-only'>Search</span>

@@ -76,7 +76,6 @@ export { CommonDropdown } from './atoms/common-dropdown';
 // Common Dropdown
 export type {
   CommonDropdownActionItem,
-  CommonDropdownActionRow,
   CommonDropdownCheckboxItem,
   CommonDropdownCustomItem,
   CommonDropdownItem,
@@ -92,7 +91,6 @@ export type {
 } from './atoms/common-dropdown-types';
 export {
   isActionItem,
-  isActionRow,
   isCheckboxItem,
   isCustomItem,
   isLabel,
@@ -250,13 +248,6 @@ export { LoadingSkeleton, Skeleton } from './atoms/skeleton';
 // Spinner
 export type { SpinnerProps, SpinnerSize, SpinnerTone } from './atoms/spinner';
 export { Spinner } from './atoms/spinner';
-// Stackable Badge Group
-export type {
-  StackableBadgeGroupProps,
-  StackableBadgeItem,
-  StackableBadgeTone,
-} from './atoms/stackable-badge-group';
-export { StackableBadgeGroup } from './atoms/stackable-badge-group';
 // Switch
 export { Switch } from './atoms/switch';
 // Textarea
@@ -313,7 +304,6 @@ export {
   animation,
   borders,
   buttons,
-  concentricRadii,
   featureAccents,
   interactive,
   JovieColor,

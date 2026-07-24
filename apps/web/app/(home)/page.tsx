@@ -1,16 +1,17 @@
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import {
-  type HomepageArtistProfileCards,
-  HomepageArtistProfiles,
-} from '@/components/homepage/HomepageArtistProfiles';
 import { HomepageClosedLoop } from '@/components/homepage/HomepageClosedLoop';
 import { HomepageElectricSeam } from '@/components/homepage/HomepageElectricSeam';
 import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
-import { HomepageMeetJovie } from '@/components/homepage/HomepageMeetJovie';
+import {
+  HomepageMeetJovie,
+  type HomepageMeetJovieCards,
+} from '@/components/homepage/HomepageMeetJovie';
+import { HomepageOpportunitySection } from '@/components/homepage/HomepageOpportunitySection';
 import { HomepagePosterHero } from '@/components/homepage/HomepagePosterHero';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
+import { HomepageWorkspaceSectionLazy } from '@/components/homepage/HomepageWorkspaceSectionLazy';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { FaqSection } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
@@ -42,33 +43,36 @@ const HomepageV2FinalCta = dynamic(
     })),
   { ssr: true }
 );
+const HomeComposerHero = dynamic(
+  () =>
+    import('@/components/marketing/HomeComposerHero').then(m => ({
+      default: m.HomeComposerHero,
+    })),
+  { ssr: true }
+);
 const HERO_PRODUCT_IMAGES = {
-  product: getMarketingExportImage('shell-v1-dashboard-desktop'),
+  product: getMarketingExportImage('shell-v1-releases-desktop'),
 };
-const DISTRIBUTION_SUPPORT_COPY = {
-  primary: 'Music does not stop at distribution.',
-  secondary: 'Jovie keeps the next decision in view.',
-} as const;
+const WORKSPACE_SCREENSHOT = getMarketingExportImage(
+  HOMEPAGE_LAUNCH_COPY.workspace.screenshotKey
+);
 const ARTIST_OUTCOME_CARDS = [
   {
     id: 'drive-streams',
     title: 'Drive Streams',
-    body: 'Put the latest release, pre-save, or countdown at the front of the profile.',
     image: getMarketingExportImage('tim-white-profile-listen-mobile'),
   },
   {
     id: 'capture-fans',
     title: 'Capture Fans',
-    body: 'Fan capture builds a list you can use again.',
     image: getMarketingExportImage('tim-white-profile-subscribe-mobile'),
   },
   {
     id: 'get-paid',
     title: 'Get Paid',
-    body: 'Make direct support feel native to the artist profile.',
     image: getMarketingExportImage('tim-white-profile-pay-mobile'),
   },
-] as const satisfies HomepageArtistProfileCards;
+] as const satisfies HomepageMeetJovieCards;
 
 export const revalidate = false;
 
@@ -201,6 +205,7 @@ function HomepageHero() {
         headingId='home-hero-heading'
         headline={HERO_COPY.headline}
         subtitle={HERO_COPY.subhead}
+        lede={HERO_COPY.lede}
         trackedLinkComponent={HomepageTrackedLink}
         primaryCta={{
           label: HERO_COPY.primaryCta.label,
@@ -231,17 +236,33 @@ function HomepageHero() {
       />
       <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
         <HomeTrustSection
-          ariaLabel={`${DISTRIBUTION_SUPPORT_COPY.primary} ${DISTRIBUTION_SUPPORT_COPY.secondary}`}
-          label={
-            <span className='homepage-trust-editorial-copy'>
-              <span>{DISTRIBUTION_SUPPORT_COPY.primary}</span>
-              <span>{DISTRIBUTION_SUPPORT_COPY.secondary}</span>
-            </span>
-          }
+          label='Artists Distributed Through'
           presentation='inline-strip'
         />
       </div>
     </>
+  );
+}
+
+function HomepageOpportunity() {
+  const copy = HOMEPAGE_LAUNCH_COPY.productStatement;
+  const aiCopy = HOMEPAGE_LAUNCH_COPY.aiComposer;
+
+  return (
+    <HomepageOpportunitySection
+      headline={copy.body}
+      description={copy.description}
+      opportunities={copy.cards}
+      demo={
+        <div data-testid='homepage-ai-composer-demo'>
+          <HomeComposerHero />
+          <div className='homepage-opportunity-section__demo-copy'>
+            <h3>{aiCopy.headline}</h3>
+            <p>{aiCopy.body}</p>
+          </div>
+        </div>
+      }
+    />
   );
 }
 
@@ -263,8 +284,9 @@ function HomepageFaq() {
 function HomepageUnlockedSections() {
   return (
     <>
-      <HomepageMeetJovie />
-      <HomepageArtistProfiles cards={ARTIST_OUTCOME_CARDS} />
+      <HomepageMeetJovie cards={ARTIST_OUTCOME_CARDS} />
+      <HomepageOpportunity />
+      <HomepageWorkspaceSectionLazy screenshot={WORKSPACE_SCREENSHOT} />
       <HomepageClosedLoop />
       <HomepageFaq />
     </>

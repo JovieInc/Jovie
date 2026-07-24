@@ -46,8 +46,8 @@ interface CommandResult {
 
 interface PerfAuthBootstrapResult {
   readonly authStatePath: string;
-  readonly betterAuthUserId: string;
   readonly persona: DevTestAuthPersona;
+  readonly userId: string | null;
 }
 
 interface DirectMetricsResult {
@@ -613,11 +613,11 @@ async function withAuthContext<T>(
   auth: PerfAuthBootstrapResult | undefined,
   action: () => Promise<T>
 ) {
-  const previousUserId = process.env.E2E_BETTER_AUTH_USER_ID;
+  const previousUserId = process.env.E2E_CLERK_USER_ID;
   const previousCi = process.env.CI;
 
-  if (auth?.betterAuthUserId) {
-    process.env.E2E_BETTER_AUTH_USER_ID = auth.betterAuthUserId;
+  if (auth?.userId) {
+    process.env.E2E_CLERK_USER_ID = auth.userId;
   }
   process.env.CI = '1';
 
@@ -625,9 +625,9 @@ async function withAuthContext<T>(
     return await action();
   } finally {
     if (previousUserId === undefined) {
-      delete process.env.E2E_BETTER_AUTH_USER_ID;
+      delete process.env.E2E_CLERK_USER_ID;
     } else {
-      process.env.E2E_BETTER_AUTH_USER_ID = previousUserId;
+      process.env.E2E_CLERK_USER_ID = previousUserId;
     }
 
     if (previousCi === undefined) {

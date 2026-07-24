@@ -56,20 +56,6 @@ describe('EmptyState (canonical molecule API)', () => {
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
-  it('renders a domain-owned CTA through the canonical action slot', () => {
-    render(
-      <EmptyState
-        heading='No Events'
-        description='Get alerted when shows are announced.'
-        actionSlot={<button type='button'>Turn on event alerts</button>}
-      />
-    );
-
-    expect(
-      screen.getByRole('button', { name: 'Turn on event alerts' })
-    ).toBeInTheDocument();
-  });
-
   it('renders primary action as link when href is provided', () => {
     render(
       <EmptyState

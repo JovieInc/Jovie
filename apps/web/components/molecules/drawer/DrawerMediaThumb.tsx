@@ -8,8 +8,6 @@ export interface DrawerMediaThumbProps {
   readonly src?: string | null;
   readonly alt: string;
   readonly fallback: ReactNode;
-  /** Intrinsic image dimensions; keeps Next Image stable while the drawer is collapsed. */
-  readonly dimension?: number;
   readonly sizeClassName?: string;
   readonly sizes?: string;
   readonly className?: string;
@@ -20,7 +18,6 @@ export function DrawerMediaThumb({
   src,
   alt,
   fallback,
-  dimension = 64,
   sizeClassName = 'h-16 w-16',
   sizes = '64px',
   className,
@@ -38,9 +35,8 @@ export function DrawerMediaThumb({
         <Image
           src={src}
           alt={alt}
-          width={dimension}
-          height={dimension}
-          className={cn('h-full w-full object-cover', imageClassName)}
+          fill
+          className={cn('object-cover', imageClassName)}
           sizes={sizes}
         />
       ) : (

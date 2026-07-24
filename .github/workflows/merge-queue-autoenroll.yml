@@ -61,7 +61,7 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
       - name: Checkout main policy code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: main
           persist-credentials: false
@@ -76,10 +76,6 @@ jobs:
           MERGE_QUEUE_BACKEND: ${{ vars.MERGE_QUEUE_BACKEND }}
           DRAIN_MUTATION_AUTHORIZATION: merge-queue-autoenroll
           MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll
-          # Queue-pressure deferrals are temporary. Only the existing push on
-          # main controller run may reconcile an exact green auto-merge head;
-          # PR/CI events continue to honor queue-deferred as an explicit hold.
-          DRAIN_RECONCILE_QUEUE_DEFERRED: ${{ github.event_name == 'push' && '1' || '0' }}
         run: |
           if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]; then
             echo "::error::Merge Queue Auto-Enroll requires MERGE_QUEUE_BACKEND=native" >&2
@@ -100,7 +96,7 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
       - name: Checkout main policy code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: main
           persist-credentials: false

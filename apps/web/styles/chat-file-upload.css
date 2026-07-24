@@ -193,16 +193,8 @@
   gap: var(--space-2);
   padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
   border-radius: 9999px;
-  background: var(--system-b-bg-surface-1);
+  background: color-mix(in oklab, white 4%, transparent);
   border: 1px solid var(--system-b-app-frame-seam);
-  color: var(--color-text-primary-token);
-  transition:
-    background-color var(--system-b-duration-fast) var(--system-b-ease),
-    border-color var(--system-b-duration-fast) var(--system-b-ease);
-}
-
-:where(.system-b-chat-file-chip:hover) {
-  background: var(--system-b-bg-surface-2);
 }
 
 :where(.system-b-chat-file-chip-icon) {
@@ -216,32 +208,6 @@
   align-items: center;
   justify-content: center;
   color: var(--color-text-secondary-token);
-}
-
-:where(.system-b-chat-file-chip-label) {
-  max-width: 7.5rem;
-  overflow: hidden;
-  color: inherit;
-  font-size: var(--text-app);
-  line-height: var(--space-4);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-:where(.system-b-chat-file-chip-remove) {
-  width: var(--space-4);
-  height: var(--space-4);
-  margin-left: var(--space-0-5);
-  border-radius: var(--radius-full);
-  color: var(--color-text-secondary-token);
-}
-
-:where(.system-b-chat-file-chip-remove:hover) {
-  color: var(--color-text-primary-token);
-}
-
-:where(.system-b-chat-file-chip-remove:focus-visible) {
-  color: var(--color-text-primary-token);
 }
 
 /* ── Chat Upload Pay Gate ─────────────────────────────────────────────── */

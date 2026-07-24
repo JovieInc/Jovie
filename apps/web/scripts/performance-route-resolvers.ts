@@ -28,17 +28,19 @@ function getSqlClient() {
   return databaseUrl ? neon(databaseUrl) : null;
 }
 
-function resolveBetterAuthUserId(
+function resolveClerkUserId(
   authCookies?: readonly { name?: string; value?: string }[]
 ) {
-  const bypassBetterAuthUserId = authCookies
+  const envClerkUserId = process.env.E2E_CLERK_USER_ID?.trim();
+  if (envClerkUserId) {
+    return envClerkUserId;
+  }
+  const bypassClerkUserId = authCookies
     ?.find(cookie => cookie.name === '__e2e_test_user_id')
     ?.value?.trim();
-  if (bypassBetterAuthUserId) {
-    return bypassBetterAuthUserId;
-  }
-
-  return process.env.E2E_BETTER_AUTH_USER_ID?.trim() || null;
+  return bypassClerkUserId && bypassClerkUserId.length > 0
+    ? bypassClerkUserId
+    : null;
 }
 
 function replaceRouteToken(
@@ -132,22 +134,22 @@ async function queryProfileHandle(handle: string) {
   return rows[0]?.username_normalized ?? null;
 }
 
-async function queryActiveProfile(betterAuthUserId?: string | null) {
+async function queryActiveProfile(clerkUserId?: string | null) {
   const sql = getSqlClient();
-  const resolvedBetterAuthUserId =
-    betterAuthUserId ?? process.env.E2E_BETTER_AUTH_USER_ID?.trim() ?? null;
+  const resolvedClerkUserId =
+    clerkUserId ?? process.env.E2E_CLERK_USER_ID?.trim() ?? null;
 
-  if (!sql || !resolvedBetterAuthUserId) {
+  if (!sql || !resolvedClerkUserId) {
     return null;
   }
 
   const rows = await withResolverTimeout(
-    `queryActiveProfile(${resolvedBetterAuthUserId})`,
+    `queryActiveProfile(${resolvedClerkUserId})`,
     sql<Array<{ id: string; username_normalized: string }>>`
       select cp.id, cp.username_normalized
       from users u
       join creator_profiles cp on cp.id = u.active_profile_id
-      where u.better_auth_user_id = ${resolvedBetterAuthUserId}
+      where u.clerk_id = ${resolvedClerkUserId}
       limit 1
     `,
     [] as Array<{ id: string; username_normalized: string }>
@@ -492,7 +494,7 @@ export async function resolveChatConversationPerfPath(
   context: PerfResolveContext
 ): Promise<string> {
   const activeProfile =
-    (await queryActiveProfile(resolveBetterAuthUserId(context.authCookies))) ??
+    (await queryActiveProfile(resolveClerkUserId(context.authCookies))) ??
     (await resolveActiveProfileViaApp(context));
   const existingConversationId = activeProfile
     ? await queryExistingConversationId(activeProfile.id)
@@ -522,7 +524,7 @@ export async function resolveReleaseTasksPerfPath(
   }
 
   const activeProfile =
-    (await queryActiveProfile(resolveBetterAuthUserId(context.authCookies))) ??
+    (await queryActiveProfile(resolveClerkUserId(context.authCookies))) ??
     (await resolveActiveProfileViaApp(context));
 
   if (!activeProfile) {

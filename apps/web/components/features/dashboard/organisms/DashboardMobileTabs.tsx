@@ -1,23 +1,16 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo } from 'react';
-import { APP_ROUTES } from '@/constants/routes';
+import { useCallback, useMemo } from 'react';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
-  isLibraryNavigationRoute,
+  adminNavigation,
+  filterProfilesWorkspaceNavigation,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
-  settingsNavItem,
 } from '@/features/dashboard/dashboard-nav';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
-import {
-  type NavigationTelemetryContext,
-  startNavigationTelemetry,
-  trackNavigationImpressions,
-} from '@/lib/tracking/navigation-telemetry';
+import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 
 import { LiquidGlassMenu, type LiquidGlassMenuItem } from './LiquidGlassMenu';
@@ -27,8 +20,7 @@ function toMenuItem(item: NavItem): LiquidGlassMenuItem {
 }
 
 const PRIMARY_ITEMS = mobilePrimaryNavigation.map(toMenuItem);
-const EXPANDED_ITEMS = mobileExpandedNavigation.map(toMenuItem);
-const UTILITY_ITEMS = [settingsNavItem].map(toMenuItem);
+const ADMIN_ITEMS = adminNavigation.map(toMenuItem);
 
 export interface DashboardMobileTabsProps {
   readonly className?: string;
@@ -37,80 +29,28 @@ export interface DashboardMobileTabsProps {
 export function DashboardMobileTabs({
   className,
 }: DashboardMobileTabsProps): React.JSX.Element {
+  const { isAdmin } = useDashboardData();
+  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
   const { signOut } = useAuthSafe();
-  const pathname = usePathname();
-  const isMobile = useMediaQuery('(max-width: 1023px)');
-  const isElectron = useIsElectronRuntime();
-  const telemetryContext = useMemo<NavigationTelemetryContext>(
-    () => ({
-      isElectron,
-      isMobile: true,
-      navVariant: 'canonical_customer_ia_v1',
-    }),
-    [isElectron]
+  const expandedItems = useMemo(
+    () =>
+      filterProfilesWorkspaceNavigation(
+        mobileExpandedNavigation,
+        profilesWorkspaceEnabled
+      ).map(toMenuItem),
+    [profilesWorkspaceEnabled]
   );
 
-  useEffect(() => {
-    if (!isMobile) return;
-    trackNavigationImpressions(
-      PRIMARY_ITEMS.map(item => item.id),
-      pathname,
-      telemetryContext
-    );
-  }, [isMobile, pathname, telemetryContext]);
-
-  const handleItemActivate = useCallback(
-    (
-      item: LiquidGlassMenuItem,
-      inputMethod: Parameters<typeof startNavigationTelemetry>[0]['inputMethod']
-    ) =>
-      startNavigationTelemetry({
-        itemId: item.id,
-        sourcePathname: pathname,
-        destinationHref: item.href,
-        inputMethod,
-        context: telemetryContext,
-      }),
-    [pathname, telemetryContext]
-  );
-
-  const handleExpandedItemsVisible = useCallback(
-    (items: readonly LiquidGlassMenuItem[]) => {
-      if (!isMobile) return;
-      trackNavigationImpressions(
-        items.map(item => item.id),
-        pathname,
-        telemetryContext
-      );
-    },
-    [isMobile, pathname, telemetryContext]
-  );
-
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     await signOut({ redirectUrl: '/' });
-  };
+  }, [signOut]);
 
   return (
     <LiquidGlassMenu
       primaryItems={PRIMARY_ITEMS}
-      expandedItems={EXPANDED_ITEMS}
-      utilityItems={UTILITY_ITEMS}
-      onItemActivate={handleItemActivate}
-      onExpandedItemsVisible={handleExpandedItemsVisible}
+      expandedItems={expandedItems}
+      adminItems={isAdmin ? ADMIN_ITEMS : undefined}
       onSignOut={handleSignOut}
-      isItemActive={(item, currentPathname) => {
-        if (item.id === 'library') {
-          return isLibraryNavigationRoute(currentPathname);
-        }
-        if (item.href === APP_ROUTES.DASHBOARD) {
-          return currentPathname === item.href;
-        }
-        return (
-          currentPathname === item.href ||
-          currentPathname.startsWith(`${item.href}/`)
-        );
-      }}
-      inFlow
       className={cn('lg:hidden', className)}
     />
   );

@@ -51,13 +51,17 @@ function LibraryArtworkImage({
   }
 
   return (
-    <ArtworkFallbackTile
-      seed={asset.title}
-      size={
-        size === 'row' ? 'thumbnail' : size === 'drawer' ? 'hero' : 'default'
-      }
-      iconClassName={size === 'row' ? 'h-4 w-4' : 'h-[36%] w-[36%]'}
-    />
+    <div
+      className={cn(
+        'relative overflow-hidden border border-subtle bg-surface-1',
+        sizeClasses[size]
+      )}
+    >
+      <ArtworkFallbackTile
+        seed={asset.title}
+        iconClassName={size === 'row' ? 'h-4 w-4' : 'h-[36%] w-[36%]'}
+      />
+    </div>
   );
 }
 
@@ -88,7 +92,6 @@ export function LibraryMediaThumbnail({
     <div
       className={cn(
         'system-b-library-media-thumbnail relative h-full w-full overflow-hidden',
-        size === 'row' && 'rounded-sm',
         className
       )}
       data-testid={`library-media-thumbnail-${asset.id}`}

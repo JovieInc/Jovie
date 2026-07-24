@@ -358,7 +358,6 @@ export function ProfileUnifiedDrawer({
       navigationLevel={isSubView ? 'secondary' : 'root'}
       dataTestId='profile-menu-drawer'
       presentation={presentation}
-      centerTitle={renderedView === 'pay'}
     >
       <AnimatePresence mode='wait' initial={false}>
         <motion.div

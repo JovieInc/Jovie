@@ -192,30 +192,6 @@ describe('ChatMessage', () => {
     expect(bubble.textContent).not.toContain('blob.vercel-storage.com');
   });
 
-  it('renders an attachment-only message on its chip surface without a redundant user bubble (JOV-4556)', () => {
-    const messageProps = {
-      id: 'user-file-only',
-      role: 'user' as const,
-      parts: [
-        {
-          type: 'file' as const,
-          mediaType: 'text/markdown',
-          url: 'https://example.com/release-notes.md',
-          name: 'release-notes.md',
-        },
-      ],
-    };
-
-    fastRender(<ChatMessage {...messageProps} />);
-
-    const attachmentFrame = screen.getByTestId('chat-user-attachment-frame');
-    expect(attachmentFrame).toHaveClass('system-b-chat-user-attachments');
-    expect(
-      within(attachmentFrame).getByTestId('file-attachment-chip')
-    ).toHaveTextContent('release-notes.md');
-    expect(screen.queryByTestId('chat-user-bubble')).toBeNull();
-  });
-
   it('renders thinking with stable System B loading hooks', () => {
     const messageProps = {
       id: 'assistant-thinking',

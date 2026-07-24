@@ -5,7 +5,6 @@ import {
   NAV_SHORTCUTS,
   SHORTCUT_CATEGORY_LABELS,
   type ShortcutCategory,
-  WORKSPACE_SWITCH_SHORTCUT,
 } from './keyboard-shortcuts';
 
 describe('keyboard-shortcuts definitions', () => {
@@ -102,13 +101,8 @@ describe('keyboard-shortcuts definitions', () => {
       expect(ids).toContain('nav-settings');
     });
 
-    it('uses the canonical library route for library navigation', () => {
-      expect(NAV_SHORTCUTS.library.href).toBe(APP_ROUTES.LIBRARY);
-      expect(NAV_SHORTCUTS.releases.href).toBe(APP_ROUTES.LIBRARY);
-    });
-
-    it('uses the canonical contacts workspace route', () => {
-      expect(NAV_SHORTCUTS.contacts.href).toBe(APP_ROUTES.CONTACTS);
+    it('uses the canonical releases route for release navigation', () => {
+      expect(NAV_SHORTCUTS.releases.href).toBe(APP_ROUTES.RELEASES);
     });
 
     it('uses the canonical calendar route for calendar navigation', () => {
@@ -166,7 +160,6 @@ describe('keyboard-shortcuts definitions', () => {
       expect(NAV_SHORTCUTS.profile).toBeDefined();
       expect(NAV_SHORTCUTS.contacts).toBeDefined();
       expect(NAV_SHORTCUTS.releases).toBeDefined();
-      expect(NAV_SHORTCUTS.library).toBeDefined();
       expect(NAV_SHORTCUTS.calendar).toBeDefined();
       expect(NAV_SHORTCUTS.touring).toBeDefined();
       expect(NAV_SHORTCUTS.audience).toBeDefined();
@@ -192,17 +185,6 @@ describe('keyboard-shortcuts definitions', () => {
       // Display label uses the option glyph; keep the assertion loose so the
       // exact glyph is documented in keyboard-shortcuts.ts only.
       expect(themeShortcut!.keys).toMatch(/T$/);
-    });
-
-    it('keeps the admin workspace binding out of the public help catalog', () => {
-      expect(KEYBOARD_SHORTCUTS.some(s => s.id === 'switch-workspace')).toBe(
-        false
-      );
-      expect(WORKSPACE_SWITCH_SHORTCUT.shortcutKey).toBe('Alt+Shift+w');
-      expect(WORKSPACE_SWITCH_SHORTCUT.decision).toEqual({
-        status: 'required',
-        binding: 'useGlobalShortcutActions',
-      });
     });
 
     it('includes sidebar toggle shortcut', () => {

@@ -2,6 +2,11 @@
 
 import { expect, type Page, type Request, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
+import {
+  APP_FLAG_OVERRIDES_COOKIE,
+  FF_OVERRIDES_KEY,
+} from '@/lib/flags/overrides';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 import { resolveChatConversationPath } from './utils/dashboard-route-resolvers';
 import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
@@ -88,15 +93,24 @@ function attachRequestBudgetProbe(page: Page): {
   };
 }
 
-async function installDocumentLoadCounter(page: Page): Promise<void> {
+async function forceDesignV1(page: Page): Promise<void> {
+  const overrides = JSON.stringify({
+    [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
+  });
+
   await page.addInitScript(
-    ({ loadCounterKey }) => {
+    ({ cookieName, key, loadCounterKey, value }) => {
       const nextLoadCount =
         Number(sessionStorage.getItem(loadCounterKey) ?? '0') + 1;
       sessionStorage.setItem(loadCounterKey, String(nextLoadCount));
+      localStorage.setItem(key, value);
+      document.cookie = `${cookieName}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
     },
     {
+      cookieName: APP_FLAG_OVERRIDES_COOKIE,
+      key: FF_OVERRIDES_KEY,
       loadCounterKey: DOCUMENT_LOAD_COUNTER_KEY,
+      value: overrides,
     }
   );
 }
@@ -384,7 +398,7 @@ test('app shell persists across core app routes without duplicate request bursts
   test.setTimeout(240_000);
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await installDocumentLoadCounter(page);
+  await forceDesignV1(page);
   await setTestAuthBypassSession(
     page,
     'creator-ready',

@@ -1,6 +1,7 @@
 import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
 import {
   APP_FLAG_OVERRIDES_COOKIE,
   FF_OVERRIDES_KEY,
@@ -27,7 +28,14 @@ import {
   waitForSettle,
 } from './helpers';
 
-const SCREENSHOT_FLAG_OVERRIDES = JSON.stringify({});
+// Force DESIGN_V1 (and its SHELL_CHAT_V1 alias) on for every catalog scenario.
+// The override slot for both flag names is `code:DESIGN_V1`, so a single entry
+// covers the entire New Design surface. We pin this explicitly so a future
+// change to APP_FLAG_DEFAULTS or the Statsig gate cannot silently flip
+// marketing/product screenshots back to the legacy shell.
+const SCREENSHOT_FLAG_OVERRIDES = JSON.stringify({
+  [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
+});
 
 const MANIFEST_PATH = join(CATALOG_OUTPUT_DIR, 'manifest.json');
 

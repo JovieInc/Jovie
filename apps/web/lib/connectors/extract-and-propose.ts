@@ -1,9 +1,8 @@
 import 'server-only';
-import { and, desc, eq } from 'drizzle-orm';
-import { TIM_BRAND_DEAL_SOURCE_ACCOUNT } from '@/lib/connectors/brand-deal-opportunity';
+import { and, eq } from 'drizzle-orm';
 import { runConnectorEnrichment } from '@/lib/connectors/enrichment';
 import {
-  buildGmailOpportunityQuery,
+  buildGmailBookingQuery,
   type GmailMessage,
   getGmailMessage,
   getHeader,
@@ -23,64 +22,66 @@ const DEFAULT_GMAIL_WINDOW_DAYS = 30;
  * Core extraction pipeline for the AI Connector magic moment.
  *
  * Steps:
- * 1. Load decrypted tokens for the user's Gmail connector account.
- * 2. Fetch Gmail booking and paid-brand candidates via a narrow query.
+ * 1. Load decrypted tokens for the user's Gmail + Calendar connector accounts.
+ * 2. Fetch Gmail booking candidates via narrow query and persist external_objects.
  * 3. Run connector enrichment pipelines (context_facts + memory graph + suggestions).
  *
  * @returns Number of new suggested actions created.
  */
 export async function extractAndPropose(userId: string): Promise<number> {
-  const gmailAccountId = await syncGmailExternalObjects(userId);
-  if (!gmailAccountId) return 0;
+  const synced = await syncGmailExternalObjects(userId);
+  if (!synced) return 0;
 
-  const enrichment = await runConnectorEnrichment(userId, {
-    gmailAccountId,
-  });
+  const enrichment = await runConnectorEnrichment(userId);
   return enrichment.totalSuggestionsCreated;
 }
 
-async function syncGmailExternalObjects(
-  userId: string
-): Promise<string | null> {
-  const gmailAccounts = await db
-    .select({
-      id: connectorAccounts.id,
-      providerAccountId: connectorAccounts.providerAccountId,
-    })
-    .from(connectorAccounts)
-    .where(
-      and(
-        eq(connectorAccounts.userId, userId),
-        eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.gmail),
-        eq(connectorAccounts.status, 'connected')
+async function syncGmailExternalObjects(userId: string): Promise<boolean> {
+  const [gmailAccount, calendarAccount] = await Promise.all([
+    db
+      .select({ id: connectorAccounts.id })
+      .from(connectorAccounts)
+      .where(
+        and(
+          eq(connectorAccounts.userId, userId),
+          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.gmail),
+          eq(connectorAccounts.status, 'connected')
+        )
       )
-    )
-    .orderBy(desc(connectorAccounts.updatedAt));
-  const gmailAccount =
-    gmailAccounts.find(
-      account =>
-        account.providerAccountId.trim().toLowerCase() ===
-        TIM_BRAND_DEAL_SOURCE_ACCOUNT
-    ) ?? gmailAccounts[0];
+      .limit(1)
+      .then(rows => rows[0] ?? null),
+    db
+      .select({ id: connectorAccounts.id })
+      .from(connectorAccounts)
+      .where(
+        and(
+          eq(connectorAccounts.userId, userId),
+          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.google_calendar),
+          eq(connectorAccounts.status, 'connected')
+        )
+      )
+      .limit(1)
+      .then(rows => rows[0] ?? null),
+  ]);
 
-  if (!gmailAccount) {
-    logger.info('[extract-and-propose] Skipping — Gmail not connected', {
+  if (!gmailAccount || !calendarAccount) {
+    logger.info('[extract-and-propose] Skipping — connectors not connected', {
       userId,
     });
-    return null;
+    return false;
   }
 
   const gmailTokens = await loadDecryptedToken(gmailAccount.id);
   if (!gmailTokens) {
     logger.error('[extract-and-propose] Token load failed', { userId });
-    return null;
+    return false;
   }
 
   const historyWindowDays =
     parseInt(env.GMAIL_HISTORY_WINDOW_DAYS ?? '', 10) ||
     DEFAULT_GMAIL_WINDOW_DAYS;
 
-  const query = buildGmailOpportunityQuery(historyWindowDays);
+  const query = buildGmailBookingQuery(historyWindowDays);
   const listResult = await listGmailMessages(
     gmailTokens.accessToken,
     query,
@@ -89,10 +90,10 @@ async function syncGmailExternalObjects(
   const messageStubs = listResult.messages ?? [];
 
   if (messageStubs.length === 0) {
-    logger.info('[extract-and-propose] No Gmail opportunity candidates found', {
+    logger.info('[extract-and-propose] No Gmail booking candidates found', {
       userId,
     });
-    return gmailAccount.id;
+    return true;
   }
 
   const messageDetails = await Promise.allSettled(
@@ -138,7 +139,7 @@ async function syncGmailExternalObjects(
     messageCount: messages.length,
   });
 
-  return gmailAccount.id;
+  return true;
 }
 
 export async function extractAndProposeWithErrorCapture(

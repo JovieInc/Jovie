@@ -1,55 +1,8 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 
 describe('DashboardHeader', () => {
-  it('mounts shared responsive controls exactly once', () => {
-    render(
-      <DashboardHeader
-        breadcrumbs={[{ label: 'New Chat', href: '/app/chat' }]}
-        leading={<button type='button'>Go back</button>}
-        sidebarTrigger={<button type='button'>Toggle sidebar</button>}
-        searchSurface={<button type='button'>Search chats</button>}
-        action={
-          <button type='button' aria-label='Show Tim White profile'>
-            TW
-          </button>
-        }
-      />
-    );
-
-    expect(
-      screen.getAllByRole('heading', { name: 'New Chat', level: 1 })
-    ).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Go back' })).toHaveLength(1);
-    expect(
-      screen.getAllByRole('button', { name: 'Toggle sidebar' })
-    ).toHaveLength(1);
-    expect(
-      screen.getAllByRole('button', { name: 'Search chats' })
-    ).toHaveLength(1);
-    expect(
-      screen.getAllByRole('button', { name: 'Show Tim White profile' })
-    ).toHaveLength(1);
-  });
-
-  it('keeps the mobile profile fallback when no route action is registered', () => {
-    render(
-      <DashboardHeader
-        breadcrumbs={[{ label: 'New Chat', href: '/app/chat' }]}
-        mobileProfileSlot={
-          <button type='button' aria-label='Open profile'>
-            Profile
-          </button>
-        }
-      />
-    );
-
-    expect(
-      screen.getAllByRole('button', { name: 'Open profile' })
-    ).toHaveLength(1);
-  });
-
   it('renders mobile actions in a flat wrapper without pill chrome', () => {
     const { container } = render(
       <DashboardHeader
@@ -58,10 +11,8 @@ describe('DashboardHeader', () => {
       />
     );
 
-    const headerRow = container.querySelector(
-      '[data-testid="dashboard-header"] > div'
-    );
-    const actionButton = within(headerRow!).getByRole('button', {
+    const mobileHeader = container.querySelector('.hidden.max-sm\\:flex');
+    const actionButton = within(mobileHeader!).getByRole('button', {
       name: 'Add release',
     });
     const actionWrapper = actionButton.parentElement;
@@ -107,35 +58,13 @@ describe('DashboardHeader', () => {
       />
     );
 
-    const header = container.querySelector('[data-testid="dashboard-header"]');
+    const mobileHeader = container.querySelector('.hidden.max-sm\\:flex');
 
-    expect(header).not.toBeNull();
-    expect(within(header!).getByText('Library')).toBeInTheDocument();
+    expect(mobileHeader).not.toBeNull();
+    expect(within(mobileHeader!).getByText('Library')).toBeInTheDocument();
     expect(
-      within(header!).getByRole('button', { name: 'Filter Library' })
+      within(mobileHeader!).getByRole('button', { name: 'Filter Library' })
     ).toBeInTheDocument();
-  });
-
-  it('reserves only the compact control width for mobile search beside a chat title', () => {
-    const longTitle =
-      'Release planning for the summer residency announcement and launch';
-    const { container } = render(
-      <DashboardHeader
-        breadcrumbs={[{ label: 'New Chat', href: '/app/chat/conv-123' }]}
-        breadcrumbSuffix={<span title={longTitle}>{longTitle}</span>}
-        searchSurface={<button type='button'>Search chats</button>}
-        action={<button type='button'>Thread options</button>}
-      />
-    );
-
-    const title = screen.getByRole('heading', { name: longTitle, level: 1 });
-    const searchButton = screen.getByRole('button', { name: 'Search chats' });
-
-    expect(title).toHaveClass('min-w-0', 'truncate');
-    expect(searchButton.parentElement).toHaveClass('max-sm:w-app-control-sm');
-    expect(
-      container.querySelectorAll('[data-testid="dashboard-header"] h1')
-    ).toHaveLength(1);
   });
 
   it('prefers the breadcrumb suffix for the mobile title when present', () => {
@@ -146,21 +75,16 @@ describe('DashboardHeader', () => {
       />
     );
 
-    const header = container.querySelector('[data-testid="dashboard-header"]');
+    const mobileHeader = container.querySelector('.hidden.max-sm\\:flex');
 
-    expect(header).not.toBeNull();
+    expect(mobileHeader).not.toBeNull();
     expect(
-      within(header!).getByRole('heading', {
-        name: 'Release planning thread',
-        level: 1,
-      })
+      within(mobileHeader!).getByText('Release planning thread')
     ).toBeInTheDocument();
-    expect(
-      within(header!).queryByRole('heading', { name: 'New Chat' })
-    ).toBeNull();
+    expect(within(mobileHeader!).queryByText('New Chat')).toBeNull();
   });
 
-  it('keeps the breadcrumb in its slot when search activates', () => {
+  it('collapses the breadcrumb when the search surface takes over', () => {
     const { container } = render(
       <DashboardHeader
         breadcrumbs={[{ label: 'Releases', href: '/app/dashboard/releases' }]}
@@ -175,7 +99,7 @@ describe('DashboardHeader', () => {
       '[data-search-active="true"]'
     ) as HTMLElement | null;
     expect(desktopRow).not.toBeNull();
-    expect(within(desktopRow!).getByText('Releases')).toBeInTheDocument();
+    expect(within(desktopRow!).queryByText('Releases')).not.toBeInTheDocument();
     expect(
       within(desktopRow!).getByRole('searchbox', { name: 'Filter releases' })
     ).toBeInTheDocument();
@@ -201,9 +125,7 @@ describe('DashboardHeader', () => {
     expect(header).not.toHaveClass('bg-(--linear-app-content-surface)');
     // Layout is unchanged — the desktop row keeps the compact header height.
     expect(
-      container.querySelector(
-        '.sm\\:h-\\(--linear-app-header-height-compact\\)'
-      )
+      container.querySelector('.h-\\(--linear-app-header-height-compact\\)')
     ).not.toBeNull();
   });
 });

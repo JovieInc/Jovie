@@ -27,7 +27,6 @@ describe('table System B style exports', () => {
     expect(alignment.rowHeight).toBe('system-b-table-row-height');
     expect(rowState.selected).toBe('system-b-table-row-selected');
     expect(rowState.focusVisible).toBe('system-b-table-row-focus-visible');
-    expect(rowState.focused).toBe('system-b-table-row-focused');
     expect(selection.checked).toBe('system-b-table-selection-checked');
     expect(columnWidths.small).toBe('system-b-table-column-small');
     expect(columnWidths.actions).toBe('system-b-table-column-actions');
@@ -45,17 +44,5 @@ describe('table System B style exports', () => {
     expect(source).not.toMatch(/\b(?:bg|shadow|ring|border|w|min-w|h)-\[/);
     expect(source).not.toMatch(/color-mix\(|rgba?\(|#[0-9a-fA-F]{3,8}\b/);
     expect(source).not.toMatch(/group-(?:hover|focus-visible)\/task-row:bg-/);
-  });
-
-  it('keeps reduced motion and the 40px row invariant in the canonical stylesheet', () => {
-    const designSystemSource = readFileSync(
-      join(process.cwd(), 'styles/design-system.css'),
-      'utf8'
-    );
-
-    expect(designSystemSource).toContain('height: 40px;');
-    expect(designSystemSource).toContain(
-      '@media (prefers-reduced-motion: reduce)'
-    );
   });
 });

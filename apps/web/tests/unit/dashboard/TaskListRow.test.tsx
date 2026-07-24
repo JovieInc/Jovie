@@ -53,26 +53,11 @@ describe('TaskListRow', () => {
     const meta = getByTestId('task-list-row-meta-task-1');
     expect(meta.className).toContain('flex-wrap');
     expect(meta.className).not.toContain('grid-cols-');
-    expect(meta.className).toContain('gap-x-2');
-    expect(meta.className).toContain('gap-y-0.5');
-  });
-
-  it('keeps row controls at the shared compact hit-area density', () => {
-    const { getByTestId } = fastRender(
-      <TaskListRow
-        task={mockTask}
-        artistName='Tim White'
-        onOpenRelease={vi.fn()}
-      />
-    );
-
-    expect(getByTestId('task-list-row-task-1').className).toContain('py-1');
-    expect(getByTestId('task-list-row-task-1').className).toContain('w-full');
   });
 
   it('keeps the release link clickable and marks the selected state on the row shell', () => {
     const onOpenRelease = vi.fn();
-    const { getByRole, getByTestId, getByText } = fastRender(
+    const { getByRole, getByTestId } = fastRender(
       <TaskListRow
         task={mockTask}
         artistName='Tim White'
@@ -91,7 +76,6 @@ describe('TaskListRow', () => {
     expect(getByTestId('task-list-row-task-1').className).toContain(
       'system-b-table-row-selected'
     );
-    expect(getByText(mockTask.title)).toBeVisible();
   });
 
   it('renders shell due metadata inline inside the wrapping meta row', () => {

@@ -136,16 +136,6 @@ const creatorRoutes = [
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
   },
   {
-    path: APP_ROUTES.TOUR_DATES,
-    name: 'Tour Dates',
-    kind: 'render',
-    surface: 'creator',
-    authRole: 'user',
-    contentSelector: '[data-testid="tour-dates-page"]',
-    requiresUserButton: true,
-    performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
-  },
-  {
     path: RELEASE_TASKS_ROUTE,
     name: 'Release Tasks',
     kind: 'dynamic',
@@ -312,6 +302,14 @@ const aliasRoutes = [
     acceptedDestinations: [APP_ROUTES.SETTINGS_CONTACTS],
   },
   {
+    path: APP_ROUTES.TOUR_DATES,
+    name: 'Legacy Touring Redirect',
+    kind: 'redirect',
+    surface: 'alias',
+    authRole: 'user',
+    acceptedDestinations: [APP_ROUTES.SETTINGS_TOURING],
+  },
+  {
     path: DASHBOARD_TIPPING_ROUTE,
     name: 'Legacy Tipping Redirect',
     kind: 'redirect',
@@ -336,7 +334,7 @@ const aliasRoutes = [
     kind: 'redirect',
     surface: 'alias',
     authRole: 'user',
-    acceptedDestinations: [APP_ROUTES.TOUR_DATES],
+    acceptedDestinations: [APP_ROUTES.SETTINGS_TOURING],
   },
 ] as const satisfies readonly DashboardRouteDescriptor[];
 
@@ -608,8 +606,6 @@ export const EXCLUDED_ROUTES: Record<string, string> = {
   '/:username/:slug/sounds': 'Release sounds (dynamic)',
   '/:username/:slug/:trackSlug': 'Track page (dynamic)',
   '/:username/...slug': 'Catch-all profile route',
-  '/dev/*': 'Developer utilities',
-  '/exp/*': 'Experimental/concept pages',
 };
 
 const fastHealthPaths = new Set([

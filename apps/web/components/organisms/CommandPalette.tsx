@@ -11,31 +11,13 @@
  *   - injecting the "Recent chats" section as an additional source.
  */
 
-import { usePathname, useRouter } from 'next/navigation';
-import {
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-} from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { CmdKPalette } from '@/components/organisms/CmdKPalette';
 import { type PaletteSection } from '@/components/organisms/SharedCommandPalette';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  useHeaderActions,
-  useOptionalHeaderActions,
-} from '@/contexts/HeaderActionsContext';
-import {
-  APP_SHELL_WORKSPACES,
-  getCurrentAppShellWorkspace,
-  getNextAppShellWorkspace,
-} from '@/lib/app-shell/workspaces';
 import type { EntityRef } from '@/lib/commands/entities';
-import type { NavCommand } from '@/lib/commands/registry';
-import { WORKSPACE_SWITCH_SHORTCUT } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
@@ -49,84 +31,48 @@ export function CommandPalette() {
   // (e.g., when AuthShellWrapper renders without its inner providers) it
   // should be a no-op instead of crashing.
   const dashboardData = useContext(DashboardDataContext);
-  const headerActions = useOptionalHeaderActions();
-  if (!dashboardData || !headerActions) {
+  if (!dashboardData) {
     return null;
   }
-  return <CommandPaletteController />;
-}
-
-/**
- * Main content-plane slot. AuthShellWrapper swaps this in for the active route
- * so Cmd+K never floats over a second, independently interactive page.
- */
-export function CommandPaletteMainSurface() {
-  const dashboardData = useContext(DashboardDataContext);
-  const { closeCommandPalette, isCommandPaletteOpen, setCommandPaletteHeader } =
-    useHeaderActions();
-  if (!dashboardData || !isCommandPaletteOpen) return null;
-  return (
-    <CommandPaletteInner
-      profileId={dashboardData.selectedProfile?.id}
-      isAdmin={dashboardData.isAdmin}
-      open={isCommandPaletteOpen}
-      onOpenChange={next => {
-        if (!next) closeCommandPalette();
-      }}
-      presentation='main'
-      onHeaderChange={setCommandPaletteHeader}
-    />
-  );
+  return <CommandPaletteInner profileId={dashboardData.selectedProfile?.id} />;
 }
 
 interface CommandPaletteInnerProps {
   readonly profileId: string | undefined;
-  readonly isAdmin: boolean;
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly presentation: 'main' | 'dialog';
-  readonly onHeaderChange?: (header: ReactNode | null) => void;
 }
 
-function CommandPaletteController() {
-  const { closeCommandPalette, isCommandPaletteOpen, openCommandPalette } =
-    useHeaderActions();
-  const isOpenRef = useRef(false);
-  isOpenRef.current = isCommandPaletteOpen;
+function CommandPaletteInner({ profileId }: CommandPaletteInnerProps) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
 
+  // Global ⌘K / Ctrl+K trigger.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const isK = event.key === 'k' || event.key === 'K';
-      if (!isK || !(event.metaKey || event.ctrlKey)) return;
-      if (event.shiftKey || event.altKey || isFormElement(event.target)) return;
+      if (!isK) return;
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.shiftKey || event.altKey) return;
+      const target = event.target as Element | null;
+      if (isFormElement(target)) return;
       event.preventDefault();
-      if (isOpenRef.current) closeCommandPalette();
-      else openCommandPalette();
+      setOpen(prev => !prev);
+    }
+    function onOpenCommandPalette() {
+      setOpen(true);
     }
     globalThis.addEventListener('keydown', onKeyDown);
-    globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, openCommandPalette);
+    globalThis.addEventListener(
+      OPEN_COMMAND_PALETTE_EVENT,
+      onOpenCommandPalette
+    );
     return () => {
       globalThis.removeEventListener('keydown', onKeyDown);
       globalThis.removeEventListener(
         OPEN_COMMAND_PALETTE_EVENT,
-        openCommandPalette
+        onOpenCommandPalette
       );
     };
-  }, [closeCommandPalette, openCommandPalette]);
-
-  return null;
-}
-
-function CommandPaletteInner({
-  profileId,
-  isAdmin,
-  open,
-  onOpenChange,
-  presentation,
-  onHeaderChange,
-}: CommandPaletteInnerProps) {
-  const router = useRouter();
-  const pathname = usePathname();
+  }, []);
 
   const { data: conversations } = useChatConversationsQuery({
     limit: RECENT_CHAT_LIMIT,
@@ -138,30 +84,6 @@ function CommandPaletteInner({
   // entity section so the shared list+keyboard machinery picks them up.
   const additionalSections = useMemo<PaletteSection[]>(() => {
     const sections: PaletteSection[] = [];
-    if (isAdmin) {
-      const currentWorkspace = getCurrentAppShellWorkspace(pathname);
-      const nextWorkspace = getNextAppShellWorkspace(
-        APP_SHELL_WORKSPACES,
-        currentWorkspace.id
-      );
-      if (nextWorkspace) {
-        const nav: NavCommand = {
-          kind: 'nav',
-          id: 'switch-workspace',
-          label: `Switch to ${nextWorkspace.label}`,
-          description: 'Change the active workspace.',
-          iconName: 'Columns2',
-          surfaces: ['cmdk'],
-          href: nextWorkspace.href,
-          shortcutLabel: WORKSPACE_SWITCH_SHORTCUT.keys,
-        };
-        sections.push({
-          id: 'workspace-actions',
-          label: 'Workspace',
-          items: [{ kind: 'nav', nav }],
-        });
-      }
-    }
     if (conversations && conversations.length > 0) {
       sections.push({
         id: 'recent-chats',
@@ -181,7 +103,7 @@ function CommandPaletteInner({
       });
     }
     return sections;
-  }, [conversations, isAdmin, pathname]);
+  }, [conversations]);
 
   const handleAdditionalSelect = useCallback(
     (id: string) => {
@@ -189,29 +111,18 @@ function CommandPaletteInner({
       if (id.startsWith('thread:')) {
         const threadId = id.slice('thread:'.length);
         router.push(`${APP_ROUTES.CHAT}/${threadId}`);
-        return;
-      }
-      if (id === 'switch-workspace') {
-        const currentWorkspace = getCurrentAppShellWorkspace(pathname);
-        const nextWorkspace = getNextAppShellWorkspace(
-          APP_SHELL_WORKSPACES,
-          currentWorkspace.id
-        );
-        if (nextWorkspace) router.push(nextWorkspace.href);
       }
     },
-    [pathname, router]
+    [router]
   );
 
   return (
     <CmdKPalette
       profileId={profileId ?? ''}
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={setOpen}
       additionalSectionsAfter={additionalSections}
       onAdditionalSelect={handleAdditionalSelect}
-      presentation={presentation}
-      onHeaderChange={onHeaderChange}
     />
   );
 }

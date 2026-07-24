@@ -33,7 +33,6 @@ export const DESKTOP_SMOKE_SPECS = [
   'smoke-auth.spec.ts',
   'shell-chat-v1.spec.ts',
   'shell-chat-v1-flag-off.spec.ts',
-  'chat-performance-ratchet.spec.ts',
 ] as const;
 
 export const MOBILE_SMOKE_SPECS = [

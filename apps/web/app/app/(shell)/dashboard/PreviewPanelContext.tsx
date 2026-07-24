@@ -2,8 +2,6 @@
 
 import {
   createContext,
-  type Dispatch,
-  type SetStateAction,
   useCallback,
   useContext,
   useEffect,
@@ -20,8 +18,6 @@ export interface PreviewPanelLink {
   category?: 'social' | 'music' | 'commerce' | 'other';
   isVisible: boolean;
   verificationStatus?: 'unverified' | 'pending' | 'verified';
-  /** Compare-and-swap token for link state mutations. */
-  version?: number;
 }
 
 export interface PreviewPanelData {
@@ -33,8 +29,6 @@ export interface PreviewPanelData {
   location: string | null;
   hometown: string | null;
   activeSinceYear: number | null;
-  /** Compare-and-swap token for dashboard profile edits. */
-  profileEditVersion?: number;
   links: PreviewPanelLink[];
   profilePath: string;
   dspConnections: {
@@ -62,8 +56,7 @@ interface PreviewPanelStateContextValue {
 
 interface PreviewPanelDataContextValue {
   previewData: PreviewPanelData | null;
-  /** Supports functional updates so hydrators can merge without races. */
-  setPreviewData: Dispatch<SetStateAction<PreviewPanelData | null>>;
+  setPreviewData: (data: PreviewPanelData | null) => void;
 }
 
 // Combined type for backwards compatibility

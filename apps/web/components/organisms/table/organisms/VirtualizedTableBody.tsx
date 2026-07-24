@@ -97,12 +97,6 @@ export interface VirtualizedTableBodyProps<TData> {
   readonly getRowClassName?: (row: TData, index: number) => string;
 
   /**
-   * Consumer-owned selected state for rows that do not use TanStack checkbox
-   * selection (for example, a row that owns an open details rail).
-   */
-  readonly isRowSelected?: (row: TData, index: number) => boolean;
-
-  /**
    * Get a stable test ID for a row when callers need selector-level targeting.
    */
   readonly getRowTestId?: (row: TData, index: number) => string | undefined;
@@ -187,7 +181,6 @@ export function VirtualizedTableBody<TData>({
   onRowShiftClick,
   getContextMenuItems,
   getRowClassName,
-  isRowSelected,
   getRowTestId,
   renderRow,
   getRowId,
@@ -255,7 +248,6 @@ export function VirtualizedTableBody<TData>({
             shouldVirtualize={useVirtual}
             virtualStart={virtualItem?.start}
             focusedIndex={focusedIndex}
-            isSelected={isRowSelected?.(rowData, rowIndex)}
             onRowClick={onRowClick}
             onRowContextMenu={onRowContextMenu}
             onKeyDown={onKeyDown}

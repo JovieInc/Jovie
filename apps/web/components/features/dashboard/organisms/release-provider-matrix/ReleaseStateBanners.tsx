@@ -1,7 +1,6 @@
 'use client';
 
 import type { ReleaseViewModel } from '@/lib/discography/types';
-import type { DspMatch } from '@/lib/queries';
 import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
 import { ImportProgressBanner } from './ImportProgressBanner';
 import { SmartLinkGateBanner } from './SmartLinkGateBanner';
@@ -9,8 +8,6 @@ import { SMART_LINK_SOFT_CAP } from './smart-link-gating';
 
 interface ReleaseStateBannersProps {
   readonly rows: ReleaseViewModel[];
-  readonly appleMusicMatches?: DspMatch[];
-  readonly isAppleMusicEligibilityLoading?: boolean;
   readonly showImportProgress: boolean;
   readonly showReleasesTable: boolean;
   readonly artistName: string | null;
@@ -31,8 +28,6 @@ interface ReleaseStateBannersProps {
 
 export function ReleaseStateBanners({
   rows,
-  appleMusicMatches,
-  isAppleMusicEligibilityLoading,
   showImportProgress,
   showReleasesTable,
   artistName,
@@ -51,17 +46,16 @@ export function ReleaseStateBanners({
 
   return (
     <>
-      <div
-        className='mx-3 lg:mx-4 mt-3 min-h-15'
-        data-testid='release-import-progress-slot'
-      >
-        <ImportProgressBanner
-          artistName={artistName}
-          importedCount={importedCount}
-          totalCount={totalCount}
-          visible={showImportProgress}
-        />
-      </div>
+      {showImportProgress && (
+        <div className='mx-3 lg:mx-4 mt-3'>
+          <ImportProgressBanner
+            artistName={artistName}
+            importedCount={importedCount}
+            totalCount={totalCount}
+            visible={showImportProgress}
+          />
+        </div>
+      )}
 
       {showReleasesTable &&
         firstProfileId &&
@@ -71,8 +65,6 @@ export function ReleaseStateBanners({
             profileId={firstProfileId}
             spotifyConnected={isSpotifyConnected}
             releases={rows}
-            matches={appleMusicMatches}
-            isLoading={isAppleMusicEligibilityLoading}
             onMatchStatusChange={onAppleMusicMatchStatusChange}
             className='mx-3 lg:mx-4 mt-3'
           />

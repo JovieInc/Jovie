@@ -203,47 +203,6 @@ export async function ensureBetterAuthTestUser({
     throw new Error('Better Auth test user conflict could not be resolved');
   }
 
-  // Old local databases can retain the pre-cutover `ba_dev_*` row for an
-  // otherwise valid browse persona. Its text id is not the persisted app-user
-  // UUID and would leak into queries keyed by `users.id`, producing 22P02.
-  // These identities are strictly allowlisted dev fixtures, so replacing the
-  // obsolete Better Auth row (and its cascade-owned sessions) is safer than
-  // perpetuating the invalid identity through the app shell.
-  if (
-    user.id !== baUserId &&
-    user.id.startsWith('ba_dev_') &&
-    isAllowlistedTestAccountEmail(normalizedEmail)
-  ) {
-    await db.delete(baUsers).where(eq(baUsers.id, user.id));
-
-    const [replacement] = await db
-      .insert(baUsers)
-      .values({
-        id: baUserId,
-        name: fullName,
-        email: normalizedEmail,
-        emailVerified: true,
-      })
-      .onConflictDoNothing()
-      .returning({ id: baUsers.id });
-
-    if (replacement) {
-      return replacement.id;
-    }
-
-    const [resolvedReplacement] = await db
-      .select({ id: baUsers.id })
-      .from(baUsers)
-      .where(or(eq(baUsers.email, normalizedEmail), eq(baUsers.id, baUserId)))
-      .limit(1);
-
-    if (resolvedReplacement?.id === baUserId) {
-      return resolvedReplacement.id;
-    }
-
-    throw new Error('Better Auth test user replacement could not be resolved');
-  }
-
   return user.id;
 }
 

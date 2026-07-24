@@ -7,13 +7,10 @@
  * `signal_type` which always wins over the heuristics.
  */
 
-import { BRAND_DEAL_OPPORTUNITY_KIND } from './brand-deal-opportunity';
-
 export const OPPORTUNITY_SIGNAL_TYPES = [
   'new_song',
   'new_event',
   'new_profile_match',
-  'brand_deal',
   'other',
 ] as const;
 
@@ -44,7 +41,6 @@ const KIND_PREFIX_RULES: readonly (readonly [
   ['new_song', ['release.', 'song.', 'track.', 'music.']],
   ['new_event', ['calendar.', 'event.', 'tour.', 'booking.', 'show.']],
   ['new_profile_match', ['profile.', 'profile_match.', 'match.', 'collab.']],
-  ['brand_deal', [BRAND_DEAL_OPPORTUNITY_KIND]],
 ];
 
 const PROFILE_MATCH_PATTERN =
@@ -118,6 +114,5 @@ export const OPPORTUNITY_SIGNAL_TYPE_META: Readonly<
     label: 'Profile Match',
     filterLabel: 'Profile Matches',
   },
-  brand_deal: { label: 'Brand Deal', filterLabel: 'Brand Deals' },
   other: { label: 'Suggestion', filterLabel: 'Other' },
 };

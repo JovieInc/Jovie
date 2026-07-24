@@ -17,17 +17,12 @@ vi.mock('@/lib/flags/client', () => ({
   useAppFlag: () => false,
 }));
 
-vi.mock('@/features/dashboard/organisms/PreviewDataHydrator', () => ({
-  PreviewDataHydrator: ({
-    initialLinks,
-  }: {
-    initialLinks: readonly unknown[];
-  }) => (
-    <div
-      data-testid='preview-data-hydrator'
-      data-initial-link-count={initialLinks.length}
-    />
-  ),
+vi.mock('@/hooks/useRegisterRightPanel', () => ({
+  useRegisterRightPanel: vi.fn(),
+}));
+
+vi.mock('@/features/dashboard/organisms/profile-contact-sidebar', () => ({
+  ProfileContactSidebar: () => null,
 }));
 
 vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
@@ -89,35 +84,15 @@ const pendingTourDate = {
 };
 
 describe('OpportunityInboxPageClient', () => {
-  it('hydrates the artist-profile rail with the inbox profile data', async () => {
-    render(
-      <OpportunityInboxPageClient
-        inbox={{ cards: [], emptyActionCards: [] }}
-        initialLinks={[
-          {
-            id: 'spotify-link',
-            platform: 'spotify',
-            platformType: 'dsp',
-            url: 'https://open.spotify.com/artist/example',
-            sortOrder: 0,
-            isActive: true,
-            displayText: 'Spotify',
-            state: 'active',
-            confidence: null,
-            sourcePlatform: null,
-            sourceType: null,
-            evidence: null,
-            verificationStatus: null,
-            verificationToken: null,
-            verifiedAt: null,
-            version: 1,
-          },
-        ]}
-      />
+  it('registers a non-null right panel for the artist-profile rail', async () => {
+    const { useRegisterRightPanel } = await import(
+      '@/hooks/useRegisterRightPanel'
     );
-    expect(await screen.findByTestId('preview-data-hydrator')).toHaveAttribute(
-      'data-initial-link-count',
-      '1'
+    render(
+      <OpportunityInboxPageClient inbox={{ cards: [], emptyActionCards: [] }} />
+    );
+    expect(vi.mocked(useRegisterRightPanel)).toHaveBeenCalledWith(
+      expect.anything()
     );
   });
 
@@ -144,58 +119,7 @@ describe('OpportunityInboxPageClient', () => {
     );
 
     expect(screen.getByTestId('opportunity-inbox-feed')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Inbox' })).toBeInTheDocument();
-    expect(
-      screen.getByText('Pending opportunities, ready to accept or dismiss.')
-    ).toBeInTheDocument();
-  });
-
-  it('renders and filters a verified brand-deal decision', () => {
-    render(
-      <OpportunityInboxPageClient
-        inbox={{
-          cards: [
-            {
-              id: 'brand-deal-1',
-              signalType: 'brand_deal',
-              typeLabel: 'Brand Deal',
-              createdAt: '2026-07-29T10:00:00.000Z',
-              title: 'Example Brand creator-performance pilot',
-              why: '$7.5k-$12.5k · Backstage · verified · score 82.4',
-              primaryActionLabel: 'Approve buyer',
-              status: 'pending',
-              category: 'brand_deal',
-            },
-            {
-              id: 'song-1',
-              signalType: 'new_song',
-              typeLabel: 'New Song',
-              createdAt: '2026-07-29T09:00:00.000Z',
-              title: 'New single detected',
-              why: 'Native Spotify signal.',
-              primaryActionLabel: 'Set up release',
-              status: 'pending',
-              category: 'suggestion',
-            },
-          ],
-          emptyActionCards: [],
-        }}
-      />
-    );
-
-    expect(
-      screen.getByText('Example Brand creator-performance pilot')
-    ).toBeVisible();
-    expect(
-      screen.getByText('$7.5k-$12.5k · Backstage · verified · score 82.4')
-    ).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Approve buyer' })).toBeVisible();
-
-    fireEvent.click(screen.getByTestId('opportunity-inbox-filter-brand_deal'));
-    expect(
-      screen.getByText('Example Brand creator-performance pilot')
-    ).toBeVisible();
-    expect(screen.queryByText('New single detected')).not.toBeInTheDocument();
+    expect(screen.getByText('Home — the inbox')).toBeInTheDocument();
   });
 
   it('renders the empty state when there are no cards', () => {
@@ -220,9 +144,9 @@ describe('OpportunityInboxPageClient', () => {
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
     expect(screen.getByText('Your Inbox Is Clear')).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Connect catalog' })
-    ).toHaveAttribute('href', '/app/settings/artist-profile');
+    expect(screen.getByTestId('opportunity-inbox-empty-cta')).toHaveTextContent(
+      'Connect catalog'
+    );
   });
 
   it('filters cards by signal type and restores them on All', () => {

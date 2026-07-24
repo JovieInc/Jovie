@@ -110,11 +110,11 @@ html[data-desktop-runtime="electron"]
   -webkit-app-region: no-drag;
 }
 
-/* Titlebar rail alignment for the canonical app shell — the app-shell-body has
+/* Titlebar rail alignment for shellChatV1 — the app-shell-body has
    p-[--linear-app-shell-gap] on all sides, so the sidebar column starts at
    gap offset from the left edge. Mirror that offset in the titlebar so the
    sidebar-cell left edge aligns with the sidebar rail. */
-html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
+html[data-desktop-runtime="electron"] [data-shell-design="shellChatV1"]
   [data-electron-titlebar="true"] {
   padding-left: var(--linear-app-shell-gap);
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
@@ -738,12 +738,13 @@ body {
   }
   /* Tactile press — transform only; never transition:all (DESIGN.md / JOV-3368) */
   .interactive-press {
-    @apply transition-transform duration-subtle ease-subtle active:scale-[var(--scale-press)] motion-reduce:active:scale-100;
+    @apply transition-transform duration-subtle ease-subtle active:scale-[0.96];
   }
   /* Button component styles */
   .btn {
-    @apply inline-flex items-center justify-center rounded-full text-app font-medium transition-[background-color,border-color,color] duration-normal ease-subtle disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center rounded-full text-app font-medium transition-[background-color,transform] duration-normal ease-subtle disabled:opacity-50 disabled:pointer-events-none;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-(--linear-bg-page);
+    @apply active:scale-[0.96];
   }
   .btn-primary {
     background-color: var(--color-btn-primary-bg);
@@ -2035,6 +2036,23 @@ body {
   h6 {
     @apply text-base lg:text-lg;
   }
+  /* Interactive controls — tactile press via transform only (no transition:all) */
+  :where(
+    button:not(:disabled):not([data-static="true"]),
+    [role="button"]:not([aria-disabled="true"]):not([data-static="true"]),
+    summary
+  ) {
+    transition: transform var(--duration-subtle) var(--ease-subtle);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :where(
+        button:not(:disabled):not([data-static="true"]),
+        [role="button"]:not([aria-disabled="true"]):not([data-static="true"]),
+        summary
+      ):active {
+      transform: scale(0.96);
+    }
+  }
 }
 
 /* ============================================
@@ -2156,7 +2174,7 @@ body {
     );
   }
   .btn-press {
-    @apply transition-transform duration-subtle ease-subtle active:scale-[var(--scale-press)] motion-reduce:active:scale-100;
+    @apply transition-transform duration-subtle ease-subtle active:scale-[0.96];
   }
   /* Chat empty state — refined depth & motion */
   .chat-logo-mark {
@@ -2681,8 +2699,6 @@ body {
   --color-warning-subtle: var(--color-warning-subtle);
   --color-info: var(--color-info);
   --color-info-subtle: var(--color-info-subtle);
-  /* Named accent utilities use the existing carbon palette runtime tokens. */
-  --color-accent-blue: var(--color-accent-blue);
   --color-error-subtle: var(--color-error-subtle);
   --color-error-foreground: var(--color-error-foreground);
   /* Accent token — enables bg-accent-subtle, text-accent, border-accent */

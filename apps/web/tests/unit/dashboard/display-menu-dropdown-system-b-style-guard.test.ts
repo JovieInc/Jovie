@@ -8,16 +8,6 @@ const sourcePath = join(
 );
 
 describe('DisplayMenuDropdown System B style guard', () => {
-  it('composes the canonical toolbar action trigger instead of restoring local chrome', () => {
-    const source = readFileSync(sourcePath, 'utf8');
-
-    expect(source).toContain(
-      "import { PAGE_TOOLBAR_ACTION_BUTTON_CLASS } from './PageToolbar';"
-    );
-    expect(source).toContain('PAGE_TOOLBAR_ACTION_BUTTON_CLASS');
-    expect(source).not.toContain('hover:border-subtle');
-  });
-
   it('keeps the checked switch state neutral instead of primary/accent filled', () => {
     const source = readFileSync(sourcePath, 'utf8');
 

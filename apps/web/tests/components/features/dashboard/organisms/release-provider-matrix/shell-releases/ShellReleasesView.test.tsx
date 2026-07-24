@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
-import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
 import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
@@ -13,19 +13,16 @@ import {
 } from '@/contexts/RightPanelContext';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
-const { mockUseDspMatchesQuery, mockUsePlanGate } = vi.hoisted(() => ({
-  mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
-  mockUsePlanGate: vi.fn(() => ({
-    isLoading: false,
-    isError: false,
-    smartLinksLimit: null as number | null,
-    isPro: true,
-    canCreateManualReleases: true,
-    canGenerateAlbumArt: false,
-    canGenerateReleasePlans: true,
-    canEditSmartLinks: true,
-    canAccessFutureReleases: true,
-  })),
+const mockUsePlanGate = vi.fn(() => ({
+  isLoading: false,
+  isError: false,
+  smartLinksLimit: null as number | null,
+  isPro: true,
+  canCreateManualReleases: true,
+  canGenerateAlbumArt: false,
+  canGenerateReleasePlans: true,
+  canEditSmartLinks: true,
+  canAccessFutureReleases: true,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -103,17 +100,7 @@ vi.mock(
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/AppleMusicSyncBanner',
   () => ({
-    AppleMusicSyncBanner: ({
-      isLoading,
-      matches,
-    }: {
-      readonly isLoading?: boolean;
-      readonly matches?: Array<{ readonly status: string }>;
-    }) =>
-      isLoading ||
-      matches?.some(match => match.status === 'confirmed') ? null : (
-        <div data-testid='apple-music-sync-banner' />
-      ),
+    AppleMusicSyncBanner: () => <div data-testid='apple-music-sync-banner' />,
   })
 );
 
@@ -216,7 +203,6 @@ vi.mock('@/lib/queries', () => {
     useSaveReleaseStatusMutation: () => mutation,
     useSaveReleaseTargetPlaylistsMutation: () => mutation,
     useSyncReleasesFromSpotifyMutation: () => mutation,
-    useDspMatchesQuery: () => mockUseDspMatchesQuery(),
     usePlanGate: () => mockUsePlanGate(),
   };
 });
@@ -322,10 +308,7 @@ function RightPanelProbe() {
 function HeaderActionsProbe() {
   const state = useOptionalHeaderActions();
   return (
-    <div
-      data-testid='header-actions-probe'
-      data-search-total={state?.headerSearchAdapter?.totalCount}
-    >
+    <div data-testid='header-actions-probe'>
       <HeaderSearchSurfaceFromContext />
       {state?.headerActions}
     </div>
@@ -365,7 +348,6 @@ function renderShell(
 }
 
 beforeEach(() => {
-  mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
   mockUsePlanGate.mockReturnValue({
     isLoading: false,
     isError: false,
@@ -380,65 +362,6 @@ beforeEach(() => {
 });
 
 describe('ShellReleasesView', () => {
-  it('waits to mount the list until Apple eligibility resolves, then commits banner and rows together', () => {
-    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
-    const rendered = renderShell(
-      [fakeRelease({ id: 'release-1', title: 'Wait for eligibility' })],
-      { spotifyConnected: true }
-    );
-
-    expect(
-      screen.queryByRole('option', { name: /Wait for eligibility/ })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('apple-music-sync-banner')
-    ).not.toBeInTheDocument();
-
-    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
-    rendered.rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <HeaderActionsProvider>
-          <RightPanelProvider>
-            <ShellReleasesView
-              releases={[
-                fakeRelease({ id: 'release-1', title: 'Wait for eligibility' }),
-              ]}
-              providerConfig={providerConfig}
-              primaryProviders={primaryProviders}
-              artistName='Bahamas'
-              spotifyConnected
-            />
-            <HeaderActionsProbe />
-            <RightPanelProbe />
-          </RightPanelProvider>
-        </HeaderActionsProvider>
-      </QueryClientProvider>
-    );
-
-    expect(
-      screen.getByRole('option', { name: /Wait for eligibility/ })
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('apple-music-sync-banner')).toBeInTheDocument();
-  });
-
-  it('keeps the settled no-banner release list mounted', () => {
-    mockUseDspMatchesQuery.mockReturnValue({
-      data: [{ status: 'confirmed' }],
-      isLoading: false,
-    });
-
-    renderShell([fakeRelease({ id: 'release-2', title: 'Already linked' })], {
-      spotifyConnected: true,
-    });
-
-    expect(
-      screen.getByRole('option', { name: /Already linked/ })
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId('apple-music-sync-banner')
-    ).not.toBeInTheDocument();
-  });
-
   it('renders one row per release with title + artist', () => {
     renderShell([
       fakeRelease({ id: '1', title: 'Lost in the Light' }),
@@ -531,21 +454,24 @@ describe('ShellReleasesView', () => {
     });
   });
 
-  it('registers release filtering behind the shared global search trigger', async () => {
+  it('registers shell search exposing the release count in the shared trigger', async () => {
     renderShell([
       fakeRelease({ id: '1', title: 'Alpha' }),
       fakeRelease({ id: '2', title: 'Beta' }),
     ]);
     const probe = await screen.findByTestId('header-actions-probe');
     expect(probe).toBeInTheDocument();
-    expect(probe).toHaveAttribute('data-search-total', '2');
-    const searchTrigger = await screen.findByRole('button', {
-      name: 'Search Jovie',
+    expect(
+      screen.queryByRole('button', { name: /search releases/i })
+    ).not.toBeInTheDocument();
+    const filterTrigger = await screen.findByRole('button', {
+      name: /filter releases/i,
     });
-    expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
+    expect(filterTrigger).toHaveTextContent('2');
+    expect(filterTrigger).toHaveAttribute('data-app-search-trigger', 'true');
   });
 
-  it('does not open a second route-filter popup from the shell trigger', async () => {
+  it('opens the releases filter through the shell-owned trigger', async () => {
     renderShell([fakeRelease({ id: '1', title: 'Alpha' })]);
 
     expect(
@@ -553,12 +479,12 @@ describe('ShellReleasesView', () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Search Jovie' })
+      await screen.findByRole('button', { name: /filter releases/i })
     );
 
     expect(
-      screen.queryByRole('combobox', { name: 'Filter releases' })
-    ).not.toBeInTheDocument();
+      await screen.findByRole('combobox', { name: 'Filter releases' })
+    ).toBeInTheDocument();
   });
 
   describe('entitlement gating', () => {

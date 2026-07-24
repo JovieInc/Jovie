@@ -164,7 +164,7 @@ export function LibraryAssetSharePanel({
       {visibility === 'private' ? (
         <Button
           type='button'
-          variant='secondary'
+          variant='outline'
           size='sm'
           onClick={() => {
             handleRevoke().catch(() => {});

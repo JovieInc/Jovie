@@ -86,10 +86,12 @@ import { useAppFlag } from '@/lib/flags/client';
 
 export function MyComponent() {
   const stripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
+  const designV1Enabled = useAppFlag('DESIGN_V1');
 
   return (
     <div>
       {stripeConnectEnabled && <PayoutsComponent />}
+      {designV1Enabled && <DesignV1Component />}
     </div>
   );
 }
@@ -289,10 +291,12 @@ import { useAppFlag } from '@/lib/flags/client';
 
 export function MyComponent() {
   const stripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
+  const designV1Enabled = useAppFlag('DESIGN_V1');
 
   return (
     <div>
       {stripeConnectEnabled && <PayoutsComponent />}
+      {designV1Enabled && <DesignV1Component />}
     </div>
   );
 }

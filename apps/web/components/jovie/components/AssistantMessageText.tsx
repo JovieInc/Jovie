@@ -16,18 +16,6 @@ function tokenKey(token: ChatToken, index: number): string {
   return `skill:${token.id}:${index}`;
 }
 
-/**
- * Preserve Streamdown's block rendering for structured markdown. Plain prose
- * adjacent to an entity token is safe to render inline, which keeps the whole
- * sentence on one text flow instead of creating detached paragraph blocks.
- */
-function isInlineMarkdownFragment(content: string): boolean {
-  return (
-    !/[\r\n]/.test(content) &&
-    !/^\s*(?:[-*+] |\d+[.)] |#{1,6}\s|>|```)/.test(content)
-  );
-}
-
 interface AssistantMessageTextProps {
   readonly content: string;
   readonly isStreaming?: boolean;
@@ -58,7 +46,6 @@ export function AssistantMessageText({
               key={key}
               content={token.value}
               isStreaming={isStreaming}
-              inline={isInlineMarkdownFragment(token.value)}
             />
           );
         }

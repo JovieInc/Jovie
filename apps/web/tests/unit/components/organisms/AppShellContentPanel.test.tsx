@@ -25,24 +25,16 @@ describe('AppShellContentPanel', () => {
         frame='none'
         contentPadding='compact'
         scroll='page'
-        data-testid='shell-panel'
       >
         <div>Settings content</div>
       </AppShellContentPanel>
     );
 
     expect(screen.getByText('Settings content')).toBeInTheDocument();
-    const pageScrollOwner = screen.getByTestId('shell-panel');
     const outerPanel = container.querySelector('.mx-auto');
     expect(outerPanel).toHaveClass('max-w-(--app-shell-content-max-form)');
     expect(container.innerHTML).toContain('px-3 py-3 sm:px-3.5 sm:py-3.5');
-    expect(pageScrollOwner).toHaveClass(
-      'min-h-0',
-      'overflow-y-auto',
-      'overflow-x-hidden',
-      'overscroll-contain'
-    );
-    expect(outerPanel).not.toHaveClass('overflow-y-auto');
+    expect(container.innerHTML).toContain('overflow-visible');
   });
 
   it('keeps the toolbar and content on the same outer inset contract', () => {

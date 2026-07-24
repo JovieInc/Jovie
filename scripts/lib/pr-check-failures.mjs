@@ -14,6 +14,7 @@ export const AGENT_BRANCH_RE_LEGACY = /(^|\/)jov-\d+/i;
 
 export function isAgentBranch(headRefName) {
   if (!headRefName) return false;
+  if (headRefName.startsWith('gtmq_')) return false;
   return (
     AGENT_BRANCH_RE.test(headRefName) ||
     AGENT_BRANCH_RE_LEGACY.test(headRefName)
@@ -57,14 +58,6 @@ export const ADVISORY_CHECK_NAMES = Object.freeze(
     'Taste Label Guard',
     'Claude Review',
     'Seer Code Review',
-    // PR Visual Review is explicitly advisory (workflow header + job name).
-    // Terminal red must not dequeue green native-MQ members.
-    'Capture changed UI (desktop + mobile) (advisory)',
-    'Review screenshots and post advisory review',
-    'PR Visual Review',
-    // Hosted quality signals — not branch-protection required contexts.
-    'SonarCloud Code Analysis',
-    'Vercel Agent Review',
     'scope-judge',
     'Scope Alignment Check',
     // Folded into ci-fast's Structural Contract; retained for old PR heads
@@ -85,17 +78,6 @@ export const ADVISORY_CHECK_NAMES = Object.freeze(
       .map(job => job.name),
   ].filter((name, index, names) => names.indexOf(name) === index)
 );
-
-// Controller runs are orchestration receipts, never product-quality gates.
-// In particular, a failed controller attempt can be the *effect* of a stale
-// label or transient queue mutation. Treating its `enroll` job as a source-CI
-// failure creates a feedback loop: the next controller run sees its own red
-// receipt, dequeues an otherwise green PR, and keeps it stranded. Scope this
-// by workflow identity rather than by the generic job names so an unrelated
-// `enroll` safety check still fails closed.
-export const ADVISORY_CHECK_WORKFLOWS = Object.freeze([
-  'Merge Queue Auto-Enroll',
-]);
 
 export const REQUIRED_CHECK_NAMES = Object.freeze(
   parseRequiredStatusChecksFromYaml(branchProtectionYaml).map(name => ({
@@ -120,13 +102,6 @@ export function isAdvisoryCheckName(name) {
   return ADVISORY_CHECK_NAMES.includes(name ?? '');
 }
 
-export function isAdvisoryCheck(check) {
-  return (
-    isAdvisoryCheckName(normalizeCheckName(check)) ||
-    ADVISORY_CHECK_WORKFLOWS.includes(check?.workflow ?? '')
-  );
-}
-
 /**
  * Terminal failures only — mirrors scripts/drain-pr-queue.sh check_failures_for_pr.
  * Pending/queued/cancelled runs are not failures.
@@ -145,7 +120,7 @@ export function extractTerminalFailures(checks) {
   for (const check of checks ?? []) {
     if (!isTerminalFailure(check)) continue;
     const name = normalizeCheckName(check);
-    if (isAdvisoryCheck(check)) continue;
+    if (isAdvisoryCheckName(name)) continue;
     names.add(name);
   }
   return [...names].sort();

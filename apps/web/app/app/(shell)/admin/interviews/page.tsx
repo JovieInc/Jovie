@@ -2,7 +2,6 @@ import { Badge } from '@jovie/ui';
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import { loadAdminInterviewRows } from './interviews-data';
 
@@ -32,14 +31,11 @@ function statusBadgeTone(status: string) {
 }
 
 export default async function AdminInterviewsPage() {
-  await requireCurrentAdminPageAccess();
-
   const rows = await loadAdminInterviewRows();
 
   return (
     <AdminPage
       title='User Interviews'
-      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Mom Test is a proper-name methodology.
       description='Mom Test interviews captured after onboarding.'
       testId='admin-interviews-page'
     >

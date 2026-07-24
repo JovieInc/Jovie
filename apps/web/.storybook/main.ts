@@ -409,18 +409,9 @@ const config: StorybookConfig = {
       },
     };
 
-    // Suppress "use client" directive warnings in build output.
-    // build.target must match the esnext esbuild/optimizeDeps targets above:
-    // `storybook build` lowers final chunks with esbuild against build.target
-    // (default 'modules' = chrome87/edge88/es2020/firefox78/safari14), and that
-    // lowering hard-fails on object rest/destructuring in Storybook/Next
-    // packages ("Transforming destructuring to the configured target
-    // environment ... is not supported yet") — the exact merge-queue failure in
-    // issue #14841. The preview bundle only runs in current Chromium (CI +
-    // Chromatic), so esnext is safe.
+    // Suppress "use client" directive warnings in build output
     config.build = {
       ...config.build,
-      target: 'esnext',
       rollupOptions: {
         ...config.build?.rollupOptions,
         onwarn(warning, warn) {

@@ -78,7 +78,6 @@ vi.mock('@/lib/db/schema/connectors', () => ({
     status: 'suggested_actions.status',
     payload: 'suggested_actions.payload',
     kind: 'suggested_actions.kind',
-    signalType: 'suggested_actions.signalType',
     approvedAt: 'suggested_actions.approvedAt',
   },
 }));
@@ -130,41 +129,6 @@ const BOOKING_PAYLOAD = {
   startsAt: '2026-08-01T18:00:00.000Z',
   endsAt: '2026-08-01T19:00:00.000Z',
   timeZone: 'America/Los_Angeles',
-};
-
-const VERIFIED_BRAND_DEAL_PAYLOAD = {
-  title: 'Example Brand creator-performance pilot',
-  buyerName: 'Alex Buyer',
-  buyerCompany: 'Example Brand',
-  budgetMinCents: 750_000,
-  budgetMaxCents: 1_250_000,
-  currency: 'USD',
-  sourceLabel: 'Backstage',
-  sourceType: 'backstage',
-  sourceAccount: 't@timwhite.co',
-  requiredSourceAccount: 't@timwhite.co',
-  sourceReference: 'https://www.backstage.com/casting/example',
-  observedAt: '2026-07-29T10:00:00.000Z',
-  evidenceStatus: 'verified',
-  confidence: 1,
-  identityMatched: true,
-  ownershipVerified: true,
-  personalDealVerified: true,
-  relationshipType: 'authenticated_marketplace_match',
-  rightsSummary: '90-day organic usage, no exclusivity',
-  depositPercent: 50,
-  activeSponsorCampaignCount: 0,
-  includedRevisions: 1,
-  usageTermDays: 90,
-  exclusivity: 'none',
-  routeToLyb: false,
-  lybPaidFlowVerified: false,
-  externalSendApproved: false,
-  commercialApprovalId: null,
-  expectedUpfrontCashCents: 500_000,
-  closeProbability: 0.6,
-  repeatPotential: 1.5,
-  creatorMinutes: 60,
 };
 
 function makeRequest() {
@@ -245,7 +209,6 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
       id: suggestedActions.id,
       payload: suggestedActions.payload,
       kind: suggestedActions.kind,
-      signalType: suggestedActions.signalType,
     });
 
     // Workflow enqueue gets the row's own payload, no second DB round-trip.
@@ -287,81 +250,6 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
     );
   });
 
-  it('approves a brand-deal buyer for preparation without entering the calendar executor', async () => {
-    mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
-    mockDbUpdateReturning.mockResolvedValueOnce([
-      {
-        id: ACTION_ID,
-        payload: VERIFIED_BRAND_DEAL_PAYLOAD,
-        kind: 'brand_deal.opportunity',
-        signalType: 'brand_deal',
-      },
-    ]);
-
-    const response = await POST(makeRequest(), makeParams(ACTION_ID));
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body).toEqual({
-      ok: true,
-      approvalId: ACTION_ID,
-      status: 'approved-for-preparation',
-    });
-    expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
-    expect(mockRecordInboxDecision).toHaveBeenCalledWith({
-      suggestedActionId: ACTION_ID,
-      userId: USER_ID,
-      verdict: 'approved',
-      cardKind: 'brand_deal.opportunity',
-      surface: 'opportunity-inbox',
-    });
-  });
-
-  it('fails an unverified brand-deal row closed without entering the calendar executor', async () => {
-    mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
-    mockDbUpdateReturning.mockResolvedValueOnce([
-      {
-        id: ACTION_ID,
-        payload: {
-          ...VERIFIED_BRAND_DEAL_PAYLOAD,
-          ownershipVerified: false,
-        },
-        kind: 'brand_deal.opportunity',
-        signalType: 'brand_deal',
-      },
-    ]);
-
-    const response = await POST(makeRequest(), makeParams(ACTION_ID));
-    const body = await response.json();
-
-    expect(response.status).toBe(422);
-    expect(body).toEqual({ error: 'brand-deal-evidence-unverified' });
-    expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
-    expect(mockRecordInboxDecision).not.toHaveBeenCalled();
-    expect(mockDbUpdateSet).toHaveBeenLastCalledWith({ status: 'failed' });
-  });
-
-  it('fails a persisted noncanonical brand-deal alias closed', async () => {
-    mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
-    mockDbUpdateReturning.mockResolvedValueOnce([
-      {
-        id: ACTION_ID,
-        payload: VERIFIED_BRAND_DEAL_PAYLOAD,
-        kind: 'ugc.booking',
-        signalType: 'brand_deal',
-      },
-    ]);
-
-    const response = await POST(makeRequest(), makeParams(ACTION_ID));
-    const body = await response.json();
-
-    expect(response.status).toBe(422);
-    expect(body).toEqual({ error: 'brand-deal-evidence-unverified' });
-    expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
-    expect(mockRecordInboxDecision).not.toHaveBeenCalled();
-    expect(mockDbUpdateSet).toHaveBeenLastCalledWith({ status: 'failed' });
-  });
-
   it('CAS miss + recovery "enqueued" -> 200 approved-recovered, no direct enqueue call', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
     mockDbUpdateReturning.mockResolvedValueOnce([]);
@@ -384,39 +272,6 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
     // Recovery owns enqueueing internally but currently does not perform taste
     // writeback. Leave that gap unspecified here so this suite does not freeze it.
     expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
-  });
-
-  it('CAS miss + decision-only recovery stays approved for preparation', async () => {
-    mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
-    mockDbUpdateReturning.mockResolvedValueOnce([]);
-    mockRecoverOrphanedApprovedAction.mockResolvedValueOnce('decision-only');
-
-    const response = await POST(makeRequest(), makeParams(ACTION_ID));
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body).toEqual({
-      ok: true,
-      approvalId: ACTION_ID,
-      status: 'approved-for-preparation',
-    });
-    expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
-  });
-
-  it('CAS miss + invalid decision-only recovery fails closed', async () => {
-    mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
-    mockDbUpdateReturning.mockResolvedValueOnce([]);
-    mockRecoverOrphanedApprovedAction.mockResolvedValueOnce(
-      'invalid-decision-only'
-    );
-
-    const response = await POST(makeRequest(), makeParams(ACTION_ID));
-    const body = await response.json();
-
-    expect(response.status).toBe(422);
-    expect(body).toEqual({ error: 'brand-deal-evidence-unverified' });
-    expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
-    expect(mockDbUpdateSet).toHaveBeenLastCalledWith({ status: 'failed' });
   });
 
   it('CAS miss + recovery "already-queued" -> 200 approved-pending-enqueue', async () => {

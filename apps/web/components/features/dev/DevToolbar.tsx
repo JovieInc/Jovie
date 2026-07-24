@@ -2,7 +2,6 @@
 
 import { Button } from '@jovie/ui';
 import {
-  Activity,
   ArrowUpCircle,
   Check,
   ChevronDown,
@@ -27,25 +26,15 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
-import { useStoredAppFlagOverrides } from '@/lib/flags/client';
+import { useAppFlag, useStoredAppFlagOverrides } from '@/lib/flags/client';
 import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
+  DESIGN_V1_ALIAS_FLAGS,
 } from '@/lib/flags/contracts';
-import {
-  getUxLatencySummaries,
-  subscribeUxLatency,
-} from '@/lib/monitoring/interaction-latency';
 import {
   registerServiceWorker,
   SW_ENABLED_KEY,
@@ -63,12 +52,16 @@ type FlagEntry = {
 
 const ALL_FLAGS: FlagEntry[] = (
   Object.entries(APP_FLAG_OVERRIDE_KEYS) as [string, string][]
-).map(([name, key]) => ({
-  name,
-  key,
-  source: 'code' as const,
-  serverDefault: APP_FLAG_DEFAULTS[name as keyof typeof APP_FLAG_DEFAULTS],
-}));
+)
+  .filter(
+    ([name]) => !(DESIGN_V1_ALIAS_FLAGS as readonly string[]).includes(name)
+  )
+  .map(([name, key]) => ({
+    name,
+    key,
+    source: 'code' as const,
+    serverDefault: APP_FLAG_DEFAULTS[name as keyof typeof APP_FLAG_DEFAULTS],
+  }));
 
 /**
  * Lookup table: override-storage-key -> server default. Used to detect
@@ -254,20 +247,14 @@ function getPromoteTitle(
   return 'Promote to production';
 }
 
-function formatLatencyMs(value: number | null): string {
-  return value === null ? '—' : `${Math.round(value)}ms`;
-}
-
 export function DevToolbar({
   env,
   sha,
   version,
-  defaultHidden = false,
 }: Readonly<{
   env: string;
   sha: string;
   version: string;
-  defaultHidden?: boolean;
 }>) {
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(true);
@@ -291,9 +278,6 @@ export function DevToolbar({
   const [personaAction, setPersonaAction] = useState<PersonaActionState>(null);
   const personaStatusAbortRef = useRef<AbortController | null>(null);
   const [swEnabled, setSwEnabled] = useState(false);
-  const [latencySummaries, setLatencySummaries] = useState(() =>
-    getUxLatencySummaries()
-  );
   const [promoteState, setPromoteState] = useState<
     'idle' | 'checking' | 'ready' | 'promoting' | 'done' | 'error'
   >('idle');
@@ -303,6 +287,7 @@ export function DevToolbar({
   } | null>(null);
   const { theme, setTheme } = useTheme();
   const overridesCtx = useStoredAppFlagOverrides();
+  const designV1Enabled = useAppFlag('DESIGN_V1');
   const flagBadgeCtx = useFlagBadges();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -325,26 +310,13 @@ export function DevToolbar({
     };
   }, []);
 
-  // Restore state from localStorage and mark as mounted.
-  // Compact surfaces (e.g. /app/chat via defaultHidden) always start with the
-  // flag drawer collapsed — only the bottom bar + badge count may show — so a
-  // prior expanded session on another route cannot overwhelm the chat UI.
+  // Restore state from localStorage and mark as mounted
   useEffect(() => {
     setMounted(true);
-    const storedOpen = localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1';
-    setOpen(defaultHidden ? false : storedOpen);
-    const storedHidden = localStorage.getItem(TOOLBAR_HIDDEN_KEY);
-    setHidden(storedHidden === null ? defaultHidden : storedHidden === '1');
+    setOpen(localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1');
+    setHidden(localStorage.getItem(TOOLBAR_HIDDEN_KEY) === '1');
     setSwEnabled(localStorage.getItem(SW_ENABLED_KEY) === '1');
-  }, [defaultHidden]);
-
-  useEffect(
-    () =>
-      subscribeUxLatency(() => {
-        setLatencySummaries(getUxLatencySummaries());
-      }),
-    []
-  );
+  }, []);
 
   // Keyboard shortcut: Cmd+Shift+D (Mac) / Ctrl+Shift+D (other)
   useEffect(() => {
@@ -378,7 +350,7 @@ export function DevToolbar({
 
   // Expose toolbar height as a CSS variable so scrollable content areas can
   // add their own bottom padding without shrinking the full-viewport app shell.
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (hidden) {
       document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
       return;
@@ -391,13 +363,9 @@ export function DevToolbar({
       );
     };
     updateVar();
-    const observer =
-      typeof ResizeObserver === 'undefined'
-        ? null
-        : new ResizeObserver(updateVar);
-    if (toolbarRef.current) observer?.observe(toolbarRef.current);
+    const timer = setTimeout(updateVar, 220);
     return () => {
-      observer?.disconnect();
+      clearTimeout(timer);
       document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
     };
   }, [open, hidden]);
@@ -568,11 +536,6 @@ export function DevToolbar({
     });
   }
 
-  const collapseDrawer = useCallback(() => {
-    setOpen(false);
-    localStorage.setItem(TOOLBAR_STORAGE_KEY, '0');
-  }, []);
-
   const hide = useCallback(() => {
     setHidden(true);
     localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
@@ -596,14 +559,20 @@ export function DevToolbar({
       ).length,
     [validOverrides]
   );
+  const designV1OverrideKey = APP_FLAG_OVERRIDE_KEYS.DESIGN_V1;
+  const designV1Overridden =
+    designV1OverrideKey in overrides &&
+    isMeaningfulOverride(
+      designV1OverrideKey,
+      overrides[designV1OverrideKey] as boolean
+    );
+
   /**
    * Set an override unless the new value matches the server default — in
    * which case clear the override so the count stays accurate and stale
    * no-op overrides don't accumulate. Read current state from the
    * `overrides` map directly (not from `useAppFlag` closure) so rapid
    * double-clicks don't race against a pending re-render.
-   * After selection, collapse the flag drawer so it cannot overwhelm chat
-   * (or other compact surfaces); the override badge keeps the count visible.
    */
   const setOrClearOverride = useCallback(
     (key: string, value: boolean) => {
@@ -616,23 +585,16 @@ export function DevToolbar({
         overridesCtx.setOverride(key, value);
       }
       flashFlag(key);
-      collapseDrawer();
     },
-    [collapseDrawer, flashFlag, overridesCtx]
+    [flashFlag, overridesCtx]
   );
 
-  const clearOverrideAndCollapse = useCallback(
-    (key: string) => {
-      overridesCtx.removeOverride(key);
-      collapseDrawer();
-    },
-    [collapseDrawer, overridesCtx]
-  );
-
-  const clearAllOverridesAndCollapse = useCallback(() => {
-    overridesCtx.clearOverrides();
-    collapseDrawer();
-  }, [collapseDrawer, overridesCtx]);
+  const toggleDesignV1 = useCallback(() => {
+    const currentOverride = overrides[designV1OverrideKey];
+    const current =
+      typeof currentOverride === 'boolean' ? currentOverride : designV1Enabled;
+    setOrClearOverride(designV1OverrideKey, !current);
+  }, [designV1Enabled, designV1OverrideKey, overrides, setOrClearOverride]);
 
   // Unified flag list: filter by search, sort overrides to top
   const filteredFlags = useMemo(() => {
@@ -768,155 +730,123 @@ export function DevToolbar({
       className='fixed bottom-0 left-0 right-0 z-[9999] font-mono text-xs'
     >
       {/* Expanded panel */}
-      {open ? (
-        <div
-          data-testid='dev-toolbar-flag-drawer'
-          className='overflow-y-auto border-t border-default backdrop-blur-sm bg-surface-1/80'
-          style={{ maxHeight: 'min(400px, calc(100dvh - 7rem))' }}
-        >
-          <div className='flex flex-col'>
-            {/*
-             * Visual states: hidden/collapsed omit the drawer; expanded always
-             * reserves this exact-height strip. Empty and populated samples
-             * render the same five cells, so live telemetry changes text only.
-             * Narrow viewports scroll horizontally without moving controls.
-             */}
-            <section
-              data-testid='dev-toolbar-latency'
-              className='flex h-12 shrink-0 items-stretch overflow-x-auto border-b border-subtle'
-              aria-label='UX Latency P50 And P95'
-            >
-              <div className='flex w-24 shrink-0 items-center gap-1.5 px-4 text-3xs font-medium text-(--color-text-tertiary)'>
-                <Activity size={11} aria-hidden />
-                Latency
-              </div>
-              {latencySummaries.map(summary => (
-                <div
-                  key={summary.metric}
-                  className='flex w-32 shrink-0 flex-col justify-center border-l border-subtle px-3'
-                  data-metric={summary.metric}
-                >
-                  <span className='truncate text-3xs text-(--color-text-tertiary)'>
-                    {summary.label}
+      <div
+        className='overflow-hidden border-t border-default backdrop-blur-sm bg-surface-1/80'
+        style={{
+          maxHeight: open ? '400px' : '0px',
+          borderTopWidth: open ? undefined : 0,
+          transitionDuration: 'var(--duration-subtle)',
+          transitionProperty: 'max-height, border-top-width',
+          transitionTimingFunction: 'var(--ease-subtle)',
+        }}
+      >
+        <div className='flex flex-col'>
+          {/* Search bar */}
+          <div className='flex items-center gap-2 px-4 py-2 border-b border-subtle'>
+            <Search size={12} className='shrink-0 text-quaternary-token' />
+            <input
+              ref={searchRef}
+              type='text'
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder='Search flags...'
+              className='flex-1 bg-transparent text-(--color-text-primary) placeholder:text-quaternary-token outline-none text-xs'
+              aria-label='Search Flags'
+            />
+            {search && (
+              <Button
+                type='button'
+                variant='ghost'
+                onClick={() => setSearch('')}
+                className='h-auto w-auto shrink-0 p-0 text-quaternary-token hover:bg-transparent hover:text-(--color-text-primary) transition-colors'
+                aria-label='Clear Search'
+              >
+                <X size={11} />
+              </Button>
+            )}
+            <span className='shrink-0 text-3xs text-quaternary-token'>
+              {matchCount} of {filteredFlags.total}
+            </span>
+          </div>
+
+          {/* Flags list */}
+          <div className='px-4 py-2 max-h-48 overflow-y-auto'>
+            {/* Overridden flags group */}
+            {filteredFlags.overridden.length > 0 && (
+              <div className='mb-2 border-l-2 border-accent pl-3'>
+                <div className='flex items-center justify-between mb-1'>
+                  <span className='text-3xs font-semibold uppercase tracking-wide text-accent'>
+                    Overrides ({filteredFlags.overridden.length})
                   </span>
-                  <span className='whitespace-nowrap text-3xs text-quaternary-token'>
-                    P50 {formatLatencyMs(summary.p50Ms)} · P95{' '}
-                    {formatLatencyMs(summary.p95Ms)}
-                  </span>
+                  <Button
+                    type='button'
+                    variant='link'
+                    onClick={overridesCtx.clearOverrides}
+                    className='text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
+                  >
+                    Clear All
+                  </Button>
                 </div>
-              ))}
-            </section>
-
-            {/* Search bar */}
-            <div className='flex items-center gap-2 px-4 py-2 border-b border-subtle'>
-              <Search size={12} className='shrink-0 text-quaternary-token' />
-              <input
-                ref={searchRef}
-                type='text'
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder='Search flags...'
-                className='flex-1 bg-transparent text-(--color-text-primary) placeholder:text-quaternary-token outline-none text-xs'
-                aria-label='Search Flags'
-              />
-              {search && (
-                <Button
-                  type='button'
-                  variant='ghost'
-                  onClick={() => setSearch('')}
-                  className='h-auto w-auto shrink-0 p-0 text-quaternary-token hover:bg-transparent hover:text-(--color-text-primary) transition-colors'
-                  aria-label='Clear Search'
-                >
-                  <X size={11} />
-                </Button>
-              )}
-              <span className='shrink-0 text-3xs text-quaternary-token'>
-                {matchCount} of {filteredFlags.total}
-              </span>
-            </div>
-
-            {/* Flags list */}
-            <div className='px-4 py-2 max-h-48 overflow-y-auto'>
-              {/* Overridden flags group */}
-              {filteredFlags.overridden.length > 0 && (
-                <div className='mb-2 border-l-2 border-accent pl-3'>
-                  <div className='flex items-center justify-between mb-1'>
-                    <span className='text-3xs font-semibold uppercase tracking-wide text-accent'>
-                      Overrides ({filteredFlags.overridden.length})
-                    </span>
-                    <Button
-                      type='button'
-                      variant='link'
-                      onClick={clearAllOverridesAndCollapse}
-                      className='text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
-                    >
-                      Clear All
-                    </Button>
-                  </div>
-                  <div className='flex flex-col gap-0.5'>
-                    {filteredFlags.overridden.map(flag => (
-                      <FlagRow
-                        key={flag.key}
-                        label={flag.name.toLowerCase().replaceAll('_', ' ')}
-                        flashing={flashedKey === flag.key}
-                        isOverridden
-                        checked={overrides[flag.key]}
-                        serverDefault={flag.serverDefault}
-                        onCheckedChange={v => setOrClearOverride(flag.key, v)}
-                        onClear={() => clearOverrideAndCollapse(flag.key)}
-                        source={flag.source}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Orphan overrides — keys in localStorage that no longer match the contract */}
-              {orphanKeys.length > 0 && !search && (
-                <OrphanOverrides
-                  keys={orphanKeys}
-                  onPurge={overridesCtx.purgeOrphans}
-                />
-              )}
-
-              {/* Non-overridden flags */}
-              {filteredFlags.nonOverridden.length > 0 && (
                 <div className='flex flex-col gap-0.5'>
-                  {filteredFlags.nonOverridden.map(flag => {
-                    const checked =
-                      flag.source === 'code' ? flag.serverDefault : false;
-                    return (
-                      <FlagRow
-                        key={flag.key}
-                        label={flag.name.toLowerCase().replaceAll('_', ' ')}
-                        flashing={flashedKey === flag.key}
-                        isOverridden={false}
-                        checked={checked}
-                        onCheckedChange={v => setOrClearOverride(flag.key, v)}
-                        onClear={() => clearOverrideAndCollapse(flag.key)}
-                        source={flag.source}
-                      />
-                    );
-                  })}
+                  {filteredFlags.overridden.map(flag => (
+                    <FlagRow
+                      key={flag.key}
+                      label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                      flashing={flashedKey === flag.key}
+                      isOverridden
+                      checked={overrides[flag.key]}
+                      serverDefault={flag.serverDefault}
+                      onCheckedChange={v => setOrClearOverride(flag.key, v)}
+                      onClear={() => overridesCtx.removeOverride(flag.key)}
+                      source={flag.source}
+                    />
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Empty search state */}
-              {matchCount === 0 && search && (
-                <div className='py-3 text-center text-quaternary-token'>
-                  No flags match &lsquo;{search}&rsquo;
-                </div>
-              )}
-            </div>
+            {/* Orphan overrides — keys in localStorage that no longer match the contract */}
+            {orphanKeys.length > 0 && !search && (
+              <OrphanOverrides
+                keys={orphanKeys}
+                onPurge={overridesCtx.purgeOrphans}
+              />
+            )}
+
+            {/* Non-overridden flags */}
+            {filteredFlags.nonOverridden.length > 0 && (
+              <div className='flex flex-col gap-0.5'>
+                {filteredFlags.nonOverridden.map(flag => {
+                  const checked =
+                    flag.source === 'code' ? flag.serverDefault : false;
+                  return (
+                    <FlagRow
+                      key={flag.key}
+                      label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                      flashing={flashedKey === flag.key}
+                      isOverridden={false}
+                      checked={checked}
+                      onCheckedChange={v => setOrClearOverride(flag.key, v)}
+                      onClear={() => overridesCtx.removeOverride(flag.key)}
+                      source={flag.source}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Empty search state */}
+            {matchCount === 0 && search && (
+              <div className='py-3 text-center text-quaternary-token'>
+                No flags match &lsquo;{search}&rsquo;
+              </div>
+            )}
           </div>
         </div>
-      ) : null}
+      </div>
 
       {/* Bottom bar (always visible) */}
-      <div
-        data-testid='dev-toolbar-bottom-bar'
-        className='relative flex items-center h-9 overflow-x-auto overscroll-x-contain px-4 gap-2 border-t border-default backdrop-blur-sm bg-surface-1/80 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'
-      >
+      <div className='relative flex items-center h-9 px-4 gap-2 border-t border-default backdrop-blur-sm bg-surface-1/80 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'>
         {/* Center: brand logo */}
         <div className='absolute left-1/2 -translate-x-1/2 pointer-events-none'>
           <BrandLogo size={16} tone='auto' aria-hidden rounded={false} />
@@ -956,6 +886,24 @@ export function DevToolbar({
         <span className='max-md:hidden md:inline px-1.5 py-0.5 rounded text-3xs text-quaternary-token bg-surface-2 shrink-0'>
           {breakpoint}
         </span>
+
+        <Button
+          type='button'
+          variant='ghost'
+          aria-pressed={designV1Enabled}
+          title='Toggle New Design (DESIGN_V1)'
+          onClick={toggleDesignV1}
+          className={`h-auto shrink-0 gap-1 px-1.5 py-1 rounded text-3xs transition-colors ${
+            designV1Enabled
+              ? 'text-accent bg-accent/10 hover:bg-accent/15'
+              : 'text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2'
+          }`}
+        >
+          <span>New Design</span>
+          {designV1Overridden && (
+            <span className='text-3xs opacity-70'>(override)</span>
+          )}
+        </Button>
 
         <div className='flex-1' />
 
@@ -1032,17 +980,19 @@ export function DevToolbar({
             <span className='max-sm:hidden sm:inline text-3xs'>Route</span>
           </Button>
 
-          <Link
-            href={APP_ROUTES.DESIGN_STUDIO}
-            title='Open Design Studio'
-            className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
-            aria-label='Design Studio'
-          >
-            <PanelsTopLeft size={11} />
-            <span className='max-sm:hidden sm:inline text-3xs'>
-              Design Studio
-            </span>
-          </Link>
+          {designV1Enabled && (
+            <Link
+              href={APP_ROUTES.DESIGN_STUDIO}
+              title='Open Design Studio'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-quaternary-token hover:text-(--color-text-primary) hover:bg-surface-2 transition-colors'
+              aria-label='Design Studio'
+            >
+              <PanelsTopLeft size={11} />
+              <span className='max-sm:hidden sm:inline text-3xs'>
+                Design Studio
+              </span>
+            </Link>
+          )}
 
           <Link
             href={APP_ROUTES.ADMIN}

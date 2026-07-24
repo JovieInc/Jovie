@@ -1,6 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -118,24 +117,6 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     });
   });
 
-  it('keeps the standard Google OAuth button available when One Tap declines', async () => {
-    oneTapConfiguredState.value = true;
-    oneTapMock.mockRejectedValueOnce(new Error('Google One Tap unavailable'));
-
-    render(<AuthShell mode='sign-in' />);
-
-    await waitFor(() => {
-      expect(oneTapMock).toHaveBeenCalledWith({
-        callbackURL: '/signin',
-        context: 'signin',
-      });
-    });
-
-    expect(
-      await screen.findByRole('button', { name: /google/i })
-    ).toBeVisible();
-  });
-
   it('starts Google sign-in through Better Auth social with mode-aware callbacks', async () => {
     const user = userEvent.setup();
     render(<AuthShell mode='sign-in' />);
@@ -173,14 +154,9 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     });
   });
 
-  it('keeps the signed-in first render deterministic, then hides after hydration', async () => {
+  it('renders nothing when the visitor is already signed in', () => {
     authState.isSignedIn = true;
-
-    const serverMarkup = renderToStaticMarkup(<AuthShell mode='sign-in' />);
-    expect(serverMarkup).toContain('data-auth-shell-ready="true"');
-    expect(serverMarkup).toContain('Email me a Code');
-
     const { container } = render(<AuthShell mode='sign-in' />);
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    expect(container).toBeEmptyDOMElement();
   });
 });

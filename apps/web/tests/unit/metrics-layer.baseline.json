@@ -93,7 +93,7 @@
       "tables": 0,
       "rates": 1
     },
-    "app/exp/shell-v1/ShellV1ExperimentClient.tsx": {
+    "app/exp/shell-v1/page.tsx": {
       "tables": 0,
       "rates": 1
     },

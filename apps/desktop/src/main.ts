@@ -49,7 +49,6 @@ import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   decideRendererRecovery,
   RENDERER_BOOT_WATCHDOG_MS,
-  shouldRecoverAuthHandoffToCanonicalShell,
   shouldArmRendererBootWatchdog,
 } from './renderer-recovery';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
@@ -120,6 +119,14 @@ const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
+const DESKTOP_RUNTIME_LABEL_BY_PLATFORM: Partial<
+  Record<NodeJS.Platform, string>
+> = {
+  darwin: 'Mac OS',
+  linux: 'Linux',
+  win32: 'Windows',
+} as const;
+
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
   | typeof UPDATE_DOWNLOADED_CHANNEL;
@@ -609,14 +616,6 @@ function restoreMainWindowAfterAuthHandoff(): void {
   if (!mainWindowHiddenForAuthHandoff) return;
   mainWindowHiddenForAuthHandoff = false;
   if (mainWindow && !mainWindow.isDestroyed()) {
-    if (
-      shouldRecoverAuthHandoffToCanonicalShell(
-        mainWindow.webContents.getURL()
-      )
-    ) {
-      const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
-      void mainWindow.loadURL(buildDesktopAuthHandoffUrl(authUrl));
-    }
     showWindow(mainWindow);
   }
 }
@@ -890,9 +889,16 @@ function escapeHtmlAttribute(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 }
 
+function getDesktopRuntimeLabel(
+  platform: NodeJS.Platform = process.platform
+): string {
+  return DESKTOP_RUNTIME_LABEL_BY_PLATFORM[platform] ?? platform;
+}
+
 function buildDesktopLoadFailureUrl(): string {
   const retryUrl = escapeHtmlAttribute(APP_ENTRY_URL);
   const appOrigin = escapeHtmlAttribute(APP_ORIGIN);
+  const runtimeLabel = escapeHtmlAttribute(getDesktopRuntimeLabel());
   const html = `<!doctype html>
 <html lang="en">
   <head>
@@ -900,18 +906,19 @@ function buildDesktopLoadFailureUrl(): string {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Jovie Desktop</title>
     <style>
-      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-text-primary: ${SYSTEM_B_DESKTOP_TOKENS.textPrimary}; --system-b-text-secondary: ${SYSTEM_B_DESKTOP_TOKENS.textSecondary}; --system-b-primary-bg: ${SYSTEM_B_DESKTOP_TOKENS.primaryBackground}; --system-b-primary-fg: ${SYSTEM_B_DESKTOP_TOKENS.primaryForeground}; --system-b-radius-pill: ${SYSTEM_B_DESKTOP_TOKENS.radiusPill}; }
+      :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-surface-1: ${SYSTEM_B_DESKTOP_TOKENS.surfaceColor}; --system-b-text-primary: ${SYSTEM_B_DESKTOP_TOKENS.textPrimary}; --system-b-text-secondary: ${SYSTEM_B_DESKTOP_TOKENS.textSecondary}; --system-b-border-subtle: ${SYSTEM_B_DESKTOP_TOKENS.borderSubtle}; --system-b-primary-bg: ${SYSTEM_B_DESKTOP_TOKENS.primaryBackground}; --system-b-primary-fg: ${SYSTEM_B_DESKTOP_TOKENS.primaryForeground}; --system-b-radius-shell: ${SYSTEM_B_DESKTOP_TOKENS.radiusShell}; --system-b-radius-pill: ${SYSTEM_B_DESKTOP_TOKENS.radiusPill}; --system-b-shadow-popover: ${SYSTEM_B_DESKTOP_TOKENS.shadowPopover}; }
       html, body { margin: 0; min-height: 100vh; background: var(--system-b-bg-base); color: var(--system-b-text-primary); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; }
       body { display: grid; place-items: center; overflow: hidden; }
-      .shell { position: relative; display: grid; width: min(420px, calc(100vw - 48px)); gap: 16px; padding: 32px 24px; text-align: center; }
-      .mark { position: absolute; left: 50%; top: 50%; width: 180px; height: 180px; opacity: 0.035; pointer-events: none; transform: translate(-50%, -50%); }
-      .copy { position: relative; display: grid; gap: 8px; justify-items: center; }
-      h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
-      p { margin: 0; max-width: 34ch; color: var(--system-b-text-secondary); font-size: 13px; line-height: 1.55; }
-      .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-      a { display: inline-flex; height: 34px; align-items: center; justify-content: center; border-radius: var(--system-b-radius-pill); padding: 0 13px; color: var(--system-b-text-primary); font-size: 12px; font-weight: 590; text-decoration: none; }
+      .shell { position: relative; display: grid; width: min(520px, calc(100vw - 48px)); gap: 22px; padding: 40px; border: 1px solid var(--system-b-border-subtle); border-radius: var(--system-b-radius-shell); background: var(--system-b-surface-1); box-shadow: var(--system-b-shadow-popover); }
+      .mark { position: absolute; right: -52px; top: -46px; width: 220px; height: 220px; opacity: 0.055; }
+      .brand { display: flex; align-items: center; gap: 14px; }
+      .icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: var(--system-b-radius-shell); background: var(--system-b-primary-bg); color: var(--system-b-primary-fg); }
+      h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: 0; }
+      p { margin: 0; max-width: 38ch; color: var(--system-b-text-secondary); font-size: 13px; line-height: 1.55; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+      a { display: inline-flex; height: 34px; align-items: center; justify-content: center; border-radius: var(--system-b-radius-pill); padding: 0 13px; border: 1px solid var(--system-b-border-subtle); background: transparent; color: var(--system-b-text-primary); font-size: 12px; font-weight: 590; text-decoration: none; }
       .primary { background: var(--system-b-primary-bg); color: var(--system-b-primary-fg); }
-      .secondary { color: var(--system-b-text-secondary); }
+      .meta { color: var(--system-b-text-secondary); font-size: 11px; }
     </style>
   </head>
   <body>
@@ -919,14 +926,23 @@ function buildDesktopLoadFailureUrl(): string {
       <svg class="mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
         <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
       </svg>
-      <div class="copy">
-        <h1>Jovie couldn’t load</h1>
-        <p>Check your connection, then try again.</p>
+      <div class="brand">
+        <div class="icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 353.68 347.97">
+            <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Jovie Desktop</h1>
+          <p>Built for artists.</p>
+        </div>
       </div>
+      <p>Jovie could not load the app shell. Check your connection, then retry. If this keeps happening, open Jovie in your browser and install the latest desktop build.</p>
       <div class="actions">
         <a class="primary" href="${retryUrl}">Retry</a>
-        <a class="secondary" href="${appOrigin}">Open Jovie</a>
+        <a href="${appOrigin}">Open Jovie</a>
       </div>
+      <div class="meta">Desktop shell runtime: ${runtimeLabel}</div>
     </main>
   </body>
 </html>`;

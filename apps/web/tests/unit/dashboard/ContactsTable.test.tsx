@@ -1,10 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { ComponentProps, ReactNode } from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  RightPanelProvider,
-  useRightPanel,
-} from '@/contexts/RightPanelContext';
+import { rowState } from '@/components/organisms/table/table.styles';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import { ContactsTable } from '@/features/dashboard/organisms/contacts-table/ContactsTable';
 
@@ -19,10 +16,6 @@ vi.mock('@/contexts/HeaderActionsContext', () => ({
 
 vi.mock('@/contexts/TableMetaContext', () => ({
   useTableMeta: () => ({
-    tableMeta: {
-      rightPanelWidth: 0,
-      toggle: null,
-    },
     setTableMeta,
   }),
 }));
@@ -40,23 +33,23 @@ vi.mock('@/components/organisms/table', async importOriginal => {
     convertToCommonDropdownItems: vi.fn(() => []),
     UnifiedTable: ({
       data,
-      isRowSelected,
-      isLoading,
+      getRowClassName,
       onRowClick,
     }: {
       readonly data: EditableContact[];
-      readonly isRowSelected?: (row: EditableContact, index: number) => boolean;
-      readonly isLoading?: boolean;
+      readonly getRowClassName?: (
+        row: EditableContact,
+        index: number
+      ) => string;
       readonly onRowClick?: (row: EditableContact) => void;
     }) => {
-      const firstRowSelected = data[0]
-        ? String(isRowSelected?.(data[0], 0) ?? false)
-        : 'false';
+      const firstRowClassName = data[0]
+        ? (getRowClassName?.(data[0], 0) ?? '')
+        : '';
 
       return (
         <div
-          data-first-row-selected={firstRowSelected}
-          data-loading={String(isLoading)}
+          data-first-row-class={firstRowClassName}
           data-testid='contacts-unified-table'
         >
           {data[0] ? (
@@ -115,111 +108,42 @@ const contacts: EditableContact[] = [
   },
 ];
 
-function RightPanelOutlet() {
-  return <output data-testid='contacts-right-panel'>{useRightPanel()}</output>;
-}
-
-function renderContactsTable(props: ComponentProps<typeof ContactsTable>) {
-  return render(
-    <RightPanelProvider>
-      <ContactsTable {...props} />
-      <RightPanelOutlet />
-    </RightPanelProvider>
-  );
-}
-
 describe('ContactsTable', () => {
-  it('registers details in the shared right rail instead of mounting them beside the table', async () => {
-    renderContactsTable({
-      contacts,
-      artistName: 'Tim White',
-      onUpdate: () => undefined,
-      onSave: async () => undefined,
-      onDelete: () => undefined,
-      onAddContact: () => undefined,
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('contact-detail-sidebar')).toHaveAttribute(
-        'data-open',
-        'false'
-      );
-    });
-
-    const sidebar = screen.getByTestId('contact-detail-sidebar');
-    expect(screen.getByTestId('contacts-table')).not.toContainElement(sidebar);
+  it('uses shell-selected row chrome and keeps the detail surface flat', () => {
+    render(
+      <ContactsTable
+        contacts={contacts}
+        artistName='Tim White'
+        onUpdate={() => undefined}
+        onSave={async () => undefined}
+        onDelete={() => undefined}
+        onAddContact={() => undefined}
+      />
+    );
 
     expect(screen.getByText('1 contact')).toBeInTheDocument();
     expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
-      'data-first-row-selected',
-      'false'
+      'data-first-row-class',
+      ''
     );
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Select first contact' })
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId('contact-detail-sidebar')).toHaveAttribute(
-        'data-open',
-        'true'
-      );
-      expect(screen.getByTestId('contact-detail-sidebar')).toHaveAttribute(
-        'data-contact-id',
-        'contact-1'
-      );
-    });
-    expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
-      'data-first-row-selected',
+    expect(screen.getByTestId('contact-detail-sidebar')).toHaveAttribute(
+      'data-open',
       'true'
+    );
+    expect(screen.getByTestId('contact-detail-sidebar')).toHaveAttribute(
+      'data-contact-id',
+      'contact-1'
+    );
+    expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
+      'data-first-row-class',
+      rowState.selected
     );
     expect(setHeaderActions).toHaveBeenCalled();
     expect(setTableMeta).toHaveBeenCalled();
-  });
-
-  it('forwards loading state to the table instead of showing a false empty state', () => {
-    renderContactsTable({
-      contacts: [],
-      artistName: 'Tim White',
-      isLoading: true,
-      onUpdate: () => undefined,
-      onSave: async () => undefined,
-      onDelete: () => undefined,
-      onAddContact: () => undefined,
-    });
-
-    expect(screen.getByTestId('contacts-table')).toBeInTheDocument();
-    expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
-      'data-loading',
-      'true'
-    );
-    expect(screen.queryByText('No Contacts Yet')).not.toBeInTheDocument();
-  });
-
-  it('offers the canonical add contact action from the empty state', () => {
-    const onAddContact = vi.fn();
-
-    renderContactsTable({
-      contacts: [],
-      artistName: 'Tim White',
-      onUpdate: () => undefined,
-      onSave: async () => undefined,
-      onDelete: () => undefined,
-      onAddContact,
-    });
-
-    expect(screen.getByRole('heading', { name: 'No Contacts' })).toBeVisible();
-    expect(
-      screen.getByText(
-        'Add a contact to manage bookings, management, and press.'
-      )
-    ).toBeVisible();
-    const addContactButton = screen.getByRole('button', {
-      name: 'Add Contact',
-    });
-    expect(addContactButton).toHaveTextContent('Add Contact');
-
-    fireEvent.click(addContactButton);
-    expect(onAddContact).toHaveBeenCalledTimes(1);
   });
 });

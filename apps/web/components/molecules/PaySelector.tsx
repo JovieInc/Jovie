@@ -5,17 +5,10 @@ import { ChevronDown, PencilLine } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { cn } from '@/lib/utils';
 import { formatDollarAmount } from '@/lib/utils/format-number';
 
 type PaySelectorPresentation = 'default' | 'drawer';
-
-export interface PaymentMethodCapability {
-  readonly id: 'apple-pay' | 'venmo';
-  readonly label: string;
-  readonly availability: 'eligible' | 'available' | 'unavailable';
-}
 
 interface PaySelectorProps {
   readonly amounts?: number[];
@@ -23,11 +16,6 @@ interface PaySelectorProps {
   readonly isLoading?: boolean;
   readonly className?: string;
   readonly paymentLabel?: string;
-  /**
-   * A provider is only rendered when the caller has proven eligibility. The
-   * public profile currently supplies Venmo as the truthful fallback.
-   */
-  readonly paymentMethod?: PaymentMethodCapability;
   readonly presentation?: PaySelectorPresentation;
   readonly primaryLabel?: string;
   readonly otherPaymentOptionsLabel?: string;
@@ -65,7 +53,6 @@ export function PaySelector({
   isLoading = false,
   className = '',
   paymentLabel,
-  paymentMethod,
   presentation = 'default',
   primaryLabel = 'Continue',
   otherPaymentOptionsLabel = 'Other payment methods',
@@ -93,19 +80,6 @@ export function PaySelector({
   }, [amounts, customAmount, customMode, defaultIdx, selectedIdx]);
 
   const canContinue = selectedAmount > 0;
-  const resolvedMethod =
-    paymentMethod ??
-    (paymentLabel === 'Venmo'
-      ? {
-          id: 'venmo' as const,
-          label: paymentLabel,
-          availability: 'available' as const,
-        }
-      : undefined);
-  const isMethodAvailable = resolvedMethod?.availability !== 'unavailable';
-  const paymentActionLabel = resolvedMethod
-    ? `Pay ${formatAmountForScreenReader(selectedAmount)} with ${resolvedMethod.label}`
-    : `${primaryLabel} with ${formatAmountForScreenReader(selectedAmount)}`;
 
   const handleContinue = useCallback(() => {
     if (!canContinue) {
@@ -154,7 +128,7 @@ export function PaySelector({
   if (presentation === 'drawer') {
     return (
       <div
-        className={cn('w-full space-y-4.5', className)}
+        className={cn('space-y-4.5', className)}
         data-presentation='drawer'
         data-test='pay-selector'
       >
@@ -168,17 +142,14 @@ export function PaySelector({
         <div className='sr-only' aria-live='polite' ref={statusRef}></div>
 
         <div className='space-y-4'>
-          <div
-            className='min-h-32 w-full'
-            data-testid='pay-selector-amount-slot'
-          >
-            <div className='min-h-12'>
+          <div className='min-h-40' data-testid='pay-selector-amount-slot'>
+            <div className='min-h-23'>
               {customMode ? (
-                <div className='flex min-h-12 items-center'>
+                <div className='flex min-h-23 items-center'>
                   <label className='w-full'>
                     <span className='sr-only'>Custom Amount</span>
-                    <div className='flex h-12 items-center rounded-full border border-white/12 bg-white/[0.03] px-4 text-white dark:text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
-                      <span className='mr-2 text-mid font-medium tracking-[-0.04em] text-tertiary-token'>
+                    <div className='flex h-23 items-center rounded-3xl border border-white/12 bg-white/[0.03] px-4.5 text-white dark:text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
+                      <span className='mr-3 text-2xl font-medium tracking-[-0.04em] text-tertiary-token'>
                         $
                       </span>
                       <input
@@ -192,7 +163,7 @@ export function PaySelector({
                           );
                         }}
                         placeholder='0.00'
-                        className='h-full w-full bg-transparent text-mid font-semibold tracking-[-0.03em] text-primary-token outline-none placeholder:text-tertiary-token'
+                        className='h-full w-full bg-transparent text-3xl font-semibold tracking-[-0.05em] text-primary-token outline-none placeholder:text-tertiary-token'
                         aria-label='Custom Amount'
                       />
                     </div>
@@ -200,59 +171,68 @@ export function PaySelector({
                 </div>
               ) : (
                 <fieldset
-                  className='m-0 grid grid-cols-3 gap-2 border-0 p-0'
+                  className='m-0 grid grid-cols-3 gap-3 border-0 p-0'
                   aria-label='Amount Options'
                 >
                   {amounts.map((amount, idx) => {
                     const isSelected = idx === selectedIdx;
                     return (
-                      <AmountSelector
+                      <Button
                         key={amount}
-                        amount={amount}
-                        isSelected={isSelected}
-                        onClick={handleAmountSelect}
-                        index={idx}
-                        ariaLabel={`Select ${formatAmountForScreenReader(amount)} payment amount`}
-                      />
+                        type='button'
+                        variant='ghost'
+                        aria-pressed={isSelected}
+                        aria-label={`Select ${formatAmountForScreenReader(amount)} payment amount`}
+                        onClick={() => handleAmountSelect(idx)}
+                        className={cn(
+                          'flex h-23 items-center justify-center rounded-3xl border text-center transition-[border-color,background-color,box-shadow,color,opacity] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                          isSelected
+                            ? 'border-white bg-white dark:bg-surface-1 text-(--color-bg-input) shadow-[0_20px_40px_rgba(255,255,255,0.08)]'
+                            : 'border-white/10 bg-white/[0.02] text-white dark:text-white hover:border-white/18 hover:bg-white/[0.04]'
+                        )}
+                      >
+                        <span className='text-lg font-medium tracking-[-0.03em]'>
+                          {formatAmountForScreenReader(amount)}
+                        </span>
+                      </Button>
                     );
                   })}
                 </fieldset>
               )}
             </div>
-          </div>
 
-          <SmartLinkProviderButton
-            label={
-              isLoading
-                ? `Opening ${resolvedMethod?.label ?? 'payment'}…`
-                : paymentActionLabel
-            }
-            ariaLabel={paymentActionLabel}
-            primary
-            onClick={handleContinue}
-            disabled={isLoading || !canContinue || !isMethodAvailable}
-            icon={
-              resolvedMethod?.id === 'venmo' ? (
-                <SocialIcon
-                  platform='venmo'
-                  size={20}
-                  className='shrink-0'
-                  aria-hidden
-                />
-              ) : null
-            }
-          />
+            <div className='mt-3.5 flex justify-end'>
+              <Button
+                type='button'
+                variant='ghost'
+                onClick={handleCustomToggle}
+                className='inline-flex h-auto items-center gap-1.5 text-app font-medium tracking-[-0.015em] text-secondary-token transition-colors duration-subtle hover:bg-transparent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                aria-pressed={customMode}
+                aria-controls='pay-selector-heading'
+              >
+                <span>Custom Amount</span>
+                <PencilLine className='h-3.5 w-3.5' />
+              </Button>
+            </div>
+          </div>
 
           <Button
             type='button'
-            variant='ghost'
-            onClick={handleCustomToggle}
-            className='inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-4 text-app font-medium tracking-[-0.015em] text-secondary-token transition-[border-color,background-color,color] duration-subtle hover:border-white/16 hover:bg-white/[0.05] hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
-            aria-pressed={customMode}
-            aria-controls='pay-selector-heading'
+            variant='primary'
+            onClick={handleContinue}
+            disabled={isLoading || !canContinue}
+            className='flex h-13 w-full items-center justify-center gap-2.5 rounded-full border-0 bg-(--profile-pearl-primary-bg) px-5 text-base font-semibold tracking-[-0.025em] text-(--profile-pearl-primary-fg) shadow-none transition-[opacity] duration-subtle hover:opacity-96 disabled:cursor-not-allowed disabled:opacity-50'
+            aria-label={`${primaryLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
           >
-            <span>Custom Amount</span>
-            <PencilLine className='h-3.5 w-3.5' />
+            {paymentLabel === 'Venmo' ? (
+              <SocialIcon
+                platform='venmo'
+                size={20}
+                className='shrink-0'
+                aria-hidden
+              />
+            ) : null}
+            {isLoading ? 'Processing...' : primaryLabel}
           </Button>
 
           {showOtherPaymentOptions && paymentLabel ? (
@@ -316,8 +296,8 @@ export function PaySelector({
   )}`;
   if (isLoading) {
     continueLabel = 'Processing...';
-  } else if (resolvedMethod) {
-    continueLabel = paymentActionLabel;
+  } else if (paymentLabel) {
+    continueLabel = `Continue with ${paymentLabel}`;
   }
 
   return (
@@ -354,15 +334,15 @@ export function PaySelector({
         onClick={handleContinue}
         className='mt-4 flex w-full items-center justify-center gap-2.5 rounded-full border border-white/8 text-mid font-semibold tracking-[-0.015em] text-btn-primary-foreground shadow-none transition-[opacity,border-color] duration-subtle hover:border-white/14'
         size='lg'
-        disabled={isLoading || !canContinue || !isMethodAvailable}
+        disabled={isLoading}
         variant='primary'
         aria-label={
-          resolvedMethod
-            ? paymentActionLabel
+          paymentLabel
+            ? `Continue with ${paymentLabel} for ${formatAmountForScreenReader(selectedAmount)}`
             : `Continue with ${formatAmountForScreenReader(selectedAmount)}`
         }
       >
-        {resolvedMethod?.id === 'venmo' ? (
+        {paymentLabel ? (
           <SocialIcon
             platform='venmo'
             size={20}

@@ -16,7 +16,7 @@ describe('Card', () => {
     render(<Card data-testid='card'>Card content</Card>);
     const card = screen.getByTestId('card');
     expect(card).toBeInTheDocument();
-    expect(card.className).toContain('rounded-(--system-b-radius-card)');
+    expect(card.className).toContain('rounded-[var(--radius-lg)]');
     expect(card.className).toContain('border-subtle');
     expect(card.className).toContain('bg-surface-1');
   });
@@ -52,7 +52,7 @@ describe('Card', () => {
     );
     const article = screen.getByTestId('article');
     expect(article.tagName).toBe('ARTICLE');
-    expect(article.className).toContain('rounded-(--system-b-radius-card)');
+    expect(article.className).toContain('rounded-[var(--radius-lg)]');
   });
 
   it('supports asChild with section element', () => {
@@ -74,7 +74,7 @@ describe('Card', () => {
     );
     const card = screen.getByTestId('card');
     expect(card.className).toContain('custom-class');
-    expect(card.className).toContain('rounded-(--system-b-radius-card)');
+    expect(card.className).toContain('rounded-[var(--radius-lg)]');
   });
 
   it('passes through HTML attributes', () => {
@@ -319,7 +319,7 @@ describe('Card composition', () => {
     expect(footer.tagName).toBe('FOOTER');
 
     // Verify classes are still applied
-    expect(article.className).toContain('rounded-(--system-b-radius-card)');
+    expect(article.className).toContain('rounded-[var(--radius-lg)]');
     expect(header.className).toContain('flex');
     expect(title.className).toContain('text-base');
   });

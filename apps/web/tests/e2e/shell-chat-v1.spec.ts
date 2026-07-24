@@ -1,5 +1,6 @@
 /**
- * E2E smoke: the production authenticated shell renders the canonical frame.
+ * E2E smoke: the production authenticated shell can render the Shell + Chat V1
+ * frame when the dev override forces `DESIGN_V1`.
  *
  * Run:
  *   doppler run --project jovie-web --config dev -- env E2E_USE_TEST_AUTH_BYPASS=1 pnpm --filter @jovie/web exec playwright test tests/e2e/shell-chat-v1.spec.ts --project=chromium
@@ -9,6 +10,11 @@
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import type { PersistedToolEvent } from '@/lib/chat/tool-events';
+import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
+import {
+  APP_FLAG_OVERRIDES_COOKIE,
+  FF_OVERRIDES_KEY,
+} from '@/lib/flags/overrides';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 import {
   chatComposerInputLocator,
@@ -43,6 +49,24 @@ async function mockStableSlashPickerNetwork(page: Page) {
       contentType: 'application/json',
       body: JSON.stringify([]),
     })
+  );
+}
+
+async function forceDesignV1(page: Page) {
+  const overrides = JSON.stringify({
+    [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
+  });
+
+  await page.addInitScript(
+    ({ cookieName, key, value }) => {
+      localStorage.setItem(key, value);
+      document.cookie = `${cookieName}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
+    },
+    {
+      cookieName: APP_FLAG_OVERRIDES_COOKIE,
+      key: FF_OVERRIDES_KEY,
+      value: overrides,
+    }
   );
 }
 
@@ -185,7 +209,7 @@ type ShellChatLocators = {
 
 function shellChatFrameLocators(page: Page): ShellChatLocators {
   const shellFrame = page.locator(
-    '[data-app-shell-frame="true"]:has([data-testid="app-shell-scroll"] [data-testid="chat-content"])'
+    '[data-shell-design="shellChatV1"]:has([data-testid="app-shell-scroll"] [data-testid="chat-content"])'
   );
   const shellScroll = shellFrame.locator('[data-testid="app-shell-scroll"]');
   const chatContent = shellScroll.locator('[data-testid="chat-content"]');
@@ -311,6 +335,8 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
   );
   test.setTimeout(180_000);
 
+  await forceDesignV1(page);
+
   await setTestAuthBypassSession(page, 'creator-ready', 'e2e-shell-chat-user');
   await gotoAuthenticatedChatRoute(page);
 
@@ -335,6 +361,7 @@ test('chat route picker opens without moving the shell or composer', async ({
   test.setTimeout(180_000);
 
   await mockStableSlashPickerNetwork(page);
+  await forceDesignV1(page);
   await setTestAuthBypassSession(
     page,
     'creator-ready',
@@ -397,6 +424,7 @@ test('chat route slash picker clears active transcript content in populated thre
   test.setTimeout(300_000);
 
   await mockFlyoutConversation(page);
+  await forceDesignV1(page);
   await setTestAuthBypassSession(
     page,
     'creator-ready',
@@ -459,6 +487,8 @@ test('chat composer clears mobile shell tabs on tablet and phone', async ({
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
   );
   test.setTimeout(180_000);
+
+  await forceDesignV1(page);
   await setTestAuthBypassSession(
     page,
     'creator-ready',

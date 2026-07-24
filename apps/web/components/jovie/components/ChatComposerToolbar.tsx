@@ -13,11 +13,6 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useRef } from 'react';
 
 import { cn } from '@/lib/utils';
-import {
-  CHAT_COMPOSER_ATTACH_ARIA_LABEL,
-  CHAT_COMPOSER_SEND_ARIA_LABEL,
-  CHAT_COMPOSER_STOP_ARIA_LABEL,
-} from '../chat-composer-copy';
 import { TRANSITION_FAST } from './chat-motion';
 
 /**
@@ -80,48 +75,32 @@ export function ComposerSendButton({
   const motionInit = reducedMotion ? undefined : { scale: 0.5, opacity: 0 };
   const isInteractive = showStop || canSend;
 
-  const actionLabel = showStop
-    ? CHAT_COMPOSER_STOP_ARIA_LABEL
-    : CHAT_COMPOSER_SEND_ARIA_LABEL;
-  // When empty, keep the same accessible name (tests + AT) but clarify the
-  // disabled reason in the hover tooltip — disabled buttons need a span wrapper
-  // so the tooltip trigger can still receive pointer events.
-  const tooltipContent =
-    showStop || canSend ? actionLabel : 'Type a message to send';
-
   return (
-    <SimpleTooltip content={tooltipContent}>
-      <span
+    <SimpleTooltip content={showStop ? 'Stop generating' : 'Send message'}>
+      <button
+        type='button'
+        onMouseDown={onMouseDown}
+        onClick={showStop ? onStop : onSend}
+        disabled={!showStop && !canSend}
         className={cn(
-          'inline-flex shrink-0',
+          'system-b-chat-composer-primary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
           !isInteractive && 'cursor-not-allowed'
         )}
+        aria-label={showStop ? 'Stop generating' : 'Send message'}
       >
-        <button
-          type='button'
-          onMouseDown={onMouseDown}
-          onClick={showStop ? onStop : onSend}
-          disabled={!showStop && !canSend}
-          className={cn(
-            'system-b-chat-composer-primary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
-            !isInteractive && 'cursor-not-allowed'
-          )}
-          aria-label={actionLabel}
-        >
-          <AnimatePresence mode='wait' initial={false}>
-            <motion.span
-              key={key}
-              initial={motionInit}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={motionInit}
-              transition={TRANSITION_FAST}
-              className='flex items-center justify-center'
-            >
-              {icon}
-            </motion.span>
-          </AnimatePresence>
-        </button>
-      </span>
+        <AnimatePresence mode='wait' initial={false}>
+          <motion.span
+            key={key}
+            initial={motionInit}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={motionInit}
+            transition={TRANSITION_FAST}
+            className='flex items-center justify-center'
+          >
+            {icon}
+          </motion.span>
+        </AnimatePresence>
+      </button>
     </SimpleTooltip>
   );
 }
@@ -156,29 +135,27 @@ export function ComposerAttachButton({
 
   return (
     <DropdownMenu open={plusMenuOpen} onOpenChange={onOpenChange}>
-      <SimpleTooltip content='Attach files'>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type='button'
-            variant='ghost'
-            size='icon'
-            onMouseDown={onMouseDown}
-            disabled={isProcessing || isLoading || isSubmitting || disabled}
-            className={cn(
-              'h-9 w-9 shrink-0 border border-transparent bg-surface-0 text-tertiary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
-              plusMenuOpen && 'border-subtle bg-surface-1 text-primary-token',
-              'disabled:cursor-not-allowed disabled:opacity-50'
-            )}
-            aria-label={CHAT_COMPOSER_ATTACH_ARIA_LABEL}
-          >
-            {isProcessing ? (
-              <Loader2 className='h-4 w-4 animate-spin' strokeWidth={2.25} />
-            ) : (
-              <Plus className='h-4 w-4' strokeWidth={2.25} />
-            )}
-          </Button>
-        </DropdownMenuTrigger>
-      </SimpleTooltip>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type='button'
+          variant='ghost'
+          size='icon'
+          onMouseDown={onMouseDown}
+          disabled={isProcessing || isLoading || isSubmitting || disabled}
+          className={cn(
+            'h-9 w-9 shrink-0 border border-transparent bg-surface-0 text-tertiary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
+            plusMenuOpen && 'border-subtle bg-surface-1 text-primary-token',
+            'disabled:cursor-not-allowed disabled:opacity-50'
+          )}
+          aria-label='Attach Files'
+        >
+          {isProcessing ? (
+            <Loader2 className='h-4 w-4 animate-spin' strokeWidth={2.25} />
+          ) : (
+            <Plus className='h-4 w-4' strokeWidth={2.25} />
+          )}
+        </Button>
+      </DropdownMenuTrigger>
       <DropdownMenuContent
         align='start'
         side='top'

@@ -277,7 +277,7 @@ const WeeklyStreamsCell = memo(function WeeklyStreamsCell({
 // ── Main row component ─────────────────────────────────────────────────────────
 
 /**
- * Linear-style release row for the canonical production path. Replaces the legacy
+ * Linear-style release row for the DESIGN_V1 path. Replaces the legacy
  * provider-matrix cells with: artwork (+ agent pulse when syncing) + title
  * + type badge + artists (+ inline sync status) + status + drop date +
  * DSP avatar stack + smart link + more menu.

@@ -16,7 +16,6 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
-import { BRAND_DEAL_OPPORTUNITY_KIND } from '@/lib/connectors/brand-deal-opportunity';
 import { db } from '@/lib/db';
 import { suggestedActionStatusEnum } from '@/lib/db/schema/enums';
 import {
@@ -26,40 +25,6 @@ import {
 
 const USER_ID = 'user-uuid-0000-0000-0000-000000000001';
 const ACTION_ID = 'action-uuid-0000-0000-0000-000000000001';
-const VERIFIED_BRAND_DEAL_PAYLOAD = {
-  title: 'Example Brand creator-performance pilot',
-  buyerName: 'Alex Buyer',
-  buyerCompany: 'Example Brand',
-  budgetMinCents: 750_000,
-  budgetMaxCents: 1_250_000,
-  currency: 'USD',
-  sourceLabel: 'Backstage',
-  sourceType: 'backstage',
-  sourceAccount: 't@timwhite.co',
-  requiredSourceAccount: 't@timwhite.co',
-  sourceReference: 'https://www.backstage.com/casting/example',
-  observedAt: '2026-07-29T10:00:00.000Z',
-  evidenceStatus: 'verified',
-  confidence: 1,
-  identityMatched: true,
-  ownershipVerified: true,
-  personalDealVerified: true,
-  relationshipType: 'authenticated_marketplace_match',
-  rightsSummary: '90-day organic usage, no exclusivity',
-  depositPercent: 50,
-  activeSponsorCampaignCount: 0,
-  includedRevisions: 1,
-  usageTermDays: 90,
-  exclusivity: 'none',
-  routeToLyb: false,
-  lybPaidFlowVerified: false,
-  externalSendApproved: false,
-  commercialApprovalId: null,
-  expectedUpfrontCashCents: 500_000,
-  closeProbability: 0.6,
-  repeatPotential: 1.5,
-  creatorMinutes: 60,
-};
 
 function mockSelectChain(rows: unknown[]) {
   const chain = {
@@ -148,52 +113,6 @@ describe('recoverOrphanedApprovedAction', () => {
       })
     ).resolves.toBe('already-queued');
 
-    expect(db.insert).not.toHaveBeenCalled();
-  });
-
-  it('keeps approved brand-deal decisions out of the action executor', async () => {
-    mockSelectChain([
-      {
-        id: ACTION_ID,
-        status: 'approved',
-        userId: USER_ID,
-        payload: VERIFIED_BRAND_DEAL_PAYLOAD,
-        kind: BRAND_DEAL_OPPORTUNITY_KIND,
-        signalType: 'brand_deal',
-      },
-    ]);
-
-    await expect(
-      recoverOrphanedApprovedAction({
-        approvalId: ACTION_ID,
-        userId: USER_ID,
-      })
-    ).resolves.toBe('decision-only');
-
-    expect(db.select).toHaveBeenCalledOnce();
-    expect(db.insert).not.toHaveBeenCalled();
-  });
-
-  it('fails closed when concurrent recovery sees invalid brand-deal evidence', async () => {
-    mockSelectChain([
-      {
-        id: ACTION_ID,
-        status: 'approved',
-        userId: USER_ID,
-        payload: {},
-        kind: BRAND_DEAL_OPPORTUNITY_KIND,
-        signalType: 'brand_deal',
-      },
-    ]);
-
-    await expect(
-      recoverOrphanedApprovedAction({
-        approvalId: ACTION_ID,
-        userId: USER_ID,
-      })
-    ).resolves.toBe('invalid-decision-only');
-
-    expect(db.select).toHaveBeenCalledOnce();
     expect(db.insert).not.toHaveBeenCalled();
   });
 
@@ -317,7 +236,6 @@ describe('reconcileOrphanedAcceptedActions', () => {
         id: ACTION_ID,
         userId: USER_ID,
         payload: { title: 'Show' },
-        kind: 'calendar.create_event',
       },
     ]);
     const insertChain = mockInsertChain();
@@ -329,24 +247,5 @@ describe('reconcileOrphanedAcceptedActions', () => {
 
     expect(insertChain.values).toHaveBeenCalledOnce();
     expect(insertChain.onConflictDoNothing).toHaveBeenCalledOnce();
-  });
-
-  it('defensively skips decision-only brand deals returned by the query', async () => {
-    mockSelectChain([
-      {
-        id: ACTION_ID,
-        userId: USER_ID,
-        payload: {},
-        kind: BRAND_DEAL_OPPORTUNITY_KIND,
-        signalType: 'brand_deal',
-      },
-    ]);
-
-    await expect(reconcileOrphanedAcceptedActions(20)).resolves.toEqual({
-      scanned: 1,
-      enqueued: 0,
-    });
-
-    expect(db.insert).not.toHaveBeenCalled();
   });
 });

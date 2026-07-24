@@ -72,7 +72,7 @@ export function JovieLogo({
         aria-label={computedAriaLabel}
         target={target}
         rel={target === '_blank' ? 'noopener noreferrer' : undefined}
-        className='rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 transition-colors'
+        className='rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 transition-colors'
         title={title}
       >
         <div className={wrapperClasses}>{logoContent}</div>

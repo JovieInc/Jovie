@@ -19,7 +19,6 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
-import { useAdminPeopleRightPanel } from '@/components/features/admin/AdminPeopleRightPanelProvider';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
@@ -368,22 +367,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     [actionCallbacks]
   );
 
-  const detailPanel = useMemo(
-    () => (
-      <AdminUserDetailDrawer
-        user={selectedUser}
-        onClose={() => setSelectedUser(null)}
-        contextMenuItems={
-          selectedUser
-            ? convertToCommonDropdownItems(getContextMenuItems(selectedUser))
-            : undefined
-        }
-      />
-    ),
-    [getContextMenuItems, selectedUser]
-  );
-  useAdminPeopleRightPanel(detailPanel);
-
   // Bulk actions
   const bulkActions = useMemo(() => {
     const selectedUsers = users.filter(u => selectedIds.has(u.id));
@@ -560,120 +543,133 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
   return (
     <QueryErrorBoundary fallback={TableErrorFallback}>
-      <AdminTableShell
-        testId='admin-users-content'
-        className='rounded-none border-0'
-        toolbar={
-          <>
-            <TableBulkActionsToolbar
-              selectedCount={selectedCount}
-              onClearSelection={clearSelection}
-              actions={bulkActions}
-            />
-            <AdminTableHeader
-              title='Users'
-              subtitle='Review lifecycle state, profile completion, and suppression health.'
-            />
-            <AdminTableSubheader
-              start={
-                <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-                  Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                  {total.toLocaleString()} users
-                </div>
-              }
-              end={
-                <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
-                  <ExportCSVButton<AdminUserRow>
-                    getData={() => users}
-                    columns={usersCSVColumns}
-                    filename={USERS_CSV_FILENAME_PREFIX}
-                    disabled={users.length === 0}
-                    ariaLabel='Export users to CSV file'
-                    chrome='page-toolbar'
-                    iconOnly
-                    tooltipLabel='Export'
-                  />
-                </div>
-              }
-            />
-          </>
-        }
-      >
-        {() =>
-          isMobile ? (
-            <div className='space-y-2 p-3'>
-              {users.length === 0 ? (
-                <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
-                  <Users className='h-6 w-6' />
-                  <div>
-                    <div className='text-sm font-semibold tracking-tight text-primary-token'>
-                      No users found
+      <div className='flex h-full'>
+        <div className='flex-1 min-w-0'>
+          <AdminTableShell
+            testId='admin-users-content'
+            className='rounded-none border-0'
+            toolbar={
+              <>
+                <TableBulkActionsToolbar
+                  selectedCount={selectedCount}
+                  onClearSelection={clearSelection}
+                  actions={bulkActions}
+                />
+                <AdminTableHeader
+                  title='Users'
+                  subtitle='Review lifecycle state, profile completion, and suppression health.'
+                />
+                <AdminTableSubheader
+                  start={
+                    <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+                      Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                      {total.toLocaleString()} users
                     </div>
-                    <div className='text-xs text-secondary-token'>
-                      Users will appear here once they sign up.
+                  }
+                  end={
+                    <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
+                      <ExportCSVButton<AdminUserRow>
+                        getData={() => users}
+                        columns={usersCSVColumns}
+                        filename={USERS_CSV_FILENAME_PREFIX}
+                        disabled={users.length === 0}
+                        ariaLabel='Export users to CSV file'
+                        chrome='page-toolbar'
+                        iconOnly
+                        tooltipLabel='Export'
+                      />
                     </div>
-                  </div>
-                </ContentSurfaceCard>
-              ) : (
-                users.map(user => (
-                  <AdminUserMobileCard
-                    key={user.id}
-                    user={user}
-                    isSelected={selectedIds.has(user.id)}
-                    onToggleSelect={toggleSelect}
-                    contextMenuItems={getContextMenuItems(user)}
-                  />
-                ))
-              )}
+                  }
+                />
+              </>
+            }
+          >
+            {() =>
+              isMobile ? (
+                <div className='space-y-2 p-3'>
+                  {users.length === 0 ? (
+                    <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
+                      <Users className='h-6 w-6' />
+                      <div>
+                        <div className='text-sm font-semibold tracking-tight text-primary-token'>
+                          No users found
+                        </div>
+                        <div className='text-xs text-secondary-token'>
+                          Users will appear here once they sign up.
+                        </div>
+                      </div>
+                    </ContentSurfaceCard>
+                  ) : (
+                    users.map(user => (
+                      <AdminUserMobileCard
+                        key={user.id}
+                        user={user}
+                        isSelected={selectedIds.has(user.id)}
+                        onToggleSelect={toggleSelect}
+                        contextMenuItems={getContextMenuItems(user)}
+                      />
+                    ))
+                  )}
 
-              {hasNextPage ? (
-                <Button
-                  type='button'
-                  variant='secondary'
-                  size='sm'
-                  className='w-full'
-                  loading={isFetchingNextPage}
-                  onClick={() => {
+                  {hasNextPage ? (
+                    <Button
+                      type='button'
+                      variant='secondary'
+                      size='sm'
+                      className='w-full'
+                      loading={isFetchingNextPage}
+                      onClick={() => {
+                        fetchNextPage().catch(() => {});
+                      }}
+                    >
+                      Load More Users
+                    </Button>
+                  ) : null}
+                </div>
+              ) : (
+                <AdminDataTable
+                  data={users}
+                  columns={columns}
+                  rowSelection={rowSelection}
+                  isLoading={false}
+                  emptyState={
+                    <ContentSurfaceCard className='mx-4 my-6 flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
+                      <Users className='h-6 w-6' />
+                      <div>
+                        <div className='text-sm font-semibold tracking-tight text-primary-token'>
+                          No users found
+                        </div>
+                        <div className='text-xs text-secondary-token'>
+                          Users will appear here once they sign up.
+                        </div>
+                      </div>
+                    </ContentSurfaceCard>
+                  }
+                  getRowId={row => row.id}
+                  getRowClassName={getRowClassName}
+                  onRowClick={handleRowClick}
+                  onFocusedRowChange={handleFocusedRowChange}
+                  getContextMenuItems={getContextMenuItems}
+                  hasNextPage={hasNextPage}
+                  isFetchingNextPage={isFetchingNextPage}
+                  onLoadMore={() => {
                     fetchNextPage().catch(() => {});
                   }}
-                >
-                  Load More Users
-                </Button>
-              ) : null}
-            </div>
-          ) : (
-            <AdminDataTable
-              data={users}
-              columns={columns}
-              rowSelection={rowSelection}
-              isLoading={false}
-              emptyState={
-                <ContentSurfaceCard className='mx-4 my-6 flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
-                  <Users className='h-6 w-6' />
-                  <div>
-                    <div className='text-sm font-semibold tracking-tight text-primary-token'>
-                      No users found
-                    </div>
-                    <div className='text-xs text-secondary-token'>
-                      Users will appear here once they sign up.
-                    </div>
-                  </div>
-                </ContentSurfaceCard>
-              }
-              getRowId={row => row.id}
-              getRowClassName={getRowClassName}
-              onRowClick={handleRowClick}
-              onFocusedRowChange={handleFocusedRowChange}
-              getContextMenuItems={getContextMenuItems}
-              hasNextPage={hasNextPage}
-              isFetchingNextPage={isFetchingNextPage}
-              onLoadMore={() => {
-                fetchNextPage().catch(() => {});
-              }}
-            />
-          )
-        }
-      </AdminTableShell>
+                />
+              )
+            }
+          </AdminTableShell>
+        </div>
+        <AdminUserDetailDrawer
+          user={selectedUser}
+          onClose={() => setSelectedUser(null)}
+          contextMenuItems={
+            selectedUser
+              ? convertToCommonDropdownItems(getContextMenuItems(selectedUser))
+              : undefined
+          }
+        />
+      </div>
 
       {/* Ban confirmation dialog with reason */}
       <AlertDialog

@@ -16,28 +16,24 @@ describe('handleMigrationErrors', () => {
     mockWarn.mockClear();
   });
 
-  it('propagates creator_profiles migration errors instead of inventing onboarding', async () => {
+  it('returns fallback for creator_profiles migration errors', async () => {
     const { handleMigrationErrors } = await import(
       '@/lib/migrations/handleMigrationErrors'
     );
 
     const result = handleMigrationErrors(
-      {
-        code: '42703',
-        message:
-          'column "creator_profiles"."profile_edit_version" does not exist',
-      },
+      { code: '42P01', message: 'relation "creator_profiles" does not exist' },
       { userId: 'user_123', operation: 'creator_profiles' }
     );
 
-    expect(result).toEqual({
-      shouldRetry: true,
-      error: 'column "creator_profiles"."profile_edit_version" does not exist',
-    });
-    expect(mockWarn).not.toHaveBeenCalled();
+    expect(result).toEqual({ shouldRetry: false, fallbackData: [] });
+    expect(mockWarn).toHaveBeenCalledWith(
+      '[Dashboard] creator_profiles schema migration in progress; treating as needs onboarding',
+      { userId: 'user_123', operation: 'creator_profiles' }
+    );
   });
 
-  it('propagates creator_profiles column errors without postgres codes', async () => {
+  it('returns fallback when creator_profiles columns are missing', async () => {
     const { handleMigrationErrors } = await import(
       '@/lib/migrations/handleMigrationErrors'
     );
@@ -50,11 +46,7 @@ describe('handleMigrationErrors', () => {
       { userId: 'user_123', operation: 'creator_profiles' }
     );
 
-    expect(result).toEqual({
-      shouldRetry: true,
-      error:
-        'column "profile_name" of relation "creator_profiles" does not exist',
-    });
+    expect(result).toEqual({ shouldRetry: false, fallbackData: [] });
   });
 
   it('returns fallback for user_settings migration errors', async () => {
@@ -229,7 +221,7 @@ describe('handleMigrationErrors', () => {
     );
   });
 
-  it('propagates uppercase creator_profiles column errors', async () => {
+  it('returns fallback for uppercase column missing creator_profiles errors', async () => {
     const { handleMigrationErrors } = await import(
       '@/lib/migrations/handleMigrationErrors'
     );
@@ -242,12 +234,11 @@ describe('handleMigrationErrors', () => {
       { userId: 'user_123', operation: 'creator_profiles' }
     );
 
-    expect(result).toEqual({
-      shouldRetry: true,
-      error:
-        'COLUMN "profile_name" OF RELATION "creator_profiles" DOES NOT EXIST',
-    });
-    expect(mockWarn).not.toHaveBeenCalled();
+    expect(result).toEqual({ shouldRetry: false, fallbackData: [] });
+    expect(mockWarn).toHaveBeenCalledWith(
+      '[Dashboard] creator_profiles schema migration in progress; treating as needs onboarding',
+      { userId: 'user_123', operation: 'creator_profiles' }
+    );
   });
 
   it('returns fallback for uppercase column missing social_links errors', async () => {

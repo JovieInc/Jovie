@@ -2,6 +2,7 @@ export type { BadgeProps } from './badge';
 export { Badge, badgeVariants } from './badge';
 export type { ButtonProps } from './button';
 export { Button, buttonVariants } from './button';
+
 export {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -21,18 +22,13 @@ export {
 } from './dropdown-menu';
 export type { KbdProps } from './kbd';
 export { Kbd } from './kbd';
+
 export {
   Popover,
   PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
 } from './popover';
-export type {
-  StackableBadgeGroupProps,
-  StackableBadgeItem,
-  StackableBadgeTone,
-} from './stackable-badge-group';
-export { StackableBadgeGroup } from './stackable-badge-group';
 export type { TooltipContentProps } from './tooltip';
 export {
   Tooltip,

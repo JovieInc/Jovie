@@ -57,7 +57,7 @@ async function getHudTvAbsoluteUrl(kioskToken: string): Promise<string> {
  *
  * Mode resolution is fail-closed: any `?kiosk` param means token path. An
  * invalid token returns the access fallback card — admin auth is NOT
- * consulted here because the in-shell Ops surface at `/app/ov/ops` is
+ * consulted here because the in-shell Ops surface at `/app/admin/ops` is
  * the canonical admin path. This separation prevents an invalid kiosk
  * URL from silently escalating to admin-rendered content.
  */
@@ -75,13 +75,13 @@ export default async function HudTvPage({
 
   // Fail-closed: only token mode is honored on /hud-tv. Even if the request
   // happens to come from a signed-in admin, the dedicated TV route is for
-  // physical-display use only — admins should use /app/ov/ops instead.
+  // physical-display use only — admins should use /app/admin/ops instead.
   const failedToken = !auth.ok || auth.mode !== 'kiosk';
   if (failedToken) {
     const message =
       !auth.ok && auth.reason === 'not_configured'
-        ? 'This HUD is not configured for kiosk access. Set HUD_KIOSK_TOKEN to enable kiosk mode, or sign in as an admin and visit /app/ov/ops.'
-        : 'Unauthorized. Provide a valid kiosk token, or sign in as an admin and visit /app/ov/ops.';
+        ? 'This HUD is not configured for kiosk access. Set HUD_KIOSK_TOKEN to enable kiosk mode, or sign in as an admin and visit /app/admin/ops.'
+        : 'Unauthorized. Provide a valid kiosk token, or sign in as an admin and visit /app/admin/ops.';
 
     return (
       <StandaloneProductPage width='md' centered>

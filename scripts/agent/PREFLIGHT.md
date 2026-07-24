@@ -38,10 +38,7 @@ source (`ledger` / `keyword` / `semantic`) is recorded in
 `gbrain-timeout`. Unreachable/empty GBrain keeps the existing policy:
 soft by default, hard block with `AGENT_PREFLIGHT_REQUIRE_GBRAIN=1`.
 
-Free-text lookup results never fabricate an owner or lease:
-`receipt.ownership.owner` remains `null` and
-`receipt.ownership.context_available` reports whether coordination context was
-retrieved. The ownership receipt also records requested/resolved slug, engine/CLI/MCP
+The ownership receipt also records requested/resolved slug, engine/CLI/MCP
 latency when available, timeout tier, and lookup health. Nullable DB lock and
 session signal fields only report signatures seen in command stderr; `null`
 means no signal was observed, not that a database health probe passed. This
@@ -90,7 +87,6 @@ Exit `0` = `verdict: go`. Exit `1` = `verdict: blocked`. Exit `2` = script error
     "scope": "string|null",
     "source": "ledger|keyword|semantic|gbrain|gbrain-timeout|gbrain-empty|gbrain-missing|none",
     "reachable": true,
-    "context_available": true,
     "ms": 12
   },
   "worktree": {

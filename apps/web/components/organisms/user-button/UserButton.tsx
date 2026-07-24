@@ -3,9 +3,8 @@
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import { Button, CommonDropdown } from '@jovie/ui';
 import {
-  Cookie,
   CreditCard,
-  FileCheck2,
+  FileText,
   HelpCircle,
   Keyboard,
   LogOut,
@@ -57,7 +56,6 @@ interface BuildDropdownItemsParams {
   userInitials: string;
   formattedUsername: string | null;
   handleProfile: () => void;
-  handleHelp: () => void;
   handleSettings: () => void;
   iosAlphaAccess: {
     hasAccess: boolean;
@@ -92,7 +90,6 @@ function buildDropdownItems({
   userInitials,
   formattedUsername,
   handleProfile,
-  handleHelp,
   handleSettings,
   iosAlphaAccess,
   usageStatsUrl,
@@ -105,63 +102,48 @@ function buildDropdownItems({
   isElectronRuntime,
 }: BuildDropdownItemsParams): CommonDropdownItem[] {
   const items: CommonDropdownItem[] = [
+    // Profile card
     {
-      type: 'action-row',
-      id: 'profile-help',
-      className: 'grid w-full grid-cols-1 px-1',
-      items: [
-        {
-          type: 'action',
-          id: 'profile-card',
-          label: `Open profile for ${displayName}`,
-          onClick: handleProfile,
-          className: 'min-w-0 min-h-12 gap-2.5 px-1.5 py-1.5',
-          content: (
-            <>
-              <Avatar
-                src={userImageUrl}
-                alt={displayName || 'User avatar'}
-                name={displayName || userInitials}
-                size='xs'
-                className='shrink-0'
-              />
-              <div className='min-w-0 flex-1'>
-                <div className='flex min-w-0 items-center gap-2'>
-                  <span
-                    title={displayName}
-                    className='min-w-0 flex-1 truncate text-app font-medium text-primary-token'
+      type: 'custom',
+      id: 'profile-card',
+      render: () => (
+        <button
+          type='button'
+          onClick={handleProfile}
+          className='w-full cursor-pointer rounded-xl px-2.5 py-2 hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover text-left'
+        >
+          <div className='flex w-full items-center gap-2.5'>
+            <Avatar
+              src={userImageUrl}
+              alt={displayName || 'User avatar'}
+              name={displayName || userInitials}
+              size='xs'
+              className='shrink-0'
+            />
+            <div className='min-w-0 flex-1'>
+              <div className='flex items-center gap-2'>
+                <span className='truncate text-app font-medium text-primary-token'>
+                  {displayName}
+                </span>
+                {billingStatus.isPro && (
+                  <Badge
+                    variant='secondary'
+                    size='sm'
+                    className='shrink-0 rounded-full px-1.5 py-0 text-3xs font-medium'
                   >
-                    {displayName}
-                  </span>
-                  {billingStatus.isPro && (
-                    <Badge
-                      variant='secondary'
-                      size='sm'
-                      className='shrink-0 rounded-full px-1.5 py-0 text-3xs font-medium'
-                    >
-                      Pro
-                    </Badge>
-                  )}
-                </div>
-                <p
-                  aria-hidden={formattedUsername ? undefined : true}
-                  className='mt-0.5 h-4 truncate text-2xs text-tertiary-token'
-                >
-                  {formattedUsername ?? '\u00A0'}
-                </p>
+                    Pro
+                  </Badge>
+                )}
               </div>
-            </>
-          ),
-        },
-        {
-          type: 'action',
-          id: 'help',
-          label: 'Help',
-          icon: HelpCircle,
-          onClick: handleHelp,
-          className: 'min-h-8',
-        },
-      ],
+              {formattedUsername && (
+                <p className='truncate text-2xs text-tertiary-token mt-0.5'>
+                  {formattedUsername}
+                </p>
+              )}
+            </div>
+          </div>
+        </button>
+      ),
     },
     { type: 'separator', id: 'sep-1' },
     {
@@ -240,7 +222,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'terms-of-service',
       label: 'Terms Of Service',
-      icon: FileCheck2,
+      icon: FileText,
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_TERMS, '_blank', 'noopener,noreferrer'),
     },
@@ -248,7 +230,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'cookie-policy',
       label: 'Cookie Policy',
-      icon: Cookie,
+      icon: FileText,
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_COOKIES, '_blank', 'noopener,noreferrer'),
     }
@@ -418,11 +400,6 @@ export function UserButton({
   const { userImageUrl, displayName, userInitials, formattedUsername } =
     userInfo;
 
-  const handleHelp = useCallback(() => {
-    window.open(APP_ROUTES.SUPPORT, '_blank', 'noopener,noreferrer');
-    setIsMenuOpen(false);
-  }, [setIsMenuOpen]);
-
   useEffect(() => {
     if (!isElectronRuntime || !isLoaded || !user) {
       setIOSAlphaAccess({ hasAccess: false, installUrl: null });
@@ -480,7 +457,7 @@ export function UserButton({
             open={isMenuOpen}
             onOpenChange={setIsMenuOpen}
             disabled
-            contentClassName='w-72 max-w-[calc(100vw-1rem)]'
+            contentClassName='w-60'
           />
         </div>
       );
@@ -489,13 +466,10 @@ export function UserButton({
     return showUserInfo ? (
       <div
         data-testid='user-button-loading'
-        className='flex w-full items-center gap-2 rounded-md px-2 py-1 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0'
+        className='flex w-full items-center gap-2 rounded-md px-2 py-1'
       >
         <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
-        <div
-          data-user-button-loading-copy
-          className='flex-1 group-data-[collapsible=icon]:hidden'
-        >
+        <div className='flex-1'>
           <div className='h-3 w-20 rounded-sm bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
         </div>
       </div>
@@ -515,7 +489,6 @@ export function UserButton({
     userInitials,
     formattedUsername,
     handleProfile,
-    handleHelp,
     handleSettings,
     iosAlphaAccess,
     usageStatsUrl: APP_ROUTES.SETTINGS_USAGE,
@@ -534,7 +507,7 @@ export function UserButton({
     (showUserInfo ? (
       <button
         type='button'
-        className='flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0'
+        className='flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
       >
         <Avatar
           src={userImageUrl}
@@ -543,18 +516,14 @@ export function UserButton({
           size='xs'
           className='shrink-0'
         />
-        <div
-          data-user-button-display-name
-          className='min-w-0 flex-1 group-data-[collapsible=icon]:hidden'
-        >
+        <div className='min-w-0 flex-1'>
           <p className='text-app font-normal text-sidebar-item-foreground truncate'>
             {displayName}
           </p>
         </div>
         <Icon
           name='ChevronRight'
-          data-user-button-chevron
-          className='size-3 text-sidebar-item-icon group-data-[collapsible=icon]:hidden'
+          className='w-3 h-3 text-sidebar-item-icon'
           aria-hidden='true'
         />
       </button>
@@ -581,10 +550,10 @@ export function UserButton({
         variant='dropdown'
         items={dropdownItems}
         trigger={triggerElement}
-        align={trigger || showUserInfo ? 'start' : 'end'}
+        align={trigger ? 'start' : 'end'}
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
-        contentClassName='w-72 max-w-[calc(100vw-1rem)]'
+        contentClassName='w-60'
       />
       <DashboardFeedbackModal
         isOpen={isFeedbackOpen}

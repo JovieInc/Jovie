@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { ACTION_BAR_BUTTON_CLASS, ActionBar } from './ActionBar';
 
 export const PAGE_TOOLBAR_CONTAINER_CLASS =
-  'flex min-h-10 min-w-0 items-center gap-1.5 bg-transparent px-3 py-1.5';
+  'flex min-h-10 min-w-0 items-center gap-1.5 bg-transparent px-app-header py-1.5';
 
 export const PAGE_TOOLBAR_START_CLASS =
   'flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
@@ -21,20 +21,21 @@ export const PAGE_TOOLBAR_META_TEXT_CLASS =
   'text-xs text-tertiary-token tabular-nums';
 
 export const PAGE_TOOLBAR_TAB_BUTTON_CLASS =
-  'inline-flex h-7.5 items-center justify-center gap-1.5 rounded-pill bg-transparent px-2.5 text-2xs font-caption font-[540] tracking-tight text-tertiary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 disabled:pointer-events-none disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
+  'inline-flex h-7.5 items-center justify-center gap-1.5 rounded-pill bg-transparent px-2.5 text-2xs font-caption font-[540] tracking-tight text-secondary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 disabled:pointer-events-none disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
 
-export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS = 'bg-surface-1 text-primary-token';
+export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
+  'ring-2 ring-(--color-accent) text-primary-token';
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
-  'h-7 rounded-full border-0 bg-transparent px-2 text-2xs font-[540] text-tertiary-token shadow-none hover:border-0 hover:bg-surface-1 hover:text-primary-token hover:shadow-none focus-visible:border-0 focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-0 active:border-0 active:bg-surface-1 active:text-primary-token active:shadow-none disabled:pointer-events-none disabled:bg-transparent disabled:opacity-35 [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-7 rounded-full border-0 bg-transparent px-2 text-2xs font-[540] text-tertiary-token shadow-none hover:border-0 hover:bg-(--linear-row-hover) hover:text-primary-token hover:shadow-none focus-visible:border-0 focus-visible:bg-(--linear-row-hover) focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-0 active:border-0 active:bg-(--linear-row-hover) active:text-primary-token active:shadow-none disabled:pointer-events-none disabled:bg-transparent disabled:opacity-35 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
   'w-7 justify-center px-0 text-tertiary-token';
 
 export const TABLE_TOOLBAR_SHELL_CLASS =
-  'flex h-11 min-h-11 min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) px-3 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
+  'flex h-11 min-h-11 min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) px-3.5 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
 
 export const TABLE_TOOLBAR_OVERLAY_CLASS = cn(
   'absolute inset-x-0 top-0 z-10',
@@ -206,7 +207,6 @@ export function PageToolbarActionButton({
       label={tooltipLabel}
       shortcut={tooltipShortcut}
       side='bottom'
-      contentVariant='compact'
     >
       {button}
     </TooltipShortcut>

@@ -1,7 +1,4 @@
-import {
-  JOVIE_ICON_PATH,
-  JOVIE_ICON_VIEW_BOX,
-} from '@/components/atoms/jovie-icon-path';
+import { Logo } from '@/components/atoms/Logo';
 
 /**
  * Generic "service unavailable" page shown to blocked users.
@@ -12,21 +9,15 @@ import {
  *
  * Intentionally minimal. No error codes, no support links,
  * no language that indicates account-level enforcement.
- * Logo is plain SVG — never a rounded box outside of app icons.
+ * Logo is non-interactive to avoid redirect loops for banned users.
  */
 export function UnavailablePage() {
   return (
     <div className='system-b-unavailable-page'>
       <div className='system-b-unavailable-content'>
-        <svg
-          viewBox={JOVIE_ICON_VIEW_BOX}
-          fill='none'
-          xmlns='http://www.w3.org/2000/svg'
-          aria-hidden='true'
-          className='system-b-unavailable-mark'
-        >
-          <path fill='currentColor' d={JOVIE_ICON_PATH} />
-        </svg>
+        <div className='system-b-unavailable-mark' aria-hidden='true'>
+          <Logo aria-hidden size='lg' tone='white' variant='icon' />
+        </div>
 
         <h1 className='system-b-unavailable-title'>
           Jovie is unavailable right now

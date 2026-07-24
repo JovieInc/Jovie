@@ -66,7 +66,7 @@ export function UsageMenuItem({
   };
 
   return (
-    <div data-testid='usage-menu-item'>
+    <div className='border-t border-subtle/60' data-testid='usage-menu-item'>
       <Button
         type='button'
         variant='ghost'

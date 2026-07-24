@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
-import { AdminPeopleRightPanelProvider } from '@/components/features/admin/AdminPeopleRightPanelProvider';
 import { AdminCreatorsPageWrapper } from '@/components/features/admin/admin-creator-profiles/AdminCreatorsPageWrapper';
 import { AdminReleasesPageWrapper } from '@/components/features/admin/admin-releases-table';
 import { AdminUsersTableUnified } from '@/components/features/admin/admin-users-table/AdminUsersTableUnified';
@@ -16,7 +15,6 @@ import {
   isAdminPeopleView,
 } from '@/constants/admin-navigation';
 import { getAdminCreatorProfiles } from '@/lib/admin/creator-profiles';
-import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { getAdminReleases } from '@/lib/admin/releases';
 import { getAdminUsers } from '@/lib/admin/users';
 import {
@@ -202,8 +200,6 @@ async function renderPeopleView(
 export default async function AdminPeoplePage({
   searchParams,
 }: Readonly<AdminPeoplePageProps>) {
-  await requireCurrentAdminPageAccess();
-
   const params = await adminPeopleSearchParams.parse(searchParams);
   const view = resolvePeopleView(params.view);
   const content = await renderPeopleView(view, params);
@@ -220,7 +216,7 @@ export default async function AdminPeoplePage({
       testId='admin-people-page'
       viewTestId={`admin-people-view-${view}`}
     >
-      <AdminPeopleRightPanelProvider>{content}</AdminPeopleRightPanelProvider>
+      {content}
     </AdminPage>
   );
 }

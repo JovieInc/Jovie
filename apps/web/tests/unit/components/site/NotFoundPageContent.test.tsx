@@ -10,9 +10,6 @@ import { APP_ROUTES } from '@/constants/routes';
 
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const componentPath = join(appRoot, 'components/site/NotFoundPageContent.tsx');
-const rootRoutePath = join(appRoot, 'app/not-found.tsx');
-const marketingLayoutPath = join(appRoot, 'app/(marketing)/layout.tsx');
-const marketingRoutePath = join(appRoot, 'app/(marketing)/not-found.tsx');
 
 const hashMark = String.fromCharCode(35);
 const hardcodedHashColorPattern = new RegExp(`${hashMark}[\\da-fA-F]{3,8}\\b`);
@@ -69,23 +66,5 @@ describe('NotFoundPageContent', () => {
     expect(source).toContain('`${prefix}-actions`');
     expect(source).toContain('`${prefix}-action-secondary`');
     expect(source).not.toContain('style={{');
-  });
-
-  it('keeps root and marketing 404s on their canonical public shells', async () => {
-    const [rootRoute, marketingLayout, marketingRoute] = await Promise.all([
-      readFile(rootRoutePath, 'utf8'),
-      readFile(marketingLayoutPath, 'utf8'),
-      readFile(marketingRoutePath, 'utf8'),
-    ]);
-
-    expect(rootRoute).toContain("variant='minimal'");
-    expect(rootRoute).toContain('system-b-root-not-found-main');
-    expect(rootRoute).toContain(
-      "<NotFoundPageContent variant='generic' surface='root' />"
-    );
-    expect(marketingRoute).toContain('MarketingContainer');
-    expect(marketingRoute).toContain('system-b-marketing-not-found');
-    expect(marketingRoute).toContain('system-b-marketing-not-found-code');
-    expect(marketingLayout).toContain('<PublicPageShell');
   });
 });

@@ -115,15 +115,14 @@ test('evaluateOwnership: empty gbrain hard when required', () => {
   assert.equal(r.ownership.source, 'gbrain-empty');
 });
 
-test('evaluateOwnership: reachable context does not invent an owner', () => {
+test('evaluateOwnership: reachable marks presence only (no invented names)', () => {
   const r = evaluateOwnership({
     gbrainOnPath: true,
     gbrainOutput: 'Owner: Alice the CEO of everything scope: whole company',
     task: 'JOV-4183',
   });
   assert.equal(r.ownership.reachable, true);
-  assert.equal(r.ownership.owner, null);
-  assert.equal(r.ownership.context_available, true);
+  assert.equal(r.ownership.owner, 'available');
   assert.equal(r.ownership.scope, 'JOV-4183');
   assert.equal(r.ownership.source, 'gbrain');
   assert.deepEqual(r.blockers, []);
@@ -191,8 +190,7 @@ test('buildReceipt / assembleReceipt schema and merge', () => {
   assert.equal(receipt.verdict, 'go');
   assert.equal(receipt.ms_total, 42);
   assert.equal(receipt.worktree.branch, 'feat');
-  assert.equal(receipt.ownership.owner, null);
-  assert.equal(receipt.ownership.context_available, true);
+  assert.equal(receipt.ownership.owner, 'available');
   assert.equal(receipt.gstack.installed, true);
   assert.deepEqual(receipt.blockers, []);
 

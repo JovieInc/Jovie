@@ -71,7 +71,7 @@ export default function PricingPage() {
       <MarketingHero variant='centered'>
         {/* ui-casing-allow: marketing display headline */}
         <h1 id='pricing-heading' className='marketing-h2-linear max-w-170'>
-          Simple Pricing.{' '}
+          Simple pricing.{' '}
           <span className='text-secondary-token'>No surprises.</span>
         </h1>
       </MarketingHero>

@@ -224,7 +224,7 @@ guarded so mutable upstream instructions cannot be installed silently:
 test "$(git ls-remote https://github.com/Leonxlnx/taste-skill.git HEAD | awk '{print $1}')" = "06d6028b5c623016c59ce8536f578e5a1127b499" && DISABLE_TELEMETRY=1 DO_NOT_TRACK=1 npx --yes skills add https://github.com/Leonxlnx/taste-skill --skill "design-taste-frontend" -y
 ```
 
-Safe UI-only fixes can use the guarded native-queue UI fast lane from JOV-3895 only when the diff stays inside the allowed visual UI paths in `.github/MERGE_QUEUE.md`. The PR must carry `ui`, `fast-track-ui`, `fast`, and `merge-queue`, plus a `## Fast-track UI eligibility` section with `Why eligible`, `Before`, `After`, and `Checks run` evidence. The merge-queue guard fails closed for API routes, auth, billing, DB/migrations, security/CSP, infra/cron, routing behavior, package manifests, CI, and broad refactors.
+Safe UI-only fixes can use the guarded Graphite UI fast lane from JOV-3895 only when the diff stays inside the allowed visual UI paths in `.github/MERGE_QUEUE.md`. The PR must carry `ui`, `fast-track-ui`, `fast`, and `merge-queue`, plus a `## Fast-track UI eligibility` section with `Why eligible`, `Before`, `After`, and `Checks run` evidence. The merge-queue guard fails closed for API routes, auth, billing, DB/migrations, security/CSP, infra/cron, routing behavior, package manifests, CI, and broad refactors.
 
 Config variables:
 

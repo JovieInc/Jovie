@@ -25,7 +25,7 @@ jobs:
     outputs:
       has_visual_changes: ${{ steps.detect.outputs.has_visual_changes }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
       - name: Detect visual-relevant changes
@@ -45,17 +45,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @jovie/web exec playwright install chromium --with-deps
+      - run: pnpm --filter web exec playwright install chromium --with-deps
       - name: Run Storybook A11y Tests
         id: a11y-test
-        run: pnpm --filter @jovie/web test:a11y
+        run: pnpm --filter web test:a11y
       - name: A11y Results Summary
         if: always()
         run: |
@@ -64,7 +64,7 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "FAIL: Accessibility violations detected - blocking this PR." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "To run locally: pnpm --filter @jovie/web test:a11y" >> "$GITHUB_STEP_SUMMARY"
+            echo "To run locally: pnpm --filter web test:a11y" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "## A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"

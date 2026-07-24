@@ -5,7 +5,6 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowRight,
   CalendarDays,
-  Handshake,
   MessageSquare,
   Music2,
   Sparkles,
@@ -31,7 +30,6 @@ const SIGNAL_TYPE_VISUALS: Readonly<
   new_song: { icon: Music2, accentClassName: 'text-accent-blue' },
   new_event: { icon: CalendarDays, accentClassName: 'text-accent-purple' },
   new_profile_match: { icon: UserRound, accentClassName: 'text-accent-pink' },
-  brand_deal: { icon: Handshake, accentClassName: 'text-accent-orange' },
   other: { icon: Sparkles, accentClassName: '' },
 };
 

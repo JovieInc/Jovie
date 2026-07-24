@@ -6,19 +6,7 @@
  * run until recovered here or via the approve retry path.
  */
 
-import {
-  and,
-  sql as drizzleSql,
-  eq,
-  isNull,
-  ne,
-  notExists,
-  or,
-} from 'drizzle-orm';
-import {
-  BRAND_DEAL_OPPORTUNITY_KIND,
-  parseBrandDealOpportunity,
-} from '@/lib/connectors/brand-deal-opportunity';
+import { and, sql as drizzleSql, eq, notExists } from 'drizzle-orm';
 import { isMissingConnectorWorkflowTablesError } from '@/lib/connectors/schema-errors';
 import { db } from '@/lib/db';
 import { suggestedActions, workflowRuns } from '@/lib/db/schema/connectors';
@@ -34,8 +22,6 @@ type BookingPayload = {
 export type OrphanedApprovalRecoveryResult =
   | 'enqueued'
   | 'already-queued'
-  | 'decision-only'
-  | 'invalid-decision-only'
   | 'not-accepted'
   | 'not-found';
 
@@ -90,8 +76,6 @@ export async function recoverOrphanedApprovedAction(input: {
         status: suggestedActions.status,
         userId: suggestedActions.userId,
         payload: suggestedActions.payload,
-        kind: suggestedActions.kind,
-        signalType: suggestedActions.signalType,
       })
       .from(suggestedActions)
       .where(eq(suggestedActions.id, input.approvalId))
@@ -103,15 +87,6 @@ export async function recoverOrphanedApprovedAction(input: {
 
     if (action.userId !== input.userId || action.status !== 'approved') {
       return 'not-accepted';
-    }
-
-    if (
-      action.kind === BRAND_DEAL_OPPORTUNITY_KIND ||
-      action.signalType === 'brand_deal'
-    ) {
-      return parseBrandDealOpportunity(action.kind, action.payload)
-        ? 'decision-only'
-        : 'invalid-decision-only';
     }
 
     const [existingRun] = await db
@@ -166,18 +141,11 @@ export async function reconcileOrphanedAcceptedActions(
         id: suggestedActions.id,
         userId: suggestedActions.userId,
         payload: suggestedActions.payload,
-        kind: suggestedActions.kind,
-        signalType: suggestedActions.signalType,
       })
       .from(suggestedActions)
       .where(
         and(
           eq(suggestedActions.status, 'approved'),
-          ne(suggestedActions.kind, BRAND_DEAL_OPPORTUNITY_KIND),
-          or(
-            isNull(suggestedActions.signalType),
-            ne(suggestedActions.signalType, 'brand_deal')
-          ),
           workflowRunMissingForSuggestedAction()
         )
       )
@@ -185,13 +153,6 @@ export async function reconcileOrphanedAcceptedActions(
 
     let enqueued = 0;
     for (const action of orphaned) {
-      // Defense in depth if a caller or mock bypasses the SQL predicate.
-      if (
-        action.kind === BRAND_DEAL_OPPORTUNITY_KIND ||
-        action.signalType === 'brand_deal'
-      ) {
-        continue;
-      }
       const enqueueResult = await enqueueApprovedActionWorkflow({
         userId: action.userId,
         approvalId: action.id,

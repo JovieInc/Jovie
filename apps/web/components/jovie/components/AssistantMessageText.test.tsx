@@ -5,18 +5,9 @@ import { fastRender } from '@/tests/utils/fast-render';
 import { AssistantMessageText } from './AssistantMessageText';
 
 vi.mock('./ChatMarkdown', () => ({
-  ChatMarkdown: ({
-    content,
-    inline = false,
-  }: {
-    readonly content: string;
-    readonly inline?: boolean;
-  }) =>
-    inline ? (
-      <span data-testid='chat-markdown'>{content}</span>
-    ) : (
-      <div data-testid='chat-markdown'>{content}</div>
-    ),
+  ChatMarkdown: ({ content }: { content: string }) => (
+    <div data-testid='chat-markdown'>{content}</div>
+  ),
 }));
 
 describe('AssistantMessageText', () => {
@@ -43,30 +34,12 @@ describe('AssistantMessageText', () => {
     const markdownSegments = screen.getAllByTestId('chat-markdown');
     expect(markdownSegments[0]).toHaveTextContent('Listen to');
     expect(markdownSegments[1]).toHaveTextContent('tonight.');
-    expect(markdownSegments).toHaveLength(2);
-    expect(markdownSegments.every(segment => segment.tagName === 'SPAN')).toBe(
-      true
-    );
     expect(screen.queryByText('@release:rel_1[Sober]')).toBeNull();
 
     await user.click(screen.getByTestId('entity-chip-popover-trigger'));
     const content = await screen.findByTestId('entity-chip-popover-content');
     expect(content).toHaveAttribute('data-entity-kind', 'release');
     expect(content.textContent).toContain('Sober');
-  });
-
-  it('keeps structured markdown on the normal block renderer', () => {
-    fastRender(
-      <AssistantMessageText
-        content={'- @release:rel_1[Sober]\n  keeps list semantics'}
-      />
-    );
-
-    expect(
-      screen
-        .getAllByTestId('chat-markdown')
-        .every(segment => segment.tagName === 'DIV')
-    ).toBe(true);
   });
 
   it('renders skill tokens as neutral assistant mentions', () => {

@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   LibraryLoadingState,
@@ -11,6 +12,7 @@ import {
 } from '@/app/app/(shell)/library/library-data';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { useAppFlag } from '@/lib/flags/client';
 import {
   isLibraryApprovalStatus,
   type LibraryApprovalStatus,
@@ -20,6 +22,16 @@ import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { primaryProviderKeys, providerConfig } from './config';
 import { ReleaseTableSkeleton } from './loading';
+
+const ReleasesExperience = dynamic(
+  () =>
+    import('@/features/dashboard/organisms/release-provider-matrix').then(
+      mod => mod.ReleasesExperience
+    ),
+  {
+    loading: () => <ReleaseTableSkeleton showHeader={false} />,
+  }
+);
 
 export type ReleaseCatalogView = 'list' | 'assets';
 
@@ -50,6 +62,7 @@ export function ReleaseCatalogPageClient({
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
+  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1');
   const hasProfile = Boolean(profileId);
 
   const {
@@ -147,6 +160,10 @@ export function ReleaseCatalogPageClient({
         onRetry={() => {
           refetch();
         }}
+        secondaryAction={{
+          label: 'Refresh Page',
+          onClick: () => globalThis.location.reload(),
+        }}
         extraContext={{ Profile: profileId }}
       />
     );
@@ -156,15 +173,32 @@ export function ReleaseCatalogPageClient({
     return <ReleaseTableSkeleton showHeader={false} />;
   }
 
+  if (designV1ReleasesEnabled) {
+    return (
+      <ShellReleasesView
+        releases={releases ?? []}
+        providerConfig={providerConfig}
+        primaryProviders={primaryProviderKeys}
+        artistName={spotifyArtistName ?? appleMusicArtistName ?? null}
+        allowArtworkDownloads={allowArtworkDownloads}
+        spotifyConnected={spotifyConnected}
+        appleMusicConnected={appleMusicConnected}
+        initialImporting={spotifyImportStatus === 'importing'}
+        initialTotalCount={spotifyImportTotal}
+      />
+    );
+  }
+
   return (
-    <ShellReleasesView
+    <ReleasesExperience
       releases={releases ?? []}
       providerConfig={providerConfig}
       primaryProviders={primaryProviderKeys}
-      artistName={spotifyArtistName ?? appleMusicArtistName ?? null}
-      allowArtworkDownloads={allowArtworkDownloads}
       spotifyConnected={spotifyConnected}
+      spotifyArtistName={spotifyArtistName}
       appleMusicConnected={appleMusicConnected}
+      appleMusicArtistName={appleMusicArtistName}
+      allowArtworkDownloads={allowArtworkDownloads}
       initialImporting={spotifyImportStatus === 'importing'}
       initialTotalCount={spotifyImportTotal}
     />

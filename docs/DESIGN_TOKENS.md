@@ -187,23 +187,6 @@ these, not redefine them.
 - **Canonical button sizes** — `sm` = 28px, `md` = 36px, `lg` = 44px; `icon`
   uses the `md` control height with equal width.
 
-### Concentric radius-by-elevation
-
-Nested System B surfaces use a shared geometric rule: **outer radius = inner
-radius + inset**. Use the semantic CSS aliases rather than a one-off `rounded-*`
-value when creating a reusable card, overlay, or panel.
-
-| Surface | Outer token | Inset | Inner token |
-| --- | --- | --- | --- |
-| Card | `--system-b-radius-card` (`--radius-xl`) | `--space-1` | `--system-b-radius-card-inner` (`--radius-lg`) |
-| Overlay | `--system-b-radius-overlay` (`--radius-xl`) | `--space-1` | `--system-b-radius-overlay-inner` (`--radius-lg`) |
-| Panel/dialog | `--system-b-radius-panel` (`--radius-3xl`) | `--space-1` | `--system-b-radius-panel-inner` (`--radius-2xl`) |
-
-The typed contract is `SYSTEM_B_CONCENTRIC_SURFACES` in
-`apps/web/lib/design/system-b-radius.ts`. Shared `Card`, dropdown/popover, and
-dialog primitives consume the outer aliases. An inset child surface should use
-the matching `*-inner` alias; pill/circle geometry is excluded from this rule.
-
 ## Source guards (composer + header radius/padding)
 
 Composer and app-shell header surfaces must not reintroduce off-token corner

@@ -157,24 +157,6 @@ export const ChatMessage = memo(function ChatMessage({
     attachmentChips.length === 0 &&
     !messageText.includes('\n') &&
     messageText.length <= 44;
-  const userAttachmentContent = attachmentChips.map(chip =>
-    chip.isImage ? (
-      <ImageAttachmentChip
-        key={chip.dedupeKey}
-        url={chip.url}
-        name={chip.name}
-        tone='onLight'
-      />
-    ) : (
-      <FileAttachmentChip
-        key={chip.dedupeKey}
-        url={chip.url}
-        name={chip.name}
-        mediaType={chip.mediaType}
-        tone='onLight'
-      />
-    )
-  );
 
   return (
     <motion.div
@@ -189,35 +171,42 @@ export const ChatMessage = memo(function ChatMessage({
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
       {isUser ? (
-        attachmentChips.length > 0 && !messageText ? (
-          <div
-            className='system-b-chat-user-attachments'
-            data-testid='chat-user-attachment-frame'
-            data-has-message='false'
-          >
-            {userAttachmentContent}
-          </div>
-        ) : (
-          <div
-            data-testid='chat-user-bubble'
-            data-bubble-shape={useUserPillBubble ? 'pill' : 'rectangle'}
-            className='system-b-chat-user-bubble'
-          >
-            {attachmentChips.length > 0 && (
-              <div
-                className='system-b-chat-user-attachments'
-                data-has-message={messageText ? 'true' : 'false'}
-              >
-                {userAttachmentContent}
-              </div>
-            )}
-            {messageText && (
-              <div className='system-b-chat-user-text'>
-                <TokenizedText content={messageText} tone='onLight' />
-              </div>
-            )}
-          </div>
-        )
+        <div
+          data-testid='chat-user-bubble'
+          data-bubble-shape={useUserPillBubble ? 'pill' : 'rectangle'}
+          className='system-b-chat-user-bubble'
+        >
+          {attachmentChips.length > 0 && (
+            <div
+              className='system-b-chat-user-attachments'
+              data-has-message={messageText ? 'true' : 'false'}
+            >
+              {attachmentChips.map(chip =>
+                chip.isImage ? (
+                  <ImageAttachmentChip
+                    key={chip.dedupeKey}
+                    url={chip.url}
+                    name={chip.name}
+                    tone='onLight'
+                  />
+                ) : (
+                  <FileAttachmentChip
+                    key={chip.dedupeKey}
+                    url={chip.url}
+                    name={chip.name}
+                    mediaType={chip.mediaType}
+                    tone='onLight'
+                  />
+                )
+              )}
+            </div>
+          )}
+          {messageText && (
+            <div className='system-b-chat-user-text'>
+              <TokenizedText content={messageText} tone='onLight' />
+            </div>
+          )}
+        </div>
       ) : (
         <div className='system-b-chat-assistant-frame'>
           {showThinkingIndicator ? (

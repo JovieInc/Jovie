@@ -3,11 +3,9 @@
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { APP_ROUTES } from '@/constants/routes';
 import {
   isDemoRecordingClient,
   isDevChromeDisabledClient,
-  isLocalDevelopmentDevChrome,
 } from '@/lib/demo-recording';
 
 const DevToolbar = dynamic(
@@ -42,6 +40,14 @@ export function resetDevToolbarHeight(): void {
   document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
 }
 
+function hasDevToolbarCookie(): boolean {
+  if (typeof document === 'undefined') return false;
+
+  return document.cookie
+    .split(';')
+    .some(cookie => cookie.trim().startsWith('__dev_toolbar=1'));
+}
+
 export function isDevToolbarSuppressedPath(pathname: string): boolean {
   return (
     DEV_TOOLBAR_SUPPRESSED_PATHS.has(pathname) ||
@@ -49,21 +55,15 @@ export function isDevToolbarSuppressedPath(pathname: string): boolean {
   );
 }
 
-export function shouldDefaultDevToolbarHidden(pathname: string): boolean {
-  return (
-    pathname === APP_ROUTES.CHAT || pathname.startsWith(`${APP_ROUTES.CHAT}/`)
-  );
-}
-
 /**
- * Customer-facing deployments never render development controls. The toolbar
- * is intentionally limited to a local `next dev` runtime; staging is a real
- * customer review surface, not an internal control plane.
+ * Production customer sessions never show the toolbar unless an explicit
+ * `__dev_toolbar=1` cookie opt-in is present (emergency prod debugging).
  */
 export function shouldRenderDevToolbar({
   env,
   disabled = false,
   pathname,
+  hasCookie = false,
   isDemoRecording = false,
   isDevChromeDisabled = false,
   isElectron = false,
@@ -72,21 +72,18 @@ export function shouldRenderDevToolbar({
   readonly env: string;
   readonly disabled?: boolean;
   readonly pathname: string;
-  /** Legacy input retained for callers; production is always fail-closed. */
   readonly hasCookie?: boolean;
   readonly isDemoRecording?: boolean;
   readonly isDevChromeDisabled?: boolean;
   readonly isElectron?: boolean;
   readonly nodeEnv?: string | undefined;
 }): boolean {
-  // Kept in the public contract for existing test callers; environment itself
-  // is the source of truth because Vercel previews compile with production.
-  void nodeEnv;
   if (disabled) return false;
   if (isDemoRecording || isDevChromeDisabled || isElectron) return false;
   if (isDevToolbarSuppressedPath(pathname)) return false;
 
-  if (!isLocalDevelopmentDevChrome(env)) return false;
+  const isProduction = nodeEnv === 'production' && env === 'production';
+  if (isProduction) return hasCookie;
 
   return true;
 }
@@ -115,6 +112,7 @@ export function DevToolbarGate({
         env,
         disabled,
         pathname,
+        hasCookie: hasDevToolbarCookie(),
         isDemoRecording: isDemoRecordingClient(),
         isDevChromeDisabled: isDevChromeDisabledClient(),
         isElectron:
@@ -170,12 +168,5 @@ export function DevToolbarGate({
     return null;
   }
 
-  return (
-    <DevToolbar
-      env={env}
-      sha={sha}
-      version={version}
-      defaultHidden={shouldDefaultDevToolbarHidden(pathname)}
-    />
-  );
+  return <DevToolbar env={env} sha={sha} version={version} />;
 }

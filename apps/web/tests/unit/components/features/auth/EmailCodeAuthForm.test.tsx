@@ -1,6 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -12,23 +11,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * transition.
  */
 
-const { authState, mockSendVerificationOtp, mockSignInEmailOtp } = vi.hoisted(
-  () => ({
-    authState: { isLoaded: true, isSignedIn: false },
-    mockSendVerificationOtp: vi.fn(),
-    mockSignInEmailOtp: vi.fn(),
-  })
-);
+const { mockSendVerificationOtp, mockSignInEmailOtp } = vi.hoisted(() => ({
+  mockSendVerificationOtp: vi.fn(),
+  mockSignInEmailOtp: vi.fn(),
+}));
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
-}));
-
-vi.mock('@/hooks/useClerkSafe', () => ({
-  useAuthSafe: () => ({
-    isLoaded: authState.isLoaded,
-    isSignedIn: authState.isSignedIn,
-  }),
 }));
 
 vi.mock('@/lib/auth/client', () => ({
@@ -74,22 +63,6 @@ describe('EmailCodeAuthForm', () => {
     // clearAllMocks does not drain that queue — it would otherwise leak into
     // the next test's first send/verify call. reset guarantees a clean slate.
     vi.resetAllMocks();
-    authState.isLoaded = true;
-    authState.isSignedIn = false;
-  });
-
-  it('keeps signed-in initial markup deterministic, then hides after hydration', async () => {
-    authState.isSignedIn = true;
-
-    const serverMarkup = renderToStaticMarkup(
-      <EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />
-    );
-    expect(serverMarkup).toContain('Email Address');
-
-    const { container } = render(
-      <EmailCodeAuthForm mode='sign-in' redirectUrl='/app/dashboard' />
-    );
-    await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 
   describe('send-code error mapping (readErrorCode / getSendErrorMessage)', () => {

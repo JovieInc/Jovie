@@ -11,7 +11,6 @@ import {
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import React, { useMemo } from 'react';
-import { NavBadge } from '@/components/atoms/NavBadge';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
 import { cn } from '@/lib/utils';
@@ -187,6 +186,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   thread,
   active,
   unread,
+  hasThreadActions,
   tight,
   onSelect,
   onThreadContextMenu,
@@ -194,6 +194,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   readonly thread: SidebarThread;
   readonly active: boolean;
   readonly unread: boolean;
+  readonly hasThreadActions: boolean;
   readonly tight?: boolean;
   readonly onSelect?: (id: string) => void;
   readonly onThreadContextMenu?: (
@@ -205,9 +206,12 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     getSidebarNavRowClassName({
       active,
       tight,
-      trailingOverlay: Boolean(onThreadContextMenu),
+      // Always reserve trailing gutter so long titles never crash into the
+      // seam / overflow menu. Extra pr when actions are present.
+      className: hasThreadActions ? 'pr-8' : 'pr-2.5',
     }),
-    'text-left',
+    // Button atom is inline-flex; force grid so the title column can shrink.
+    'grid w-full min-w-0 text-left',
     active
       ? undefined
       : unread
@@ -228,13 +232,12 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
                 : 'bg-white/25'
         )}
       />
+      {/* Soft edge fade > hard ellipsis: titles stay readable without mid-glyph chops. */}
       <span
         className={cn(
-          // The label owns the complete middle grid track. A fixed terminal
-          // fade (with the WebKit property for every supported shell) makes
-          // truncation read as intentional rather than a hard crop.
-          'min-w-0 w-full justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left [-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
-          'text-xs',
+          'min-w-0 w-full justify-self-stretch overflow-hidden whitespace-nowrap text-left text-xs',
+          '[mask-image:linear-gradient(to_right,black_calc(100%-48px),transparent)]',
+          '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%-48px),transparent)]',
           unread && 'font-medium'
         )}
       >
@@ -245,11 +248,16 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   return (
     <div
       className={cn(
-        'group/thread relative flex items-center',
+        'group/thread relative flex w-full min-w-0 items-center',
         tight ? 'h-6' : 'h-7'
       )}
     >
-      <Tooltip label={thread.title} side='right' block>
+      <Tooltip
+        label={thread.title}
+        side='right'
+        block
+        className='min-w-0 w-full'
+      >
         {thread.href ? (
           <Link
             href={thread.href}
@@ -281,12 +289,8 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             onClick={e => onThreadContextMenu(e, thread)}
             aria-label={`Chat Actions for ${thread.title}`}
             className={cn(
-              // The action deliberately sits above the label instead of
-              // owning a permanent grid track. The title can use the full
-              // middle column at rest; on intent, its existing right-edge
-              // fade runs beneath this opaque action surface.
-              'absolute right-2.5 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:bg-surface-0 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
-              'opacity-0 group-hover/thread:opacity-100 group-hover/thread:bg-surface-0 focus-visible:opacity-100'
+              'absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
+              'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
             )}
           >
             <MoreHorizontal
@@ -339,11 +343,10 @@ export function SidebarThreadsSection({
           Chats
         </span>
         {unreadCount > 0 && (
-          <NavBadge
-            variant='count'
-            count={unreadCount}
-            aria-label={`${unreadCount} unread ${unreadCount === 1 ? 'chat' : 'chats'}`}
-          />
+          <span className='inline-flex items-center gap-1 text-2xs font-medium text-quaternary-token'>
+            <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/85' />
+            {unreadCount}
+          </span>
         )}
       </div>
 
@@ -418,12 +421,14 @@ export function SidebarThreadsSection({
         {visible.map(t => {
           const active = activeThreadId === t.id;
           const unread = !!t.unread && !active;
+          const hasThreadActions = Boolean(onThreadContextMenu);
           return (
             <SidebarThreadRow
               key={t.id}
               thread={t}
               active={active}
               unread={unread}
+              hasThreadActions={hasThreadActions}
               tight={tight}
               onSelect={onSelect}
               onThreadContextMenu={onThreadContextMenu}

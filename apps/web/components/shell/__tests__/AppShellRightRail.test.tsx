@@ -13,14 +13,9 @@ describe('AppShellRightRail', () => {
     const rail = screen.getByTestId('app-shell-right-rail');
 
     expect(rail).toHaveAttribute('aria-label', 'Context Panel');
-    expect(rail).toHaveAttribute('data-shell-rail-motion', 'right');
     expect(rail).toHaveClass(
       'sticky',
       'top-0',
-      'z-30',
-      'lg:z-10',
-      'w-0',
-      'lg:w-fit',
       'h-full',
       'min-h-0',
       'self-stretch',
@@ -28,25 +23,24 @@ describe('AppShellRightRail', () => {
       'duration-cinematic',
       'ease-cinematic'
     );
-    expect(rail).toHaveClass('transition-[flex-basis,width,opacity,transform]');
     expect(rail).not.toHaveClass('self-start');
-    expect(rail).not.toHaveClass('z-10');
     expect(rail).toContainElement(screen.getByTestId('fixture-panel'));
   });
 
-  it('applies the canonical rail radius treatment', () => {
+  it('applies shellChatV1 radius treatment when opted in', () => {
     render(
-      <AppShellRightRail>
+      <AppShellRightRail variant='shellChatV1'>
         <div>Panel</div>
       </AppShellRightRail>
     );
 
     const rail = screen.getByTestId('app-shell-right-rail');
 
+    expect(rail).toHaveAttribute('data-shell-design', 'shellChatV1');
     expect(rail).toHaveClass('lg:rounded-(--linear-app-shell-radius)');
   });
 
-  it('has no desktop overlay positioning and only allocates the width of its drawer child', () => {
+  it('defaults to legacy variant without shell radius chrome', () => {
     render(
       <AppShellRightRail>
         <div>Panel</div>
@@ -55,13 +49,8 @@ describe('AppShellRightRail', () => {
 
     const rail = screen.getByTestId('app-shell-right-rail');
 
-    expect(rail).toHaveClass('lg:w-fit', 'shrink-0');
-    expect(rail).not.toHaveClass(
-      'fixed',
-      'absolute',
-      'lg:fixed',
-      'lg:absolute'
-    );
+    expect(rail).toHaveAttribute('data-shell-design', 'legacy');
+    expect(rail).not.toHaveClass('lg:rounded-(--linear-app-shell-radius)');
   });
 
   it('merges custom className without replacing base sticky layout', () => {

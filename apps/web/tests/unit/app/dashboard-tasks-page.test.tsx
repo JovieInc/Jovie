@@ -68,8 +68,8 @@ vi.mock('@/lib/queries/HydrateClient', () => ({
   }) => <div data-testid='hydrate-client'>{children}</div>,
 }));
 
-vi.mock('@/components/features/dashboard/tasks/TasksPageClient', () => ({
-  TasksPageClient: () => (
+vi.mock('@/components/features/dashboard/tasks/LazyTasksPageClient', () => ({
+  LazyTasksPageClient: () => (
     <div data-testid='tasks-page-client'>Tasks Client</div>
   ),
 }));
@@ -139,12 +139,12 @@ describe('tasks page routes', () => {
     expect(mockFetchQuery).not.toHaveBeenCalled();
   });
 
-  it('prefetches only the default list before rendering the workspace', async () => {
+  it('server-prefetches default task data before rendering the workspace', async () => {
     render(await TasksPage());
 
-    expect(mockFetchQuery).toHaveBeenCalledTimes(1);
+    expect(mockFetchQuery).toHaveBeenCalledTimes(2);
     expect(mockGetTasks).toHaveBeenCalledWith({ limit: 100 });
-    expect(mockGetTaskBoard).not.toHaveBeenCalled();
+    expect(mockGetTaskBoard).toHaveBeenCalledWith({ limit: 100 });
     expect(screen.getByTestId('hydrate-client')).toBeInTheDocument();
     expect(screen.getByTestId('tasks-page-client')).toBeInTheDocument();
     expect(

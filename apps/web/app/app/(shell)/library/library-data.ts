@@ -320,19 +320,6 @@ export function formatLibraryReleaseDate(value: string | null): string {
   return new Intl.DateTimeFormat('en', {
     month: 'short',
     day: 'numeric',
-    timeZone: 'UTC',
-  }).format(date);
-}
-
-export function formatLibraryReleaseDateTitle(value: string | null): string {
-  if (!value) return 'No Release Date';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'No Release Date';
-
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
     year: 'numeric',
     timeZone: 'UTC',
   }).format(date);

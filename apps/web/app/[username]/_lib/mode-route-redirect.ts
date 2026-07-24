@@ -1,6 +1,14 @@
-import { NextResponse } from 'next/server';
+import { redirect } from 'next/navigation';
 import type { ProfileMode } from '@/features/profile/contracts';
 import { getProfileModeHref } from '@/features/profile/registry';
+
+type RouteParams = Promise<{
+  readonly username: string;
+}>;
+
+type RouteSearchParams = Promise<{
+  readonly source?: string | string[];
+}>;
 
 type RedirectSourceSearchParams = {
   readonly source?: string | string[];
@@ -45,24 +53,30 @@ export function getRouteRedirectSearchParams(searchParams: URLSearchParams) {
   } satisfies RedirectSourceSearchParams;
 }
 
-/**
- * Hard HTTP 307 response for the legacy mode redirect sinks
- * (/{username}/tour|tip|listen|releases|music|subscribe).
- *
- * These MUST be route handlers, not pages calling `redirect()`: the
- * segment's loading.tsx streams the shell (status 200) before a page-level
- * `redirect()` throws, so a page sink can only deliver a client-side
- * streamed redirect — never the hard 307 the sinks promise. A route handler
- * owns the whole response, so the 307 + Location header are authoritative.
- */
-export function profileModeRedirectResponse(
-  requestUrl: string,
-  username: string,
-  searchParams: RedirectSourceSearchParams | undefined,
-  mode: Exclude<ProfileMode, 'profile'>
-): NextResponse {
-  const href = searchParams
-    ? getProfileModeRedirectHref(username, searchParams, mode)
-    : getProfileModeHref(username, mode);
-  return NextResponse.redirect(new URL(href, requestUrl), 307);
+export async function redirectToProfileMode(
+  params: RouteParams,
+  searchParamsOrMode:
+    | RouteSearchParams
+    | Exclude<ProfileMode, 'profile'>
+    | undefined,
+  maybeMode?: Exclude<ProfileMode, 'profile'>
+) {
+  const mode =
+    typeof searchParamsOrMode === 'string' ? searchParamsOrMode : maybeMode;
+
+  if (!mode) {
+    throw new Error('redirectToProfileMode requires a profile mode');
+  }
+
+  if (typeof searchParamsOrMode === 'string' || searchParamsOrMode == null) {
+    const { username } = await params;
+    redirect(getProfileModeHref(username, mode));
+  }
+
+  const [{ username }, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParamsOrMode,
+  ]);
+
+  redirect(getProfileModeRedirectHref(username, resolvedSearchParams, mode));
 }

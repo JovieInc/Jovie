@@ -5,18 +5,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
 } from '@jovie/ui';
 import {
   type ColumnDef,
@@ -48,6 +36,8 @@ import {
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
+  type CSSProperties,
+  cloneElement,
   createContext,
   type MouseEvent,
   memo,
@@ -61,12 +51,12 @@ import {
   useState,
 } from 'react';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
-import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import { toast } from '@/components/feedback';
+import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
   DrawerHeader,
   DrawerSection,
@@ -82,15 +72,14 @@ import {
   ToolbarMenuChoiceItem,
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
 import { PageShell } from '@/components/organisms/PageShell';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_ICON_CLASS,
+  PAGE_TOOLBAR_MENU_TRIGGER_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbar,
   PageToolbarActionButton,
-  PageToolbarTabButton,
   TableEmptyState,
   UnifiedTable,
   UnifiedTableSkeleton,
@@ -104,10 +93,11 @@ import {
   DspAvatarStack,
 } from '@/components/shell/DspAvatarStack';
 import type { FilterPill } from '@/components/shell/pill-search.types';
+import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
+import { useRegisterShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
-import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
@@ -129,7 +119,6 @@ import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
   formatLibraryDuration,
   formatLibraryReleaseDate,
-  formatLibraryReleaseDateTitle,
   getLibraryAspectRatioClass,
   getLibraryAssetAspectRatio,
   getLibraryDrawerHeroClass,
@@ -513,7 +502,7 @@ const StatusCell = memo(function StatusCell({
     <span
       role='status'
       className={cn(
-        'system-b-library-status-pill inline-flex h-6 w-fit max-w-full items-center truncate rounded-full border px-2 leading-4',
+        'system-b-library-status-pill inline-flex h-6 w-fit items-center border px-2 leading-4',
         releaseStatusClasses(asset.status)
       )}
       data-testid={`library-release-status-${asset.id}`}
@@ -533,7 +522,7 @@ const ApprovalStatusCell = memo(function ApprovalStatusCell({
     <span
       role='status'
       className={cn(
-        'system-b-library-status-pill inline-flex h-6 w-fit max-w-full items-center truncate rounded-full border px-2 leading-4',
+        'system-b-library-status-pill inline-flex h-6 w-fit items-center border px-2 leading-4',
         libraryApprovalStatusClasses(asset.approvalStatus)
       )}
       data-testid={`library-approval-status-${asset.id}`}
@@ -544,22 +533,16 @@ const ApprovalStatusCell = memo(function ApprovalStatusCell({
   );
 });
 
-const ReleaseDateCell = memo(function ReleaseDateCell({
-  asset,
-}: {
-  readonly asset: LibraryReleaseAsset;
-}) {
+function assetMatchesSearchQuery(
+  asset: LibraryReleaseAsset,
+  normalizedQuery: string
+): boolean {
+  if (!normalizedQuery) return true;
   return (
-    <span
-      className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'
-      title={formatLibraryReleaseDateTitle(asset.releaseDate)}
-    >
-      {asset.releaseDate
-        ? formatLibraryReleaseDate(asset.releaseDate)
-        : 'No date'}
-    </span>
+    asset.title.toLowerCase().includes(normalizedQuery) ||
+    asset.artist.toLowerCase().includes(normalizedQuery)
   );
-});
+}
 
 /**
  * Neutral fallback avatar color for provider keys missing from
@@ -676,14 +659,6 @@ const LIBRARY_CATALOG_COLUMNS = [
     enableSorting: false,
     meta: { className: 'px-2' },
   }),
-  libraryColumnHelper.display({
-    id: 'releaseDate',
-    header: 'Release Date',
-    cell: ({ row }) => <ReleaseDateCell asset={row.original} />,
-    size: 112,
-    minSize: 96,
-    meta: { className: 'pl-2 pr-3' },
-  }),
   libraryColumnHelper.accessor('artist', {
     id: 'artist',
     header: 'Artist',
@@ -709,14 +684,6 @@ const LIBRARY_TABLE_COLUMNS = [
     size: 9999,
     enableSorting: false,
     meta: { className: 'pl-2.5 pr-2' },
-  }),
-  libraryColumnHelper.display({
-    id: 'releaseDate',
-    header: 'Release Date',
-    cell: ({ row }) => <ReleaseDateCell asset={row.original} />,
-    size: 112,
-    minSize: 96,
-    meta: { className: 'pl-2 pr-3' },
   }),
   // Release + Approval share the same md breakpoint so a Released+Draft
   // row never shows bare "Draft" alone (JOV-3333 / #10384).
@@ -759,6 +726,20 @@ const LIBRARY_TABLE_COLUMNS = [
     enableSorting: false,
     meta: { className: 'hidden lg:table-cell px-2' },
   }),
+  libraryColumnHelper.display({
+    id: 'releaseDate',
+    header: 'Release Date',
+    cell: ({ row }) => (
+      <span className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'>
+        {row.original.releaseDate
+          ? formatLibraryReleaseDate(row.original.releaseDate)
+          : 'No date'}
+      </span>
+    ),
+    size: 112,
+    minSize: 96,
+    meta: { className: 'hidden sm:table-cell pl-2 pr-3' },
+  }),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
 const LIBRARY_VIEW_FILTER_CHIP_KEYS = PRESETS.map(preset => preset.id);
@@ -797,9 +778,40 @@ export function LibraryLoadingState() {
         minWidth={LIBRARY_TABLE_MIN_WIDTH}
         skeletonRows={SKELETON_ROW_COUNT.TABLE}
         skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
-        containerClassName='h-full'
+        containerClassName={cn('h-full', LIBRARY_CONTENT_INSET_CLASS)}
       />
     </PageShell>
+  );
+}
+
+function LibraryViewFilterChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  readonly label: string;
+  readonly count: number;
+  readonly active: boolean;
+  readonly onClick: () => void;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'system-b-library-filter-pill h-7 rounded-full px-3 font-caption transition-colors duration-subtle ease-subtle',
+        active
+          ? 'system-b-library-filter-pill-active'
+          : 'system-b-library-filter-pill-idle'
+      )}
+    >
+      {label}
+      <span className='system-b-library-rail-count ml-1 tabular-nums'>
+        {count}
+      </span>
+    </button>
   );
 }
 
@@ -818,16 +830,10 @@ function LibraryViewFilterChips({
       data-testid='library-view-filter-chips'
     >
       {PRESETS.map(view => (
-        <PageToolbarTabButton
+        <LibraryViewFilterChip
           key={view.id}
-          label={
-            <>
-              {view.label}
-              <span className='system-b-library-rail-count ml-1 tabular-nums text-tertiary-token'>
-                {assets.filter(view.predicate).length}
-              </span>
-            </>
-          }
+          label={view.label}
+          count={assets.filter(view.predicate).length}
           active={preset === view.id}
           onClick={() => onPreset(view.id)}
         />
@@ -872,17 +878,7 @@ function LibrarySavedViewRow({
   );
 }
 
-interface LibraryFilterPanelProps {
-  readonly assets: readonly LibraryReleaseAsset[];
-  readonly savedView: LibrarySavedViewId;
-  readonly onSavedView: (savedView: LibrarySavedViewId) => void;
-  readonly filters: LibraryFilters;
-  readonly onFilters: (filters: LibraryFilters) => void;
-  readonly onClearFilters: () => void;
-  readonly className?: string;
-}
-
-function LibraryFilterPanel({
+function LibraryRail({
   assets,
   savedView,
   onSavedView,
@@ -890,7 +886,15 @@ function LibraryFilterPanel({
   onFilters,
   onClearFilters,
   className,
-}: LibraryFilterPanelProps) {
+}: {
+  readonly assets: readonly LibraryReleaseAsset[];
+  readonly savedView: LibrarySavedViewId;
+  readonly onSavedView: (savedView: LibrarySavedViewId) => void;
+  readonly filters: LibraryFilters;
+  readonly onFilters: (filters: LibraryFilters) => void;
+  readonly onClearFilters: () => void;
+  readonly className?: string;
+}) {
   const releaseTypes = uniqueSorted(assets.map(asset => asset.releaseType));
   const statuses = uniqueSorted(assets.map(asset => asset.status));
   const approvalStatuses = uniqueSorted(
@@ -927,14 +931,13 @@ function LibraryFilterPanel({
     filters.providers.size;
 
   return (
-    <fieldset
-      data-testid='library-filter-panel'
+    <nav
+      aria-label='Library Filters'
       className={cn(
-        'system-b-library-rail flex min-h-0 min-w-0 flex-col border-0 p-2.5',
+        'system-b-library-rail flex min-h-0 flex-col p-2.5',
         className
       )}
     >
-      <legend className='sr-only'>Library Filters</legend>
       <div className='min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <div className='pb-2'>
           <p className='system-b-library-rail-title pb-1 pt-2'>Smart Filters</p>
@@ -1063,7 +1066,7 @@ function LibraryFilterPanel({
           </FilterSection>
         ) : null}
       </div>
-    </fieldset>
+    </nav>
   );
 }
 
@@ -1170,92 +1173,6 @@ function FilterRow({
   );
 }
 
-function LibraryFiltersControl({
-  activeFilterCount,
-  filterPanel,
-  isDesktop,
-  open,
-  onOpenChange,
-}: {
-  readonly activeFilterCount: number;
-  readonly filterPanel: ReactNode;
-  readonly isDesktop: boolean;
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-}) {
-  const ariaLabel =
-    activeFilterCount > 0
-      ? `Show filters (${activeFilterCount})`
-      : 'Show filters';
-  const trigger = (
-    <PageToolbarActionButton
-      label='Show Filters'
-      icon={
-        <span className='relative grid place-items-center'>
-          <Filter className={PAGE_TOOLBAR_ICON_CLASS} />
-          {activeFilterCount > 0 ? (
-            <span
-              data-testid='library-filter-active-indicator'
-              className='absolute -right-1 -top-0.5 h-1.5 w-1.5 rounded-full bg-accent'
-              aria-hidden='true'
-            />
-          ) : null}
-        </span>
-      }
-      ariaLabel={ariaLabel}
-      active={open}
-      iconOnly
-    />
-  );
-
-  if (isDesktop) {
-    return (
-      <Tooltip>
-        <Popover open={open} onOpenChange={onOpenChange}>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-          </TooltipTrigger>
-          <PopoverContent
-            aria-label='Library Filters'
-            align='end'
-            sideOffset={6}
-            className='flex max-h-[min(36rem,var(--radix-popover-content-available-height))] w-80 overflow-hidden p-0'
-            testId='library-filter-popover'
-          >
-            {filterPanel}
-          </PopoverContent>
-        </Popover>
-        <TooltipContent side='bottom'>Show filters</TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <Tooltip>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <TooltipTrigger asChild>
-          <SheetTrigger asChild>{trigger}</SheetTrigger>
-        </TooltipTrigger>
-        <SheetContent
-          side='right'
-          className='flex w-full max-w-[22rem] flex-col gap-0 p-0'
-          testId='library-filter-sheet'
-        >
-          <SheetHeader className='shrink-0 border-b border-subtle px-4 py-3 text-left'>
-            <SheetTitle>Library Filters</SheetTitle>
-            <SheetDescription className='sr-only'>
-              Filter by saved view, approval, release status, type, asset, or
-              provider.
-            </SheetDescription>
-          </SheetHeader>
-          {filterPanel}
-        </SheetContent>
-      </Sheet>
-      <TooltipContent side='bottom'>Show filters</TooltipContent>
-    </Tooltip>
-  );
-}
-
 function SortDropdown({
   sort,
   onSort,
@@ -1264,44 +1181,33 @@ function SortDropdown({
   readonly onSort: (sort: LibrarySortKey) => void;
 }) {
   return (
-    <Tooltip>
-      <DropdownMenu>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>
-            <PageToolbarActionButton
-              label={`Sort by ${SORT_LABELS[sort]}`}
-              icon={
-                <ArrowUpDown
-                  className={PAGE_TOOLBAR_ICON_CLASS}
-                  strokeWidth={2.25}
-                />
-              }
-              ariaLabel={`Sort by ${SORT_LABELS[sort]}`}
-              iconOnly
-            />
-          </DropdownMenuTrigger>
-        </TooltipTrigger>
-        <DropdownMenuContent
-          align='end'
-          side='bottom'
-          sideOffset={6}
-          aria-label='Sort Library'
-          className={TOOLBAR_MENU_CONTENT_CLASS}
-        >
-          {(Object.keys(SORT_LABELS) as LibrarySortKey[]).map(key => (
-            <ToolbarMenuChoiceItem
-              key={key}
-              active={sort === key}
-              label={SORT_LABELS[key]}
-              onSelect={() => onSort(key)}
-            />
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <TooltipContent side='bottom'>
-        Sort by {SORT_LABELS[sort].toLowerCase()}
-      </TooltipContent>
-    </Tooltip>
+    <ShellDropdown
+      align='end'
+      side='bottom'
+      sideOffset={6}
+      width={184}
+      trigger={
+        <button type='button' className={PAGE_TOOLBAR_MENU_TRIGGER_CLASS}>
+          <ArrowUpDown className={PAGE_TOOLBAR_ICON_CLASS} strokeWidth={2.25} />
+          <span className='hidden sm:inline'>{SORT_LABELS[sort]}</span>
+          <ChevronDown className='h-3 w-3' strokeWidth={2.25} />
+        </button>
+      }
+    >
+      <ShellDropdown.Label>Sort By</ShellDropdown.Label>
+      <ShellDropdown.RadioGroup
+        value={sort}
+        onValueChange={value => onSort(value as LibrarySortKey)}
+      >
+        {(Object.keys(SORT_LABELS) as LibrarySortKey[]).map(key => (
+          <ShellDropdown.RadioItem
+            key={key}
+            value={key}
+            label={SORT_LABELS[key]}
+          />
+        ))}
+      </ShellDropdown.RadioGroup>
+    </ShellDropdown>
   );
 }
 
@@ -1379,13 +1285,13 @@ function LibraryToolbar({
   onView,
   gridDensity,
   onGridDensity,
+  searchQuery,
+  onSearchQuery,
   visibleCount,
   totalCount,
-  filtersOpen,
-  onFiltersOpenChange,
+  mobileFiltersOpen,
+  onToggleMobileFilters,
   activeFilterCount,
-  filterPanel,
-  isDesktop,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly preset: LibraryPresetId;
@@ -1396,13 +1302,13 @@ function LibraryToolbar({
   readonly onView: (view: LibraryViewMode) => void;
   readonly gridDensity: LibraryGridDensity;
   readonly onGridDensity: (density: LibraryGridDensity) => void;
+  readonly searchQuery: string;
+  readonly onSearchQuery: (query: string) => void;
   readonly visibleCount: number;
   readonly totalCount: number;
-  readonly filtersOpen: boolean;
-  readonly onFiltersOpenChange: (open: boolean) => void;
+  readonly mobileFiltersOpen: boolean;
+  readonly onToggleMobileFilters: () => void;
   readonly activeFilterCount: number;
-  readonly filterPanel: ReactNode;
-  readonly isDesktop: boolean;
 }) {
   return (
     <PageToolbar
@@ -1421,12 +1327,25 @@ function LibraryToolbar({
       }
       end={
         <>
-          <LibraryFiltersControl
-            activeFilterCount={activeFilterCount}
-            filterPanel={filterPanel}
-            isDesktop={isDesktop}
-            open={filtersOpen}
-            onOpenChange={onFiltersOpenChange}
+          <AppSearchField
+            value={searchQuery}
+            onChange={onSearchQuery}
+            placeholder='Search library'
+            ariaLabel='Search library by title'
+            className='w-36 sm:w-48'
+          />
+          <PageToolbarActionButton
+            label={
+              activeFilterCount > 0
+                ? `Show Filters (${activeFilterCount})`
+                : 'Show Filters'
+            }
+            icon={<Filter className={PAGE_TOOLBAR_ICON_CLASS} />}
+            onClick={onToggleMobileFilters}
+            aria-expanded={mobileFiltersOpen}
+            ariaPressed={mobileFiltersOpen}
+            tooltipLabel={mobileFiltersOpen ? 'Hide filters' : 'Show filters'}
+            className='lg:hidden'
           />
           <SortDropdown sort={sort} onSort={onSort} />
           {view === 'grid' ? (
@@ -1519,7 +1438,7 @@ const AssetCard = memo(function AssetCard({
               <span
                 role='status'
                 className={cn(
-                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
+                  'system-b-library-card-status border px-1.5 py-0.5 leading-4',
                   releaseStatusClasses(asset.status)
                 )}
                 data-testid={`library-release-status-${asset.id}`}
@@ -1530,7 +1449,7 @@ const AssetCard = memo(function AssetCard({
               <span
                 role='status'
                 className={cn(
-                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
+                  'system-b-library-card-status border px-1.5 py-0.5 leading-4',
                   libraryApprovalStatusClasses(asset.approvalStatus)
                 )}
                 data-testid={`library-approval-status-${asset.id}`}
@@ -1733,7 +1652,7 @@ function LibraryReleaseTable({
       minWidth={LIBRARY_TABLE_MIN_WIDTH}
       hideHeader={hideHeader}
       className='system-b-library-table'
-      containerClassName='h-full'
+      containerClassName={cn('h-full', LIBRARY_CONTENT_INSET_CLASS)}
       skeletonRows={SKELETON_ROW_COUNT.TABLE}
       skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
     />
@@ -1756,10 +1675,8 @@ function EmptyCatalog() {
       aria-label='Library'
       frame='content-container'
       contentPadding='none'
-      surfaceMode='table'
       data-testid='library-surface'
     >
-      <NavigationDestinationReady destination='library' />
       <TableEmptyState
         icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
         title='No Library Items'
@@ -1786,7 +1703,7 @@ function NoResults({ onReset }: { readonly onReset: () => void }) {
     <TableEmptyState
       title='No Assets Match'
       description='No library items match the selected view or filters.'
-      className='min-h-75'
+      className='m-3 min-h-75'
       action={
         <button
           type='button'
@@ -1980,7 +1897,7 @@ function ApprovalStatusEditor({
           aria-label='Approval Status'
           data-testid={`library-approval-status-select-${asset.id}`}
           className={cn(
-            'system-b-library-status-pill inline-flex h-6 max-w-full items-center gap-1 truncate rounded-full border px-2',
+            'system-b-library-status-pill inline-flex h-6 items-center gap-1 border px-2',
             libraryApprovalStatusClasses(asset.approvalStatus),
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
@@ -2083,6 +2000,7 @@ function AssetDrawer({
   onClose,
   activePreviewId,
   playingPreviewId,
+  isDesktopLayout,
   onTogglePreview,
   onAudioUploaded,
   getContextMenuItems,
@@ -2097,6 +2015,7 @@ function AssetDrawer({
   readonly onClose: () => void;
   readonly activePreviewId: string | null;
   readonly playingPreviewId: string | null;
+  readonly isDesktopLayout: boolean;
   readonly onTogglePreview: LibraryPreviewToggle;
   readonly onAudioUploaded: (assetId: string, previewUrl: string) => void;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
@@ -2129,13 +2048,9 @@ function AssetDrawer({
     currentId !== null &&
     currentId === playingPreviewId &&
     currentId === activePreviewId;
-  const handleDrawerKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      onClose();
-    },
-    [onClose]
+  const closedDrawerClassName = cn(
+    'pointer-events-none opacity-0',
+    isDesktopLayout ? null : 'translate-y-2 hidden'
   );
   const drawerHeaderActions = current ? (
     <DrawerHeaderActions
@@ -2150,12 +2065,16 @@ function AssetDrawer({
   ) : null;
 
   return (
-    <RightDrawer
-      isOpen={open}
-      width={360}
-      ariaLabel='Library asset details'
-      onKeyDown={handleDrawerKeyDown}
-      className='system-b-library-drawer border-l border-(--app-shell-frame-seam)'
+    <aside
+      aria-hidden={!open}
+      inert={open ? undefined : true}
+      className={cn(
+        'system-b-library-drawer h-full min-h-0 overflow-hidden border-l border-subtle transition-[opacity,transform] duration-cinematic ease-cinematic',
+        isDesktopLayout
+          ? 'static z-auto rounded-none border-y-0 border-r-0 shadow-none'
+          : 'system-b-library-drawer--mobile fixed inset-x-3 bottom-20 top-16 z-40 border',
+        open ? 'translate-y-0 opacity-100' : closedDrawerClassName
+      )}
       data-testid='library-asset-drawer'
     >
       {current ? (
@@ -2202,7 +2121,7 @@ function AssetDrawer({
                     <span
                       role='status'
                       className={cn(
-                        'system-b-library-status-pill inline-flex h-6 max-w-full items-center truncate rounded-full border px-2',
+                        'system-b-library-status-pill inline-flex h-6 items-center border px-2',
                         releaseStatusClasses(current.status)
                       )}
                       data-testid={`library-release-status-${current.id}`}
@@ -2315,15 +2234,7 @@ function AssetDrawer({
                       />
                       <MetadataRow
                         label={isMerch ? 'Updated' : 'Release Date'}
-                        value={
-                          <span
-                            title={formatLibraryReleaseDateTitle(
-                              current.releaseDate
-                            )}
-                          >
-                            {formatLibraryReleaseDate(current.releaseDate)}
-                          </span>
-                        }
+                        value={formatLibraryReleaseDate(current.releaseDate)}
                       />
                       <MetadataRow
                         label='Type'
@@ -2436,29 +2347,36 @@ function AssetDrawer({
           </div>
         </TableContextMenu>
       ) : null}
-    </RightDrawer>
+    </aside>
   );
 }
 
 function LibraryStatusBar({
   visibleCount,
   totalCount,
+  sort,
+  view,
   activePreviewTitle,
 }: {
   readonly visibleCount: number;
   readonly totalCount: number;
+  readonly sort: LibrarySortKey;
+  readonly view: LibraryViewMode;
   readonly activePreviewTitle: string | null;
 }) {
+  const viewLabel =
+    view === 'grid' ? 'Grid' : view === 'table' ? 'Table' : 'List';
+  const idleSummary = `${SORT_LABELS[sort]} - ${viewLabel}`;
+  const playbackSummary = activePreviewTitle
+    ? `Playing ${activePreviewTitle}`
+    : idleSummary;
+
   return (
-    <div className='system-b-library-status-bar hidden h-(--app-shell-footer-row-height) shrink-0 items-center justify-between gap-3 border-t border-(--app-shell-frame-seam) px-(--linear-app-header-padding-x) sm:flex'>
+    <div className='system-b-library-status-bar hidden h-8 shrink-0 items-center justify-between gap-3 border-t border-subtle px-(--linear-app-header-padding-x) sm:flex'>
       <span className='min-w-0 truncate'>
         {visibleCount} of {totalCount} Items
       </span>
-      {activePreviewTitle ? (
-        <span className='min-w-0 truncate text-right'>
-          Playing {activePreviewTitle}
-        </span>
-      ) : null}
+      <span className='min-w-0 truncate text-right'>{playbackSummary}</span>
     </div>
   );
 }
@@ -2487,16 +2405,16 @@ export function LibrarySurface({
   const [preset, setPreset] = useState<LibraryPresetId>(() =>
     parseLibraryViewParam(searchParams.get('view'))
   );
-  // Keep the server render and the browser's first hydration render identical.
-  // A persisted view belongs to the post-hydration enhancement path; reading it
-  // here would make a returning user's first client render differ from SSR.
-  const [savedView, setSavedView] = useState<LibrarySavedViewId>('all');
+  const [savedView, setSavedView] = useState<LibrarySavedViewId>(() =>
+    readPersistedLibrarySavedView()
+  );
   const [filters, setFilters] = useState<LibraryFilters>(() => emptyFilters());
+  const [searchQuery, setSearchQuery] = useState('');
   const [sort, setSort] = useState<LibrarySortKey>('releaseDate');
   const { view, setView } = useLibraryViewMode();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [pills, setPills] = useState<FilterPill[]>([]);
   const { density: gridDensity, setDensity: setGridDensity } =
     useLibraryGridDensity();
@@ -2506,14 +2424,11 @@ export function LibrarySurface({
   const deferredSavedView = useDeferredValue(savedView);
   const deferredPills = useDeferredValue(pills);
   const deferredSort = useDeferredValue(sort);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   useEffect(() => {
     setPreset(parseLibraryViewParam(searchParams.get('view')));
   }, [searchParams]);
-
-  useEffect(() => {
-    setSavedView(readPersistedLibrarySavedView());
-  }, []);
 
   // Version-stack duplicate ingests so each release renders as one row
   // (JOV-3089); overrides then layer on top of the surviving canonical row.
@@ -2553,18 +2468,21 @@ export function LibrarySurface({
       PRESETS.find(item => item.id === deferredPreset)?.predicate ??
       (() => true);
     const savedViewPredicate = getLibrarySavedViewPredicate(deferredSavedView);
+    const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
 
     return effectiveAssets
       .filter(presetPredicate)
       .filter(savedViewPredicate)
       .filter(asset => assetMatchesFilters(asset, deferredFilters))
       .filter(asset => assetMatchesPills(asset, deferredPills))
+      .filter(asset => assetMatchesSearchQuery(asset, normalizedQuery))
       .toSorted(compareAssets(deferredSort));
   }, [
     deferredFilters,
     deferredPills,
     deferredPreset,
     deferredSavedView,
+    deferredSearchQuery,
     deferredSort,
     effectiveAssets,
   ]);
@@ -2641,6 +2559,22 @@ export function LibrarySurface({
     }
   }, [selectedId, visibleAssets]);
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+        return;
+      }
+      if (event.key === 'Escape' && drawerOpen) {
+        event.preventDefault();
+        setDrawerOpen(false);
+      }
+    }
+
+    globalThis.addEventListener('keydown', onKeyDown);
+    return () => globalThis.removeEventListener('keydown', onKeyDown);
+  }, [drawerOpen]);
+
   const handlePresetChange = useCallback(
     (next: LibraryPresetId) => {
       setPreset(next);
@@ -2669,6 +2603,7 @@ export function LibrarySurface({
     handleSavedViewChange('all');
     setFilters(emptyFilters());
     setPills([]);
+    setSearchQuery('');
   }
 
   function openAsset(id: string) {
@@ -2797,19 +2732,29 @@ export function LibrarySurface({
 
   useRegisterHeaderSearch(headerSearchAdapter);
 
-  const filterPanel = useMemo(
+  const libraryRail = useMemo(
     () => (
-      <LibraryFilterPanel
+      <LibraryRail
         assets={effectiveAssets}
         savedView={savedView}
         onSavedView={handleSavedViewChange}
         filters={filters}
         onFilters={setFilters}
         onClearFilters={() => setFilters(emptyFilters())}
-        className='max-h-full flex-1'
       />
     ),
     [effectiveAssets, filters, handleSavedViewChange, savedView]
+  );
+
+  useRegisterShellSidebarOverride(
+    effectiveAssets.length > 0
+      ? {
+          key: 'library',
+          backHref: APP_ROUTES.CHAT,
+          backLabel: 'Back to App',
+          content: libraryRail,
+        }
+      : null
   );
 
   const handleAudioUploaded = useCallback(
@@ -2823,43 +2768,10 @@ export function LibrarySurface({
     [router]
   );
 
-  const assetDrawerPanel = useMemo(
-    () => (
-      <AssetDrawer
-        asset={selectedAsset}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        activePreviewId={activePreviewId}
-        playingPreviewId={playingPreviewId}
-        onTogglePreview={handleTogglePreview}
-        onAudioUploaded={handleAudioUploaded}
-        getContextMenuItems={getContextMenuItems}
-        profileId={profileId}
-        artistHandle={artistHandle}
-        pressKitCandidates={effectiveAssets.filter(
-          item => getLibraryItemKind(item) === 'release'
-        )}
-        onApprovalStatusChange={handleApprovalStatusChange}
-        onShareChange={handleShareChange}
-      />
-    ),
-    [
-      activePreviewId,
-      artistHandle,
-      drawerOpen,
-      effectiveAssets,
-      getContextMenuItems,
-      handleApprovalStatusChange,
-      handleAudioUploaded,
-      handleShareChange,
-      handleTogglePreview,
-      playingPreviewId,
-      profileId,
-      selectedAsset,
-    ]
-  );
-
-  useRegisterRightPanel(assetDrawerPanel);
+  const drawerColumnWidth = drawerOpen ? '360px' : '0px';
+  const libraryGridTemplateColumns = isDesktopLayout
+    ? `minmax(0,1fr) ${drawerColumnWidth}`
+    : 'minmax(0, 1fr)';
 
   if (effectiveAssets.length === 0) {
     return <EmptyCatalog />;
@@ -2870,7 +2782,6 @@ export function LibrarySurface({
       aria-label='Library'
       frame='content-container'
       contentPadding='none'
-      surfaceMode='table'
       data-testid='library-surface'
       toolbar={
         <LibraryToolbar
@@ -2883,22 +2794,35 @@ export function LibrarySurface({
           onView={setView}
           gridDensity={gridDensity}
           onGridDensity={setGridDensity}
+          searchQuery={searchQuery}
+          onSearchQuery={setSearchQuery}
           visibleCount={visibleAssets.length}
           totalCount={effectiveAssets.length}
-          filtersOpen={filtersOpen}
-          onFiltersOpenChange={setFiltersOpen}
+          mobileFiltersOpen={mobileFiltersOpen}
+          onToggleMobileFilters={() => setMobileFiltersOpen(value => !value)}
           activeFilterCount={activeFilterCount}
-          filterPanel={filterPanel}
-          isDesktop={isDesktopLayout}
         />
       }
     >
-      <NavigationDestinationReady destination='library' />
+      {mobileFiltersOpen ? (
+        <div className='lg:hidden'>
+          {cloneElement(libraryRail, {
+            className: 'max-h-[45svh] shrink-0 border-b border-subtle',
+          })}
+        </div>
+      ) : null}
+
       <div
-        data-testid='library-content-frame'
-        className='flex h-full min-h-0 flex-1 overflow-hidden'
+        className='grid h-full min-h-0 flex-1 overflow-hidden'
+        style={
+          {
+            gridTemplateColumns: libraryGridTemplateColumns,
+            transition:
+              'grid-template-columns var(--duration-cinematic) var(--ease-cinematic)',
+          } as CSSProperties
+        }
       >
-        <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
+        <div className='flex min-h-0 min-w-0 flex-col overflow-hidden'>
           <div className='min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0'>
             {visibleAssets.length === 0 ? (
               <NoResults onReset={resetView} />
@@ -2939,9 +2863,29 @@ export function LibrarySurface({
           <LibraryStatusBar
             visibleCount={visibleAssets.length}
             totalCount={effectiveAssets.length}
+            sort={sort}
+            view={view}
             activePreviewTitle={activePreviewTitle}
           />
         </div>
+        <AssetDrawer
+          asset={selectedAsset}
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          activePreviewId={activePreviewId}
+          playingPreviewId={playingPreviewId}
+          isDesktopLayout={isDesktopLayout}
+          onTogglePreview={handleTogglePreview}
+          onAudioUploaded={handleAudioUploaded}
+          getContextMenuItems={getContextMenuItems}
+          profileId={profileId}
+          artistHandle={artistHandle}
+          pressKitCandidates={effectiveAssets.filter(
+            item => getLibraryItemKind(item) === 'release'
+          )}
+          onApprovalStatusChange={handleApprovalStatusChange}
+          onShareChange={handleShareChange}
+        />
       </div>
     </PageShell>
   );

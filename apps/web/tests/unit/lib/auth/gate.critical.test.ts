@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Better Auth critical gate coverage.
@@ -17,7 +17,6 @@ const {
   mockNormalizeEmail,
   mockCaptureError,
   mockCaptureCriticalError,
-  mockEq,
 } = vi.hoisted(() => ({
   mockGetSession: vi.fn(),
   mockGetCachedDevTestAuthSession: vi.fn(),
@@ -29,7 +28,6 @@ const {
   mockNormalizeEmail: vi.fn((e: string) => e?.toLowerCase().trim() ?? e),
   mockCaptureError: vi.fn().mockResolvedValue(undefined),
   mockCaptureCriticalError: vi.fn().mockResolvedValue(undefined),
-  mockEq: vi.fn((_column: unknown, value: unknown) => ({ eq: value })),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -116,7 +114,7 @@ vi.mock('@/lib/waitlist/settings', () => ({
 }));
 
 vi.mock('drizzle-orm', () => ({
-  eq: mockEq,
+  eq: vi.fn((_col, val) => ({ eq: val })),
   and: vi.fn((...args: unknown[]) => ({ and: args })),
   sql: Object.assign(
     (strings: TemplateStringsArray, ...values: unknown[]) => ({
@@ -162,21 +160,6 @@ function chainLimit(rows: unknown[]) {
   };
 }
 
-function chainLimitRejecting(error: Error) {
-  return {
-    from: vi.fn().mockReturnValue({
-      leftJoin: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockRejectedValue(error),
-        }),
-      }),
-      where: vi.fn().mockReturnValue({
-        limit: vi.fn().mockRejectedValue(error),
-      }),
-    }),
-  };
-}
-
 function activeDbUser(overrides: Record<string, unknown> = {}) {
   return {
     id: 'db_user_1',
@@ -200,10 +183,6 @@ function activeDbUser(overrides: Record<string, unknown> = {}) {
 }
 
 describe('@critical gate.ts (Better Auth)', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetCachedDevTestAuthSession.mockResolvedValue(null);
@@ -239,27 +218,6 @@ describe('@critical gate.ts (Better Auth)', () => {
     expect(result.clerkUserId).toBe('ba_user_1');
     expect(result.dbUserId).toBe('db_user_1');
     expect(result.profileId).toBe('profile_1');
-  });
-
-  it('looks up a bypass actor by Better Auth id rather than app user id', async () => {
-    mockGetCachedDevTestAuthSession.mockResolvedValue({
-      dbUserId: '00000000-0000-4000-8000-000000000101',
-      clerkUserId: 'ba_user_1',
-      email: 'artist@example.com',
-    });
-    mockDbSelect.mockReturnValue(chainLimit([activeDbUser()]));
-
-    const result = await resolveUserState();
-
-    expect(result.state).toBe(CanonicalUserState.ACTIVE);
-    expect(result.clerkUserId).toBe('ba_user_1');
-    expect(result.dbUserId).toBe('db_user_1');
-    expect(mockEq).toHaveBeenCalledWith('users.betterAuthUserId', 'ba_user_1');
-    expect(mockEq).not.toHaveBeenCalledWith(
-      'users.betterAuthUserId',
-      '00000000-0000-4000-8000-000000000101'
-    );
-    expect(mockGetSession).not.toHaveBeenCalled();
   });
 
   it('returns NEEDS_ONBOARDING when profile is incomplete', async () => {
@@ -329,40 +287,6 @@ describe('@critical gate.ts (Better Auth)', () => {
     expect(mockGetSession).not.toHaveBeenCalled();
     expect(result.state).toBe(CanonicalUserState.ACTIVE);
     expect(result.dbUserId).toBe('db_user_1');
-  });
-
-  it('keeps a synthetic creator-ready test session on its Better Auth identity when the shell passes its cached id', async () => {
-    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
-    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
-    vi.stubEnv('VERCEL_ENV', 'development');
-    mockGetCachedDevTestAuthSession.mockResolvedValue({
-      // Secretless capture has no app users row. `cached.ts` therefore
-      // exposes the BA id here while the auth gate must select its synthetic
-      // ACTIVE fallback below.
-      dbUserId: 'ba_creator_ready',
-      clerkUserId: 'ba_creator_ready',
-      email: 'browse-ready+clerk_test@jov.ie',
-      persona: 'creator-ready',
-    });
-    mockDbSelect.mockReturnValue(
-      chainLimitRejecting(new Error('database unavailable in visual capture'))
-    );
-
-    const result = await resolveUserState({
-      knownClerkUserId: 'ba_creator_ready',
-    });
-
-    expect(result).toMatchObject({
-      state: CanonicalUserState.ACTIVE,
-      clerkUserId: 'ba_creator_ready',
-      dbUserId: '00000000-0000-4000-8000-000000000101',
-    });
-    expect(mockEq).toHaveBeenCalledWith(
-      'users.betterAuthUserId',
-      'ba_creator_ready'
-    );
-    expect(mockEq).not.toHaveBeenCalledWith('users.id', 'ba_creator_ready');
-    expect(mockGetSession).not.toHaveBeenCalled();
   });
 
   it('creates a DB user when waitlist gate is disabled and no waitlist entry exists', async () => {

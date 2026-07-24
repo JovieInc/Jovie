@@ -107,7 +107,6 @@ export function evaluateOwnership(input) {
         scope: task || null,
         source: 'gbrain-missing',
         reachable: false,
-        context_available: false,
         ms: input.ms ?? 0,
         diagnostics: input.diagnostics ?? null,
       },
@@ -132,7 +131,6 @@ export function evaluateOwnership(input) {
         scope: task || null,
         source: timedOut ? 'gbrain-timeout' : 'gbrain-empty',
         reachable: false,
-        context_available: false,
         ms: input.ms ?? 0,
         diagnostics: input.diagnostics ?? null,
       },
@@ -140,15 +138,13 @@ export function evaluateOwnership(input) {
     };
   }
 
-  // Free-text context is not an ownership claim. Expose availability without
-  // fabricating an owner that downstream agents could mistake for a lease.
+  // Do not invent owner names from free-text hits — mark presence only.
   return {
     ownership: {
-      owner: null,
+      owner: 'available',
       scope: task || 'repo',
       source: input.source || 'gbrain',
       reachable: true,
-      context_available: true,
       ms: input.ms ?? 0,
       diagnostics: input.diagnostics ?? null,
     },

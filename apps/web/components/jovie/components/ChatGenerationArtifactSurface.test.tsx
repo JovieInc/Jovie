@@ -68,12 +68,6 @@ describe('ChatGenerationArtifactSurface', () => {
     expect(
       document.querySelector('.system-b-chat-pitch-block-text[data-clamped]')
     ).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: 'Copy Pitch pitch' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Copy full pitch draft' })
-    ).toBeInTheDocument();
   });
 
   it('keeps artifact visuals and shimmer on System B classes', () => {

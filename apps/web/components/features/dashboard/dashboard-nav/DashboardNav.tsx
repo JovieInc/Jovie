@@ -1,11 +1,14 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
+import { Search } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { NavBadge } from '@/components/atoms/NavBadge';
+import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { toast } from '@/components/feedback';
+import { openCommandPalette } from '@/components/organisms/command-palette-events';
+import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -21,26 +24,39 @@ import {
   writeThreadReadState,
 } from '@/components/shell/SidebarThreadsSection';
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
-import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
-import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
-import { shouldShowInboxNavigation } from '@/lib/inbox/navigation-availability';
+import {
+  APP_ROUTES,
+  buildLibraryViewRoute,
+  isDemoRoutePath,
+} from '@/constants/routes';
+import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
-  type NavigationTelemetryContext,
-  startNavigationTelemetry,
-  trackNavigationImpressions,
-} from '@/lib/tracking/navigation-telemetry';
-import {
+  adminNavigationSections,
+  artistProfileNavItem,
   artistSettingsNavigation,
+  filterProfilesWorkspaceNavigation,
+  inboxNavItem,
+  newThreadNavItem,
   primaryNavigation,
+  releasesNavItem,
+  touringNavItem,
   userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
-import { isLibraryNavigationRoute } from './navigation-state';
 import type { DashboardNavProps, NavItem } from './types';
+
+const searchNavItem: NavItem = {
+  name: 'Search',
+  href: APP_ROUTES.CHAT,
+  id: 'search',
+  icon: Search,
+  description:
+    'Search app content across conversations, releases, artists, tasks, and more',
+};
 
 type DashboardNavSection = {
   readonly key: string;
@@ -52,19 +68,37 @@ function navItemPathname(href: string): string {
   return new URL(href, 'https://jovie.local').pathname;
 }
 
+function isReleasesRoute(pathname: string): boolean {
+  return (
+    pathname === APP_ROUTES.LIBRARY ||
+    pathname === APP_ROUTES.DASHBOARD_LIBRARY ||
+    pathname === APP_ROUTES.LEGACY_DASHBOARD_LIBRARY ||
+    pathname === APP_ROUTES.RELEASES ||
+    pathname === APP_ROUTES.DASHBOARD_RELEASES
+  );
+}
+
 function isItemActive(pathname: string, item: NavItem): boolean {
-  // Inbox owns only the shell root. Prefix matching `/app` would otherwise
-  // mark it active on every customer route.
-  if (item.id === 'inbox') {
-    return normalizeTrailingSlash(pathname) === APP_ROUTES.DASHBOARD;
+  if (item.id === 'releases') {
+    return isReleasesRoute(pathname);
   }
 
-  if (item.id === 'library') {
-    return isLibraryNavigationRoute(pathname);
+  if (item.id === 'artist-profile') {
+    return (
+      pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE ||
+      pathname.startsWith(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}/`)
+    );
+  }
+
+  if (item.id === 'touring') {
+    return (
+      pathname === APP_ROUTES.SETTINGS_TOURING ||
+      pathname.startsWith(`${APP_ROUTES.SETTINGS_TOURING}/`)
+    );
   }
 
   const normalizedPathname = (() => {
-    if (isLibraryNavigationRoute(pathname)) {
+    if (isReleasesRoute(pathname)) {
       return APP_ROUTES.LIBRARY;
     }
     if (
@@ -126,32 +160,26 @@ function formatTaskBadge(
   return count > 99 ? '99+' : count;
 }
 
-export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
-  const { inboxNavigation, selectedProfile } = useDashboardData();
+export function DashboardNav(_: DashboardNavProps) {
+  const { isAdmin, selectedProfile } = useDashboardData();
+  const { clearPendingShell, showPendingShell } = usePendingShell();
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
+  const { isOpen: isPreviewPanelOpen, open: openPreviewPanel } =
+    usePreviewPanelState();
   const queryClient = useQueryClient();
-  const isElectron = useIsElectronRuntime();
-  // Persisted navigation state is a client-only enhancement. Reading it during
-  // the first render would make a returning browser render different badges
-  // from the server markup and can force React to abandon hydration.
-  const [threadReadAtById, setThreadReadAtById] = useState<
-    Record<string, string>
-  >({});
-  const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(null);
-  const [hasHydratedPersistedState, setHasHydratedPersistedState] =
-    useState(false);
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
+  const inboxHomeEnabled = useAppFlag('INBOX_HOME');
+  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
+  const [threadReadAtById, setThreadReadAtById] =
+    useState<Record<string, string>>(readThreadReadState);
+  const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(
+    readTasksSeenAt
+  );
+  const artistName = selectedProfile?.displayName?.trim();
   const profileId = selectedProfile?.id ?? '';
   const isDemo = isDemoRoutePath(pathname);
-  const telemetryContext = useMemo<NavigationTelemetryContext>(
-    () => ({
-      isElectron,
-      isMobile,
-      navVariant: 'canonical_customer_ia_v1',
-    }),
-    [isElectron, isMobile]
-  );
   const { canAccessTasksWorkspace, isLoading: isPlanGateLoading } =
     usePlanGate();
   const { data: taskStats } = useTaskStatsQuery(profileId, {
@@ -159,19 +187,8 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     seenAt: tasksSeenAt,
   });
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
-  const visiblePrimaryNavigation = useMemo(
-    () =>
-      primaryNavigation.filter(
-        item =>
-          item.id !== 'inbox' ||
-          shouldShowInboxNavigation(
-            inboxNavigation,
-            isItemActive(pathname, item)
-          )
-      ),
-    [inboxNavigation, pathname]
-  );
   const threadsVisible =
+    shellChatV1Enabled &&
     !isDemo &&
     !isInSettings &&
     (isMobile ? openMobile : sidebarState === 'open');
@@ -186,19 +203,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   });
 
   useEffect(() => {
-    setThreadReadAtById(readThreadReadState());
-    setTasksSeenAt(readTasksSeenAt());
-    setHasHydratedPersistedState(true);
-  }, []);
-
-  useEffect(() => {
-    if (
-      !hasHydratedPersistedState ||
-      !conversations ||
-      conversations.length === 0
-    ) {
-      return;
-    }
+    if (!conversations || conversations.length === 0) return;
 
     setThreadReadAtById(previous => {
       if (Object.keys(previous).length > 0) return previous;
@@ -212,7 +217,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       writeThreadReadState(baseline);
       return baseline;
     });
-  }, [conversations, hasHydratedPersistedState]);
+  }, [conversations]);
 
   useEffect(() => {
     if (normalizeTrailingSlash(pathname) !== APP_ROUTES.TASKS) return;
@@ -221,48 +226,27 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     setTasksSeenAt(nextSeenAt);
   }, [pathname]);
 
-  useEffect(() => {
-    if (isDemo || isMobile) return;
-    trackNavigationImpressions(
-      isInSettings
-        ? ['settings']
-        : visiblePrimaryNavigation.map(item => item.id),
-      pathname,
-      telemetryContext
-    );
-  }, [
-    isDemo,
-    isInSettings,
-    isMobile,
-    pathname,
-    telemetryContext,
-    visiblePrimaryNavigation,
-  ]);
-
-  const artistSettingsLabel = 'Artist';
+  // Settings nav: "General" (user) and artist name (or "Artist") groups.
+  // In the chat shell the artist row itself shows the display name, so keep the
+  // section label generic to avoid duplicate "Tim White" buttons in the sidebar.
+  const artistSettingsLabel =
+    shellChatV1Enabled || isInSettings ? 'Artist' : artistName || 'Artist';
 
   // Memoize nav sections for dashboard (non-settings) mode
   const navSections = useMemo<readonly DashboardNavSection[]>(() => {
     const decorateItem = (item: NavItem): NavItem => {
       if (item.id === 'tasks') {
-        const taskCount = canAccessTasksWorkspace
-          ? formatTaskBadge(taskStats, tasksSeenAt)
-          : undefined;
-
         return {
           ...item,
           badge: (() => {
             if (isPlanGateLoading) return undefined;
-            if (canAccessTasksWorkspace) {
-              return taskCount == null ? undefined : (
-                <NavBadge
-                  variant='count'
-                  count={taskCount}
-                  aria-label={`${taskCount} ${tasksSeenAt ? 'new ' : ''}active tasks`}
-                />
-              );
-            }
-            return <NavBadge variant='pro' />;
+            if (canAccessTasksWorkspace)
+              return formatTaskBadge(taskStats, tasksSeenAt);
+            return (
+              <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-3xs font-semibold tracking-wider text-secondary-token'>
+                Pro
+              </span>
+            );
           })(),
         };
       }
@@ -270,24 +254,62 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       return item;
     };
 
+    const audienceItem = primaryNavigation.find(item => item.id === 'audience');
+    const tasksItem = primaryNavigation.find(item => item.id === 'tasks');
+
+    if (shellChatV1Enabled) {
+      return [
+        {
+          key: 'top',
+          items: [
+            ...(inboxHomeEnabled ? [decorateItem(inboxNavItem)] : []),
+            decorateItem(newThreadNavItem),
+            searchNavItem,
+            decorateItem(releasesNavItem),
+          ],
+        },
+        {
+          key: 'artist',
+          label: artistSettingsLabel,
+          items: [
+            ...(profilesWorkspaceEnabled
+              ? [decorateItem(artistProfileNavItem)]
+              : []),
+            decorateItem(touringNavItem),
+            ...(audienceItem ? [decorateItem(audienceItem)] : []),
+            ...(tasksItem ? [decorateItem(tasksItem)] : []),
+          ],
+        },
+      ];
+    }
+
     return [
       {
         key: 'primary',
-        items: visiblePrimaryNavigation.map(decorateItem),
+        items: [
+          ...(inboxHomeEnabled ? [decorateItem(inboxNavItem)] : []),
+          ...filterProfilesWorkspaceNavigation(
+            primaryNavigation,
+            profilesWorkspaceEnabled
+          ).map(decorateItem),
+        ],
       },
     ];
   }, [
     canAccessTasksWorkspace,
     isPlanGateLoading,
+    artistSettingsLabel,
+    inboxHomeEnabled,
+    profilesWorkspaceEnabled,
+    shellChatV1Enabled,
     taskStats,
     tasksSeenAt,
-    visiblePrimaryNavigation,
   ]);
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const libraryPrefetchedProfileIdRef = useRef<string | null>(null);
-  const libraryWarmReadyProfileIdRef = useRef<string | null>(null);
+  const releasesPrefetchedProfileIdRef = useRef<string | null>(null);
+  const releasesWarmReadyProfileIdRef = useRef<string | null>(null);
   useEffect(
     () => () => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
@@ -296,29 +318,39 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   );
 
   useEffect(() => {
-    libraryPrefetchedProfileIdRef.current = null;
-    libraryWarmReadyProfileIdRef.current = null;
+    releasesPrefetchedProfileIdRef.current = null;
+    releasesWarmReadyProfileIdRef.current = null;
   }, [profileId]);
 
-  const warmLibraryRoute = useCallback(async () => {
-    if (isDemo || !profileId) return;
+  const warmReleasesRoute = useCallback(async () => {
+    if (isDemo || !profileId) {
+      return;
+    }
 
-    router.prefetch(APP_ROUTES.LIBRARY);
-    if (libraryPrefetchedProfileIdRef.current === profileId) return;
+    const releasesRoute = buildLibraryViewRoute('releases');
 
-    libraryPrefetchedProfileIdRef.current = profileId;
+    if (releasesPrefetchedProfileIdRef.current === profileId) {
+      router.prefetch(releasesRoute);
+      return;
+    }
+
+    releasesPrefetchedProfileIdRef.current = profileId;
+    router.prefetch(releasesRoute);
+
     try {
       await Promise.all([
         import('@/features/dashboard/organisms/release-provider-matrix'),
         import('@/lib/queries/prefetch-dashboard').then(
           ({ prefetchForRoute }) =>
-            prefetchForRoute('library', queryClient, profileId)
+            prefetchForRoute('releases', queryClient, profileId)
         ),
       ]);
-      libraryWarmReadyProfileIdRef.current = profileId;
+
+      releasesPrefetchedProfileIdRef.current = profileId;
+      releasesWarmReadyProfileIdRef.current = profileId;
     } catch {
-      libraryPrefetchedProfileIdRef.current = null;
-      libraryWarmReadyProfileIdRef.current = null;
+      releasesPrefetchedProfileIdRef.current = null;
+      releasesWarmReadyProfileIdRef.current = null;
     }
   }, [isDemo, profileId, queryClient, router]);
 
@@ -326,26 +358,34 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     if (
       isDemo ||
       !profileId ||
-      libraryWarmReadyProfileIdRef.current === profileId ||
-      isLibraryNavigationRoute(pathname)
+      releasesWarmReadyProfileIdRef.current === profileId ||
+      pathname === APP_ROUTES.RELEASES ||
+      pathname === APP_ROUTES.DASHBOARD_RELEASES ||
+      pathname === APP_ROUTES.LIBRARY
     ) {
       return;
     }
 
+    // Defer the eager releases prefetch past initial dashboard paint so the
+    // shell can hydrate without competing with a background chunk fetch +
+    // TanStack Query warmup. Matches the hover-prefetch debounce pattern
+    // used by handlePrefetch below. The prefetched marker is written inside
+    // the timer so a cleanup that fires before the timer runs (fast route
+    // change) leaves the ref null and a later visit will retry.
     const handle = setTimeout(() => {
-      warmLibraryRoute().catch(() => {});
+      warmReleasesRoute().catch(() => {});
     }, 300);
 
     return () => clearTimeout(handle);
-  }, [isDemo, pathname, profileId, warmLibraryRoute]);
+  }, [isDemo, pathname, profileId, warmReleasesRoute]);
 
   const handlePrefetch = useCallback(
     (itemId: string) => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
-      const prefetchDelayMs = itemId === 'library' ? 0 : 150;
+      const prefetchDelayMs = itemId === 'releases' ? 0 : 150;
       prefetchTimerRef.current = setTimeout(() => {
-        if (itemId === 'library') {
-          warmLibraryRoute().catch(() => {});
+        if (itemId === 'releases') {
+          warmReleasesRoute().catch(() => {});
           return;
         }
         import('@/lib/queries/prefetch-dashboard')
@@ -355,13 +395,47 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
           .catch(() => {});
       }, prefetchDelayMs);
     },
-    [profileId, queryClient, warmLibraryRoute]
+    [profileId, queryClient, warmReleasesRoute]
   );
+
+  const showPendingReleasesShell = useCallback(() => {
+    if (releasesWarmReadyProfileIdRef.current === profileId) {
+      return;
+    }
+
+    showPendingShell('releases');
+  }, [profileId, showPendingShell]);
+
+  const clearPendingReleasesShell = useCallback(() => {
+    if (releasesWarmReadyProfileIdRef.current === profileId) {
+      return;
+    }
+
+    clearPendingShell('releases');
+  }, [clearPendingShell, profileId]);
 
   // In demo mode, intercept nav clicks for tabs without demo data
   const handleDemoNavClick = useCallback((item: NavItem) => {
     toast.info(`${item.name} is not available in demo mode`);
   }, []);
+
+  const handleSearchClick = useCallback(() => {
+    openCommandPalette();
+  }, []);
+
+  const handleOpenArtistProfilePanel = useCallback(() => {
+    const isOnChat = pathname.startsWith(APP_ROUTES.CHAT);
+
+    if (isOnChat) {
+      openPreviewPanel();
+      return;
+    }
+
+    router.push(APP_ROUTES.CHAT);
+    queueMicrotask(() => {
+      openPreviewPanel();
+    });
+  }, [openPreviewPanel, pathname, router]);
 
   const activeThreadId = useMemo(() => {
     const chatPrefix = `${APP_ROUTES.CHAT}/`;
@@ -414,15 +488,29 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
+      const isReleasesItem = item.id === 'releases';
+      const isSearchItem = item.id === 'search';
+      const opensArtistProfilePanel =
+        shellChatV1Enabled && !isInSettings && item.id === 'artist-profile';
       const isNewThreadItem =
         item.id === 'chat' && item.href === APP_ROUTES.CHAT;
-      const isActive = isNewThreadItem
-        ? normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT
-        : isItemActive(pathname, item);
+      let isActive = false;
+      if (isNewThreadItem) {
+        isActive = normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT;
+      } else if (opensArtistProfilePanel) {
+        isActive = isPreviewPanelOpen;
+      } else if (!isSearchItem) {
+        isActive = isItemActive(pathname, item);
+      }
       const shortcut = NAV_SHORTCUTS[item.id];
 
-      // In demo mode, only Library has real content — intercept all other nav clicks.
-      const demoUnavailable = isDemo && item.id !== 'library';
+      // In demo mode, only Releases has real content — intercept all other nav clicks
+      const demoUnavailable = isDemo && !isReleasesItem && !isSearchItem;
+      const renderAsButton = isSearchItem || opensArtistProfilePanel;
+      let onClick: (() => void) | undefined;
+      if (demoUnavailable) onClick = () => handleDemoNavClick(item);
+      else if (isSearchItem) onClick = handleSearchClick;
+      else if (opensArtistProfilePanel) onClick = handleOpenArtistProfilePanel;
 
       return (
         <NavMenuItem
@@ -431,21 +519,16 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
           isActive={isActive}
           shortcut={shortcut}
           prefetch={undefined}
-          onClick={demoUnavailable ? () => handleDemoNavClick(item) : undefined}
-          onActivate={
-            demoUnavailable
-              ? undefined
-              : inputMethod =>
-                  startNavigationTelemetry({
-                    itemId: isInSettings ? 'settings' : item.id,
-                    sourcePathname: pathname,
-                    destinationHref: item.href,
-                    inputMethod,
-                    context: telemetryContext,
-                  })
-          }
+          onClick={onClick}
           preventNavigation={demoUnavailable}
-          renderAsButton={false}
+          renderAsButton={renderAsButton}
+          useShellNavItem={shellChatV1Enabled}
+          onNavigate={
+            isReleasesItem && !isActive ? showPendingReleasesShell : undefined
+          }
+          onCancelNavigate={
+            isReleasesItem && !isActive ? clearPendingReleasesShell : undefined
+          }
           onPrefetch={() => handlePrefetch(item.id)}
         />
       );
@@ -454,15 +537,20 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       pathname,
       handleDemoNavClick,
       handlePrefetch,
+      handleSearchClick,
+      handleOpenArtistProfilePanel,
+      clearPendingReleasesShell,
+      showPendingReleasesShell,
       isDemo,
       isInSettings,
-      telemetryContext,
+      isPreviewPanelOpen,
+      shellChatV1Enabled,
     ]
   );
 
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
-    (items: readonly NavItem[]) => (
+    (items: NavItem[]) => (
       <SidebarMenu className='gap-px'>
         {items.map((item, index) => renderNavItem(item, index))}
       </SidebarMenu>
@@ -506,18 +594,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                       {renderSection(section.items)}
                     </SidebarCollapsibleGroup>
                   ) : (
-                    <>
-                      {renderSection(section.items.slice(0, 1))}
-                      {index === 0 && searchSurface ? (
-                        <div
-                          data-sidebar-search-slot='true'
-                          className='my-1.5 h-7 shrink-0 group-data-[collapsible=icon]:hidden'
-                        >
-                          {searchSurface}
-                        </div>
-                      ) : null}
-                      {renderSection(section.items.slice(1))}
-                    </>
+                    renderSection(section.items)
                   )}
                 </div>
               ))}
@@ -547,6 +624,29 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
             />
           </div>
         ) : null}
+
+        {isAdmin && !isInSettings && (
+          <div data-testid='admin-nav-section' className='mt-3'>
+            <SidebarCollapsibleGroup
+              label='Admin'
+              defaultOpen={false}
+              storageKey='dashboard.admin'
+            >
+              {adminNavigationSections.map(section => (
+                <div
+                  key={section.label}
+                  className='space-y-2'
+                  data-admin-section={section.label}
+                >
+                  <p className='px-2.5 pb-0.5 text-xs font-caption tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden'>
+                    {section.label}
+                  </p>
+                  {renderSection(section.items)}
+                </div>
+              ))}
+            </SidebarCollapsibleGroup>
+          </div>
+        )}
       </nav>
       {contextMenuOverlay}
     </>

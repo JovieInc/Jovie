@@ -176,30 +176,6 @@ export const radii = {
   full: 'var(--radius-full)', // 9999px — circles
 } as const;
 
-/**
- * Semantic radius pairs for nested System B surfaces. The outer radius is
- * always the inner radius plus `inset`, keeping the two corner arcs
- * concentric. Use the outer alias for a shared surface and the matching inner
- * alias for a rounded child placed inside its inset.
- */
-export const concentricRadii = {
-  card: {
-    outer: 'var(--system-b-radius-card)',
-    inner: 'var(--system-b-radius-card-inner)',
-    inset: 'var(--space-1)',
-  },
-  overlay: {
-    outer: 'var(--system-b-radius-overlay)',
-    inner: 'var(--system-b-radius-overlay-inner)',
-    inset: 'var(--space-1)',
-  },
-  panel: {
-    outer: 'var(--system-b-radius-panel)',
-    inner: 'var(--system-b-radius-panel-inner)',
-    inset: 'var(--space-1)',
-  },
-} as const;
-
 // ============================================
 // SPACING (8px grid system)
 // ============================================

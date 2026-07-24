@@ -5,6 +5,16 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ---
 
+## Design system
+
+### Void stories and off-system chrome must not ship
+
+**Mistake:** Storybook/Chromatic "coverage" stories staged bare atoms on pure black or gray-900 void tiles, hand-rolled `bg-blue-600` CTAs, or design-studio leftovers that looked like product UI. Agents then copied that chrome into shipping surfaces, bypassing `@jovie/ui` and System B tokens while still going green on a11y/visual gates.
+
+**Rule:** One design system (System B), two languages (product + marketing editorial). Prefer `@jovie/ui` atoms first; app molecules only when product-specific (`PaySelector`, etc.). Forbidden: System A / `.linear-marketing` for new work, design-studio leftovers as product UI, hand-rolled buttons when package atoms exist, void Storybook atoms, demo/exp routes as templates. Guard: `scripts/storybook-story-quality-guard.mjs`. Map: `docs/design/COMPONENT_MAP.md`. Spec: root `DESIGN.md` TARGET vs STATE tables.
+
+---
+
 ## DSP / Provider Keys
 
 ### YouTube vs YouTube Music are distinct ProviderKeys
@@ -17,12 +27,6 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 ---
 
 ## Testing
-
-### Route-level ordering tests must cover the real transaction entry point
-
-**Mistake:** Avatar theme extraction was moved outside one onboarding transaction, but the dashboard profile PUT path still performed retried image download and Sharp work inside `withDbSessionTx`.
-
-**Rule:** For external work adjacent to a database transaction, test the production route's exact event order. Authentication and external derivation must finish before transaction entry, and the transaction helper must accept only the precomputed value.
 
 ### Repeated review comments must become durable guardrails
 

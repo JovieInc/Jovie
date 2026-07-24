@@ -6,6 +6,8 @@ import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { cn } from '@/lib/utils';
 
+export type AppShellFrameVariant = 'legacy' | 'shellChatV1';
+
 interface AppShellFrameProps {
   readonly sidebar: ReactNode;
   readonly header?: ReactNode;
@@ -15,6 +17,7 @@ interface AppShellFrameProps {
   readonly mobileBottomNav?: ReactNode;
   readonly contentClassName?: string;
   readonly containerClassName?: string;
+  readonly variant?: AppShellFrameVariant;
   /** When true (desktop), sidebar dims and right rail fully collapses off-canvas. */
   readonly composerFocusActive?: boolean;
   /**
@@ -52,15 +55,23 @@ export const AppShellFrame = memo(function AppShellFrame({
   mobileBottomNav,
   contentClassName,
   containerClassName,
+  // Default to 'legacy' so callers that don't pass `variant` (AppShellSkeleton,
+  // DemoShell, future surfaces) match the current production state. AuthShell
+  // explicitly passes 'shellChatV1' when DESIGN_V1 is on.
+  variant = 'legacy',
   composerFocusActive = false,
   chatAmbientGradient = false,
 }: Readonly<AppShellFrameProps>) {
+  const isShellChatV1 = variant === 'shellChatV1';
+
   return (
     <div
       data-app-shell-frame='true'
+      data-shell-design={variant}
       data-composer-focus={composerFocusActive ? 'true' : undefined}
       className={cn(
-        'relative flex h-full w-full flex-col overflow-hidden bg-(--linear-bg-page)',
+        'relative flex h-full w-full flex-col overflow-hidden',
+        isShellChatV1 ? 'bg-(--linear-bg-page)' : 'bg-base',
         /* PWA safe area: pad top for notch/Dynamic Island in standalone mode (mobile only) */
         'max-lg:pt-[env(safe-area-inset-top)]',
         containerClassName
@@ -69,40 +80,31 @@ export const AppShellFrame = memo(function AppShellFrame({
       <DesktopTitlebar />
       <div
         data-app-shell-body='true'
-        data-shell-rail-motion='coordinated'
         className={cn(
-          // Allocation belongs to the shell, not individual routes. Keeping the
-          // side slots and main plane on the same motion contract means a rail
-          // can yield canvas without its content or adjacent route snapping.
-          'flex min-h-0 min-w-0 flex-1 overflow-hidden transition-[gap,padding] duration-cinematic ease-cinematic motion-reduce:transition-none lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)'
+          'flex min-h-0 min-w-0 flex-1 overflow-hidden',
+          isShellChatV1 && 'lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)'
         )}
       >
         <div
           data-testid='app-shell-sidebar-mount'
-          className='flex h-full min-h-0 shrink-0 flex-col transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none'
+          className='flex h-full min-h-0 shrink-0 flex-col transition-opacity duration-cinematic ease-cinematic motion-reduce:transition-none'
         >
           {sidebar}
         </div>
 
-        <div
-          data-app-shell-content-column='true'
-          className='flex min-h-0 min-w-0 flex-1 flex-col transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
+        <main
+          id='main-content'
+          className={cn(
+            // `isolate` gives <main> its own stacking context so the negative-z
+            // chat ambient layer below paints above main's background but
+            // beneath the in-flow header/content (#13386).
+            'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
+            isShellChatV1
+              ? 'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
+              : 'lg:border-l lg:border-subtle'
+          )}
         >
-          <div
-            data-app-shell-main-plane='true'
-            className='flex min-h-0 min-w-0 flex-1 overflow-hidden transition-[gap,flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none lg:gap-(--app-shell-gap)'
-          >
-            <main
-              id='main-content'
-              className={cn(
-                // `isolate` gives <main> its own stacking context so the negative-z
-                // chat ambient layer below paints above main's background but
-                // beneath the in-flow header/content (#13386).
-                'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--color-bg-surface-0)/90',
-                'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
-              )}
-            >
-              {/* Full-bleed ambient wash on chat routes — spans the whole content
+          {/* Full-bleed ambient wash on chat routes — spans the whole content
               panel so its top edge is above the (transparent) header band.
               Negative z-index is load-bearing: an absolute sibling with z-auto
               would paint ON TOP of the in-flow static header; `-z-10` inside
@@ -111,57 +113,44 @@ export const AppShellFrame = memo(function AppShellFrame({
               previous chat canvas tone on all breakpoints. Pure background:
               pointer-events-none, no layout impact (#13386, preserves the
               full-viewport guarantee from #12135 / JOV-3614). */}
-              {chatAmbientGradient ? (
-                <div
-                  aria-hidden='true'
-                  data-testid='chat-ambient-gradient'
-                  className='pointer-events-none absolute inset-0 -z-10 bg-(--app-shell-content-surface)'
-                  style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
-                />
-              ) : null}
-              {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
-              {header}
-              <div
-                className={cn(
-                  'flex flex-1 min-h-0 min-w-0 overflow-hidden transition-[gap] duration-cinematic ease-cinematic motion-reduce:transition-none'
-                )}
-              >
-                <div
-                  data-testid='app-shell-scroll'
-                  className={cn(
-                    // Shell-level pane never owns vertical scroll — routes and table
-                    // surfaces scroll inside this clip so the right rail stays fixed.
-                    'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none pb-[var(--dev-toolbar-height,0px)]',
-                    contentClassName
-                  )}
-                >
-                  {main}
-                </div>
-              </div>
-            </main>
+          {chatAmbientGradient ? (
+            <div
+              aria-hidden='true'
+              data-testid='chat-ambient-gradient'
+              className='pointer-events-none absolute inset-0 -z-10 bg-(--app-shell-content-surface)'
+              style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
+            />
+          ) : null}
+          {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
+          {header}
+          <div
+            className={cn(
+              'flex flex-1 min-h-0 min-w-0 overflow-hidden',
+              isShellChatV1 && 'lg:gap-(--app-shell-gap)'
+            )}
+          >
+            <div
+              data-testid='app-shell-scroll'
+              className={cn(
+                // Shell-level pane never owns vertical scroll — routes and table
+                // surfaces scroll inside this clip so the right rail stays fixed.
+                'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain pb-[var(--dev-toolbar-height,0px)]',
+                contentClassName
+              )}
+            >
+              {main}
+            </div>
             {rightPanel ? (
-              <AppShellRightRail>{rightPanel}</AppShellRightRail>
+              <AppShellRightRail variant={variant}>
+                {rightPanel}
+              </AppShellRightRail>
             ) : null}
           </div>
-          {/* The player is shell chrome, not content-card chrome. Keeping it as
-              an in-flow sibling reserves its own tray below <main>, matching
-              the sidebar's canvas elevation without obscuring routes or rails. */}
-          {audioPlayer ? (
-            <div data-testid='app-shell-audio-tray' className='shrink-0'>
-              {audioPlayer}
-            </div>
-          ) : null}
-        </div>
+          {audioPlayer}
+        </main>
       </div>
 
-      {mobileBottomNav ? (
-        <div
-          className='system-b-app-mobile-bottom-surface shrink-0 lg:hidden'
-          data-testid='app-shell-mobile-bottom-surface'
-        >
-          {mobileBottomNav}
-        </div>
-      ) : null}
+      {mobileBottomNav}
     </div>
   );
 });

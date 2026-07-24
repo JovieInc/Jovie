@@ -13,7 +13,7 @@ export const TASK_DATA_TABLE_CONTAINER_CLASSNAME =
   'h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5';
 
 export const TASK_DATA_TABLE_ROW_CLASSNAME =
-  'group/row group/task-row !bg-transparent !shadow-none hover:!bg-transparent hover:!shadow-none focus-visible:!bg-transparent focus-visible:!shadow-none focus-within:!bg-transparent focus-within:!shadow-none';
+  'group/row group/task-row bg-transparent shadow-none hover:bg-transparent focus-within:shadow-none focus-visible:bg-transparent focus-visible:shadow-none';
 
 export type TaskDataTableProps<TData> = UnifiedTableProps<TData>;
 

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   afterAll,
@@ -429,7 +429,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('does not show the passive billing-status toast on admin surfaces', () => {
-    mockUsePathname.mockReturnValue(APP_ROUTES.OV);
+    mockUsePathname.mockReturnValue('/app/admin');
     mockUseBillingStatusQuery.mockReturnValue({
       data: null,
       isLoading: false,
@@ -442,7 +442,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('does not show the passive billing-status toast after a clean admin login with a healthy subscription', () => {
-    mockUsePathname.mockReturnValue(APP_ROUTES.ADMIN_OPS);
+    mockUsePathname.mockReturnValue('/app/admin/ops');
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
       isLoading: false,
@@ -622,31 +622,6 @@ describe('UserButton billing actions', () => {
     expect(document.querySelector('.animate-pulse')).toBeNull();
   });
 
-  it('keeps the loading sidebar identity footprint collapse-safe', () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: null,
-      isLoading: false,
-      error: null,
-    } as any);
-    mockUseUserSafe.mockReturnValue({
-      isLoaded: false,
-      isSignedIn: false,
-      user: null,
-    } as any);
-
-    render(<UserButton showUserInfo />);
-
-    const loading = screen.getByTestId('user-button-loading');
-    expect(loading).toHaveClass(
-      'group-data-[collapsible=icon]:size-7',
-      'group-data-[collapsible=icon]:justify-center',
-      'group-data-[collapsible=icon]:p-0'
-    );
-    expect(
-      loading.querySelector('[data-user-button-loading-copy]')
-    ).toHaveClass('group-data-[collapsible=icon]:hidden');
-  });
-
   it('shows an inline usage remaining row in the user menu', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },
@@ -662,181 +637,5 @@ describe('UserButton billing actions', () => {
     expect(screen.getByText('Usage remaining')).toBeInTheDocument();
     expect(screen.getByText('60%')).toBeInTheDocument();
     expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
-  });
-
-  it('gives narrow identity content its own full-width row and preserves menu focus order', async () => {
-    const longDisplayName =
-      'Adele Adkins and the Very Long International Touring Ensemble';
-    mockUseUserSafe.mockReturnValue({
-      isLoaded: true,
-      isSignedIn: true,
-      user: {
-        id: 'user_123',
-        imageUrl: null,
-        fullName: longDisplayName,
-        firstName: 'Adele',
-        emailAddresses: [{ emailAddress: 'adele@example.com' }],
-        primaryEmailAddress: { emailAddress: 'adele@example.com' },
-      } as any,
-    });
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
-      isLoading: false,
-      error: null,
-    } as any);
-    const openMock = vi.spyOn(window, 'open').mockReturnValue(null);
-
-    const user = userEvent.setup();
-    render(<UserButton showUserInfo />);
-
-    await user.click(screen.getByText(longDisplayName));
-
-    const identityRow = document.querySelector<HTMLElement>(
-      '[data-menu-action-row="profile-help"]'
-    );
-    expect(identityRow).not.toBeNull();
-    expect(screen.getByRole('menu')).toHaveClass(
-      'w-72',
-      'max-w-[calc(100vw-1rem)]'
-    );
-    expect(identityRow).toHaveClass('grid', 'grid-cols-1', 'w-full');
-    expect(identityRow?.querySelectorAll('[role="menuitem"]')).toHaveLength(2);
-    expect(identityRow?.querySelector('button, a')).toBeNull();
-
-    const profileItem = within(identityRow as HTMLElement).getByRole(
-      'menuitem',
-      {
-        name: `Open profile for ${longDisplayName}`,
-      }
-    );
-    expect(profileItem).toHaveClass('min-w-0');
-    expect(within(profileItem).getByText(longDisplayName)).toHaveClass(
-      'truncate'
-    );
-    expect(within(profileItem).getByText(longDisplayName)).toHaveAttribute(
-      'title',
-      longDisplayName
-    );
-
-    // The dropdown's max width protects the full row contract on 390px
-    // screens, while the title keeps the complete identity discoverable.
-    expect(screen.getByRole('menu')).toHaveClass('max-w-[calc(100vw-1rem)]');
-
-    const helpItem = within(identityRow as HTMLElement).getByRole('menuitem', {
-      name: 'Help',
-    });
-    expect(helpItem).toHaveClass('min-h-8');
-    await user.keyboard('{ArrowDown}');
-    expect(profileItem).toHaveFocus();
-    await user.keyboard('{ArrowDown}');
-    expect(helpItem).toHaveFocus();
-    await user.keyboard('{ArrowDown}');
-    expect(screen.getByRole('menuitem', { name: /Settings/u })).toHaveFocus();
-    await user.keyboard('{ArrowUp}');
-    expect(helpItem).toHaveFocus();
-    await user.keyboard('{Enter}');
-    expect(openMock).toHaveBeenCalledWith(
-      APP_ROUTES.SUPPORT,
-      '_blank',
-      'noopener,noreferrer'
-    );
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-  });
-
-  it('preserves trigger keyboard and escape-to-close menu semantics', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
-    const user = userEvent.setup();
-    render(<UserButton showUserInfo />);
-
-    const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
-    trigger.focus();
-    await user.keyboard('{Enter}');
-
-    expect(await screen.findByRole('menu')).toBeVisible();
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    expect(trigger).toHaveFocus();
-  });
-
-  it('collapses the sidebar identity trigger to a centered avatar-only control', () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
-
-    render(<UserButton showUserInfo />);
-
-    const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
-
-    expect(trigger).toHaveClass(
-      'group-data-[collapsible=icon]:size-7',
-      'group-data-[collapsible=icon]:justify-center',
-      'group-data-[collapsible=icon]:gap-0',
-      'group-data-[collapsible=icon]:p-0'
-    );
-    expect(
-      trigger.querySelector('[data-user-button-display-name]')
-    ).toHaveClass('group-data-[collapsible=icon]:hidden');
-    expect(trigger.querySelector('[data-user-button-chevron]')).toHaveClass(
-      'group-data-[collapsible=icon]:hidden'
-    );
-  });
-
-  it('anchors the sidebar identity menu to the start edge', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
-    const user = userEvent.setup();
-
-    render(<UserButton showUserInfo />);
-    await user.click(screen.getByRole('button', { name: /Adele Adkins/i }));
-
-    expect(await screen.findByRole('menu')).toHaveAttribute(
-      'data-align',
-      'start'
-    );
-  });
-
-  it('uses distinct semantic icons for the Learn More menu items', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
-    const user = userEvent.setup();
-
-    render(<UserButton showUserInfo />);
-
-    await user.click(screen.getByRole('button', { name: /Adele Adkins/i }));
-    await user.hover(screen.getByRole('menuitem', { name: 'Learn More' }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole('menuitem', { name: 'Privacy Policy' })
-      ).toBeVisible();
-    });
-
-    expect(
-      screen
-        .getByRole('menuitem', { name: 'Privacy Policy' })
-        .querySelector('svg')?.className.baseVal
-    ).toContain('lucide-shield');
-    expect(
-      screen
-        .getByRole('menuitem', { name: 'Terms Of Service' })
-        .querySelector('svg')?.className.baseVal
-    ).toContain('lucide-file-check-corner');
-    expect(
-      screen
-        .getByRole('menuitem', { name: 'Cookie Policy' })
-        .querySelector('svg')?.className.baseVal
-    ).toContain('lucide-cookie');
   });
 });

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   isDevToolbarSuppressedPath,
   resetDevToolbarHeight,
-  shouldDefaultDevToolbarHidden,
   shouldRenderDevToolbar,
 } from '@/components/features/dev/DevToolbarGate';
 
@@ -23,14 +22,6 @@ describe('DevToolbarGate production + path gating', () => {
     expect(isDevToolbarSuppressedPath('/app/dashboard/releases')).toBe(false);
   });
 
-  it('defaults chat routes to the minimally intrusive toolbar state', () => {
-    expect(shouldDefaultDevToolbarHidden('/app/chat')).toBe(true);
-    expect(shouldDefaultDevToolbarHidden('/app/chat/thread-123')).toBe(true);
-    expect(shouldDefaultDevToolbarHidden('/app/dashboard/releases')).toBe(
-      false
-    );
-  });
-
   it('never renders for production customers without the opt-in cookie', () => {
     expect(
       shouldRenderDevToolbar({
@@ -42,7 +33,7 @@ describe('DevToolbarGate production + path gating', () => {
     ).toBe(false);
   });
 
-  it('never renders controls in production even with a stale opt-in cookie', () => {
+  it('allows production only with explicit __dev_toolbar cookie opt-in', () => {
     expect(
       shouldRenderDevToolbar({
         env: 'production',
@@ -50,7 +41,7 @@ describe('DevToolbarGate production + path gating', () => {
         hasCookie: true,
         nodeEnv: 'production',
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('still hides production opt-in toolbar on suppressed product paths', () => {
@@ -72,7 +63,7 @@ describe('DevToolbarGate production + path gating', () => {
     ).toBe(false);
   });
 
-  it('renders only for local development on normal app routes', () => {
+  it('renders for non-production (dev/preview) on normal app routes', () => {
     expect(
       shouldRenderDevToolbar({
         env: 'development',
@@ -86,14 +77,7 @@ describe('DevToolbarGate production + path gating', () => {
         pathname: '/app/dashboard',
         nodeEnv: 'production',
       })
-    ).toBe(false);
-    expect(
-      shouldRenderDevToolbar({
-        env: 'preview',
-        pathname: '/app/dashboard',
-        nodeEnv: 'development',
-      })
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('respects disabled / demo / electron / dev-chrome-disabled flags', () => {

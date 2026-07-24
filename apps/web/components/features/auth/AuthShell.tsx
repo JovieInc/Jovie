@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthProviderButtonSlot } from '@/features/auth/AuthProviderButtons';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
@@ -117,11 +117,6 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
   } = props;
   const searchParams = useSearchParams();
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
-  // `useAuthSafe` can resolve a cached Better Auth session synchronously in
-  // the browser while SSR has no session. Keep the first client render equal
-  // to the server tree, then let the route-level entry guard own the signed-in
-  // redirect after hydration.
-  const [hasHydrated, setHasHydrated] = useState(false);
   const [pendingProvider, setPendingProvider] =
     useState<PrimaryAuthOAuthProvider | null>(null);
   const [oauthError, setOauthError] = useState<string | null>(null);
@@ -144,10 +139,6 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     () => getEnabledAuthOAuthProviders(),
     []
   );
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
 
   const _redirectSignedInVisitor = useCallback(() => {
     const destination = getClientAuthenticatedAuthEntryRedirect(searchParams);
@@ -196,7 +187,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     [mode, pendingProvider]
   );
 
-  if (hasHydrated && isAuthLoaded && isSignedIn) {
+  if (isAuthLoaded && isSignedIn) {
     return null;
   }
 

@@ -45,7 +45,7 @@ jobs:
       deployment_url_b64: ${{ steps.target.outputs.deployment_url_b64 }}
       commit_sha: ${{ steps.target.outputs.commit_sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
@@ -329,7 +329,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.resolve-target.outputs.commit_sha }}
           fetch-depth: 1
@@ -395,32 +395,31 @@ jobs:
       auth_smoke_status: ${{ steps.auth-result.outputs.auth_smoke_status || steps.check-creds.outputs.auth_smoke_status }}
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.resolve-target.outputs.commit_sha }}
           fetch-depth: 1
           persist-credentials: false
-      - uses: ./.github/actions/setup-doppler
 
       - name: Check for production auth credentials
         id: check-creds
         env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
+          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
         run: |
           set -euo pipefail
-          # Expanded inside the Doppler child shell.
-          # shellcheck disable=SC2016
-          if [ -n "${DOPPLER_TOKEN:-}" ] &&
-            doppler run --project jovie-web --config prd \
-              --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
-              --no-fallback -- env -u DOPPLER_TOKEN bash -c \
-                '[ -n "${E2E_PROD_USER_EMAIL:-}" ] && [ -n "${DATABASE_URL:-}" ]'; then
+          if { [ -n "$E2E_PROD_USER_EMAIL" ] &&
+              [ -n "$E2E_PROD_USER_PASSWORD" ]; } ||
+            { [ -n "$E2E_CLERK_USER_USERNAME" ] &&
+              [ -n "$E2E_CLERK_USER_PASSWORD" ]; }; then
             {
               echo "credentials_configured=true"
               echo "skip=false"
             } >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::Production Better Auth OTP proof is not configured; authenticated smoke is explicitly skipped and is not release proof."
+            echo "::notice::Production auth credentials are not configured; authenticated smoke is explicitly skipped and is not release proof."
             {
               echo "credentials_configured=false"
               echo "auth_smoke_status=not-configured"
@@ -450,23 +449,24 @@ jobs:
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           test -n "$PRODUCTION_BASE_URL"
-          doppler run --project jovie-web --config prd \
-            --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
-            --no-fallback -- env -u DOPPLER_TOKEN \
-              CI=true \
-              BASE_URL="$PRODUCTION_BASE_URL" \
-              EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
-              EXPECTED_VERCEL_ENVIRONMENT=production \
-              PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
-                node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
+          CI=true \
+          BASE_URL="$PRODUCTION_BASE_URL" \
+          EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
+          EXPECTED_VERCEL_ENVIRONMENT=production \
+          PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
           echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
-          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
+          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
+          E2E_PROD_USER_CODE: ${{ secrets.E2E_PROD_USER_CODE }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && steps.check-creds.outputs.skip != 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -476,7 +476,6 @@ jobs:
           path: |
             apps/web/test-results/
           retention-days: 3
-          allow-markdown: 'true'
 
   lighthouse:
     name: Lighthouse CI (Landed Production)
@@ -487,7 +486,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.resolve-target.outputs.commit_sha }}
           persist-credentials: false

@@ -52,41 +52,6 @@ export const Basic: Story = {
   ),
 };
 
-/** Compact labels use the shared pill contract; explanatory content uses the shared rounded rectangle. */
-export const ContentShapes: Story = {
-  render: () => (
-    <div className='flex flex-col items-center gap-6'>
-      <Tooltip defaultOpen>
-        <TooltipTrigger>
-          <Button variant='outline'>Compact label</Button>
-        </TooltipTrigger>
-        <TooltipContent contentVariant='compact'>Save draft</TooltipContent>
-      </Tooltip>
-      <Tooltip defaultOpen>
-        <TooltipTrigger>
-          <Button variant='outline'>Two-line explanation</Button>
-        </TooltipTrigger>
-        <TooltipContent contentVariant='rich'>
-          This explanation intentionally wraps into a calm, shared rounded
-          rectangle.
-        </TooltipContent>
-      </Tooltip>
-    </div>
-  ),
-};
-
-/** Keyboard focus opens the same compact tooltip contract without a pointer. */
-export const KeyboardFocus: Story = {
-  render: () => (
-    <Tooltip>
-      <TooltipTrigger>
-        <Button variant='outline'>Tab here</Button>
-      </TooltipTrigger>
-      <TooltipContent contentVariant='compact'>Keyboard focus</TooltipContent>
-    </Tooltip>
-  ),
-};
-
 /**
  * Tooltip with arrow enabled (arrow is hidden by default)
  */

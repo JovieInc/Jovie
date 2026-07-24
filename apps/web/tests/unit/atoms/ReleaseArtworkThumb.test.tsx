@@ -87,8 +87,6 @@ describe('ReleaseArtworkThumb', () => {
     );
     const wrapper = container.firstChild as HTMLElement;
     expect(wrapper).toHaveStyle({ width: '40px', height: '40px' });
-    expect(wrapper).toHaveClass('rounded-xs');
-    expect(wrapper).not.toHaveClass('outline');
   });
 
   it('renders with custom size applied as inline style', () => {
@@ -97,6 +95,5 @@ describe('ReleaseArtworkThumb', () => {
     );
     const wrapper = container.firstChild as HTMLElement;
     expect(wrapper).toHaveStyle({ width: '64px', height: '64px' });
-    expect(wrapper).toHaveClass('rounded-lg');
   });
 });

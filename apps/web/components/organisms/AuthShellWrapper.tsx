@@ -34,14 +34,15 @@ import {
   useTableMeta,
 } from '@/contexts/TableMetaContext';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
+import { HeaderUsagePill } from '@/features/dashboard/atoms/HeaderUsagePill';
 import { RightRailKeyboardHandler } from '@/hooks/RightRailKeyboardHandler';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
-import type { AppShellMode } from '@/types/app-shell';
+import { useAppFlag } from '@/lib/flags/client';
 import { AuthShell } from './AuthShell';
-import { CommandPalette, CommandPaletteMainSurface } from './CommandPalette';
+import { CommandPalette } from './CommandPalette';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 import {
   PendingShellContext,
@@ -52,7 +53,6 @@ import {
 export { TableMetaProvider, usePendingShell, useTableMeta };
 
 export interface AuthShellWrapperProps {
-  readonly mode?: AppShellMode;
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
   readonly sidebarDefaultOpen?: boolean;
   readonly previewPanelDefaultOpen?: boolean;
@@ -73,28 +73,28 @@ function KeyboardShortcutsHandler() {
  * AuthShellWrapperInner - Inner component with access to HeaderActionsContext
  */
 function AuthShellWrapperInner({
-  mode,
   persistSidebarCollapsed,
   sidebarDefaultOpen,
   previewPanelDefaultOpen,
   children,
 }: Readonly<{
-  mode: AppShellMode;
   persistSidebarCollapsed?: AuthShellWrapperProps['persistSidebarCollapsed'];
   sidebarDefaultOpen?: boolean;
   previewPanelDefaultOpen?: boolean;
   children: ReactNode;
 }>) {
-  const config = useAuthRouteConfig(mode);
+  const config = useAuthRouteConfig();
   const pathname = usePathname();
   const headerActions = useHeaderActions();
   const isElectron = useIsElectronRuntime();
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const [, startTransition] = useTransition();
   const [pendingShellRoute, setPendingShellRoute] =
     useState<PendingShellRoute>(null);
   const pendingShellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const releasesShellOverlayRef = useRef<HTMLDivElement | null>(null);
 
   // TableMeta state for audience/creators tables
   const [tableMeta, setTableMeta] = useState<TableMeta>({
@@ -114,9 +114,14 @@ function AuthShellWrapperInner({
     : 'app-shell';
 
   const showArtistProfileRailToggle =
+    shellChatV1Enabled &&
     previewEnabled &&
     !config.isDemoRoute &&
     (config.isChatRoute || pathname === APP_ROUTES.DASHBOARD);
+
+  // Home/inbox glanceable usage pill (top-right, quiet chrome).
+  const showUsagePill =
+    !config.isDemoRoute && pathname === APP_ROUTES.DASHBOARD;
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
@@ -124,6 +129,7 @@ function AuthShellWrapperInner({
     () => (
       <>
         {showArtistProfileRailToggle ? <ArtistProfileRailToggle /> : null}
+        {showUsagePill ? <HeaderUsagePill /> : null}
         {config.showChatUsageIndicator && !config.isDemoRoute ? (
           <HeaderChatUsageIndicator />
         ) : null}
@@ -135,6 +141,7 @@ function AuthShellWrapperInner({
       config.showChatUsageIndicator,
       isElectron,
       showArtistProfileRailToggle,
+      showUsagePill,
     ]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
@@ -164,38 +171,55 @@ function AuthShellWrapperInner({
     [persistSidebarCollapsed, startTransition]
   );
 
-  const clearPendingShell = useCallback((route?: PendingShellRoute) => {
-    setPendingShellRoute(current =>
-      route && current !== route ? current : null
-    );
-    if (pendingShellTimerRef.current) {
-      clearTimeout(pendingShellTimerRef.current);
-      pendingShellTimerRef.current = null;
+  const setReleasesShellVisible = useCallback((visible: boolean) => {
+    const node = releasesShellOverlayRef.current;
+    if (!node) {
+      return;
     }
+
+    node.style.display = visible ? 'flex' : 'none';
+    node.setAttribute('aria-hidden', visible ? 'false' : 'true');
   }, []);
+
+  const clearPendingShell = useCallback(
+    (route?: PendingShellRoute) => {
+      setPendingShellRoute(current =>
+        route && current !== route ? current : null
+      );
+      setReleasesShellVisible(false);
+      if (pendingShellTimerRef.current) {
+        clearTimeout(pendingShellTimerRef.current);
+        pendingShellTimerRef.current = null;
+      }
+    },
+    [setReleasesShellVisible]
+  );
 
   const showPendingShell = useCallback(
     (route: Exclude<PendingShellRoute, null>) => {
       setPendingShellRoute(route);
+      if (route === 'releases') {
+        setReleasesShellVisible(true);
+      }
       if (pendingShellTimerRef.current) {
         clearTimeout(pendingShellTimerRef.current);
       }
 
       pendingShellTimerRef.current = setTimeout(() => {
+        setReleasesShellVisible(false);
         setPendingShellRoute(activeRoute =>
           activeRoute === route ? null : activeRoute
         );
         pendingShellTimerRef.current = null;
       }, 10_000);
     },
-    []
+    [setReleasesShellVisible]
   );
 
   useEffect(
     () => () => {
       if (pendingShellTimerRef.current) {
         clearTimeout(pendingShellTimerRef.current);
-        pendingShellTimerRef.current = null;
       }
     },
     []
@@ -218,38 +242,32 @@ function AuthShellWrapperInner({
   );
   const shellChildren = (
     <div className='relative flex h-full min-h-0 flex-col'>
-      {headerActions.isCommandPaletteOpen ? (
-        <CommandPaletteMainSurface />
-      ) : (
-        children
-      )}
-      {pendingShellRoute === 'releases' ? (
-        <div
-          aria-live='polite'
-          className='absolute inset-0 z-10 flex items-start justify-center bg-page/96 px-4 py-6 sm:px-6'
-          data-testid='releases-shell-ready'
-          role='status'
-        >
-          <div className='w-full max-w-3xl rounded-2xl border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--app-shell-content-surface)_96%,var(--linear-bg-surface-0))] px-4 py-4 shadow-[0_16px_40px_rgba(0,0,0,0.16)] sm:px-5'>
-            <div className='flex items-center justify-between gap-4'>
-              <div>
-                <p className='text-sm font-semibold tracking-tighter text-primary-token'>
-                  Opening Releases
-                </p>
-                <p className='mt-1 text-sm text-secondary-token'>
-                  Preparing your release workspace.
-                </p>
-              </div>
-              <div
-                aria-hidden='true'
-                className='h-2.5 w-24 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--app-shell-frame-seam)_78%,transparent)]'
-              >
-                <div className='h-full w-1/2 animate-pulse rounded-full bg-primary-token/65' />
-              </div>
+      {children}
+      <div
+        ref={releasesShellOverlayRef}
+        aria-hidden='true'
+        className='absolute inset-0 z-10 hidden items-start justify-center bg-page/96 px-4 py-6 sm:px-6'
+        data-testid='releases-shell-ready'
+      >
+        <div className='w-full max-w-3xl rounded-2xl border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--app-shell-content-surface)_96%,var(--linear-bg-surface-0))] px-4 py-4 shadow-[0_16px_40px_rgba(0,0,0,0.16)] sm:px-5'>
+          <div className='flex items-center justify-between gap-4'>
+            <div>
+              <p className='text-sm font-semibold tracking-tighter text-primary-token'>
+                Opening Releases
+              </p>
+              <p className='mt-1 text-sm text-secondary-token'>
+                Preparing your release workspace.
+              </p>
+            </div>
+            <div
+              aria-hidden='true'
+              className='h-2.5 w-24 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--app-shell-frame-seam)_78%,transparent)]'
+            >
+              <div className='h-full w-1/2 animate-pulse rounded-full bg-primary-token/65' />
             </div>
           </div>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 
@@ -269,7 +287,6 @@ function AuthShellWrapperInner({
                 breadcrumbs={config.breadcrumbs}
                 headerBadge={headerBadge}
                 headerAction={headerAction}
-                commandPaletteHeader={headerActions.commandPaletteHeader}
                 showMobileTabs={config.showMobileTabs}
                 isTableRoute={config.isTableRoute}
                 isLyricsRoute={config.isLyricsRoute}
@@ -302,7 +319,6 @@ function AuthShellWrapperInner({
  * Separates routing concerns (hook) from layout (AuthShell).
  */
 export function AuthShellWrapper({
-  mode = 'customer',
   persistSidebarCollapsed,
   sidebarDefaultOpen,
   previewPanelDefaultOpen,
@@ -314,7 +330,6 @@ export function AuthShellWrapper({
         <HeaderActionsProvider>
           <ShellSidebarOverrideProvider>
             <AuthShellWrapperInner
-              mode={mode}
               persistSidebarCollapsed={persistSidebarCollapsed}
               sidebarDefaultOpen={sidebarDefaultOpen}
               previewPanelDefaultOpen={previewPanelDefaultOpen}

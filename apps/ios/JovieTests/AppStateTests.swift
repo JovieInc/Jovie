@@ -713,31 +713,3 @@ struct AppStateTests {
     #expect(appState.billingURL.absoluteString == "https://jov.ie/app/settings/billing")
   }
 }
-
-struct WhatsNewPresentationPolicyTests {
-  @Test func presentsOnlyForAnUnseenVersionWhenEligible() {
-    #expect(WhatsNewPresentationPolicy.shouldPresent(
-      currentVersion: "2.4",
-      lastPresentedVersion: nil,
-      isEligible: true
-    ))
-    #expect(WhatsNewPresentationPolicy.shouldPresent(
-      currentVersion: "2.4",
-      lastPresentedVersion: "2.3",
-      isEligible: true
-    ))
-    #expect(!WhatsNewPresentationPolicy.shouldPresent(
-      currentVersion: "2.4",
-      lastPresentedVersion: "2.4",
-      isEligible: true
-    ))
-  }
-
-  @Test func doesNotPresentUntilTheAppIsReady() {
-    #expect(!WhatsNewPresentationPolicy.shouldPresent(
-      currentVersion: "2.4",
-      lastPresentedVersion: nil,
-      isEligible: false
-    ))
-  }
-}

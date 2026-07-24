@@ -67,11 +67,6 @@ export function InvestorBrief({
           <Button asChild variant='secondary'>
             <a href='#brief'>Read The Brief</a>
           </Button>
-          <Button asChild variant='ghost'>
-            <Link href='/investor-portal/closed-loop-creator'>
-              Read The Closed-Loop Creator Thesis
-            </Link>
-          </Button>
         </div>
       </header>
 

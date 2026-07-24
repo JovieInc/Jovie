@@ -33,15 +33,15 @@ describe('globals.css ui-feel quick wins (JOV-3368)', () => {
     );
   });
 
-  it('keeps press compression explicit and token-driven', () => {
+  it('uses named transition-transform and active scale on interactive controls', () => {
     expect(source).toContain('.interactive-press');
     expect(source).toMatch(
-      /\.interactive-press\s*\{[\s\S]*transition-transform[\s\S]*active:scale-\[var\(--scale-press\)\]/
+      /\.interactive-press\s*\{[\s\S]*transition-transform[\s\S]*active:scale-\[0\.96\]/
     );
-    expect(source).not.toContain(
-      'button:not(:disabled):not([data-static="true"])'
+    expect(source).toMatch(
+      /button:not\(:disabled\)[\s\S]*transition:\s*transform var\(--duration-subtle\)/
     );
-    expect(source).not.toMatch(/transform:\s*scale\(0\.96\)/);
+    expect(source).toMatch(/transform:\s*scale\(0\.96\)/);
     expect(source).not.toMatch(
       /\.interactive-press\s*\{[^}]*transition:\s*all/
     );
@@ -49,7 +49,7 @@ describe('globals.css ui-feel quick wins (JOV-3368)', () => {
 
   it('migrates btn-press from opacity to scale press feedback', () => {
     expect(source).toMatch(
-      /\.btn-press\s*\{[\s\S]*transition-transform[\s\S]*active:scale-\[var\(--scale-press\)\]/
+      /\.btn-press\s*\{[\s\S]*transition-transform[\s\S]*active:scale-\[0\.96\]/
     );
     expect(source).not.toMatch(/\.btn-press\s*\{[^}]*active:opacity-80/);
   });

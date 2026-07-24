@@ -20,11 +20,6 @@ export interface TooltipShortcutProps {
    */
   readonly side?: 'top' | 'right' | 'bottom' | 'left';
   /**
-   * Declares the shape contract for the tooltip content. Toolbar labels are
-   * compact by definition; explanatory labels should opt into `rich`.
-   */
-  readonly contentVariant?: 'compact' | 'rich';
-  /**
    * The trigger element (button, link, etc.)
    */
   readonly children: React.ReactNode;
@@ -38,17 +33,12 @@ export function TooltipShortcut({
   label,
   shortcut,
   side = 'top',
-  contentVariant = 'rich',
   children,
 }: TooltipShortcutProps) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent
-        contentVariant={contentVariant}
-        side={side}
-        className='flex items-center gap-2'
-      >
+      <TooltipContent side={side} className='flex items-center gap-2'>
         <span>{label}</span>
         {shortcut && <Kbd variant='tooltip'>{shortcut}</Kbd>}
       </TooltipContent>

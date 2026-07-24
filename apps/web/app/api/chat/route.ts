@@ -47,7 +47,6 @@ import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { createVoicePromoTool } from '@/lib/ai/tools/voice-promo';
 import { getOptionalAuth } from '@/lib/auth/cached';
-import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
 import { createAccountChatTools } from '@/lib/chat/account-tools';
@@ -114,6 +113,7 @@ import {
 import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
@@ -207,17 +207,13 @@ const CHAT_KILL_SWITCH_GATES = {
 
 /**
  * Fetches artist context server-side from the database.
- * Validates that the authenticated user can manage the profile.
+ * Validates that the profile belongs to the authenticated user.
  */
 async function fetchArtistContext(
   profileId: string,
-  appUserId: string
+  clerkUserId: string
 ): Promise<ArtistContext | null> {
-  const access = await getExactProfileAccess(db, appUserId, profileId);
-  if (!access.ok) {
-    return null;
-  }
-
+  // Fetch profile with ownership check via user join
   const [result] = await db
     .select({
       displayName: creatorProfiles.displayName,
@@ -229,12 +225,14 @@ async function fetchArtistContext(
       spotifyUrl: creatorProfiles.spotifyUrl,
       appleMusicUrl: creatorProfiles.appleMusicUrl,
       profileViews: creatorProfiles.profileViews,
+      userClerkId: users.clerkId,
     })
     .from(creatorProfiles)
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.id, profileId))
     .limit(1);
 
-  if (!result) {
+  if (result?.userClerkId !== clerkUserId) {
     return null;
   }
 

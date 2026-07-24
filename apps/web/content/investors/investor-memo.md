@@ -28,8 +28,6 @@ Music creation is easier than ever, but attention and monetization are harder th
 
 Jovie is an AI growth engine for music creators. It turns a creator's link in bio into a personalized funnel that identifies high-value fans and routes each visitor to the next best action—streaming, subscribing, merch, or tickets—then follows up automatically to increase lifetime value.
 
-For the broader operating thesis behind this loop, read [The Closed-Loop Creator Thesis](/investor-portal/closed-loop-creator).
-
 **Product:** AI flywheel for fan value extraction
 
 Jovie runs an always-on decision loop on every profile view:

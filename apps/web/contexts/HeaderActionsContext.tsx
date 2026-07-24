@@ -7,15 +7,12 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
-import { OPEN_HEADER_SEARCH_EVENT } from '@/components/shell/header-search-events';
 import type {
   FilterField,
   FilterPill,
 } from '@/components/shell/pill-search.types';
-import { isFormElement } from '@/lib/utils/keyboard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -59,10 +56,6 @@ interface HeaderActionsState {
   headerBadge: ReactNode;
   headerSearchAdapter: HeaderSearchAdapter | null;
   isSearchOpen: boolean;
-  /** Main-plane command/search takeover state (JOV-3940). */
-  isCommandPaletteOpen: boolean;
-  /** Replaces the breadcrumb slot while the command surface is active. */
-  commandPaletteHeader: ReactNode;
 }
 
 interface HeaderActionsDispatch {
@@ -71,9 +64,6 @@ interface HeaderActionsDispatch {
   setHeaderSearchAdapter: (adapter: HeaderSearchAdapter | null) => void;
   openSearch: () => void;
   closeSearch: () => void;
-  openCommandPalette: () => void;
-  closeCommandPalette: () => void;
-  setCommandPaletteHeader: (header: ReactNode) => void;
 }
 
 /** Full context value – kept for backward-compat of `useHeaderActions()`. */
@@ -125,118 +115,24 @@ export function HeaderActionsProvider({
   const [headerSearchAdapter, setHeaderSearchAdapter] =
     useState<HeaderSearchAdapter | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [commandPaletteHeader, setCommandPaletteHeader] =
-    useState<ReactNode>(null);
-  const priorFocusRef = useRef<HTMLElement | null>(null);
-  const focusRestoreFrameRef = useRef<number | null>(null);
 
-  const openSearch = useCallback(() => {
-    if (focusRestoreFrameRef.current !== null) {
-      cancelAnimationFrame(focusRestoreFrameRef.current);
-      focusRestoreFrameRef.current = null;
-    }
-    const activeElement = document.activeElement;
-    priorFocusRef.current =
-      activeElement instanceof HTMLElement ? activeElement : null;
-    setIsSearchOpen(true);
-  }, []);
-  const closeSearch = useCallback(() => {
-    if (focusRestoreFrameRef.current !== null) {
-      cancelAnimationFrame(focusRestoreFrameRef.current);
-    }
-    setIsSearchOpen(false);
-    const priorFocus = priorFocusRef.current;
-    priorFocusRef.current = null;
-    focusRestoreFrameRef.current = requestAnimationFrame(() => {
-      focusRestoreFrameRef.current = null;
-      if (priorFocus?.isConnected) priorFocus.focus();
-    });
-  }, []);
-
-  const openCommandPalette = useCallback(() => {
-    if (focusRestoreFrameRef.current !== null) {
-      cancelAnimationFrame(focusRestoreFrameRef.current);
-      focusRestoreFrameRef.current = null;
-    }
-    const activeElement = document.activeElement;
-    priorFocusRef.current =
-      activeElement instanceof HTMLElement ? activeElement : null;
-    // The former sidebar popover must never compete with the main-plane surface.
-    setIsSearchOpen(false);
-    setIsCommandPaletteOpen(true);
-  }, []);
-
-  const closeCommandPalette = useCallback(() => {
-    if (focusRestoreFrameRef.current !== null) {
-      cancelAnimationFrame(focusRestoreFrameRef.current);
-    }
-    setIsCommandPaletteOpen(false);
-    setCommandPaletteHeader(null);
-    const priorFocus = priorFocusRef.current;
-    priorFocusRef.current = null;
-    focusRestoreFrameRef.current = requestAnimationFrame(() => {
-      focusRestoreFrameRef.current = null;
-      if (priorFocus?.isConnected) priorFocus.focus();
-    });
-  }, []);
-
-  useEffect(
-    () => () => {
-      if (focusRestoreFrameRef.current !== null) {
-        cancelAnimationFrame(focusRestoreFrameRef.current);
-      }
-    },
-    []
-  );
-
+  // When the active adapter changes (route swap, page unmount), make sure
+  // the search collapses back to the breadcrumb-first state — otherwise
+  // navigating from Releases to a non-search route would leave the header
+  // stuck in the open pill surface.
+  const adapterKey = headerSearchAdapter?.key ?? null;
   useEffect(() => {
-    function onOpenSearch() {
-      openCommandPalette();
+    if (!adapterKey) {
+      setIsSearchOpen(false);
     }
+  }, [adapterKey]);
 
-    function onKeyDown(event: KeyboardEvent) {
-      if (
-        event.defaultPrevented ||
-        event.isComposing ||
-        event.key !== '/' ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.altKey ||
-        event.shiftKey ||
-        isFormElement(event.target)
-      ) {
-        return;
-      }
-      event.preventDefault();
-      openCommandPalette();
-    }
-
-    globalThis.addEventListener(OPEN_HEADER_SEARCH_EVENT, onOpenSearch);
-    globalThis.addEventListener('keydown', onKeyDown);
-    return () => {
-      globalThis.removeEventListener(OPEN_HEADER_SEARCH_EVENT, onOpenSearch);
-      globalThis.removeEventListener('keydown', onKeyDown);
-    };
-  }, [openCommandPalette]);
+  const openSearch = useCallback(() => setIsSearchOpen(true), []);
+  const closeSearch = useCallback(() => setIsSearchOpen(false), []);
 
   const state = useMemo(
-    () => ({
-      headerActions,
-      headerBadge,
-      headerSearchAdapter,
-      isSearchOpen,
-      isCommandPaletteOpen,
-      commandPaletteHeader,
-    }),
-    [
-      commandPaletteHeader,
-      headerActions,
-      headerBadge,
-      headerSearchAdapter,
-      isCommandPaletteOpen,
-      isSearchOpen,
-    ]
+    () => ({ headerActions, headerBadge, headerSearchAdapter, isSearchOpen }),
+    [headerActions, headerBadge, headerSearchAdapter, isSearchOpen]
   );
 
   // useState setters are referentially stable, so this memo never recomputes.
@@ -247,11 +143,8 @@ export function HeaderActionsProvider({
       setHeaderSearchAdapter,
       openSearch,
       closeSearch,
-      openCommandPalette,
-      closeCommandPalette,
-      setCommandPaletteHeader,
     }),
-    [closeCommandPalette, closeSearch, openCommandPalette, openSearch]
+    [closeSearch, openSearch]
   );
 
   return (

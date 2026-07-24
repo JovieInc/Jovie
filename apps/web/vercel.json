@@ -2,7 +2,7 @@
   "framework": "nextjs",
   "installCommand": "corepack enable && corepack pnpm install",
   "buildCommand": "corepack pnpm run build",
-  "ignoreCommand": "bash -c 'R=$VERCEL_GIT_COMMIT_REF;if [[ $R == main || $R == production ]]; then exit 1; fi;npx turbo-ignore @jovie/web'",
+  "ignoreCommand": "bash -c 'R=$VERCEL_GIT_COMMIT_REF;[[ $R == main || $R == production || $R =~ ^(codex|claude|codegen-bot|linear)/ ]] && exit 0;npx turbo-ignore @jovie/web'",
   "github": {
     "autoAlias": false
   },

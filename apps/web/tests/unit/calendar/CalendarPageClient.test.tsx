@@ -13,14 +13,6 @@ const mocks = vi.hoisted(() => ({
   rejectEvent: vi.fn(),
   rejectEvents: vi.fn(),
   undoRejectEvent: vi.fn(),
-  navigationReady: vi.fn(),
-}));
-
-vi.mock('@/components/features/dashboard/NavigationDestinationReady', () => ({
-  NavigationDestinationReady: (props: unknown) => {
-    mocks.navigationReady(props);
-    return null;
-  },
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
@@ -145,9 +137,6 @@ describe('CalendarPageClient', () => {
     expect(mocks.useReleasesQuery).toHaveBeenCalledWith('profile-1');
     expect(screen.getByText('May Release')).toBeInTheDocument();
     expect(screen.getByText('Movement Festival')).toBeInTheDocument();
-    expect(
-      screen.queryByText('Releases and events at a glance.')
-    ).not.toBeInTheDocument();
   });
 
   it('keeps event review filtering backed by the event query', () => {
@@ -161,38 +150,6 @@ describe('CalendarPageClient', () => {
     expect(screen.getByText('Movement Festival')).toBeInTheDocument();
   });
 
-  it('uses canonical Button variants for filters and event-review actions', () => {
-    mocks.useEventsQuery.mockReturnValue({
-      data: [pendingEvent, confirmedEvent, rejectedEvent],
-      isLoading: false,
-    });
-    renderCalendar();
-
-    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute(
-      'data-variant',
-      'ghost'
-    );
-
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: /18 Movement Festival Warehouse Set Old Listing/,
-      })
-    );
-
-    expect(screen.getByRole('button', { name: 'Confirm' })).toHaveAttribute(
-      'data-variant',
-      'secondary'
-    );
-    expect(
-      screen
-        .getAllByRole('button', { name: 'Reject' })
-        .some(button => button.getAttribute('data-variant') === 'tertiary')
-    ).toBe(true);
-    expect(
-      screen.getByRole('button', { name: 'Show rejected · 1' })
-    ).toHaveAttribute('data-variant', 'ghost');
-  });
-
   it('does not fetch scoped release or event data without a selected profile', () => {
     mocks.useDashboardData.mockReturnValue({
       selectedProfile: null,
@@ -201,21 +158,6 @@ describe('CalendarPageClient', () => {
 
     expect(mocks.useReleasesQuery).toHaveBeenCalledWith('');
     expect(mocks.useEventsQuery).toHaveBeenCalledWith('');
-  });
-
-  it('does not mark the destination ready when a calendar query fails', () => {
-    mocks.useEventsQuery.mockReturnValue({
-      data: undefined,
-      isError: true,
-      isLoading: false,
-    });
-
-    renderCalendar();
-
-    expect(mocks.navigationReady.mock.calls.at(-1)?.[0]).toMatchObject({
-      destination: 'calendar',
-      ready: false,
-    });
   });
 
   it('renders named hooks for selected day, bulk actions, rejected expansion, and loading', () => {
@@ -248,12 +190,12 @@ describe('CalendarPageClient', () => {
     );
 
     expect(bulkSlot).toHaveAttribute('data-active', 'true');
-    expect(
-      screen.getByRole('button', { name: 'Confirm Selected (1)' })
-    ).toHaveClass('system-b-calendar-action-confirm');
-    expect(
-      screen.getByRole('button', { name: 'Reject Selected (1)' })
-    ).toHaveClass('system-b-calendar-action-reject');
+    expect(screen.getByText('Confirm selected (1)')).toHaveClass(
+      'system-b-calendar-action-confirm'
+    );
+    expect(screen.getByText('Reject selected (1)')).toHaveClass(
+      'system-b-calendar-action-reject'
+    );
 
     const rejectedToggle = screen.getByRole('button', {
       name: 'Show rejected · 1',
@@ -262,7 +204,7 @@ describe('CalendarPageClient', () => {
     fireEvent.click(rejectedToggle);
 
     expect(screen.getAllByText('Old Listing')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: 'Undo Reject' })).toHaveClass(
+    expect(screen.getByRole('button', { name: 'Undo reject' })).toHaveClass(
       'system-b-calendar-action-secondary'
     );
   });

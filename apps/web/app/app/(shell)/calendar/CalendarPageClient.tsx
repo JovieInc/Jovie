@@ -24,9 +24,11 @@ import {
   rejectEvents,
   undoRejectEvent,
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
-import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
-import { PageToolbar } from '@/components/organisms/table';
+import {
+  PAGE_TOOLBAR_META_TEXT_CLASS,
+  PageToolbar,
+} from '@/components/organisms/table';
 import { getEventLocalDateKey } from '@/lib/events/date';
 import { normalizeTicketUrl } from '@/lib/events/ticket-url';
 import { queryKeys } from '@/lib/queries';
@@ -202,16 +204,10 @@ export function CalendarPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
   const queryClient = useQueryClient();
-  const {
-    data: releases,
-    isError: releasesError,
-    isLoading: isLoadingReleases,
-  } = useReleasesQuery(profileId);
-  const {
-    data: events,
-    isError: eventsError,
-    isLoading: isLoadingEvents,
-  } = useEventsQuery(profileId);
+  const { data: releases, isLoading: isLoadingReleases } =
+    useReleasesQuery(profileId);
+  const { data: events, isLoading: isLoadingEvents } =
+    useEventsQuery(profileId);
 
   const releasesByDay = useMemo<Map<string, ReleaseDot[]>>(() => {
     const map = new Map<string, ReleaseDot[]>();
@@ -419,10 +415,13 @@ export function CalendarPageClient() {
 
   return (
     <PageShell
-      data-testid='calendar-workspace'
       toolbar={
         <PageToolbar
-          start={null}
+          start={
+            <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+              Releases and events at a glance.
+            </span>
+          }
           end={
             <div className='flex flex-wrap items-center justify-end gap-1'>
               <FilterPill
@@ -454,10 +453,6 @@ export function CalendarPageClient() {
         />
       }
     >
-      <NavigationDestinationReady
-        destination='calendar'
-        ready={!isLoading && !releasesError && !eventsError}
-      />
       <PageContent>
         <div className='flex h-full min-h-0 flex-col gap-4'>
           <div className='flex flex-wrap items-center justify-between gap-2'>
@@ -715,37 +710,30 @@ export function CalendarPageClient() {
                   >
                     {selectedPendingIds.size > 0 && (
                       <>
-                        <Button
+                        <button
                           type='button'
-                          variant='secondary'
-                          size='sm'
                           onClick={handleBulkConfirm}
                           disabled={isActionPending}
                           className='system-b-calendar-action-confirm h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
                         >
-                          Confirm Selected ({selectedPendingIds.size})
-                        </Button>
-                        <Button
+                          Confirm selected ({selectedPendingIds.size})
+                        </button>
+                        <button
                           type='button'
-                          variant='tertiary'
-                          size='sm'
-                          destructive
                           onClick={handleBulkReject}
                           disabled={isActionPending}
                           className='system-b-calendar-action-reject h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
                         >
-                          Reject Selected ({selectedPendingIds.size})
-                        </Button>
-                        <Button
+                          Reject selected ({selectedPendingIds.size})
+                        </button>
+                        <button
                           type='button'
-                          variant='ghost'
-                          size='sm'
                           onClick={() => setSelectedPendingIds(new Set())}
                           disabled={isActionPending}
                           className='system-b-calendar-action-ghost h-7 rounded-md px-2 transition-colors duration-subtle ease-subtle'
                         >
                           Clear
-                        </Button>
+                        </button>
                       </>
                     )}
                   </div>
@@ -755,10 +743,8 @@ export function CalendarPageClient() {
               {/* Rejected events — collapsed by default */}
               {rejectedSelectedEvents.length > 0 && (
                 <div className='mt-4'>
-                  <Button
+                  <button
                     type='button'
-                    variant='ghost'
-                    size='sm'
                     onClick={() => setShowRejected(s => !s)}
                     aria-expanded={showRejected}
                     aria-controls='rejected-events-list'
@@ -767,7 +753,7 @@ export function CalendarPageClient() {
                     {showRejected
                       ? 'Hide rejected'
                       : `Show rejected · ${rejectedSelectedEvents.length}`}
-                  </Button>
+                  </button>
                   {showRejected && (
                     <ul
                       id='rejected-events-list'
@@ -820,10 +806,8 @@ type FilterPillProps = Readonly<{
 
 function FilterPill(props: FilterPillProps) {
   return (
-    <Button
+    <button
       type='button'
-      variant='ghost'
-      size='sm'
       onClick={props.onClick}
       aria-pressed={props.active}
       className={cn(
@@ -836,7 +820,7 @@ function FilterPill(props: FilterPillProps) {
       )}
     >
       {props.label}
-    </Button>
+    </button>
   );
 }
 
@@ -907,53 +891,43 @@ function EventRow(props: EventRowProps) {
         )}
         {props.variant === 'pending' && (
           <>
-            <Button
+            <button
               type='button'
-              variant='secondary'
-              size='sm'
               onClick={props.onConfirm}
               disabled={props.disabled}
               className='system-b-calendar-action-confirm h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
             >
               Confirm
-            </Button>
-            <Button
+            </button>
+            <button
               type='button'
-              variant='tertiary'
-              size='sm'
-              destructive
               onClick={props.onReject}
               disabled={props.disabled}
               className='system-b-calendar-action-reject h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
             >
               Reject
-            </Button>
+            </button>
           </>
         )}
         {props.variant === 'confirmed' && props.onReject && (
-          <Button
+          <button
             type='button'
-            variant='ghost'
-            size='sm'
-            destructive
             onClick={props.onReject}
             disabled={props.disabled}
             className='system-b-calendar-action-danger-ghost h-7 rounded-md px-2 transition-colors duration-subtle ease-subtle'
           >
             Reject
-          </Button>
+          </button>
         )}
         {props.variant === 'rejected' && props.onUndoReject && (
-          <Button
+          <button
             type='button'
-            variant='secondary'
-            size='sm'
             onClick={props.onUndoReject}
             disabled={props.disabled}
             className='system-b-calendar-action-secondary h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
           >
-            Undo Reject
-          </Button>
+            Undo reject
+          </button>
         )}
       </div>
     </li>

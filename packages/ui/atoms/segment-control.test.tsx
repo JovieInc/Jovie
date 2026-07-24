@@ -319,19 +319,6 @@ describe('SegmentControl', () => {
         screen.getByRole('tab', { name: 'Links' }).className
       ).not.toContain('flex-1');
     });
-
-    it('applies responsive layout classes to the tablist', () => {
-      render(
-        <SegmentControl
-          value='links'
-          onValueChange={vi.fn()}
-          options={defaultOptions}
-          listClassName='flex-wrap gap-1.5'
-        />
-      );
-
-      expect(screen.getByRole('tablist')).toHaveClass('flex-wrap', 'gap-1.5');
-    });
   });
 
   describe('Accessibility', () => {

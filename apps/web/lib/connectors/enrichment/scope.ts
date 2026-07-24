@@ -26,8 +26,7 @@ async function resolveCreatorProfileId(
 }
 
 export async function resolveConnectorEnrichmentContext(
-  userId: string,
-  options: { readonly gmailAccountId?: string } = {}
+  userId: string
 ): Promise<ConnectorEnrichmentAccountContext | null> {
   const accounts = await db
     .select({
@@ -43,13 +42,9 @@ export async function resolveConnectorEnrichmentContext(
       )
     );
 
-  const gmail = options.gmailAccountId
-    ? accounts.find(
-        row =>
-          row.id === options.gmailAccountId &&
-          row.provider === CONNECTOR_PROVIDERS.gmail
-      )
-    : accounts.find(row => row.provider === CONNECTOR_PROVIDERS.gmail);
+  const gmail = accounts.find(
+    row => row.provider === CONNECTOR_PROVIDERS.gmail
+  );
   const calendar = accounts.find(
     row => row.provider === CONNECTOR_PROVIDERS.google_calendar
   );

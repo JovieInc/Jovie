@@ -9,8 +9,6 @@ interface ChatMarkdownProps {
   readonly content: string;
   readonly className?: string;
   readonly isStreaming?: boolean;
-  /** Render a prose fragment without Streamdown's paragraph block wrapper. */
-  readonly inline?: boolean;
 }
 
 /**
@@ -20,12 +18,9 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   content,
   className,
   isStreaming = false,
-  inline = false,
 }: ChatMarkdownProps) {
   return (
-    <Streamdown
-      {...getChatMarkdownStreamdownConfig(isStreaming, className, inline)}
-    >
+    <Streamdown {...getChatMarkdownStreamdownConfig(isStreaming, className)}>
       {content}
     </Streamdown>
   );

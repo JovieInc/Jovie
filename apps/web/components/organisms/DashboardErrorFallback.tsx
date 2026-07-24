@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import type { FallbackProps } from 'react-error-boundary';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 
@@ -11,18 +12,20 @@ export function DashboardErrorFallback({
   error,
   resetErrorBoundary,
 }: FallbackProps) {
+  const router = useRouter();
   const errorWithDigest = error as Error & { digest?: string };
 
   return (
     <PageErrorState
-      title='Unable to Load Dashboard'
+      title='Unable to load dashboard'
       message={
         errorWithDigest.message ||
         'An unexpected error occurred while loading your dashboard.'
       }
       error={errorWithDigest}
-      actionLabel='Retry'
+      actionLabel='Reload dashboard'
       onRetry={resetErrorBoundary}
+      secondaryAction={{ label: 'Go home', onClick: () => router.push('/') }}
       extraContext={{ Context: 'Dashboard' }}
     />
   );

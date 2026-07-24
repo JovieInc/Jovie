@@ -16,6 +16,11 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
+import {
+  APP_FLAG_OVERRIDES_COOKIE,
+  FF_OVERRIDES_KEY,
+} from '@/lib/flags/overrides';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 import { gotoAuthenticatedChatRoute } from './utils/smoke-test-utils';
 
@@ -36,6 +41,23 @@ test.describe('right-rail × composer interaction', () => {
 
   test.beforeEach(async ({ page }) => {
     test.setTimeout(120_000);
+
+    // Enable DESIGN_V1 so the rail toggle and right-rail mount are active
+    const overrides = JSON.stringify({
+      [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
+    });
+
+    await page.addInitScript(
+      ({ cookieName, key, value }) => {
+        localStorage.setItem(key, value);
+        document.cookie = `${cookieName}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
+      },
+      {
+        cookieName: APP_FLAG_OVERRIDES_COOKIE,
+        key: FF_OVERRIDES_KEY,
+        value: overrides,
+      }
+    );
 
     await setTestAuthBypassSession(page, 'creator-ready');
     await gotoAuthenticatedChatRoute(page);
@@ -209,31 +231,5 @@ test.describe('right-rail × composer interaction', () => {
 
     await textarea.fill('rapid toggles completed');
     await expect(textarea).toHaveValue('rapid toggles completed');
-  });
-
-  test('F: profile-menu dialog transition releases the composer', async ({
-    page,
-  }) => {
-    await page.locator(RAIL_TOGGLE).click();
-    await expect(page.locator(RIGHT_RAIL)).toBeVisible({ timeout: 10_000 });
-
-    await page.getByRole('button', { name: 'Profile Actions' }).click();
-    await page.getByRole('menuitem', { name: 'UTM Builder' }).click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 });
-
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 10_000 });
-
-    const pointerEvents = await page.evaluate(
-      () => getComputedStyle(document.body).pointerEvents
-    );
-    expect(pointerEvents).not.toBe('none');
-
-    const textarea = page.locator(COMPOSER_TEXTAREA);
-    await textarea.click();
-    await textarea.fill('composer remains available after UTM dialog');
-    await expect(textarea).toHaveValue(
-      'composer remains available after UTM dialog'
-    );
   });
 });

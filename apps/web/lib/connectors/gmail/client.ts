@@ -50,27 +50,6 @@ export function buildGmailBookingQuery(historyWindowDays: number): string {
 }
 
 /**
- * Narrow read-only query for booking signals and explicit paid brand briefs.
- * Commercial qualification still happens locally against normalized metadata.
- */
-export function buildGmailOpportunityQuery(historyWindowDays: number): string {
-  return `category:primary newer_than:${historyWindowDays}d (${[
-    'booking',
-    '"show confirmation"',
-    '"gig confirmation"',
-    'contract',
-    '"performance agreement"',
-    '"event confirmation"',
-    '"paid creator campaign"',
-    '"creator-performance campaign"',
-    '"brand partnership"',
-    '"paid partnership"',
-    '"ugc campaign"',
-    '"sponsor campaign"',
-  ].join(' OR ')})`;
-}
-
-/**
  * Lists Gmail messages matching the booking query.
  * Returns up to `maxResults` message stubs (id + threadId only).
  */
