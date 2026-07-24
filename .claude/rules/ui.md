@@ -2,6 +2,13 @@
 
 Design system, component hierarchy, surfaces, taste rules. Always read `DESIGN.md` before making any visual decisions.
 
+**One system, two languages (founder-locked 2026-06-18):** System B tokens only.
+Product language + marketing editorial language share the same foundation. "System A"
+is historical — not a valid choice for new work. Prefer/forbid component map:
+[`docs/design/COMPONENT_MAP.md`](../../docs/design/COMPONENT_MAP.md). Generated agent
+contract: [`docs/llms-design-manifest.txt`](../../docs/llms-design-manifest.txt)
+(`pnpm ds:llms-manifest`).
+
 ## Component Architecture
 
 Components follow atomic design with feature-based grouping:
@@ -35,6 +42,8 @@ apps/web/components/
 - `atoms/` must NOT import from `molecules/` or `organisms/`
 - `molecules/` must NOT import from `organisms/`
 - `features/{x}/` must NOT import from `features/{y}/` — if a component is needed by 2+ features, **promote it** to the shared `atoms/`, `molecules/`, or `organisms/` layer
+- Prefer `@jovie/ui` atoms (Button, Input, Badge, Dialog, Card, Field, …) before app-level atoms — see [`docs/design/COMPONENT_MAP.md`](../../docs/design/COMPONENT_MAP.md)
+- Do **not** ship hand-rolled buttons/inputs when `@jovie/ui` covers them, design-studio leftovers as product UI, void Storybook atoms, or demo/exp chrome as production templates
 
 **Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`). Arbitrary Tailwind values (`w-[327px]`, `text-[#fff]`) are tracked by a drift ratchet (`apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts`) — the count may only go DOWN. Converge to tokens; never add new arbitrary values.
 
