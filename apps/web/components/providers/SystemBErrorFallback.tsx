@@ -72,7 +72,9 @@ export function SystemBErrorFallback({
                 >
                   <Button
                     type='button'
-                    variant={action.variant === 'secondary' ? 'secondary' : 'primary'}
+                    variant={
+                      action.variant === 'secondary' ? 'secondary' : 'primary'
+                    }
                     size='sm'
                   >
                     {action.label}
@@ -85,7 +87,9 @@ export function SystemBErrorFallback({
               <Button
                 key={`${action.type}-${action.label}`}
                 type='button'
-                variant={action.variant === 'secondary' ? 'secondary' : 'primary'}
+                variant={
+                  action.variant === 'secondary' ? 'secondary' : 'primary'
+                }
                 size='sm'
                 onClick={action.onClick}
               >
