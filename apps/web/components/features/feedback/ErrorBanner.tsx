@@ -122,7 +122,7 @@ export function ErrorBanner({
       )}
     >
       <div className='flex gap-3'>
-        <span className='mt-1 flex h-8 w-8 items-center justify-center rounded-full border border-red-500/40 bg-red-500/15 text-red-200 shadow-inner dark:border-red-700/60 dark:bg-red-900/40'>
+        <span className='mt-1 flex h-8 w-8 items-center justify-center rounded-full border border-error/40 bg-error/15 text-error-foreground shadow-inner dark:border-error/60 dark:bg-error/40'>
           <AlertTriangle className='h-5 w-5' aria-hidden='true' />
         </span>
 
@@ -131,7 +131,7 @@ export function ErrorBanner({
             {title}
           </p>
           {description ? (
-            <p className='text-sm leading-snug text-red-100/90 dark:text-red-100/80'>
+            <p className='text-sm leading-snug text-error-foreground/90'>
               {description}
             </p>
           ) : null}
@@ -147,13 +147,13 @@ export function ErrorBanner({
               type='button'
               variant='link'
               onClick={() => setShowDetails(!showDetails)}
-              className='h-auto text-xs text-red-100/70 hover:text-red-100 dark:text-red-200/70 dark:hover:text-red-200 underline decoration-dotted'
+              className='h-auto text-xs text-error-foreground/80 hover:text-error-foreground underline decoration-dotted'
             >
               {showDetails ? 'Hide Error Details' : 'Show Error Details'}
             </Button>
 
             {showDetails && (
-              <div className='mt-2 pt-2 border-t border-red-500/20 dark:border-red-900/40 space-y-1.5'>
+              <div className='mt-2 pt-2 border-t border-error/20 dark:border-error/40 space-y-1.5'>
                 {error?.digest && (
                   <p className='text-xs text-red-100/80 dark:text-red-200/70'>
                     Error ID: {error.digest}
@@ -198,7 +198,7 @@ export function ErrorBanner({
             size='icon'
             onClick={onDismiss}
             aria-label='Dismiss Error'
-            className='mt-0.5 h-auto w-auto shrink-0 self-start rounded-full border border-red-500/30 bg-transparent p-1.5 text-red-700 transition-colors hover:bg-red-500/10 hover:text-red-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 focus-visible:ring-offset-1 focus-visible:ring-offset-red-50 dark:border-red-800/50 dark:text-red-300 dark:hover:bg-red-900/40 dark:hover:text-red-100 dark:focus-visible:ring-offset-red-950'
+            className='mt-0.5 h-auto w-auto shrink-0 self-start rounded-full border border-error/30 bg-transparent p-1.5 text-error transition-colors hover:bg-error/10 hover:text-error-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/70 focus-visible:ring-offset-1 focus-visible:ring-offset-error-subtle dark:border-error/50 dark:text-error-foreground dark:hover:bg-error/40 dark:hover:text-error-foreground dark:focus-visible:ring-offset-error'
           >
             <X className='h-4 w-4' aria-hidden='true' />
           </Button>

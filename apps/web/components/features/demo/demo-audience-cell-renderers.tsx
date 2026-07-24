@@ -63,8 +63,8 @@ export function renderDemoReturningCell({
   const visits = row.original.visits;
   if (visits > 1) {
     return (
-      <span className='inline-flex items-center gap-1.5 text-xs text-blue-400'>
-        <ArrowLeftRight className={`${ICON_CLS} text-blue-400`} aria-hidden />
+      <span className='inline-flex items-center gap-1.5 text-xs text-accent'>
+        <ArrowLeftRight className={`${ICON_CLS} text-accent`} aria-hidden />
         Yes
       </span>
     );

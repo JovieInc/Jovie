@@ -13,7 +13,7 @@ describe('InfoBox', () => {
     const container = screen.getByText('Information').closest('div');
     expect(screen.getByText('Information')).toBeInTheDocument();
     expect(screen.getByText('Test content')).toBeInTheDocument();
-    expect(container).toHaveClass('bg-blue-50', 'border-blue-200');
+    expect(container).toHaveClass('bg-info-subtle', 'border-info/20');
   });
 
   it('applies variant styling when provided', () => {
@@ -24,7 +24,7 @@ describe('InfoBox', () => {
     );
 
     const container = screen.getByText('Error').closest('div');
-    expect(container).toHaveClass('bg-red-50', 'border-red-200');
+    expect(container).toHaveClass('bg-error-subtle', 'border-error/20');
   });
 
   it('renders without a title when omitted', () => {

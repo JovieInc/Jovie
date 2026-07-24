@@ -38,7 +38,7 @@ export function SocialProofSection() {
       <div className='mx-auto max-w-7xl px-6 lg:px-8'>
         <div className='mx-auto max-w-3xl text-center mb-16'>
           <div className='mb-8'>
-            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-sm font-medium text-blue-400'>
+            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20 text-sm font-medium text-accent'>
               <svg
                 className='w-4 h-4'
                 fill='none'
@@ -91,7 +91,7 @@ export function SocialProofSection() {
                 <div className='absolute -inset-4 bg-linear-to-r from-white/5 to-white/10 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-cinematic' />
                 <div className='relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-colors duration-slower'>
                   <div className='mb-6'>
-                    <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400'>
+                    <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-success/20 text-success'>
                       {testimonial.metric}
                     </span>
                   </div>

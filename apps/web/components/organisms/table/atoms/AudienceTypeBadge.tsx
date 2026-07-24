@@ -10,10 +10,10 @@ export interface AudienceTypeBadgeProps {
 
 const TYPE_DOT_COLORS: Record<AudienceMemberType, string> = {
   anonymous: 'bg-tertiary-token/70',
-  email: 'bg-blue-500',
-  sms: 'bg-violet-500',
-  spotify: 'bg-emerald-500',
-  customer: 'bg-amber-500',
+  email: 'bg-accent',
+  sms: 'bg-accent',
+  spotify: 'bg-success',
+  customer: 'bg-warning',
 };
 
 const TYPE_LABELS: Record<AudienceMemberType, string> = {

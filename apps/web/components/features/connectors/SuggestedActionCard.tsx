@@ -61,9 +61,9 @@ function buildLocationLine(
 }
 
 function confidenceDotClass(confidence: number): string {
-  if (confidence >= 0.9) return 'bg-green-500';
-  if (confidence >= 0.7) return 'bg-yellow-500';
-  return 'bg-red-500';
+  if (confidence >= 0.9) return 'bg-success';
+  if (confidence >= 0.7) return 'bg-warning';
+  return 'bg-error';
 }
 
 /**

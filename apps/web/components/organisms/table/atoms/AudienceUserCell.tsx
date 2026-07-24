@@ -30,10 +30,10 @@ const DEVICE_LABELS: Record<string, string> = {
 
 const TYPE_DOT_COLORS: Record<AudienceMemberType, string> = {
   anonymous: 'bg-tertiary-token/70',
-  email: 'bg-blue-500',
-  sms: 'bg-violet-500',
-  spotify: 'bg-emerald-500',
-  customer: 'bg-amber-500',
+  email: 'bg-accent',
+  sms: 'bg-accent',
+  spotify: 'bg-success',
+  customer: 'bg-warning',
 };
 
 function formatAnonymousVisitorLabel(
@@ -101,7 +101,7 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
         {primaryLabel}
       </span>
       {isBot ? (
-        <span className='shrink-0 rounded-full bg-amber-500/12 px-2 py-0.5 text-2xs font-caption text-amber-700 dark:text-amber-300'>
+        <span className='shrink-0 rounded-full bg-warning/12 px-2 py-0.5 text-2xs font-caption text-warning'>
           Bot
         </span>
       ) : null}

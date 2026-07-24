@@ -20,7 +20,7 @@ export function PreFooterCTA() {
           <div className='mb-8'>
             <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-1/80 border border-subtle backdrop-blur-sm text-sm font-medium text-secondary-token transition-colors duration-slower'>
               <svg
-                className='w-4 h-4 text-blue-600 dark:text-blue-400'
+                className='w-4 h-4 text-accent'
                 fill='none'
                 viewBox='0 0 24 24'
                 stroke='currentColor'
@@ -89,10 +89,7 @@ export function PreFooterCTA() {
           {/* Social proof with enhanced styling */}
           <div className='mt-10 p-4 rounded-2xl bg-surface-1/50 backdrop-blur-sm border border-subtle'>
             <p className='text-sm text-tertiary-token font-medium'>
-              Join{' '}
-              <span className='text-blue-600 dark:text-blue-400 font-semibold'>
-                10,000+
-              </span>{' '}
+              Join <span className='text-accent font-semibold'>10,000+</span>{' '}
               artists already using Jovie
             </p>
           </div>

@@ -42,15 +42,15 @@ const columnHelper = createColumnHelper<AdminReleaseRow>();
 
 const RELEASE_TYPE_VARIANTS: Record<string, string> = {
   single: 'bg-secondary-token/10 text-secondary-token',
-  album: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  ep: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
-  compilation: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  album: 'bg-accent/10 text-accent',
+  ep: 'bg-accent/10 text-accent',
+  compilation: 'bg-warning/10 text-warning',
 };
 
 const SOURCE_TYPE_VARIANTS: Record<string, string> = {
   manual: 'bg-secondary-token/10 text-secondary-token',
-  admin: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  ingested: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  admin: 'bg-accent/10 text-accent',
+  ingested: 'bg-success/10 text-success',
 };
 
 function ReleaseTypeBadge({ type }: { readonly type: string }) {

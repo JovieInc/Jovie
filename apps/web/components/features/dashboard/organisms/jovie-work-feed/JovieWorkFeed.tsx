@@ -34,10 +34,10 @@ const JOVIE_WORK_ICONS: Record<JovieWorkIcon, typeof Sparkles> = {
 };
 
 const PHASE_STYLES: Record<JovieWorkPhase, string> = {
-  pending: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  in_progress: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
-  completed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  failed: 'bg-red-500/10 text-red-700 dark:text-red-300',
+  pending: 'bg-warning/10 text-warning',
+  in_progress: 'bg-accent/10 text-accent',
+  completed: 'bg-success/10 text-success',
+  failed: 'bg-error/10 text-error',
 };
 
 function JovieWorkGlyph({ icon }: { readonly icon: JovieWorkIcon }) {
@@ -161,7 +161,7 @@ export function JovieWorkFeed({ profileId, range = '7d' }: JovieWorkFeedProps) {
         <span className='inline-flex shrink-0 items-center gap-1.5 text-2xs font-caption text-tertiary-token'>
           <span
             aria-hidden='true'
-            className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse'
+            className='h-1.5 w-1.5 rounded-full bg-success animate-pulse'
           />
           <span>Live</span>
         </span>

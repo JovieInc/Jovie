@@ -81,13 +81,13 @@ export function PerformanceDashboard({
   const getRatingColor = (rating: string): string => {
     switch (rating) {
       case 'good':
-        return 'bg-green-100 text-green-800';
+        return 'bg-success/10 text-success';
       case 'needs-improvement':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-warning/10 text-warning';
       case 'poor':
-        return 'bg-red-100 text-red-800';
+        return 'bg-error/10 text-error';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-surface-1 text-secondary-token';
     }
   };
 
@@ -130,7 +130,9 @@ export function PerformanceDashboard({
         {expanded && (
           <div className='p-4'>
             {Object.keys(metrics).length === 0 ? (
-              <p className='text-sm text-gray-500'>Collecting metrics...</p>
+              <p className='text-sm text-tertiary-token'>
+                Collecting metrics...
+              </p>
             ) : (
               <div className='space-y-2'>
                 {Object.values(metrics).map(metric => (

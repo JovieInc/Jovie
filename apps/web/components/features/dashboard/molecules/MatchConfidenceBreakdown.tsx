@@ -6,22 +6,22 @@ import { cn } from '@/lib/utils';
 /** Get color class based on contribution score threshold */
 function getContributionColorClass(contribution: number): string {
   if (contribution >= 10) return 'text-success';
-  if (contribution >= 5) return 'text-amber-600 dark:text-amber-400';
+  if (contribution >= 5) return 'text-warning';
   return 'text-tertiary-token';
 }
 
 /** Get color class based on percentage threshold */
 function getPercentageColorClass(percentage: number): string {
-  if (percentage >= 80) return 'bg-green-500';
-  if (percentage >= 50) return 'bg-amber-500';
-  return 'bg-red-500/60';
+  if (percentage >= 80) return 'bg-success';
+  if (percentage >= 50) return 'bg-warning';
+  return 'bg-error/60';
 }
 
 /** Get total score color class */
 function getTotalScoreColorClass(percentage: number): string {
   if (percentage >= 80) return 'text-success';
-  if (percentage >= 50) return 'text-amber-600 dark:text-amber-400';
-  return 'text-red-600 dark:text-red-400';
+  if (percentage >= 50) return 'text-warning';
+  return 'text-error';
 }
 
 export interface ConfidenceBreakdownData {

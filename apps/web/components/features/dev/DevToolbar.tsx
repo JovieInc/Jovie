@@ -187,8 +187,8 @@ const PROMOTE_LABELS: Record<PromoteState, string> = {
 
 function getPromoteButtonColor(state: PromoteState): string {
   if (state === 'done') return 'text-accent';
-  if (state === 'error') return 'text-red-400';
-  return 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10';
+  if (state === 'error') return 'text-error';
+  return 'text-success hover:text-success hover:bg-success/10';
 }
 
 function AsyncActionIcon({

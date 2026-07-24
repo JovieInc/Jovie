@@ -15,26 +15,24 @@ export function InfoBox({
   className,
 }: InfoBoxProps) {
   const variantClasses = {
-    info: 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800',
-    warning:
-      'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800',
-    success:
-      'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800',
-    error: 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800',
+    info: 'bg-info-subtle border-info/20',
+    warning: 'bg-warning-subtle border-warning/20',
+    success: 'bg-success-subtle border-success/20',
+    error: 'bg-error-subtle border-error/20',
   };
 
   const titleClasses = {
-    info: 'text-blue-900 dark:text-blue-100',
-    warning: 'text-yellow-900 dark:text-yellow-100',
-    success: 'text-green-900 dark:text-green-100',
-    error: 'text-red-900 dark:text-red-100',
+    info: 'text-info-foreground',
+    warning: 'text-warning-foreground',
+    success: 'text-success-foreground',
+    error: 'text-error-foreground',
   };
 
   const contentClasses = {
-    info: 'text-blue-800 dark:text-blue-200',
-    warning: 'text-yellow-800 dark:text-yellow-200',
-    success: 'text-green-800 dark:text-green-200',
-    error: 'text-red-800 dark:text-red-200',
+    info: 'text-info-foreground',
+    warning: 'text-warning-foreground',
+    success: 'text-success-foreground',
+    error: 'text-error-foreground',
   };
 
   return (
