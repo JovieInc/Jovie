@@ -1,0 +1,119 @@
+name: Visual Approval Guard
+
+# No change to a visual baseline surface may merge without explicit human
+# visual approval, recorded as the `visual-approved` label on the PR. This is
+# what stops an agent — or the scheduled visual-regression.yml self-healer,
+# which always runs `--update-snapshots` and auto-PRs regenerated baselines
+# from `visual-baselines/auto-update` via JOVIE_BOT — from silently shifting
+# what the product is allowed to look like. The bot PR is NOT exempt: human
+# review of regenerated baselines is the entire point of that flow.
+# Policy: docs/VISUAL_TESTING_POLICY.md.
+#
+# Baseline surfaces (keep in sync with scripts/visual-approval-guard.mjs and
+# docs/VISUAL_TESTING_POLICY.md):
+#   apps/web/tests/e2e/__snapshots__/**
+#   apps/web/contrast-ratchet.baseline.json
+#   apps/web/touch-target-ratchet.baseline.json
+#   apps/web/tests/unit/design-system/button-surface-classes-remaining.json
+#
+# Unlike pr-size-guard.yml this workflow DOES run on labeled/unlabeled: the
+# label is the gate, so applying `visual-approved` after a failing run must
+# turn the required context green without a new push. That is safe here for
+# the same reason it is dangerous there (JOV-3580): pull_request runs never
+# cancel in progress (cancel-in-progress is merge_group-only below), so label
+# churn can only serialize ~10s API-only runs — it can never orphan a
+# CANCELLED run as the latest required context. Because `labeled` re-runs the
+# real check, no separate label-override check-run workflow (the
+# pr-size-guard-label-override.yml pattern) is needed.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  # Active native-queue required-context producer. Labels can change after a
+  # PR enters the queue (label events do not evict it), so revalidate the
+  # source PR's labels against the exact synthetic group before reproducing
+  # the required context on the head.
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: visual-approval-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}
+  # pull_request: never cancel — duplicate same-head-SHA runs (opened +
+  # synchronize, label churn from the autonomous merge loop) must each reach
+  # a terminal success/failure so the rollup cannot pin a CANCELLED run for
+  # this required context (JOV-3580). merge_group stays keyed by exact head.
+  cancel-in-progress: ${{ github.event_name == 'merge_group' }}
+
+jobs:
+  merge-group-visual:
+    name: ${{ github.event_name == 'merge_group' && 'Visual Approval Guard' || 'Visual Approval Guard (merge-group inactive)' }}
+    if: github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out trusted queue policy
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # Never execute policy code from the synthetic PR-controlled head.
+          ref: ${{ github.event.merge_group.base_sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/visual-approval-guard.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Bootstrap policy from head when base predates the guard
+        # Only until the commit that introduces this guard lands on main:
+        # base_sha cannot contain the policy script yet, so fall back to the
+        # group head. Removed from the trust path as soon as main has it.
+        run: |
+          if [ ! -f scripts/visual-approval-guard.mjs ]; then
+            git fetch --no-tags --depth=1 origin "${{ github.event.merge_group.head_sha }}"
+            git checkout FETCH_HEAD -- scripts/visual-approval-guard.mjs
+          fi
+
+      - name: Enforce visual approval on the merge-group head
+        env:
+          # The synthetic head controls this workflow definition. Never expose
+          # an App private key here; the read-only ephemeral token is enough.
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          set -euo pipefail
+          # Native merge-queue refs embed the source PR:
+          # refs/heads/gh-readonly-queue/<base>/pr-<N>-<base_sha>.
+          PR=$(printf '%s' "$HEAD_REF" | sed -n 's|.*/pr-\([0-9][0-9]*\)-.*|\1|p' | head -1)
+          if [ -z "$PR" ]; then
+            echo "✅ Merge-group head is not attributable to a single source PR (stacked group draft)."
+            echo "   Source-PR enforcement covers this: a PR can only enter the queue with 'Visual Approval Guard' green."
+            exit 0
+          fi
+          node scripts/visual-approval-guard.mjs --pr "$PR"
+
+  visual:
+    name: ${{ github.event_name == 'pull_request' && 'Visual Approval Guard' || 'Visual Approval Guard (source inactive)' }}
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out guard policy
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/visual-approval-guard.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Enforce visual approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: node scripts/visual-approval-guard.mjs --pr "$PR"

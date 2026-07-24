@@ -117,6 +117,17 @@ const config: StorybookConfig = {
           replacement: require.resolve('./enrich-profile-mock.ts'),
         },
         {
+          // task-actions.ts dynamically imports lib/ai/anthropic
+          // (@anthropic-ai/sdk, Node-only) — keep it out of the browser
+          // preview bundle.
+          find: '@/app/app/(shell)/dashboard/releases/task-actions',
+          replacement: require.resolve('./release-task-actions-mock.ts'),
+        },
+        {
+          find: '@/app/app/(shell)/dashboard/releases/catalog-task-actions',
+          replacement: require.resolve('./release-task-actions-mock.ts'),
+        },
+        {
           // lib/auth/better-auth.ts imports this RELATIVELY
           // ('./apple-client-secret'), so a plain '@/…' find never matches.
           // Full-specifier regex: .replace() swaps the entire id for the

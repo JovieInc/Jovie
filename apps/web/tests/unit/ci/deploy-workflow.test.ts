@@ -371,7 +371,7 @@ describe('CI test-performance path gate', () => {
       "run_test_performance: ${{ steps.detect.outputs.run_test_performance || 'false' }}"
     );
     expect(detectStep).toContain(
-      'for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse'
+      'for t in run_build run_test run_test_performance run_storybook_a11y run_ui_visual run_public_lighthouse'
     );
     expect(detectStep).toContain(
       'echo "run_test_performance=false" >> "$GITHUB_OUTPUT"'
