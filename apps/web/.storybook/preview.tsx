@@ -16,7 +16,28 @@ import '../app/globals.css';
 const FIXED_NOW = new Date('2026-01-15T12:00:00.000Z');
 const STABLE_ID_PREFIX = 'sb-stable';
 
+function installProcessPolyfill(): void {
+  // Chromatic story extraction runs in a browser. Vite `define` rewrites most
+  // process.env.* references, but a global fallback prevents hard crashes if
+  // any residual bare `process` access remains in the story graph.
+  const g = globalThis as typeof globalThis & {
+    process?: { env?: Record<string, string | undefined> };
+  };
+  if (!g.process) {
+    g.process = { env: {} };
+  }
+  if (!g.process.env) {
+    g.process.env = {};
+  }
+  const env = g.process.env;
+  env.NODE_ENV = env.NODE_ENV || 'development';
+  env.NEXT_PUBLIC_APP_VERSION =
+    env.NEXT_PUBLIC_APP_VERSION || '0.0.0-storybook';
+  env.NEXT_PUBLIC_BUILD_SHA = env.NEXT_PUBLIC_BUILD_SHA || 'storybook';
+}
+
 function installDeterministicFixtures(): void {
+  installProcessPolyfill();
   if (typeof window === 'undefined') return;
   if (
     (window as Window & { __jovieStorybookFixtures?: boolean })
