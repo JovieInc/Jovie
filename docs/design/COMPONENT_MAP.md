@@ -65,6 +65,7 @@ outside a single feature with no Next/app imports.
 |----------------|------|
 | [`DESIGN.md`](../../DESIGN.md) | Tokens, languages, surface TARGET vs STATE |
 | [`.claude/rules/ui.md`](../../.claude/rules/ui.md) | Layer boundaries + taste invariants |
+| [`ONE_SYSTEM_DRIFT.md`](./ONE_SYSTEM_DRIFT.md) | Ranked drift inventory + migration batches |
 | [`docs/llms-design-manifest.txt`](../llms-design-manifest.txt) | Generated agent contract (`pnpm ds:llms-manifest`) |
 | [`packages/ui/README.md`](../../packages/ui/README.md) | Package import + atom list |
 | `apps/web/tests/unit/design-system/singular-system-b-ratchet.test.ts` | Global one-system ratchet |

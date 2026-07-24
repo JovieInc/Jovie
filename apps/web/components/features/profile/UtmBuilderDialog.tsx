@@ -1,9 +1,8 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import { Button, Input, Label } from '@jovie/ui';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Label } from '@/components/atoms/Label';
 import { toast } from '@/components/feedback';
 import {
   Dialog,
