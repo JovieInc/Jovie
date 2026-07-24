@@ -1,45 +1,46 @@
-/** Maximum audio upload size (150 MB), aligned with library uploads. */
-export const AUDIO_MAX_FILE_SIZE_BYTES = 150 * 1024 * 1024;
+import {
+  AUDIO_FILE_ACCEPT,
+  AUDIO_MAX_FILE_SIZE_BYTES,
+  isSupportedAudioFile,
+  SUPPORTED_AUDIO_FORMAT_LABELS,
+  SUPPORTED_AUDIO_MIME_TYPES_SET,
+} from '@jovie/audio-contracts';
 
-export const SUPPORTED_AUDIO_MIME_TYPES = [
-  'audio/aac',
-  'audio/aiff',
-  'audio/flac',
-  'audio/mp4',
-  'audio/mpeg',
-  'audio/wav',
-  'audio/x-aiff',
-  'audio/x-flac',
-  'audio/x-m4a',
-  'audio/x-wav',
-] as const;
-
-export type SupportedAudioMimeType =
-  (typeof SUPPORTED_AUDIO_MIME_TYPES)[number];
-
-export const SUPPORTED_AUDIO_MIME_TYPES_SET = new Set<string>(
-  SUPPORTED_AUDIO_MIME_TYPES
-);
-
-export const AUDIO_FILE_ACCEPT = SUPPORTED_AUDIO_MIME_TYPES.join(',');
-
-/** Human labels for supported container formats (UI copy). */
-export const SUPPORTED_AUDIO_FORMAT_LABELS = [
-  'MP3',
-  'WAV',
-  'FLAC',
-  'AIFF',
-  'AAC',
-  'M4A',
-] as const;
+export type {
+  AudioFileDescriptor,
+  AudioFormatDefinition,
+  AudioFormatId,
+  AudioPlatform,
+  AudioUploadSurface,
+  Bpm,
+  Milliseconds,
+  Percent,
+  Seconds,
+  SupportedAudioMimeType,
+} from '@jovie/audio-contracts';
+export {
+  AUDIO_FILE_ACCEPT,
+  AUDIO_FORMAT_REGISTRY,
+  AUDIO_MAX_FILE_SIZE_BYTES,
+  AUDIO_UPLOAD_POLICIES,
+  getAudioFormat,
+  getAudioFormatByFileName,
+  getAudioFormatByMimeType,
+  getAudioFormatLabel,
+  getCanonicalAudioMimeType,
+  isSupportedAudioFile,
+  isSupportedAudioMimeType,
+  SUPPORTED_AUDIO_EXTENSIONS,
+  SUPPORTED_AUDIO_FORMAT_LABELS,
+  SUPPORTED_AUDIO_MIME_TYPES,
+  SUPPORTED_AUDIO_MIME_TYPES_SET,
+} from '@jovie/audio-contracts';
 
 /** @deprecated Prefer AUDIO_FILE_ACCEPT */
 export const AUDIO_ACCEPT = AUDIO_FILE_ACCEPT;
 
 /** @deprecated Prefer SUPPORTED_AUDIO_MIME_TYPES_SET */
 export const ALLOWED_AUDIO_MIME_TYPES = SUPPORTED_AUDIO_MIME_TYPES_SET;
-
-const AUDIO_EXTENSION_PATTERN = /\.(aac|aiff?|flac|m4a|mp3|wav)$/i;
 
 /** Named-rule codes for rejected audio uploads (JOV-3688). */
 export type AudioUploadRuleCode =
@@ -65,16 +66,6 @@ export interface AudioUploadRejection {
 export type AudioUploadValidationResult =
   | { readonly ok: true }
   | AudioUploadRejection;
-
-export function isSupportedAudioFile(
-  file: Pick<File, 'name' | 'type'>
-): boolean {
-  if (SUPPORTED_AUDIO_MIME_TYPES_SET.has(file.type)) {
-    return true;
-  }
-
-  return AUDIO_EXTENSION_PATTERN.test(file.name);
-}
 
 function formatMaxSizeMb(maxSizeBytes: number): number {
   return Math.round(maxSizeBytes / (1024 * 1024));

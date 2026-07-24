@@ -34,6 +34,8 @@
       "@/types/*": ["./types/*"],
       "@jovie/auth-routing": ["../../packages/auth-routing"],
       "@jovie/auth-routing/*": ["../../packages/auth-routing/*"],
+      "@jovie/audio-contracts": ["../../packages/audio-contracts"],
+      "@jovie/audio-contracts/*": ["../../packages/audio-contracts/*"],
       "@jovie/ui": ["../../packages/ui"],
       "@jovie/ui/*": ["../../packages/ui/*"],
       "@jovie/extension-contracts": ["../../packages/extension-contracts"],
