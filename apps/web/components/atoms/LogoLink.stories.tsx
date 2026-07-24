@@ -91,7 +91,7 @@ export const AllSizes: Story = {
 
 export const InHeader: Story = {
   render: () => (
-    <div className='bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 w-full p-4'>
+    <div className='bg-white dark:bg-base border-b border-gray-200 dark:border-gray-800 w-full p-4'>
       <div className='max-w-7xl mx-auto flex items-center justify-between'>
         <LogoLink logoSize='sm' />
         <div className='text-sm text-gray-600'>Header Context</div>

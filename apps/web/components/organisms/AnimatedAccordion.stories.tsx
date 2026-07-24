@@ -69,7 +69,7 @@ export const Interactive: Story = {
         <button
           type='button'
           onClick={() => setIsOpen(!isOpen)}
-          className='w-full px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-md font-medium'
+          className='w-full px-4 py-2 bg-primary-token text-base dark:bg-base dark:text-primary-token rounded-md font-medium'
         >
           {isOpen ? 'Close' : 'Open'} Accordion
         </button>
