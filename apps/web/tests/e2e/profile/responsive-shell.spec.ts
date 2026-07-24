@@ -116,7 +116,7 @@ async function assertBottomTabBarState(
       ).toHaveCount(1, { timeout: SMOKE_TIMEOUTS.QUICK });
 
       const expectedLabelByMode: Record<string, string> = {
-        profile: 'Profile',
+        profile: 'Home',
         listen: 'Music',
         tour: 'Events',
         subscribe: 'Alerts',
