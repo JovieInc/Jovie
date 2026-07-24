@@ -11,11 +11,7 @@ type Story = StoryObj;
 
 export const Default: Story = {
   render: () => (
-    <button
-      type='button'
-      className={closeButtonClassName}
-      aria-label='Close'
-    >
+    <button type='button' className={closeButtonClassName} aria-label='Close'>
       <CloseButtonIcon />
     </button>
   ),

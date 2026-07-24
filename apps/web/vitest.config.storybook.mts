@@ -29,7 +29,9 @@ function rewriteNextCompiledReactPlugin(): Plugin {
       let bare: string | null = null;
       if (normalized.includes('next/dist/compiled/react-dom')) {
         bare = 'react-dom';
-      } else if (normalized.includes('next/dist/compiled/react/jsx-dev-runtime')) {
+      } else if (
+        normalized.includes('next/dist/compiled/react/jsx-dev-runtime')
+      ) {
         bare = 'react/jsx-dev-runtime';
       } else if (normalized.includes('next/dist/compiled/react/jsx-runtime')) {
         bare = 'react/jsx-runtime';
