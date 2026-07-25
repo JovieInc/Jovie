@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${HEARTBEAT_FIXTURE_SCENARIO:?HEARTBEAT_FIXTURE_SCENARIO is required}"
+: "${HEARTBEAT_FIXTURE_STATE_DIR:?HEARTBEAT_FIXTURE_STATE_DIR is required}"
+
+mkdir -p "$HEARTBEAT_FIXTURE_STATE_DIR"
+endpoint=""
+for argument in "$@"; do
+  if [[ "$argument" == repos/* ]]; then
+    endpoint="$argument"
+  fi
+done
+
+run_id=29989764821
+run_attempt=1
+head_sha="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+if [[ "$endpoint" == *'/jobs?per_page=100' ]]; then
+  expected_endpoint="repos/JovieInc/Jovie/actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100"
+  if [[ "$endpoint" != "$expected_endpoint" ]]; then
+    echo "unexpected jobs endpoint" >&2
+    exit 1
+  fi
+  jobs_count_file="$HEARTBEAT_FIXTURE_STATE_DIR/jobs-count"
+  jobs_count=0
+  if [[ -f "$jobs_count_file" ]]; then
+    jobs_count="$(<"$jobs_count_file")"
+  fi
+  jobs_count=$((jobs_count + 1))
+  echo "$jobs_count" > "$jobs_count_file"
+
+  job_status='completed'
+  job_conclusion='"success"'
+  job_run_id="$run_id"
+  job_run_attempt="$run_attempt"
+  job_head_sha="$head_sha"
+  runner_id='55'
+  runner_name='"gem-linux-2"'
+  labels='["jovie-runner"]'
+
+  case "$HEARTBEAT_FIXTURE_SCENARIO" in
+    lagging-then-settled)
+      if (( jobs_count == 1 )); then
+        job_status='in_progress'
+        job_conclusion='null'
+      fi
+      ;;
+    persistent-lag)
+      job_status='in_progress'
+      job_conclusion='null'
+      ;;
+    changed-evidence)
+      if (( jobs_count == 1 )); then
+        job_status='in_progress'
+        job_conclusion='null'
+      else
+        job_head_sha="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      fi
+      ;;
+    wrong-identity)
+      job_run_id=42
+      ;;
+    missing-label)
+      labels='["ubuntu-latest"]'
+      ;;
+    failed)
+      job_status='completed'
+      job_conclusion='"failure"'
+      ;;
+    *)
+      echo "unknown fixture scenario" >&2
+      exit 2
+      ;;
+  esac
+
+  cat <<JSON
+[{"jobs":[{"id":89149681067,"run_id":$job_run_id,"run_attempt":$job_run_attempt,"head_sha":"$job_head_sha","name":"Self-hosted runner heartbeat","status":"$job_status","conclusion":$job_conclusion,"runner_id":$runner_id,"runner_name":$runner_name,"labels":$labels}]}]
+JSON
+  exit 0
+fi
+
+updated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+cat <<JSON
+{"workflow_runs":[{"id":$run_id,"run_attempt":$run_attempt,"name":"Runner Heartbeat","path":".github/workflows/runner-heartbeat.yml","head_branch":"main","head_sha":"$head_sha","head_repository":{"full_name":"JovieInc/Jovie"},"event":"schedule","status":"completed","conclusion":"success","updated_at":"$updated_at","html_url":"https://github.com/JovieInc/Jovie/actions/runs/$run_id"}]}
+JSON
