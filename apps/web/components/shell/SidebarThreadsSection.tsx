@@ -206,12 +206,9 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     getSidebarNavRowClassName({
       active,
       tight,
-      // Always reserve trailing gutter so long titles never crash into the
-      // seam / overflow menu. Extra pr when actions are present.
-      className: hasThreadActions ? 'pr-8' : 'pr-2.5',
+      className: hasThreadActions ? 'pr-8' : undefined,
     }),
-    // Button atom is inline-flex; force grid so the title column can shrink.
-    'grid w-full min-w-0 text-left',
+    'text-left',
     active
       ? undefined
       : unread
@@ -232,12 +229,10 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
                 : 'bg-white/25'
         )}
       />
-      {/* Soft edge fade > hard ellipsis: titles stay readable without mid-glyph chops. */}
       <span
         className={cn(
-          'min-w-0 w-full justify-self-stretch overflow-hidden whitespace-nowrap text-left text-xs',
-          '[mask-image:linear-gradient(to_right,black_calc(100%-48px),transparent)]',
-          '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%-48px),transparent)]',
+          'min-w-0 truncate text-left justify-self-start',
+          'text-xs',
           unread && 'font-medium'
         )}
       >
@@ -248,16 +243,11 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   return (
     <div
       className={cn(
-        'group/thread relative flex w-full min-w-0 items-center',
+        'group/thread relative flex items-center',
         tight ? 'h-6' : 'h-7'
       )}
     >
-      <Tooltip
-        label={thread.title}
-        side='right'
-        block
-        className='min-w-0 w-full'
-      >
+      <Tooltip label={thread.title} side='right' block>
         {thread.href ? (
           <Link
             href={thread.href}

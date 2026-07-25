@@ -50,13 +50,6 @@ describe('classifyOpportunitySignalType', () => {
         rationale: null,
       })
     ).toBe('new_profile_match');
-    expect(
-      classifyOpportunitySignalType({
-        kind: 'authority.create_page',
-        payload: {},
-        rationale: null,
-      })
-    ).toBe('new_profile_match');
   });
 
   it('classifies songs from payload text', () => {

@@ -1,0 +1,19 @@
+{
+  "name": "@jovie/audio-contracts",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:mutation": "../../apps/web/node_modules/.bin/stryker run stryker.config.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vitest": "4.1.8"
+  }
+}
