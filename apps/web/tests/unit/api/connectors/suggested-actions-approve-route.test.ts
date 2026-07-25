@@ -155,7 +155,14 @@ const ROUTE_PATH = '/api/connectors/suggested-actions/[id]/approve';
 
 describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+
+    // resetAllMocks clears implementations as well as queued one-shot results.
+    // Rebuild the fluent update chain so every test starts from the same DB
+    // state instead of consuming responses left by another test or file order.
+    mockDbUpdateWhere.mockReturnValue({ returning: mockDbUpdateReturning });
+    mockDbUpdateSet.mockReturnValue({ where: mockDbUpdateWhere });
+    mockDbUpdate.mockReturnValue({ set: mockDbUpdateSet });
   });
 
   it('returns 401 and performs no db/workflow work when unauthenticated', async () => {
