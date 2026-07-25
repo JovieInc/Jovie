@@ -86,6 +86,8 @@ const STATIC_CSP_PARTS = {
     'https://vercel.live',
     'https://challenges.cloudflare.com',
     'https://r2.leadsy.ai',
+    // Leadsy dynamically injects scripts from this CloudFront domain (JOVIE-WEB-R7)
+    'https://ddwl4m2hdecbv.cloudfront.net',
     'https://tag.trovo-tag.com',
     // Google Analytics 4 / gtag.js (JOV-3664)
     'https://www.googletagmanager.com',
