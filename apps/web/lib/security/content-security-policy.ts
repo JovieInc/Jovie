@@ -115,6 +115,7 @@ const STATIC_CSP_PARTS = {
     'wss://ws-us3.pusher.com',
     'https://r2.leadsy.ai',
     'https://wvbknd.leadsy.ai',
+    'https://api.instantly.ai',
     // Google OAuth + AI Connector APIs (JOV-2230)
     'https://accounts.google.com',
     'https://oauth2.googleapis.com',
