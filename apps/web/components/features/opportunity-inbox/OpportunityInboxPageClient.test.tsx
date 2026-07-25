@@ -17,12 +17,17 @@ vi.mock('@/lib/flags/client', () => ({
   useAppFlag: () => false,
 }));
 
-vi.mock('@/hooks/useRegisterRightPanel', () => ({
-  useRegisterRightPanel: vi.fn(),
-}));
-
-vi.mock('@/features/dashboard/organisms/profile-contact-sidebar', () => ({
-  ProfileContactSidebar: () => null,
+vi.mock('@/features/dashboard/organisms/PreviewDataHydrator', () => ({
+  PreviewDataHydrator: ({
+    initialLinks,
+  }: {
+    initialLinks: readonly unknown[];
+  }) => (
+    <div
+      data-testid='preview-data-hydrator'
+      data-initial-link-count={initialLinks.length}
+    />
+  ),
 }));
 
 vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
@@ -84,15 +89,35 @@ const pendingTourDate = {
 };
 
 describe('OpportunityInboxPageClient', () => {
-  it('registers a non-null right panel for the artist-profile rail', async () => {
-    const { useRegisterRightPanel } = await import(
-      '@/hooks/useRegisterRightPanel'
-    );
+  it('hydrates the artist-profile rail with the inbox profile data', async () => {
     render(
-      <OpportunityInboxPageClient inbox={{ cards: [], emptyActionCards: [] }} />
+      <OpportunityInboxPageClient
+        inbox={{ cards: [], emptyActionCards: [] }}
+        initialLinks={[
+          {
+            id: 'spotify-link',
+            platform: 'spotify',
+            platformType: 'dsp',
+            url: 'https://open.spotify.com/artist/example',
+            sortOrder: 0,
+            isActive: true,
+            displayText: 'Spotify',
+            state: 'active',
+            confidence: null,
+            sourcePlatform: null,
+            sourceType: null,
+            evidence: null,
+            verificationStatus: null,
+            verificationToken: null,
+            verifiedAt: null,
+            version: 1,
+          },
+        ]}
+      />
     );
-    expect(vi.mocked(useRegisterRightPanel)).toHaveBeenCalledWith(
-      expect.anything()
+    expect(await screen.findByTestId('preview-data-hydrator')).toHaveAttribute(
+      'data-initial-link-count',
+      '1'
     );
   });
 

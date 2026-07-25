@@ -3,30 +3,50 @@ import { OpportunityInboxPageClient } from '@/components/features/opportunity-in
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { loadOpportunityInboxData } from '@/lib/connectors/opportunity-inbox-data';
+import type { AvailableDSP } from '@/lib/dsp';
+import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { logger } from '@/lib/utils/logger';
 import { loadAuthenticatedAppShellUserId } from './app-shell-route-context';
-import { getDashboardShellData } from './dashboard/actions';
+import {
+  getDashboardShellData,
+  getProfileSocialLinks,
+  type ProfileSocialLink,
+} from './dashboard/actions';
 
 /**
- * Resolve the selected profile id for the tour-date inbox sections. Fail-soft:
- * the inbox must still render suggested-action cards when dashboard shell
- * data is unavailable, so any error degrades to null (sections omitted).
+ * Resolve the selected profile plus the data needed to hydrate the profile
+ * rail. Fail-soft: the inbox must still render suggested-action cards when
+ * dashboard shell data is unavailable.
  */
-async function resolveSelectedProfileId(
-  clerkUserId: string
-): Promise<string | null> {
+async function resolveProfileRailData(clerkUserId: string): Promise<{
+  readonly connectedDSPs: readonly AvailableDSP[];
+  readonly initialLinks: readonly ProfileSocialLink[];
+  readonly profileId: string | null;
+}> {
   try {
     const dashboardData = await getDashboardShellData(clerkUserId);
     if (dashboardData.dashboardLoadError) {
-      return null;
+      return { connectedDSPs: [], initialLinks: [], profileId: null };
     }
-    return dashboardData.selectedProfile?.id ?? null;
+    const selectedProfile = dashboardData.selectedProfile;
+    if (!selectedProfile) {
+      return { connectedDSPs: [], initialLinks: [], profileId: null };
+    }
+
+    const initialLinks = await getProfileSocialLinks(selectedProfile.id).catch(
+      () => []
+    );
+    return {
+      connectedDSPs: getCanonicalProfileDSPs(selectedProfile, initialLinks),
+      initialLinks,
+      profileId: selectedProfile.id,
+    };
   } catch (error) {
     logger.error(
-      '[opportunity-inbox] selected profile resolution failed; skipping tour-date sections',
+      '[opportunity-inbox] profile rail data resolution failed; rendering inbox without profile data',
       error
     );
-    return null;
+    return { connectedDSPs: [], initialLinks: [], profileId: null };
   }
 }
 
@@ -34,12 +54,20 @@ export async function OpportunityInboxRoute() {
   const clerkUserId = await loadAuthenticatedAppShellUserId({
     route: APP_ROUTES.DASHBOARD,
   });
-  const profileId = await resolveSelectedProfileId(clerkUserId);
-  const inbox = await loadOpportunityInboxData(clerkUserId, { profileId });
+  const profileRailData = await resolveProfileRailData(clerkUserId);
+  const inbox = await loadOpportunityInboxData(clerkUserId, {
+    profileId: profileRailData.profileId,
+  });
 
   if (!inbox) {
     redirect(buildAppShellSignInUrl(APP_ROUTES.DASHBOARD));
   }
 
-  return <OpportunityInboxPageClient inbox={inbox} />;
+  return (
+    <OpportunityInboxPageClient
+      inbox={inbox}
+      initialLinks={profileRailData.initialLinks}
+      connectedDSPs={profileRailData.connectedDSPs}
+    />
+  );
 }
