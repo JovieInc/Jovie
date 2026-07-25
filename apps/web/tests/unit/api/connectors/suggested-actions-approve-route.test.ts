@@ -155,7 +155,20 @@ const ROUTE_PATH = '/api/connectors/suggested-actions/[id]/approve';
 
 describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // Full reset — clears call history, pending once-values, and default
+    // implementations. Re-establish the mock chain so db.update().set().where()
+    // returns correctly chained mock functions for every test. Without this,
+    // pending mockResolvedValueOnce from a prior test can break the next test
+    // running in the same fork (sporadically observed in --shard=6/10 CI runs).
+    vi.resetAllMocks();
+
+    // Re-establish the db.update().set().where().returning() mock chain
+    // because resetAllMocks clears the vi.hoisted() factory implementations.
+    mockDbUpdate.mockImplementation(() => ({ set: mockDbUpdateSet }));
+    mockDbUpdateSet.mockImplementation(() => ({ where: mockDbUpdateWhere }));
+    mockDbUpdateWhere.mockImplementation(() => ({
+      returning: mockDbUpdateReturning,
+    }));
   });
 
   it('returns 401 and performs no db/workflow work when unauthenticated', async () => {

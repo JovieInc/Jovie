@@ -427,7 +427,7 @@ describe('baked runner prerequisite contract', () => {
       '.github/runner-image/build-context.sh "$EXPECTED_SHA"'
     );
     expect(runnerImageOfflineProof).toContain(
-      'uses: crazy-max/ghaction-github-runtime@3cb05d89e1f492524af3d41a1c98c83bc3025124'
+      'uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487'
     );
     expect(runnerImageOfflineProof).toContain(
       "runner-image-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-"
