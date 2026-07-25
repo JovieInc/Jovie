@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "teamId": "bdc09edc-f91c-4a06-b308-74b4fcf093f8",
+  "states": {
+    "triage": "9844cfe6-6cf4-4347-842c-893a68f349b8",
+    "backlog": "1551ed21-7743-4573-82d8-8949410d3b8d",
+    "todo": "c6c00506-dc9f-4910-8ff7-3874dd77174c",
+    "inProgress": "721e032a-fe72-4374-9a61-d9976d079e1e",
+    "inReview": "dab6e387-69d3-4d66-9946-526fc4f1950b"
+  },
+  "labels": {
+    "founderFastTrack": "founder-fast-track",
+    "humanReview": "human-review-required",
+    "backlogOrchestratorManaged": "backlog-orchestrator"
+  }
+}

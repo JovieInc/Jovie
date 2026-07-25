@@ -222,7 +222,12 @@
     "storybook:quality": "node scripts/storybook-story-quality-guard.mjs",
     "story-coverage:check": "node scripts/story-coverage-ratchet.mjs",
     "story-coverage:measure": "node scripts/story-coverage-ratchet.mjs measure",
-    "story-coverage:audit": "node scripts/ui-story-coverage-policy.mjs"
+    "story-coverage:audit": "node scripts/ui-story-coverage-policy.mjs",
+    "backlog:reconcile": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs reconcile",
+    "backlog:audit": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs audit",
+    "backlog:admit-next": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs admit-next",
+    "backlog:report": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs report",
+    "backlog:test": "node --test scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
