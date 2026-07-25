@@ -1,4 +1,3 @@
-import { ProfileFeedbackToaster } from '@/components/features/profile/ProfileFeedbackToaster';
 import { ProfileWebVitalsReporter } from '@/components/features/profile/ProfileWebVitalsReporter';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 
@@ -35,7 +34,6 @@ export default function ProfileLayout({
     <ClientProviders forceBypassClerk skipCoreProviders>
       {children}
       <ProfileWebVitalsReporter />
-      <ProfileFeedbackToaster />
     </ClientProviders>
   );
 }
