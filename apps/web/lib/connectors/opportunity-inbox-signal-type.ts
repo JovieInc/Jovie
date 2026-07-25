@@ -40,10 +40,7 @@ const KIND_PREFIX_RULES: readonly (readonly [
 ])[] = [
   ['new_song', ['release.', 'song.', 'track.', 'music.']],
   ['new_event', ['calendar.', 'event.', 'tour.', 'booking.', 'show.']],
-  [
-    'new_profile_match',
-    ['profile.', 'profile_match.', 'match.', 'collab.', 'authority.'],
-  ],
+  ['new_profile_match', ['profile.', 'profile_match.', 'match.', 'collab.']],
 ];
 
 const PROFILE_MATCH_PATTERN =

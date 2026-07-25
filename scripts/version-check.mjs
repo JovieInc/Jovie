@@ -57,7 +57,16 @@ const workspacePackageJsons = ['apps', 'packages']
     readdirSync(join(ROOT, scope), { withFileTypes: true })
       .filter(entry => entry.isDirectory())
       .map(entry => `${scope}/${entry.name}/package.json`)
-      .filter(rel => existsSync(join(ROOT, rel)))
+      .filter(rel => {
+        const abs = join(ROOT, rel);
+        if (!existsSync(abs)) return false;
+        try {
+          const content = readFileSync(abs, 'utf-8');
+          return /^(\s*)"version":\s*"/m.test(content);
+        } catch {
+          return false;
+        }
+      })
   )
   .sort();
 

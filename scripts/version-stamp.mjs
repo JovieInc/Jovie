@@ -71,8 +71,16 @@ export function discoverVersionedManifests(root = ROOT) {
         continue;
       }
       const rel = `${scope}/${entry.name}/package.json`;
-      if (existsSync(join(root, rel))) {
-        manifests.push(rel);
+      const abs = join(root, rel);
+      if (existsSync(abs)) {
+        try {
+          const content = readFileSync(abs, 'utf-8');
+          if (/^(\s*)"version":\s*"/m.test(content)) {
+            manifests.push(rel);
+          }
+        } catch {
+          // unreadable or malformed — skip
+        }
       }
     }
   }

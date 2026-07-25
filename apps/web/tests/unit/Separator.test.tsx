@@ -2,10 +2,6 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Separator } from '@/components/atoms/Separator';
 
-/**
- * App Separator is a re-export of `@jovie/ui` Separator (one-system lock).
- * Asserts the package contract so we do not re-fork neutral gray pairs.
- */
 describe('Separator', () => {
   describe('rendering', () => {
     it('renders with default horizontal orientation', () => {
@@ -56,13 +52,12 @@ describe('Separator', () => {
   });
 
   describe('styling', () => {
-    it('applies canonical token background (not legacy neutral gray pair)', () => {
+    it('applies base background color classes', () => {
       const { container } = render(<Separator />);
       const separator = container.querySelector('[data-slot="separator"]');
 
-      expect(separator).toHaveClass('bg-border');
-      expect(separator).not.toHaveClass('bg-neutral-200');
-      expect(separator).not.toHaveClass('dark:bg-neutral-800');
+      expect(separator).toHaveClass('bg-neutral-200');
+      expect(separator).toHaveClass('dark:bg-neutral-800');
     });
 
     it('applies shrink-0 class', () => {
@@ -76,16 +71,16 @@ describe('Separator', () => {
       const { container } = render(<Separator orientation='horizontal' />);
       const separator = container.querySelector('[data-slot="separator"]');
 
-      expect(separator).toHaveClass('h-px');
-      expect(separator).toHaveClass('w-full');
+      expect(separator).toHaveClass('data-[orientation=horizontal]:h-px');
+      expect(separator).toHaveClass('data-[orientation=horizontal]:w-full');
     });
 
     it('applies vertical sizing classes', () => {
       const { container } = render(<Separator orientation='vertical' />);
       const separator = container.querySelector('[data-slot="separator"]');
 
-      expect(separator).toHaveClass('h-full');
-      expect(separator).toHaveClass('w-px');
+      expect(separator).toHaveClass('data-[orientation=vertical]:h-full');
+      expect(separator).toHaveClass('data-[orientation=vertical]:w-px');
     });
   });
 

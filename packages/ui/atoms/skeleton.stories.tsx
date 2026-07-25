@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { LoadingSkeleton, Skeleton } from './skeleton';
 
 const meta: Meta<typeof Skeleton> = {
-  title: 'UI/Atoms/Skeleton',
+  title: 'shadcn/Skeleton',
   component: Skeleton,
   parameters: {
     layout: 'centered',
