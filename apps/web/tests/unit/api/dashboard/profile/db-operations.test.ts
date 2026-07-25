@@ -1,202 +1,390 @@
 import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
-const mockGetUserByClerkId = vi.hoisted(() => vi.fn());
-const mockDbSelect = vi.hoisted(() => vi.fn());
-const mockDbUpdate = vi.hoisted(() => vi.fn());
-const mockEq = vi.hoisted(() =>
-  vi.fn((left, right) => ({
-    left,
-    right,
-  }))
+const getExactProfileAccess = vi.hoisted(() => vi.fn());
+const eq = vi.hoisted(() => vi.fn((left, right) => ({ left, right })));
+const and = vi.hoisted(() =>
+  vi.fn((...conditions: unknown[]) => ({ conditions }))
 );
-const mockDb = vi.hoisted(() => ({
-  select: mockDbSelect,
-  update: mockDbUpdate,
-}));
 
-vi.mock('@/lib/db', () => ({
-  db: mockDb,
+vi.mock('@/lib/auth/profile-access', () => ({
+  getExactProfileAccess,
 }));
-
-vi.mock('@/lib/db/queries/shared', () => ({
-  getUserByClerkId: mockGetUserByClerkId,
-}));
-
 vi.mock('drizzle-orm', async () => {
   const actual =
     await vi.importActual<typeof import('drizzle-orm')>('drizzle-orm');
-  return {
-    ...actual,
-    eq: mockEq,
-  };
+  return { ...actual, eq, and };
 });
 
-function createSelectChain(result: unknown[] = []) {
-  const chain = {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue(result),
+function createTx(options?: {
+  existing?: Record<string, unknown>;
+  conflict?: Record<string, unknown> | null;
+  updated?: Record<string, unknown> | null;
+  currentVersion?: number;
+}) {
+  const selections = [
+    [
+      options?.existing ?? {
+        id: 'profile-a',
+        usernameNormalized: 'oldname',
+        settings: { hide_branding: false },
+        theme: {},
+        avatarUrl: null,
+        profileEditVersion: 1,
+      },
+    ],
+    ...(options?.conflict === undefined
+      ? []
+      : [options.conflict ? [options.conflict] : []]),
+  ];
+  const predicates: unknown[] = [];
+  const updates: Array<{ table: unknown; values: Record<string, unknown> }> =
+    [];
+  const tx = {
+    select: vi.fn(() => ({
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn(async () => {
+        if (selections.length > 0) return selections.shift() ?? [];
+        return [{ profileEditVersion: options?.currentVersion ?? 2 }];
+      }),
+    })),
+    update: vi.fn((table: unknown) => {
+      const chain = {
+        set(next: Record<string, unknown>) {
+          updates.push({ table, values: next });
+          return chain;
+        },
+        where(predicate: unknown) {
+          predicates.push(predicate);
+          return chain;
+        },
+        returning: vi.fn(async () =>
+          options?.updated === null
+            ? []
+            : [
+                options?.updated ?? {
+                  id: 'profile-a',
+                  usernameNormalized: 'oldname',
+                  profileEditVersion: 2,
+                },
+              ]
+        ),
+      };
+      return chain;
+    }),
   };
-  mockDbSelect.mockReturnValue(chain);
-  return chain;
+  return { tx, predicates, updates };
 }
 
-function createUpdateChain(result: unknown[] = []) {
-  const chain = {
-    set: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    returning: vi.fn().mockResolvedValue(result),
-  };
-  mockDbUpdate.mockReturnValue(chain);
-  return chain;
-}
-
-describe('updateProfileRecords', () => {
+describe('updateProfileRecords exact-profile CAS', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getExactProfileAccess.mockResolvedValue({
+      ok: true,
+      profileId: 'profile-a',
+      ownerUserId: 'user-a',
+    });
   });
 
-  it('merges incoming settings with existing settings before update', async () => {
-    mockGetUserByClerkId.mockResolvedValue({ id: 'user-1' });
-    createSelectChain([
-      {
-        usernameNormalized: 'testartist',
-        settings: { hide_branding: false, exclude_self_from_analytics: true },
-      },
-    ]);
-    const updateChain = createUpdateChain([
-      {
-        id: 'profile-1',
-        usernameNormalized: 'testartist',
-      },
-    ]);
+  it.each([
+    { reason: 'forbidden' as const, status: 403 },
+    { reason: 'not_found' as const, status: 404 },
+  ])('stops the profile update preflight at exact access $reason', async ({
+    reason,
+    status,
+  }) => {
+    getExactProfileAccess.mockResolvedValue({ ok: false, reason });
+    const { tx } = createTx();
+    const { getProfileUpdatePreflight } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
 
+    const result = await getProfileUpdatePreflight(
+      tx as never,
+      'user-a',
+      'profile-a'
+    );
+
+    expect(result).toBeInstanceOf(NextResponse);
+    expect((result as NextResponse).status).toBe(status);
+    expect(tx.select).not.toHaveBeenCalled();
+  });
+
+  it('reads the current avatar and CAS version after exact access succeeds', async () => {
+    const avatarUrl = 'https://example.com/avatar.png';
+    const { tx } = createTx({
+      existing: {
+        avatarUrl,
+        profileEditVersion: 7,
+      },
+    });
+    const { getProfileUpdatePreflight } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await getProfileUpdatePreflight(
+      tx as never,
+      'user-a',
+      'profile-a'
+    );
+
+    expect(result).toEqual({ avatarUrl, profileEditVersion: 7 });
+    expect(getExactProfileAccess).toHaveBeenCalledWith(
+      tx,
+      'user-a',
+      'profile-a'
+    );
+  });
+
+  it('merges settings and scopes the CAS to the selected profile primary key', async () => {
+    const { tx, predicates, updates } = createTx();
     const { updateProfileRecords } = await import(
       '@/app/api/dashboard/profile/lib/db-operations'
     );
 
     const result = await updateProfileRecords({
-      clerkUserId: 'clerk_123',
-      displayNameForUserUpdate: undefined,
+      tx: tx as never,
+      appUserId: 'user-a',
+      profileId: 'profile-a',
       dbProfileUpdates: {
         location: 'Austin, TX',
         settings: { hometown: 'Tulsa, OK' },
       },
+      displayNameForUserUpdate: undefined,
+      usernameUpdate: undefined,
+      expectedVersion: 1,
+      precomputedAvatarTheme: undefined,
     });
 
     expect(result).not.toBeInstanceOf(NextResponse);
-    expect(updateChain.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        location: 'Austin, TX',
-        settings: {
-          hide_branding: false,
-          exclude_self_from_analytics: true,
-          hometown: 'Tulsa, OK',
-        },
-      })
-    );
+    expect(updates[0]?.values).toMatchObject({
+      location: 'Austin, TX',
+      settings: { hide_branding: false, hometown: 'Tulsa, OK' },
+    });
+    expect(predicates[0]).toEqual({
+      conditions: [
+        { left: creatorProfiles.id, right: 'profile-a' },
+        { left: creatorProfiles.profileEditVersion, right: 1 },
+      ],
+    });
   });
 
-  it('does not update user name when profile update returns no row', async () => {
-    mockGetUserByClerkId.mockResolvedValue({ id: 'user-1' });
-    createSelectChain([]);
-    createUpdateChain([]);
-
+  it('merges a precomputed avatar accent without external work', async () => {
+    const avatarUrl = 'https://example.com/new-avatar.png';
+    const profileAccent = {
+      version: 1 as const,
+      primaryHex: '#123456',
+      sourceUrl: avatarUrl,
+    };
+    const { tx, updates } = createTx({
+      existing: {
+        id: 'profile-a',
+        usernameNormalized: 'oldname',
+        settings: {},
+        theme: { mode: 'dark' },
+        avatarUrl: 'https://example.com/old-avatar.png',
+        profileEditVersion: 1,
+      },
+    });
     const { updateProfileRecords } = await import(
       '@/app/api/dashboard/profile/lib/db-operations'
     );
 
     const result = await updateProfileRecords({
-      clerkUserId: 'clerk_123',
-      displayNameForUserUpdate: 'Updated Name',
-      dbProfileUpdates: { location: 'Austin, TX' },
+      tx: tx as never,
+      appUserId: 'user-a',
+      profileId: 'profile-a',
+      dbProfileUpdates: { avatarUrl },
+      displayNameForUserUpdate: undefined,
+      usernameUpdate: undefined,
+      expectedVersion: 1,
+      precomputedAvatarTheme: { profileAccent },
+    });
+
+    expect(result).not.toBeInstanceOf(NextResponse);
+    expect(updates[0]?.values).toMatchObject({
+      avatarUrl,
+      theme: { mode: 'dark', profileAccent },
+    });
+  });
+
+  it('keeps username, profile fields, and users.name in one transaction outcome', async () => {
+    const { tx, predicates, updates } = createTx({ conflict: null });
+    const { updateProfileRecords } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await updateProfileRecords({
+      tx: tx as never,
+      appUserId: 'user-a',
+      profileId: 'profile-a',
+      dbProfileUpdates: { bio: 'New bio' },
+      displayNameForUserUpdate: 'New Name',
+      usernameUpdate: 'newname',
+      expectedVersion: 1,
+      precomputedAvatarTheme: undefined,
+    });
+
+    expect(result).not.toBeInstanceOf(NextResponse);
+    expect(updates[0]?.values).toMatchObject({
+      bio: 'New bio',
+      username: 'newname',
+      usernameNormalized: 'newname',
+    });
+    expect(updates[1]?.values).toMatchObject({ name: 'New Name' });
+    expect(predicates[1]).toEqual({
+      left: users.id,
+      right: 'user-a',
+    });
+  });
+
+  it('updates the profile owner identity instead of the manager identity', async () => {
+    getExactProfileAccess.mockResolvedValue({
+      ok: true,
+      profileId: 'profile-a',
+      ownerUserId: 'owner-user',
+    });
+    const { tx, predicates, updates } = createTx();
+    const { updateProfileRecords } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await updateProfileRecords({
+      tx: tx as never,
+      appUserId: 'manager-user',
+      profileId: 'profile-a',
+      dbProfileUpdates: { displayName: 'Artist Name' },
+      displayNameForUserUpdate: 'Artist Name',
+      usernameUpdate: undefined,
+      expectedVersion: 1,
+      precomputedAvatarTheme: undefined,
+    });
+
+    expect(result).not.toBeInstanceOf(NextResponse);
+    expect(updates[1]?.table).toBe(users);
+    expect(predicates[1]).toEqual({
+      left: users.id,
+      right: 'owner-user',
+    });
+  });
+
+  it('does not update users.name when the exact CAS loses', async () => {
+    const { tx, updates } = createTx({
+      updated: null,
+      currentVersion: 2,
+    });
+    const { updateProfileRecords } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await updateProfileRecords({
+      tx: tx as never,
+      appUserId: 'user-a',
+      profileId: 'profile-a',
+      dbProfileUpdates: { bio: 'Stale' },
+      displayNameForUserUpdate: 'Must Roll Back',
+      usernameUpdate: undefined,
+      expectedVersion: 1,
+      precomputedAvatarTheme: undefined,
     });
 
     expect(result).toBeInstanceOf(NextResponse);
-    expect(mockDbUpdate).toHaveBeenCalledTimes(1);
-    expect(mockDbUpdate).toHaveBeenCalledWith(creatorProfiles);
+    expect((result as NextResponse).status).toBe(409);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]?.table).toBe(creatorProfiles);
   });
 
-  it('loads the profile through the user lookup and creator_profiles relation', async () => {
-    mockGetUserByClerkId.mockResolvedValue({ id: 'user-1' });
-    createSelectChain([
-      {
-        profile: {
-          id: 'profile-1',
-          userId: 'user-1',
-          displayName: 'Test Artist',
-        },
-      },
-    ]);
-
-    const { getProfileByClerkId } = await import(
-      '@/app/api/dashboard/profile/lib/db-operations'
-    );
-
-    const result = await getProfileByClerkId('clerk_123');
-
-    expect(mockGetUserByClerkId).toHaveBeenCalledWith(
-      expect.any(Object),
-      'clerk_123'
-    );
-    expect(mockDbSelect).toHaveBeenCalledWith({
-      profile: expect.any(Object),
-    });
-    expect(result).toEqual({
-      profile: {
-        id: 'profile-1',
-        userId: 'user-1',
-        displayName: 'Test Artist',
+  it('returns a conflict before requiring theme work for a stale avatar CAS', async () => {
+    const { tx, updates } = createTx({
+      existing: {
+        id: 'profile-a',
+        usernameNormalized: 'oldname',
+        settings: {},
+        theme: {},
+        avatarUrl: 'https://example.com/old-avatar.png',
+        profileEditVersion: 4,
       },
     });
-  });
-
-  it('returns null when the Clerk user does not exist', async () => {
-    mockGetUserByClerkId.mockResolvedValue(null);
-
-    const { getProfileByClerkId } = await import(
+    const { updateProfileRecords } = await import(
       '@/app/api/dashboard/profile/lib/db-operations'
     );
 
-    await expect(getProfileByClerkId('clerk_missing')).resolves.toBeNull();
-    expect(mockDbSelect).not.toHaveBeenCalled();
-  });
-});
-
-describe('getProfileByClerkId', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('resolves the Clerk user before loading the profile by user.id', async () => {
-    let resolveUser: (value: { id: string } | null) => void;
-    const userPromise = new Promise<{ id: string } | null>(resolve => {
-      resolveUser = resolve;
+    const result = await updateProfileRecords({
+      tx: tx as never,
+      appUserId: 'user-a',
+      profileId: 'profile-a',
+      dbProfileUpdates: {
+        avatarUrl: 'https://example.com/new-avatar.png',
+      },
+      displayNameForUserUpdate: undefined,
+      usernameUpdate: undefined,
+      expectedVersion: 3,
+      precomputedAvatarTheme: undefined,
+      avatarPreflightVersion: 4,
     });
-    mockGetUserByClerkId.mockReturnValue(userPromise);
 
-    const profileRow = { profile: { id: 'profile-1' } };
-    const selectChain = createSelectChain([profileRow]);
+    expect(result).toBeInstanceOf(NextResponse);
+    expect((result as NextResponse).status).toBe(409);
+    expect(updates).toHaveLength(0);
+  });
 
-    const { getProfileByClerkId } = await import(
+  it('returns a conflict if the avatar changes after an unchanged-avatar preflight', async () => {
+    const { tx, updates } = createTx({
+      existing: {
+        id: 'profile-a',
+        usernameNormalized: 'oldname',
+        settings: {},
+        theme: {},
+        avatarUrl: 'https://example.com/concurrent-avatar.png',
+        profileEditVersion: 4,
+      },
+    });
+    const { updateProfileRecords } = await import(
       '@/app/api/dashboard/profile/lib/db-operations'
     );
 
-    const profilePromise = getProfileByClerkId('clerk_123');
-
-    await Promise.resolve();
-    expect(mockDbSelect).not.toHaveBeenCalled();
-
-    resolveUser!({ id: 'user-1' });
-    await expect(profilePromise).resolves.toEqual(profileRow);
-
-    expect(mockGetUserByClerkId).toHaveBeenCalledWith(mockDb, 'clerk_123');
-    expect(selectChain.from).toHaveBeenCalledWith(creatorProfiles);
-    expect(selectChain.where).toHaveBeenCalledWith({
-      left: creatorProfiles.userId,
-      right: 'user-1',
+    const result = await updateProfileRecords({
+      tx: tx as never,
+      appUserId: 'user-a',
+      profileId: 'profile-a',
+      dbProfileUpdates: {
+        avatarUrl: 'https://example.com/request-avatar.png',
+      },
+      displayNameForUserUpdate: undefined,
+      usernameUpdate: undefined,
+      precomputedAvatarTheme: undefined,
+      avatarPreflightVersion: 3,
     });
+
+    expect(result).toBeInstanceOf(NextResponse);
+    expect((result as NextResponse).status).toBe(409);
+    expect(updates).toHaveLength(0);
+  });
+
+  it('rejects a username owned by another exact profile before writing', async () => {
+    const { tx, updates } = createTx({
+      conflict: { id: 'profile-b' },
+    });
+    const { updateProfileRecords } = await import(
+      '@/app/api/dashboard/profile/lib/db-operations'
+    );
+
+    const result = await updateProfileRecords({
+      tx: tx as never,
+      appUserId: 'user-a',
+      profileId: 'profile-a',
+      dbProfileUpdates: {},
+      displayNameForUserUpdate: undefined,
+      usernameUpdate: 'taken',
+      expectedVersion: 1,
+      precomputedAvatarTheme: undefined,
+    });
+
+    expect(result).toBeInstanceOf(NextResponse);
+    expect((result as NextResponse).status).toBe(400);
+    expect(updates).toHaveLength(0);
   });
 });

@@ -13,6 +13,14 @@ const mocks = vi.hoisted(() => ({
   rejectEvent: vi.fn(),
   rejectEvents: vi.fn(),
   undoRejectEvent: vi.fn(),
+  navigationReady: vi.fn(),
+}));
+
+vi.mock('@/components/features/dashboard/NavigationDestinationReady', () => ({
+  NavigationDestinationReady: (props: unknown) => {
+    mocks.navigationReady(props);
+    return null;
+  },
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
@@ -158,6 +166,21 @@ describe('CalendarPageClient', () => {
 
     expect(mocks.useReleasesQuery).toHaveBeenCalledWith('');
     expect(mocks.useEventsQuery).toHaveBeenCalledWith('');
+  });
+
+  it('does not mark the destination ready when a calendar query fails', () => {
+    mocks.useEventsQuery.mockReturnValue({
+      data: undefined,
+      isError: true,
+      isLoading: false,
+    });
+
+    renderCalendar();
+
+    expect(mocks.navigationReady.mock.calls.at(-1)?.[0]).toMatchObject({
+      destination: 'calendar',
+      ready: false,
+    });
   });
 
   it('renders named hooks for selected day, bulk actions, rejected expansion, and loading', () => {

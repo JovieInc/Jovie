@@ -4,20 +4,30 @@
  * Database operations for profile updates.
  */
 
-import { eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getExactProfileAccess } from '@/lib/auth/profile-access';
+import type { DbOrTransaction } from '@/lib/db';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { mergeProfileTheme } from '@/lib/profile/profile-theme';
-import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
+import {
+  mergeProfileTheme,
+  type ProfileThemeRecord,
+} from '@/lib/profile/profile-theme';
 import { NO_STORE_HEADERS } from './constants';
 
 export interface UpdateProfileRecordsParams {
-  clerkUserId: string;
+  tx: DbOrTransaction;
+  appUserId: string;
+  profileId: string;
   dbProfileUpdates: Record<string, unknown>;
   displayNameForUserUpdate: string | undefined;
+  usernameUpdate: string | undefined;
+  expectedVersion?: number;
+  precomputedAvatarTheme: ProfileThemeRecord | undefined;
+  avatarPreflightVersion?: number;
 }
 
 export interface UpdateProfileRecordsResult {
@@ -25,31 +35,138 @@ export interface UpdateProfileRecordsResult {
   oldUsernameNormalized: string | null;
 }
 
-export async function updateProfileRecords({
-  clerkUserId,
-  dbProfileUpdates,
-  displayNameForUserUpdate,
-}: UpdateProfileRecordsParams): Promise<
-  UpdateProfileRecordsResult | NextResponse
-> {
-  const user = await getUserByClerkId(db, clerkUserId);
-  if (!user) {
+export interface ProfileUpdatePreflight {
+  avatarUrl: string | null;
+  profileEditVersion: number;
+}
+
+function versionConflictResponse(
+  currentVersion: number | undefined,
+  expectedVersion: number
+) {
+  return NextResponse.json(
+    {
+      error: 'Conflict: Profile has been modified by another request',
+      code: 'VERSION_CONFLICT',
+      currentVersion,
+      expectedVersion,
+    },
+    { status: 409, headers: NO_STORE_HEADERS }
+  );
+}
+
+export async function getProfileUpdatePreflight(
+  tx: DbOrTransaction,
+  appUserId: string,
+  profileId: string
+): Promise<ProfileUpdatePreflight | NextResponse> {
+  const access = await getExactProfileAccess(tx, appUserId, profileId);
+  if (!access.ok) {
     return NextResponse.json(
-      { error: 'User not found' },
+      {
+        error:
+          access.reason === 'forbidden' ? 'Forbidden' : 'Profile not found',
+      },
+      {
+        status: access.reason === 'forbidden' ? 403 : 404,
+        headers: NO_STORE_HEADERS,
+      }
+    );
+  }
+
+  const [profile] = await tx
+    .select({
+      avatarUrl: creatorProfiles.avatarUrl,
+      profileEditVersion: creatorProfiles.profileEditVersion,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+  if (!profile) {
+    return NextResponse.json(
+      { error: 'Profile not found' },
       { status: 404, headers: NO_STORE_HEADERS }
     );
   }
 
-  const [existingProfile] = await db
+  return {
+    avatarUrl: profile.avatarUrl,
+    profileEditVersion: profile.profileEditVersion ?? 1,
+  };
+}
+
+export async function updateProfileRecords({
+  tx,
+  appUserId,
+  profileId,
+  dbProfileUpdates,
+  displayNameForUserUpdate,
+  usernameUpdate,
+  expectedVersion,
+  precomputedAvatarTheme,
+  avatarPreflightVersion,
+}: UpdateProfileRecordsParams): Promise<
+  UpdateProfileRecordsResult | NextResponse
+> {
+  const access = await getExactProfileAccess(tx, appUserId, profileId);
+  if (!access.ok) {
+    return NextResponse.json(
+      {
+        error:
+          access.reason === 'forbidden' ? 'Forbidden' : 'Profile not found',
+      },
+      {
+        status: access.reason === 'forbidden' ? 403 : 404,
+        headers: NO_STORE_HEADERS,
+      }
+    );
+  }
+
+  const [existingProfile] = await tx
     .select({
+      id: creatorProfiles.id,
       usernameNormalized: creatorProfiles.usernameNormalized,
       settings: creatorProfiles.settings,
       theme: creatorProfiles.theme,
       avatarUrl: creatorProfiles.avatarUrl,
+      profileEditVersion: creatorProfiles.profileEditVersion,
     })
     .from(creatorProfiles)
-    .where(eq(creatorProfiles.userId, user.id))
+    .where(eq(creatorProfiles.id, profileId))
     .limit(1);
+  if (!existingProfile) {
+    return NextResponse.json(
+      { error: 'Profile not found' },
+      { status: 404, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  const currentVersion = existingProfile.profileEditVersion ?? 1;
+  const compareVersion = expectedVersion ?? currentVersion;
+  if (
+    (expectedVersion !== undefined && expectedVersion !== currentVersion) ||
+    (avatarPreflightVersion !== undefined &&
+      avatarPreflightVersion !== currentVersion)
+  ) {
+    return versionConflictResponse(
+      currentVersion,
+      expectedVersion ?? avatarPreflightVersion ?? compareVersion
+    );
+  }
+
+  if (usernameUpdate && usernameUpdate !== existingProfile.usernameNormalized) {
+    const [conflict] = await tx
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, usernameUpdate))
+      .limit(1);
+    if (conflict && conflict.id !== profileId) {
+      return NextResponse.json(
+        { error: 'Handle already taken' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+  }
 
   const incomingSettings = dbProfileUpdates.settings;
   const mergedSettings =
@@ -79,43 +196,65 @@ export async function updateProfileRecords({
       ? dbProfileUpdates.avatarUrl
       : null;
 
-  const finalTheme =
-    nextAvatarUrl === null
-      ? mergedTheme
-      : await buildThemeWithProfileAccent({
-          existingTheme:
-            mergedTheme ??
-            (existingProfile?.theme as
-              | Record<string, unknown>
-              | null
-              | undefined),
-          sourceUrl: nextAvatarUrl,
-        });
+  let finalTheme = mergedTheme;
+  if (nextAvatarUrl !== null) {
+    if (precomputedAvatarTheme === undefined) {
+      throw new Error('Changed avatar requires a precomputed profile theme');
+    }
+    finalTheme = mergeProfileTheme(
+      mergedTheme ??
+        (existingProfile?.theme as Record<string, unknown> | null | undefined),
+      precomputedAvatarTheme
+    );
+  }
 
   const finalProfileUpdates = {
     ...dbProfileUpdates,
+    ...(usernameUpdate
+      ? { username: usernameUpdate, usernameNormalized: usernameUpdate }
+      : {}),
     ...(mergedSettings === undefined ? {} : { settings: mergedSettings }),
     ...(finalTheme === undefined ? {} : { theme: finalTheme }),
   };
 
-  const [updatedProfile] = await db
+  const [updatedProfile] = await tx
     .update(creatorProfiles)
-    .set({ ...finalProfileUpdates, updatedAt: new Date() })
-    .where(eq(creatorProfiles.userId, user.id))
+    .set({
+      ...finalProfileUpdates,
+      profileEditVersion: drizzleSql`${creatorProfiles.profileEditVersion} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(creatorProfiles.id, profileId),
+        eq(creatorProfiles.profileEditVersion, compareVersion)
+      )
+    )
     .returning();
 
   if (!updatedProfile) {
+    if (existingProfile) {
+      const [currentProfile] = await tx
+        .select({ profileEditVersion: creatorProfiles.profileEditVersion })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.id, profileId))
+        .limit(1);
+      return versionConflictResponse(
+        currentProfile?.profileEditVersion,
+        compareVersion
+      );
+    }
     return NextResponse.json(
       { error: 'Profile not found' },
       { status: 404, headers: NO_STORE_HEADERS }
     );
   }
 
-  if (displayNameForUserUpdate) {
-    await db
+  if (displayNameForUserUpdate && access.ownerUserId) {
+    await tx
       .update(users)
       .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
-      .where(eq(users.id, user.id));
+      .where(eq(users.id, access.ownerUserId));
   }
 
   return {

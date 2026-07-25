@@ -15,6 +15,7 @@ const {
   mockGetEntitlements,
   mockSanitizeContactInput,
   mockInvalidateProfileCache,
+  mockEq,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockWithDbSessionTx: vi.fn(),
@@ -25,6 +26,7 @@ const {
   mockGetEntitlements: vi.fn(),
   mockSanitizeContactInput: vi.fn(),
   mockInvalidateProfileCache: vi.fn(),
+  mockEq: vi.fn((a: unknown, b: unknown) => [a, b]),
 }));
 
 // ---------------------------------------------------------------------------
@@ -66,7 +68,7 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => args),
   asc: vi.fn((col: unknown) => col),
   count: vi.fn(() => 'count'),
-  eq: vi.fn((a: unknown, b: unknown) => [a, b]),
+  eq: mockEq,
 }));
 
 // Mock DB schema tables
@@ -261,6 +263,8 @@ describe('contacts/actions.ts', () => {
       expect(contacts).toHaveLength(1);
       expect(contacts[0].id).toBe('contact_1');
       expect(contacts[0].email).toBe('jane@example.com');
+      expect(mockEq).toHaveBeenCalledWith('users.id', 'user_123');
+      expect(mockEq).not.toHaveBeenCalledWith('users.clerkId', 'user_123');
     });
 
     it('throws Unauthorized when not authenticated', async () => {

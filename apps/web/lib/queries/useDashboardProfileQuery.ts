@@ -15,10 +15,21 @@ export interface DashboardProfile {
   updatedAt: string;
 }
 
-// Use shared fetch utilities for consistent timeout and error handling
-const fetchDashboardProfile = createQueryFn<DashboardProfile>(
-  '/api/dashboard/profile'
-);
+type DashboardProfileApiResponse =
+  | DashboardProfile
+  | { profile: DashboardProfile };
+
+const fetchDashboardProfileResponse =
+  createQueryFn<DashboardProfileApiResponse>('/api/dashboard/profile');
+
+async function fetchDashboardProfile({
+  signal,
+}: {
+  signal?: AbortSignal;
+}): Promise<DashboardProfile> {
+  const response = await fetchDashboardProfileResponse({ signal });
+  return 'profile' in response ? response.profile : response;
+}
 
 interface UpdateProfileInput {
   displayName?: string;
@@ -131,7 +142,8 @@ export function useUpdateDashboardProfileMutation() {
  *
  * @example
  * function VenmoForm() {
- *   const { mutateAsync, isPending } = useUpdateVenmoMutation();
+ *   const { data: profile } = useDashboardProfileQuery();
+ *   const { mutateAsync, isPending } = useUpdateVenmoMutation(profile?.id);
  *
  *   const handleSave = async (handle: string) => {
  *     await mutateAsync({ venmo_handle: handle });
@@ -140,15 +152,18 @@ export function useUpdateDashboardProfileMutation() {
  *   return <input disabled={isPending} />;
  * }
  */
-export function useUpdateVenmoMutation() {
+export function useUpdateVenmoMutation(profileId: string | undefined) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: UpdateVenmoInput) => {
+      if (!profileId) {
+        throw new Error('Missing profile id; please refresh and try again.');
+      }
       return fetchWithTimeout<DashboardProfile>('/api/dashboard/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates: input }),
+        body: JSON.stringify({ profileId, updates: input }),
       });
     },
 

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
-import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
@@ -308,7 +308,10 @@ function RightPanelProbe() {
 function HeaderActionsProbe() {
   const state = useOptionalHeaderActions();
   return (
-    <div data-testid='header-actions-probe'>
+    <div
+      data-testid='header-actions-probe'
+      data-search-total={state?.headerSearchAdapter?.totalCount}
+    >
       <HeaderSearchSurfaceFromContext />
       {state?.headerActions}
     </div>
@@ -454,21 +457,18 @@ describe('ShellReleasesView', () => {
     });
   });
 
-  it('registers shell search exposing the release count in the shared trigger', async () => {
+  it('registers release filtering behind the shared global search trigger', async () => {
     renderShell([
       fakeRelease({ id: '1', title: 'Alpha' }),
       fakeRelease({ id: '2', title: 'Beta' }),
     ]);
     const probe = await screen.findByTestId('header-actions-probe');
     expect(probe).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /search releases/i })
-    ).not.toBeInTheDocument();
-    const filterTrigger = await screen.findByRole('button', {
-      name: /filter releases/i,
+    expect(probe).toHaveAttribute('data-search-total', '2');
+    const searchTrigger = await screen.findByRole('button', {
+      name: 'Search',
     });
-    expect(filterTrigger).toHaveTextContent('2');
-    expect(filterTrigger).toHaveAttribute('data-app-search-trigger', 'true');
+    expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
   });
 
   it('opens the releases filter through the shell-owned trigger', async () => {
@@ -478,8 +478,9 @@ describe('ShellReleasesView', () => {
       screen.queryByRole('combobox', { name: 'Filter releases' })
     ).not.toBeInTheDocument();
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
     fireEvent.click(
-      await screen.findByRole('button', { name: /filter releases/i })
+      await screen.findByRole('button', { name: 'Filter Current View' })
     );
 
     expect(

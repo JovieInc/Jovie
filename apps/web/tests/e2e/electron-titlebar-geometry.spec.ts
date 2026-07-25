@@ -9,7 +9,7 @@
  * 2. No duplicate sidebar toggles — Electron gets exactly one titlebar toggle
  *    and zero web sidebar-header controls.
  * 3. The sidebar-cell width equals the CSS sidebar-width token, confirming rail alignment.
- *    (In a real Electron run the CSS `padding-left` rule for shellChatV1 takes effect;
+ *    (In a real Electron run the canonical shell CSS `padding-left` rule takes effect;
  *    in the browser we verify the column structure is present and correctly attributed.)
  *
  * Run:
@@ -22,35 +22,17 @@
 
 import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
-import {
-  APP_FLAG_OVERRIDES_COOKIE,
-  FF_OVERRIDES_KEY,
-} from '@/lib/flags/overrides';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-async function forceDesignV1(page: Page): Promise<void> {
-  const overrides = JSON.stringify({
-    [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
+async function installElectronRuntime(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {},
+    });
+    document.documentElement.dataset.desktopRuntime = 'electron';
   });
-
-  await page.addInitScript(
-    ({ cookieName, key, value }) => {
-      Object.defineProperty(window, 'electronAPI', {
-        configurable: true,
-        value: {},
-      });
-      document.documentElement.dataset.desktopRuntime = 'electron';
-      localStorage.setItem(key, value);
-      document.cookie = `${cookieName}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
-    },
-    {
-      cookieName: APP_FLAG_OVERRIDES_COOKIE,
-      key: FF_OVERRIDES_KEY,
-      value: overrides,
-    }
-  );
 }
 
 async function forceElectronRuntime(page: Page): Promise<void> {
@@ -124,7 +106,7 @@ test('titlebar DOM has a single sidebar toggle and an empty main-cell drag regio
   );
   test.setTimeout(180_000);
 
-  await forceDesignV1(page);
+  await installElectronRuntime(page);
   await gotoShellRoute(page);
 
   // Wait for shell frame to be present
@@ -185,7 +167,7 @@ test('no duplicate sidebar dock button and titlebar toggle on the same page', as
   );
   test.setTimeout(180_000);
 
-  await forceDesignV1(page);
+  await installElectronRuntime(page);
   await gotoShellRoute(page);
 
   await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible({
@@ -221,7 +203,7 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
   test.setTimeout(180_000);
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await forceDesignV1(page);
+  await installElectronRuntime(page);
   await gotoShellRoute(page);
 
   await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible({
@@ -288,7 +270,7 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, re
   );
   test.setTimeout(240_000);
 
-  await forceDesignV1(page);
+  await installElectronRuntime(page);
 
   const routeChecks: ReadonlyArray<{
     readonly route: string;

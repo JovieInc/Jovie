@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   assertBottomReachable,
   assertScrollable,
@@ -128,8 +129,8 @@ test.describe('App-shell scroll-pane regression', () => {
   const adminRoutes = [
     {
       label: 'admin overview',
-      bypass: '/api/dev/test-auth/enter?persona=admin&redirect=/app/admin',
-      expectedPath: /\/app\/admin/,
+      bypass: `/api/dev/test-auth/enter?persona=admin&redirect=${APP_ROUTES.OV}`,
+      expectedPath: /\/app\/ov/,
       scrollSelector: '[data-testid="admin-overview-page"]',
     },
     {
@@ -166,6 +167,9 @@ test.describe('App-shell scroll-pane regression', () => {
 
       await page.goto(route.bypass);
       await page.waitForURL(route.expectedPath, { timeout: 30_000 });
+      if (route.label === 'admin overview') {
+        expect(new URL(page.url()).pathname).toBe(APP_ROUTES.OV);
+      }
 
       // Wait for the shell scroll clip to mount before measuring route-owned panes.
       await expect(page.locator(APP_SHELL_SCROLL_SELECTOR)).toBeVisible({

@@ -12,6 +12,9 @@ const themeState = {
   theme: 'system',
   resolvedTheme: 'dark',
 };
+const dashboardState: { selectedProfile: { id: string } | null } = {
+  selectedProfile: { id: 'selected-profile-id' },
+};
 
 vi.mock('next-themes', () => ({
   useTheme: () => ({
@@ -26,6 +29,10 @@ vi.mock('@/lib/hooks/useHighContrast', () => ({
     isHighContrast: false,
     setHighContrast: setHighContrastMock,
   }),
+}));
+
+vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
+  useDashboardData: () => dashboardState,
 }));
 
 vi.mock('@/lib/queries', () => ({
@@ -51,6 +58,7 @@ describe('SettingsAppearanceSection', () => {
     vi.clearAllMocks();
     themeState.theme = 'system';
     themeState.resolvedTheme = 'dark';
+    dashboardState.selectedProfile = { id: 'selected-profile-id' };
   });
 
   it('renders all appearance controls including resolved system value', () => {
@@ -72,5 +80,23 @@ describe('SettingsAppearanceSection', () => {
 
     expect(setThemeMock).toHaveBeenCalledWith('light');
     expect(updateThemeMock).toHaveBeenCalledWith('light', false);
+  });
+
+  it('disables appearance changes without a selected profile', () => {
+    dashboardState.selectedProfile = null;
+    renderSection();
+
+    const lightTheme = screen.getByTestId('theme-option-light');
+    const highContrast = screen.getByLabelText('Toggle high contrast mode');
+    expect(lightTheme).toBeDisabled();
+    expect(highContrast).toBeDisabled();
+
+    fireEvent.click(lightTheme);
+    fireEvent.click(highContrast);
+
+    expect(setThemeMock).not.toHaveBeenCalled();
+    expect(updateThemeMock).not.toHaveBeenCalled();
+    expect(setHighContrastMock).not.toHaveBeenCalled();
+    expect(saveHighContrastMock).not.toHaveBeenCalled();
   });
 });

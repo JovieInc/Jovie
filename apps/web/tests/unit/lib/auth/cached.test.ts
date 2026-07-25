@@ -95,6 +95,11 @@ describe('cached auth utilities', () => {
         orgId: null,
       });
       expect(mockGetSession).toHaveBeenCalledTimes(1);
+      expect(mockGetSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: { disableCookieCache: true },
+        })
+      );
     });
 
     it('deduplicates multiple calls within the same request', async () => {
@@ -133,6 +138,29 @@ describe('cached auth utilities', () => {
 
       expect(result.userId).toBe('user_hdr');
       expect(mockGetSession).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['banned', null],
+      ['suspended', null],
+      ['active', new Date('2026-07-22T00:00:00Z')],
+    ])('fails closed for a %s app user even when Better Auth returns a cached session', async (userStatus, deletedAt) => {
+      mockGetSession.mockResolvedValue({
+        user: { id: 'ba_blocked' },
+        session: { id: 'sess_cached' },
+      });
+      mockGetAppUserByBetterAuthId.mockResolvedValue({
+        id: 'user_blocked',
+        userStatus,
+        deletedAt,
+      });
+
+      const { getCachedAuth } = await import('@/lib/auth/cached');
+      await expect(getCachedAuth()).resolves.toEqual({
+        userId: null,
+        sessionId: null,
+        orgId: null,
+      });
     });
   });
 

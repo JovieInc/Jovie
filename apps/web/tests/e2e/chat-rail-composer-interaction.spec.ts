@@ -16,11 +16,6 @@
  */
 
 import { expect, test } from '@playwright/test';
-import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
-import {
-  APP_FLAG_OVERRIDES_COOKIE,
-  FF_OVERRIDES_KEY,
-} from '@/lib/flags/overrides';
 import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 import { gotoAuthenticatedChatRoute } from './utils/smoke-test-utils';
 
@@ -41,23 +36,6 @@ test.describe('right-rail × composer interaction', () => {
 
   test.beforeEach(async ({ page }) => {
     test.setTimeout(120_000);
-
-    // Enable DESIGN_V1 so the rail toggle and right-rail mount are active
-    const overrides = JSON.stringify({
-      [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
-    });
-
-    await page.addInitScript(
-      ({ cookieName, key, value }) => {
-        localStorage.setItem(key, value);
-        document.cookie = `${cookieName}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
-      },
-      {
-        cookieName: APP_FLAG_OVERRIDES_COOKIE,
-        key: FF_OVERRIDES_KEY,
-        value: overrides,
-      }
-    );
 
     await setTestAuthBypassSession(page, 'creator-ready');
     await gotoAuthenticatedChatRoute(page);

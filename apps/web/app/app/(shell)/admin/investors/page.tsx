@@ -8,6 +8,7 @@ import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UnifiedTableSkeleton } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { cn } from '@/lib/utils';
 import {
   InvestorTable,
@@ -99,7 +100,9 @@ const INVESTOR_TABLE_SKELETON_COLUMN_CONFIG = [
  * Admin investor pipeline dashboard.
  * Table listing all investors with stage dropdown, scores, and view counts.
  */
-export default function InvestorPipelinePage() {
+export default async function InvestorPipelinePage() {
+  await requireCurrentAdminPageAccess();
+
   return (
     <AdminPage
       title='Investors'

@@ -19,7 +19,7 @@ import { useAudioChromeSnapshot } from './audio-chrome-state';
  */
 export function SidebarBottomNowPlayingBridge() {
   const audioChrome = useAudioChromeSnapshot();
-  const { playbackState, toggleTrack } = useTrackAudioPlayer();
+  const { playbackState, stop, toggleTrack } = useTrackAudioPlayer();
 
   const handlePlay = useCallback(() => {
     if (!playbackState.activeTrackId || !playbackState.trackTitle) return;
@@ -59,6 +59,7 @@ export function SidebarBottomNowPlayingBridge() {
         }}
         isPlaying={playbackState.isPlaying}
         onPlay={handlePlay}
+        onDismiss={stop}
         className='border-0 bg-transparent shadow-none transition-[opacity,transform,background-color] duration-cinematic ease-cinematic'
       />
     </div>

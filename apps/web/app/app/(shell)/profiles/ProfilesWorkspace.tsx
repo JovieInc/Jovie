@@ -353,7 +353,7 @@ export function ProfilesWorkspace({
 
   if (!data) {
     return (
-      <PageShell>
+      <PageShell data-testid='profiles-workspace'>
         <TableEmptyState
           title='No artist profile selected'
           description='Select or claim an artist profile to monitor its presence.'
@@ -368,6 +368,7 @@ export function ProfilesWorkspace({
       : `${data.monitoredCount} of ${data.monitoringLimit} monitored`;
   return (
     <PageShell
+      data-testid='profiles-workspace'
       surfaceMode='table'
       toolbar={
         <PageToolbar

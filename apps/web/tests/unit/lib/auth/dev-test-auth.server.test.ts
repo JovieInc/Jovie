@@ -10,6 +10,7 @@ const {
   mockInvalidateTestUserCaches,
   mockDbLimit,
   mockCreateSession,
+  mockMakeSignature,
   mockLoggerWarn,
   mockSetActiveProfileForUser,
 } = vi.hoisted(() => ({
@@ -21,9 +22,17 @@ const {
   mockEnsureUserRecord: vi.fn(),
   mockInvalidateTestUserCaches: vi.fn(),
   mockDbLimit: vi.fn(),
-  mockCreateSession: vi.fn().mockResolvedValue({ id: 'sess_test' }),
+  mockCreateSession: vi.fn().mockResolvedValue({
+    id: 'sess_test',
+    token: 'session_token_test',
+  }),
+  mockMakeSignature: vi.fn().mockResolvedValue('signed'),
   mockLoggerWarn: vi.fn(),
   mockSetActiveProfileForUser: vi.fn(),
+}));
+
+vi.mock('better-auth/crypto', () => ({
+  makeSignature: mockMakeSignature,
 }));
 
 vi.mock('@/lib/db', () => {
@@ -50,9 +59,22 @@ vi.mock('@/lib/db', () => {
 vi.mock('@/lib/auth/better-auth', () => ({
   auth: {
     $context: Promise.resolve({
+      authCookies: {
+        sessionToken: {
+          attributes: {
+            httpOnly: true,
+            path: '/',
+            sameSite: 'Lax',
+            secure: false,
+          },
+          name: 'better-auth.session_token',
+        },
+      },
       internalAdapter: {
         createSession: mockCreateSession,
       },
+      secret: 'better-auth-test-secret',
+      sessionConfig: { expiresIn: 604800 },
     }),
   },
 }));
@@ -509,6 +531,63 @@ describe('dev-test-auth.server', () => {
         betterAuthUserId: 'ba_user_clerk',
       }),
       'dev-test-auth'
+    );
+  });
+
+  it('builds a signed Better Auth session cookie for explicit performance auth', async () => {
+    const { buildBetterAuthSessionCookieDescriptor } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    await expect(
+      buildBetterAuthSessionCookieDescriptor(
+        {
+          persona: 'creator',
+          clerkUserId: 'ba_user_clerk',
+          email: 'browse+clerk_test@jov.ie',
+          username: 'browse-test-user',
+          fullName: 'Browse Test User',
+          isAdmin: false,
+          profilePath: '/browse-test-user',
+        },
+        false
+      )
+    ).resolves.toEqual({
+      name: 'better-auth.session_token',
+      value: 'session_token_test.signed',
+      httpOnly: true,
+      maxAge: 604800,
+      path: '/',
+      sameSite: 'lax',
+      secure: false,
+    });
+    expect(mockMakeSignature).toHaveBeenCalledWith(
+      'session_token_test',
+      'better-auth-test-secret'
+    );
+  });
+
+  it('fails closed when explicit performance auth gets no session token', async () => {
+    mockCreateSession.mockResolvedValueOnce({ id: 'sess_without_token' });
+    const { buildBetterAuthSessionCookieDescriptor } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    await expect(
+      buildBetterAuthSessionCookieDescriptor(
+        {
+          persona: 'creator',
+          clerkUserId: 'ba_user_clerk',
+          email: 'browse+clerk_test@jov.ie',
+          username: 'browse-test-user',
+          fullName: 'Browse Test User',
+          isAdmin: false,
+          profilePath: '/browse-test-user',
+        },
+        false
+      )
+    ).rejects.toThrow(
+      'Better Auth performance session creation returned no token'
     );
   });
 

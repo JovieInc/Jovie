@@ -135,27 +135,29 @@ export function ComposerAttachButton({
 
   return (
     <DropdownMenu open={plusMenuOpen} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type='button'
-          variant='ghost'
-          size='icon'
-          onMouseDown={onMouseDown}
-          disabled={isProcessing || isLoading || isSubmitting || disabled}
-          className={cn(
-            'h-9 w-9 shrink-0 border border-transparent bg-surface-0 text-tertiary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
-            plusMenuOpen && 'border-subtle bg-surface-1 text-primary-token',
-            'disabled:cursor-not-allowed disabled:opacity-50'
-          )}
-          aria-label='Attach Files'
-        >
-          {isProcessing ? (
-            <Loader2 className='h-4 w-4 animate-spin' strokeWidth={2.25} />
-          ) : (
-            <Plus className='h-4 w-4' strokeWidth={2.25} />
-          )}
-        </Button>
-      </DropdownMenuTrigger>
+      <SimpleTooltip content='Attach files'>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type='button'
+            variant='ghost'
+            size='icon'
+            onMouseDown={onMouseDown}
+            disabled={isProcessing || isLoading || isSubmitting || disabled}
+            className={cn(
+              'h-9 w-9 shrink-0 border border-transparent bg-surface-0 text-tertiary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
+              plusMenuOpen && 'border-subtle bg-surface-1 text-primary-token',
+              'disabled:cursor-not-allowed disabled:opacity-50'
+            )}
+            aria-label='Attach Files'
+          >
+            {isProcessing ? (
+              <Loader2 className='h-4 w-4 animate-spin' strokeWidth={2.25} />
+            ) : (
+              <Plus className='h-4 w-4' strokeWidth={2.25} />
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+      </SimpleTooltip>
       <DropdownMenuContent
         align='start'
         side='top'

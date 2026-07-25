@@ -20,7 +20,7 @@ export function SettingsAnalyticsSection({
   onArtistUpdate,
   isPro = true,
 }: SettingsAnalyticsSectionProps) {
-  const { updateAnalyticsFilterAsync } = useAnalyticsFilterMutation();
+  const { updateAnalyticsFilterAsync } = useAnalyticsFilterMutation(artist.id);
 
   const handleOptimisticUpdate = useCallback(
     (enabled: boolean) => {

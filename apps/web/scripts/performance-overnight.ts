@@ -332,16 +332,6 @@ async function stopServer(child: ReturnType<typeof spawn>) {
   child.kill('SIGKILL');
 }
 
-function isLoopbackBaseUrl(baseUrl: string) {
-  const hostname = new URL(baseUrl).hostname;
-  return (
-    hostname === '127.0.0.1' ||
-    hostname === 'localhost' ||
-    hostname === '::1' ||
-    hostname === '[::1]'
-  );
-}
-
 function runPerfAuth(baseUrl: string, authPath: string) {
   const authResult = runCommand(
     'pnpm',
@@ -506,43 +496,14 @@ async function main() {
   buildProject();
 
   const buildPort = await findFreePort();
-  let server = await startServer(artifactDir, buildPort);
+  const server = await startServer(artifactDir, buildPort);
 
   try {
-    let authStatePath: string;
-
-    try {
-      authStatePath = bootstrapAuthState(
-        artifactDir,
-        server.baseUrl,
-        options.authPath
-      );
-    } catch (error) {
-      if (
-        !isLoopbackBaseUrl(server.baseUrl) ||
-        !process.env.E2E_CLERK_USER_ID
-      ) {
-        throw error;
-      }
-
-      writeFileSync(
-        resolve(artifactDir, 'auth-fallback.log'),
-        `Primary auth bootstrap failed at ${new Date().toISOString()}.\n${String(
-          error
-        )}\nRetrying with loopback test-auth bypass enabled.\n`
-      );
-      await stopServer(server.child);
-      server = await startServer(artifactDir, buildPort, {
-        E2E_USE_TEST_AUTH_BYPASS: '1',
-        NEXT_PUBLIC_CLERK_MOCK: '1',
-        NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
-      });
-      authStatePath = bootstrapAuthState(
-        artifactDir,
-        server.baseUrl,
-        options.authPath
-      );
-    }
+    const authStatePath = bootstrapAuthState(
+      artifactDir,
+      server.baseUrl,
+      options.authPath
+    );
 
     const summary = await runPerformanceBudgetsGuard({
       authPath: authStatePath,

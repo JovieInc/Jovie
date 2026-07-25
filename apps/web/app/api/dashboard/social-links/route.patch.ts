@@ -98,7 +98,7 @@ export async function PATCH(req: Request) {
       }
 
       if (action === 'accept') {
-        await tx
+        const updatedRows = await tx
           .update(socialLinks)
           .set({
             state: 'active',
@@ -106,7 +106,36 @@ export async function PATCH(req: Request) {
             version: versioning.nextVersion,
             updatedAt: new Date(),
           })
-          .where(eq(socialLinks.id, linkId));
+          .where(
+            and(
+              eq(socialLinks.id, linkId),
+              eq(socialLinks.creatorProfileId, profileId),
+              eq(socialLinks.version, versioning.currentVersion)
+            )
+          )
+          .returning({ id: socialLinks.id });
+
+        if (updatedRows.length === 0) {
+          const [currentLink] = await tx
+            .select({ version: socialLinks.version })
+            .from(socialLinks)
+            .where(
+              and(
+                eq(socialLinks.id, linkId),
+                eq(socialLinks.creatorProfileId, profileId)
+              )
+            )
+            .limit(1);
+          return NextResponse.json(
+            {
+              error: 'Conflict: Link has been modified by another request',
+              code: 'VERSION_CONFLICT',
+              expectedVersion: versioning.currentVersion,
+              currentVersion: currentLink?.version,
+            },
+            { status: 409, headers: combinedHeaders }
+          );
+        }
 
         await syncPrimaryMusicUrlsFromSocialLinks(tx, profileId);
         await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
@@ -143,7 +172,7 @@ export async function PATCH(req: Request) {
       }
 
       if (action === 'dismiss') {
-        await tx
+        const updatedRows = await tx
           .update(socialLinks)
           .set({
             state: 'rejected',
@@ -151,7 +180,36 @@ export async function PATCH(req: Request) {
             version: versioning.nextVersion,
             updatedAt: new Date(),
           })
-          .where(eq(socialLinks.id, linkId));
+          .where(
+            and(
+              eq(socialLinks.id, linkId),
+              eq(socialLinks.creatorProfileId, profileId),
+              eq(socialLinks.version, versioning.currentVersion)
+            )
+          )
+          .returning({ id: socialLinks.id });
+
+        if (updatedRows.length === 0) {
+          const [currentLink] = await tx
+            .select({ version: socialLinks.version })
+            .from(socialLinks)
+            .where(
+              and(
+                eq(socialLinks.id, linkId),
+                eq(socialLinks.creatorProfileId, profileId)
+              )
+            )
+            .limit(1);
+          return NextResponse.json(
+            {
+              error: 'Conflict: Link has been modified by another request',
+              code: 'VERSION_CONFLICT',
+              expectedVersion: versioning.currentVersion,
+              currentVersion: currentLink?.version,
+            },
+            { status: 409, headers: combinedHeaders }
+          );
+        }
 
         await syncPrimaryMusicUrlsFromSocialLinks(tx, profileId);
         await invalidateSocialLinksCache(profileId, profile.usernameNormalized);

@@ -513,7 +513,8 @@ function ChatRailContextCards({
               profileId={profileId}
               onDismiss={onDismiss}
             />
-          ) : target.kind === 'tour-date' && profileId ? (
+          ) : (target.kind === 'tour-date' || target.kind === 'event') &&
+            profileId ? (
             <ChatTourDateContextCard
               key={target.focusKey}
               target={target}

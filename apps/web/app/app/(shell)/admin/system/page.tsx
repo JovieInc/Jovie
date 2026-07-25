@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { AdminSystemMap } from '@/components/features/admin/system-map/AdminSystemMap';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
@@ -32,6 +33,8 @@ interface Props {
 }
 
 export default async function AdminSystemPage({ searchParams }: Props) {
+  await requireCurrentAdminPageAccess();
+
   const params = await searchParams;
   const rawTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
   const activeTab = resolveTab(rawTab);

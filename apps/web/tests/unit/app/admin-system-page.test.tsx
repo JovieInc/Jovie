@@ -204,6 +204,6 @@ describe('admin-navigation constants include system_map', () => {
 
   it('ADMIN_SYSTEM route is defined in APP_ROUTES', async () => {
     const { APP_ROUTES } = await import('@/constants/routes');
-    expect(APP_ROUTES.ADMIN_SYSTEM).toBe('/app/admin/system');
+    expect(APP_ROUTES.ADMIN_SYSTEM).toBe('/app/ov/system');
   });
 });

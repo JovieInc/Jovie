@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   isDemoRecordingClient,
   isDevChromeDisabledClient,
@@ -40,14 +41,6 @@ export function resetDevToolbarHeight(): void {
   document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
 }
 
-function hasDevToolbarCookie(): boolean {
-  if (typeof document === 'undefined') return false;
-
-  return document.cookie
-    .split(';')
-    .some(cookie => cookie.trim().startsWith('__dev_toolbar=1'));
-}
-
 export function isDevToolbarSuppressedPath(pathname: string): boolean {
   return (
     DEV_TOOLBAR_SUPPRESSED_PATHS.has(pathname) ||
@@ -55,15 +48,19 @@ export function isDevToolbarSuppressedPath(pathname: string): boolean {
   );
 }
 
+export function shouldDefaultDevToolbarHidden(pathname: string): boolean {
+  return (
+    pathname === APP_ROUTES.CHAT || pathname.startsWith(`${APP_ROUTES.CHAT}/`)
+  );
+}
+
 /**
- * Production customer sessions never show the toolbar unless an explicit
- * `__dev_toolbar=1` cookie opt-in is present (emergency prod debugging).
+ * Production customer sessions never render development controls.
  */
 export function shouldRenderDevToolbar({
   env,
   disabled = false,
   pathname,
-  hasCookie = false,
   isDemoRecording = false,
   isDevChromeDisabled = false,
   isElectron = false,
@@ -72,6 +69,7 @@ export function shouldRenderDevToolbar({
   readonly env: string;
   readonly disabled?: boolean;
   readonly pathname: string;
+  /** Legacy input retained for callers; production is always fail-closed. */
   readonly hasCookie?: boolean;
   readonly isDemoRecording?: boolean;
   readonly isDevChromeDisabled?: boolean;
@@ -83,7 +81,7 @@ export function shouldRenderDevToolbar({
   if (isDevToolbarSuppressedPath(pathname)) return false;
 
   const isProduction = nodeEnv === 'production' && env === 'production';
-  if (isProduction) return hasCookie;
+  if (isProduction) return false;
 
   return true;
 }
@@ -112,7 +110,6 @@ export function DevToolbarGate({
         env,
         disabled,
         pathname,
-        hasCookie: hasDevToolbarCookie(),
         isDemoRecording: isDemoRecordingClient(),
         isDevChromeDisabled: isDevChromeDisabledClient(),
         isElectron:
@@ -168,5 +165,12 @@ export function DevToolbarGate({
     return null;
   }
 
-  return <DevToolbar env={env} sha={sha} version={version} />;
+  return (
+    <DevToolbar
+      env={env}
+      sha={sha}
+      version={version}
+      defaultHidden={shouldDefaultDevToolbarHidden(pathname)}
+    />
+  );
 }

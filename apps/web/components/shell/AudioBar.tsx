@@ -10,6 +10,7 @@ import {
   Shuffle,
   SkipBack,
   SkipForward,
+  X,
 } from 'lucide-react';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
@@ -75,6 +76,7 @@ export function AudioBar({
   onPrevious,
   onNext,
   onCollapse,
+  onDismiss,
   currentTime,
   duration,
   cues,
@@ -95,6 +97,7 @@ export function AudioBar({
   readonly onPrevious?: () => void;
   readonly onNext?: () => void;
   readonly onCollapse?: () => void;
+  readonly onDismiss?: () => void;
   readonly currentTime: number;
   readonly duration: number;
   readonly cues?: readonly ScrubCue[];
@@ -211,6 +214,16 @@ export function AudioBar({
           testId='audio-bar-minimize'
         >
           <Minimize2 className='h-3.5 w-3.5' strokeWidth={2.25} />
+        </IconBtn>
+      )}
+      {onDismiss && (
+        <IconBtn
+          label='Dismiss Player'
+          onClick={onDismiss}
+          tooltipSide='top'
+          tone='ghost'
+        >
+          <X aria-hidden='true' className='size-3.5' strokeWidth={2.25} />
         </IconBtn>
       )}
     </div>

@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { CheckSquare, Lock } from 'lucide-react';
 import Link from 'next/link';
+import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { PageShell } from '@/components/organisms/PageShell';
 import { APP_ROUTES } from '@/constants/routes';
@@ -69,6 +70,7 @@ function TasksUpgradeContent({
 export function TasksWorkspaceUpgradeInterstitial() {
   return (
     <PageShell data-testid='tasks-upgrade-interstitial'>
+      <NavigationDestinationReady destination='tasks' />
       <section className='flex min-h-0 flex-1 items-center justify-center px-6 py-6'>
         <TasksUpgradeContent
           heading='Upgrade to access Tasks'

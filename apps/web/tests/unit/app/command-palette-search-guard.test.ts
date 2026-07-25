@@ -32,15 +32,30 @@ describe('command palette search shell guard', () => {
     );
   });
 
-  it('keeps DashboardNav Search wired to the command palette event', () => {
+  it('keeps Search exclusively in the shared header surface', () => {
     const source = readSource(
       'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
     );
 
-    expect(source).toContain('openCommandPalette');
+    expect(source).not.toContain('openHeaderSearch');
+    expect(source).not.toContain("name: 'Search'");
+    expect(source).not.toContain("name='Search'");
+    expect(source).not.toContain('openCommandPalette');
     expect(source).not.toContain('globalThis.dispatchEvent');
     expect(source).not.toMatch(
       /new\s+Event\(\s*OPEN_COMMAND_PALETTE_EVENT\s*\)/
     );
+  });
+
+  it('keeps header search off the full release matrix transport', () => {
+    const connectorSource = readSource(
+      'components/shell/HeaderSearchSurfaceFromContext.tsx'
+    );
+    const clientSource = readSource('components/shell/header-search-client.ts');
+
+    expect(connectorSource).not.toContain('useReleasesQuery');
+    expect(connectorSource).not.toContain('loadReleaseMatrix');
+    expect(clientSource).toContain('/api/search/header');
+    expect(clientSource).toContain('signal');
   });
 });

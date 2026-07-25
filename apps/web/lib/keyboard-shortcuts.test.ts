@@ -101,8 +101,13 @@ describe('keyboard-shortcuts definitions', () => {
       expect(ids).toContain('nav-settings');
     });
 
-    it('uses the canonical releases route for release navigation', () => {
-      expect(NAV_SHORTCUTS.releases.href).toBe(APP_ROUTES.RELEASES);
+    it('uses the canonical library route for library navigation', () => {
+      expect(NAV_SHORTCUTS.library.href).toBe(APP_ROUTES.LIBRARY);
+      expect(NAV_SHORTCUTS.releases.href).toBe(APP_ROUTES.LIBRARY);
+    });
+
+    it('uses the canonical contacts workspace route', () => {
+      expect(NAV_SHORTCUTS.contacts.href).toBe(APP_ROUTES.CONTACTS);
     });
 
     it('uses the canonical calendar route for calendar navigation', () => {
@@ -160,6 +165,7 @@ describe('keyboard-shortcuts definitions', () => {
       expect(NAV_SHORTCUTS.profile).toBeDefined();
       expect(NAV_SHORTCUTS.contacts).toBeDefined();
       expect(NAV_SHORTCUTS.releases).toBeDefined();
+      expect(NAV_SHORTCUTS.library).toBeDefined();
       expect(NAV_SHORTCUTS.calendar).toBeDefined();
       expect(NAV_SHORTCUTS.touring).toBeDefined();
       expect(NAV_SHORTCUTS.audience).toBeDefined();

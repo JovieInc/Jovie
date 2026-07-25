@@ -5,7 +5,6 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateUsernameChange } from '@/lib/cache/profile';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { invalidateHandleCache } from '@/lib/onboarding/handle-availability-cache';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export type UsernameValidationErrorCode = 'INVALID_USERNAME' | 'USERNAME_TAKEN';
@@ -27,7 +26,7 @@ interface UsernameUpdateOutcome {
 }
 
 async function updateCanonicalUsernameInternal(
-  clerkUserId: string,
+  appUserId: string,
   rawUsername: string
 ): Promise<UsernameUpdateOutcome> {
   const validation = validateUsername(rawUsername);
@@ -41,19 +40,18 @@ async function updateCanonicalUsernameInternal(
   const normalized = normalizeUsername(rawUsername);
 
   return withDbSessionTx(
-    async (tx, sessionClerkUserId) => {
-      const effectiveClerkUserId = sessionClerkUserId;
-      if (effectiveClerkUserId !== clerkUserId) {
-        throw new Error('Clerk user mismatch while syncing username');
+    async (tx, sessionAppUserId) => {
+      if (sessionAppUserId !== appUserId) {
+        throw new Error('App user mismatch while syncing username');
       }
 
       const [userRow] = await tx
-        .select({ id: users.id })
+        .select({ id: users.id, activeProfileId: users.activeProfileId })
         .from(users)
-        .where(eq(users.clerkId, effectiveClerkUserId))
+        .where(eq(users.id, sessionAppUserId))
         .limit(1);
 
-      if (!userRow) {
+      if (!userRow?.activeProfileId) {
         throw new Error('User not found');
       }
 
@@ -63,7 +61,7 @@ async function updateCanonicalUsernameInternal(
           usernameNormalized: creatorProfiles.usernameNormalized,
         })
         .from(creatorProfiles)
-        .where(eq(creatorProfiles.userId, userRow.id))
+        .where(eq(creatorProfiles.id, userRow.activeProfileId))
         .limit(1);
 
       if (!profile) {
@@ -112,7 +110,7 @@ async function updateCanonicalUsernameInternal(
         previousCanonicalUsername,
       };
     },
-    { clerkUserId }
+    { clerkUserId: appUserId }
   );
 }
 
@@ -122,18 +120,15 @@ async function updateCanonicalUsernameInternal(
  * NOTE: Usernames are stored ONLY in the database (creator_profiles table).
  * Clerk username field is NOT used - this eliminates sync overhead.
  *
- * @param clerkUserId - The Clerk user ID
+ * @param appUserId - The authenticated app users.id UUID
  * @param rawUsername - The raw username input
  * @throws UsernameValidationError if username is invalid or taken
  */
 export async function syncCanonicalUsernameFromApp(
-  clerkUserId: string,
+  appUserId: string,
   rawUsername: string
 ): Promise<void> {
-  const outcome = await updateCanonicalUsernameInternal(
-    clerkUserId,
-    rawUsername
-  );
+  const outcome = await updateCanonicalUsernameInternal(appUserId, rawUsername);
 
   if (outcome.conflict) {
     throw new UsernameValidationError('USERNAME_TAKEN', 'Handle already taken');
@@ -145,15 +140,6 @@ export async function syncCanonicalUsernameFromApp(
       outcome.normalized,
       outcome.previousCanonicalUsername
     );
-
-    // Invalidate handle-availability cache for both old and new handles.
-    // This ensures old handle availability and new handle reservation update quickly.
-    await Promise.all([
-      invalidateHandleCache(outcome.normalized),
-      outcome.previousCanonicalUsername
-        ? invalidateHandleCache(outcome.previousCanonicalUsername)
-        : Promise.resolve(),
-    ]);
   }
 }
 

@@ -1,10 +1,9 @@
 import { TooltipProvider } from '@jovie/ui';
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
+import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { QueryProvider } from '@/components/providers/QueryProvider';
-import { isLocalDevelopmentAutomationRequest } from '@/lib/security/development-only';
-import { requireDevelopmentOnlyPage } from '@/lib/security/require-development-only';
+import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
@@ -19,11 +18,10 @@ export default async function ExpLayout({
 }: {
   readonly children: ReactNode;
 }) {
-  const headerStore = await headers();
-  requireDevelopmentOnlyPage({
-    allowLocalDevelopmentAutomation:
-      isLocalDevelopmentAutomationRequest(headerStore),
-  });
+  const access = await getCurrentAdminPageAccess();
+  if (!access.isAuthenticated || !access.userId || !access.hasAdminRole) {
+    notFound();
+  }
 
   return (
     <QueryProvider>

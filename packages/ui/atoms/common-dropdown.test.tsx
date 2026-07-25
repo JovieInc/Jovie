@@ -463,6 +463,117 @@ describe('CommonDropdown', () => {
     });
   });
 
+  describe('Action Rows', () => {
+    it('keeps sibling actions in one row and in roving-focus order', async () => {
+      const user = userEvent.setup({ delay: null });
+      const firstAction = vi.fn();
+      const secondAction = vi.fn();
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'action-row',
+          id: 'identity-help',
+          className: 'grid grid-cols-[minmax(0,1fr)_auto]',
+          items: [
+            {
+              type: 'action',
+              id: 'identity',
+              label: 'Open Profile',
+              content: <span>Adele Adkins</span>,
+              onClick: firstAction,
+            },
+            {
+              type: 'action',
+              id: 'help',
+              label: 'Help',
+              onClick: secondAction,
+            },
+          ],
+        },
+        {
+          type: 'action',
+          id: 'settings',
+          label: 'Settings',
+          onClick: vi.fn(),
+        },
+      ];
+
+      render(<CommonDropdown items={items} />);
+      await user.click(screen.getByRole('button', { name: 'More actions' }));
+
+      const row = document.querySelector<HTMLElement>(
+        '[data-menu-action-row="identity-help"]'
+      );
+      expect(row).not.toBeNull();
+      expect(row).toHaveClass('grid', 'grid-cols-[minmax(0,1fr)_auto]');
+      expect(row?.querySelectorAll('[role="menuitem"]')).toHaveLength(2);
+
+      const profileItem = screen.getByRole('menuitem', {
+        name: 'Open Profile',
+      });
+      const helpItem = screen.getByRole('menuitem', { name: 'Help' });
+
+      await user.keyboard('{ArrowDown}');
+      expect(profileItem).toHaveFocus();
+      await user.keyboard('{ArrowDown}');
+      expect(helpItem).toHaveFocus();
+      await user.keyboard('{Enter}');
+      expect(secondAction).toHaveBeenCalledOnce();
+    });
+
+    it('filters actions within a shared row', async () => {
+      const user = userEvent.setup({ delay: null });
+      const items: CommonDropdownItem[] = [
+        {
+          type: 'action-row',
+          id: 'identity-help',
+          items: [
+            {
+              type: 'action',
+              id: 'identity',
+              label: 'Open Profile',
+              onClick: vi.fn(),
+            },
+            {
+              type: 'action',
+              id: 'help',
+              label: 'Help',
+              onClick: vi.fn(),
+            },
+          ],
+        },
+        {
+          type: 'action',
+          id: 'settings',
+          label: 'Settings',
+          onClick: vi.fn(),
+        },
+      ];
+
+      render(
+        <CommonDropdown
+          items={items}
+          searchable
+          searchPlaceholder='Search actions'
+        />
+      );
+      await user.click(screen.getByRole('button', { name: 'More actions' }));
+      await user.type(
+        screen.getByRole('textbox', { name: 'Search actions' }),
+        'help'
+      );
+
+      expect(
+        screen.getByRole('menuitem', { name: 'Help' })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('menuitem', { name: 'Open Profile' })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('menuitem', { name: 'Settings' })
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe('Loading State', () => {
     it('shows loading spinner when isLoading is true', () => {
       render(

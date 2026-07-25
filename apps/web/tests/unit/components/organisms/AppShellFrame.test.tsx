@@ -3,13 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 
 describe('AppShellFrame', () => {
-  it('renders the shellChatV1 design when explicitly opted in', () => {
+  it('renders the canonical shell design', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
         header={<header>Header</header>}
         main={<div>Main Content</div>}
-        variant='shellChatV1'
       />
     );
 
@@ -17,10 +16,7 @@ describe('AppShellFrame', () => {
 
     expect(mainContent).toHaveAttribute('id', 'main-content');
     expect(mainContent).not.toHaveAttribute('tabindex');
-    expect(mainContent.closest('[data-shell-design]')).toHaveAttribute(
-      'data-shell-design',
-      'shellChatV1'
-    );
+    expect(mainContent.closest('[data-app-shell-frame]')).toBeInTheDocument();
     expect(mainContent).toHaveClass('lg:shadow-(--linear-app-shell-shadow)');
     // #main-content keeps its full rounded shell radius — no Electron override
     // strips the top corners now that the header lives inside the card.
@@ -34,48 +30,6 @@ describe('AppShellFrame', () => {
     const headers = screen.getAllByText('Header');
     expect(headers).toHaveLength(1);
     expect(mainContent).toContainElement(headers[0] as HTMLElement);
-  });
-
-  it('defaults to the legacy variant so flag-off callers match production', () => {
-    render(
-      <AppShellFrame
-        sidebar={<aside>Sidebar</aside>}
-        header={<header>Header</header>}
-        main={<div>Main Content</div>}
-      />
-    );
-
-    expect(
-      screen.getByRole('main').closest('[data-shell-design]')
-    ).toHaveAttribute('data-shell-design', 'legacy');
-  });
-
-  it('can render the legacy flat shell frame for the old design', () => {
-    render(
-      <AppShellFrame
-        sidebar={<aside>Sidebar</aside>}
-        header={<header>Header</header>}
-        main={<div>Main Content</div>}
-        variant='legacy'
-      />
-    );
-
-    const mainContent = screen.getByRole('main');
-
-    expect(mainContent.closest('[data-shell-design]')).toHaveAttribute(
-      'data-shell-design',
-      'legacy'
-    );
-    expect(mainContent).toHaveClass('lg:border-l');
-    // Guard against the production Tailwind v4 token form (not the legacy
-    // [var(...)] spelling) so this negative assert actually tracks the class
-    // AppShellFrame emits for shellChatV1.
-    expect(mainContent).not.toHaveClass(
-      'lg:shadow-(--linear-app-shell-shadow)'
-    );
-    expect(mainContent.querySelector('div.flex.flex-1')).not.toHaveClass(
-      'lg:gap-(--app-shell-gap)'
-    );
   });
 
   it('keeps the right rail outside the non-scrolling shell clip', () => {
@@ -99,6 +53,20 @@ describe('AppShellFrame', () => {
       screen.getByTestId('fixture-right-rail')
     );
     expect(rightRail).toHaveClass('sticky', 'top-0');
+  });
+
+  it('reserves dev-toolbar height inside the shell scroll pane', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+      />
+    );
+
+    expect(screen.getByTestId('app-shell-scroll')).toHaveClass(
+      'pb-[var(--dev-toolbar-height,0px)]'
+    );
   });
 
   it('marks composer focus on the shell frame for chrome retreat styles', () => {
@@ -139,7 +107,6 @@ describe('AppShellFrame', () => {
         sidebar={<aside>Sidebar</aside>}
         header={<header data-testid='fixture-header'>Header</header>}
         main={<div>Main Content</div>}
-        variant='shellChatV1'
         chatAmbientGradient
       />
     );
