@@ -23,12 +23,12 @@ describe('DropDateChip', () => {
     expect(chip.className).not.toContain('tracking-[');
   });
 
-  it('lights up cyan when tone is soon', () => {
+  it('lights up accent when tone is soon', () => {
     const { container } = render(
       <DropDateChip label='Drops in 4 days' tone='soon' />
     );
     expect((container.firstElementChild as HTMLElement).className).toContain(
-      'cyan'
+      'accent'
     );
   });
 
@@ -36,12 +36,12 @@ describe('DropDateChip', () => {
     const past = render(<DropDateChip label='Released Jan 1' tone='past' />);
     expect(
       (past.container.firstElementChild as HTMLElement).className
-    ).not.toContain('cyan-500/10');
+    ).not.toContain('accent/10');
     past.unmount();
 
     const future = render(<DropDateChip label='Drops Jun 20' tone='future' />);
     expect(
       (future.container.firstElementChild as HTMLElement).className
-    ).not.toContain('cyan-500/10');
+    ).not.toContain('accent/10');
   });
 });
