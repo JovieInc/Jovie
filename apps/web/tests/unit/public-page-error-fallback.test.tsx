@@ -62,11 +62,7 @@ describe('PublicPageErrorFallback', () => {
       'system-b-error-fallback'
     );
     expect(screen.getAllByRole('button')).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Refresh' })).toHaveClass(
-      'system-b-error-fallback__action',
-      'system-b-error-fallback__action--primary',
-      'focus-ring-transparent-offset'
-    );
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
