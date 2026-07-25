@@ -37,9 +37,13 @@ import { normalizeEmail } from '@/lib/utils/email';
 const {
   creatorContacts,
   creatorProfiles,
+  discogRecordings,
+  discogReleaseTracks,
   discogReleases,
   discogTracks,
   libraryAssetApprovalStatuses,
+  merchCards,
+  profilePhotos,
   promoDownloads,
   providers,
   providerLinks,
@@ -126,6 +130,14 @@ function sleep(ms: number): Promise<void> {
 }
 
 const DEFAULT_TEST_RELEASE_ARTWORK_URL = '/android-chrome-512x512.png';
+
+/**
+ * Deterministic public track-preview fixture (F6, docs/qa/public-profile-stories.md).
+ * The repo has no sample-audio fixture host (unit tests use example.com
+ * mocks), so this uses a stable, publicly reachable SoundHelix sample mp3.
+ */
+const E2E_TRACK_PREVIEW_URL =
+  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
 
 const REQUIRED_PUBLIC_QA_PROVIDERS = [
   {
@@ -276,6 +288,22 @@ async function withSeedDatabaseRetry<T>(
   }
 }
 
+/**
+ * Deterministic extreme values for the `edgecase-long` public-profile QA
+ * fixture (docs/qa/public-profile-stories.md). ~200-char display name with no
+ * spaces (overflow-wrap), ~4000-char bio with newlines (whitespace-pre-line).
+ */
+const EDGE_CASE_LONG_DISPLAY_NAME = 'EdgecaseLongDisplayName'
+  .repeat(9)
+  .slice(0, 200);
+const EDGE_CASE_LONG_BIO = Array.from(
+  { length: 50 },
+  (_, index) =>
+    `Paragraph ${index + 1} of the edge-case-long bio: this deliberately verbose sentence exercises wrapping, clamping, and whitespace-pre-line rendering across every public surface.`
+)
+  .join('\n')
+  .slice(0, 4000);
+
 const TEST_PROFILES: TestProfile[] = [
   {
     username: 'dualipa',
@@ -296,6 +324,26 @@ const TEST_PROFILES: TestProfile[] = [
     displayName: 'Test Artist',
     bio: 'Test artist for E2E tipping tests',
     spotifyUrl: 'https://open.spotify.com/artist/test',
+    avatarUrl: DEFAULT_TEST_AVATAR_URL,
+  },
+  {
+    // Public, claimed profile with a normal name/avatar but nothing else:
+    // no socials/DSPs, releases, tour dates, contacts, venmo, bio, or merch.
+    // Exercises every empty state (docs/qa/public-profile-stories.md).
+    username: 'edgecase-empty',
+    displayName: 'Edge Case Empty',
+    bio: '',
+    avatarUrl: DEFAULT_TEST_AVATAR_URL,
+  },
+  {
+    // Public, claimed profile with extreme values (long name/bio, many
+    // socials, long release/tour strings) to exercise overflow/wrap/clamp.
+    // The extra social links, release, and tour dates are seeded by
+    // seedEdgeCaseLongFixtures below.
+    username: 'edgecase-long',
+    displayName: EDGE_CASE_LONG_DISPLAY_NAME,
+    bio: EDGE_CASE_LONG_BIO,
+    spotifyUrl: 'https://open.spotify.com/artist/edgecaselongoverflowfixture',
     avatarUrl: DEFAULT_TEST_AVATAR_URL,
   },
 ];
@@ -378,6 +426,7 @@ interface TestTrack {
   durationMs: number;
   isrc?: string;
   isExplicit?: boolean;
+  previewUrl?: string;
 }
 
 /** Release template for seeding */
@@ -722,16 +771,141 @@ const TEST_TOUR_DATES: TestTourDate[] = [
 ];
 
 /**
+ * Tour dates for the `edgecase-long` profile — very long venue/city names to
+ * exercise truncation/wrapping in the public Events surface.
+ */
+const EDGE_CASE_LONG_TOUR_DATES: TestTourDate[] = [
+  {
+    externalId: 'seed-edgecase-long-grand-amphitheater',
+    title:
+      'The Extremely Long World Tour Title That Just Keeps Going And Going',
+    venueName:
+      'The Grand International Amphitheater of Performing Arts and Cultural Celebration Center',
+    city: 'Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch',
+    region: null,
+    country: 'UK',
+    provider: 'manual',
+    ticketStatus: 'available',
+    ticketUrl: 'https://www.ticketmaster.com/event/edgecase-long-1',
+    latitude: 53.22,
+    longitude: -4.2,
+    timezone: 'Europe/London',
+    monthsFromNow: 2,
+    startTime: '8:00 PM',
+  },
+  {
+    externalId: 'seed-edgecase-long-riverside-pavilion',
+    title: null,
+    venueName:
+      'Riverside Pavilion and Convention Exposition Hall of the Greater Northern Metropolitan District',
+    city: 'The Very Long Metropolitan City Name of the Northern Reaches',
+    region: 'CA',
+    country: 'USA',
+    provider: 'bandsintown',
+    ticketStatus: 'sold_out',
+    ticketUrl: 'https://www.axs.com/events/edgecase-long-2',
+    latitude: 34.05,
+    longitude: -118.24,
+    timezone: 'America/Los_Angeles',
+    monthsFromNow: 3,
+    startTime: '7:30 PM',
+  },
+  {
+    externalId: 'seed-edgecase-long-historic-opera',
+    title: 'Acoustic Evening',
+    venueName:
+      'The Historic Royal Opera House and Symphony Concert Ballroom Annex Building Number Three',
+    city: 'Schaumburg-Hoffnung Estates Upon the River',
+    region: 'NY',
+    country: 'USA',
+    provider: 'manual',
+    ticketStatus: 'available',
+    ticketUrl: null,
+    latitude: 40.71,
+    longitude: -74.01,
+    timezone: 'America/New_York',
+    monthsFromNow: 4,
+    startTime: '7:00 PM',
+  },
+  {
+    externalId: 'seed-edgecase-long-open-air',
+    title: null,
+    venueName:
+      'Open Air Festival Grounds at the International Exhibition Park of Modern Contemporary Music',
+    city: 'Kleinlangenfeldberg an der Donau',
+    region: null,
+    country: 'Germany',
+    provider: 'bandsintown',
+    ticketStatus: 'cancelled',
+    ticketUrl: 'https://dice.fm/event/edgecase-long-4',
+    latitude: 52.52,
+    longitude: 13.4,
+    timezone: 'Europe/Berlin',
+    monthsFromNow: 5,
+    startTime: '6:00 PM',
+  },
+  {
+    externalId: 'seed-edgecase-long-dome',
+    title: 'Stadium Spectacular',
+    venueName:
+      'The National Super Dome Arena Complex and Entertainment Megaplex of the Southern Hemisphere',
+    city: 'Woolloomooloo Wharf District Greater Sydney Metropolitan Area',
+    region: 'NSW',
+    country: 'Australia',
+    provider: 'manual',
+    ticketStatus: 'available',
+    ticketUrl: 'https://www.stubhub.com/event/edgecase-long-5',
+    latitude: -33.87,
+    longitude: 151.21,
+    timezone: 'Australia/Sydney',
+    monthsFromNow: 6,
+    startTime: '8:30 PM',
+  },
+];
+
+/**
+ * Extra tour dates for the `dualipa` public-profile QA matrix (PP-18,
+ * docs/qa/public-profile-stories.md). The shared TEST_TOUR_DATES sold_out
+ * rows are not publicly visible: bandsintown rows seed
+ * confirmation_status='pending' (deriveConfirmationStatus maps only 'manual'
+ * to 'confirmed') and getUpcomingTourDatesForProfile filters to confirmed +
+ * future rows, while Metro Chicago is manual but past-dated. This adds a
+ * confirmed (provider 'manual'), future sold_out row. Kept dualipa-only so
+ * the e2e-test-user and prebuilt-claim profiles that reuse TEST_TOUR_DATES
+ * stay unchanged. (The confirmed future cancelled case is already covered by
+ * seed-enmore-sydney in TEST_TOUR_DATES.)
+ */
+const DUALIPA_QA_TOUR_DATES: TestTourDate[] = [
+  {
+    externalId: 'seed-dualipa-msg-sold-out',
+    title: 'Neon Skyline World Tour',
+    venueName: 'Madison Square Garden',
+    city: 'New York',
+    region: 'NY',
+    country: 'USA',
+    provider: 'manual',
+    ticketStatus: 'sold_out',
+    ticketUrl: 'https://www.ticketmaster.com/event/dualipa-sold-out',
+    latitude: 40.75,
+    longitude: -73.99,
+    timezone: 'America/New_York',
+    monthsFromNow: 9,
+    startTime: '8:00 PM',
+  },
+];
+
+/**
  * Seeds tour dates for a creator profile.
  * Idempotent — uses onConflictDoNothing to safely backfill.
  */
 async function seedTourDatesForProfile(
   db: ReturnType<typeof drizzle>,
-  profileId: string
+  profileId: string,
+  dates: readonly TestTourDate[] = TEST_TOUR_DATES
 ) {
   console.log('    Seeding tour dates...');
 
-  const values = TEST_TOUR_DATES.map(td => ({
+  const values = dates.map(td => ({
     profileId,
     externalId: td.externalId,
     // confirmation_status is NOT NULL with no default (trust gate) — derive
@@ -764,7 +938,164 @@ async function seedTourDatesForProfile(
     return;
   }
 
-  console.log(`    ✓ Ensured ${TEST_TOUR_DATES.length} tour dates`);
+  console.log(`    ✓ Ensured ${dates.length} tour dates`);
+}
+
+/**
+ * Deterministic merch card fixtures for the `dualipa` public-profile QA
+ * stories (PP-26, docs/qa/public-profile-stories.md). The card IDs are
+ * duplicated as literals in tests/e2e/profile/qa/merch.spec.ts (specs must
+ * not import this server-side module) — keep the two in sync.
+ *
+ * Card coverage:
+ *  - standard: primary image + 4 size variants (happy path).
+ *  - longTitle: ~150-char title + long description, primary image empty so
+ *    the mockupUrls[0] fallback renders (G6 wrap + fallback chain).
+ *  - noVariants: empty variantMap (checkout disabled) and no images at all
+ *    (ShoppingBag icon fallback).
+ */
+export const E2E_MERCH_CARD_IDS = {
+  standard: '7e26a000-0000-4000-8000-0000000000a1',
+  longTitle: '7e26a000-0000-4000-8000-0000000000b2',
+  noVariants: '7e26a000-0000-4000-8000-0000000000c3',
+} as const;
+
+/**
+ * Shopify storefront seeded onto the `edgecase-long` profile settings so
+ * PP-27 can exercise the /shop interstitial + redirect. dualipa intentionally
+ * keeps no shopifyUrl so the no-shop redirect fallback stays covered (and the
+ * existing profile.spec.ts "no shop configured" smoke keeps passing).
+ */
+const E2E_SHOP_QA_SHOPIFY_URL = 'https://edgecase-long-merch.myshopify.com';
+
+interface MerchQaCardSeed {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly productType: string;
+  readonly primaryImageUrl: string;
+  readonly mockupUrls: readonly string[];
+  readonly variantMap: Readonly<Record<string, number>>;
+  readonly retailPriceCents: number;
+  readonly estimatedShippingCostCents: number;
+}
+
+const MERCH_QA_CARDS: readonly MerchQaCardSeed[] = [
+  {
+    id: E2E_MERCH_CARD_IDS.standard,
+    title: 'Neon Skyline Tee',
+    description:
+      'Deterministic merch fixture for public QA: heavyweight black tee with stacked venue typography.',
+    productType: 'T-Shirt',
+    primaryImageUrl: DEFAULT_TEST_AVATAR_URL,
+    mockupUrls: [],
+    variantMap: { s: 4011, m: 4012, l: 4013, xl: 4014 },
+    retailPriceCents: 3500,
+    estimatedShippingCostCents: 499,
+  },
+  {
+    id: E2E_MERCH_CARD_IDS.longTitle,
+    title:
+      'Neon Skyline Anniversary Deluxe Tee With An Extremely Long Product Title That Keeps Going To Exercise Clean Wrapping Across Every Viewport Width',
+    description: Array.from(
+      { length: 4 },
+      (_, index) =>
+        `Paragraph ${index + 1} of the deliberately verbose merch description used to verify the product page wraps long copy without overflow.`
+    ).join(' '),
+    productType: 'T-Shirt',
+    primaryImageUrl: '',
+    mockupUrls: [DEFAULT_TEST_AVATAR_URL],
+    variantMap: { s: 4011, m: 4012 },
+    retailPriceCents: 4200,
+    estimatedShippingCostCents: 499,
+  },
+  {
+    id: E2E_MERCH_CARD_IDS.noVariants,
+    title: 'Icon Fallback Cap',
+    description:
+      'Deterministic merch fixture with no variants and no imagery: checkout must stay disabled and the icon fallback must render.',
+    productType: 'Hat',
+    primaryImageUrl: '',
+    mockupUrls: [],
+    variantMap: {},
+    retailPriceCents: 2800,
+    estimatedShippingCostCents: 399,
+  },
+];
+
+/**
+ * Seeds live merch cards for a creator profile. Idempotent — upserts on the
+ * deterministic card IDs.
+ */
+async function seedMerchFixturesForProfile(
+  db: ReturnType<typeof drizzle>,
+  profileId: string
+) {
+  console.log('    Seeding merch card fixtures...');
+
+  for (const card of MERCH_QA_CARDS) {
+    const catalogVariantIds = Object.values(card.variantMap);
+    const values = {
+      creatorProfileId: profileId,
+      createdByClerkUserId: 'e2e-merch-qa-seed',
+      status: 'live' as const,
+      title: card.title,
+      description: card.description,
+      productType: card.productType,
+      primaryImageUrl: card.primaryImageUrl,
+      mockupUrls: [...card.mockupUrls],
+      printful: {
+        catalogProductId: 71,
+        catalogVariantIds,
+        variantMap: { ...card.variantMap },
+        placements: ['front'],
+        techniques: ['dtg' as const],
+        printFileUrls: [DEFAULT_TEST_AVATAR_URL],
+        availabilityRegion: 'US',
+        shippingProfile: 'standard',
+        catalogCostSource: 'printful' as const,
+        catalogProductName: 'Bella+Canvas 3001',
+        providerWarnings: [],
+      },
+      currency: 'USD' as const,
+      retailPriceCents: card.retailPriceCents,
+      estimatedPrintfulProductCostCents: 1200,
+      estimatedShippingCostCents: card.estimatedShippingCostCents,
+      pricing: {
+        currency: 'USD' as const,
+        retailPriceCents: card.retailPriceCents,
+        estimatedPrintfulProductCostCents: 1200,
+        estimatedShippingCostCents: card.estimatedShippingCostCents,
+        stripeFeeEstimateCents: 130,
+        refundReserveCents: 100,
+        artistRoyaltyRateBps: 5000,
+        artistPayoutPerUnitEstimateCents: 800,
+        jovieMarginPerUnitEstimateCents: 771,
+        printfulCostSource: 'printful' as const,
+      },
+      rankScore: 50,
+      learning: {
+        styleLane: 'band_tour_uniform',
+        typographyStyle: 'stacked venue typography',
+        graphicDensity: 'maximal' as const,
+        garmentColor: 'black',
+        motifs: ['pop', 'signal grid'],
+        selectedOverOptionIds: [],
+        rejectedAttributes: [],
+      },
+      publishedAt: new Date(),
+    };
+
+    await db
+      .insert(merchCards)
+      .values({ id: card.id, ...values })
+      .onConflictDoUpdate({
+        target: merchCards.id,
+        set: { ...values, updatedAt: new Date() },
+      });
+  }
+
+  console.log(`    ✓ Ensured ${MERCH_QA_CARDS.length} merch cards`);
 }
 
 async function seedPublicContactsForProfile(
@@ -813,6 +1144,9 @@ const TEST_RELEASES: TestRelease[] = [
         discNumber: 1,
         durationMs: 214000,
         isrc: 'USAT20000001',
+        // F6: deterministic preview URL so the PAC / smart-link audio
+        // preview can render inline playback instead of the degraded ladder.
+        previewUrl: E2E_TRACK_PREVIEW_URL,
       },
     ],
   },
@@ -912,6 +1246,306 @@ const TEST_RELEASES: TestRelease[] = [
     ],
   },
 ];
+
+/**
+ * Release fixture for the `edgecase-long` profile — ~120-char title, long
+ * label, and a long track title to exercise overflow/wrap/clamp on smart
+ * links and the Music tab (PP-09/PP-28).
+ */
+const EDGE_CASE_LONG_RELEASE: TestRelease = {
+  title:
+    'An Extremely Long Album Title Designed To Overflow Every Container And Wrap Cleanly Across Multiple Lines On All Surfaces',
+  slug: 'an-extremely-long-album-title-edge-case',
+  releaseType: 'album',
+  releaseDate: new Date('2024-05-10'),
+  artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
+  spotifyUrl: 'https://open.spotify.com/album/0EDGECASELONGOVERFLOWFIXTURE01',
+  totalTracks: 1,
+  upc: '191061000007',
+  label: 'The Very Long Independent Record Label Name International Group',
+  tracks: [
+    {
+      title:
+        'An Extremely Long Track Title Featuring A Very Long Featured Artist Name And Even More Words After That',
+      slug: 'an-extremely-long-track-title-edge-case',
+      trackNumber: 1,
+      discNumber: 1,
+      durationMs: 243000,
+      isrc: 'USAT20000101',
+    },
+  ],
+};
+
+/**
+ * Social links for the `edgecase-long` profile — combined with the Spotify
+ * link seeded by the generic TEST_PROFILES loop, this yields 12 links across
+ * platforms so the social-icon limit logic is exercised (PP-01/G6).
+ */
+const EDGE_CASE_LONG_SOCIAL_LINKS = [
+  {
+    platform: 'apple_music',
+    platformType: 'music_streaming' as const,
+    url: 'https://music.apple.com/us/artist/edgecase-long/0000000001',
+    displayText: 'Listen on Apple Music',
+    sortOrder: 2,
+  },
+  {
+    platform: 'youtube_music',
+    platformType: 'music_streaming' as const,
+    url: 'https://music.youtube.com/channel/UC-edgecase-long',
+    displayText: 'Listen on YouTube Music',
+    sortOrder: 3,
+  },
+  {
+    platform: 'soundcloud',
+    platformType: 'music_streaming' as const,
+    url: 'https://soundcloud.com/edgecase-long',
+    displayText: 'Listen on SoundCloud',
+    sortOrder: 4,
+  },
+  {
+    platform: 'deezer',
+    platformType: 'music_streaming' as const,
+    url: 'https://deezer.com/artist/edgecase-long',
+    displayText: 'Listen on Deezer',
+    sortOrder: 5,
+  },
+  {
+    platform: 'tidal',
+    platformType: 'music_streaming' as const,
+    url: 'https://tidal.com/browse/artist/edgecase-long',
+    displayText: 'Listen on Tidal',
+    sortOrder: 6,
+  },
+  {
+    platform: 'instagram',
+    platformType: 'social' as const,
+    url: 'https://instagram.com/edgecase.long',
+    displayText: 'Instagram',
+    sortOrder: 7,
+  },
+  {
+    platform: 'tiktok',
+    platformType: 'social' as const,
+    url: 'https://tiktok.com/@edgecase.long',
+    displayText: 'TikTok',
+    sortOrder: 8,
+  },
+  {
+    platform: 'twitter',
+    platformType: 'social' as const,
+    url: 'https://x.com/edgecaselong',
+    displayText: 'X (Twitter)',
+    sortOrder: 9,
+  },
+  {
+    platform: 'youtube',
+    platformType: 'video' as const,
+    url: 'https://youtube.com/@edgecaselong',
+    displayText: 'YouTube',
+    sortOrder: 10,
+  },
+  {
+    platform: 'facebook',
+    platformType: 'social' as const,
+    url: 'https://facebook.com/edgecaselong',
+    displayText: 'Facebook',
+    sortOrder: 11,
+  },
+  {
+    platform: 'twitch',
+    platformType: 'video' as const,
+    url: 'https://twitch.tv/edgecaselong',
+    displayText: 'Twitch',
+    sortOrder: 12,
+  },
+];
+
+/**
+ * Genre + press-photo fixtures for the `edgecase-long` About surface (PP-25,
+ * docs/qa/public-profile-stories.md). Genres live on
+ * creatorProfiles.genres (text[]) and include a case-variant duplicate
+ * ('Pop' / 'pop') to exercise the dedup path. Press photos are
+ * profile_photos rows with photo_type='press' + status='ready' (the public
+ * query in lib/db/queries/press-photos.ts filters on both), carry 4:5 aspect
+ * metadata, and reuse the local avatar asset the other seeds use. The grid
+ * only renders when settings.allowProfilePhotoDownloads === true, which the
+ * edgecase-long settings write below sets.
+ */
+const EDGE_CASE_LONG_GENRES = ['Pop', 'pop', 'Dance-Pop', 'Electronic'];
+
+const EDGE_CASE_LONG_PRESS_PHOTOS = [
+  {
+    sortOrder: 0,
+    originalFilename: 'edgecase-long-press-1.png',
+    width: 1600,
+    height: 2000,
+  },
+  {
+    sortOrder: 1,
+    originalFilename: 'edgecase-long-press-2.png',
+    width: 2000,
+    height: 2500,
+  },
+  {
+    sortOrder: 2,
+    originalFilename: 'edgecase-long-press-3.png',
+    width: 1200,
+    height: 1500,
+  },
+] as const;
+
+/**
+ * Seeds the `edgecase-long` extras: many social links, one long-titled
+ * release (with approval + provider link + long-titled track), and long
+ * venue/city tour dates. Idempotent like the other seed helpers.
+ */
+async function seedEdgeCaseLongFixtures(
+  db: ReturnType<typeof drizzle>,
+  profileId: string
+) {
+  console.log('    Seeding edgecase-long fixtures...');
+
+  for (const link of EDGE_CASE_LONG_SOCIAL_LINKS) {
+    await ensureSocialLink(db, {
+      creatorProfileId: profileId,
+      platform: link.platform,
+      platformType: link.platformType,
+      url: link.url,
+      displayText: link.displayText,
+      isActive: true,
+      sortOrder: link.sortOrder,
+      state: 'active',
+    });
+  }
+  console.log(
+    `    ✓ Added ${EDGE_CASE_LONG_SOCIAL_LINKS.length} social links for edgecase-long`
+  );
+
+  for (const provider of REQUIRED_PUBLIC_QA_PROVIDERS) {
+    await db.insert(providers).values(provider).onConflictDoNothing();
+  }
+
+  const releaseValues = {
+    creatorProfileId: profileId,
+    title: EDGE_CASE_LONG_RELEASE.title,
+    slug: EDGE_CASE_LONG_RELEASE.slug,
+    releaseType: EDGE_CASE_LONG_RELEASE.releaseType,
+    releaseDate: EDGE_CASE_LONG_RELEASE.releaseDate,
+    revealDate: EDGE_CASE_LONG_RELEASE.revealDate ?? null,
+    artworkUrl: EDGE_CASE_LONG_RELEASE.artworkUrl,
+    totalTracks: EDGE_CASE_LONG_RELEASE.totalTracks,
+    upc: EDGE_CASE_LONG_RELEASE.upc,
+    label: EDGE_CASE_LONG_RELEASE.label,
+    sourceType: 'manual' as const,
+  } satisfies SeededReleaseValues;
+
+  const [release] = await db
+    .insert(discogReleases)
+    .values(releaseValues)
+    .onConflictDoUpdate({
+      target: [discogReleases.creatorProfileId, discogReleases.slug],
+      set: { ...releaseValues, updatedAt: new Date() },
+    })
+    .returning({ id: discogReleases.id });
+
+  await db
+    .insert(libraryAssetApprovalStatuses)
+    .values(buildPublicReleaseApprovalSeedRow(profileId, release.id))
+    .onConflictDoUpdate({
+      target: [
+        libraryAssetApprovalStatuses.creatorProfileId,
+        libraryAssetApprovalStatuses.assetId,
+      ],
+      set: {
+        approvalStatus: 'approved',
+        itemKind: 'release',
+        updatedAt: new Date(),
+      },
+    });
+
+  await db
+    .insert(providerLinks)
+    .values({
+      providerId: 'spotify',
+      ownerType: 'release',
+      releaseId: release.id,
+      url: EDGE_CASE_LONG_RELEASE.spotifyUrl,
+      isPrimary: true,
+      sourceType: 'manual',
+    })
+    .onConflictDoNothing();
+
+  if (EDGE_CASE_LONG_RELEASE.tracks) {
+    await seedTracksForRelease(
+      db,
+      release.id,
+      profileId,
+      EDGE_CASE_LONG_RELEASE.tracks,
+      EDGE_CASE_LONG_RELEASE.spotifyUrl
+    );
+  }
+  console.log('    ✓ Ensured long-titled release for edgecase-long');
+
+  await seedTourDatesForProfile(db, profileId, EDGE_CASE_LONG_TOUR_DATES);
+
+  // Genres for the About surface (read from creatorProfiles.genres).
+  await db
+    .update(creatorProfiles)
+    .set({ genres: [...EDGE_CASE_LONG_GENRES], updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, profileId));
+  console.log(
+    `    ✓ Ensured ${EDGE_CASE_LONG_GENRES.length} genres for edgecase-long`
+  );
+
+  // Press photos for the About grid. Rows are keyed to the profile owner;
+  // delete-then-insert keeps the fixture idempotent (profile_photos has no
+  // unique constraint to upsert on).
+  const [profileOwner] = await db
+    .select({ userId: creatorProfiles.userId })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+  const ownerUserId = profileOwner?.userId;
+
+  if (ownerUserId) {
+    await db
+      .delete(profilePhotos)
+      .where(
+        and(
+          eq(profilePhotos.creatorProfileId, profileId),
+          eq(profilePhotos.photoType, 'press')
+        )
+      );
+
+    await db.insert(profilePhotos).values(
+      EDGE_CASE_LONG_PRESS_PHOTOS.map(photo => ({
+        userId: ownerUserId,
+        creatorProfileId: profileId,
+        status: 'ready' as const,
+        sourceType: 'manual' as const,
+        blobUrl: DEFAULT_TEST_AVATAR_URL,
+        smallUrl: DEFAULT_TEST_AVATAR_URL,
+        mediumUrl: DEFAULT_TEST_AVATAR_URL,
+        largeUrl: DEFAULT_TEST_AVATAR_URL,
+        originalFilename: photo.originalFilename,
+        mimeType: 'image/png',
+        width: photo.width,
+        height: photo.height,
+        processedAt: new Date(),
+        photoType: 'press',
+        sortOrder: photo.sortOrder,
+      }))
+    );
+    console.log(
+      `    ✓ Ensured ${EDGE_CASE_LONG_PRESS_PHOTOS.length} press photos for edgecase-long`
+    );
+  } else {
+    console.warn(
+      '    ⚠ edgecase-long profile has no owner user; skipping press photos'
+    );
+  }
+}
 
 /**
  * Seeds releases, tracks, and provider links for a creator profile.
@@ -1112,6 +1746,7 @@ async function seedTracksForRelease(
     durationMs: track.durationMs,
     isrc: track.isrc ?? null,
     isExplicit: track.isExplicit ?? false,
+    previewUrl: track.previewUrl ?? null,
     sourceType: 'manual' as const,
   }));
 
@@ -1136,6 +1771,61 @@ async function seedTracksForRelease(
         trackId: track.id,
         url: `${releaseSpotifyUrl}?track=${encodeURIComponent(track.slug)}`,
         isPrimary: true,
+        sourceType: 'manual',
+      })
+      .onConflictDoNothing();
+  }
+
+  // Tracks with a previewUrl also need canonical discog_recordings /
+  // discog_release_tracks rows: the release track summary's primaryPreviewUrl
+  // derives exclusively from discog_recordings.preview_url
+  // (lib/discography/queries.ts trackSummarySelectColumns), and the legacy
+  // insert above is onConflictDoNothing, so backfill the legacy row too.
+  for (const track of tracks) {
+    if (!track.previewUrl) {
+      continue;
+    }
+
+    await db
+      .update(discogTracks)
+      .set({ previewUrl: track.previewUrl, updatedAt: new Date() })
+      .where(
+        and(
+          eq(discogTracks.releaseId, releaseId),
+          eq(discogTracks.slug, track.slug)
+        )
+      );
+
+    const recordingValues = {
+      creatorProfileId: profileId,
+      title: track.title,
+      slug: track.slug,
+      isrc: track.isrc ?? null,
+      durationMs: track.durationMs,
+      isExplicit: track.isExplicit ?? false,
+      previewUrl: track.previewUrl,
+      sourceType: 'manual' as const,
+    };
+
+    const [recording] = await db
+      .insert(discogRecordings)
+      .values(recordingValues)
+      .onConflictDoUpdate({
+        target: [discogRecordings.creatorProfileId, discogRecordings.slug],
+        set: { ...recordingValues, updatedAt: new Date() },
+      })
+      .returning({ id: discogRecordings.id });
+
+    await db
+      .insert(discogReleaseTracks)
+      .values({
+        releaseId,
+        recordingId: recording.id,
+        title: track.title,
+        slug: track.slug,
+        trackNumber: track.trackNumber,
+        discNumber: track.discNumber,
+        isExplicit: track.isExplicit ?? false,
         sourceType: 'manual',
       })
       .onConflictDoNothing();
@@ -1380,6 +2070,26 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           ownerUserId = userId;
         }
 
+        // Edge-case QA profiles must be claimed (owner user) so the public
+        // profile renders the claimed shell rather than a claim banner.
+        if (
+          profile.username === 'edgecase-empty' ||
+          profile.username === 'edgecase-long'
+        ) {
+          const edgeCaseOwnerEmail = normalizeEmail(
+            `${profile.username}-public@jov.ie`
+          );
+          const { id: userId } = await ensureUser(db, {
+            clerkId: getSeedDeterministicClerkId(edgeCaseOwnerEmail),
+            email: edgeCaseOwnerEmail,
+            name: profile.displayName,
+            userStatus: 'active',
+            isAdmin: false,
+          });
+
+          ownerUserId = userId;
+        }
+
         const createdProfileId = await ensureCreatorProfile(db, {
           userId: ownerUserId,
           username: profile.username,
@@ -1473,7 +2183,35 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
         if (profile.username === 'dualipa') {
           await seedReleasesForProfile(db, createdProfileId);
           await seedTourDatesForProfile(db, createdProfileId);
+          await seedTourDatesForProfile(
+            db,
+            createdProfileId,
+            DUALIPA_QA_TOUR_DATES
+          );
           await seedPublicContactsForProfile(db, createdProfileId);
+          await seedMerchFixturesForProfile(db, createdProfileId);
+        }
+
+        // Add extreme-value fixtures (social links, release, tour dates) for
+        // the edgecase-long public-profile QA story matrix fixture.
+        if (profile.username === 'edgecase-long') {
+          await seedEdgeCaseLongFixtures(db, createdProfileId);
+
+          // Give edgecase-long a Shopify storefront so PP-27 can exercise the
+          // /shop interstitial + redirect; dualipa intentionally has none.
+          // allowProfilePhotoDownloads gates the About press-photo grid
+          // (PP-25, app/[username]/about/page.tsx).
+          await db
+            .update(creatorProfiles)
+            .set({
+              settings: {
+                shopifyUrl: E2E_SHOP_QA_SHOPIFY_URL,
+                allowProfilePhotoDownloads: true,
+              },
+              updatedAt: new Date(),
+            })
+            .where(eq(creatorProfiles.id, createdProfileId));
+          console.log('    ✓ Ensured Shopify URL for edgecase-long');
         }
 
         // Add Venmo payment link for tipping tests + GTM prebuilt claim fixture
