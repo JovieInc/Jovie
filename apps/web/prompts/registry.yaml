@@ -20,3 +20,7 @@ prompts:
       path: skills/retouch-white-space.md
       skillId: retouch
       version: '1.0.0'
+    - id: draft-artist-wiki-page
+      path: skills/draft-artist-wiki-page.md
+      skillId: draftArtistWikiPage
+      version: '1.0.0'
