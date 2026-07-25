@@ -47,8 +47,9 @@ describe('SystemBErrorFallback', () => {
       screen.getByText('An unexpected error occurred.')
     ).toBeInTheDocument();
     expect(screen.getByText('Error ID: digest-1')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Try Again' })).toHaveClass(
-      'system-b-error-fallback__action--primary'
+    expect(screen.getByRole('button', { name: 'Try Again' })).toHaveAttribute(
+      'data-variant',
+      'primary'
     );
     expect(screen.getByRole('link', { name: 'Go Home' })).toHaveAttribute(
       'href',
@@ -69,7 +70,7 @@ describe('SystemBErrorFallback', () => {
     expect(source).not.toContain('CSSProperties');
     expect(source).toContain('JOVIE_ICON_PATH');
     expect(source).toContain("fill='currentColor'");
-    expect(source).toContain('system-b-error-fallback__action--');
+    expect(source).toContain('system-b-error-fallback__action-link');
   });
 
   it('backs the primitive with System B tokens in the source of truth', async () => {
