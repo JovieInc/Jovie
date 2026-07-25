@@ -102,6 +102,19 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /**
+   * Navigation telemetry fans out one bounded event per visible nav item plus
+   * activation/readiness. The dedicated budget prevents normal navigation
+   * bursts from splitting a valid activation/readiness pair.
+   */
+  navigationTelemetry: {
+    name: 'Navigation Telemetry',
+    limit: 600,
+    window: '1 m',
+    prefix: 'navigation_telemetry',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // Onboarding Operations
   // ---------------------------------------------------------------------------
@@ -167,6 +180,15 @@ export const RATE_LIMITERS = {
     limit: 30,
     window: '1 m',
     prefix: 'dashboard_links',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Authenticated header search: 60 requests per minute per user */
+  headerSearch: {
+    name: 'Header Search',
+    limit: 60,
+    window: '1 m',
+    prefix: 'header_search',
     analytics: true,
   } satisfies RateLimitConfig,
 

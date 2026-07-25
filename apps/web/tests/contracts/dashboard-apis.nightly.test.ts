@@ -130,6 +130,14 @@ vi.mock('@/lib/cache', () => ({
     mockInvalidateSocialLinksCache(...args),
 }));
 
+vi.mock('@/lib/cache/profile', () => ({
+  invalidateUsernameChange: vi.fn(),
+}));
+
+vi.mock('@/lib/analytics/runtime-aware', () => ({
+  trackServerEvent: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/ingestion/confidence', () => ({
   computeLinkConfidence: (...args: any[]) => mockComputeLinkConfidence(...args),
 }));
@@ -168,6 +176,10 @@ vi.mock('@/lib/db/social-links-sync', () => ({
   syncSocialLinksFromPrimaryMusicUrls: vi.fn(),
   syncPrimaryMusicUrlsFromSocialLinks: (...args: any[]) =>
     mockSyncPrimaryMusicUrlsFromSocialLinks(...args),
+}));
+
+vi.mock('@/lib/wallet/apple/profile-pass', () => ({
+  refreshAppleWalletProfilePassForProfileId: vi.fn(),
 }));
 
 vi.mock('@sentry/nextjs', () => ({
@@ -236,8 +248,9 @@ function mockSocialLinkDependencies() {
 
 function expectStatusOk(response: Response, body: unknown) {
   if (response.status !== 200) {
+    const capturedError = mockCaptureError.mock.lastCall?.[1];
     throw new Error(
-      `Expected 200 response, received ${response.status}: ${JSON.stringify(body)}`
+      `Expected 200 response, received ${response.status}: ${JSON.stringify(body)}; captured=${String(capturedError)}`
     );
   }
 }
@@ -317,7 +330,7 @@ describe('Dashboard API contracts', () => {
       );
       const body = await response.json();
 
-      expect(response.status).toBe(200);
+      expectStatusOk(response, body);
       expect(response.headers.get('Cache-Control')).toBe(NO_STORE);
       expect(body).toMatchObject({
         profile_views: 42,
@@ -603,13 +616,14 @@ describe('Dashboard API contracts', () => {
         new Request('http://localhost/api/dashboard/profile', {
           method: 'PUT',
           body: JSON.stringify({
+            profileId: PROFILE_ID,
             updates: { username: 'TestUser', displayName: 'Test User' },
           }),
         })
       );
       const body = await response.json();
 
-      expect(response.status).toBe(200);
+      expectStatusOk(response, body);
       expect(body.profile.username).toBe('testuser');
       expect(body.profile.usernameNormalized).toBe('testuser');
     });

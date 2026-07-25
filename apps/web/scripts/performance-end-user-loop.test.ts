@@ -5,6 +5,7 @@ import {
   createEndUserLoopState,
   normalizeRawPageResults,
   refreshEndUserLoopStateConfig,
+  resolveEndUserServerLaunch,
   resolveServerBaseUrl,
 } from './performance-end-user-loop';
 import {
@@ -225,6 +226,28 @@ describe('performance end-user loop', () => {
     expect(resolveServerBaseUrl('http://127.0.0.1:3000', 4100)).toBe(
       'http://127.0.0.1:4100'
     );
+  });
+
+  it('preserves an explicit performance database for the baseline server', () => {
+    const databaseUrl = 'postgresql://perf-user@127.0.0.1:55432/jovie_uas_perf';
+    const { baseUrl, launch } = resolveEndUserServerLaunch(
+      'http://localhost:3000',
+      4100,
+      { DATABASE_URL: databaseUrl }
+    );
+
+    expect(baseUrl).toBe('http://localhost:4100');
+    expect(launch.args).toContain(
+      '--preserve-env=BETTER_AUTH_URL,DATABASE_URL'
+    );
+    expect(launch.env).toMatchObject({
+      BETTER_AUTH_URL: baseUrl,
+      DATABASE_URL: databaseUrl,
+      E2E_USE_TEST_AUTH_BYPASS: '1',
+      HOSTNAME: 'localhost',
+      NODE_ENV: 'production',
+      PORT: '4100',
+    });
   });
 
   it('filters stale failing route ids that are outside the selected routes', () => {

@@ -96,7 +96,11 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/constants/routes', () => ({
-  APP_ROUTES: { SETTINGS_TOURING: '/app/settings/touring', SIGNIN: '/signin' },
+  APP_ROUTES: {
+    TOUR_DATES: '/app/tour-dates',
+    SETTINGS_TOURING: '/app/settings/touring',
+    SIGNIN: '/signin',
+  },
 }));
 
 vi.mock('@/lib/bandsintown', () => ({
@@ -398,6 +402,7 @@ describe('tour-dates/actions.ts', () => {
       expect(result.success).toBe(true);
       expect(mockEncryptPII).toHaveBeenCalledWith('a-valid-api-key-12345');
       expect(mockDbUpdate).toHaveBeenCalled();
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/tour-dates');
       expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings/touring');
     });
 
@@ -443,6 +448,7 @@ describe('tour-dates/actions.ts', () => {
 
       expect(result.success).toBe(true);
       expect(mockDbUpdate).toHaveBeenCalled();
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/tour-dates');
       expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings/touring');
     });
 
@@ -499,6 +505,8 @@ describe('tour-dates/actions.ts', () => {
       expect(result.success).toBe(true);
       expect(result.synced).toBe(1);
       expect(result.tourDates).toHaveLength(1);
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/tour-dates');
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings/touring');
       expect(mockVerifyBandsintownArtist).toHaveBeenCalledWith(
         'My Artist',
         null
@@ -823,6 +831,7 @@ describe('tour-dates/actions.ts', () => {
       expect(result.success).toBe(true);
       expect(mockDbUpdate).toHaveBeenCalled();
       expect(mockDbDelete).toHaveBeenCalled();
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/tour-dates');
       expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings/touring');
     });
 

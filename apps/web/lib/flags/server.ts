@@ -32,7 +32,11 @@ const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
   (Object.keys(APP_FLAG_DEFAULTS) as AppFlagName[]).filter(
     flagName =>
       flagName !== 'RELEASE_PLAN_DEMO' &&
-      flagName !== 'RELEASE_TO_REVENUE_AUTOPILOT'
+      flagName !== 'RELEASE_TO_REVENUE_AUTOPILOT' &&
+      // The inbox flag changes canonical customer navigation. Keep its
+      // rollout role-invariant so entering customer mode never gives admins
+      // a different sidebar from creators.
+      flagName !== 'INBOX_HOME'
   )
 );
 

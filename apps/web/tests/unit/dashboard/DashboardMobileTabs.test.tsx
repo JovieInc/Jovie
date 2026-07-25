@@ -38,11 +38,10 @@ vi.mock('@/lib/tracking/navigation-telemetry', () => ({
 }));
 
 const CANONICAL_LABELS = [
-  'New Chat',
   'Inbox',
+  'Chat',
   'Library',
   'Contacts',
-  'Profiles',
   'Calendar',
   'Tasks',
 ] as const;
@@ -60,13 +59,11 @@ describe('DashboardMobileTabs', () => {
     render(<DashboardMobileTabs />);
 
     const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
-    expect(tabs.parentElement).toHaveAttribute('data-layout', 'in-flow');
-    expect(tabs.parentElement).not.toHaveClass('fixed');
     const directLinks = within(tabs).getAllByRole('link');
 
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
-      'New Chat',
       'Inbox',
+      'Chat',
       'Library',
     ]);
     expect(
@@ -82,7 +79,7 @@ describe('DashboardMobileTabs', () => {
     render(<DashboardMobileTabs />);
 
     expect(mockTrackNavigationImpressions).toHaveBeenCalledWith(
-      ['chat', 'inbox', 'library'],
+      ['inbox', 'chat', 'library'],
       APP_ROUTES.CHAT,
       expect.objectContaining({
         isMobile: true,
@@ -105,7 +102,7 @@ describe('DashboardMobileTabs', () => {
     });
   });
 
-  it('shows the exact seven in order, with Settings separated as utility', async () => {
+  it('shows the exact six in order, with Settings separated as utility', async () => {
     const user = userEvent.setup();
     render(<DashboardMobileTabs />);
 
@@ -115,22 +112,27 @@ describe('DashboardMobileTabs', () => {
     });
     const links = within(menu).getAllByRole('link');
 
-    expect(links.slice(0, 7).map(link => link.textContent?.trim())).toEqual(
+    expect(links.slice(0, 6).map(link => link.textContent?.trim())).toEqual(
       CANONICAL_LABELS
     );
-    expect(links.slice(0, 7).map(link => link.getAttribute('href'))).toEqual([
-      APP_ROUTES.CHAT,
+    expect(links.slice(0, 6).map(link => link.getAttribute('href'))).toEqual([
       APP_ROUTES.DASHBOARD,
+      APP_ROUTES.CHAT,
       APP_ROUTES.LIBRARY,
       APP_ROUTES.CONTACTS,
-      APP_ROUTES.PROFILES,
       APP_ROUTES.CALENDAR,
       APP_ROUTES.TASKS,
     ]);
-    expect(links.at(7)).toHaveTextContent('Settings');
-    expect(links.at(7)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
+    expect(links.at(6)).toHaveTextContent('Settings');
+    expect(links.at(6)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
 
-    for (const label of ['Search', 'Touring', 'Audience', 'Releases']) {
+    for (const label of [
+      'Search',
+      'Touring',
+      'Audience',
+      'Profiles',
+      'Releases',
+    ]) {
       expect(within(menu).queryByRole('link', { name: label })).toBeNull();
     }
   });
@@ -164,7 +166,7 @@ describe('DashboardMobileTabs', () => {
       within(chatTabs).getByRole('link', { name: 'Inbox' })
     ).not.toHaveAttribute('aria-current');
     expect(
-      within(chatTabs).getByRole('link', { name: 'New Chat' })
+      within(chatTabs).getByRole('link', { name: 'Chat' })
     ).toHaveAttribute('aria-current', 'page');
     chat.unmount();
 

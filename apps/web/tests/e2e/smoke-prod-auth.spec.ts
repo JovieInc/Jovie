@@ -258,6 +258,12 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     const lower = mainText.toLowerCase();
     expect(lower).not.toContain('application error');
     expect(lower).not.toContain('something went wrong');
+
+    const performanceAuthStatePath =
+      process.env.PERFORMANCE_AUTH_STATE_PATH?.trim();
+    if (performanceAuthStatePath) {
+      await page.context().storageState({ path: performanceAuthStatePath });
+    }
   });
 
   test('dashboard tab navigation works', async ({ page }, testInfo) => {

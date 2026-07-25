@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
+import type { BrandVariant } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
-import { AppShellFrame, type AppShellFrameVariant } from './AppShellFrame';
+import { AppShellFrame } from './AppShellFrame';
 
 const NAV_ITEMS = [
   { key: 'nav-inbox', width: '60%' },
@@ -19,9 +20,9 @@ const NAV_ITEMS_2 = [
 ];
 
 function DefaultSidebarSkeleton({
-  isShellChatV1,
+  brandVariant,
 }: {
-  readonly isShellChatV1: boolean;
+  readonly brandVariant: BrandVariant;
 }) {
   return (
     <div
@@ -29,28 +30,20 @@ function DefaultSidebarSkeleton({
       // compact header height so the post-resolve UnifiedSidebar slots in
       // without a width/header reflow.
       className={cn(
-        'max-lg:hidden bg-sidebar lg:flex lg:shrink-0 lg:flex-col',
-        isShellChatV1 ? 'lg:w-(--app-shell-sidebar-width)' : 'lg:w-58'
+        'max-lg:hidden bg-sidebar lg:flex lg:w-(--app-shell-sidebar-width) lg:shrink-0 lg:flex-col',
+        brandVariant === 'ov' && 'ov-mode'
       )}
     >
       <div
         className={cn(
-          'flex items-center gap-2 px-2.5',
-          isShellChatV1
-            ? 'h-(--app-shell-header-height-compact) py-0.5'
-            : 'h-9 pt-2'
+          'flex h-(--app-shell-header-height-compact) items-center gap-2 px-2.5 py-0.5'
         )}
       >
         <div className='skeleton h-6 w-6 rounded-md' />
         <div className='skeleton h-4 w-24 rounded' />
       </div>
 
-      <div
-        className={cn(
-          'flex-1 space-y-1',
-          isShellChatV1 ? 'px-2.5 pt-1.5' : 'px-2 pt-4'
-        )}
-      >
+      <div className={cn('flex-1 space-y-1 px-2.5 pt-1.5')}>
         {NAV_ITEMS.map(item => (
           <div
             key={item.key}
@@ -82,12 +75,7 @@ function DefaultSidebarSkeleton({
         ))}
       </div>
 
-      <div
-        className={cn(
-          'flex items-center gap-2 pb-2 pt-1',
-          isShellChatV1 ? 'px-2.5' : 'px-2'
-        )}
-      >
+      <div className={cn('flex items-center gap-2 px-2.5 pb-2 pt-1')}>
         <div className='skeleton h-7 w-7 shrink-0 rounded-full' />
         <div className='skeleton h-3 w-20 rounded' />
       </div>
@@ -98,17 +86,13 @@ function DefaultSidebarSkeleton({
 export function AppShellSkeleton({
   main: mainOverride,
   audioPlayer,
-  variant,
+  brandVariant = 'jovie',
   sidebar: sidebarOverride,
 }: {
   readonly main?: ReactNode;
   readonly audioPlayer?: ReactNode;
-  /**
-   * Match the AppShellFrame variant the post-skeleton render will use so the
-   * Suspense fallback doesn't flash a different layout while data loads.
-   * Defaults to 'legacy' to match the production default state.
-   */
-  readonly variant?: AppShellFrameVariant;
+  /** Brand skin for the sidebar fallback. */
+  readonly brandVariant?: BrandVariant;
   /**
    * Override the sidebar skeleton. Pass `null` for unauthenticated onboarding
    * surfaces (e.g. /start) that intentionally render without sidebar.
@@ -116,18 +100,15 @@ export function AppShellSkeleton({
    */
   readonly sidebar?: ReactNode | null;
 } = {}) {
-  const isShellChatV1 = variant === 'shellChatV1';
-
   const resolvedSidebar =
     sidebarOverride !== undefined ? (
       sidebarOverride
     ) : (
-      <DefaultSidebarSkeleton isShellChatV1={isShellChatV1} />
+      <DefaultSidebarSkeleton brandVariant={brandVariant} />
     );
 
   return (
     <AppShellFrame
-      variant={variant}
       sidebar={resolvedSidebar}
       header={
         <header
@@ -135,10 +116,7 @@ export function AppShellSkeleton({
           // matches the compact header token used by DashboardHeader so the
           // Suspense fallback doesn't shift the breadcrumb down a row.
           className={cn(
-            'flex shrink-0 items-center gap-2',
-            isShellChatV1
-              ? 'h-(--app-shell-header-height-compact) bg-(--app-shell-content-surface) px-2.5'
-              : 'h-12 border-b border-subtle px-4'
+            'flex h-(--app-shell-header-height-compact) shrink-0 items-center gap-2 bg-(--app-shell-content-surface) px-2.5'
           )}
         >
           <div className='skeleton h-4 w-20 rounded' />

@@ -2,7 +2,6 @@ import { and, asc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { users } from '@/lib/db/schema/auth';
 import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
@@ -53,15 +52,14 @@ export async function GET(req: Request) {
     }
 
     const contacts = await withDbSessionTx(
-      async (tx, clerkUserId) => {
+      async (tx, appUserId) => {
         const [profile] = await tx
           .select({ id: creatorProfiles.id })
           .from(creatorProfiles)
-          .innerJoin(users, eq(users.id, creatorProfiles.userId))
           .where(
             and(
               eq(creatorProfiles.id, profileId),
-              eq(users.clerkId, clerkUserId)
+              eq(creatorProfiles.userId, appUserId)
             )
           )
           .limit(1);

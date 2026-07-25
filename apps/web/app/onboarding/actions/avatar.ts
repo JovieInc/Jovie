@@ -11,6 +11,7 @@ import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
 import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
 import { applyProfileEnrichment } from '@/lib/ingestion/profile';
+import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
 import type { AvatarFetchResult, AvatarUploadResult } from './types';
 
 /** Known Vercel project prefixes for this workspace. */
@@ -403,6 +404,13 @@ export async function handleBackgroundAvatarUpload(
       return;
     }
 
+    // Accent derivation can download, retry, and invoke Sharp. Finish that
+    // expensive work before opening the RLS session transaction.
+    const precomputedAvatarTheme = await buildThemeWithProfileAccent({
+      existingTheme: null,
+      sourceUrl: uploaded.blobUrl,
+    });
+
     await withDbSessionTx(async tx => {
       const [profile] = await tx
         .select({
@@ -418,6 +426,7 @@ export async function handleBackgroundAvatarUpload(
         avatarLockedByUser: profile?.avatarLockedByUser ?? null,
         currentAvatarUrl: profile?.avatarUrl ?? null,
         extractedAvatarUrl: uploaded.blobUrl,
+        precomputedAvatarTheme,
       });
 
       await tx

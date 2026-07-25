@@ -1,7 +1,8 @@
 'use client';
 
 import { Check, ImagePlus, Loader2, RotateCw, X } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelData,
   usePreviewPanelContext,
@@ -15,6 +16,12 @@ import { cn } from '@/lib/utils';
 type UploadState = 'idle' | 'uploading' | 'success' | 'error';
 
 export function ChatAvatarUploadCard() {
+  const { selectedProfile } = useDashboardData();
+  const selectedProfileId = selectedProfile?.id;
+  const selectedProfileIdRef = useRef(selectedProfileId);
+  useEffect(() => {
+    selectedProfileIdRef.current = selectedProfileId;
+  }, [selectedProfileId]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<UploadState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -23,9 +30,10 @@ export function ChatAvatarUploadCard() {
   const previewPanel = usePreviewPanelContext();
   // Snapshot + local object URL for the in-flight optimistic avatar swap.
   const pendingRef = useRef<{
+    profileId: string | null;
     snapshot: PreviewPanelData | null;
     objectUrl: string | null;
-  }>({ snapshot: null, objectUrl: null });
+  }>({ profileId: null, snapshot: null, objectUrl: null });
 
   const clearObjectUrl = useCallback(() => {
     if (pendingRef.current.objectUrl) {
@@ -35,7 +43,20 @@ export function ChatAvatarUploadCard() {
   }, []);
 
   const { mutate: uploadAvatar } = useAvatarMutation({
+    profileId: selectedProfileId,
     onSuccess: (avatarUrl: string) => {
+      if (pendingRef.current.profileId !== selectedProfileIdRef.current) {
+        clearObjectUrl();
+        pendingRef.current = {
+          profileId: null,
+          snapshot: null,
+          objectUrl: null,
+        };
+        setState('idle');
+        setError(null);
+        return;
+      }
+
       setState('success');
 
       // Swap the optimistic object URL for the persisted avatar URL.
@@ -46,9 +67,25 @@ export function ChatAvatarUploadCard() {
         });
       }
       clearObjectUrl();
-      pendingRef.current.snapshot = null;
+      pendingRef.current = {
+        profileId: null,
+        snapshot: null,
+        objectUrl: null,
+      };
     },
     onError: (err: Error) => {
+      if (pendingRef.current.profileId !== selectedProfileIdRef.current) {
+        clearObjectUrl();
+        pendingRef.current = {
+          profileId: null,
+          snapshot: null,
+          objectUrl: null,
+        };
+        setState('idle');
+        setError(null);
+        return;
+      }
+
       setState('error');
       setError(err.message || 'Upload failed. Please try again.');
 
@@ -57,12 +94,22 @@ export function ChatAvatarUploadCard() {
         previewPanel.setPreviewData(pendingRef.current.snapshot);
       }
       clearObjectUrl();
-      pendingRef.current.snapshot = null;
+      pendingRef.current = {
+        profileId: null,
+        snapshot: null,
+        objectUrl: null,
+      };
     },
   });
 
   const handleFile = useCallback(
     (file: File) => {
+      if (!selectedProfileId) {
+        setState('error');
+        setError('Select a profile before uploading a photo.');
+        return;
+      }
+
       const validationError = validateAvatarFile(file);
       if (validationError) {
         setState('error');
@@ -75,20 +122,24 @@ export function ChatAvatarUploadCard() {
       // Optimistically show the chosen image in the live preview while it uploads.
       const snapshot = previewPanel?.previewData ?? null;
       const objectUrl = snapshot ? URL.createObjectURL(file) : null;
-      pendingRef.current = { snapshot, objectUrl };
+      pendingRef.current = {
+        profileId: selectedProfileId,
+        snapshot,
+        objectUrl,
+      };
       if (snapshot && objectUrl) {
         previewPanel?.setPreviewData({ ...snapshot, avatarUrl: objectUrl });
       }
 
       uploadAvatar(file);
     },
-    [uploadAvatar, previewPanel]
+    [selectedProfileId, uploadAvatar, previewPanel]
   );
 
   const handleClick = useCallback(() => {
-    if (state === 'uploading') return;
+    if (state === 'uploading' || !selectedProfileId) return;
     fileInputRef.current?.click();
-  }, [state]);
+  }, [selectedProfileId, state]);
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -174,7 +225,7 @@ export function ChatAvatarUploadCard() {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          disabled={state === 'uploading'}
+          disabled={state === 'uploading' || !selectedProfileId}
           className={cn(
             'system-b-chat-avatar-upload-dropzone',
             isDragOver && 'system-b-chat-avatar-upload-dropzone-active',

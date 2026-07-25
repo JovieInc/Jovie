@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   DASHBOARD_ROUTE_MATRIX,
   EXCLUDED_ROUTES,
@@ -25,7 +26,20 @@ function getAllRegisteredRoutes(): Set<string> {
 
   for (const group of Object.values(DASHBOARD_ROUTE_MATRIX)) {
     for (const route of group.full) {
-      routes.add(normalizeDynamicSegments(route.path));
+      const normalizedRoute = normalizeDynamicSegments(route.path);
+      routes.add(normalizedRoute);
+
+      // OV is the canonical public URL, but its pages remain implemented in
+      // the legacy admin directory behind a Next rewrite. Count that physical
+      // alias as registered when this source-level gate scans page.tsx files.
+      if (
+        normalizedRoute === APP_ROUTES.OV ||
+        normalizedRoute.startsWith(`${APP_ROUTES.OV}/`)
+      ) {
+        routes.add(
+          normalizedRoute.replace(APP_ROUTES.OV, APP_ROUTES.LEGACY_ADMIN)
+        );
+      }
     }
   }
 

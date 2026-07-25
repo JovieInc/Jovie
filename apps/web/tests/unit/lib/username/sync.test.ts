@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const withDbSessionTxMock = vi.hoisted(() => vi.fn());
 const invalidateUsernameChangeMock = vi.hoisted(() => vi.fn());
-const invalidateHandleCacheMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/session', () => ({
   withDbSessionTx: withDbSessionTxMock,
@@ -10,10 +9,6 @@ vi.mock('@/lib/auth/session', () => ({
 
 vi.mock('@/lib/cache/profile', () => ({
   invalidateUsernameChange: invalidateUsernameChangeMock,
-}));
-
-vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
-  invalidateHandleCache: invalidateHandleCacheMock,
 }));
 
 type SelectResult = Array<Record<string, unknown>>;
@@ -45,7 +40,7 @@ describe('syncCanonicalUsernameFromApp', () => {
 
   it('invalidates old and new profile caches when username changes', async () => {
     const tx = createTx([
-      [{ id: 'user-1' }],
+      [{ id: 'user-1', activeProfileId: 'profile-1' }],
       [{ id: 'profile-1', usernameNormalized: 'oldname' }],
       [],
     ]);
@@ -64,13 +59,11 @@ describe('syncCanonicalUsernameFromApp', () => {
       'newname',
       'oldname'
     );
-    expect(invalidateHandleCacheMock).toHaveBeenCalledWith('newname');
-    expect(invalidateHandleCacheMock).toHaveBeenCalledWith('oldname');
   });
 
   it('does not invalidate caches when username is unchanged', async () => {
     const tx = createTx([
-      [{ id: 'user-1' }],
+      [{ id: 'user-1', activeProfileId: 'profile-1' }],
       [{ id: 'profile-1', usernameNormalized: 'samehandle' }],
     ]);
 
@@ -85,6 +78,5 @@ describe('syncCanonicalUsernameFromApp', () => {
     await syncCanonicalUsernameFromApp('clerk_1', 'samehandle');
 
     expect(invalidateUsernameChangeMock).not.toHaveBeenCalled();
-    expect(invalidateHandleCacheMock).not.toHaveBeenCalled();
   });
 });

@@ -90,7 +90,7 @@ describe('ReleasesPageClient skeleton behavior', () => {
     await renderPage();
 
     expect(screen.queryByTestId('release-table-skeleton')).toBeNull();
-    expect(screen.getAllByTestId('dynamic-stub').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('shell-releases-view')).toBeInTheDocument();
   });
 
   it('keeps the releases view mounted when populated data is present', async () => {
@@ -102,7 +102,7 @@ describe('ReleasesPageClient skeleton behavior', () => {
     await renderPage();
 
     expect(screen.queryByTestId('release-table-skeleton')).toBeNull();
-    expect(screen.getAllByTestId('dynamic-stub').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('shell-releases-view')).toBeInTheDocument();
   });
 
   it('renders the error state when isError and no data are present', async () => {
@@ -126,6 +126,6 @@ describe('ReleasesPageClient skeleton behavior', () => {
     await renderPage();
 
     expect(screen.queryByTestId('page-error-state')).toBeNull();
-    expect(screen.getAllByTestId('dynamic-stub').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('shell-releases-view')).toBeInTheDocument();
   });
 });

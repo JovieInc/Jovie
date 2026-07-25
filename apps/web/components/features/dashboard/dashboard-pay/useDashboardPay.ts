@@ -19,7 +19,8 @@ import type { UseDashboardPayReturn } from './types';
 export function useDashboardPay(): UseDashboardPayReturn {
   const router = useRouter();
   const dashboardData = useDashboardData();
-  const updateVenmoMutation = useUpdateVenmoMutation();
+  const selectedProfileId = dashboardData.selectedProfile?.id;
+  const updateVenmoMutation = useUpdateVenmoMutation(selectedProfileId);
 
   const [artist, setArtist] = useState<Artist | null>(
     dashboardData.selectedProfile
@@ -50,9 +51,11 @@ export function useDashboardPay(): UseDashboardPayReturn {
   }, [dashboardData.selectedProfile]);
 
   const hasVenmoHandle = Boolean(artist?.venmo_handle);
+  const isProfileSynchronized =
+    selectedProfileId !== undefined && artist?.id === selectedProfileId;
 
   const handleSaveVenmo = useCallback(async () => {
-    if (!artist) return;
+    if (!artist || !isProfileSynchronized) return;
 
     const trimmedHandle = venmoHandle.trim();
     if (!trimmedHandle) {
@@ -84,7 +87,7 @@ export function useDashboardPay(): UseDashboardPayReturn {
           : 'Failed to update Venmo handle';
       toast.error(message);
     }
-  }, [venmoHandle, artist, updateVenmoMutation, router]);
+  }, [venmoHandle, artist, isProfileSynchronized, updateVenmoMutation, router]);
 
   const handleCancel = useCallback(() => {
     if (!artist) return;
@@ -93,7 +96,7 @@ export function useDashboardPay(): UseDashboardPayReturn {
   }, [artist]);
 
   const handleDisconnect = useCallback(async () => {
-    if (!artist) return;
+    if (!artist || !isProfileSynchronized) return;
 
     try {
       await updateVenmoMutation.mutateAsync({
@@ -114,7 +117,7 @@ export function useDashboardPay(): UseDashboardPayReturn {
         error instanceof Error ? error.message : 'Failed to disconnect Venmo';
       toast.error(message);
     }
-  }, [artist, updateVenmoMutation, router]);
+  }, [artist, isProfileSynchronized, updateVenmoMutation, router]);
 
   return {
     artist,

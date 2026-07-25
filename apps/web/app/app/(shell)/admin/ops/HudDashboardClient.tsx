@@ -753,7 +753,7 @@ export function HudDashboardClient({
   const showDispatch = presentationMode !== 'token';
   const showQrPanel = presentationMode === 'token' && Boolean(hudUrl);
 
-  // Outer layout: shell defers width to the AdminToolPage container (no
+  // Outer layout: shell defers width to the AdminPage container (no
   // additional centering or max-width so metrics fill the full horizontal
   // space at any viewport). Kiosk keeps its own padding for breathing room
   // on TV displays but also removes the max-width cap so wide monitors get

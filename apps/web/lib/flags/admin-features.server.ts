@@ -6,7 +6,6 @@ import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_DESCRIPTIONS,
   type AppFlagName,
-  DESIGN_V1_ALIAS_FLAGS,
 } from './contracts';
 
 /** One admin Features table row: flag metadata + each env's raw override cell. */
@@ -20,12 +19,7 @@ export interface FeatureFlagAdminRow {
   readonly prod: boolean | null;
 }
 
-const ALIAS_FLAGS = new Set<string>(DESIGN_V1_ALIAS_FLAGS);
-
-/** Runtime flags shown in the admin UI (DESIGN_V1 surface aliases collapsed out). */
-const RUNTIME_FLAG_NAMES = (
-  Object.keys(APP_FLAG_DEFAULTS) as AppFlagName[]
-).filter(name => !ALIAS_FLAGS.has(name));
+const RUNTIME_FLAG_NAMES = Object.keys(APP_FLAG_DEFAULTS) as AppFlagName[];
 
 export async function getFeatureFlagAdminRows(): Promise<
   FeatureFlagAdminRow[]

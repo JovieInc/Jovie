@@ -42,17 +42,18 @@ function getAnnualSavingsPercent(
 const PRO_HIGHLIGHTS = [
   {
     icon: Bell,
-    label: 'Release notifications',
+    label: 'Release Notifications',
     detail: 'Notify fans the moment you drop',
   },
   {
     icon: BarChart3,
-    label: '90-day analytics',
+    // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Numeric-leading duration is valid Title Case; the rule's canonical suggestion is identical.
+    label: '90-day Analytics',
     detail: 'Geographic insights & advanced data',
   },
   {
     icon: BadgeCheck,
-    label: 'Verified badge',
+    label: 'Verified Badge',
     detail: 'Build trust with your audience',
   },
 ] as const;
@@ -275,7 +276,7 @@ export function OnboardingCheckoutClient({
       <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
         <div className={FORM_LAYOUT.headerSection}>
           <h1 className={FORM_LAYOUT.title}>
-            Upgrade to {planMarketing.displayName}
+            Upgrade To {planMarketing.displayName}
           </h1>
           <p className={FORM_LAYOUT.hint}>
             {isDefaultUpsell && username
@@ -371,7 +372,6 @@ export function OnboardingCheckoutClient({
   return (
     <SidebarProvider defaultOpen={false}>
       <AppShellFrame
-        variant='shellChatV1'
         sidebar={null}
         containerClassName='[color-scheme:dark]'
         contentClassName='overflow-hidden!'

@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-
+import {
+  getUxLatencySummaries,
+  resetUxLatencyForTests,
+} from '@/lib/monitoring/interaction-latency';
 import {
   createWebSpeechTranscriber,
   isWebSpeechTranscriptionSupported,
@@ -39,6 +42,8 @@ function removeMockSpeechRecognition() {
 describe('transcriber', () => {
   afterEach(() => {
     removeMockSpeechRecognition();
+    resetUxLatencyForTests();
+    vi.restoreAllMocks();
   });
 
   it('detects Web Speech support in the browser', () => {
@@ -91,5 +96,38 @@ describe('transcriber', () => {
 
     expect(onTranscript).toHaveBeenCalledWith('hello world');
     expect(onError).toHaveBeenCalledWith('not-allowed');
+  });
+
+  it('records start-to-first-transcript latency once per recognition session', () => {
+    installMockSpeechRecognition();
+    vi.spyOn(performance, 'now')
+      .mockReturnValueOnce(100)
+      .mockReturnValueOnce(275)
+      .mockReturnValueOnce(350);
+    const transcriber = createWebSpeechTranscriber({ onTranscript: vi.fn() });
+
+    transcriber.start();
+    const recognition = MockSpeechRecognition.instances[0];
+    const resultEvent = {
+      results: [
+        {
+          0: { transcript: 'hello', confidence: 1 },
+          length: 1,
+          item: () => ({ transcript: 'hello', confidence: 1 }),
+        },
+      ],
+    } as unknown as Event;
+    recognition?.onresult?.(resultEvent);
+    recognition?.onresult?.(resultEvent);
+
+    expect(
+      getUxLatencySummaries().find(
+        summary => summary.metric === 'speech_to_text'
+      )
+    ).toMatchObject({
+      sampleCount: 1,
+      p50Ms: 175,
+      p95Ms: 175,
+    });
   });
 });

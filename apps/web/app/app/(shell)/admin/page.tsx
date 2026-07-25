@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import {
   AdminFounderHudSection,
   AdminFounderHudSectionSkeleton,
@@ -23,7 +24,9 @@ export const metadata: Metadata = {
 
 export const runtime = 'nodejs';
 
-export default function AdminOverviewPage() {
+export default async function AdminOverviewPage() {
+  await requireCurrentAdminPageAccess();
+
   return (
     <AdminPage
       title='Overview'

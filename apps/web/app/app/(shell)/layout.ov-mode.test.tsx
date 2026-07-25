@@ -10,8 +10,6 @@ const {
   getCurrentAdminPageAccessMock,
   headersMock,
   redirectMock,
-  suspendShellContentMock,
-  unstableRethrowMock,
 } = vi.hoisted(() => ({
   dashboardShellContentMock: vi.fn(),
   getAppFlagValueMock: vi.fn(),
@@ -21,8 +19,6 @@ const {
   redirectMock: vi.fn((href: string) => {
     throw new Error(`NEXT_REDIRECT:${href}`);
   }),
-  suspendShellContentMock: { value: false },
-  unstableRethrowMock: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -32,16 +28,13 @@ vi.mock('next/headers', () => ({ headers: headersMock }));
 vi.mock('next/navigation', () => ({
   redirect: redirectMock,
   unstable_rethrow: (error: unknown) => {
-    unstableRethrowMock(error);
-    if (error instanceof Error && error.message.startsWith('NEXT_REDIRECT:')) {
-      throw error;
-    }
+    throw error;
   },
 }));
 
-vi.mock('@/components/organisms/AppShellSkeleton', () => ({
-  AppShellSkeleton: ({ main }: { readonly main?: ReactNode }) => (
-    <div data-testid='app-shell-skeleton'>{main}</div>
+vi.mock('@/components/organisms/CinematicAppBoot', () => ({
+  CinematicAppBoot: ({ brandVariant }: { brandVariant?: string }) => (
+    <div data-testid='shell-fallback' data-brand-variant={brandVariant} />
   ),
 }));
 vi.mock('@/components/organisms/PersistentAudioBar', () => ({
@@ -54,12 +47,10 @@ vi.mock('@/components/shell/LyricsRouteSkeleton', () => ({
   LyricsRouteSkeleton: () => null,
 }));
 vi.mock('@/components/shell/TasksRouteSkeleton', () => ({
-  TasksRouteSkeleton: () => <div data-testid='tasks-route-skeleton' />,
+  TasksRouteSkeleton: () => null,
 }));
-const errorBannerMock = vi.hoisted(() => vi.fn((_props: unknown) => null));
-
 vi.mock('@/features/feedback/ErrorBanner', () => ({
-  ErrorBanner: errorBannerMock,
+  ErrorBanner: () => null,
 }));
 
 vi.mock('@/lib/admin/page-access', () => ({
@@ -79,9 +70,7 @@ vi.mock('@/lib/flags/server', () => ({
   getAppFlagValue: getAppFlagValueMock,
 }));
 
-vi.mock('./chat/ChatLoadingState', () => ({
-  default: () => <div data-testid='chat-route-skeleton' />,
-}));
+vi.mock('./chat/loading', () => ({ default: () => null }));
 vi.mock('./dashboard/releases/loading', () => ({
   ReleaseTableSkeleton: () => null,
 }));
@@ -94,9 +83,6 @@ vi.mock('./DashboardShellContent', () => ({
     readonly mode: string;
   }) => {
     dashboardShellContentMock(props);
-    if (suspendShellContentMock.value) {
-      throw new Promise(() => {});
-    }
     return <div data-shell-mode={props.mode}>{props.children}</div>;
   },
 }));
@@ -108,8 +94,6 @@ describe('AppShellLayout OV mode', () => {
     vi.clearAllMocks();
     getCachedAuthMock.mockResolvedValue({ userId: 'user_test' });
     getAppFlagValueMock.mockResolvedValue(true);
-    suspendShellContentMock.value = false;
-    unstableRethrowMock.mockReset();
   });
 
   it('terminates unauthorized OV requests before shell or flag data loads', async () => {
@@ -158,65 +142,5 @@ describe('AppShellLayout OV mode', () => {
     expect(
       screen.getByText('Customer content').closest('[data-shell-mode]')
     ).toHaveAttribute('data-shell-mode', 'customer');
-  });
-
-  it('keeps the first authenticated shell boot on the stable shell fallback while content streams', async () => {
-    headersMock.mockResolvedValue(
-      new Headers({
-        'next-url': APP_ROUTES.TASKS,
-        'x-jovie-app-shell-mode': 'customer',
-      })
-    );
-    suspendShellContentMock.value = true;
-
-    render(await AppShellLayout({ children: <div>Tasks content</div> }));
-
-    expect(screen.getByTestId('app-shell-skeleton')).toContainElement(
-      screen.getByTestId('tasks-route-skeleton')
-    );
-
-    headersMock.mockResolvedValue(
-      new Headers({
-        'next-url': APP_ROUTES.LIBRARY,
-        'x-jovie-app-shell-mode': 'customer',
-      })
-    );
-
-    render(await AppShellLayout({ children: <div>Library content</div> }));
-
-    expect(screen.getAllByTestId('app-shell-skeleton')).toHaveLength(2);
-  });
-
-  it('keeps unknown loading routes neutral instead of flashing chat', async () => {
-    headersMock.mockResolvedValue(
-      new Headers({ 'x-jovie-app-shell-mode': 'customer' })
-    );
-    suspendShellContentMock.value = true;
-
-    render(await AppShellLayout({ children: <div>Unknown content</div> }));
-
-    expect(screen.getByTestId('app-shell-skeleton')).toBeInTheDocument();
-    expect(screen.queryByTestId('chat-route-skeleton')).toBeNull();
-  });
-
-  it('keeps the fatal recovery action primary and the return path secondary', async () => {
-    const failure = new Error('workspace query failed');
-    getCachedAuthMock.mockRejectedValueOnce(failure);
-
-    render(await AppShellLayout({ children: <div>Unavailable content</div> }));
-
-    expect(unstableRethrowMock).toHaveBeenCalledWith(failure);
-    expect(errorBannerMock.mock.calls.at(-1)?.[0]).toEqual(
-      expect.objectContaining({
-        title: 'Dashboard failed to load',
-        actions: [
-          expect.objectContaining({ label: 'Retry', variant: 'primary' }),
-          expect.objectContaining({
-            label: 'Return to Jovie',
-            variant: 'secondary',
-          }),
-        ],
-      })
-    );
   });
 });

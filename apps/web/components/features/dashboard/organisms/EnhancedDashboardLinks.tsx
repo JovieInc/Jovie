@@ -218,6 +218,7 @@ export function EnhancedDashboardLinks({
       location: selectedProfile?.location ?? null,
       hometown: getHometownFromSettings(selectedProfile?.settings) ?? null,
       activeSinceYear: selectedProfile?.activeSinceYear ?? null,
+      profileEditVersion: selectedProfile?.profileEditVersion,
       links: dashboardLinks,
       profilePath,
       dspConnections: {
@@ -237,6 +238,7 @@ export function EnhancedDashboardLinks({
     selectedProfile?.settings,
     selectedProfile?.location,
     selectedProfile?.activeSinceYear,
+    selectedProfile?.profileEditVersion,
     setPreviewData,
     username,
   ]);

@@ -20,6 +20,7 @@ import {
 import { cn } from '../lib/utils';
 import {
   renderActionItem,
+  renderActionRow,
   renderCheckboxItem,
   renderIcon,
   renderLabel,
@@ -32,6 +33,7 @@ import type {
 } from './common-dropdown-types';
 import {
   isActionItem,
+  isActionRow,
   isCheckboxItem,
   isCustomItem,
   isLabel,
@@ -245,6 +247,10 @@ export function renderItem(
 
   if (isActionItem(item)) {
     return renderActionItem(item, context);
+  }
+
+  if (isActionRow(item)) {
+    return renderActionRow(item, context);
   }
 
   if (isCheckboxItem(item)) {

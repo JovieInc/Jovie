@@ -71,12 +71,17 @@ function assertSuccess(result: CommandResult, message: string) {
   );
 }
 
-function readBypassUserId(filePath: string) {
+function readBetterAuthUserId(filePath: string) {
   const state = JSON.parse(readFileSync(filePath, 'utf8')) as StorageStateLike;
   return (
     state.cookies?.find(cookie => cookie.name === '__e2e_test_user_id')
       ?.value ?? null
   );
+}
+
+function resolvePerformanceDatabaseOverride(runtimeEnv: NodeJS.ProcessEnv) {
+  const databaseUrl = runtimeEnv.DATABASE_URL?.trim();
+  return databaseUrl ? { DATABASE_URL: databaseUrl } : {};
 }
 
 function buildProject() {
@@ -203,9 +208,44 @@ async function waitForServer(baseUrl: string, child: ReturnType<typeof spawn>) {
   throw new Error('Timed out waiting for the launch perf server to start.');
 }
 
+export function buildStandaloneServerLaunch(
+  baseUrl: string,
+  runtimeEnv: NodeJS.ProcessEnv = process.env
+) {
+  const parsedBaseUrl = new URL(baseUrl);
+  const databaseOverride = resolvePerformanceDatabaseOverride(runtimeEnv);
+  const preservedEnv = [
+    'BETTER_AUTH_URL',
+    ...(databaseOverride.DATABASE_URL === undefined ? [] : ['DATABASE_URL']),
+  ];
+  return {
+    args: [
+      'run',
+      '--project',
+      'jovie-web',
+      '--config',
+      'dev',
+      `--preserve-env=${preservedEnv.join(',')}`,
+      '--',
+      'node',
+      standaloneServerPath,
+    ],
+    env: {
+      ...runtimeEnv,
+      ...databaseOverride,
+      HOSTNAME: parsedBaseUrl.hostname,
+      PORT: parsedBaseUrl.port,
+      NODE_ENV: 'production',
+      E2E_USE_TEST_AUTH_BYPASS: '1',
+      BETTER_AUTH_URL: baseUrl,
+    },
+  } satisfies {
+    readonly args: string[];
+    readonly env: NodeJS.ProcessEnv;
+  };
+}
+
 async function startServer(baseUrl: string, artifactDir: string) {
-  const hostname = new URL(baseUrl).hostname;
-  const port = new URL(baseUrl).port;
   const logPath = resolve(artifactDir, 'server.log');
   writeFileSync(logPath, '');
 
@@ -217,30 +257,12 @@ async function startServer(baseUrl: string, artifactDir: string) {
     );
   }
 
-  const child = spawn(
-    'doppler',
-    [
-      'run',
-      '--project',
-      'jovie-web',
-      '--config',
-      'dev',
-      '--',
-      'node',
-      standaloneServerPath,
-    ],
-    {
-      cwd: repoRoot,
-      env: {
-        ...process.env,
-        HOSTNAME: hostname,
-        PORT: port,
-        NODE_ENV: 'production',
-        E2E_USE_TEST_AUTH_BYPASS: '1',
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }
-  );
+  const launch = buildStandaloneServerLaunch(baseUrl);
+  const child = spawn('doppler', launch.args, {
+    cwd: repoRoot,
+    env: launch.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 
   const appendOutput = (chunk: Buffer | string) => {
     writeFileSync(logPath, String(chunk), { flag: 'a' });
@@ -314,7 +336,7 @@ function printSummary(summary: GuardSummary) {
 async function main() {
   const originalCi = process.env.CI;
   const hadBypass = process.env.E2E_USE_TEST_AUTH_BYPASS;
-  const originalUserId = process.env.E2E_CLERK_USER_ID;
+  const originalUserId = process.env.E2E_BETTER_AUTH_USER_ID;
   const artifactDir = resolve(perfRoot, `launch-check-${timestampLabel()}`);
   ensureDir(artifactDir);
 
@@ -338,11 +360,11 @@ async function main() {
       'creator-ready'
     );
 
-    const requireBypassUserId = (
+    const requireBetterAuthUserId = (
       authPath: string,
       persona: 'creator' | 'creator-ready'
     ) => {
-      const userId = readBypassUserId(authPath);
+      const userId = readBetterAuthUserId(authPath);
       if (!userId) {
         throw new Error(
           `Auth bootstrap for ${persona} did not persist __e2e_test_user_id in ${authPath}.`
@@ -351,7 +373,7 @@ async function main() {
       return userId;
     };
 
-    process.env.E2E_CLERK_USER_ID = requireBypassUserId(
+    process.env.E2E_BETTER_AUTH_USER_ID = requireBetterAuthUserId(
       onboardingAuthPath,
       'creator'
     );
@@ -366,7 +388,7 @@ async function main() {
       runs: 3,
     });
 
-    process.env.E2E_CLERK_USER_ID = requireBypassUserId(
+    process.env.E2E_BETTER_AUTH_USER_ID = requireBetterAuthUserId(
       creatorReadyAuthPath,
       'creator-ready'
     );
@@ -408,17 +430,20 @@ async function main() {
     }
 
     if (originalUserId === undefined) {
-      delete process.env.E2E_CLERK_USER_ID;
+      delete process.env.E2E_BETTER_AUTH_USER_ID;
     } else {
-      process.env.E2E_CLERK_USER_ID = originalUserId;
+      process.env.E2E_BETTER_AUTH_USER_ID = originalUserId;
     }
 
     await stopServer(child);
   }
 }
 
-main().catch(error => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${message}\n`);
-  process.exit(1);
-});
+const entryPath = process.argv[1] ? resolve(process.argv[1]) : null;
+if (entryPath === fileURLToPath(import.meta.url)) {
+  void main().catch(error => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`${message}\n`);
+    process.exit(1);
+  });
+}

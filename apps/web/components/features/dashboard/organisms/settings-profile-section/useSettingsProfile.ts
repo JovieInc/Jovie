@@ -117,7 +117,9 @@ export function useSettingsProfile({
   }, [artist]);
 
   // TanStack Query mutation for profile saves (silent, for auto-save)
-  const { mutateAsync: saveProfileMutation } = useProfileSaveMutation();
+  const { mutateAsync: saveProfileMutation } = useProfileSaveMutation(
+    artist.id
+  );
 
   // Store mutation ref for use in saveFn callback
   const saveProfileMutationRef = useRef(saveProfileMutation);
@@ -130,6 +132,7 @@ export function useSettingsProfile({
 
   // TanStack Query mutation for avatar URL update (with notifications)
   const { mutateAsync: updateProfileMutation } = useProfileMutation({
+    profileId: artist.id,
     silent: true, // We handle notifications manually for avatar updates
   });
 
@@ -185,6 +188,7 @@ export function useSettingsProfile({
       try {
         // Use TanStack Query mutation via ref to get latest function
         response = await saveProfileMutationRef.current({
+          profileId: artistRef.current.id,
           updates: {
             username,
             displayName,
@@ -289,6 +293,7 @@ export function useSettingsProfile({
       try {
         // Use TanStack Query mutation for profile update
         const response = await updateProfileMutation({
+          profileId: artist.id,
           updates: {
             avatarUrl: imageUrl,
           },

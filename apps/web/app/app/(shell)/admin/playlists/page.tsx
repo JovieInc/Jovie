@@ -3,6 +3,7 @@ import { ExternalLink } from 'lucide-react';
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { approvePlaylist, rejectPlaylist } from './playlist-actions';
 import { type AdminPlaylistTab, loadAdminPlaylists } from './playlists-data';
 
@@ -20,6 +21,8 @@ export default async function AdminPlaylistsPage({
 }: Readonly<{
   searchParams: Promise<{ tab?: string }>;
 }>) {
+  await requireCurrentAdminPageAccess();
+
   const { tab = 'pending' } = await searchParams;
   const currentTab = (
     ['pending', 'published', 'rejected'].includes(tab) ? tab : 'pending'

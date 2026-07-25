@@ -25,6 +25,8 @@ export interface DashboardSocialLink {
   verificationStatus?: 'unverified' | 'pending' | 'verified';
   verificationToken?: string | null;
   verifiedAt?: string | null;
+  /** Optimistic locking version for concurrent mutations. */
+  version?: number;
 }
 
 /**

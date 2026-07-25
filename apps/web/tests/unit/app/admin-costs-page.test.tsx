@@ -39,6 +39,10 @@ vi.mock('@/lib/admin/costs', () => ({
   getCostsLastRefreshedAt: mockGetLastRefreshed,
 }));
 
+vi.mock('@/lib/admin/page-access', () => ({
+  requireCurrentAdminPageAccess: vi.fn().mockResolvedValue('user_admin'),
+}));
+
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));

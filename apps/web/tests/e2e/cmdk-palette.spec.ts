@@ -76,7 +76,7 @@ test.describe('Command palette — Cmd+K contract', () => {
     await expect(page.locator(PALETTE_INPUT)).toBeHidden({ timeout: 5_000 });
   });
 
-  test('sidebar Search opens the canonical command palette', async ({
+  test('sidebar Search opens the persistent header search, not the palette', async ({
     page,
   }) => {
     await ensureSignedInUser(page);
@@ -87,8 +87,9 @@ test.describe('Command palette — Cmd+K contract', () => {
 
     await page.getByRole('button', { name: /^Search$/ }).click();
 
-    const paletteInput = page.locator(PALETTE_INPUT);
-    await expect(paletteInput).toBeVisible({ timeout: 10_000 });
-    await expect(paletteInput).toBeFocused();
+    const headerInput = page.getByRole('combobox', { name: 'Search Jovie' });
+    await expect(headerInput).toBeVisible({ timeout: 10_000 });
+    await expect(headerInput).toBeFocused();
+    await expect(page.locator(PALETTE_INPUT)).toBeHidden();
   });
 });

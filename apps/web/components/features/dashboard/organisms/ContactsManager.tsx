@@ -1,5 +1,6 @@
 'use client';
 
+import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { useContactsManager } from '@/features/dashboard/hooks/useContactsManager';
 import { ContactsTable } from '@/features/dashboard/organisms/contacts-table';
@@ -43,6 +44,7 @@ export function ContactsManager({
 
   return (
     <>
+      <NavigationDestinationReady destination='contacts' />
       <ContactsTable
         contacts={contacts}
         artistName={artistName}

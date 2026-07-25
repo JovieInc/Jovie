@@ -77,6 +77,8 @@ import {
   useUpdateSettingsMutation,
 } from '@/lib/queries';
 
+const PROFILE_ID = '11111111-1111-4111-8111-111111111111';
+
 /* ------------------------------------------------------------------ */
 /*  Shared test infrastructure                                        */
 /* ------------------------------------------------------------------ */
@@ -127,9 +129,15 @@ describe('useUpdateSettingsMutation', () => {
   });
 
   it('calls the mutation function with the supplied payload', async () => {
-    const { result } = renderHook(() => useUpdateSettingsMutation(), {
-      wrapper: TestWrapper,
+    queryClient.setQueryData(['user', 'profile'], {
+      profile: { id: 'legacy-envelope-profile' },
     });
+    const { result } = renderHook(
+      () => useUpdateSettingsMutation({ profileId: PROFILE_ID }),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     const payload = { updates: { settings: { marketing_emails: true } } };
 
@@ -137,13 +145,40 @@ describe('useUpdateSettingsMutation', () => {
       await result.current.mutateAsync(payload);
     });
 
-    expect(mockMutationFn.mock.calls[0][0]).toEqual(payload);
+    expect(mockMutationFn.mock.calls[0][0]).toEqual({
+      ...payload,
+      profileId: PROFILE_ID,
+    });
+  });
+
+  it('does not fall back to the legacy GET profile cache envelope', async () => {
+    queryClient.setQueryData(['user', 'profile'], {
+      profile: { id: 'legacy-envelope-profile' },
+    });
+    const { result } = renderHook(
+      () => useUpdateSettingsMutation({ profileId: undefined }),
+      {
+        wrapper: TestWrapper,
+      }
+    );
+
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync({
+          updates: { settings: { marketing_emails: true } },
+        });
+      })
+    ).rejects.toThrow('Missing profile id');
+    expect(mockMutationFn).not.toHaveBeenCalled();
   });
 
   it('shows theme success toast when updating theme', async () => {
-    const { result } = renderHook(() => useUpdateSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useUpdateSettingsMutation({ profileId: PROFILE_ID }),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     await act(async () => {
       await result.current.mutateAsync({
@@ -157,9 +192,12 @@ describe('useUpdateSettingsMutation', () => {
   });
 
   it('shows analytics filter success toast when updating exclude_self_from_analytics', async () => {
-    const { result } = renderHook(() => useUpdateSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useUpdateSettingsMutation({ profileId: PROFILE_ID }),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     await act(async () => {
       await result.current.mutateAsync({
@@ -173,9 +211,12 @@ describe('useUpdateSettingsMutation', () => {
   });
 
   it('shows generic settings success toast for other settings updates', async () => {
-    const { result } = renderHook(() => useUpdateSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useUpdateSettingsMutation({ profileId: PROFILE_ID }),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     await act(async () => {
       await result.current.mutateAsync({
@@ -189,9 +230,12 @@ describe('useUpdateSettingsMutation', () => {
   it('invalidates user.settings query key on success', async () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    const { result } = renderHook(() => useUpdateSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useUpdateSettingsMutation({ profileId: PROFILE_ID }),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     await act(async () => {
       await result.current.mutateAsync({
@@ -210,9 +254,12 @@ describe('useUpdateSettingsMutation', () => {
     const error = new Error('Network error');
     mockMutationFn.mockRejectedValueOnce(error);
 
-    const { result } = renderHook(() => useUpdateSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useUpdateSettingsMutation({ profileId: PROFILE_ID }),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     await act(async () => {
       try {
@@ -234,9 +281,12 @@ describe('useUpdateSettingsMutation', () => {
     const error = new Error('Timeout');
     mockMutationFn.mockRejectedValueOnce(error);
 
-    const { result } = renderHook(() => useUpdateSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useUpdateSettingsMutation({ profileId: PROFILE_ID }),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     await act(async () => {
       try {
@@ -258,9 +308,12 @@ describe('useUpdateSettingsMutation', () => {
     const error = new Error('Bad request');
     mockMutationFn.mockRejectedValueOnce(error);
 
-    const { result } = renderHook(() => useUpdateSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useUpdateSettingsMutation({ profileId: PROFILE_ID }),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     await act(async () => {
       try {
@@ -285,7 +338,7 @@ describe('useUpdateSettingsMutation', () => {
 
 describe('useThemeMutation', () => {
   it('wraps updateTheme to send the correct theme payload', async () => {
-    const { result } = renderHook(() => useThemeMutation(), {
+    const { result } = renderHook(() => useThemeMutation(PROFILE_ID), {
       wrapper: TestWrapper,
     });
 
@@ -294,12 +347,13 @@ describe('useThemeMutation', () => {
     });
 
     expect(mockMutationFn.mock.calls[0][0]).toEqual({
+      profileId: PROFILE_ID,
       updates: { theme: { preference: 'dark', highContrast: false } },
     });
   });
 
   it('accepts "system" as a valid theme preference', async () => {
-    const { result } = renderHook(() => useThemeMutation(), {
+    const { result } = renderHook(() => useThemeMutation(PROFILE_ID), {
       wrapper: TestWrapper,
     });
 
@@ -308,12 +362,13 @@ describe('useThemeMutation', () => {
     });
 
     expect(mockMutationFn.mock.calls[0][0]).toEqual({
+      profileId: PROFILE_ID,
       updates: { theme: { preference: 'system', highContrast: false } },
     });
   });
 
   it('suppresses success toasts for theme changes', async () => {
-    const { result } = renderHook(() => useThemeMutation(), {
+    const { result } = renderHook(() => useThemeMutation(PROFILE_ID), {
       wrapper: TestWrapper,
     });
 
@@ -329,7 +384,7 @@ describe('useThemeMutation', () => {
     const error = new Error('Network error');
     mockMutationFn.mockRejectedValueOnce(error);
 
-    const { result } = renderHook(() => useThemeMutation(), {
+    const { result } = renderHook(() => useThemeMutation(PROFILE_ID), {
       wrapper: TestWrapper,
     });
 
@@ -345,7 +400,7 @@ describe('useThemeMutation', () => {
   });
 
   it('exposes isPending, isError, and error from the underlying mutation', () => {
-    const { result } = renderHook(() => useThemeMutation(), {
+    const { result } = renderHook(() => useThemeMutation(PROFILE_ID), {
       wrapper: TestWrapper,
     });
 
@@ -364,7 +419,7 @@ describe('useThemeMutation', () => {
 
 describe('useHighContrastMutation', () => {
   it('sends the current preference and high-contrast value', async () => {
-    const { result } = renderHook(() => useHighContrastMutation(), {
+    const { result } = renderHook(() => useHighContrastMutation(PROFILE_ID), {
       wrapper: TestWrapper,
     });
 
@@ -373,12 +428,13 @@ describe('useHighContrastMutation', () => {
     });
 
     expect(mockMutationFn.mock.calls[0][0]).toEqual({
+      profileId: PROFILE_ID,
       updates: { theme: { preference: 'dark', highContrast: true } },
     });
   });
 
   it('suppresses success toasts for high-contrast toggles', async () => {
-    const { result } = renderHook(() => useHighContrastMutation(), {
+    const { result } = renderHook(() => useHighContrastMutation(PROFILE_ID), {
       wrapper: TestWrapper,
     });
 
@@ -397,23 +453,30 @@ describe('useHighContrastMutation', () => {
 
 describe('useNotificationSettingsMutation', () => {
   it('sends notification settings in the correct shape', async () => {
-    const { result } = renderHook(() => useNotificationSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useNotificationSettingsMutation(PROFILE_ID),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     await act(async () => {
       result.current.updateNotifications({ marketing_emails: false });
     });
 
     expect(mockMutationFn.mock.calls[0][0]).toEqual({
+      profileId: PROFILE_ID,
       updates: { settings: { marketing_emails: false } },
     });
   });
 
   it('supports updating multiple notification fields at once', async () => {
-    const { result } = renderHook(() => useNotificationSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useNotificationSettingsMutation(PROFILE_ID),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     await act(async () => {
       result.current.updateNotifications({
@@ -423,6 +486,7 @@ describe('useNotificationSettingsMutation', () => {
     });
 
     expect(mockMutationFn.mock.calls[0][0]).toEqual({
+      profileId: PROFILE_ID,
       updates: {
         settings: { email_notifications: true, push_notifications: false },
       },
@@ -430,9 +494,12 @@ describe('useNotificationSettingsMutation', () => {
   });
 
   it('exposes isPending, isError, and error', () => {
-    const { result } = renderHook(() => useNotificationSettingsMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useNotificationSettingsMutation(PROFILE_ID),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     expect(result.current).toHaveProperty('updateNotifications');
     expect(result.current).toHaveProperty('isPending');
@@ -447,37 +514,48 @@ describe('useNotificationSettingsMutation', () => {
 
 describe('useAnalyticsFilterMutation', () => {
   it('sends exclude_self_from_analytics=true via updateAnalyticsFilter', async () => {
-    const { result } = renderHook(() => useAnalyticsFilterMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useAnalyticsFilterMutation(PROFILE_ID),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     await act(async () => {
       result.current.updateAnalyticsFilter(true);
     });
 
     expect(mockMutationFn.mock.calls[0][0]).toEqual({
+      profileId: PROFILE_ID,
       updates: { settings: { exclude_self_from_analytics: true } },
     });
   });
 
   it('sends exclude_self_from_analytics=false via updateAnalyticsFilter', async () => {
-    const { result } = renderHook(() => useAnalyticsFilterMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useAnalyticsFilterMutation(PROFILE_ID),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     await act(async () => {
       result.current.updateAnalyticsFilter(false);
     });
 
     expect(mockMutationFn.mock.calls[0][0]).toEqual({
+      profileId: PROFILE_ID,
       updates: { settings: { exclude_self_from_analytics: false } },
     });
   });
 
   it('provides an async variant (updateAnalyticsFilterAsync) that returns a promise', async () => {
-    const { result } = renderHook(() => useAnalyticsFilterMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useAnalyticsFilterMutation(PROFILE_ID),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     let response: unknown;
     await act(async () => {
@@ -491,9 +569,12 @@ describe('useAnalyticsFilterMutation', () => {
     const error = new Error('Server down');
     mockMutationFn.mockRejectedValueOnce(error);
 
-    const { result } = renderHook(() => useAnalyticsFilterMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useAnalyticsFilterMutation(PROFILE_ID),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     await act(async () => {
       await expect(
@@ -503,9 +584,12 @@ describe('useAnalyticsFilterMutation', () => {
   });
 
   it('exposes isPending, isError, and error', () => {
-    const { result } = renderHook(() => useAnalyticsFilterMutation(), {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderHook(
+      () => useAnalyticsFilterMutation(PROFILE_ID),
+      {
+        wrapper: TestWrapper,
+      }
+    );
 
     expect(result.current).toHaveProperty('updateAnalyticsFilter');
     expect(result.current).toHaveProperty('updateAnalyticsFilterAsync');

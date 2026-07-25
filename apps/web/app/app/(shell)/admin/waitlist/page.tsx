@@ -5,6 +5,7 @@ import {
   buildAdminPeopleHref,
   searchParamsFromRecord,
 } from '@/constants/admin-navigation';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 
 export const metadata: Metadata = {
   title: 'Waitlist | Admin',
@@ -19,6 +20,8 @@ interface AdminWaitlistRedirectPageProps {
 export default async function AdminWaitlistRedirectPage({
   searchParams,
 }: Readonly<AdminWaitlistRedirectPageProps>) {
+  await requireCurrentAdminPageAccess();
+
   const params = searchParamsFromRecord(await searchParams);
   redirect(buildAdminPeopleHref('waitlist', params));
 }

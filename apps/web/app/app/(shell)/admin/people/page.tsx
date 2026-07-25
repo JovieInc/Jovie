@@ -15,6 +15,7 @@ import {
   isAdminPeopleView,
 } from '@/constants/admin-navigation';
 import { getAdminCreatorProfiles } from '@/lib/admin/creator-profiles';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { getAdminReleases } from '@/lib/admin/releases';
 import { getAdminUsers } from '@/lib/admin/users';
 import {
@@ -200,6 +201,8 @@ async function renderPeopleView(
 export default async function AdminPeoplePage({
   searchParams,
 }: Readonly<AdminPeoplePageProps>) {
+  await requireCurrentAdminPageAccess();
+
   const params = await adminPeopleSearchParams.parse(searchParams);
   const view = resolvePeopleView(params.view);
   const content = await renderPeopleView(view, params);

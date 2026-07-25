@@ -101,6 +101,12 @@
 | `/api/audience/visit` | POST | `public` | Track profile visit |
 | `/s/[code]` | GET | `public` | Track source link or QR scan and redirect |
 
+### Analytics
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/analytics/navigation` | POST, GET | `auth` (POST), `admin` (GET) | Rate-limited, aggregate-only app navigation telemetry writes; privacy-suppressed admin baseline reads |
+
 ### Billing
 
 | Route | Methods | Auth | Description |
@@ -135,7 +141,7 @@
 |-------|---------|------|-------------|
 | `/api/chat` | POST | `auth` | Send chat message to AI assistant |
 | `/api/chat/confirm-edit` | POST | `auth` | Confirm AI-suggested profile edit |
-| `/api/chat/confirm-link` | POST | `auth` | Confirm AI-suggested link add |
+| `/api/chat/confirm-link` | POST | `auth` | Confirm AI-suggested link add; optional `expectedVersion` enforces CAS, success returns `version`, stale writes return 409 `VERSION_CONFLICT` |
 | `/api/chat/confirm-remove-link` | POST | `auth` | Confirm AI-suggested link removal |
 | `/api/chat/conversations` | GET, POST | `auth` | List/create conversations |
 | `/api/chat/conversations/[id]` | GET, DELETE | `auth` | Get/delete conversation |
@@ -200,14 +206,14 @@
 | `/api/dashboard/pixels` | GET, POST | `auth` | Pixel management |
 | `/api/dashboard/pixels/health` | GET | `auth` | Pixel health check |
 | `/api/dashboard/pixels/test-event` | POST | `auth` | Send test pixel event |
-| `/api/dashboard/profile` | GET, PUT | `auth` | Profile data |
+| `/api/dashboard/profile` | GET, PUT | `auth` | GET returns `{ profile }` (the web query adapter also accepts the legacy raw-profile response and normalizes its cache); PUT requires canonical `profileId` with no active-profile fallback, accepts optional integer `expectedVersion`, returns `profile.profileEditVersion`, and returns 409 `VERSION_CONFLICT` for stale writes |
 | `/api/dashboard/releases/artwork-downloads` | POST | `auth` | Toggle allow-artwork-downloads for the active profile |
 | `/api/dashboard/releases/[releaseId]/analytics` | GET | `auth` | Release analytics |
 | `/api/dashboard/releases/[releaseId]/pitch` | POST | `auth` | Generate release pitch |
 | `/api/dashboard/releases/[releaseId]/tracks` | GET | `auth` | Release tracks |
 | `/api/dashboard/retargeting/attribution` | GET | `auth` | Retargeting attribution data |
 | `/api/dashboard/shop` | GET, POST | `auth` | Shop management |
-| `/api/dashboard/social-links` | GET, POST, PUT, DELETE | `auth` | Social link CRUD |
+| `/api/dashboard/social-links` | GET, POST, PUT, PATCH, DELETE | `auth` | Social link CRUD; PUT/PATCH/DELETE accept optional `expectedVersion`, success returns `version`, stale writes return 409 `VERSION_CONFLICT` |
 | `/api/dashboard/tour-dates/[id]/analytics` | GET | `auth` | Tour date analytics |
 
 ### Dev
@@ -365,6 +371,12 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/revalidate/featured-creators` | POST | `cron` | Revalidate featured creators cache |
+
+### Search
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/search/header` | GET | `auth` | Per-user rate-limited search of the active profile's releases with standard rate-limit headers/429, validated input, a five-result cap, and a minimal result shape |
 
 ### Sentry
 

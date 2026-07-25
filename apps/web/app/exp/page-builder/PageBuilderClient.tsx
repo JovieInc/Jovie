@@ -88,14 +88,10 @@ function parseMode(param: string | null): StudioMode {
   return 'pages';
 }
 
-export function PageBuilderClient({
-  designV1Enabled,
-}: Readonly<{
-  designV1Enabled: boolean;
-}>) {
+export function PageBuilderClient() {
   const searchParams = useSearchParams();
 
-  const mode = designV1Enabled ? parseMode(searchParams.get('mode')) : 'pages';
+  const mode = parseMode(searchParams.get('mode'));
   const headerMode = parseHeader(searchParams.get('header'));
   const footerMode = parseFooter(searchParams.get('footer'));
   const ctaMode = parseCta(searchParams.get('cta'));
@@ -196,7 +192,6 @@ export function PageBuilderClient({
         // Use the resolved variant count, not raw URL ids — keeps the label
         // truthful when someone hand-types a stale or unknown id into ?body=.
         bodyCount={bodyVariants.length}
-        designV1Enabled={designV1Enabled}
         mode={mode}
         onSetMode={nextMode => setParam({ mode: nextMode })}
         onSetHeader={mode => setParam({ header: mode })}
@@ -253,7 +248,6 @@ interface ToolbarProps {
   readonly footerMode: FooterMode;
   readonly ctaMode: CtaMode;
   readonly bodyCount: number;
-  readonly designV1Enabled: boolean;
   readonly mode: StudioMode;
   readonly onSetMode: (mode: StudioMode) => void;
   readonly onSetHeader: (mode: HeaderMode) => void;
@@ -267,7 +261,6 @@ function Toolbar({
   footerMode,
   ctaMode,
   bodyCount,
-  designV1Enabled,
   mode,
   onSetMode,
   onSetHeader,
@@ -277,14 +270,8 @@ function Toolbar({
 }: ToolbarProps) {
   return (
     <div className='page-builder-toolbar fixed left-0 right-0 top-0 z-50 flex h-14 items-center gap-4 overflow-x-auto border-b border-white/10 bg-black/85 px-4 text-white dark:text-white shadow-lg backdrop-blur-md'>
-      <span
-        className={
-          designV1Enabled
-            ? 'shrink-0 whitespace-nowrap text-xs font-semibold text-white/80'
-            : 'shrink-0 whitespace-nowrap text-2xs font-semibold uppercase tracking-wider text-white/70'
-        }
-      >
-        {designV1Enabled ? 'Design Studio' : 'Page Builder'}
+      <span className='shrink-0 whitespace-nowrap text-xs font-semibold text-white/80'>
+        Design Studio
       </span>
 
       <div
@@ -292,7 +279,7 @@ function Toolbar({
         aria-hidden='true'
       />
 
-      {designV1Enabled && (
+      {
         <div className='inline-flex rounded-md border border-white/10 bg-black/60 p-0.5'>
           {[
             { value: 'pages', label: 'Pages', icon: LayoutTemplate },
@@ -320,7 +307,7 @@ function Toolbar({
             );
           })}
         </div>
-      )}
+      }
 
       {mode === 'pages' ? (
         <>

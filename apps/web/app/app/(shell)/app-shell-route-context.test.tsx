@@ -183,12 +183,12 @@ describe('loadAppShellRouteContext', () => {
     await expect(
       loadAppShellRouteContext({
         route: '/app/library',
-        requiredFlag: 'SHELL_CHAT_V1',
+        requiredFlag: 'PROFILES_WORKSPACE',
         dashboardErrorMessage: 'Failed to load library data.',
       })
     ).rejects.toThrow('NEXT_NOT_FOUND');
 
-    expect(getAppFlagValueMock).toHaveBeenCalledWith('SHELL_CHAT_V1', {
+    expect(getAppFlagValueMock).toHaveBeenCalledWith('PROFILES_WORKSPACE', {
       userId: 'user_1',
     });
     expect(getDashboardShellDataMock).not.toHaveBeenCalled();

@@ -1,12 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { APP_ROUTES } from '@/constants/routes';
+import {
+  getCurrentAdminPageAccess,
+  requireCurrentAdminPageAccess,
+} from '@/lib/admin/page-access';
 
-const { mockGetCachedAuth, mockIsAdmin } = vi.hoisted(() => ({
+const { mockGetCachedAuth, mockIsAdmin, mockRedirect } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockIsAdmin: vi.fn(),
+  mockRedirect: vi.fn((href: string) => {
+    throw new Error(`NEXT_REDIRECT:${href}`);
+  }),
 }));
 
 vi.mock('server-only', () => ({}));
+vi.mock('next/navigation', () => ({ redirect: mockRedirect }));
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
@@ -56,5 +64,21 @@ describe('getCurrentAdminPageAccess', () => {
       isAuthenticated: true,
       hasAdminRole: false,
     });
+  });
+
+  it('redirects non-admins at the authoritative page read gate', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_member' });
+    mockIsAdmin.mockResolvedValue(false);
+
+    await expect(requireCurrentAdminPageAccess()).rejects.toThrow(
+      `NEXT_REDIRECT:${APP_ROUTES.DASHBOARD}`
+    );
+  });
+
+  it('returns the authorized admin user id', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_admin' });
+    mockIsAdmin.mockResolvedValue(true);
+
+    await expect(requireCurrentAdminPageAccess()).resolves.toBe('user_admin');
   });
 });

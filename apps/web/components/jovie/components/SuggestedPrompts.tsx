@@ -12,8 +12,10 @@ import {
 } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 
+import { track } from '@/lib/analytics';
 import { shouldHideAlbumArtChatSuggestion } from '@/lib/chat/album-art-capability';
 import { cn } from '@/lib/utils';
+import type { ChatStarterActionId } from '../starter-actions';
 import {
   type ChatSuggestion,
   DEFAULT_SUGGESTIONS,
@@ -52,11 +54,8 @@ interface SuggestedPromptsProps {
   readonly albumArtCapability?: PromptCapability;
   /** When true, hides the "Build artist profile" chip — profile setup is done. */
   readonly isProfileComplete?: boolean;
-  /**
-   * Labels already covered by empty-state action cards (or other scaffolds).
-   * Prevents a chip from advertising a conflicting enabled state vs a card.
-   */
-  readonly excludeLabels?: readonly string[];
+  /** Canonical starter intents already owned by primary action cards. */
+  readonly excludeActionIds?: readonly ChatStarterActionId[];
   readonly layout?: 'rail' | 'grid' | 'flat';
   /**
    * Variant F: while the slash picker is open, fade chips out (don't unmount)
@@ -89,7 +88,15 @@ function SuggestionPill({
     <button
       type='button'
       onClick={() => {
-        if (!disabled) onSelect(suggestion.prompt);
+        if (!disabled) {
+          if (suggestion.telemetryKey) {
+            track('chat_starter_action_selected', {
+              action: suggestion.telemetryKey,
+              surface: 'quick_action',
+            });
+          }
+          onSelect(suggestion.prompt);
+        }
       }}
       disabled={disabled}
       className={cn(
@@ -101,6 +108,9 @@ function SuggestionPill({
       aria-label={suggestion.label}
       aria-disabled={disabled}
       title={title}
+      data-starter-action-surface={
+        suggestion.actionId ? 'secondary' : undefined
+      }
     >
       <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token transition-colors duration-fast group-hover:text-primary-token'>
         {IconComponent && <IconComponent className='h-3.5 w-3.5 shrink-0' />}
@@ -112,14 +122,14 @@ function SuggestionPill({
   );
 }
 
-function filterExcludedLabels(
+function filterExcludedActions(
   suggestions: readonly ChatSuggestion[],
-  excludeLabels: readonly string[] | undefined
+  excludeActionIds: readonly ChatStarterActionId[] | undefined
 ): readonly ChatSuggestion[] {
-  if (!excludeLabels || excludeLabels.length === 0) return suggestions;
-  const excluded = new Set(excludeLabels.map(label => label.toLowerCase()));
+  if (!excludeActionIds || excludeActionIds.length === 0) return suggestions;
+  const excluded = new Set(excludeActionIds);
   return suggestions.filter(
-    suggestion => !excluded.has(suggestion.label.toLowerCase())
+    suggestion => !suggestion.actionId || !excluded.has(suggestion.actionId)
   );
 }
 
@@ -130,37 +140,22 @@ export function SuggestedPrompts({
   canUseAdvancedTools = false,
   albumArtCapability,
   isProfileComplete = false,
-  excludeLabels,
+  excludeActionIds,
   layout = 'rail',
   dimmed = false,
 }: SuggestedPromptsProps) {
   const filterProfileSuggestion = (suggestions: readonly ChatSuggestion[]) => {
     const withoutProfile = isProfileComplete
       ? suggestions.filter(
-          suggestion => suggestion.label !== 'Build Artist Profile'
+          suggestion => suggestion.actionId !== 'build-artist-profile'
         )
       : suggestions;
-    return filterExcludedLabels(withoutProfile, excludeLabels);
+    return filterExcludedActions(withoutProfile, excludeActionIds);
   };
 
-  const promptSuggestions = isFirstSession
-    ? filterProfileSuggestion(FIRST_SESSION_SUGGESTIONS).map(suggestion => {
-        if (
-          suggestion.icon === 'Link2' &&
-          typeof latestReleaseTitle === 'string' &&
-          latestReleaseTitle.trim().length > 0
-        ) {
-          const cleanTitle = latestReleaseTitle.trim();
-          return {
-            ...suggestion,
-            label: `Link “${cleanTitle}”`,
-            prompt: `Set up a link for ${cleanTitle}.`,
-          };
-        }
-
-        return suggestion;
-      })
-    : filterProfileSuggestion(DEFAULT_SUGGESTIONS);
+  const promptSuggestions = filterProfileSuggestion(
+    isFirstSession ? FIRST_SESSION_SUGGESTIONS : DEFAULT_SUGGESTIONS
+  );
 
   const resolvedAlbumArtCapability = albumArtCapability ?? {
     availability: 'unknown' as const,
@@ -191,7 +186,7 @@ export function SuggestedPrompts({
 
   const promptSuggestionsWithCapabilities = promptSuggestions.flatMap(
     suggestion => {
-      if (suggestion.label !== 'Generate Album Art') return [suggestion];
+      if (suggestion.actionId !== 'generate-album-art') return [suggestion];
       // Provider broken → drop the album-art pill entirely; surface the brief
       // fallback in its place so the row keeps a creative-direction action.
       if (isAlbumArtProviderBroken) {
@@ -233,10 +228,10 @@ export function SuggestedPrompts({
     FEEDBACK_SUGGESTION,
   ];
 
-  const isAlbumArtSuggestion = (label: string) =>
-    label === 'Generate Album Art';
-  const albumArtPillDisabledReason = (label: string) =>
-    isAlbumArtSuggestion(label) ? resolvedAlbumArtCapability.reason : null;
+  const isAlbumArtSuggestion = (suggestion: ChatSuggestion) =>
+    suggestion.actionId === 'generate-album-art';
+  const albumArtPillDisabledReason = (suggestion: ChatSuggestion) =>
+    isAlbumArtSuggestion(suggestion) ? resolvedAlbumArtCapability.reason : null;
 
   // `inert` removes the subtree from the tab order AND blocks pointer events,
   // so dimmed chips can't be reached by Tab/Shift+Tab while the slash picker
@@ -266,10 +261,8 @@ export function SuggestedPrompts({
               suggestion={suggestion}
               onSelect={onSelect}
               className='min-w-0 max-w-none justify-start px-3.5 py-2'
-              disabled={
-                isAlbumArtSuggestion(suggestion.label) && albumArtDisabled
-              }
-              disabledReason={albumArtPillDisabledReason(suggestion.label)}
+              disabled={isAlbumArtSuggestion(suggestion) && albumArtDisabled}
+              disabledReason={albumArtPillDisabledReason(suggestion)}
             />
           ))}
         </div>
@@ -283,10 +276,8 @@ export function SuggestedPrompts({
                 onSelect={onSelect}
                 density='compact'
                 className='min-w-0 max-w-none px-3'
-                disabled={
-                  isAlbumArtSuggestion(suggestion.label) && albumArtDisabled
-                }
-                disabledReason={albumArtPillDisabledReason(suggestion.label)}
+                disabled={isAlbumArtSuggestion(suggestion) && albumArtDisabled}
+                disabledReason={albumArtPillDisabledReason(suggestion)}
               />
             ))}
           </div>
@@ -313,24 +304,26 @@ export function SuggestedPrompts({
               variant='tertiary'
               size='sm'
               onClick={() => {
-                if (
-                  !(
-                    suggestion.label === 'Generate Album Art' &&
-                    albumArtDisabled
-                  )
-                ) {
+                if (!(isAlbumArtSuggestion(suggestion) && albumArtDisabled)) {
+                  if (suggestion.telemetryKey) {
+                    track('chat_starter_action_selected', {
+                      action: suggestion.telemetryKey,
+                      surface: 'quick_action',
+                    });
+                  }
                   onSelect(suggestion.prompt);
                 }
               }}
-              disabled={
-                suggestion.label === 'Generate Album Art' && albumArtDisabled
-              }
+              disabled={isAlbumArtSuggestion(suggestion) && albumArtDisabled}
               className='group h-auto w-full justify-start rounded-full px-3 py-2 text-left text-secondary-token hover:bg-surface-0 hover:text-primary-token disabled:cursor-not-allowed disabled:opacity-50'
               aria-label={suggestion.label}
               title={
-                isAlbumArtSuggestion(suggestion.label)
+                isAlbumArtSuggestion(suggestion)
                   ? (resolvedAlbumArtCapability.reason ?? suggestion.label)
                   : suggestion.label
+              }
+              data-starter-action-surface={
+                suggestion.actionId ? 'secondary' : undefined
               }
             >
               <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-fast group-hover:text-primary-token'>
@@ -371,10 +364,8 @@ export function SuggestedPrompts({
               suggestion={suggestion}
               onSelect={onSelect}
               className='snap-start'
-              disabled={
-                isAlbumArtSuggestion(suggestion.label) && albumArtDisabled
-              }
-              disabledReason={albumArtPillDisabledReason(suggestion.label)}
+              disabled={isAlbumArtSuggestion(suggestion) && albumArtDisabled}
+              disabledReason={albumArtPillDisabledReason(suggestion)}
             />
           ))}
           {pitchSuggestion && (

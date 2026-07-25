@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isDevToolbarSuppressedPath,
   resetDevToolbarHeight,
+  shouldDefaultDevToolbarHidden,
   shouldRenderDevToolbar,
 } from '@/components/features/dev/DevToolbarGate';
 
@@ -22,6 +23,14 @@ describe('DevToolbarGate production + path gating', () => {
     expect(isDevToolbarSuppressedPath('/app/dashboard/releases')).toBe(false);
   });
 
+  it('defaults chat routes to the minimally intrusive toolbar state', () => {
+    expect(shouldDefaultDevToolbarHidden('/app/chat')).toBe(true);
+    expect(shouldDefaultDevToolbarHidden('/app/chat/thread-123')).toBe(true);
+    expect(shouldDefaultDevToolbarHidden('/app/dashboard/releases')).toBe(
+      false
+    );
+  });
+
   it('never renders for production customers without the opt-in cookie', () => {
     expect(
       shouldRenderDevToolbar({
@@ -33,7 +42,7 @@ describe('DevToolbarGate production + path gating', () => {
     ).toBe(false);
   });
 
-  it('allows production only with explicit __dev_toolbar cookie opt-in', () => {
+  it('never renders controls in production even with a stale opt-in cookie', () => {
     expect(
       shouldRenderDevToolbar({
         env: 'production',
@@ -41,7 +50,7 @@ describe('DevToolbarGate production + path gating', () => {
         hasCookie: true,
         nodeEnv: 'production',
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('still hides production opt-in toolbar on suppressed product paths', () => {

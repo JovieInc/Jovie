@@ -18,15 +18,16 @@ vi.mock('@/lib/admin/roles', () => ({
 
 vi.mock('@/lib/flags/registry', () => ({
   APP_FLAG_REGISTRY: {
-    DESIGN_V1: {
-      run: (...args: unknown[]) => registryRunMock('DESIGN_V1', ...args),
-    },
     STRIPE_CONNECT_ENABLED: {
       run: (...args: unknown[]) =>
         registryRunMock('STRIPE_CONNECT_ENABLED', ...args),
     },
     MERCH_MVP: {
       run: (...args: unknown[]) => registryRunMock('MERCH_MVP', ...args),
+    },
+    APPLE_WALLET_PROFILE_PASS: {
+      run: (...args: unknown[]) =>
+        registryRunMock('APPLE_WALLET_PROFILE_PASS', ...args),
     },
   },
   PROFILE_ALERT_OPTIN_VARIANT_FLAG: { run: vi.fn() },
@@ -37,7 +38,6 @@ describe('getAppFlagsSnapshot flagNames option', () => {
   beforeEach(() => {
     registryRunMock.mockReset();
     registryRunMock.mockImplementation(async (flagName: string) => {
-      if (flagName === 'DESIGN_V1') return true;
       if (flagName === 'STRIPE_CONNECT_ENABLED') return false;
       return true;
     });
@@ -48,16 +48,16 @@ describe('getAppFlagsSnapshot flagNames option', () => {
 
     const snapshot = await getAppFlagsSnapshot({
       userId: 'user_123',
-      flagNames: ['DESIGN_V1', 'STRIPE_CONNECT_ENABLED'],
+      flagNames: ['MERCH_MVP', 'STRIPE_CONNECT_ENABLED'],
     });
 
     const resolvedFlagNames = registryRunMock.mock.calls.map(call => call[0]);
     expect(resolvedFlagNames).toEqual(
-      expect.arrayContaining(['DESIGN_V1', 'STRIPE_CONNECT_ENABLED'])
+      expect.arrayContaining(['MERCH_MVP', 'STRIPE_CONNECT_ENABLED'])
     );
-    expect(resolvedFlagNames).not.toContain('MERCH_MVP');
+    expect(resolvedFlagNames).not.toContain('APPLE_WALLET_PROFILE_PASS');
     expect(snapshot).toEqual({
-      DESIGN_V1: true,
+      MERCH_MVP: true,
       STRIPE_CONNECT_ENABLED: false,
     });
     expect(Object.keys(snapshot)).toHaveLength(2);

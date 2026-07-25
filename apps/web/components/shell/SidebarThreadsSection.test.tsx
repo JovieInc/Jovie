@@ -98,6 +98,21 @@ describe('SidebarThreadsSection', () => {
     expect(allThreadsLink).toHaveAttribute('aria-current', 'page');
   });
 
+  it('announces the unread chat count through the canonical nav badge', () => {
+    render(
+      <SidebarThreadsSection
+        threads={[threads[0], { ...threads[1], unread: true }]}
+        activeThreadId={null}
+        tight
+        collapsed={false}
+      />
+    );
+
+    const unreadBadge = screen.getByLabelText('1 unread chat');
+    expect(unreadBadge).toHaveTextContent('1');
+    expect(unreadBadge).toHaveAttribute('data-nav-badge', 'count');
+  });
+
   it('renders selectable button rows when no href is provided', () => {
     const onSelect = vi.fn();
 

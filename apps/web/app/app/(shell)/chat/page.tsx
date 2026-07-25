@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { DeferredChatPageClient } from './DeferredChatPageClient';
 
 const CHAT_DESCRIPTION = 'Start a new conversation with Jovie AI';
-const CHAT_TITLE = 'Home';
+const CHAT_TITLE = 'New Chat';
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
