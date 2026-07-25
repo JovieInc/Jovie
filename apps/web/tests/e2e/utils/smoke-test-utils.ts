@@ -125,6 +125,13 @@ export const EXPECTED_ERROR_PATTERNS = [
 
   // Next.js dev + CSP on bypass-auth local runs can emit this React dev-only eval warning.
   'eval() is not supported in this environment',
+
+  // React 19 dev error emitted when framer-motion (vendored by `motion` 12.x)
+  // schedules updates inside its useInsertionEffect during animated content
+  // swaps (profile mode tabs, drawer AnimatePresence). Vendor-level dev
+  // warning, not app code — no app/module in this repo calls
+  // useInsertionEffect directly (verified 2026-07).
+  'useinsertioneffect must not schedule updates',
 ] as const;
 
 const EXPECTED_WARNING_PATTERNS = [
