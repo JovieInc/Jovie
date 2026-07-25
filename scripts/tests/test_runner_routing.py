@@ -15,6 +15,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _WORKFLOWS = _REPO_ROOT / ".github" / "workflows"
 _QUERY_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "query-runner-heartbeat.sh"
 _AWAIT_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "await-runner-heartbeat.sh"
+_FIXTURE_GH = (
+    _REPO_ROOT / "scripts" / "tests" / "fixtures" / "runner-heartbeat-gh" / "gh"
+)
 
 
 def _job_block(workflow: str, job_name: str) -> str:
@@ -115,6 +118,7 @@ def _exact_evidence(
     job: dict[str, Any] = {
         "id": 843137,
         "run_id": run["id"],
+        "run_attempt": run["run_attempt"],
         "head_sha": run.get("head_sha", head_sha),
         "name": "Self-hosted runner heartbeat",
         "status": "completed",
@@ -189,6 +193,53 @@ def _run_query(
             key, value = line.split("=", 1)
             outputs[key] = value
     return result, outputs
+
+
+def _run_fixture_query(
+    tmp_path: Path,
+    scenario: str,
+    *,
+    attempts: int = 3,
+) -> tuple[subprocess.CompletedProcess[str], dict[str, str], int]:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    state_dir = tmp_path / "fixture-state"
+    output = tmp_path / "github-output"
+    fake_sleep = tmp_path / "sleep"
+    fake_sleep.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    fake_sleep.chmod(fake_sleep.stat().st_mode | stat.S_IXUSR)
+    env = os.environ.copy()
+    env.pop("GITHUB_ACTIONS", None)
+    env.update(
+        {
+            "PATH": f"{tmp_path}:{env['PATH']}",
+            "GH_REPO": "JovieInc/Jovie",
+            "GITHUB_OUTPUT": str(output),
+            "HEARTBEAT_GH_TEST_HELPER": str(_FIXTURE_GH),
+            "HEARTBEAT_GH_TEST_MODE": "1",
+            "HEARTBEAT_MAX_AGE_SECONDS": "900",
+            "HEARTBEAT_API_TIMEOUT_SECONDS": "5",
+            "HEARTBEAT_JOB_POLL_ATTEMPTS": str(attempts),
+            "HEARTBEAT_JOB_POLL_INTERVAL_SECONDS": "1",
+            "HEARTBEAT_FIXTURE_SCENARIO": scenario,
+            "HEARTBEAT_FIXTURE_STATE_DIR": str(state_dir),
+        }
+    )
+    result = subprocess.run(
+        ["bash", str(_QUERY_SCRIPT)],
+        cwd=_REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    outputs: dict[str, str] = {}
+    if output.exists():
+        for line in output.read_text(encoding="utf-8").splitlines():
+            key, value = line.split("=", 1)
+            outputs[key] = value
+    jobs_count_file = state_dir / "jobs-count"
+    jobs_count = int(jobs_count_file.read_text(encoding="utf-8"))
+    return result, outputs, jobs_count
 
 
 def _run_await(
@@ -268,6 +319,52 @@ def test_exact_fresh_run_and_job_prove_fixed_runner_health(tmp_path: Path) -> No
     assert outputs["health"] == "up", outputs
     assert outputs["probe_state"] == "healthy"
     assert "run 29672288797 attempt 1" in outputs["evidence"]
+
+
+def test_terminal_run_with_lagging_job_polls_same_attempt_to_settled_success(
+    tmp_path: Path,
+) -> None:
+    result, outputs, jobs_count = _run_fixture_query(
+        tmp_path, "lagging-then-settled"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert jobs_count == 2
+    assert outputs["health"] == "up", outputs
+    assert outputs["probe_state"] == "healthy"
+    assert "run 29989764821 attempt 1" in outputs["evidence"]
+
+
+def test_persistent_lag_times_out_fail_closed_after_bounded_job_polls(
+    tmp_path: Path,
+) -> None:
+    result, outputs, jobs_count = _run_fixture_query(
+        tmp_path, "persistent-lag", attempts=3
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert jobs_count == 3
+    assert outputs["health"] == "down"
+    assert outputs["probe_state"] == "unhealthy"
+    assert "remained unsettled after 3 observations" in outputs["evidence"]
+
+
+def test_job_identity_drift_missing_label_and_non_success_fail_closed(
+    tmp_path: Path,
+) -> None:
+    cases = (
+        ("wrong-identity", "uncertain"),
+        ("changed-evidence", "uncertain"),
+        ("missing-label", "uncertain"),
+        ("failed", "unhealthy"),
+    )
+
+    for scenario, expected_state in cases:
+        result, outputs, _ = _run_fixture_query(tmp_path / scenario, scenario)
+
+        assert result.returncode == 0, result.stderr
+        assert outputs["health"] == "down"
+        assert outputs["probe_state"] == expected_state, outputs
 
 
 def test_production_actions_context_cannot_authorize_test_gh_helper(
@@ -613,6 +710,8 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     assert "secrets." not in route
     assert "GH_TOKEN: ${{ github.token }}" in route
     assert "HEARTBEAT_API_TIMEOUT_SECONDS: '5'" in route
+    assert "HEARTBEAT_JOB_POLL_ATTEMPTS: '3'" in route
+    assert "HEARTBEAT_JOB_POLL_INTERVAL_SECONDS: '2'" in route
     assert "HEARTBEAT_POLL_ATTEMPTS: '10'" in route
     assert "HEARTBEAT_POLL_INTERVAL_SECONDS: '5'" in route
     assert "HEARTBEAT_EXPECTED_EVENT:" in route
@@ -630,6 +729,9 @@ def test_ci_route_is_trusted_secretless_bounded_and_nonblocking() -> None:
     assert '.[0].run_id == $run_id' in query
     assert '.[0].head_sha == $head_sha' in query
     assert 'index("jovie-runner") != null' in query
+    assert 'jobs_endpoint="repos/$GH_REPO/actions/runs/$run_id/attempts/$run_attempt/jobs?per_page=100"' in query
+    assert '.[0].run_attempt == $run_attempt' in query
+    assert "HEARTBEAT_JOB_POLL_ATTEMPTS" in query
     assert 'degrade pending "current exact heartbeat' in query
     assert "for ((attempt = 1; attempt <= POLL_ATTEMPTS; attempt++))" in awaiter
     assert 'if [[ "$probe_state" != "pending" ]]' in awaiter
