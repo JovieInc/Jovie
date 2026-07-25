@@ -50,7 +50,11 @@ function recordSensitiveValues(path, values) {
     if (err.code === 'EEXIST' && existsSync(path)) {
       // Race: another worker created the file between our existsSync check and
       // the O_EXCL open.  Re-open for append without O_EXCL.
-      descriptor = openSync(path, constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW, 0o600);
+      descriptor = openSync(
+        path,
+        constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW,
+        0o600
+      );
     } else {
       throw err;
     }
