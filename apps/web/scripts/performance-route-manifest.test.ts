@@ -146,6 +146,10 @@ describe('performance route manifest', () => {
       APP_ROUTES.PROFILES,
       `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
     ]);
+    expect(presence?.readySelectors.content).toEqual([
+      '[data-testid="profiles-workspace"]',
+      'section#artist-profile',
+    ]);
   });
 
   it('measures the canonical profile rail control without inventing a link route', () => {

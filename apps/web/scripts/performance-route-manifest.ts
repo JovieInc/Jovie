@@ -1246,7 +1246,7 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['section#artist-profile'],
+      content: ['[data-testid="profiles-workspace"]', 'section#artist-profile'],
       redirectDestinations: [
         APP_ROUTES.PROFILES,
         `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
