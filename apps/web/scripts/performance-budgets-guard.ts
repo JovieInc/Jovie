@@ -444,7 +444,7 @@ function matchesExpectedPath(actualUrl: URL, expectedPath: string) {
   return actualUrl.pathname === normalizedExpected;
 }
 
-async function waitForExpectedUrl(
+export async function waitForExpectedUrl(
   page: Page,
   expectedPaths: readonly string[],
   timeoutMs = READY_TIMEOUT_MS
@@ -458,7 +458,7 @@ async function waitForExpectedUrl(
       expectedPaths.some(expectedPath =>
         matchesExpectedPath(currentUrl, expectedPath)
       ),
-    { timeout: timeoutMs }
+    { timeout: timeoutMs, waitUntil: 'domcontentloaded' }
   );
 }
 
