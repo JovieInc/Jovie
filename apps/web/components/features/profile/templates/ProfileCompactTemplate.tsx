@@ -360,9 +360,20 @@ export function ProfileCompactTemplate({
     [artist.theme]
   );
 
-  const initialSource = useMemo(() => {
-    if (globalThis.window === undefined) return null;
-    return new URLSearchParams(globalThis.location.search).get('source');
+  // Hydration-safe ?source= capture: reading location.search during the
+  // first client render (e.g. a window-guarded useMemo) makes the identity
+  // link href differ from the SSR'd markup whenever a source param is present
+  // (/testartist vs /testartist?source=qr — React hydration mismatch, and the
+  // attribute is never patched up). Render null (matching the server) and
+  // read the param post-mount; the re-render then stamps the source into the
+  // href and the history-sync effect. Tracking does not regress: the
+  // sourceOverride falls through to useProfileShell's own hydration-safe
+  // locationSource (useSyncExternalStore) while this is null.
+  const [initialSource, setInitialSource] = useState<string | null>(null);
+  useEffect(() => {
+    setInitialSource(
+      new URLSearchParams(globalThis.location.search).get('source')
+    );
   }, []);
 
   const { notificationsContextValue, notificationsController } =
@@ -695,19 +706,14 @@ export function ProfileCompactTemplate({
     setRequestedMode('profile');
   }, [artist.handle, artist.name]);
 
-  const compactSurfaceShowsModeHeading = drawerOpen
-    ? drawerView === 'listen' ||
-      drawerView === 'releases' ||
-      drawerView === 'subscribe' ||
-      drawerView === 'notifications' ||
-      drawerView === 'tour'
-    : requestedMode === 'listen' ||
-      requestedMode === 'releases' ||
-      requestedMode === 'subscribe' ||
-      requestedMode === 'tour';
-  const shouldRenderTemplateHeading = isDesktopLayout
-    ? true
-    : compactSurfaceShowsModeHeading;
+  // Only the desktop layout needs the shell-level sr-only h1: there the
+  // compact surface renders its heading as a <p> (renderSemanticHeading is
+  // false), so the shell h1 is the document's single h1. On mobile the
+  // compact surface ALWAYS renders exactly one h1 itself — the visible hero
+  // heading in home mode, or its own sr-only heading in non-home modes — so
+  // a shell h1 duplicates it (two h1s in the a11y tree in listen/tour/
+  // subscribe/releases modes, violating the one-h1 guardrail).
+  const shouldRenderTemplateHeading = isDesktopLayout;
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
