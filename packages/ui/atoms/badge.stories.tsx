@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Badge } from './badge';
 
 const meta: Meta<typeof Badge> = {
-  title: 'UI/Atoms/Badge',
+  title: 'shadcn/Badge',
   component: Badge,
   parameters: {
     layout: 'centered',

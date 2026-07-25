@@ -68,10 +68,9 @@ modes, neverUse rules.
 
 **Render rules:**
 - `revalidate = false` (fully static — hard invariant).
-- Dark-only theme on **System B** tokens via `.system-b-marketing` (editorial marketing language — DESIGN.md). Do **not** choose "System A" or `.linear-marketing` for new pages.
+- Dark-only theme (System A — DESIGN.md).
 - Copy-in-data: copy lives in `apps/web/data/*Copy.ts`, not inline in the page.
-- One body face (Inter; Satoshi display exception only), one container width (`page` | `prose`), spacing-only transitions.
-- Prefer `@jovie/ui` atoms; see [`docs/design/COMPONENT_MAP.md`](../design/COMPONENT_MAP.md).
+- One body face, one container width (`page` | `prose`), spacing-only transitions.
 - `data-testid="marketing-section-{sectionId}"` on each section wrapper.
 - Proof sections render only if `proofVerified: true` (the resolver already
   dropped unverified proof sections — but double-check at render).
@@ -83,13 +82,12 @@ modes, neverUse rules.
 ## Inherited invariants (NOT restated in the registry)
 
 These apply to EVERY composition; the registry does not restate them:
-- **Dark-only theme on System B** (charter delta #9; DESIGN.md editorial marketing language / `.system-b-marketing` — not historical System A).
+- **Dark-only theme** (charter delta #9; DESIGN.md System A).
 - **Fully static** (`revalidate = false` — `.claude/rules/ui.md`).
 - **Copy-in-data files** (`apps/web/data/*Copy.ts` pattern — `.claude/rules/code-style.md`).
-- **One body face (Inter), one container width** (`page` | `prose`), spacing-only transitions; Satoshi display exception only.
+- **One body face, one container width** (`page` | `prose`), spacing-only transitions.
 - **Layout-shift contract** (height-stable slots for state changes — `.claude/rules/ui.md`).
 - **Screenshot registry** (`lib/screenshots/registry.ts` — proof assets bind to `SCREENSHOT_SCENARIO_IDS`).
-- **Component map** — [`docs/design/COMPONENT_MAP.md`](../design/COMPONENT_MAP.md); no void stories / off-system shipping.
 
 ## Worked example (brief-01 from the golden fixtures)
 
