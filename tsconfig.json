@@ -20,6 +20,7 @@
     { "path": "./apps/extension" },
     { "path": "./apps/web" },
     { "path": "./packages/ui" },
+    { "path": "./packages/audio-contracts" },
     { "path": "./packages/extension-contracts" }
   ]
 }

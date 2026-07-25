@@ -67,11 +67,6 @@ Do not spend design effort on:
 
 `../DESIGN.md` is the operational design-system reference. This file defines why and when design work matters; `../DESIGN.md` defines how to execute it correctly.
 
-**Execution lock (founder-directed 2026-06-18):** one design system, two languages.
-System B tokens only; product language + marketing editorial language. Historical
-"System A" is not a valid choice for new work. Component prefer/forbid map:
-[`docs/design/COMPONENT_MAP.md`](../docs/design/COMPONENT_MAP.md).
-
 ---
 
 ## Changelog
@@ -79,4 +74,3 @@ System B tokens only; product language + marketing editorial language. Historica
 | Date | Change | Source |
 |---|---|---|
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |
-| 2026-07-23 | Cross-link one-system lock + component map. | Tim White / design-system docs lane |

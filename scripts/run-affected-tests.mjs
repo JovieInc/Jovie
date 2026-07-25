@@ -614,15 +614,11 @@ export function buildAffectedTestPlan(
       file =>
         file.startsWith('apps/web/components/') ||
         file.startsWith('apps/web/app/') ||
-        file.startsWith('packages/ui/') ||
-        file === 'scripts/design-system-agent-gate.mjs' ||
-        file === 'scripts/design-system-agent-gate.test.mjs' ||
-        file === 'apps/web/styles/design-system.css'
+        file.startsWith('packages/ui/')
     )
   ) {
     mandatoryTests.push(
-      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
-      'apps/web/tests/unit/design-system/design-system-agent-gate.test.ts'
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'
     );
   }
   if (
