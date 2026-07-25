@@ -112,6 +112,42 @@ describe('GET /api/dashboard/contacts', () => {
     expect(body[0].personName).toBe('Jane');
   });
 
+  it('checks profile ownership with the authenticated app user id', async () => {
+    const profileQuery = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([{ id: 'profile_123' }]),
+    };
+    const contactsQuery = {
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockResolvedValue([]),
+    };
+    const tx = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(profileQuery)
+        .mockReturnValueOnce(contactsQuery),
+    };
+
+    hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'app-user-uuid' });
+    hoisted.withDbSessionTxMock.mockImplementation(async operation =>
+      operation(tx, 'app-user-uuid')
+    );
+
+    const { GET } = await import('@/app/api/dashboard/contacts/route');
+    const response = await GET(
+      new Request(
+        'http://localhost/api/dashboard/contacts?profileId=profile_123'
+      )
+    );
+
+    expect(response.status).toBe(200);
+    const { eq } = await import('drizzle-orm');
+    expect(eq).toHaveBeenCalledWith('userId', 'app-user-uuid');
+    expect(eq).not.toHaveBeenCalledWith('clerkId', 'app-user-uuid');
+  });
+
   it('returns 500 on unexpected error', async () => {
     const thrownError = new Error('DB crash');
     hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'user_123' });

@@ -1247,10 +1247,13 @@ const CREATOR_SHELL_ROUTES = [
     measureMode: 'redirect',
     readySelectors: {
       content: ['section#artist-profile'],
-      redirectDestinations: [`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`],
+      redirectDestinations: [
+        APP_ROUTES.PROFILES,
+        `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
+      ],
     },
     timings: [
-      // This alias lands on the heavier artist-profile music settings surface.
+      // The legacy destination is the heavier artist-profile settings surface.
       { metric: 'redirect-complete', budget: 1500 },
       { metric: 'time-to-first-byte', budget: 1200 },
     ],

@@ -136,6 +136,18 @@ describe('performance route manifest', () => {
     expect(releaseTasks?.path).toBe('/app/releases/[releaseId]/tasks');
   });
 
+  it('accepts both Profiles workspace rollout destinations for Presence', () => {
+    const presence = getEndUserPerfRouteManifest().find(
+      route => route.id === 'creator-presence'
+    );
+
+    expect(presence?.measureMode).toBe('redirect');
+    expect(presence?.readySelectors.redirectDestinations).toEqual([
+      APP_ROUTES.PROFILES,
+      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
+    ]);
+  });
+
   it('measures the canonical profile rail control without inventing a link route', () => {
     const profile = getEndUserPerfRouteManifest().find(
       route => route.navigationItemId === 'profile'
