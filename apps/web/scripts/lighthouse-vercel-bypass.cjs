@@ -43,7 +43,22 @@ function recordSensitiveValues(path, values) {
   } else {
     flags |= constants.O_CREAT | constants.O_EXCL;
   }
-  const descriptor = openSync(path, flags, 0o600);
+  let descriptor;
+  try {
+    descriptor = openSync(path, flags, 0o600);
+  } catch (err) {
+    if (err.code === 'EEXIST' && existsSync(path)) {
+      // Race: another worker created the file between our existsSync check and
+      // the O_EXCL open.  Re-open for append without O_EXCL.
+      descriptor = openSync(
+        path,
+        constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW,
+        0o600
+      );
+    } else {
+      throw err;
+    }
+  }
   try {
     const stat = fstatSync(descriptor, { bigint: true });
     if (
