@@ -21,6 +21,10 @@ const APP_ID_SCOPED_SOURCES = [
     expectedPredicates: 2,
   },
   {
+    relativePath: 'app/app/(shell)/dashboard/actions/settings.ts',
+    expectedPredicates: 1,
+  },
+  {
     relativePath: 'app/app/(shell)/admin/actions.ts',
     expectedPredicates: 1,
   },
@@ -69,23 +73,6 @@ describe('post-Better Auth app user ID contract', () => {
     const source = readWebSource(relativePath);
 
     expect(source.match(/appUserIdFilter\(/g)).toHaveLength(expectedPredicates);
-    expect(source).not.toMatch(/eq\(users\.clerkId,\s*\w+\)/);
-  });
-
-  it('persists sidebar settings with the authenticated app UUID', () => {
-    const source = readWebSource(
-      'app/app/(shell)/dashboard/actions/settings.ts'
-    );
-    const resolvesAppUserBeforeWrite =
-      source.includes('.where(appUserIdFilter(appUserId))') &&
-      source.includes('userId: user.id');
-    const writesSessionAppUserIdDirectly =
-      source.includes('withDbSession(async appUserId =>') &&
-      source.includes('userId: appUserId');
-
-    expect(resolvesAppUserBeforeWrite || writesSessionAppUserIdDirectly).toBe(
-      true
-    );
     expect(source).not.toMatch(/eq\(users\.clerkId,\s*\w+\)/);
   });
 

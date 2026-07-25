@@ -9,8 +9,8 @@ import {
 } from '@/lib/flags/route-snapshots';
 
 describe('route flag snapshots', () => {
-  it('keeps auth routes to the design shell flag only', () => {
-    expect(resolveAuthRouteFlagNames()).toEqual(['DESIGN_V1']);
+  it('keeps auth routes free of retired shell rollout flags', () => {
+    expect(resolveAuthRouteFlagNames()).toEqual([]);
   });
 
   it('keeps onboarding and start routes to chat instrumentation only', () => {
@@ -24,14 +24,11 @@ describe('route flag snapshots', () => {
       APP_ROUTES.RELEASES,
       APP_ROUTES.SETTINGS,
       APP_ROUTES.ADMIN,
-      APP_ROUTES.FEATURE_FLAGS,
+      APP_ROUTES.ADMIN_FEATURES,
+      APP_ROUTES.LEGACY_FEATURE_FLAGS,
     ]) {
       expect(resolveAppShellRouteFlagNames(pathname)).toEqual(
-        expect.arrayContaining([
-          'DESIGN_V1',
-          'STRIPE_CONNECT_ENABLED',
-          'INBOX_HOME',
-        ])
+        expect.arrayContaining(['STRIPE_CONNECT_ENABLED', 'INBOX_HOME'])
       );
     }
   });

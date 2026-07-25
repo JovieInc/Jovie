@@ -13,20 +13,6 @@ const mockProfile = {
   settings: {},
 };
 
-vi.mock('next/dynamic', () => ({
-  default: () =>
-    function DynamicReleasesExperience(props: Record<string, unknown>) {
-      return (
-        <div
-          data-testid='releases-experience'
-          data-count={String((props.releases as unknown[])?.length ?? 0)}
-        >
-          Releases
-        </div>
-      );
-    },
-}));
-
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   DashboardDataContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
@@ -40,6 +26,21 @@ vi.mock('@/lib/flags/client', () => ({
   useAppFlag: () => false,
 }));
 
+vi.mock(
+  '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView',
+  () => ({
+    ShellReleasesView: (props: Record<string, unknown>) => (
+      <div
+        data-testid='releases-experience'
+        data-count={String((props.releases as unknown[])?.length ?? 0)}
+        data-spotify-connected={String(props.spotifyConnected)}
+      >
+        Releases
+      </div>
+    ),
+  })
+);
+
 // Mock query hook — default: loaded with empty data
 const mockQueryResult = {
   data: [] as unknown[],
@@ -49,7 +50,13 @@ const mockQueryResult = {
   error: undefined as Error | undefined,
 };
 
-let capturedPageErrorStateProps: Record<string, unknown> | null = null;
+const capturedPageErrorState = {
+  props: null as Record<string, unknown> | null,
+};
+
+function getCapturedPageErrorStateProps() {
+  return capturedPageErrorState.props;
+}
 
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => mockQueryResult,
@@ -57,7 +64,7 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
 
 vi.mock('@/features/feedback/PageErrorState', () => ({
   PageErrorState: (props: Record<string, unknown>) => {
-    capturedPageErrorStateProps = props;
+    capturedPageErrorState.props = props;
     return <div data-testid='page-error'>{String(props.message ?? '')}</div>;
   },
 }));
@@ -96,20 +103,21 @@ describe('@critical ReleasesPageClient', () => {
     mockQueryResult.isLoading = false;
     mockQueryResult.isError = true;
     mockQueryResult.error = new Error('load failed');
-    capturedPageErrorStateProps = null;
+    capturedPageErrorState.props = null;
 
     render(<ReleasesPageClient />);
     expect(screen.getByTestId('page-error')).toHaveTextContent(
       'We could not load your releases. Retry the request or refresh the page.'
     );
-    expect(capturedPageErrorStateProps).toMatchObject({
+    const errorStateProps = getCapturedPageErrorStateProps();
+    expect(errorStateProps).toMatchObject({
       title: 'Unable to load releases',
       actionLabel: 'Retry load',
     });
-    expect(typeof capturedPageErrorStateProps?.onRetry).toBe('function');
+    expect(typeof errorStateProps?.onRetry).toBe('function');
 
     mockQueryResult.refetch.mockClear();
-    (capturedPageErrorStateProps?.onRetry as (() => void) | undefined)?.();
+    (errorStateProps?.onRetry as (() => void) | undefined)?.();
     expect(mockQueryResult.refetch).toHaveBeenCalledTimes(1);
 
     // Reset
@@ -148,8 +156,8 @@ describe('@critical ReleasesPageClient', () => {
     mockQueryResult.data = [];
     render(<ReleasesPageClient />);
     expect(screen.getByTestId('releases-experience')).toHaveAttribute(
-      'data-count',
-      '0'
+      'data-spotify-connected',
+      'true'
     );
   });
 

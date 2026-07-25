@@ -137,7 +137,7 @@ test.describe('Signed-in auth verification @smoke', () => {
 
       const context = getContext();
       expect(
-        context.pageErrors,
+        context.uncaughtExceptions,
         'Signed-in auth verification page errors'
       ).toEqual([]);
       expect(
@@ -159,6 +159,10 @@ test.describe('Signed-in auth verification @smoke', () => {
   test('electron sign-in returns to the app via the native-return bounce, not the web app', async ({
     page,
   }) => {
+    test.skip(
+      TEST_AUTH_BYPASS_ENABLED,
+      'Electron native auth requires a real Better Auth session to mint its one-time token'
+    );
     test.setTimeout(180_000);
     const { cleanup } = setupPageMonitoring(page);
 

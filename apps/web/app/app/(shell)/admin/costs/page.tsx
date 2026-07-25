@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { getAdminCosts, getCostsLastRefreshedAt } from '@/lib/admin/costs';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { captureError } from '@/lib/error-tracking';
 import { CostsTable } from './CostsTable';
 
@@ -11,6 +12,8 @@ export const metadata: Metadata = {
 export const runtime = 'nodejs';
 
 export default async function AdminCostsPage() {
+  await requireCurrentAdminPageAccess();
+
   let items: Awaited<ReturnType<typeof getAdminCosts>> = [];
   let lastRefreshed: Awaited<ReturnType<typeof getCostsLastRefreshedAt>> = null;
 

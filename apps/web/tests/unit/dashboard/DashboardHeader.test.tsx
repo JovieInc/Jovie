@@ -1,8 +1,55 @@
-import { render, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 
 describe('DashboardHeader', () => {
+  it('mounts shared responsive controls exactly once', () => {
+    render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'New Chat', href: '/app/chat' }]}
+        leading={<button type='button'>Go back</button>}
+        sidebarTrigger={<button type='button'>Toggle sidebar</button>}
+        searchSurface={<button type='button'>Search chats</button>}
+        action={
+          <button type='button' aria-label='Show Tim White profile'>
+            TW
+          </button>
+        }
+      />
+    );
+
+    expect(
+      screen.getAllByRole('heading', { name: 'New Chat', level: 1 })
+    ).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Go back' })).toHaveLength(1);
+    expect(
+      screen.getAllByRole('button', { name: 'Toggle sidebar' })
+    ).toHaveLength(1);
+    expect(
+      screen.getAllByRole('button', { name: 'Search chats' })
+    ).toHaveLength(1);
+    expect(
+      screen.getAllByRole('button', { name: 'Show Tim White profile' })
+    ).toHaveLength(1);
+  });
+
+  it('keeps the mobile profile fallback when no route action is registered', () => {
+    render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'New Chat', href: '/app/chat' }]}
+        mobileProfileSlot={
+          <button type='button' aria-label='Open profile'>
+            Profile
+          </button>
+        }
+      />
+    );
+
+    expect(
+      screen.getAllByRole('button', { name: 'Open profile' })
+    ).toHaveLength(1);
+  });
+
   it('renders mobile actions in a flat wrapper without pill chrome', () => {
     const { container } = render(
       <DashboardHeader
@@ -11,8 +58,10 @@ describe('DashboardHeader', () => {
       />
     );
 
-    const mobileHeader = container.querySelector('.hidden.max-sm\\:flex');
-    const actionButton = within(mobileHeader!).getByRole('button', {
+    const headerRow = container.querySelector(
+      '[data-testid="dashboard-header"] > div'
+    );
+    const actionButton = within(headerRow!).getByRole('button', {
       name: 'Add release',
     });
     const actionWrapper = actionButton.parentElement;
@@ -58,12 +107,12 @@ describe('DashboardHeader', () => {
       />
     );
 
-    const mobileHeader = container.querySelector('.hidden.max-sm\\:flex');
+    const header = container.querySelector('[data-testid="dashboard-header"]');
 
-    expect(mobileHeader).not.toBeNull();
-    expect(within(mobileHeader!).getByText('Library')).toBeInTheDocument();
+    expect(header).not.toBeNull();
+    expect(within(header!).getByText('Library')).toBeInTheDocument();
     expect(
-      within(mobileHeader!).getByRole('button', { name: 'Filter Library' })
+      within(header!).getByRole('button', { name: 'Filter Library' })
     ).toBeInTheDocument();
   });
 
@@ -75,13 +124,18 @@ describe('DashboardHeader', () => {
       />
     );
 
-    const mobileHeader = container.querySelector('.hidden.max-sm\\:flex');
+    const header = container.querySelector('[data-testid="dashboard-header"]');
 
-    expect(mobileHeader).not.toBeNull();
+    expect(header).not.toBeNull();
     expect(
-      within(mobileHeader!).getByText('Release planning thread')
+      within(header!).getByRole('heading', {
+        name: 'Release planning thread',
+        level: 1,
+      })
     ).toBeInTheDocument();
-    expect(within(mobileHeader!).queryByText('New Chat')).toBeNull();
+    expect(
+      within(header!).queryByRole('heading', { name: 'New Chat' })
+    ).toBeNull();
   });
 
   it('collapses the breadcrumb when the search surface takes over', () => {
@@ -125,7 +179,9 @@ describe('DashboardHeader', () => {
     expect(header).not.toHaveClass('bg-(--linear-app-content-surface)');
     // Layout is unchanged — the desktop row keeps the compact header height.
     expect(
-      container.querySelector('.h-\\(--linear-app-header-height-compact\\)')
+      container.querySelector(
+        '.sm\\:h-\\(--linear-app-header-height-compact\\)'
+      )
     ).not.toBeNull();
   });
 });

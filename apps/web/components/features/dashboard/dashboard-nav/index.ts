@@ -1,19 +1,20 @@
 export {
-  adminNavigation,
-  artistProfileNavItem,
   artistSettingsNavigation,
+  calendarNavItem,
+  chatNavItem,
+  contactsNavItem,
   dashboardHome,
-  filterProfilesWorkspaceNavigation,
   inboxNavItem,
+  libraryNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   primaryNavigation,
-  profileNavItem,
-  releasesNavItem,
+  settingsNavItem,
   settingsNavigation,
-  touringNavItem,
+  tasksNavItem,
   userSettingsNavigation,
 } from './config';
 export { DashboardNav } from './DashboardNav';
+export { isLibraryNavigationRoute } from './navigation-state';
 export type { DashboardNavProps, NavItem } from './types';
 export { copyToClipboard, fallbackCopy } from './utils';

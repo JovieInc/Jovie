@@ -3,7 +3,7 @@ import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 
 /**
  * /start loading skeleton — mirrors the resolved anonymous onboarding empty
- * state (OnboardingShell → AppShellFrame shellChatV1 → OnboardingChat →
+ * state (OnboardingShell → AppShellFrame → OnboardingChat →
  * ChatEmptyStateComposerRegion) so the swap to the resolved page does not
  * reflow: same inset shell frame, same centered content column, same composer
  * anchor (712px box) and midline-anchored intro. No logo mark — the resolved
@@ -23,7 +23,6 @@ export default function StartLoading() {
       data-testid='start-loading-skeleton'
     >
       <AppShellFrame
-        variant='shellChatV1'
         sidebar={null}
         containerClassName='[color-scheme:dark]'
         contentClassName='overflow-hidden!'

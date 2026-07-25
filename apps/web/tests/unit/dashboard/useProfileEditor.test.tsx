@@ -110,6 +110,7 @@ describe('useProfileEditor', () => {
     });
 
     expect(mockMutateAsync).toHaveBeenCalledWith({
+      profileId: dashboardData.selectedProfile.id,
       updates: {
         displayName: 'Updated Name',
         username: dashboardData.selectedProfile.username,

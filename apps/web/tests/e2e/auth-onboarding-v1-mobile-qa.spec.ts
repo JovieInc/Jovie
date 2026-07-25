@@ -12,10 +12,7 @@ import {
   TEST_PERSONA_COOKIE,
   TEST_USER_ID_COOKIE,
 } from '@/lib/auth/test-mode';
-import {
-  clearAppFlagOverrides,
-  installAppFlagOverrides,
-} from './helpers/app-flag-overrides';
+import { clearAppFlagOverrides } from './helpers/app-flag-overrides';
 
 const MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
 const ONBOARDING_QA_HANDLE = 'jov1813qa';
@@ -111,7 +108,7 @@ async function stubHandleAvailability(page: Page): Promise<void> {
   );
 }
 
-test.describe('Auth and onboarding Design V1 mobile QA', () => {
+test.describe('Canonical auth and onboarding mobile QA', () => {
   test.setTimeout(180_000);
 
   test.skip(
@@ -119,14 +116,13 @@ test.describe('Auth and onboarding Design V1 mobile QA', () => {
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
   );
 
-  test('flagged sign-in and sign-up shells fit the mobile viewport', async ({
+  test('canonical sign-in and sign-up shells fit the mobile viewport', async ({
     page,
   }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
 
     for (const route of [APP_ROUTES.SIGNIN, APP_ROUTES.SIGNUP]) {
       await clearAppFlagOverrides(page);
-      await installAppFlagOverrides(page, { DESIGN_V1: true });
 
       await page.goto(route, {
         waitUntil: 'domcontentloaded',
@@ -134,9 +130,10 @@ test.describe('Auth and onboarding Design V1 mobile QA', () => {
       });
 
       const shell = page.locator('[data-auth-shell]');
-      await expect(shell).toHaveAttribute('data-design-v1-auth', 'true', {
+      await expect(shell).toBeVisible({
         timeout: 30_000,
       });
+      await expect(shell).toHaveCount(1);
       await expect(shell).toHaveAttribute('data-auth-layout-variant', 'split');
       await expect(page.locator('#auth-form')).toBeVisible({
         timeout: 30_000,
@@ -154,7 +151,6 @@ test.describe('Auth and onboarding Design V1 mobile QA', () => {
     const userId = await resolveCreatorUserId(request);
     await page.setViewportSize(MOBILE_VIEWPORT);
     await stubHandleAvailability(page);
-    await installAppFlagOverrides(page, { DESIGN_V1: true });
     await prepareCreatorSession(page, userId);
 
     await page.goto(`${APP_ROUTES.ONBOARDING}?handle=${ONBOARDING_QA_HANDLE}`, {

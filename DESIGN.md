@@ -565,6 +565,63 @@ duration token (subtle, cinematic, and raw scale) drops to 0ms automatically.
 
 ---
 
+## App IA & Page Scaffold
+
+The authenticated product has one shell and one reviewed default navigation.
+`apps/web/components/features/dashboard/dashboard-nav/config.ts` is the code
+source of truth; this table records the founder-approved six entries rendered
+by the canonical customer shell. Settings and OV operator tools are contextual
+or mutually exclusive surfaces, not additions to this primary six-item IA.
+
+| Group | Item | Canonical destination | Behavior |
+|-------|------|-----------------------|----------|
+| Primary | Inbox | `/app` | Opens the opportunity and work queue |
+| Primary | Chat | `/app/chat` | Starts or resumes the conversation workspace |
+| Primary | Library | `/app/library` | Opens releases, audio, video, images, and files |
+| Primary | Contacts | `/app/contacts` | Opens the artist contact workspace |
+| Primary | Calendar | `/app/calendar` | Opens release dates, events, and calendar moments |
+| Primary | Tasks | `/app/tasks` | Opens the task workspace |
+
+Any permanent IA change must update `primaryNavigation`, its exact structure
+test, this table, and the route coverage test in the same change. Desktop and
+mobile navigation derive from the same ordered item identities.
+
+### Five Page Types
+
+| Type | Canonical scaffold | First action contract | Route rule |
+|------|--------------------|-----------------------|------------|
+| Inbox / work queue | Shell root + opportunity stack | The first actionable card exposes its decision; do not add a competing page-level CTA | `/app` is the signed-in home |
+| Conversation | Chat workspace + composer | Focus the composer or the next required prompt; the composer owns the primary action | `/app/chat` and `/app/chat/[id]` |
+| Collection / workspace | `PageShell` + `DashboardWorkspacePanel` + `PageToolbar` + framed content | Put at most one primary pill CTA at the toolbar end; filters, display, and navigation stay secondary/ghost | Use the canonical workspace route, never a new alias stub |
+| Entity detail | `EntitySidebarShell` inside the current workspace | Put the next entity action in the rail header or first rail section | Entity detail is rail-only; selecting a row must not create a second page scaffold or page-level entity route |
+| Settings | Settings shell/sidebar + `SettingsSection` | The first editable control begins the flow; one save/confirm action owns primary emphasis | Use the canonical `/app/settings/*` route |
+
+The **first-action contract** means the first viewport communicates exactly one
+next useful action. A page may have many available controls, but it must not
+present multiple primary pills, duplicate the same CTA across header/body/footer,
+or hide the first action behind redundant explanatory chrome. Empty, loading,
+error, and populated states reserve the same action slot so the action does not
+shift.
+
+### Route Canon
+
+- Canonical routes render their scaffold inside the shared authenticated shell.
+- Compatibility redirects are a shrink-only, explicitly baselined exception;
+  new `page.tsx` redirect stubs are blocked.
+- Search is the unified shell-header input, not a duplicate search page route
+  or command-palette popup.
+- Release rows and other entity rows open the right detail rail; task workflows
+  that are true multi-step workspaces retain their reviewed canonical route.
+- Reuse the canonical `EmptyState` family. New bespoke `*EmptyState.tsx`
+  components are blocked; compose an existing primitive or add a state variant.
+
+### IA Decisions
+
+| Date | Decision | Operating trigger |
+|------|----------|-------------------|
+| 2026-07-22 | **EVENT: One authenticated app shell.** Header, sidebar, content frame, and right rail are one system; routes may not introduce a parallel shell. | Ship now: extend the shared shell. Re-evaluate only for a mutually exclusive security boundary that cannot share authenticated navigation. Then: document that boundary before introducing another shell. |
+| 2026-07-22 | **Inbox is home.** `/app` renders the opportunity Inbox and Inbox is the first canonical customer navigation entry. | Ship now: keep `/app` as Inbox. Re-evaluate when 30 days of production navigation telemetry shows more than 25% of signed-in home visits immediately leave without an Inbox action. Then: test a different home entry while preserving one shell and one canonical `/app` route. |
+
 ## Component Patterns
 
 ### Buttons
@@ -853,6 +910,9 @@ mark intentional marketing sentence-case headlines with
 | `apps/web/components/site/MarketingHeader.tsx` | Marketing header |
 | `apps/web/components/site/MarketingFooter.tsx` | Marketing footer |
 | `apps/web/components/features/auth/AuthLayout.tsx` | Product-funnel shell |
+| `apps/web/components/features/dashboard/dashboard-nav/config.ts` | Reviewed authenticated-shell navigation and rollout insertions |
+| `apps/web/components/shell/SidebarNavItem.tsx` | Canonical sidebar row and icon chrome |
+| `apps/web/components/organisms/table/molecules/PageToolbar.tsx` | Canonical workspace toolbar and action hierarchy |
 | `apps/web/components/homepage/*` | Homepage chat-intake implementation (System B) |
 | `apps/web/components/features/home/*` | Legacy marketing-home components (still used by `(marketing)/new/*`) |
 | `apps/web/app/(home)/layout.tsx` | Homepage shell — `MarketingHeader` (minimal) + `MarketingFooter` |

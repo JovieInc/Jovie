@@ -82,7 +82,7 @@ const producerCounts: Record<string, number> = {
   'nightly-testing-agent.yml': 2,
   'nightly-tests.yml': 4,
   'production-controller.yml': 1,
-  'production-release.yml': 2,
+  'production-release.yml': 3,
   'screenshots.yml': 1,
   'synthetic-monitoring.yml': 6,
   'visual-regression.yml': 5,

@@ -5,7 +5,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -44,7 +44,11 @@ function walk(dir: string, out: string[]): void {
     if (s.isDirectory()) {
       if (entry === 'node_modules' || entry === '.next') continue;
       walk(full, out);
-    } else if (SOURCE_EXT.test(entry)) {
+    } else if (
+      SOURCE_EXT.test(entry) &&
+      !/\.test\.[tj]sx?$/.test(entry) &&
+      !full.includes(`${sep}__tests__${sep}`)
+    ) {
       out.push(full);
     }
   }

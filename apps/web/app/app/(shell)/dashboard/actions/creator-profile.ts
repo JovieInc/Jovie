@@ -10,6 +10,7 @@
 
 import { and, eq } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
+import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
@@ -68,12 +69,12 @@ export async function updateCreatorProfile(
       throw new Error('Unauthorized');
     }
 
-    return await withDbSession(async clerkUserId => {
+    return await withDbSession(async appUserId => {
       // First get the user's database ID
       const [user] = await db
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.clerkId, clerkUserId))
+        .where(appUserIdFilter(appUserId))
         .limit(1);
 
       if (!user) {
@@ -183,7 +184,7 @@ async function requireOwnProfile() {
   const [user] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.clerkId, userId))
+    .where(appUserIdFilter(userId))
     .limit(1);
 
   if (!user) {

@@ -1,7 +1,10 @@
 import { redirect } from 'next/navigation';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 
-export default function AdminOutreachDmRedirectPage() {
+export default async function AdminOutreachDmRedirectPage() {
+  await requireCurrentAdminPageAccess();
+
   const params = new URLSearchParams();
   params.set('queue', 'dm');
   redirect(buildAdminGrowthHref('outreach', params));

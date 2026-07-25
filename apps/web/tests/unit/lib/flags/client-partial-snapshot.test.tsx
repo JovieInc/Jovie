@@ -13,21 +13,21 @@ function FlagProbe({
 }
 
 describe('AppFlagProvider partial snapshots', () => {
-  it('mirrors DESIGN_V1 aliases from a trimmed payload', () => {
+  it('uses a supplied value from a trimmed payload', () => {
     render(
-      <AppFlagProvider initialFlags={{ DESIGN_V1: false }}>
-        <FlagProbe flagName='DESIGN_V1_RELEASES' />
+      <AppFlagProvider initialFlags={{ STRIPE_CONNECT_ENABLED: false }}>
+        <FlagProbe flagName='STRIPE_CONNECT_ENABLED' />
       </AppFlagProvider>
     );
 
-    expect(screen.getByTestId('flag-DESIGN_V1_RELEASES')).toHaveTextContent(
+    expect(screen.getByTestId('flag-STRIPE_CONNECT_ENABLED')).toHaveTextContent(
       'false'
     );
   });
 
   it('falls back to local defaults for flags omitted from the payload', () => {
     render(
-      <AppFlagProvider initialFlags={{ DESIGN_V1: true }}>
+      <AppFlagProvider initialFlags={{ STRIPE_CONNECT_ENABLED: true }}>
         <FlagProbe flagName='ALBUM_ART_GENERATION' />
       </AppFlagProvider>
     );

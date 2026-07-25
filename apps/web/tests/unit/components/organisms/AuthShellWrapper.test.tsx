@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Short-circuit heavy import chains that this test doesn't exercise.
 
@@ -59,7 +59,7 @@ vi.mock('@/contexts/HeaderActionsContext', () => ({
   useRegisterHeaderSearch: vi.fn(),
 }));
 
-vi.mock('@/components/shell/HeaderSearchSurface', () => ({
+vi.mock('@/components/shell/HeaderSearchSurfaceFromContext', () => ({
   HeaderSearchSurface: () => null,
   HeaderSearchSurfaceFromContext: () => null,
 }));
@@ -116,7 +116,25 @@ vi.mock('@/features/dashboard/atoms/DrawerToggleButton', () => ({
 
 // Static import is safe here: vi.mock() declarations are hoisted above imports
 // by Vitest, so all mocks are registered before this module resolves.
-import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
+import {
+  AuthShellWrapper,
+  usePendingShell,
+} from '@/components/organisms/AuthShellWrapper';
+
+function PendingShellControls() {
+  const { clearPendingShell, showPendingShell } = usePendingShell();
+
+  return (
+    <>
+      <button type='button' onClick={() => showPendingShell('releases')}>
+        Open Releases
+      </button>
+      <button type='button' onClick={() => clearPendingShell('releases')}>
+        Finish Releases
+      </button>
+    </>
+  );
+}
 
 describe('AuthShellWrapper', () => {
   beforeEach(() => {
@@ -135,6 +153,13 @@ describe('AuthShellWrapper', () => {
     });
   });
 
+  afterEach(() => {
+    if (vi.isFakeTimers()) {
+      vi.runOnlyPendingTimers();
+    }
+    vi.useRealTimers();
+  });
+
   it('renders children without throwing runtime ReferenceError', () => {
     render(
       <AuthShellWrapper>
@@ -143,6 +168,16 @@ describe('AuthShellWrapper', () => {
     );
 
     expect(screen.getByText('child content')).toBeInTheDocument();
+  });
+
+  it('passes the server-resolved mode into route configuration', () => {
+    render(
+      <AuthShellWrapper mode='ov'>
+        <div>OV content</div>
+      </AuthShellWrapper>
+    );
+
+    expect(useAuthRouteConfigMock).toHaveBeenCalledWith('ov');
   });
 
   it('passes preview panel default-open state through to provider on dashboard routes', () => {
@@ -207,5 +242,102 @@ describe('AuthShellWrapper', () => {
       expect.objectContaining({ defaultOpen: false, enabled: true }),
       undefined
     );
+  });
+
+  it.each([
+    ['dashboard', {}],
+    ['chat', { isChatRoute: true, showChatUsageIndicator: true }],
+    ['admin', { section: 'admin' }],
+  ])('does not mount stale release-transition copy at rest on %s routes', (_, overrides) => {
+    useAuthRouteConfigMock.mockReturnValue({
+      section: 'dashboard',
+      isArtistProfileSettings: false,
+      breadcrumbs: [],
+      showMobileTabs: false,
+      isTableRoute: false,
+      isDemoRoute: false,
+      isChatRoute: false,
+      showChatUsageIndicator: false,
+      isLyricsRoute: false,
+      ...overrides,
+    });
+
+    render(
+      <AuthShellWrapper>
+        <div>route content</div>
+      </AuthShellWrapper>
+    );
+
+    expect(screen.queryByText('Opening Releases')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Preparing your release workspace.')
+    ).not.toBeInTheDocument();
+  });
+
+  it('mounts the release-transition overlay only while Releases is pending and clears it on success', () => {
+    render(
+      <AuthShellWrapper>
+        <PendingShellControls />
+      </AuthShellWrapper>
+    );
+
+    expect(
+      screen.queryByTestId('releases-shell-ready')
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Releases' }));
+
+    const overlay = screen.getByTestId('releases-shell-ready');
+    expect(overlay).toBeVisible();
+    expect(overlay).toHaveClass('absolute');
+    expect(overlay).toHaveAttribute('role', 'status');
+    expect(screen.getByText('Opening Releases')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finish Releases' }));
+
+    expect(
+      screen.queryByTestId('releases-shell-ready')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Opening Releases')).not.toBeInTheDocument();
+  });
+
+  it('removes the release-transition overlay when the pending route times out', () => {
+    vi.useFakeTimers();
+    render(
+      <AuthShellWrapper>
+        <PendingShellControls />
+      </AuthShellWrapper>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Releases' }));
+    expect(screen.getByText('Opening Releases')).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(9_999);
+    });
+    expect(screen.getByText('Opening Releases')).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.queryByText('Opening Releases')).not.toBeInTheDocument();
+  });
+
+  it('removes the pending overlay and cancels its timeout when the shell unmounts', () => {
+    vi.useFakeTimers();
+    const { unmount } = render(
+      <AuthShellWrapper>
+        <PendingShellControls />
+      </AuthShellWrapper>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Releases' }));
+    expect(screen.getByText('Opening Releases')).toBeInTheDocument();
+    expect(vi.getTimerCount()).toBe(1);
+
+    unmount();
+
+    expect(screen.queryByText('Opening Releases')).not.toBeInTheDocument();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

@@ -1,8 +1,9 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { queryKeys, STANDARD_NO_REMOUNT_CACHE } from '@/lib/queries';
 import { loadReleaseMatrix } from '@/lib/releases/release-matrix-loader';
+import { STANDARD_NO_REMOUNT_CACHE } from './cache-strategies';
+import { queryKeys } from './keys';
 
 interface UseReleasesQueryOptions {
   readonly enabled?: boolean;

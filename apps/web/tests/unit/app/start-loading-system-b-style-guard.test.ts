@@ -31,7 +31,7 @@ describe('/start loading System B style guard', () => {
       []
     );
     expect(source).toContain('AppShellFrame');
-    expect(source).toContain("variant='shellChatV1'");
+    expect(source).not.toContain('variant=');
     expect(source).toContain('system-b-start-loading-page');
     expect(source).toContain('system-b-start-loading-composer');
     expect(source).not.toContain('JovieMarkElectric');

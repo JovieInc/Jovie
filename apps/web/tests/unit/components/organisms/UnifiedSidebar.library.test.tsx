@@ -1,12 +1,13 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
+import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   ShellSidebarOverrideProvider,
@@ -14,17 +15,32 @@ import {
 } from '@/contexts/ShellSidebarOverrideContext';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
-import {
-  mockUsePathname,
-  resetDashboardNavTestMocks,
-} from '@/tests/utils/dashboard-nav-test-support';
+import { resetDashboardNavTestMocks } from '@/tests/utils/dashboard-nav-test-support';
+
+const unifiedPathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => unifiedPathnameMock(),
+  useParams: () => ({}),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+  }),
+}));
 
 const electronRuntimeMock = vi.hoisted(() => ({
   isElectronRuntime: true,
 }));
 
+const signOutMock = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   useIsElectronRuntime: () => electronRuntimeMock.isElectronRuntime,
+}));
+
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useAuthSafe: () => ({ signOut: signOutMock }),
 }));
 
 vi.mock('@/features/dashboard/dashboard-nav', () => ({
@@ -95,25 +111,21 @@ function LibrarySidebarOverride({
 
 function renderUnifiedSidebar({
   overrideContent,
-  designV1 = true,
   pathname = APP_ROUTES.LIBRARY,
   section = 'library',
 }: {
   readonly overrideContent?: ReactNode;
-  readonly designV1?: boolean;
   readonly pathname?: string;
-  readonly section?: 'admin' | 'dashboard' | 'library' | 'settings';
+  readonly section?: 'admin' | 'dashboard' | 'library' | 'ov' | 'settings';
 } = {}) {
-  mockUsePathname.mockReturnValue(pathname);
+  unifiedPathnameMock.mockReturnValue(pathname);
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <AppFlagProvider
-        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: designV1 }}
-      >
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
         <DashboardDataProvider value={dashboardData}>
           <TooltipProvider>
             <SidebarProvider>
@@ -136,26 +148,24 @@ function renderUnifiedSidebar({
 describe('UnifiedSidebar library route', () => {
   afterEach(() => {
     electronRuntimeMock.isElectronRuntime = true;
+    signOutMock.mockReset();
     resetDashboardNavTestMocks();
+    unifiedPathnameMock.mockReset();
+    unifiedPathnameMock.mockReturnValue(APP_ROUTES.CHAT);
   });
 
-  it('keeps the library route out of the default dashboard navigation', () => {
+  it('keeps the standard dashboard navigation on the library route', () => {
     renderUnifiedSidebar();
 
     expect(screen.queryByText('Loading Library')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Back to App' })).toBeDefined();
+    expect(screen.getByTestId('dashboard-nav')).toBeInTheDocument();
     expect(
-      screen.queryByRole('navigation', { name: 'Library navigation' })
+      screen.queryByRole('link', { name: 'Back to App' })
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: 'Releases' })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: 'Tasks' })
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('user-button')).toBeInTheDocument();
   });
 
-  it('renders the registered library navigation with the app back target', async () => {
+  it('preserves the generic route-override contract for legitimate consumers', async () => {
     renderUnifiedSidebar({
       overrideContent: <button type='button'>Needs Assets</button>,
     });
@@ -165,7 +175,6 @@ describe('UnifiedSidebar library route', () => {
         screen.getByRole('navigation', { name: 'Library filters' })
       ).toBeInTheDocument();
     });
-
     expect(screen.getByRole('button', { name: 'Status' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Needs Assets' })
@@ -179,7 +188,6 @@ describe('UnifiedSidebar library route', () => {
 
   it('omits header New Conversation and the web collapse control in Electron dashboard mode', () => {
     renderUnifiedSidebar({
-      designV1: false,
       pathname: APP_ROUTES.DASHBOARD,
       section: 'dashboard',
     });
@@ -207,5 +215,70 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
+  });
+
+  it('renders dedicated operator navigation without the customer dashboard nav', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.ADMIN_OPS,
+      section: 'ov',
+    });
+
+    expect(
+      screen.getByRole('navigation', { name: 'OV Navigation' })
+    ).toBeInTheDocument();
+    const operatorNavigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    const operatorLinks = within(operatorNavigation).getAllByRole('link');
+
+    expect(
+      operatorLinks.map(link => ({
+        label: link.textContent,
+        href: link.getAttribute('href'),
+      }))
+    ).toEqual(
+      ADMIN_NAV_REGISTRY.map(item => ({
+        label: item.label,
+        href: item.href,
+      }))
+    );
+    expect(screen.queryByTestId('dashboard-nav')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Sign Out' })
+    ).toBeInTheDocument();
+  });
+
+  it('marks only the nested operator destination current', () => {
+    renderUnifiedSidebar({
+      pathname: `${APP_ROUTES.ADMIN_OPS}/agents`,
+      section: 'ov',
+    });
+
+    const operatorNavigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    expect(
+      within(operatorNavigation).getByRole('link', { name: 'Overview' })
+    ).not.toHaveAttribute('aria-current');
+    expect(
+      within(operatorNavigation).getByRole('link', { name: 'Ops' })
+    ).toHaveAttribute('aria-current', 'page');
+    expect(
+      operatorNavigation.querySelectorAll('[aria-current="page"]')
+    ).toHaveLength(1);
+  });
+
+  it('keeps Jovie-mode admin routes on the same customer navigation contract', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.LEGACY_ADMIN,
+      section: 'admin',
+    });
+
+    expect(screen.getByTestId('dashboard-nav')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'OV Navigation' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('user-button')).toBeInTheDocument();
   });
 });

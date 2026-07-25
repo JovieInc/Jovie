@@ -10,6 +10,7 @@ import {
 import { getLeadFunnelCounts } from '@/components/features/admin/leads/LeadPipelineKpis';
 import { LeadTable } from '@/components/features/admin/leads/LeadTable';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { adminGrowthSearchParams } from '@/lib/nuqs';
 
 interface AdminGrowthPageProps {
@@ -25,6 +26,8 @@ export const runtime = 'nodejs';
 export default async function AdminGrowthPage({
   searchParams,
 }: Readonly<AdminGrowthPageProps>) {
+  await requireCurrentAdminPageAccess();
+
   const params = await adminGrowthSearchParams.parse(searchParams);
   const counts = await getLeadFunnelCounts();
 

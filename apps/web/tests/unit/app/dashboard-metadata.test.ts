@@ -102,12 +102,11 @@ describe('dashboard metadata generation', () => {
     expect(metadata.title).toBe('Inbox');
   });
 
-  it('falls back to dashboard title when profile display name is missing', async () => {
+  it('uses the visible New Chat title for the chat home route', async () => {
     const { generateMetadata } = await import('@/app/app/(shell)/chat/page');
     const metadata = await generateMetadata();
 
-    // Chat route keeps the Home title; only /app root is Inbox-forward.
-    expect(metadata.title).toBe('Home');
+    expect(metadata.title).toBe('New Chat');
   });
 
   it('uses conversation title for chat thread metadata when present', async () => {

@@ -2,6 +2,10 @@ import { getCookieCache } from 'better-auth/cookies';
 import { type NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  APP_SHELL_MODE_HEADER,
+  resolveAppShellModeFromPathname,
+} from '@/lib/app-shell/mode';
+import {
   checkProfileVisitorBlocked,
   getAudienceBlockIpFromHeaders,
 } from '@/lib/audience/public-profile-block';
@@ -78,6 +82,16 @@ export async function handleProxyRequest(
   req: NextRequest,
   userId: string | null
 ) {
+  // Derive shell mode from the original public pathname before Next rewrites
+  // `/app/ov/*` onto its physical route implementation. Never forward a
+  // client-supplied value: this header is trusted only because the proxy
+  // overwrites it on every pass-through response.
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set(
+    APP_SHELL_MODE_HEADER,
+    resolveAppShellModeFromPathname(req.nextUrl.pathname)
+  );
+
   try {
     const startTime = Date.now();
     const pathname = req.nextUrl.pathname;
@@ -95,7 +109,6 @@ export async function handleProxyRequest(
     // Next.js Server Components read the nonce from request headers via
     // headers().get('x-nonce')
     // ========================================================================
-    const requestHeaders = new Headers(req.headers);
     let nonce: string | null = null;
 
     if (pathInfo.needsNonce) {
@@ -341,6 +354,6 @@ export async function handleProxyRequest(
       pathname: req.nextUrl.pathname,
       context: 'proxy_middleware',
     });
-    return NextResponse.next();
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 }

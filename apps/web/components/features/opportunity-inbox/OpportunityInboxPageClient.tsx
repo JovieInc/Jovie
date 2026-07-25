@@ -3,9 +3,9 @@
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
-import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
+import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
+import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   OPPORTUNITY_SIGNAL_TYPE_META,
   type OpportunitySignalType,
@@ -15,6 +15,7 @@ import {
   type OpportunityInboxData,
   type OpportunityInboxTourDateItem,
 } from '@/lib/connectors/opportunity-inbox-types';
+import type { AvailableDSP } from '@/lib/dsp';
 import { useAppFlag } from '@/lib/flags/client';
 import { useOpportunityInboxMutations } from '@/lib/queries/useOpportunityInboxMutations';
 import { useTourDateReviewMutations } from '@/lib/queries/useTourDateReviewMutations';
@@ -27,31 +28,33 @@ import {
   OpportunityInboxRejectedTourDates,
 } from './OpportunityInboxTourDateSections';
 
-const ProfileContactSidebar = dynamic(
+const PreviewDataHydrator = dynamic(
   () =>
-    import('@/features/dashboard/organisms/profile-contact-sidebar').then(
-      mod => ({ default: mod.ProfileContactSidebar })
-    ),
+    import('@/features/dashboard/organisms/PreviewDataHydrator').then(mod => ({
+      default: mod.PreviewDataHydrator,
+    })),
   { ssr: false }
 );
 
-// Registers the artist-profile right rail for the dashboard home route so the
-// ArtistProfileRailToggle in the shell header can animate it open/closed.
-function HomeRightPanelHost() {
-  const panel = useMemo(
-    () => (
-      <ErrorBoundary fallback={null}>
-        <ProfileContactSidebar />
-      </ErrorBoundary>
-    ),
-    []
+function HomeRightPanelHost({
+  connectedDSPs,
+  initialLinks,
+}: Readonly<{
+  connectedDSPs: readonly AvailableDSP[];
+  initialLinks: readonly ProfileSocialLink[];
+}>) {
+  return (
+    <PreviewDataHydrator
+      connectedDSPs={connectedDSPs}
+      initialLinks={[...initialLinks]}
+    />
   );
-  useRegisterRightPanel(panel);
-  return null;
 }
 
 export interface OpportunityInboxPageClientProps {
   readonly inbox: OpportunityInboxData;
+  readonly connectedDSPs?: readonly AvailableDSP[];
+  readonly initialLinks?: readonly ProfileSocialLink[];
 }
 
 type SignalTypeFilter = OpportunitySignalType | 'all';
@@ -83,6 +86,8 @@ function sortByStartDate(
 
 export function OpportunityInboxPageClient({
   inbox,
+  connectedDSPs = [],
+  initialLinks = [],
 }: OpportunityInboxPageClientProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -276,7 +281,11 @@ export function OpportunityInboxPageClient({
       className='system-b-opportunity-inbox-page'
       data-testid='opportunity-inbox-page'
     >
-      <HomeRightPanelHost />
+      <NavigationDestinationReady destination='inbox' />
+      <HomeRightPanelHost
+        connectedDSPs={connectedDSPs}
+        initialLinks={initialLinks}
+      />
       <header className='system-b-opportunity-inbox-page-header'>
         {/* ui-casing-allow: design-locked inbox copy */}
         <h1 className='system-b-opportunity-inbox-page-title'>

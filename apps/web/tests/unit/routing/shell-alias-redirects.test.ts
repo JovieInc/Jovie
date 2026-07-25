@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
 type RedirectRule = {
+  readonly destination: string;
+  readonly permanent: boolean;
   readonly source: string;
 };
 
@@ -16,7 +18,6 @@ vi.mock('next/navigation', () => ({
 }));
 
 import ContactPage from '@/app/app/(shell)/contact/page';
-import CanonicalContactsPage from '@/app/app/(shell)/contacts/page';
 import DashboardChatPage from '@/app/app/(shell)/dashboard/chat/page';
 import DashboardContactsPage from '@/app/app/(shell)/dashboard/contacts/page';
 import DashboardLinksPage from '@/app/app/(shell)/dashboard/links/page';
@@ -25,13 +26,26 @@ import DashboardTippingPage from '@/app/app/(shell)/dashboard/tipping/page';
 import DashboardTourDatesPage from '@/app/app/(shell)/dashboard/tour-dates/page';
 import CanonicalProfilePage from '@/app/app/(shell)/profile/page';
 import CanonicalTippingPage from '@/app/app/(shell)/tipping/page';
-import CanonicalTourDatesPage from '@/app/app/(shell)/tour-dates/page';
 
 beforeEach(() => {
   redirectMock.mockClear();
 });
 
 describe('shell alias redirects', () => {
+  it('redirects the releases alias before rendering the authenticated shell', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const redirects = (await nextConfig.redirects()) as RedirectRule[];
+
+    expect(
+      redirects.find(redirect => redirect.source === APP_ROUTES.RELEASES)
+    ).toEqual({
+      source: APP_ROUTES.RELEASES,
+      destination: `${APP_ROUTES.LIBRARY}?view=releases`,
+      permanent: false,
+    });
+  });
+
   it('keeps contacts and tour aliases out of static redirects', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
@@ -57,24 +71,20 @@ describe('shell alias redirects', () => {
     ).toEqual([]);
   });
 
-  it('routes contact aliases through shell pages to contact settings', () => {
-    for (const Page of [
-      ContactPage,
-      CanonicalContactsPage,
-      DashboardContactsPage,
-    ]) {
+  it('routes legacy contact aliases through shell pages to contact settings', () => {
+    for (const Page of [ContactPage, DashboardContactsPage]) {
       expect(() => Page()).toThrow(`REDIRECT:${APP_ROUTES.SETTINGS_CONTACTS}`);
     }
 
-    expect(redirectMock).toHaveBeenCalledTimes(3);
+    expect(redirectMock).toHaveBeenCalledTimes(2);
   });
 
-  it('routes tour aliases through shell pages to touring settings', () => {
-    for (const Page of [CanonicalTourDatesPage, DashboardTourDatesPage]) {
-      expect(() => Page()).toThrow(`REDIRECT:${APP_ROUTES.SETTINGS_TOURING}`);
-    }
+  it('routes the legacy dashboard tour alias to the canonical entity surface', () => {
+    expect(() => DashboardTourDatesPage()).toThrow(
+      `REDIRECT:${APP_ROUTES.TOUR_DATES}`
+    );
 
-    expect(redirectMock).toHaveBeenCalledTimes(2);
+    expect(redirectMock).toHaveBeenCalledTimes(1);
   });
 
   it('routes profile aliases through shell pages to the chat profile panel', () => {

@@ -1,12 +1,11 @@
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { APP_ROUTES } from '@/constants/routes';
 import { formatUsd } from '@/lib/admin/format';
-import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { loadAdminAgentRun } from './agent-run-data';
 
 export const runtime = 'nodejs';
@@ -36,15 +35,7 @@ interface AgentRunDebugPageProps {
 export default async function AgentRunDebugPage({
   params,
 }: AgentRunDebugPageProps) {
-  const adminAccess = await getCurrentAdminPageAccess();
-
-  if (
-    !adminAccess.isAuthenticated ||
-    !adminAccess.userId ||
-    !adminAccess.hasAdminRole
-  ) {
-    redirect(APP_ROUTES.DASHBOARD);
-  }
+  await requireCurrentAdminPageAccess();
 
   const { id } = await params;
   const run = await loadAdminAgentRun(id);
@@ -89,15 +80,15 @@ export default async function AgentRunDebugPage({
         <DebugSection title='Token Usage'>
           <dl className='space-y-2'>
             <MetaRow
-              label='Prompt tokens'
+              label='Prompt Tokens'
               value={String(tokenUsage.promptTokens ?? '—')}
             />
             <MetaRow
-              label='Completion tokens'
+              label='Completion Tokens'
               value={String(tokenUsage.completionTokens ?? '—')}
             />
             <MetaRow
-              label='Total tokens'
+              label='Total Tokens'
               value={String(tokenUsage.totalTokens ?? '—')}
             />
           </dl>

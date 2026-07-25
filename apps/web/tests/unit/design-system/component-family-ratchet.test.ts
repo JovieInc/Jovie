@@ -5,9 +5,10 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { findNewEmptyStatePaths } from '../app/app-ia-static-guard';
 
 /**
  * Duplicate-component-family guard (count ratchet).
@@ -59,7 +60,7 @@ function walk(dir: string, out: string[]): void {
       if (entry === 'node_modules' || entry === '.next') continue;
       walk(full, out);
     } else if (entry.endsWith('.tsx') && !EXCLUDED.test(entry)) {
-      out.push(entry);
+      out.push(full);
     }
   }
 }
@@ -116,5 +117,43 @@ describe('design-system component-family ratchet', () => {
     expect(Object.keys(baseline.counts).sort()).toEqual(
       Object.keys(FAMILIES).sort()
     );
+  });
+});
+
+describe('bespoke EmptyState path guard', () => {
+  const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as {
+    allowedEmptyStatePaths: string[];
+  };
+  const allowedPaths = new Set(baseline.allowedEmptyStatePaths);
+
+  function getCurrentEmptyStatePaths(): string[] {
+    const files: string[] = [];
+    walk(SCAN_DIR, files);
+    return files
+      .map(file => relative(WEB_ROOT, file).replaceAll('\\', '/'))
+      .filter(file => /EmptyState\.tsx$/.test(file))
+      .sort();
+  }
+
+  it('allows the explicit current set and catches a bespoke fixture', () => {
+    expect(
+      findNewEmptyStatePaths(
+        [...baseline.allowedEmptyStatePaths, 'components/foo/Compliant.tsx'],
+        allowedPaths
+      )
+    ).toEqual([]);
+    expect(
+      findNewEmptyStatePaths(
+        ['components/features/new/NewFeatureEmptyState.tsx'],
+        allowedPaths
+      )
+    ).toEqual(['components/features/new/NewFeatureEmptyState.tsx']);
+  });
+
+  it('keeps the explicit exception set exact and blocks every new path', () => {
+    const currentPaths = getCurrentEmptyStatePaths();
+
+    expect(findNewEmptyStatePaths(currentPaths, allowedPaths)).toEqual([]);
+    expect(currentPaths).toEqual([...allowedPaths].sort());
   });
 });

@@ -150,6 +150,18 @@ describe('ProfileAboutTab', () => {
   });
 
   describe('bio editing', () => {
+    it('provides stable explicit labels before and during editing', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <ProfileAboutTab {...baseProps} bio='Old bio' onBioChange={vi.fn()} />
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Edit Bio' }));
+
+      expect(screen.getByRole('textbox', { name: 'Bio' })).toBeInTheDocument();
+    });
+
     it('enters edit mode on click, saves on blur', async () => {
       const user = userEvent.setup();
       const onBioChange = vi.fn();

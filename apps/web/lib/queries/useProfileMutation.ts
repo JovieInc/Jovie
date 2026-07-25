@@ -11,6 +11,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { createMutationFn, FetchError } from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError } from './mutation-utils';
@@ -31,7 +32,9 @@ export interface ProfileSettingsUpdate {
  * Profile update payload for display name, username, avatar, and other fields.
  */
 export interface ProfileUpdateInput {
-  profileId?: string;
+  profileId: string;
+  /** Compare-and-swap token returned by the previous profile response. */
+  expectedVersion?: number;
   updates: {
     displayName?: string;
     username?: string;
@@ -66,6 +69,7 @@ export interface ProfileData {
   settings?: Record<string, unknown> | null;
   creatorType: string | null;
   isPublic: boolean;
+  profileEditVersion: number;
 }
 
 /**
@@ -96,6 +100,8 @@ const updateProfileApi = createMutationFn<
 // ============================================================================
 
 export interface UseProfileMutationOptions {
+  /** ID of the currently selected profile; it may change during a mutation. */
+  profileId: string | undefined;
   /** Called on successful update */
   onSuccess?: (data: ProfileUpdateResponse) => void;
   /** Called on error */
@@ -115,6 +121,7 @@ export interface UseProfileMutationOptions {
  * @example
  * ```tsx
  * const { mutate: updateProfile, isPending } = useProfileMutation({
+ *   profileId: selectedProfile?.id,
  *   onSuccess: (data) => console.log('Updated:', data.profile),
  * });
  *
@@ -122,12 +129,21 @@ export interface UseProfileMutationOptions {
  * updateProfile({ updates: { displayName: 'New Name' } });
  * ```
  */
-export function useProfileMutation(options: UseProfileMutationOptions = {}) {
+export function useProfileMutation(options: UseProfileMutationOptions) {
   const queryClient = useQueryClient();
-  const { onSuccess, onError, silent = false } = options;
+  const { profileId, onSuccess, onError, silent = false } = options;
+  const activeProfileIdRef = useRef(profileId);
+  useEffect(() => {
+    activeProfileIdRef.current = profileId;
+  }, [profileId]);
 
   return useMutation({
-    mutationFn: updateProfileApi,
+    mutationFn: (variables: ProfileUpdateInput) => {
+      if (!profileId || variables.profileId !== profileId) {
+        throw new Error('Profile changed before the update could start.');
+      }
+      return updateProfileApi(variables);
+    },
 
     onMutate: async variables => {
       // Cancel outgoing refetches
@@ -135,12 +151,15 @@ export function useProfileMutation(options: UseProfileMutationOptions = {}) {
       await queryClient.cancelQueries({ queryKey: queryKeys.dashboard.all });
 
       // Snapshot current state for rollback
-      const previousProfile = queryClient.getQueryData(
+      const previousProfile = queryClient.getQueryData<ProfileData>(
         queryKeys.user.profile()
       );
 
       // Optimistically update the cache
-      if (previousProfile && variables.updates) {
+      const ownsProfileCache =
+        profileId === variables.profileId &&
+        previousProfile?.id === variables.profileId;
+      if (ownsProfileCache) {
         queryClient.setQueryData(
           queryKeys.user.profile(),
           (old: ProfileData | undefined) => {
@@ -153,33 +172,59 @@ export function useProfileMutation(options: UseProfileMutationOptions = {}) {
         );
       }
 
-      return { previousProfile };
+      return {
+        previousProfile,
+        profileId: variables.profileId,
+        ownsProfileCache,
+      };
     },
 
-    onSuccess: (data, _variables, _context) => {
-      // Update cache with server response
-      queryClient.setQueryData(queryKeys.user.profile(), data.profile);
+    onSuccess: (data, variables) => {
+      const currentProfile = queryClient.getQueryData<ProfileData>(
+        queryKeys.user.profile()
+      );
+      const stillOwnsActiveProfile =
+        activeProfileIdRef.current === variables.profileId &&
+        (!currentProfile || currentProfile.id === variables.profileId);
+      if (stillOwnsActiveProfile) {
+        queryClient.setQueryData(queryKeys.user.profile(), data.profile);
+      }
 
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
 
-      onSuccess?.(data);
+      if (stillOwnsActiveProfile) {
+        onSuccess?.(data);
+      }
     },
 
-    onError: (error, _variables, context) => {
-      // Rollback to previous state
-      if (context?.previousProfile) {
+    onError: (error, variables, context) => {
+      const currentProfile = queryClient.getQueryData<ProfileData>(
+        queryKeys.user.profile()
+      );
+      const stillOwnsActiveProfile =
+        activeProfileIdRef.current === variables.profileId &&
+        (!currentProfile || currentProfile.id === variables.profileId);
+
+      // Roll back only if this mutation still owns the active profile cache.
+      if (
+        stillOwnsActiveProfile &&
+        context?.ownsProfileCache &&
+        context.previousProfile
+      ) {
         queryClient.setQueryData(
           queryKeys.user.profile(),
           context.previousProfile
         );
       }
 
-      if (!silent) {
+      if (stillOwnsActiveProfile && !silent) {
         handleMutationError(error, 'Failed to update profile');
       }
 
-      onError?.(error instanceof Error ? error : new Error('Update failed'));
+      if (stillOwnsActiveProfile) {
+        onError?.(error instanceof Error ? error : new Error('Update failed'));
+      }
     },
 
     // Always revalidate after mutation to ensure server truth
@@ -202,6 +247,7 @@ export function useProfileMutation(options: UseProfileMutationOptions = {}) {
 // ============================================================================
 
 export interface UseAvatarMutationOptions {
+  profileId: string | undefined;
   /** Called on successful upload with the new avatar URL */
   onSuccess?: (avatarUrl: string) => void;
   /** Called on error */
@@ -218,6 +264,7 @@ export interface UseAvatarMutationOptions {
  * @example
  * ```tsx
  * const { mutate: uploadAvatar, isPending } = useAvatarMutation({
+ *   profileId: selectedProfile?.id,
  *   onSuccess: (url) => console.log('New avatar:', url),
  * });
  *
@@ -225,39 +272,47 @@ export interface UseAvatarMutationOptions {
  * uploadAvatar(file);
  * ```
  */
-export function useAvatarMutation(options: UseAvatarMutationOptions = {}) {
+export function useAvatarMutation(options: UseAvatarMutationOptions) {
   const queryClient = useQueryClient();
   const { onSuccess, onError } = options;
 
   return useMutation({
     mutationFn: async (file: File): Promise<string> => {
+      const profileId = options.profileId;
+      if (!profileId) {
+        throw new Error('Missing profile id; please refresh and try again.');
+      }
+
       // Step 1: Upload to blob storage
       const blobUrl = await uploadAvatarToBlob(file);
 
       // Step 2: Update profile with new URL
-      await updateProfileApi({ updates: { avatarUrl: blobUrl } });
+      await updateProfileApi({ profileId, updates: { avatarUrl: blobUrl } });
 
       return blobUrl;
     },
 
     onMutate: async () => {
+      const profileId = options.profileId;
+
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: queryKeys.user.profile() });
 
       // Snapshot for rollback
-      const previousProfile = queryClient.getQueryData(
+      const previousProfile = queryClient.getQueryData<ProfileData>(
         queryKeys.user.profile()
       );
 
-      return { previousProfile };
+      return { previousProfile, profileId };
     },
 
-    onSuccess: avatarUrl => {
-      // Update cache with new avatar
+    onSuccess: (avatarUrl, _file, context) => {
+      // Only update the profile that owned this upload. The selected profile
+      // may have changed while the blob and profile requests were in flight.
       queryClient.setQueryData(
         queryKeys.user.profile(),
         (old: ProfileData | undefined) => {
-          if (!old) return old;
+          if (!old || old.id !== context.profileId) return old;
           return { ...old, avatarUrl };
         }
       );
@@ -269,8 +324,14 @@ export function useAvatarMutation(options: UseAvatarMutationOptions = {}) {
     },
 
     onError: (error, _variables, context) => {
-      // Rollback to previous state
-      if (context?.previousProfile) {
+      // Roll back only if this upload still owns the selected profile cache.
+      const currentProfile = queryClient.getQueryData<ProfileData>(
+        queryKeys.user.profile()
+      );
+      if (
+        context?.previousProfile &&
+        currentProfile?.id === context.profileId
+      ) {
         queryClient.setQueryData(
           queryKeys.user.profile(),
           context.previousProfile
@@ -299,20 +360,38 @@ export function useAvatarMutation(options: UseAvatarMutationOptions = {}) {
  * Lightweight mutation for silent profile saves (used by auto-save).
  * No toasts, optimized for frequent calls.
  */
-export function useProfileSaveMutation() {
+export function useProfileSaveMutation(profileId: string | undefined) {
   const queryClient = useQueryClient();
+  const activeProfileIdRef = useRef(profileId);
+  useEffect(() => {
+    activeProfileIdRef.current = profileId;
+  }, [profileId]);
 
   return useMutation({
-    mutationFn: updateProfileApi,
-
-    onSuccess: data => {
-      // Silently update cache
-      queryClient.setQueryData(queryKeys.user.profile(), data.profile);
+    mutationFn: (variables: ProfileUpdateInput) => {
+      if (!profileId || variables.profileId !== profileId) {
+        throw new Error('Profile changed before the update could start.');
+      }
+      return updateProfileApi(variables);
     },
 
-    onError: () => {
+    onSuccess: (data, variables) => {
+      const currentProfile = queryClient.getQueryData<ProfileData>(
+        queryKeys.user.profile()
+      );
+      if (
+        activeProfileIdRef.current === variables.profileId &&
+        (!currentProfile || currentProfile.id === variables.profileId)
+      ) {
+        queryClient.setQueryData(queryKeys.user.profile(), data.profile);
+      }
+    },
+
+    onError: (_error, variables) => {
       // Invalidate to refetch correct state
-      queryClient.invalidateQueries({ queryKey: queryKeys.user.profile() });
+      if (activeProfileIdRef.current === variables.profileId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.user.profile() });
+      }
     },
 
     // Don't retry - auto-save will trigger again

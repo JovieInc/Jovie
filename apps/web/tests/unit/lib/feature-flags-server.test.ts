@@ -149,10 +149,18 @@ describe('Statsig server initialization', () => {
     const { checkGateForUser } = await import('@/lib/flags/statsig');
 
     await expect(
-      checkGateForUser('user-1', LEGACY_STATSIG_GATE_KEYS.DESIGN_V1, true)
+      checkGateForUser(
+        'user-1',
+        LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
+        true
+      )
     ).resolves.toBe(true);
     await expect(
-      checkGateForUser('user-2', LEGACY_STATSIG_GATE_KEYS.DESIGN_V1, true)
+      checkGateForUser(
+        'user-2',
+        LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
+        true
+      )
     ).resolves.toBe(true);
 
     expect(statsigConstructorMock).toHaveBeenCalledTimes(2);
@@ -174,7 +182,7 @@ describe('Statsig server initialization', () => {
 
       const result = checkGateForUser(
         'user-1',
-        LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
+        LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
         true
       );
 
@@ -212,7 +220,11 @@ describe('Statsig server initialization', () => {
       );
 
       await expect(
-        checkGateForUser('user-1', LEGACY_STATSIG_GATE_KEYS.DESIGN_V1, false)
+        checkGateForUser(
+          'user-1',
+          LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
+          false
+        )
       ).resolves.toBe(true);
 
       shutdownMock.mockReturnValueOnce(new Promise(() => {}));
@@ -228,7 +240,11 @@ describe('Statsig server initialization', () => {
       expect(shutdownMock).toHaveBeenCalledWith();
 
       await expect(
-        checkGateForUser('user-2', LEGACY_STATSIG_GATE_KEYS.DESIGN_V1, false)
+        checkGateForUser(
+          'user-2',
+          LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE,
+          false
+        )
       ).resolves.toBe(true);
       expect(statsigConstructorMock).toHaveBeenCalledTimes(2);
     } finally {
@@ -297,6 +313,33 @@ describe('Statsig server initialization', () => {
     ).resolves.toBe(true);
     expect(mockIsAdmin).toHaveBeenCalledWith('admin_123');
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it('keeps customer navigation flags role-invariant for admin users', async () => {
+    mockIsAdmin.mockResolvedValue(true);
+
+    vi.doMock('flags/next', () => ({
+      dedupe: <T extends (...args: never[]) => unknown>(fn: T) => fn,
+    }));
+
+    const run = vi.fn().mockResolvedValue(false);
+    vi.doMock('@/lib/flags/registry', () => ({
+      APP_FLAG_REGISTRY: {
+        INBOX_HOME: { run },
+      },
+      SUBSCRIBE_CTA_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('two_step'),
+      },
+      PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('button'),
+      },
+    }));
+
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+    await expect(
+      getAppFlagValue('INBOX_HOME', { userId: 'admin_123' })
+    ).resolves.toBe(false);
+    expect(run).toHaveBeenCalledTimes(1);
   });
 
   it('honors a per-environment override before the registry default', async () => {

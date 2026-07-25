@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { Search } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
@@ -7,6 +9,7 @@ import {
   PageToolbarActionButton,
   PageToolbarTabButton,
 } from '@/components/organisms/table/molecules/PageToolbar';
+import { findPageToolbarPrimaryCtaViolations } from '../../app/app-ia-static-guard';
 
 vi.mock('@jovie/ui', () => ({
   Button: ({ children, ...props }: ComponentProps<'button'>) => (
@@ -72,5 +75,78 @@ describe('PageToolbar buttons', () => {
     const button = screen.getByRole('button', { name: 'Toggle preview' });
     expect(button).toBeInTheDocument();
     expect(button).toBeEnabled();
+  });
+});
+
+describe('PageToolbar primary CTA guard', () => {
+  const webRoot = resolve(__dirname, '../../../..');
+
+  function readProductionTsxFiles(directory: string) {
+    const files: Array<{ path: string; source: string }> = [];
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const absolutePath = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        files.push(...readProductionTsxFiles(absolutePath));
+      } else if (
+        entry.name.endsWith('.tsx') &&
+        !/\.(?:test|stories)\.tsx$/.test(entry.name)
+      ) {
+        files.push({
+          path: relative(webRoot, absolutePath).replaceAll('\\', '/'),
+          source: readFileSync(absolutePath, 'utf8'),
+        });
+      }
+    }
+    return files;
+  }
+
+  it('allows one primary pill plus secondary toolbar actions', () => {
+    const compliant = `
+      const toolbarEnd = (
+        <>
+          <Button size='sm'>Create</Button>
+          <Button variant='secondary' size='sm'>Cancel</Button>
+        </>
+      );
+      export function Fixture() {
+        return <PageToolbar start={<span>Tasks</span>} end={toolbarEnd} />;
+      }
+    `;
+
+    expect(
+      findPageToolbarPrimaryCtaViolations([
+        { path: 'CompliantToolbar.tsx', source: compliant },
+      ])
+    ).toEqual([]);
+  });
+
+  it('catches two primary pills in one toolbar independently', () => {
+    const violation = `
+      export function Fixture() {
+        return (
+          <PageToolbar
+            start={<Button>Create</Button>}
+            end={<Button variant='primary'>Import</Button>}
+          />
+        );
+      }
+    `;
+
+    expect(
+      findPageToolbarPrimaryCtaViolations([
+        { path: 'ViolatingToolbar.tsx', source: violation },
+      ])
+    ).toEqual([
+      'ViolatingToolbar.tsx: PageToolbar has 2 primary pill CTAs (maximum 1)',
+    ]);
+  });
+
+  it('keeps every production PageToolbar at one primary pill CTA or fewer', () => {
+    const files = [
+      ...readProductionTsxFiles(join(webRoot, 'app')),
+      ...readProductionTsxFiles(join(webRoot, 'components')),
+    ];
+
+    expect(findPageToolbarPrimaryCtaViolations(files)).toEqual([]);
   });
 });

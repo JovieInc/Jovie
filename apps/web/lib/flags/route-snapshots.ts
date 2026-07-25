@@ -4,14 +4,11 @@ import { APP_ROUTES } from '@/constants/routes';
 import type { AppFlagName } from './contracts';
 
 const SHELL_CHROME_FLAG_NAMES = [
-  'DESIGN_V1',
   'STRIPE_CONNECT_ENABLED',
   'INBOX_HOME',
 ] as const satisfies readonly AppFlagName[];
 
-const AUTH_ROUTE_FLAG_NAMES = [
-  'DESIGN_V1',
-] as const satisfies readonly AppFlagName[];
+const AUTH_ROUTE_FLAG_NAMES = [] as const satisfies readonly AppFlagName[];
 
 const ONBOARDING_ROUTE_FLAG_NAMES = [
   'CHAT_JANK_MONITOR',

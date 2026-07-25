@@ -40,6 +40,17 @@ describe('performance interaction manifest', () => {
       getInteractionHotPathById('command-palette-filter')?.budget
         .firstFeedbackP95Ms
     ).toBe(50);
+    expect(
+      getInteractionHotPathById('chat-message-round-trip')?.budget
+    ).toEqual(
+      expect.objectContaining({
+        firstFeedbackP50Ms: 100,
+        usableStateP95Ms: 300,
+        renderToInteractiveP95Ms: 50,
+        maxDroppedFrames: 0,
+        minimumSampleCount: 5,
+      })
+    );
   });
 });
 
@@ -199,5 +210,95 @@ describe('performance interaction report', () => {
         ],
       })
     ).toThrow('Expected non-negative finite nextPaintMs');
+  });
+
+  it('passes the complete chat responsiveness contract', () => {
+    const samples: InteractionLatencySample[] = Array.from(
+      { length: 5 },
+      (_, runIndex) => ({
+        droppedFrameCount: 0,
+        firstFeedbackMs: 70 + runIndex,
+        renderToInteractiveMs: 20 + runIndex,
+        runIndex,
+        scenarioId: 'chat-message-round-trip',
+        usableStateMs: 180 + runIndex * 10,
+      })
+    );
+
+    const report = buildInteractionLatencyReport({ samples });
+    const summary = report.summaries[0];
+
+    expect(report.status).toBe('pass');
+    expect(summary?.p50FirstFeedbackMs).toBe(72);
+    expect(summary?.p95UsableStateMs).toBe(220);
+    expect(summary?.p95RenderToInteractiveMs).toBe(24);
+    expect(summary?.maxDroppedFrameCount).toBe(0);
+  });
+
+  it.each([
+    {
+      name: 'too few samples',
+      mutate: (samples: InteractionLatencySample[]) => samples.slice(0, 4),
+    },
+    {
+      name: 'slow median feedback',
+      mutate: (samples: InteractionLatencySample[]) =>
+        samples.map(sample => ({ ...sample, firstFeedbackMs: 101 })),
+    },
+    {
+      name: 'missing usable-state timing',
+      mutate: (samples: InteractionLatencySample[]) =>
+        samples.map(({ usableStateMs: _timing, ...sample }) => sample),
+    },
+    {
+      name: 'slow usable-state p95',
+      mutate: (samples: InteractionLatencySample[]) =>
+        samples.map((sample, index) => ({
+          ...sample,
+          usableStateMs: index === 4 ? 301 : 180,
+        })),
+    },
+    {
+      name: 'missing render timing',
+      mutate: (samples: InteractionLatencySample[]) =>
+        samples.map(({ renderToInteractiveMs: _timing, ...sample }) => sample),
+    },
+    {
+      name: 'slow render-to-interactive p95',
+      mutate: (samples: InteractionLatencySample[]) =>
+        samples.map((sample, index) => ({
+          ...sample,
+          renderToInteractiveMs: index === 4 ? 51 : 20,
+        })),
+    },
+    {
+      name: 'missing dropped-frame count',
+      mutate: (samples: InteractionLatencySample[]) =>
+        samples.map(({ droppedFrameCount: _count, ...sample }) => sample),
+    },
+    {
+      name: 'a dropped scroll frame',
+      mutate: (samples: InteractionLatencySample[]) =>
+        samples.map((sample, index) => ({
+          ...sample,
+          droppedFrameCount: index === 4 ? 1 : 0,
+        })),
+    },
+  ])('fails closed for chat samples with $name', ({ mutate }) => {
+    const completeSamples: InteractionLatencySample[] = Array.from(
+      { length: 5 },
+      (_, runIndex) => ({
+        droppedFrameCount: 0,
+        firstFeedbackMs: 70,
+        renderToInteractiveMs: 20,
+        runIndex,
+        scenarioId: 'chat-message-round-trip',
+        usableStateMs: 180,
+      })
+    );
+
+    expect(
+      buildInteractionLatencyReport({ samples: mutate(completeSamples) }).status
+    ).toBe('fail');
   });
 });

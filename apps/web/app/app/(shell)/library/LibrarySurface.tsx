@@ -5,6 +5,15 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
 } from '@jovie/ui';
 import {
   type ColumnDef,
@@ -37,7 +46,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   type CSSProperties,
-  cloneElement,
   createContext,
   type MouseEvent,
   memo,
@@ -51,6 +59,7 @@ import {
   useState,
 } from 'react';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
+import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
@@ -96,7 +105,6 @@ import type { FilterPill } from '@/components/shell/pill-search.types';
 import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
-import { useRegisterShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
@@ -878,15 +886,7 @@ function LibrarySavedViewRow({
   );
 }
 
-function LibraryRail({
-  assets,
-  savedView,
-  onSavedView,
-  filters,
-  onFilters,
-  onClearFilters,
-  className,
-}: {
+interface LibraryFilterPanelProps {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly savedView: LibrarySavedViewId;
   readonly onSavedView: (savedView: LibrarySavedViewId) => void;
@@ -894,7 +894,17 @@ function LibraryRail({
   readonly onFilters: (filters: LibraryFilters) => void;
   readonly onClearFilters: () => void;
   readonly className?: string;
-}) {
+}
+
+function LibraryFilterPanel({
+  assets,
+  savedView,
+  onSavedView,
+  filters,
+  onFilters,
+  onClearFilters,
+  className,
+}: LibraryFilterPanelProps) {
   const releaseTypes = uniqueSorted(assets.map(asset => asset.releaseType));
   const statuses = uniqueSorted(assets.map(asset => asset.status));
   const approvalStatuses = uniqueSorted(
@@ -931,13 +941,14 @@ function LibraryRail({
     filters.providers.size;
 
   return (
-    <nav
-      aria-label='Library Filters'
+    <fieldset
+      data-testid='library-filter-panel'
       className={cn(
-        'system-b-library-rail flex min-h-0 flex-col p-2.5',
+        'system-b-library-rail flex min-h-0 min-w-0 flex-col border-0 p-2.5',
         className
       )}
     >
+      <legend className='sr-only'>Library Filters</legend>
       <div className='min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <div className='pb-2'>
           <p className='system-b-library-rail-title pb-1 pt-2'>Smart Filters</p>
@@ -1066,7 +1077,7 @@ function LibraryRail({
           </FilterSection>
         ) : null}
       </div>
-    </nav>
+    </fieldset>
   );
 }
 
@@ -1170,6 +1181,83 @@ function FilterRow({
         <Check className='h-3 w-3 shrink-0 text-primary-token' />
       ) : null}
     </button>
+  );
+}
+
+function LibraryFiltersControl({
+  activeFilterCount,
+  filterPanel,
+  isDesktop,
+  open,
+  onOpenChange,
+}: {
+  readonly activeFilterCount: number;
+  readonly filterPanel: ReactNode;
+  readonly isDesktop: boolean;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+}) {
+  const label = (
+    <>
+      <span>Show Filters</span>
+      <span
+        data-testid='library-filter-count-slot'
+        aria-hidden='true'
+        className='inline-block w-8 shrink-0 text-right tabular-nums'
+      >
+        {activeFilterCount > 0 ? `(${activeFilterCount})` : null}
+      </span>
+    </>
+  );
+  const ariaLabel =
+    activeFilterCount > 0
+      ? `Show filters (${activeFilterCount})`
+      : 'Show filters';
+  const trigger = (
+    <PageToolbarActionButton
+      label={label}
+      icon={<Filter className={PAGE_TOOLBAR_ICON_CLASS} />}
+      ariaLabel={ariaLabel}
+      active={open}
+      className={isDesktop ? undefined : 'min-h-11 min-w-11'}
+    />
+  );
+
+  if (isDesktop) {
+    return (
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+        <PopoverContent
+          aria-label='Library Filters'
+          align='end'
+          sideOffset={6}
+          className='flex max-h-[min(36rem,var(--radix-popover-content-available-height))] w-80 overflow-hidden p-0'
+          testId='library-filter-popover'
+        >
+          {filterPanel}
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetTrigger asChild>{trigger}</SheetTrigger>
+      <SheetContent
+        side='right'
+        className='flex w-full max-w-[22rem] flex-col gap-0 p-0'
+        testId='library-filter-sheet'
+      >
+        <SheetHeader className='shrink-0 border-b border-subtle px-4 py-3 text-left'>
+          <SheetTitle>Library Filters</SheetTitle>
+          <SheetDescription className='sr-only'>
+            Filter by saved view, approval, release status, type, asset, or
+            provider.
+          </SheetDescription>
+        </SheetHeader>
+        {filterPanel}
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -1289,9 +1377,11 @@ function LibraryToolbar({
   onSearchQuery,
   visibleCount,
   totalCount,
-  mobileFiltersOpen,
-  onToggleMobileFilters,
+  filtersOpen,
+  onFiltersOpenChange,
   activeFilterCount,
+  filterPanel,
+  isDesktop,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly preset: LibraryPresetId;
@@ -1306,9 +1396,11 @@ function LibraryToolbar({
   readonly onSearchQuery: (query: string) => void;
   readonly visibleCount: number;
   readonly totalCount: number;
-  readonly mobileFiltersOpen: boolean;
-  readonly onToggleMobileFilters: () => void;
+  readonly filtersOpen: boolean;
+  readonly onFiltersOpenChange: (open: boolean) => void;
   readonly activeFilterCount: number;
+  readonly filterPanel: ReactNode;
+  readonly isDesktop: boolean;
 }) {
   return (
     <PageToolbar
@@ -1334,18 +1426,12 @@ function LibraryToolbar({
             ariaLabel='Search library by title'
             className='w-36 sm:w-48'
           />
-          <PageToolbarActionButton
-            label={
-              activeFilterCount > 0
-                ? `Show Filters (${activeFilterCount})`
-                : 'Show Filters'
-            }
-            icon={<Filter className={PAGE_TOOLBAR_ICON_CLASS} />}
-            onClick={onToggleMobileFilters}
-            aria-expanded={mobileFiltersOpen}
-            ariaPressed={mobileFiltersOpen}
-            tooltipLabel={mobileFiltersOpen ? 'Hide filters' : 'Show filters'}
-            className='lg:hidden'
+          <LibraryFiltersControl
+            activeFilterCount={activeFilterCount}
+            filterPanel={filterPanel}
+            isDesktop={isDesktop}
+            open={filtersOpen}
+            onOpenChange={onFiltersOpenChange}
           />
           <SortDropdown sort={sort} onSort={onSort} />
           {view === 'grid' ? (
@@ -1677,6 +1763,7 @@ function EmptyCatalog() {
       contentPadding='none'
       data-testid='library-surface'
     >
+      <NavigationDestinationReady destination='library' />
       <TableEmptyState
         icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
         title='No Library Items'
@@ -2414,7 +2501,7 @@ export function LibrarySurface({
   const { view, setView } = useLibraryViewMode();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [pills, setPills] = useState<FilterPill[]>([]);
   const { density: gridDensity, setDensity: setGridDensity } =
     useLibraryGridDensity();
@@ -2732,29 +2819,19 @@ export function LibrarySurface({
 
   useRegisterHeaderSearch(headerSearchAdapter);
 
-  const libraryRail = useMemo(
+  const filterPanel = useMemo(
     () => (
-      <LibraryRail
+      <LibraryFilterPanel
         assets={effectiveAssets}
         savedView={savedView}
         onSavedView={handleSavedViewChange}
         filters={filters}
         onFilters={setFilters}
         onClearFilters={() => setFilters(emptyFilters())}
+        className='max-h-full flex-1'
       />
     ),
     [effectiveAssets, filters, handleSavedViewChange, savedView]
-  );
-
-  useRegisterShellSidebarOverride(
-    effectiveAssets.length > 0
-      ? {
-          key: 'library',
-          backHref: APP_ROUTES.CHAT,
-          backLabel: 'Back to App',
-          content: libraryRail,
-        }
-      : null
   );
 
   const handleAudioUploaded = useCallback(
@@ -2798,21 +2875,17 @@ export function LibrarySurface({
           onSearchQuery={setSearchQuery}
           visibleCount={visibleAssets.length}
           totalCount={effectiveAssets.length}
-          mobileFiltersOpen={mobileFiltersOpen}
-          onToggleMobileFilters={() => setMobileFiltersOpen(value => !value)}
+          filtersOpen={filtersOpen}
+          onFiltersOpenChange={setFiltersOpen}
           activeFilterCount={activeFilterCount}
+          filterPanel={filterPanel}
+          isDesktop={isDesktopLayout}
         />
       }
     >
-      {mobileFiltersOpen ? (
-        <div className='lg:hidden'>
-          {cloneElement(libraryRail, {
-            className: 'max-h-[45svh] shrink-0 border-b border-subtle',
-          })}
-        </div>
-      ) : null}
-
+      <NavigationDestinationReady destination='library' />
       <div
+        data-testid='library-content-frame'
         className='grid h-full min-h-0 flex-1 overflow-hidden'
         style={
           {

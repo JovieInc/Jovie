@@ -507,7 +507,7 @@ async function resolveAuthIdentity(knownAppUserId?: string): Promise<{
   const bypassSession = await getCachedDevTestAuthSession();
   if (bypassSession) {
     return {
-      clerkUserId: bypassSession.dbUserId,
+      clerkUserId: bypassSession.clerkUserId,
       email: bypassSession.email,
     };
   }

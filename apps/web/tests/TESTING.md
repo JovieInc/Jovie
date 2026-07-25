@@ -28,14 +28,12 @@ Rules of thumb:
 - CI: the `ci-e2e-smoke` job runs the focused desktop lane; the `e2e-suite-* / E2E Smoke (PR to Preview)` step runs the tagged lane sharded.
 - Mobile parity is currently opt-in (no CI job by default). Run it locally when changing shell layout, mobile bottom nav, or any responsive code that has shipped with mobile regressions.
 
-### Flag-on / Flag-off parity
+### Canonical shell parity
 
-Shell routes that depend on `DESIGN_V1`/`SHELL_CHAT_V1` overrides require **both** a flag-on smoke and a flag-off smoke so we never ship a change that only works under one flag value:
-
-- `shell-chat-v1.spec.ts` — proves the New Design shell mounts when the override forces it on.
-- `shell-chat-v1-flag-off.spec.ts` — proves the legacy shell still mounts when the override forces it off.
-
-Marketing/product screenshots (`playwright.config.screenshots.ts` + `tests/product-screenshots/catalog.spec.ts`) continue to force the New Design via the production default; the flag-off parity coverage lives in the smoke lanes above.
+Shell routes have one production frame. Responsive smoke coverage must prove
+the same navigation, rail, focus, and loading contracts on desktop and mobile.
+The stale-override regression spec additionally proves that retired local
+override data cannot resurrect an alternate shell.
 
 ## Running Tests
 
@@ -84,16 +82,10 @@ single source of truth shared by `playwright.config.smoke.ts`,
 | **Focused mobile parity** | `pnpm --filter @jovie/web run e2e:smoke:mobile` | `playwright.config.smoke.mobile.ts` | iPhone-class viewport coverage for mobile overflow and viewport stability. Available locally; opt in via the `testing` label for preview QA. |
 | **Tagged / discovery** | `pnpm --filter @jovie/web run e2e:smoke:tagged` | default `playwright.config.ts` | Broader sharded sweep of every `-g @smoke` test. Runs on main and on PRs tagged `testing`. |
 
-The flag-gated shell is covered by **both** the flag-on path
-(`shell-chat-v1.spec.ts`) and a flag-off parity path
-(`shell-chat-v1-flag-off.spec.ts`). Both are in the focused desktop manifest so
-the PR gate catches regressions in either direction. They require
-`E2E_USE_TEST_AUTH_BYPASS=1`; in environments without it they skip cleanly.
-
-The marketing/product screenshot catalog (`pnpm --filter @jovie/web screenshots`)
-forces `DESIGN_V1` (the `SHELL_CHAT_V1` override slot) on explicitly before
-every scenario navigates, so the catalog cannot silently flip back to the
-legacy shell if defaults change.
+Canonical and stale-override shell specs are in the focused desktop manifest.
+They require `E2E_USE_TEST_AUTH_BYPASS=1`; in environments without it they skip
+cleanly. The marketing/product screenshot catalog uses the same canonical
+production shell without adding local shell overrides.
 
 ### Adding a spec to a focused lane
 
@@ -124,11 +116,11 @@ Smoke tests are designed for **fast PR feedback** (< 10 min target):
   - Dashboard navigation after Clerk test-mode sign-in
   - Quick auth-page availability checks
 
-- `shell-chat-v1.spec.ts` - New Design shell renders when `SHELL_CHAT_V1`
-  override is forced on (requires `E2E_USE_TEST_AUTH_BYPASS=1`).
+- `shell-chat-v1.spec.ts` - Canonical shell geometry, focus, composer, and
+  navigation coverage (requires `E2E_USE_TEST_AUTH_BYPASS=1`).
 
-- `shell-chat-v1-flag-off.spec.ts` - Legacy shell still renders when
-  `SHELL_CHAT_V1` override is forced off — flag-off parity guard.
+- `shell-chat-v1-flag-off.spec.ts` - Retired local shell override data is
+  ignored and the canonical shell still renders.
 
 ## Full Suite Files
 

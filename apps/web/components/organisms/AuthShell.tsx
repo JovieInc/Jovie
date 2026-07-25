@@ -5,24 +5,21 @@ import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { useComposerFocus } from '@/components/features/chat/Composer';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
-import {
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
-} from '@/components/organisms/Sidebar';
+import { SidebarProvider, useSidebar } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
-import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { useOptionalHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
-import { useAppFlag } from '@/lib/flags/client';
+import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
+import { OperatorMobileNavigation } from './OperatorMobileNavigation';
 import { PersistentAudioBar } from './PersistentAudioBar';
 export interface AuthShellProps {
-  readonly section: 'admin' | 'dashboard' | 'library' | 'settings';
+  readonly section: AppShellSection;
   readonly breadcrumbs: DashboardBreadcrumbItem[];
   readonly headerBadge?: ReactNode;
   readonly headerAction?: ReactNode;
@@ -61,44 +58,45 @@ function AuthShellInner({
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
   const headerActionsState = useOptionalHeaderActions();
-  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
-
-  const sidebarTrigger = isMobile ? null : shellChatV1Enabled ? (
-    sidebarState === 'closed' ? (
-      <SidebarCollapseButton />
-    ) : null
-  ) : (
-    <SidebarTrigger />
-  );
+  const sidebarTrigger = isMobile ? null : sidebarState === 'closed' ? (
+    <SidebarCollapseButton />
+  ) : null;
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;
+  const showCustomerMobileTabs =
+    showMobileTabs && section !== 'ov' && section !== 'admin';
+  const hasMobileBottomNav = section === 'ov' || showCustomerMobileTabs;
 
   // Memoize the sidebar so it doesn't re-render on breadcrumb/header changes.
   // The sidebar only depends on `section` — it shouldn't remount when
   // navigating between pages within the same section.
   const sidebar = useMemo(
-    () => <UnifiedSidebar section={section} />,
+    () => (
+      <UnifiedSidebar
+        section={section}
+        variant={section === 'ov' ? 'ov' : 'jovie'}
+      />
+    ),
     [section]
   );
 
   // Memoize mobile bottom nav — stable across route changes
   const mobileBottomNav = useMemo(
-    () => (showMobileTabs ? <DashboardMobileTabs /> : null),
-    [showMobileTabs]
+    () =>
+      section === 'ov' ? (
+        <OperatorMobileNavigation />
+      ) : showCustomerMobileTabs ? (
+        <DashboardMobileTabs />
+      ) : null,
+    [section, showCustomerMobileTabs]
   );
   const searchSurface = useMemo(() => {
-    if (!headerActionsState?.headerSearchAdapter) {
-      return null;
-    }
-
-    return <HeaderSearchSurfaceFromContext className='w-full sm:w-auto' />;
-  }, [headerActionsState?.headerSearchAdapter]);
-  const shellVariant = shellChatV1Enabled ? 'shellChatV1' : 'legacy';
-  const audioPlayer = useMemo(
-    () => <PersistentAudioBar variant={shellVariant} />,
-    [shellVariant]
-  );
+    return headerActionsState ? (
+      <HeaderSearchSurfaceFromContext className='w-full sm:w-auto' />
+    ) : null;
+  }, [headerActionsState]);
+  const audioPlayer = useMemo(() => <PersistentAudioBar />, []);
 
   return (
     <AppShellFrame
@@ -113,7 +111,9 @@ function AuthShellInner({
             searchSurface={searchSurface}
             isSearchActive={headerActionsState?.isSearchOpen ?? false}
             mobileProfileSlot={
-              <MobileProfileDrawer onOpen={previewPanelState.toggle} />
+              section === 'ov' || section === 'admin' ? null : (
+                <MobileProfileDrawer onOpen={previewPanelState.toggle} />
+              )
             }
             showDivider={isTableRoute}
             transparent={isChatRoute}
@@ -125,8 +125,7 @@ function AuthShellInner({
       rightPanel={rightPanel}
       audioPlayer={audioPlayer}
       mobileBottomNav={mobileBottomNav}
-      contentClassName={getContentClassName(showMobileTabs, isTableRoute)}
-      variant={shellVariant}
+      contentClassName={getContentClassName(hasMobileBottomNav, isTableRoute)}
       composerFocusActive={isComposerFocused && !isMobile}
     />
   );
