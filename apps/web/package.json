@@ -214,7 +214,7 @@
     "@jovie/ui": "workspace:*",
     "@neondatabase/serverless": "^1.1.0",
     "@noble/hashes": "2.2.0",
-    "@opentelemetry/exporter-trace-otlp-proto": "^0.218.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.221.0",
     "@opentelemetry/sdk-node": "^0.218.0",
     "@opentelemetry/sdk-trace-base": "^2.9.0",
     "@parse/node-apn": "8.1.0",
