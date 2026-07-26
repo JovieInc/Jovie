@@ -388,6 +388,45 @@ describe('useTrackAudioPlayer', () => {
     expect(mockAudio.src).toBe('');
   });
 
+  it('preserves the active track and playhead while shell consumers remount', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const firstMount = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await firstMount.result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        hasLyrics: true,
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      mockAudio.currentTime = 42;
+      mockAudio.duration = 180;
+      fireAudioEvent('playing');
+      fireAudioEvent('loadedmetadata');
+      fireAudioEvent('timeupdate');
+    });
+
+    const audioBeforeTransition = mockAudio;
+    const pauseCallsBeforeTransition = mockAudio.pause.mock.calls.length;
+    firstMount.unmount();
+    const remount = renderHook(() => useTrackAudioPlayer());
+
+    expect(mockAudio).toBe(audioBeforeTransition);
+    expect(mockAudio.pause).toHaveBeenCalledTimes(pauseCallsBeforeTransition);
+    expect(mockAudio.src).toBe('https://cdn.example.com/song.mp3');
+    expect(remount.result.current.playbackState).toMatchObject({
+      activeTrackId: 'track-1',
+      currentTime: 42,
+      duration: 180,
+      hasLyrics: true,
+      isPlaying: true,
+      playbackStatus: 'playing',
+    });
+  });
+
   it('resets state and notifies listeners when play() rejects', async () => {
     nextPlayMock = vi.fn().mockRejectedValue(new Error('Playback blocked'));
 

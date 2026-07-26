@@ -18,12 +18,14 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
     sidebar,
     header,
     main,
+    audioPlayer,
     mobileBottomNav,
     contentClassName,
   }: {
     sidebar: ReactNode;
     header?: ReactNode;
     main: ReactNode;
+    audioPlayer?: ReactNode;
     mobileBottomNav?: ReactNode;
     contentClassName?: string;
   }) => (
@@ -31,13 +33,14 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
       {sidebar}
       {header}
       {main}
+      {audioPlayer}
       {mobileBottomNav}
     </div>
   ),
 }));
 
 vi.mock('@/components/organisms/PersistentAudioBar', () => ({
-  PersistentAudioBar: () => null,
+  PersistentAudioBar: () => <div data-testid='persistent-audio-bar' />,
 }));
 
 vi.mock('@/components/organisms/Sidebar', () => ({
@@ -174,5 +177,22 @@ describe('AuthShell canonical wiring', () => {
     expect(screen.getByTestId('app-shell-frame')).not.toHaveAttribute(
       'data-content-class'
     );
+  });
+
+  it('keeps one persistent audio owner mounted across shell content transitions', () => {
+    const view = renderAuthShell();
+    const playerNode = screen.getByTestId('persistent-audio-bar');
+
+    view.rerender(
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <AuthShell section='dashboard' breadcrumbs={[]}>
+          <div>Destination Content</div>
+        </AuthShell>
+      </AppFlagProvider>
+    );
+
+    expect(screen.getByText('Destination Content')).toBeInTheDocument();
+    expect(screen.getByTestId('persistent-audio-bar')).toBe(playerNode);
+    expect(screen.getAllByTestId('persistent-audio-bar')).toHaveLength(1);
   });
 });
