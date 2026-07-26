@@ -11,13 +11,20 @@
  *   - injecting the "Recent chats" section as an additional source.
  */
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { CmdKPalette } from '@/components/organisms/CmdKPalette';
 import { type PaletteSection } from '@/components/organisms/SharedCommandPalette';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  APP_SHELL_WORKSPACES,
+  getCurrentAppShellWorkspace,
+  getNextAppShellWorkspace,
+} from '@/lib/app-shell/workspaces';
 import type { EntityRef } from '@/lib/commands/entities';
+import type { NavCommand } from '@/lib/commands/registry';
+import { WORKSPACE_SWITCH_SHORTCUT } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
@@ -34,15 +41,22 @@ export function CommandPalette() {
   if (!dashboardData) {
     return null;
   }
-  return <CommandPaletteInner profileId={dashboardData.selectedProfile?.id} />;
+  return (
+    <CommandPaletteInner
+      profileId={dashboardData.selectedProfile?.id}
+      isAdmin={dashboardData.isAdmin}
+    />
+  );
 }
 
 interface CommandPaletteInnerProps {
   readonly profileId: string | undefined;
+  readonly isAdmin: boolean;
 }
 
-function CommandPaletteInner({ profileId }: CommandPaletteInnerProps) {
+function CommandPaletteInner({ profileId, isAdmin }: CommandPaletteInnerProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   // Global ⌘K / Ctrl+K trigger.
@@ -84,6 +98,30 @@ function CommandPaletteInner({ profileId }: CommandPaletteInnerProps) {
   // entity section so the shared list+keyboard machinery picks them up.
   const additionalSections = useMemo<PaletteSection[]>(() => {
     const sections: PaletteSection[] = [];
+    if (isAdmin) {
+      const currentWorkspace = getCurrentAppShellWorkspace(pathname);
+      const nextWorkspace = getNextAppShellWorkspace(
+        APP_SHELL_WORKSPACES,
+        currentWorkspace.id
+      );
+      if (nextWorkspace) {
+        const nav: NavCommand = {
+          kind: 'nav',
+          id: 'switch-workspace',
+          label: `Switch to ${nextWorkspace.label}`,
+          description: 'Change the active workspace.',
+          iconName: 'Columns2',
+          surfaces: ['cmdk'],
+          href: nextWorkspace.href,
+          shortcutLabel: WORKSPACE_SWITCH_SHORTCUT.keys,
+        };
+        sections.push({
+          id: 'workspace-actions',
+          label: 'Workspace',
+          items: [{ kind: 'nav', nav }],
+        });
+      }
+    }
     if (conversations && conversations.length > 0) {
       sections.push({
         id: 'recent-chats',
@@ -103,7 +141,7 @@ function CommandPaletteInner({ profileId }: CommandPaletteInnerProps) {
       });
     }
     return sections;
-  }, [conversations]);
+  }, [conversations, isAdmin, pathname]);
 
   const handleAdditionalSelect = useCallback(
     (id: string) => {
@@ -111,9 +149,18 @@ function CommandPaletteInner({ profileId }: CommandPaletteInnerProps) {
       if (id.startsWith('thread:')) {
         const threadId = id.slice('thread:'.length);
         router.push(`${APP_ROUTES.CHAT}/${threadId}`);
+        return;
+      }
+      if (id === 'switch-workspace') {
+        const currentWorkspace = getCurrentAppShellWorkspace(pathname);
+        const nextWorkspace = getNextAppShellWorkspace(
+          APP_SHELL_WORKSPACES,
+          currentWorkspace.id
+        );
+        if (nextWorkspace) router.push(nextWorkspace.href);
       }
     },
-    [router]
+    [pathname, router]
   );
 
   return (

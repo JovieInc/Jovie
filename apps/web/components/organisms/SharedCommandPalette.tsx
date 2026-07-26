@@ -245,9 +245,11 @@ export function PaletteList({
             {section.items.map((item, localIdx) => {
               const flatIdx = start + localIdx;
               const shortcutLabel =
-                showIndexedShortcuts && flatIdx < 3
-                  ? `${CMD_KEY_LABEL}${flatIdx + 1}`
-                  : undefined;
+                item.kind === 'nav' && item.nav.shortcutLabel
+                  ? item.nav.shortcutLabel
+                  : showIndexedShortcuts && flatIdx < 3
+                    ? `${CMD_KEY_LABEL}${flatIdx + 1}`
+                    : undefined;
               if (variant === 'cmdk') {
                 return (
                   <CmdKPaletteRow
