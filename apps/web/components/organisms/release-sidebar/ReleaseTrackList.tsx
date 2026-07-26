@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import type { TrackSidebarData } from './TrackSidebar';
 import type { Release } from './types';
-import { useTrackAudioPlayer } from './useTrackAudioPlayer';
+import { type PlaybackState, useTrackAudioPlayer } from './useTrackAudioPlayer';
 
 interface ReleaseTrackListProps {
   readonly release: Release;
@@ -124,6 +124,14 @@ export function ReleaseTrackList({
   let liveAnnouncement = '';
   if (playbackState.playbackStatus === 'error') {
     liveAnnouncement = 'Preview unavailable.';
+  } else if (playbackState.playbackStatus === 'buffering') {
+    liveAnnouncement = 'Playback is buffering.';
+  } else if (playbackState.playbackStatus === 'stalled') {
+    liveAnnouncement = 'Playback stalled. Check your connection.';
+  } else if (playbackState.playbackStatus === 'interrupted') {
+    liveAnnouncement = 'Playback paused for another audio action.';
+  } else if (playbackState.playbackStatus === 'ended') {
+    liveAnnouncement = 'Playback finished.';
   } else if (
     playbackState.playbackStatus === 'playing' &&
     playbackState.trackTitle
@@ -231,7 +239,7 @@ function TrackListRow({
   readonly playbackState: {
     activeTrackId: string | null;
     isPlaying: boolean;
-    playbackStatus?: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+    playbackStatus?: PlaybackState['playbackStatus'];
   };
   readonly playbackQueue: readonly TrackControlSource[];
   readonly onToggleTrack: (
