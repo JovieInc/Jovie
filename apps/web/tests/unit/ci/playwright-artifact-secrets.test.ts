@@ -1225,7 +1225,7 @@ ${fixtureCheckout}
     );
     expect(
       productionRelease.match(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/g)
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     const action = readFileSync(
       join(githubRoot, 'actions/upload-safe-playwright-artifact/action.yml'),
       'utf8'
@@ -1380,6 +1380,60 @@ ${fixtureCheckout}
     expect(readFileSync(guardScript, 'utf8')).toContain(
       "binding() + '|' + stageName + '\\n'"
     );
+  });
+
+  it('requires step-scoped Markdown allowance for every production smoke producer', () => {
+    const expected = [
+      'postdeploy-probes.yml:auth-smoke:Run production auth smoke tests',
+      'production-controller.yml:ci-post-deploy-auth-smoke:Run production auth smoke tests',
+      'production-release.yml:promote-production:Prove canonical navigation budgets on exact staged build',
+    ];
+    const discovered = readdirSync(workflowsRoot)
+      .filter(name => /\.ya?ml$/.test(name))
+      .flatMap(file => {
+        const source = readFileSync(join(workflowsRoot, file), 'utf8');
+        return workflowJobBlocks(source).flatMap(job =>
+          workflowStepBlocks(job.source)
+            .filter(
+              step =>
+                step.includes(
+                  'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs"'
+                ) && step.includes('tests/e2e/smoke-prod-auth.spec.ts')
+            )
+            .map(step => ({
+              file,
+              job: job.id,
+              step: step.match(/^      - name: (.+)$/m)?.[1] ?? '',
+            }))
+        );
+      })
+      .map(({ file, job, step }) => `${file}:${job}:${step}`)
+      .sort();
+
+    expect(discovered).toEqual([...expected].sort());
+
+    for (const item of expected) {
+      const [file, jobId, stepName] = item.split(':');
+      const source = readFileSync(join(workflowsRoot, file!), 'utf8');
+      const job = workflowJobBlocks(source).find(({ id }) => id === jobId);
+      expect(job, item).toBeDefined();
+      if (!job) continue;
+      const producer = workflowStepBlocks(job.source).find(step =>
+        step.startsWith(`      - name: ${stepName}\n`)
+      );
+      expect(producer, item).toBeDefined();
+      if (!producer) continue;
+
+      expect(yamlPropertyBlock(producer, 'env', 8), item).toContain(
+        "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
+      );
+      expect(yamlPropertyBlock(job.source, 'env', 4), item).not.toContain(
+        'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
+      );
+      expect(yamlPropertyBlock(source, 'env', 0), item).not.toContain(
+        'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
+      );
+    }
   });
 
   it('detects structured, attachment, labeled, and exact environment secrets', () => {
