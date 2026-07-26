@@ -113,10 +113,14 @@ function renderUnifiedSidebar({
   overrideContent,
   pathname = APP_ROUTES.LIBRARY,
   section = 'library',
+  isAdmin = false,
+  variant,
 }: {
   readonly overrideContent?: ReactNode;
   readonly pathname?: string;
   readonly section?: 'admin' | 'dashboard' | 'library' | 'ov' | 'settings';
+  readonly isAdmin?: boolean;
+  readonly variant?: 'jovie' | 'ov';
 } = {}) {
   unifiedPathnameMock.mockReturnValue(pathname);
   const queryClient = new QueryClient({
@@ -126,7 +130,7 @@ function renderUnifiedSidebar({
   return render(
     <QueryClientProvider client={queryClient}>
       <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-        <DashboardDataProvider value={dashboardData}>
+        <DashboardDataProvider value={{ ...dashboardData, isAdmin }}>
           <TooltipProvider>
             <SidebarProvider>
               <ShellSidebarOverrideProvider>
@@ -135,7 +139,7 @@ function renderUnifiedSidebar({
                     {overrideContent}
                   </LibrarySidebarOverride>
                 ) : null}
-                <UnifiedSidebar section={section} />
+                <UnifiedSidebar section={section} variant={variant} />
               </ShellSidebarOverrideProvider>
             </SidebarProvider>
           </TooltipProvider>
@@ -215,6 +219,45 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
+  });
+
+  it('turns the logo into a workspace selector for admins', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+      isAdmin: true,
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Switch Workspace' })
+    ).toHaveTextContent('Jovie');
+  });
+
+  it('does not expose the workspace selector to non-admins', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+      isAdmin: false,
+    });
+
+    expect(
+      screen.queryByRole('button', { name: 'Switch Workspace' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Jovie', { selector: 'span' })).toBeInTheDocument();
+  });
+
+  it('shows OV as the active admin workspace without changing header height', () => {
+    const { container } = renderUnifiedSidebar({
+      pathname: APP_ROUTES.OV,
+      section: 'ov',
+      isAdmin: true,
+      variant: 'ov',
+    });
+
+    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    expect(trigger).toHaveTextContent('OV');
+    expect(trigger).toHaveClass('h-7');
+    expect(container.querySelector('[data-brand-variant="ov"]')).not.toBeNull();
   });
 
   it('renders dedicated operator navigation without the customer dashboard nav', () => {
