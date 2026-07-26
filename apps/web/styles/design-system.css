@@ -362,19 +362,35 @@
     opacity var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
 }
 
+/* Direction C public-profile rail: one full-content-width card per snap. The
+   9:4 footprint gives the inset square media roughly 42% of the card width,
+   leaving a compact copy/action column. Its 4px artwork radius steps down from
+   the 18px card surface and avoids clipping the artwork with the card border.
+   Portrait remains the default for every other EntityCarousel consumer. */
+:where(.profile-entity-card[data-layout="profile-landscape"]) {
+  aspect-ratio: 9 / 4;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  align-self: flex-start;
+  container-type: inline-size;
+}
+
 /* Unified card anatomy: the art zone is a full-width square, so the text
    zone + CTA share (card height − card width). Progressive disclosure keeps
    every line whole instead of clipping mid-line: the meta line hides below
    the height where it fits (~448px), and the eyebrow hides below the height
    where it fits next to the title (~360px) — title and CTA always fit. */
 @container (max-height: 447px) {
-  :where(.profile-entity-card) .entity-card-meta {
+  :where(.profile-entity-card:not([data-layout="profile-landscape"]))
+    .entity-card-meta {
     display: none;
   }
 }
 
 @container (max-height: 359px) {
-  :where(.profile-entity-card) .entity-card-eyebrow {
+  :where(.profile-entity-card:not([data-layout="profile-landscape"]))
+    .entity-card-eyebrow {
     display: none;
   }
 }
@@ -384,6 +400,13 @@
 :where(.profile-entity-card[data-edge="true"]) {
   transform: scale(0.96);
   opacity: 0.75;
+}
+
+:where(
+  .profile-entity-card[data-layout="profile-landscape"][data-edge="true"]
+) {
+  transform: scale(0.985);
+  opacity: 0.82;
 }
 
 /* Chromeless top-chrome icon buttons (back / overflow menu): glyph-only by
@@ -443,6 +466,38 @@
   display: none;
   width: 0;
   height: 0;
+}
+
+/* Compact profile tab entry. The outgoing panel is replaced in-place, so this
+   transform never participates in layout and cannot move the dock or header. */
+:where(.profile-primary-tab-transition) {
+  animation: profile-tab-enter var(--ds-motion-subtle-duration)
+    var(--ds-motion-subtle-easing) both;
+}
+
+:where(.profile-primary-tab-transition[data-direction="-1"]) {
+  --profile-tab-enter-offset: -6px;
+}
+
+:where(.profile-primary-tab-transition[data-direction="1"]) {
+  --profile-tab-enter-offset: 6px;
+}
+
+@keyframes profile-tab-enter {
+  from {
+    opacity: 0;
+    transform: translateX(var(--profile-tab-enter-offset, 6px));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.profile-primary-tab-transition) {
+    animation: none;
+  }
 }
 
 :where(.profile-aeo-content__heading),
