@@ -463,6 +463,7 @@ jobs:
           echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
@@ -475,6 +476,7 @@ jobs:
           path: |
             apps/web/test-results/
           retention-days: 3
+          allow-markdown: 'true'
 
   lighthouse:
     name: Lighthouse CI (Landed Production)
