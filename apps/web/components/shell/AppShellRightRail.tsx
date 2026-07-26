@@ -30,10 +30,12 @@ export function AppShellRightRail({
       data-testid='app-shell-right-rail'
       aria-label='Context Panel'
       className={cn(
+        // Mobile drawers are fixed descendants of this stacking context, so the
+        // rail must sit above the z-20 shell header. Desktop returns to z-10.
         // self-stretch (not self-start): the rail sits beside the non-scrolling
         // shell clip and must fill the content-row height so open drawers clip
         // inside the rail instead of floating over the transcript (JOV-3958).
-        'sticky top-0 z-10 flex h-full min-h-0 shrink-0 flex-col self-stretch overflow-hidden',
+        'sticky top-0 z-30 lg:z-10 flex h-full min-h-0 shrink-0 flex-col self-stretch overflow-hidden',
         // Mirror the left sidebar mount language so inner drawer width changes
         // reclaim canvas space with the same cinematic timing.
         'transition-[width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none',
