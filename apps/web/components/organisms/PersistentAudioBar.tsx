@@ -243,6 +243,9 @@ export function PersistentAudioBar() {
   if (!activeTrackId) return null;
 
   const isLoading = playbackState.playbackStatus === 'loading';
+  const isBuffering = playbackState.playbackStatus === 'buffering';
+  const isSeeking = playbackState.playbackStatus === 'seeking';
+  const isBusy = isLoading || isBuffering || isSeeking;
 
   const currentTimeFormatted = formatDuration(
     Math.round(playbackState.currentTime) * 1000
@@ -255,8 +258,12 @@ export function PersistentAudioBar() {
 
   let playButtonLabel = 'Resume playback';
   let playButtonIcon = <Play className='h-3 w-3' />;
-  if (isLoading) {
-    playButtonLabel = 'Loading track';
+  if (isBusy) {
+    playButtonLabel = isBuffering
+      ? 'Buffering track'
+      : isSeeking
+        ? 'Seeking track'
+        : 'Loading track';
     playButtonIcon = (
       <div className='h-3 w-3 animate-pulse rounded-full bg-current' />
     );

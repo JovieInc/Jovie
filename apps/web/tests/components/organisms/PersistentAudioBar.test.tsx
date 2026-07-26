@@ -1,3 +1,4 @@
+import type { AudioPlaybackStatus } from '@jovie/audio-contracts';
 import {
   act,
   fireEvent,
@@ -34,7 +35,7 @@ let searchParams = new URLSearchParams();
 const basePlaybackState = {
   activeTrackId: null as string | null,
   isPlaying: false,
-  playbackStatus: 'idle' as 'idle' | 'loading' | 'playing' | 'paused' | 'error',
+  playbackStatus: 'idle' as AudioPlaybackStatus,
   lastErrorReason: null as
     | 'play_rejected'
     | 'media_error'
@@ -247,6 +248,22 @@ describe('PersistentAudioBar', () => {
       screen.getByRole('button', { name: 'Loading track' })
     ).toBeInTheDocument();
     expect(screen.getByTestId('seek-bar')).toBeDisabled();
+  });
+
+  it('keeps pause available while buffering and communicates the state', () => {
+    setPlaying({
+      isPlaying: true,
+      playbackStatus: 'buffering',
+      currentTime: 12,
+      duration: 30,
+    });
+
+    render(<PersistentAudioBar />);
+
+    expect(
+      screen.getByRole('button', { name: 'Buffering track' })
+    ).toBeEnabled();
+    expect(screen.getByTestId('seek-bar')).toBeEnabled();
   });
 
   it('falls back to placeholder when artwork image errors', () => {

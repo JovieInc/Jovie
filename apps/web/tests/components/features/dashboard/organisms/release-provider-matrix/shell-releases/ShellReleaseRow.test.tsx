@@ -1,3 +1,4 @@
+import type { AudioPlaybackStatus } from '@jovie/audio-contracts';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,7 +8,7 @@ const toggleTrack = vi.fn().mockResolvedValue(undefined);
 let playbackState: {
   activeTrackId: string | null;
   isPlaying: boolean;
-  playbackStatus: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+  playbackStatus: AudioPlaybackStatus;
 } = {
   activeTrackId: null,
   isPlaying: false,

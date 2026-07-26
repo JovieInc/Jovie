@@ -1,5 +1,10 @@
 'use client';
 
+import {
+  type AudioPlaybackEvent,
+  type AudioPlaybackStatus,
+  getNextAudioPlaybackStatus,
+} from '@jovie/audio-contracts';
 import { useCallback, useEffect, useState } from 'react';
 
 export interface AudioTrackSource {
@@ -20,10 +25,10 @@ export interface ToggleTrackOptions {
   readonly queue?: readonly AudioTrackSource[];
 }
 
-interface PlaybackState {
+export interface PlaybackState {
   readonly activeTrackId: string | null;
   readonly isPlaying: boolean;
-  readonly playbackStatus: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+  readonly playbackStatus: AudioPlaybackStatus;
   readonly lastErrorReason:
     | 'play_rejected'
     | 'media_error'
@@ -156,6 +161,18 @@ function setState(partial: Partial<PlaybackState>): void {
   }
 }
 
+function getTransitionStatus(
+  event: AudioPlaybackEvent,
+  isPaused = true
+): AudioPlaybackStatus {
+  return getNextAudioPlaybackStatus({
+    current: state.playbackStatus,
+    event,
+    hasActiveTrack: Boolean(state.activeTrackId),
+    isPaused,
+  });
+}
+
 function getMediaSession(): MediaSession | null {
   if (typeof navigator === 'undefined') return null;
   if (!('mediaSession' in navigator)) return null;
@@ -246,7 +263,12 @@ function seekToTime(time: number): void {
   const audio = getAudio();
   if (!audio || !Number.isFinite(time)) return;
   if (!Number.isFinite(audio.duration) || audio.duration === 0) return;
-  audio.currentTime = Math.max(0, Math.min(time, audio.duration));
+  const nextTime = Math.max(0, Math.min(time, audio.duration));
+  audio.currentTime = nextTime;
+  setState({
+    playbackStatus: getTransitionStatus('seeking', audio.paused),
+    currentTime: nextTime,
+  });
 }
 
 function notifyPlaybackError(reason: PlaybackState['lastErrorReason']): void {
@@ -353,14 +375,45 @@ function bindAudioEvents(el: HTMLAudioElement): void {
   el.addEventListener('play', () =>
     setState({
       isPlaying: true,
-      playbackStatus: 'playing',
+      playbackStatus: getTransitionStatus('play'),
+      lastErrorReason: null,
+    })
+  );
+  el.addEventListener('playing', () =>
+    setState({
+      isPlaying: true,
+      playbackStatus: getTransitionStatus('playing'),
       lastErrorReason: null,
     })
   );
   el.addEventListener('pause', () =>
     setState({
       isPlaying: false,
-      playbackStatus: state.activeTrackId ? 'paused' : 'idle',
+      playbackStatus: getTransitionStatus('pause'),
+    })
+  );
+  el.addEventListener('waiting', () =>
+    setState({
+      isPlaying: !el.paused,
+      playbackStatus: getTransitionStatus('waiting'),
+    })
+  );
+  el.addEventListener('canplay', () =>
+    setState({
+      isPlaying: !el.paused,
+      playbackStatus: getTransitionStatus('canplay', el.paused),
+    })
+  );
+  el.addEventListener('seeking', () =>
+    setState({
+      isPlaying: !el.paused,
+      playbackStatus: getTransitionStatus('seeking'),
+    })
+  );
+  el.addEventListener('stalled', () =>
+    setState({
+      isPlaying: !el.paused,
+      playbackStatus: getTransitionStatus('stalled'),
     })
   );
   el.addEventListener('ended', () => {
@@ -373,7 +426,7 @@ function bindAudioEvents(el: HTMLAudioElement): void {
 
     setState({
       isPlaying: false,
-      playbackStatus: 'paused',
+      playbackStatus: getTransitionStatus('ended'),
       currentTime: 0,
       ...getQueueSnapshot(),
     });
@@ -386,6 +439,8 @@ function bindAudioEvents(el: HTMLAudioElement): void {
   el.addEventListener('seeked', () => {
     lastNotifiedAt = -Infinity; // invalidate throttle so next timeupdate fires
     setState({
+      isPlaying: !el.paused,
+      playbackStatus: getTransitionStatus('seeked', el.paused),
       currentTime: el.currentTime,
       duration: Number.isFinite(el.duration) ? el.duration : 0,
     });
@@ -450,6 +505,10 @@ export function pausePlaybackForInterruption(): void {
     _wasPlayingBeforeInterruption = Boolean(
       audio && !audio.paused && state.isPlaying
     );
+    setState({
+      isPlaying: false,
+      playbackStatus: getTransitionStatus('interruption_start'),
+    });
   }
   _interruptionDepth += 1;
   if (audio && !audio.paused) {
@@ -466,11 +525,16 @@ export function resumePlaybackAfterInterruption(
   if (_interruptionDepth > 0) return;
 
   const shouldResume = Boolean(options.resume) && _wasPlayingBeforeInterruption;
+  // Stryker disable next-line BooleanLiteral: every future read is guarded by
+  // a new zero-depth interruption, which overwrites this defensive reset.
   _wasPlayingBeforeInterruption = false;
-  if (!shouldResume) return;
 
   const audio = getAudio();
-  if (!audio || !state.activeTrackId) return;
+  setState({
+    isPlaying: false,
+    playbackStatus: getTransitionStatus('interruption_end', true),
+  });
+  if (!shouldResume || !audio || !state.activeTrackId) return;
   void audio.play().catch(() => {
     handlePlaybackFailure(audio, 'play_rejected');
   });
@@ -496,7 +560,13 @@ export function useTrackAudioPlayer() {
       // Intentional play clears dictation/local-preview holds.
       if (_interruptionDepth > 0) {
         _interruptionDepth = 0;
+        // Stryker disable next-line BooleanLiteral: a later interruption
+        // overwrites this value before it can be read.
         _wasPlayingBeforeInterruption = false;
+        setState({
+          isPlaying: false,
+          playbackStatus: getTransitionStatus('interruption_end', true),
+        });
       }
 
       // Same track — toggle pause/resume

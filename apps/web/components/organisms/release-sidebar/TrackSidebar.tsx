@@ -27,7 +27,7 @@ import type {
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { TrackPlatformLinksSection } from './TrackPlatformLinksSection';
-import { useTrackAudioPlayer } from './useTrackAudioPlayer';
+import { type PlaybackState, useTrackAudioPlayer } from './useTrackAudioPlayer';
 
 type TrackSidebarTab = 'playback' | 'platforms';
 
@@ -109,7 +109,7 @@ function getPreviewSourceLabel(
 
 function getPlaybackAnnouncement(params: {
   title: string | null | undefined;
-  playbackStatus: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+  playbackStatus: PlaybackState['playbackStatus'];
   isActiveTrack: boolean;
   isPlaying: boolean;
 }): string {
@@ -119,6 +119,26 @@ function getPlaybackAnnouncement(params: {
 
   if (!params.title || !params.isActiveTrack) {
     return '';
+  }
+
+  if (params.playbackStatus === 'loading') {
+    return `Loading ${params.title}.`;
+  }
+
+  if (params.playbackStatus === 'buffering') {
+    return `Buffering ${params.title}.`;
+  }
+
+  if (params.playbackStatus === 'stalled') {
+    return `Playback stalled for ${params.title}. Check your connection.`;
+  }
+
+  if (params.playbackStatus === 'interrupted') {
+    return `Paused ${params.title} for another audio action.`;
+  }
+
+  if (params.playbackStatus === 'ended') {
+    return `Finished ${params.title}.`;
   }
 
   if (params.isPlaying) {

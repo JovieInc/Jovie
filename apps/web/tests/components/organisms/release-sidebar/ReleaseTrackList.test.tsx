@@ -1,3 +1,4 @@
+import type { AudioPlaybackStatus } from '@jovie/audio-contracts';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,12 +23,7 @@ const { mockToggleTrack, mockQueryResult, mockPlaybackState } = vi.hoisted(
     mockPlaybackState: {
       activeTrackId: null as string | null,
       isPlaying: false,
-      playbackStatus: 'idle' as
-        | 'idle'
-        | 'loading'
-        | 'playing'
-        | 'paused'
-        | 'error',
+      playbackStatus: 'idle' as AudioPlaybackStatus,
       currentTime: 0,
       duration: 0,
       trackTitle: null as string | null,
@@ -175,6 +171,29 @@ describe('ReleaseTrackList', () => {
     expect(
       screen.queryByText('Now playing Static Skies.')
     ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['buffering', 'Playback is buffering.'],
+    ['stalled', 'Playback stalled. Check your connection.'],
+    ['interrupted', 'Playback paused for another audio action.'],
+    ['ended', 'Playback finished.'],
+  ] as const)('announces the %s transition state', (status, announcement) => {
+    const release = createMockRelease();
+    mockPlaybackState.activeTrackId = 'track_1';
+    mockPlaybackState.isPlaying =
+      status === 'buffering' || status === 'stalled';
+    mockPlaybackState.playbackStatus = status;
+    mockPlaybackState.trackTitle = 'Static Skies';
+
+    render(
+      <ReleaseTrackList
+        release={release}
+        tracksOverride={[createTrack(release)]}
+      />
+    );
+
+    expect(screen.getByText(announcement)).toBeInTheDocument();
   });
 
   it('starts playback from the left slot with the correct track payload', async () => {
