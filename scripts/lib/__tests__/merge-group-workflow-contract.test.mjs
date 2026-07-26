@@ -316,6 +316,39 @@ describe('merge_group workflow contract', () => {
     expect(SECURITY_WORKFLOW).not.toMatch(/^\s*pull_request:/m);
   });
 
+  it('coalesces a short release wave before exact authorization and mutation', () => {
+    const coalesce = getJobBlock(
+      PRODUCTION_CONTROLLER_WORKFLOW,
+      'coalesce-production'
+    );
+    const authorize = getJobBlock(
+      PRODUCTION_CONTROLLER_WORKFLOW,
+      'authorize-production'
+    );
+
+    expect(coalesce).toContain('timeout-minutes: 5');
+    expect(coalesce).toContain(
+      "github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'"
+    );
+    expect(coalesce).toContain("COALESCE_DELAY_SECONDS: '60'");
+    expect(coalesce).toContain('sleep "$COALESCE_DELAY_SECONDS"');
+    expect(coalesce).toContain('echo "is_current=false" >> "$GITHUB_OUTPUT"');
+    expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
+    expect(coalesce).toContain('commits/main');
+    expect(authorize).toContain('needs: [coalesce-production]');
+    expect(authorize).toContain(
+      "needs.coalesce-production.outputs.is_current == 'true'"
+    );
+    expect(PRODUCTION_CONTROLLER_WORKFLOW).toContain(
+      'group: production-mutation'
+    );
+    expect(PRODUCTION_CONTROLLER_WORKFLOW).toContain(
+      'cancel-in-progress: false'
+    );
+    expect(coalesce).not.toContain('vercel ');
+    expect(coalesce).not.toContain('secrets: inherit');
+  });
+
   it('keeps merge groups out of manual evidence and deployment jobs', () => {
     expect(getJobBlock(CI_WORKFLOW, 'neon-db')).not.toContain(
       "github.event_name == 'push'"
