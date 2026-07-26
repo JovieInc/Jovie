@@ -51,6 +51,9 @@ describe('performance interaction manifest', () => {
         minimumSampleCount: 5,
       })
     );
+    expect(
+      getInteractionHotPathById('lyrics-cue-seek')?.budget.firstFeedbackP95Ms
+    ).toBe(50);
   });
 });
 
