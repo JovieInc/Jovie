@@ -133,6 +133,7 @@ describe('useTrackAudioPlayer', () => {
 
     expect(mockAudio.pause).toHaveBeenCalled();
     expect(result.current.playbackState.isPlaying).toBe(false);
+    expect(result.current.playbackState.playbackStatus).toBe('paused');
 
     // Toggle again -> should resume (play)
     await act(async () => {
@@ -146,6 +147,7 @@ describe('useTrackAudioPlayer', () => {
     // play called: once for initial, once for resume
     expect(mockAudio.play).toHaveBeenCalledTimes(2);
     expect(result.current.playbackState.isPlaying).toBe(true);
+    expect(result.current.playbackState.playbackStatus).toBe('playing');
   });
 
   it('resets state and notifies error listeners on audio error', async () => {
@@ -220,6 +222,7 @@ describe('useTrackAudioPlayer', () => {
     });
 
     expect(result.current.playbackState.isPlaying).toBe(false);
+    expect(result.current.playbackState.playbackStatus).toBe('ended');
     expect(result.current.playbackState.currentTime).toBe(0);
     // activeTrackId should remain (track didn't error, it just finished)
     expect(result.current.playbackState.activeTrackId).toBe('track-1');
@@ -330,6 +333,7 @@ describe('useTrackAudioPlayer', () => {
       mockAudio.currentTime = 42;
       mockAudio.duration = 180;
       fireAudioEvent('play');
+      fireAudioEvent('playing');
       fireAudioEvent('loadedmetadata');
       fireAudioEvent('timeupdate');
     });
@@ -431,20 +435,465 @@ describe('useTrackAudioPlayer', () => {
       fireAudioEvent('play');
     });
 
+    const pauseCallsBeforeInterruption = mockAudio.pause.mock.calls.length;
     act(() => {
       engine.pausePlaybackForInterruption();
     });
-    expect(mockAudio.pause).toHaveBeenCalled();
+    expect(mockAudio.pause).toHaveBeenCalledTimes(
+      pauseCallsBeforeInterruption + 1
+    );
+    expect(result.current.playbackState.isPlaying).toBe(false);
+    expect(result.current.playbackState.playbackStatus).toBe('interrupted');
     act(() => {
       mockAudio.paused = true;
       fireAudioEvent('pause');
     });
+    expect(result.current.playbackState.playbackStatus).toBe('interrupted');
 
     act(() => {
       engine.resumePlaybackAfterInterruption();
     });
     expect(mockAudio.play).toHaveBeenCalledTimes(1);
     expect(result.current.playbackState.isPlaying).toBe(false);
+    expect(result.current.playbackState.playbackStatus).toBe('paused');
+
+    act(() => {
+      engine.resumePlaybackAfterInterruption({ resume: true });
+    });
+    expect(mockAudio.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('adopts canonical loading, buffering, seeking, stalled, and recovery states', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+
+    expect(result.current.playbackState.playbackStatus).toBe('loading');
+
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('play');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('loading');
+    expect(result.current.playbackState.isPlaying).toBe(true);
+
+    act(() => {
+      fireAudioEvent('playing');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('playing');
+
+    act(() => {
+      fireAudioEvent('waiting');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('buffering');
+    expect(result.current.playbackState.isPlaying).toBe(true);
+
+    act(() => {
+      fireAudioEvent('canplay');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('playing');
+    expect(result.current.playbackState.isPlaying).toBe(true);
+
+    act(() => {
+      fireAudioEvent('seeking');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('seeking');
+    expect(result.current.playbackState.isPlaying).toBe(true);
+
+    act(() => {
+      mockAudio.currentTime = 24;
+      fireAudioEvent('seeked');
+    });
+    expect(result.current.playbackState).toMatchObject({
+      playbackStatus: 'playing',
+      currentTime: 24,
+      isPlaying: true,
+    });
+
+    act(() => {
+      fireAudioEvent('stalled');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('stalled');
+    expect(result.current.playbackState.isPlaying).toBe(true);
+
+    act(() => {
+      fireAudioEvent('playing');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('playing');
+  });
+
+  it('keeps paused media paused when it becomes playable', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = true;
+      fireAudioEvent('canplay');
+    });
+
+    expect(result.current.playbackState).toMatchObject({
+      playbackStatus: 'paused',
+      isPlaying: false,
+    });
+  });
+
+  it('publishes seeking state immediately and clamps cue jumps', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      mockAudio.duration = 30;
+      fireAudioEvent('playing');
+      result.current.seek(99);
+    });
+
+    expect(mockAudio.currentTime).toBe(30);
+    expect(result.current.playbackState).toMatchObject({
+      playbackStatus: 'seeking',
+      currentTime: 30,
+      isPlaying: true,
+    });
+
+    act(() => {
+      fireAudioEvent('seeked');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('playing');
+  });
+
+  it('ignores invalid cue jumps and missing media without changing state', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+
+    act(() => {
+      mockAudio.duration = 0;
+      result.current.seek(10);
+      result.current.seek(Number.NaN);
+      mockAudio.duration = Number.POSITIVE_INFINITY;
+      result.current.seek(10);
+    });
+    expect(mockAudio.currentTime).toBe(0);
+    expect(result.current.playbackState.playbackStatus).toBe('loading');
+
+    vi.stubGlobal('Audio', undefined);
+    vi.resetModules();
+    const usePlayerWithoutAudio = await importFresh();
+    const withoutAudio = renderHook(() => usePlayerWithoutAudio());
+    act(() => {
+      withoutAudio.result.current.seek(10);
+    });
+    expect(withoutAudio.result.current.playbackState.playbackStatus).toBe(
+      'idle'
+    );
+    withoutAudio.unmount();
+    vi.stubGlobal('Audio', MockAudioConstructor);
+  });
+
+  it('publishes metadata duration and resets progress throttling after seek', async () => {
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1000);
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.duration = 90;
+      fireAudioEvent('loadedmetadata');
+    });
+    expect(result.current.playbackState.duration).toBe(90);
+
+    act(() => {
+      mockAudio.currentTime = 5;
+      fireAudioEvent('timeupdate');
+    });
+    expect(result.current.playbackState.currentTime).toBe(5);
+
+    nowSpy.mockReturnValue(1100);
+    act(() => {
+      mockAudio.currentTime = 6;
+      fireAudioEvent('timeupdate');
+    });
+    expect(result.current.playbackState.currentTime).toBe(5);
+
+    act(() => {
+      fireAudioEvent('seeked');
+      mockAudio.currentTime = 7;
+      fireAudioEvent('timeupdate');
+    });
+    expect(result.current.playbackState.currentTime).toBe(7);
+    nowSpy.mockRestore();
+  });
+
+  it('keeps nested interruption state until the final hold releases', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const engine = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('playing');
+      engine.pausePlaybackForInterruption();
+      engine.pausePlaybackForInterruption();
+      mockAudio.paused = true;
+      fireAudioEvent('pause');
+    });
+
+    expect(result.current.playbackState.playbackStatus).toBe('interrupted');
+
+    act(() => {
+      engine.resumePlaybackAfterInterruption({ resume: true });
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('interrupted');
+    expect(mockAudio.play).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      engine.resumePlaybackAfterInterruption({ resume: true });
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('paused');
+    expect(mockAudio.play).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('play');
+      fireAudioEvent('playing');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('playing');
+  });
+
+  it('does not pause or auto-resume a track that was already paused', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const engine = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = true;
+      fireAudioEvent('pause');
+    });
+    const pauseCalls = mockAudio.pause.mock.calls.length;
+    const playCalls = mockAudio.play.mock.calls.length;
+
+    act(() => {
+      engine.pausePlaybackForInterruption();
+      engine.resumePlaybackAfterInterruption({ resume: true });
+    });
+
+    expect(mockAudio.pause).toHaveBeenCalledTimes(pauseCalls);
+    expect(mockAudio.play).toHaveBeenCalledTimes(playCalls);
+    expect(result.current.playbackState.playbackStatus).toBe('paused');
+  });
+
+  it('does not auto-resume when media pauses before state catches up', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const engine = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('playing');
+    });
+    expect(result.current.playbackState.isPlaying).toBe(true);
+
+    const playCalls = mockAudio.play.mock.calls.length;
+    act(() => {
+      mockAudio.paused = true;
+      engine.pausePlaybackForInterruption();
+      engine.resumePlaybackAfterInterruption({ resume: true });
+    });
+
+    expect(mockAudio.play).toHaveBeenCalledTimes(playCalls);
+    expect(result.current.playbackState.playbackStatus).toBe('paused');
+  });
+
+  it('ignores a stray interruption release without corrupting the next hold', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const engine = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = true;
+      fireAudioEvent('pause');
+      engine.resumePlaybackAfterInterruption({ resume: true });
+      engine.pausePlaybackForInterruption();
+    });
+
+    expect(result.current.playbackState.playbackStatus).toBe('interrupted');
+  });
+
+  it('lets an explicit play override clear interruption ownership', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const engine = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const { result } = renderHook(() => useTrackAudioPlayer());
+    const track = {
+      id: 'track-1',
+      title: 'Test Song',
+      audioUrl: 'https://cdn.example.com/song.mp3',
+    };
+
+    await act(async () => {
+      await result.current.toggleTrack(track);
+    });
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('playing');
+      engine.pausePlaybackForInterruption();
+      mockAudio.paused = true;
+      fireAudioEvent('pause');
+    });
+
+    await act(async () => {
+      await result.current.toggleTrack(track);
+    });
+    expect(result.current.playbackState).toMatchObject({
+      isPlaying: false,
+      playbackStatus: 'paused',
+    });
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('play');
+      fireAudioEvent('playing');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('playing');
+
+    const playCalls = mockAudio.play.mock.calls.length;
+    act(() => {
+      engine.resumePlaybackAfterInterruption({ resume: true });
+    });
+    expect(mockAudio.play).toHaveBeenCalledTimes(playCalls);
+  });
+
+  it('does not publish an interruption release during a normal pause toggle', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+    const track = {
+      id: 'track-1',
+      title: 'Test Song',
+      audioUrl: 'https://cdn.example.com/song.mp3',
+    };
+
+    await act(async () => {
+      await result.current.toggleTrack(track);
+    });
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('playing');
+    });
+    expect(result.current.playbackState.playbackStatus).toBe('playing');
+
+    await act(async () => {
+      await result.current.toggleTrack(track);
+    });
+    expect(result.current.playbackState).toMatchObject({
+      isPlaying: true,
+      playbackStatus: 'playing',
+    });
+  });
+
+  it('fails closed when interruption resume is rejected', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const engine = await import(
+      '@/components/organisms/release-sidebar/useTrackAudioPlayer'
+    );
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      fireAudioEvent('playing');
+      engine.pausePlaybackForInterruption();
+      mockAudio.paused = true;
+      fireAudioEvent('pause');
+    });
+
+    mockAudio.play.mockRejectedValueOnce(new Error('Resume blocked'));
+    await act(async () => {
+      engine.resumePlaybackAfterInterruption({ resume: true });
+      await Promise.resolve();
+    });
+
+    expect(result.current.playbackState).toMatchObject({
+      activeTrackId: null,
+      isPlaying: false,
+      playbackStatus: 'error',
+      lastErrorReason: 'play_rejected',
+    });
   });
 
   it('switches source onto a single active track', async () => {
