@@ -865,6 +865,12 @@ describe('deploy workflow Vercel env resolution', () => {
 
     expect(buildJob).toContain("github.ref == 'refs/heads/main'");
     expect(buildJob).toContain('runs-on: ubuntu-latest');
+    expect(buildJob).toContain(
+      'Prove canonical audio containers in real Chromium'
+    );
+    expect(buildJob).toContain(
+      'pnpm --filter=@jovie/web run test:audio:real-media'
+    );
     expect(buildJob).toContain('Build exact combined head');
     expect(buildJob).toContain('Run deterministic layout behavior guard');
     expect(buildJob).not.toContain('actions/upload-artifact');

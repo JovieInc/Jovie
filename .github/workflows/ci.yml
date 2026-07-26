@@ -1450,6 +1450,8 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
+      - name: Prove canonical audio containers in real Chromium
+        run: pnpm --filter=@jovie/web run test:audio:real-media
       - name: Build exact combined head
         run: pnpm turbo build --filter=@jovie/web
         env:
