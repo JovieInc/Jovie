@@ -58,6 +58,8 @@ const imageUploads =
   );
 const markdownUploads = [
   'nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}',
+  'postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}',
+  'production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}',
   'visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}',
 ];
 const protectedJobs: Record<string, string[]> = {
@@ -805,6 +807,39 @@ describe('Playwright artifact secret boundary', () => {
       expect(audit.violations, `${job.file}:${job.id}`).toEqual([]);
     }
 
+    for (const [file, jobId, artifactName] of [
+      [
+        'postdeploy-probes.yml',
+        'auth-smoke',
+        'postdeploy-auth-smoke-${{ github.run_id }}',
+      ],
+      [
+        'production-controller.yml',
+        'ci-post-deploy-auth-smoke',
+        'post-deploy-auth-smoke-${{ github.run_id }}',
+      ],
+    ] as const) {
+      const workflow = readFileSync(join(workflowsRoot, file), 'utf8');
+      const job = workflowJobBlocks(workflow).find(block => block.id === jobId);
+      expect(job, `${file}:${jobId}`).toBeDefined();
+      if (!job) continue;
+      const producer = workflowStepBlocks(job.source).find(block =>
+        block.startsWith('      - name: Run production auth smoke tests\n')
+      );
+      const uploader = workflowStepBlocks(job.source).find(block =>
+        block.includes(safeUploadAction)
+      );
+      expect(producer, `${file}:${jobId}:producer`).toBeDefined();
+      expect(uploader, `${file}:${jobId}:uploader`).toBeDefined();
+      if (!producer || !uploader) continue;
+      expect(producer).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
+      expect(yamlPropertyBlock(job.source, 'env', 4)).not.toContain(
+        'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
+      );
+      expect(uploader).toContain(`name: ${artifactName}`);
+      expect(uploader).toContain("allow-markdown: 'true'");
+    }
+
     const fixtureCheckout = `      - uses: actions/checkout@0123456789abcdef
         with:
           persist-credentials: false`;
@@ -1459,6 +1494,7 @@ ${fixtureCheckout}
     write(join(policy, 'safe.md'), '# Safe diagnostics');
     write(join(policy, 'credential.md'), 'DATABASE_URL=fake-password');
     write(join(policy, 'artifact.bin'), 'opaque');
+    write(join(policy, 'artifact.trace'), 'opaque');
     for (const extension of 'avi har html mkv mov mp4 webm zip'.split(' '))
       write(join(policy, `artifact.${extension}`), 'unsafe');
     const findings = inspectPlaywrightArtifacts(
@@ -1475,6 +1511,10 @@ ${fixtureCheckout}
     });
     expect(findings).toContainEqual({
       path: join(policy, 'artifact.bin'),
+      category: 'unknown-binary',
+    });
+    expect(findings).toContainEqual({
+      path: join(policy, 'artifact.trace'),
       category: 'unknown-binary',
     });
     expect(
