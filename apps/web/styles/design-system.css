@@ -1780,7 +1780,7 @@ html[data-profile-initial-mode]
 
   /* Canonical press-feedback scale for pressable elements
      (.claude/rules/ui.md + .claude/rules/motion.md — tactile, interruptible) */
-  --scale-press: 0.96;
+  --scale-press: 0.98;
 
   /* Pre-composed transition patterns (extracted from Linear)
      Use duration custom properties so prefers-reduced-motion overrides work */

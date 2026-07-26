@@ -1,12 +1,11 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { motion } from 'motion/react';
 
 // Animation constants
 const CONTAINER_ANIMATION_DURATION = 0.5;
 const CONTAINER_ANIMATION_DELAY = 0.4;
-const BUTTON_HOVER_SCALE = 1.02;
-const BUTTON_TAP_SCALE = 0.98;
 
 interface PricingCTAProps
   extends Readonly<{
@@ -37,15 +36,14 @@ export function PricingCTA({ onUpgrade, isLoading }: PricingCTAProps) {
             </p>
           </div>
           <div className='flex justify-end'>
-            <motion.button
+            <Button
               onClick={onUpgrade}
-              disabled={isLoading}
-              className='inline-flex items-center justify-center rounded-md px-6 py-3 text-base font-medium transition-colors duration-subtle cursor-pointer bg-btn-primary text-btn-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed'
-              whileHover={{ scale: BUTTON_HOVER_SCALE }}
-              whileTap={{ scale: BUTTON_TAP_SCALE }}
+              loading={isLoading}
+              size='lg'
+              className='px-6 text-base'
             >
               {isLoading ? 'Processing...' : 'Upgrade to Pro →'}
-            </motion.button>
+            </Button>
           </div>
         </div>
       </div>
