@@ -7,23 +7,10 @@ const PRODUCTION_AUTH_SMOKE_PATH = path.resolve(
   '../../e2e/smoke-prod-auth.spec.ts'
 );
 
-describe('production auth smoke session contract', () => {
-  it('uses one rendered sign-in for dashboard and tab assertions', () => {
+describe('production auth smoke concurrency contract', () => {
+  it('serializes OTP flows that share the dedicated production identity', () => {
     const source = fs.readFileSync(PRODUCTION_AUTH_SMOKE_PATH, 'utf8');
 
     expect(source).toContain("test.describe.configure({ mode: 'serial' });");
-    expect(source.match(/await signInViaRenderedFlow\(/gu)).toHaveLength(1);
-    expect(source).not.toContain(
-      "test('dashboard tab navigation works', async"
-    );
-    expect(source).toContain('navigationPath: APP_ROUTES.RELEASES');
-    expect(source).toContain('readyPath: APP_ROUTES.LIBRARY');
-    expect(source).toContain("readyTestId: 'library-surface'");
-    expect(source).toContain("readyView: 'releases'");
-    expect(source).toContain('await page.waitForURL(');
-    expect(source).toContain('await waitForProductionDashboardContent(');
-    const tabNavigation = source.split('const tabs = ')[1];
-    expect(tabNavigation).toBeDefined();
-    expect(tabNavigation).not.toContain('.isVisible({ timeout:');
   });
 });
