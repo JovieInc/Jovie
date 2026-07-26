@@ -1,6 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
+  captureGitInfo: {
+    commit: false,
+    diff: false,
+  },
   testDir: './tests/e2e',
   testMatch: 'audio-real-media-decoding.spec.ts',
   fullyParallel: false,
@@ -10,7 +14,7 @@ export default defineConfig({
   reporter: 'line',
   timeout: 30_000,
   use: {
-    trace: 'retain-on-failure',
+    trace: process.env.CI ? 'off' : 'on-first-retry',
     video: 'off',
   },
   projects: [
