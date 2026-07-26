@@ -12,12 +12,11 @@ import {
   revalidateTag,
   updateTag,
 } from 'next/cache';
-import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
-import { userSettings, users } from '@/lib/db/schema/auth';
+import { userSettings } from '@/lib/db/schema/auth';
 import { captureError } from '@/lib/error-tracking';
 
 /**
@@ -39,20 +38,11 @@ export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
     }
 
     await withDbSession(async appUserId => {
-      // Get DB user id
-      const [user] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(appUserIdFilter(appUserId))
-        .limit(1);
-
-      if (!user?.id) throw new TypeError('User not found');
-
-      // Upsert into user_settings
+      // Upsert into user_settings — appUserId is already users.id (UUID)
       await db
         .insert(userSettings)
         .values({
-          userId: user.id,
+          userId: appUserId,
           sidebarCollapsed: collapsed,
           updatedAt: new Date(),
         })
