@@ -4382,7 +4382,10 @@ describe('production promotion exact-artifact contract', () => {
     expect(health).toContain('.head_repository.full_name == $repo');
     expect(markerState).toContain('actions/artifacts/${artifactId}/zip');
     expect(controller).toContain(
-      'Authenticated Better Auth OTP smoke did not produce passing test evidence'
+      'Authenticated Better Auth OTP smoke is blocking and did not produce passing evidence'
+    );
+    expect(controller).toContain(
+      'Authenticated Better Auth OTP smoke failed in temporary advisory mode; the controller remains visibly red'
     );
     expect(controller).not.toContain('Optional authenticated smoke lane');
     expect(controller).toContain('credentials_configured=false');

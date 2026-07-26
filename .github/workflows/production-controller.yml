@@ -654,8 +654,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      actions: read
       contents: read
+      actions: read
     outputs:
       verified: ${{ steps.finalize.outputs.verified || 'false' }}
     steps:
