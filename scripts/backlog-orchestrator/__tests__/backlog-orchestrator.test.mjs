@@ -1,5 +1,5 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 const classifier = await import('../classifier.mjs');
 const scorer = await import('../scorer.mjs');
@@ -19,18 +19,29 @@ function makeIssue(overrides = {}) {
     estimate: overrides.estimate ?? null,
     assignee: null,
     creator: null,
-    labels: { nodes: overrides.labels ? overrides.labels.map(n => ({ name: n })) : [] },
+    labels: {
+      nodes: overrides.labels ? overrides.labels.map(n => ({ name: n })) : [],
+    },
     parent: null,
     children: { nodes: [] },
     relations: { nodes: overrides.relations || [] },
-    state: { id: 'triage-id', name: overrides.state || 'Triage', type: 'triage' },
-    comments: overrides.comments ? { nodes: overrides.comments } : { nodes: [] },
+    state: {
+      id: 'triage-id',
+      name: overrides.state || 'Triage',
+      type: 'triage',
+    },
+    comments: overrides.comments
+      ? { nodes: overrides.comments }
+      : { nodes: [] },
   };
 }
 
 describe('classifier', () => {
   it('classifies a standard issue as triageable', () => {
-    const issue = makeIssue({ identifier: 'JOV-100', title: 'Fix login button color' });
+    const issue = makeIssue({
+      identifier: 'JOV-100',
+      title: 'Fix login button color',
+    });
     const c = classifier.classifyDeterministic(issue, [issue]);
     assert.equal(c.category, 'triageable');
     assert.equal(c.mrrCategory, 'activation');
@@ -39,8 +50,20 @@ describe('classifier', () => {
 
   it('detects exact duplicates', () => {
     const issues = [
-      makeIssue({ identifier: 'JOV-101', title: 'Fix button',
-        relations: [{ type: 'duplicate', relatedIssue: { id: 'o', identifier: 'JOV-100', title: 'Fix login button' } }] }),
+      makeIssue({
+        identifier: 'JOV-101',
+        title: 'Fix button',
+        relations: [
+          {
+            type: 'duplicate',
+            relatedIssue: {
+              id: 'o',
+              identifier: 'JOV-100',
+              title: 'Fix login button',
+            },
+          },
+        ],
+      }),
       makeIssue({ identifier: 'JOV-100' }),
     ];
     const c = classifier.classifyDeterministic(issues[0], issues);
@@ -48,7 +71,10 @@ describe('classifier', () => {
   });
 
   it('classifies area from labels', () => {
-    const c = classifier.classifyDeterministic(makeIssue({ title: 'UI fix', labels: ['area:ui'] }), []);
+    const c = classifier.classifyDeterministic(
+      makeIssue({ title: 'UI fix', labels: ['area:ui'] }),
+      []
+    );
     assert.equal(c.area, 'ui');
   });
 
@@ -62,8 +88,18 @@ describe('classifier', () => {
 describe('workstreamer', () => {
   it('bundles trivial issues in same area', () => {
     const issues = [
-      makeIssue({ identifier: 'JOV-1', title: 'Fix button pad', labels: ['area:ui'], estimate: 1 }),
-      makeIssue({ identifier: 'JOV-2', title: 'Fix button col', labels: ['area:ui'], estimate: 1 }),
+      makeIssue({
+        identifier: 'JOV-1',
+        title: 'Fix button pad',
+        labels: ['area:ui'],
+        estimate: 1,
+      }),
+      makeIssue({
+        identifier: 'JOV-2',
+        title: 'Fix button col',
+        labels: ['area:ui'],
+        estimate: 1,
+      }),
     ];
     const cs = issues.map(i => classifier.classifyDeterministic(i, issues));
     const ws = workstreamer.bundleWorkstreams(cs);
@@ -73,8 +109,22 @@ describe('workstreamer', () => {
 
 describe('reporter', () => {
   it('generates valid report', () => {
-    const cs = [classifier.classifyDeterministic(makeIssue({ identifier: 'JOV-1', title: 'Fix sign-in', labels: ['launch-blocker'] }), [])];
-    const report = reporter.generateShadowReport({ total: 1, classifications: cs, workstreams: [], skipped: 0 });
+    const cs = [
+      classifier.classifyDeterministic(
+        makeIssue({
+          identifier: 'JOV-1',
+          title: 'Fix sign-in',
+          labels: ['launch-blocker'],
+        }),
+        []
+      ),
+    ];
+    const report = reporter.generateShadowReport({
+      total: 1,
+      classifications: cs,
+      workstreams: [],
+      skipped: 0,
+    });
     assert.ok(report.includes('JOV-1'));
     assert.ok(report.includes('CLASSIFICATION SUMMARY'));
   });

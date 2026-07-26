@@ -27,7 +27,9 @@ export async function graphql(query, variables = {}) {
   });
   const data = await resp.json();
   if (data.errors) {
-    throw new Error(`Linear API error: ${data.errors.map(e => e.message).join('; ')}`);
+    throw new Error(
+      `Linear API error: ${data.errors.map(e => e.message).join('; ')}`
+    );
   }
   return data.data;
 }
@@ -40,7 +42,8 @@ export async function fetchTeamTriageIssues(teamId, maxResults = 1000) {
   const issues = [];
   let cursor = null;
   while (issues.length < maxResults) {
-    const data = await graphql(`
+    const data = await graphql(
+      `
       query($teamId: String!, $cursor: String) {
         team(id: $teamId) {
           issues(
@@ -76,7 +79,9 @@ export async function fetchTeamTriageIssues(teamId, maxResults = 1000) {
           }
         }
       }
-    `, { teamId, cursor });
+    `,
+      { teamId, cursor }
+    );
     const edge = data.team.issues;
     issues.push(...edge.nodes);
     if (!edge.pageInfo.hasNextPage) break;
@@ -92,7 +97,8 @@ export async function fetchTeamActiveIssues(teamId, maxResults = 1000) {
   const issues = [];
   let cursor = null;
   while (issues.length < maxResults) {
-    const data = await graphql(`
+    const data = await graphql(
+      `
       query($teamId: String!, $cursor: String) {
         team(id: $teamId) {
           issues(
@@ -124,7 +130,9 @@ export async function fetchTeamActiveIssues(teamId, maxResults = 1000) {
           }
         }
       }
-    `, { teamId, cursor });
+    `,
+      { teamId, cursor }
+    );
     const edge = data.team.issues;
     issues.push(...edge.nodes);
     if (!edge.pageInfo.hasNextPage) break;
@@ -137,7 +145,8 @@ export async function fetchTeamActiveIssues(teamId, maxResults = 1000) {
  * Fetch a single issue by identifier (e.g. "JOV-1234").
  */
 export async function fetchIssue(identifier) {
-  const data = await graphql(`
+  const data = await graphql(
+    `
     query($identifier: String!) {
       issueSearch(query: $identifier, first: 1) {
         nodes {
@@ -161,7 +170,9 @@ export async function fetchIssue(identifier) {
         }
       }
     }
-  `, { identifier });
+  `,
+    { identifier }
+  );
   return data.issueSearch.nodes[0] || null;
 }
 
@@ -169,46 +180,56 @@ export async function fetchIssue(identifier) {
  * Update an issue's labels.
  */
 export async function setIssueLabels(issueId, labelIds) {
-  return graphql(`
+  return graphql(
+    `
     mutation($id: String!, $labelIds: [String!]!) {
       issueUpdate(id: $id, input: { labelIds: $labelIds }) {
         success
       }
     }
-  `, { id: issueId, labelIds });
+  `,
+    { id: issueId, labelIds }
+  );
 }
 
 /**
  * Add a comment to an issue (machine-owned).
  */
 export async function addComment(issueId, body) {
-  return graphql(`
+  return graphql(
+    `
     mutation($id: String!, $body: String!) {
       commentCreate(input: { issueId: $id, body: $body }) {
         success
       }
     }
-  `, { id: issueId, body });
+  `,
+    { id: issueId, body }
+  );
 }
 
 /**
  * Transition an issue to a new state.
  */
 export async function transitionIssue(issueId, stateId) {
-  return graphql(`
+  return graphql(
+    `
     mutation($id: String!, $stateId: String!) {
       issueUpdate(id: $id, input: { stateId: $stateId }) {
         success
       }
     }
-  `, { id: issueId, stateId });
+  `,
+    { id: issueId, stateId }
+  );
 }
 
 /**
  * Create a relation between two issues.
  */
 export async function createRelation(issueId, relatedIssueId, type) {
-  return graphql(`
+  return graphql(
+    `
     mutation($issueId: String!, $relatedIssueId: String!, $type: String!) {
       relationCreate(input: {
         issueId: $issueId,
@@ -218,14 +239,17 @@ export async function createRelation(issueId, relatedIssueId, type) {
         success
       }
     }
-  `, { issueId, relatedIssueId, type });
+  `,
+    { issueId, relatedIssueId, type }
+  );
 }
 
 /**
  * Fetch project info for a given project slugId.
  */
 export async function fetchProjectBySlug(slugId) {
-  const data = await graphql(`
+  const data = await graphql(
+    `
     query($id: String!) {
       project(id: $id) {
         id
@@ -233,6 +257,8 @@ export async function fetchProjectBySlug(slugId) {
         slugId
       }
     }
-  `, { id: slugId });
+  `,
+    { id: slugId }
+  );
   return data.project;
 }

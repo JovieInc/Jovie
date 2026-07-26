@@ -4,7 +4,7 @@
  * Determines how many items to admit and the handoff mechanism to Gem shippers.
  */
 
-import { scoreIssue, isProductionRed } from './scorer.mjs';
+import { isProductionRed, scoreIssue } from './scorer.mjs';
 
 export const MAX_CONCURRENT_SHIPPING = 1; // v0: one item at a time
 
@@ -18,12 +18,18 @@ const FOUNDER_FAST_TRACK_LABEL = 'founder-fast-track';
  * @param {object} state - current shipping state
  * @returns {{ admit: Array, reason: string }}
  */
-export async function selectNextToAdmit(classifications, workstreams, state = {}) {
+export async function selectNextToAdmit(
+  classifications,
+  workstreams,
+  state = {}
+) {
   const prodRed = await isProductionRed();
 
   // Check for founder fast-track
   const fastTracked = classifications.filter(
-    c => c.labels?.includes?.(FOUNDER_FAST_TRACK_LABEL) && c.category !== 'duplicate'
+    c =>
+      c.labels?.includes?.(FOUNDER_FAST_TRACK_LABEL) &&
+      c.category !== 'duplicate'
   );
 
   if (fastTracked.length > 0 && !prodRed) {
@@ -39,7 +45,9 @@ export async function selectNextToAdmit(classifications, workstreams, state = {}
   // If production is red, only admit production/reliability items
   if (prodRed) {
     const remediation = classifications.filter(
-      c => c.mrrCategory === 'reliability' || c.mrrCategory === 'revenue-protection'
+      c =>
+        c.mrrCategory === 'reliability' ||
+        c.mrrCategory === 'revenue-protection'
     );
     if (remediation.length > 0) {
       const scored = remediation.map(c => ({ c, ...scoreIssue(c) }));
@@ -49,13 +57,19 @@ export async function selectNextToAdmit(classifications, workstreams, state = {}
         reason: `prod-red remediation priority: ${scored[0].c.identifier}`,
       };
     }
-    return { admit: [], reason: 'production is red — blocking all non-remediation work' };
+    return {
+      admit: [],
+      reason: 'production is red — blocking all non-remediation work',
+    };
   }
 
   // Check current load
   const capacity = MAX_CONCURRENT_SHIPPING - (state.currentlyShipping || 0);
   if (capacity <= 0) {
-    return { admit: [], reason: `at capacity (${state.currentlyShipping}/${MAX_CONCURRENT_SHIPPING})` };
+    return {
+      admit: [],
+      reason: `at capacity (${state.currentlyShipping}/${MAX_CONCURRENT_SHIPPING})`,
+    };
   }
 
   // Score all triageable workstreams and issues

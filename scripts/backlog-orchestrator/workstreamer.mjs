@@ -11,8 +11,11 @@ export class Workstream {
 }
 
 export function bundleWorkstreams(classifications) {
-  const actionable = classifications.filter(c =>
-    c.category !== 'duplicate' && c.category !== 'superseded' && c.category !== 'obsolete'
+  const actionable = classifications.filter(
+    c =>
+      c.category !== 'duplicate' &&
+      c.category !== 'superseded' &&
+      c.category !== 'obsolete'
   );
   const byArea = {};
   for (const c of actionable) {
@@ -23,8 +26,12 @@ export function bundleWorkstreams(classifications) {
   const workstreams = [];
   const bundled = new Set();
   for (const [area, issues] of Object.entries(byArea)) {
-    const small = issues.filter(c => c.effort === 'trivial' || c.effort === 'small');
-    const rest = issues.filter(c => c.effort !== 'trivial' && c.effort !== 'small');
+    const small = issues.filter(
+      c => c.effort === 'trivial' || c.effort === 'small'
+    );
+    const rest = issues.filter(
+      c => c.effort !== 'trivial' && c.effort !== 'small'
+    );
     if (small.length >= 2) {
       const ws = new Workstream(`${area}-bundle-${Date.now() % 1000}`);
       ws.name = `${area} cleanup bundle`;

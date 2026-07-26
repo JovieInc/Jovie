@@ -17,9 +17,9 @@
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs report
  */
 
-import { readFileSync, existsSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -32,13 +32,11 @@ const admitter = await import(resolve(__dirname, 'admitter.mjs'));
 const reporter = await import(resolve(__dirname, 'reporter.mjs'));
 
 // ----- Config -----
-const CONFIG_FILE = resolve(__dirname, 'config.json');
 const CACHE_FILE = resolve(__dirname, '.orchestrator-cache.json');
 
 const TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8'; // JOV team
 const BACKLOG_STATE_ID = '1551ed21-7743-4573-82d8-8949410d3b8d'; // Backlog
 const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c'; // Todo
-const TRIAGE_STATE_ID = '9844cfe6-6cf4-4347-842c-893a68f349b8'; // Triage
 
 // ----- Cache -----
 function loadCache() {
@@ -156,10 +154,14 @@ async function runReconcile(cache, isDryRun, issueArg) {
       continue;
     }
 
-    console.log(`  ${c.category}: ${issue.identifier} — ${(issue.title || '').slice(0, 50)}`);
+    console.log(
+      `  ${c.category}: ${issue.identifier} — ${(issue.title || '').slice(0, 50)}`
+    );
 
     if (isDryRun) {
-      console.log(`    (dry-run) would classify as ${c.category}, score ${c.valueScore}`);
+      console.log(
+        `    (dry-run) would classify as ${c.category}, score ${c.valueScore}`
+      );
       continue;
     }
 
@@ -202,9 +204,13 @@ async function runAdmitNext(cache, isDryRun) {
   // Check current shipping state
   const state = await scorer.currentShippingLoad();
 
-  const result = await admitter.selectNextToAdmit(classifications, workstreams, {
-    currentlyShipping: state.count,
-  });
+  const result = await admitter.selectNextToAdmit(
+    classifications,
+    workstreams,
+    {
+      currentlyShipping: state.count,
+    }
+  );
 
   console.log(`Admission decision: ${result.reason}`);
 
@@ -240,7 +246,10 @@ async function runAdmitNext(cache, isDryRun) {
   }
 
   // Update cache
-  const newCache = { ...cache, lastAdmit: { at: new Date().toISOString(), result } };
+  const newCache = {
+    ...cache,
+    lastAdmit: { at: new Date().toISOString(), result },
+  };
   saveCache(newCache);
 
   return result;
