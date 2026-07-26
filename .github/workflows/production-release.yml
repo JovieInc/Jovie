@@ -956,12 +956,7 @@ jobs:
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           PRODUCTION_DEPLOYMENT_URL_B64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
-          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
-          E2E_PROD_USER_CODE: ${{ secrets.E2E_PROD_USER_CODE }}
-          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
-          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
         run: |
           set -euo pipefail
 
@@ -971,13 +966,15 @@ jobs:
             exit 1
           }
 
-          if ! {
-            [ -n "${E2E_PROD_USER_EMAIL:-}" ] &&
-            [ -n "${E2E_PROD_USER_PASSWORD:-}" ]
-          } && ! {
-            [ -n "${E2E_CLERK_USER_USERNAME:-}" ] &&
-            [ -n "${E2E_CLERK_USER_PASSWORD:-}" ]
-          }; then
+          if [ -z "${DOPPLER_TOKEN:-}" ]; then
+            fail_performance_gate "The production Doppler credential is required before production promotion."
+          fi
+          # Expanded inside the Doppler child shell.
+          # shellcheck disable=SC2016
+          if ! doppler run --project jovie-web --config prd \
+            --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
+            --no-fallback -- env -u DOPPLER_TOKEN bash -c \
+              '[ -n "${E2E_PROD_USER_EMAIL:-}" ] && [ -n "${DATABASE_URL:-}" ]'; then
             fail_performance_gate "Authenticated performance credentials are required before production promotion."
           fi
           if [ -z "${PLAYWRIGHT_VERCEL_BYPASS_SECRET:-}" ]; then
@@ -1001,16 +998,19 @@ jobs:
           cd apps/web
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          if ! CI=true \
-            BASE_URL="$deployment_url" \
-            EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url" \
-            EXPECTED_VERCEL_ENVIRONMENT=production \
-            PERFORMANCE_AUTH_STATE_PATH="$auth_state" \
-            PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$dynamic_secrets_file" \
-              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts \
-                  --project=chromium --reporter=line \
-                  --grep "sign-in works and dashboard loads"; then
+          if ! doppler run --project jovie-web --config prd \
+            --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
+            --no-fallback -- env -u DOPPLER_TOKEN \
+              CI=true \
+              BASE_URL="$deployment_url" \
+              EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url" \
+              EXPECTED_VERCEL_ENVIRONMENT=production \
+              PERFORMANCE_AUTH_STATE_PATH="$auth_state" \
+              PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$dynamic_secrets_file" \
+                node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts \
+                    --project=chromium --reporter=line \
+                    --grep "sign-in works and dashboard loads"; then
             fail_performance_gate "Unable to establish authenticated exact-build browser state."
           fi
           if [ ! -s "$auth_state" ] ||
