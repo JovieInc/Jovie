@@ -13,10 +13,16 @@ const config = {
     'index.ts',
     'units.ts',
     'analysis.ts',
+    'beat-grid.ts',
     'playback.ts',
     '!**/*.test.ts',
   ],
-  testFiles: ['index.test.ts', 'analysis.test.ts', 'playback.test.ts'],
+  testFiles: [
+    'index.test.ts',
+    'analysis.test.ts',
+    'beat-grid.test.ts',
+    'playback.test.ts',
+  ],
   vitest: {
     configFile: 'vitest.config.mts',
   },
