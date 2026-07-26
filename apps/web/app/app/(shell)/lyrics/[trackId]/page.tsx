@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { loadAppShellRouteContext } from '../../app-shell-route-context';
 import { LyricsPageClient } from './LyricsPageClient';
 import { loadLyricsRouteTrack } from './lyrics-data';
-import { plainLyricsToLines } from './lyrics-lines';
+import { parseLyricsText } from './lyrics-lines';
 
 interface Props {
   readonly params: Promise<{
@@ -47,17 +47,16 @@ export default async function LyricsPage({ params }: Props) {
   if (!track) {
     notFound();
   }
-
+  const parsedLyrics = parseLyricsText(track.lyrics);
+  const initialDurationSec = track.durationMs ? track.durationMs / 1000 : 0;
   return (
     <LyricsPageClient
-      initialLines={plainLyricsToLines(track.lyrics)}
+      initialLyrics={parsedLyrics}
       initialTrack={{
         title: track.title,
         artist,
       }}
-      initialDurationSec={
-        track.durationMs ? Math.round(track.durationMs / 1000) : 0
-      }
+      initialDurationSec={initialDurationSec}
       trackId={trackId}
     />
   );

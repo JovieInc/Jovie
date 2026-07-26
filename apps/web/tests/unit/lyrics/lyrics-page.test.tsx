@@ -117,7 +117,11 @@ describe('LyricsPage', () => {
     expect(screen.getByTestId('lyrics-page')).toHaveTextContent('Real Track');
     expect(mocks.lyricsPageClient).toHaveBeenCalledWith(
       {
-        initialLines: [],
+        initialLyrics: {
+          lines: [],
+          provenance: { format: 'plain', offsetMs: 0, timing: 'none' },
+          timed: false,
+        },
         initialTrack: {
           title: 'Real Track',
           // Must come from selectedProfile.displayName, NOT track.artist.
@@ -149,5 +153,69 @@ describe('LyricsPage', () => {
 
     const lastCallArgs = mocks.lyricsPageClient.mock.calls.at(-1);
     expect(lastCallArgs?.[0]?.initialDurationSec).toBe(0);
+  });
+
+  it('preserves millisecond duration precision for timing validation', async () => {
+    mocks.loadLyricsRouteTrack.mockResolvedValue({
+      title: 'Precise Duration',
+      artist: 'WRONG',
+      lyrics: '[00:01.00]Opening',
+      durationMs: 213123,
+    });
+
+    render(await LyricsPage(routeParams()));
+
+    const lastCallArgs = mocks.lyricsPageClient.mock.calls.at(-1);
+    expect(lastCallArgs?.[0]?.initialDurationSec).toBe(213.123);
+  });
+
+  it('activates timed lyrics only for a fully timestamped LRC document', async () => {
+    mocks.loadLyricsRouteTrack.mockResolvedValue({
+      title: 'Timed Track',
+      artist: 'WRONG',
+      lyrics: '[00:01.00]First line\n[00:03.50]Second line',
+      durationMs: 180000,
+    });
+
+    render(await LyricsPage(routeParams()));
+
+    expect(mocks.lyricsPageClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialLyrics: {
+          lines: [
+            { startSec: 1, text: 'First line' },
+            { startSec: 3.5, text: 'Second line' },
+          ],
+          provenance: { format: 'lrc', offsetMs: 0, timing: 'line' },
+          timed: true,
+        },
+      }),
+      undefined
+    );
+  });
+
+  it('fails out-of-range timing closed without hiding readable lyrics', async () => {
+    mocks.loadLyricsRouteTrack.mockResolvedValue({
+      title: 'Stale Timing',
+      artist: 'WRONG',
+      lyrics: '[00:01.00]First line\n[03:01.01]Out of range',
+      durationMs: 180000,
+    });
+
+    render(await LyricsPage(routeParams()));
+
+    expect(mocks.lyricsPageClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialLyrics: {
+          lines: [
+            { startSec: 1, text: 'First line' },
+            { startSec: 181.01, text: 'Out of range' },
+          ],
+          provenance: { format: 'lrc', offsetMs: 0, timing: 'line' },
+          timed: true,
+        },
+      }),
+      undefined
+    );
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import type { MouseEvent } from 'react';
+import type { KeyboardEvent, MouseEvent } from 'react';
 import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
 import type { LyricLine } from './LyricsView.types';
@@ -18,6 +18,7 @@ export function LyricsTimeline({
   currentTimeSec,
   lines,
   activeIndex,
+  disabled = false,
   onSeek,
   className,
 }: {
@@ -25,6 +26,7 @@ export function LyricsTimeline({
   readonly currentTimeSec: number;
   readonly lines: readonly LyricLine[];
   readonly activeIndex: number;
+  readonly disabled?: boolean;
   readonly onSeek: (sec: number) => void;
   readonly className?: string;
 }) {
@@ -37,16 +39,34 @@ export function LyricsTimeline({
       : 0;
 
   function handleScrub(e: MouseEvent<HTMLButtonElement>) {
-    if (safeDuration <= 0) return;
+    if (disabled || safeDuration <= 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = (e.clientX - rect.left) / rect.width;
     onSeek(Math.max(0, Math.min(safeDuration, ratio * safeDuration)));
   }
 
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (disabled || safeDuration <= 0) return;
+    const seekStepSec = 5;
+    let nextTime: number | null = null;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+      nextTime = safeCurrent - seekStepSec;
+    } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+      nextTime = safeCurrent + seekStepSec;
+    } else if (event.key === 'Home') {
+      nextTime = 0;
+    } else if (event.key === 'End') {
+      nextTime = safeDuration;
+    }
+    if (nextTime === null) return;
+    event.preventDefault();
+    onSeek(Math.max(0, Math.min(safeDuration, nextTime)));
+  }
+
   return (
     <div
       className={cn(
-        'shrink-0 border-t border-(--linear-app-shell-border)/50 bg-(--linear-app-content-surface)/95 backdrop-blur-md px-4 py-3',
+        'shrink-0 border-t border-(--linear-app-shell-border)/50 bg-(--linear-app-content-surface)/95 backdrop-blur-md px-4 py-1.5',
         className
       )}
     >
@@ -57,12 +77,18 @@ export function LyricsTimeline({
         <button
           type='button'
           onClick={handleScrub}
-          className='relative flex-1 h-6 rounded-full grid focus:outline-none'
-          aria-label='Lyric timeline'
+          onKeyDown={handleKeyDown}
+          disabled={disabled || safeDuration <= 0}
+          role='slider'
+          aria-valuemin={0}
+          aria-valuemax={safeDuration}
+          aria-valuenow={Math.max(0, Math.min(safeDuration, safeCurrent))}
+          className='relative flex-1 h-11 rounded-full grid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60'
+          aria-label='Lyric Timeline'
         >
           <span className='pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-(--linear-app-shell-border)' />
           <span
-            className='pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-px bg-cyan-400/80 transition-[width] duration-subtle ease-subtle'
+            className='pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-px bg-accent/80 transition-[width] duration-subtle ease-subtle'
             style={{ width: `${pct}%` }}
           />
           {lines.map((line, i) => {
@@ -82,7 +108,7 @@ export function LyricsTimeline({
                 className={cn(
                   'pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full transition-colors duration-subtle ease-subtle',
                   isActive
-                    ? 'h-2 w-2 bg-cyan-300 shadow-[0_0_0_2px_rgb(34_211_238/0.18)]'
+                    ? 'h-2 w-2 bg-accent ring-2 ring-accent/20'
                     : 'h-1 w-1 bg-quaternary-token/80'
                 )}
                 style={{ left: `${left}%` }}
@@ -91,7 +117,7 @@ export function LyricsTimeline({
           })}
           <span
             aria-hidden='true'
-            className='pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_0_3px_rgb(34_211_238/0.18)] transition-[left] duration-subtle ease-subtle'
+            className='pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3 w-3 rounded-full bg-accent ring-3 ring-accent/20 transition-[left] duration-subtle ease-subtle'
             style={{ left: `${pct}%` }}
           />
         </button>
