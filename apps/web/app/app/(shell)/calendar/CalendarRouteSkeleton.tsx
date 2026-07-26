@@ -1,6 +1,3 @@
-'use client';
-
-import dynamic from 'next/dynamic';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { PageToolbar } from '@/components/organisms/table';
 
@@ -102,18 +99,4 @@ export function CalendarRouteSkeleton() {
       </PageContent>
     </PageShell>
   );
-}
-
-const CalendarPageClient = dynamic(
-  () =>
-    import('./CalendarPageClient').then(mod => ({
-      default: mod.CalendarPageClient,
-    })),
-  {
-    loading: () => <CalendarRouteSkeleton />,
-  }
-);
-
-export function LazyCalendarPageClient() {
-  return <CalendarPageClient />;
 }
