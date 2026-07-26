@@ -4,7 +4,7 @@ import { PageShell } from '@/components/organisms/PageShell';
 import { DashboardSegmentSkeleton } from '@/components/shell/DashboardSegmentSkeleton';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
-import { CalendarRouteSkeleton } from './calendar/LazyCalendarPageClient';
+import { CalendarRouteSkeleton } from './calendar/CalendarRouteSkeleton';
 import ChatLoading from './chat/loading';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
 import { LibraryLoadingState } from './library/LibrarySurface';
