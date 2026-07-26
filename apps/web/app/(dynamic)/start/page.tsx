@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { OnboardingShell } from '@/components/features/onboarding/OnboardingShell';
 import { getStartRouteRedirect } from '@/lib/auth/access-route-redirect';
 import { resolveUserState } from '@/lib/auth/gate';
+import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 
 /**
  * Canonical onboarding chat entry point.
@@ -38,10 +39,7 @@ export default async function StartPage(
   const params = await searchParams;
   const intentId =
     typeof params.intent_id === 'string' ? params.intent_id : undefined;
-  const starterPrompt =
-    typeof params.starter_prompt === 'string'
-      ? params.starter_prompt
-      : undefined;
+  const starterHandoff = resolveStartEntryHandoff(params);
 
   const authResult = await resolveUserState({ createDbUserIfMissing: false });
   const startRedirect = getStartRouteRedirect(authResult.state);
@@ -53,7 +51,7 @@ export default async function StartPage(
     <OnboardingShell
       intentId={intentId}
       sessionLabel='pending'
-      starterPrompt={starterPrompt}
+      starterHandoff={starterHandoff}
     />
   );
 }

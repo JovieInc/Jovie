@@ -34,10 +34,14 @@ import {
 import { useAppFlag } from '@/lib/flags/client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
+import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import { cn } from '@/lib/utils';
 import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
 import { ChatProposeNextStepCard } from './ChatProposeNextStepCard';
-import { OnboardingChatEmptyIntro } from './OnboardingChatEmptyIntro';
+import {
+  OnboardingChatEmptyIntro,
+  type OnboardingEntryMode,
+} from './OnboardingChatEmptyIntro';
 import type { OnboardingProfileBuilderState } from './OnboardingProfileRail';
 import { OnboardingProfileRail } from './OnboardingProfileRail';
 import {
@@ -98,8 +102,8 @@ interface OnboardingChatProps {
   readonly onProfileBuilderChange?: (
     state: OnboardingProfileBuilderState
   ) => void;
-  /** URL-provided starter prompt for demo and deep-link flows. */
-  readonly starterPrompt?: string;
+  /** Validated URL-provided context for an automatic first message. */
+  readonly starterHandoff?: StartEntryHandoff | null;
 }
 
 const BLOCKED_TURNSTILE_TOKEN_STATUSES: ReadonlySet<
@@ -528,13 +532,14 @@ interface OnboardingMessageRegionProps {
   readonly onSelectStarterSuggestion: (prompt: string) => void;
   readonly profileBuilderState: OnboardingProfileBuilderState;
   readonly shouldDockComposer: boolean;
-  readonly showEmptyIntro: boolean;
+  readonly entryMode: OnboardingEntryMode;
   readonly composerPickerOpen: boolean;
 }
 
 function OnboardingMessageRegion({
   composerPickerOpen,
   displayMessages,
+  entryMode,
   hasConversationStarted,
   isBusy,
   isStreaming,
@@ -548,7 +553,6 @@ function OnboardingMessageRegion({
   onSelectStarterSuggestion,
   profileBuilderState,
   shouldDockComposer,
-  showEmptyIntro,
 }: OnboardingMessageRegionProps) {
   if (shouldDockComposer) {
     return (
@@ -572,20 +576,14 @@ function OnboardingMessageRegion({
 
   if (!hasConversationStarted) {
     return (
-      <ChatEmptyStateComposerRegion
-        above={
-          showEmptyIntro ? (
-            <OnboardingChatEmptyIntro
-              onSelectSuggestion={onSelectStarterSuggestion}
-              dimmed={composerPickerOpen}
-              isBusy={isBusy}
-            />
-          ) : undefined
-        }
-      >
-        <div className='w-full' data-testid='onboarding-centered-composer'>
-          {onboardingComposerSurface}
-        </div>
+      <ChatEmptyStateComposerRegion hideWelcomeHeader>
+        <OnboardingChatEmptyIntro
+          composer={onboardingComposerSurface}
+          mode={entryMode}
+          onSelectSuggestion={onSelectStarterSuggestion}
+          dimmed={composerPickerOpen}
+          isBusy={isBusy}
+        />
       </ChatEmptyStateComposerRegion>
     );
   }
@@ -623,17 +621,21 @@ export function OnboardingChat({
   onProfileBuilderChange,
   onTurnstileRejected,
   onTurnstileRequired,
-  starterPrompt,
+  starterHandoff,
   turnstilePanel,
   turnstilePanelVisible = false,
   turnstileStatus,
   turnstileToken,
 }: OnboardingChatProps) {
-  const initialStarterPrompt = starterPrompt
-    ? sanitizeHomepagePrompt(starterPrompt)
-    : '';
+  const initialStarterPrompt = starterHandoff?.prompt ?? '';
   const hasInitialStarterPrompt = initialStarterPrompt.length > 0;
   const [input, setInput] = useState(initialStarterPrompt);
+  const [entryMode, setEntryMode] = useState<OnboardingEntryMode>(() => {
+    if (starterHandoff?.kind === 'spotify_artist') return 'spotify_handoff';
+    if (starterHandoff) return 'prompt_handoff';
+    if (intentId) return 'restoring_intent';
+    return 'blank';
+  });
   const latestInputRef = useRef(initialStarterPrompt);
   const [hasSentFirst, setHasSentFirst] = useState(false);
   const [verificationRequested, setVerificationRequested] = useState(false);
@@ -878,16 +880,15 @@ export function OnboardingChat({
       consumeHomepageIntent(intentId);
     }
 
-    if (!nextPrompt && starterPrompt) {
-      nextPrompt = sanitizeHomepagePrompt(starterPrompt);
-    }
-
     if (nextPrompt) {
       setComposerInput(nextPrompt);
       pendingStarterPromptRef.current = nextPrompt;
       hasInjectedStarterPromptRef.current = true;
+      setEntryMode('prompt_handoff');
+    } else {
+      setEntryMode('blank');
     }
-  }, [intentId, setComposerInput, starterPrompt]);
+  }, [intentId, setComposerInput]);
 
   useEffect(() => {
     const prompt = pendingStarterPromptRef.current;
@@ -1004,8 +1005,6 @@ export function OnboardingChat({
   const hasConversationStarted = messages.length > 0 || hasSentFirst;
   const shouldDockComposer =
     chatError !== null || userTurnCount > 1 || selectedArtist !== null;
-  const showEmptyIntro = !intentId && !starterPrompt;
-
   useEffect(() => {
     if (shouldDockComposer) return;
     const scrollContainer = scrollContainerRef.current;
@@ -1072,6 +1071,7 @@ export function OnboardingChat({
           <OnboardingMessageRegion
             composerPickerOpen={composerPickerOpen}
             displayMessages={displayMessages}
+            entryMode={entryMode}
             hasConversationStarted={hasConversationStarted}
             isBusy={isBusy}
             isStreaming={isStreaming}
@@ -1085,7 +1085,6 @@ export function OnboardingChat({
             onSelectStarterSuggestion={submitText}
             profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}
-            showEmptyIntro={showEmptyIntro}
           />
         </div>
       </div>
