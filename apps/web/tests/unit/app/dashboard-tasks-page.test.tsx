@@ -68,8 +68,8 @@ vi.mock('@/lib/queries/HydrateClient', () => ({
   }) => <div data-testid='hydrate-client'>{children}</div>,
 }));
 
-vi.mock('@/components/features/dashboard/tasks/LazyTasksPageClient', () => ({
-  LazyTasksPageClient: () => (
+vi.mock('@/components/features/dashboard/tasks/TasksPageClient', () => ({
+  TasksPageClient: () => (
     <div data-testid='tasks-page-client'>Tasks Client</div>
   ),
 }));
