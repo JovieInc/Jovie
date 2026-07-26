@@ -37,4 +37,19 @@ describe('app shell workspaces', () => {
       'customer'
     );
   });
+
+  it('fails closed for an empty registry', () => {
+    expect(
+      getNextAppShellWorkspace([] as readonly AppShellWorkspace[], 'missing')
+    ).toBeUndefined();
+  });
+
+  it('starts at the first workspace when the current id is unknown at runtime', () => {
+    expect(
+      getNextAppShellWorkspace(
+        APP_SHELL_WORKSPACES as readonly AppShellWorkspace[],
+        'missing'
+      )?.id
+    ).toBe('customer');
+  });
 });

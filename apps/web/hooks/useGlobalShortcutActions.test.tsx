@@ -118,6 +118,22 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
     expect(push).toHaveBeenCalledWith('/app');
   });
 
+  it('uses the physical W key when Option changes the macOS key value', () => {
+    shortcutState.isAdmin = true;
+    shortcutState.pathname = '/app';
+    push.mockClear();
+    render(<Probe />);
+
+    fireEvent.keyDown(window, {
+      key: '„',
+      code: 'KeyW',
+      altKey: true,
+      shiftKey: true,
+    });
+
+    expect(push).toHaveBeenCalledWith('/app/ov');
+  });
+
   it('does not expose workspace switching to non-admins', () => {
     shortcutState.isAdmin = false;
     shortcutState.pathname = '/app';
@@ -128,6 +144,59 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
       key: 'w',
       altKey: true,
       shiftKey: true,
+    });
+
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('does not switch workspaces while typing or composing', () => {
+    shortcutState.isAdmin = true;
+    shortcutState.pathname = '/app';
+    push.mockClear();
+    const { container } = render(
+      <>
+        <input />
+        <Probe />
+      </>
+    );
+
+    const input = container.querySelector('input')!;
+    fireEvent.keyDown(input, {
+      key: 'w',
+      code: 'KeyW',
+      altKey: true,
+      shiftKey: true,
+    });
+    fireEvent.keyDown(window, {
+      key: 'w',
+      code: 'KeyW',
+      altKey: true,
+      shiftKey: true,
+      isComposing: true,
+    });
+
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('does not switch workspaces with conflicting command modifiers', () => {
+    shortcutState.isAdmin = true;
+    shortcutState.pathname = '/app';
+    push.mockClear();
+    render(<Probe />);
+
+    fireEvent.keyDown(window, {
+      key: 'w',
+      code: 'KeyW',
+      altKey: true,
+      shiftKey: true,
+      metaKey: true,
+    });
+    fireEvent.keyDown(window, {
+      key: 'w',
+      code: 'KeyW',
+      altKey: true,
+      shiftKey: true,
+      ctrlKey: true,
     });
 
     expect(push).not.toHaveBeenCalled();

@@ -68,7 +68,12 @@ export function useGlobalShortcutActions() {
     function onKey(e: KeyboardEvent) {
       if (!isAdmin || e.isComposing) return;
       if (!e.altKey || !e.shiftKey || e.metaKey || e.ctrlKey) return;
-      if (e.key.toLowerCase() !== WORKSPACE_SWITCH_KEY) return;
+      // Option modifies `event.key` into a symbol on macOS. Prefer the
+      // physical key code so the displayed ⌥ ⇧ W binding works there, while
+      // retaining `key` as a fallback for synthetic/older environments.
+      if (e.code !== 'KeyW' && e.key.toLowerCase() !== WORKSPACE_SWITCH_KEY) {
+        return;
+      }
       if (isFormElement(e.target)) return;
       const currentWorkspace = getCurrentAppShellWorkspace(pathname);
       const nextWorkspace = getNextAppShellWorkspace(

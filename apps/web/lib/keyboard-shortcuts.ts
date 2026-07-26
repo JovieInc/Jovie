@@ -89,6 +89,20 @@ export interface KeyboardShortcut {
 export type ShortcutCategory = 'general' | 'navigation' | 'actions' | 'player';
 
 /**
+ * Admin-only workspace binding metadata. This intentionally stays outside the
+ * public shortcut catalog so non-admin help surfaces cannot reveal OV.
+ */
+export const WORKSPACE_SWITCH_SHORTCUT: KeyboardShortcut = {
+  id: 'switch-workspace',
+  label: 'Switch workspace',
+  keys: `${GLYPH_OPT} ${GLYPH_SHIFT} W`,
+  description: 'Switch the active workspace',
+  category: 'actions',
+  shortcutKey: WORKSPACE_SWITCH_SHORTCUT_KEY,
+  decision: { status: 'required', binding: 'useGlobalShortcutActions' },
+};
+
+/**
  * All keyboard shortcuts organized by category
  */
 export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
@@ -283,17 +297,6 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     shortcutKey: 'Alt+Shift+Q',
     decision: { status: 'required', binding: 'useGlobalShortcutActions' },
   },
-  {
-    id: 'switch-workspace',
-    label: 'Switch workspace',
-    keys: `${GLYPH_OPT} ${GLYPH_SHIFT} W`,
-    description: 'Switch between Jovie and OV',
-    category: 'actions',
-    icon: Columns2,
-    shortcutKey: WORKSPACE_SWITCH_SHORTCUT_KEY,
-    decision: { status: 'required', binding: 'useGlobalShortcutActions' },
-  },
-
   // Player shortcuts — scope: 'player' means only fires when audio player has focus.
   // Bare single-key shortcuts here are intentional and safe in that scoped context.
   {
@@ -384,10 +387,6 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     decision: { status: 'required', binding: 'ContextMenuOverlay' },
   },
 ];
-
-export const WORKSPACE_SWITCH_SHORTCUT = KEYBOARD_SHORTCUTS.find(
-  shortcut => shortcut.id === 'switch-workspace'
-)!;
 
 /**
  * Map from nav item ID to shortcut for quick lookup

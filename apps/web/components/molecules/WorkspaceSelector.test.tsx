@@ -68,4 +68,28 @@ describe('WorkspaceSelector', () => {
       '/app/support'
     );
   });
+
+  it('falls back to the first workspace for an unknown current id', () => {
+    render(
+      <WorkspaceSelector
+        currentWorkspaceId={'missing' as (typeof workspaces)[number]['id']}
+        workspaces={workspaces}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Switch Workspace' })
+    ).toHaveTextContent('Jovie');
+  });
+
+  it('renders nothing for an empty workspace registry', () => {
+    const { container } = render(
+      <WorkspaceSelector
+        currentWorkspaceId='missing'
+        workspaces={[] as const}
+      />
+    );
+
+    expect(container).toBeEmptyDOMElement();
+  });
 });

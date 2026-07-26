@@ -37,7 +37,7 @@ export function WorkspaceSelector<Id extends string>({
           data-electron-no-drag='true'
           style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
           className={cn(
-            'flex h-7 w-full items-center gap-1.5 rounded-lg px-2.5 transition-colors duration-normal ease-interactive hover:bg-sidebar-accent/55 focus-visible:outline-none focus-visible:bg-sidebar-accent/55',
+            'flex h-7 w-full items-center gap-1.5 rounded-lg px-2.5 transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent/55 focus-visible:outline-none focus-visible:bg-sidebar-accent/55',
             'group-data-[collapsible=icon]:justify-center'
           )}
         >

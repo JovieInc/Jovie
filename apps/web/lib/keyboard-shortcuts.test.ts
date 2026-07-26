@@ -5,6 +5,7 @@ import {
   NAV_SHORTCUTS,
   SHORTCUT_CATEGORY_LABELS,
   type ShortcutCategory,
+  WORKSPACE_SWITCH_SHORTCUT,
 } from './keyboard-shortcuts';
 
 describe('keyboard-shortcuts definitions', () => {
@@ -193,12 +194,12 @@ describe('keyboard-shortcuts definitions', () => {
       expect(themeShortcut!.keys).toMatch(/T$/);
     });
 
-    it('includes the admin workspace switch shortcut', () => {
-      const workspaceShortcut = KEYBOARD_SHORTCUTS.find(
-        s => s.id === 'switch-workspace'
+    it('keeps the admin workspace binding out of the public help catalog', () => {
+      expect(KEYBOARD_SHORTCUTS.some(s => s.id === 'switch-workspace')).toBe(
+        false
       );
-      expect(workspaceShortcut?.shortcutKey).toBe('Alt+Shift+w');
-      expect(workspaceShortcut?.decision).toEqual({
+      expect(WORKSPACE_SWITCH_SHORTCUT.shortcutKey).toBe('Alt+Shift+w');
+      expect(WORKSPACE_SWITCH_SHORTCUT.decision).toEqual({
         status: 'required',
         binding: 'useGlobalShortcutActions',
       });

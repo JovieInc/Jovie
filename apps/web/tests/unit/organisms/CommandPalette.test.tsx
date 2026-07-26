@@ -174,6 +174,20 @@ describe('CommandPalette', () => {
     expect(pushMock).toHaveBeenCalledWith('/app/ov');
   });
 
+  it('routes the admin workspace action from OV back to Jovie', () => {
+    pushMock.mockClear();
+    pathnameMock.mockReturnValue('/app/ov/ops');
+    render(withDashboard(<CommandPalette />, true));
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+
+    const action = screen
+      .getAllByRole('option')
+      .find(el => el.textContent?.includes('Switch to Jovie'));
+    fireEvent.mouseDown(action!);
+
+    expect(pushMock).toHaveBeenCalledWith('/app');
+  });
+
   it('does not leak the workspace action to non-admins', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
