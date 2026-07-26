@@ -1,19 +1,19 @@
+import {
+  getLyricsTimingStatus,
+  type ParsedLyrics,
+  parseLyricsText as parseCanonicalLyricsText,
+} from '@jovie/audio-contracts';
 import type { LyricLine } from '@/components/shell/LyricsView';
 
-/**
- * Convert plain-text lyrics into the LyricLine[] shape expected by LyricsView.
- *
- * Every line shares startSec: 0 because the route stores lyrics as plain text
- * without per-line timing. LyricsPageClient renders these via timed={false}
- * so the timing field is intentionally unused. If timed lyrics are added
- * later, parse the timestamps here instead of hard-coding zero.
- */
-export function plainLyricsToLines(lyrics: string | null): LyricLine[] {
-  if (!lyrics) return [];
+export type { ParsedLyrics } from '@jovie/audio-contracts';
+export { getLyricsTimingStatus };
 
-  return lyrics
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
-    .map(text => ({ startSec: 0, text }));
+/** Parse stored plain text or LRC through the canonical audio contract. */
+export function parseLyricsText(lyrics: string | null): ParsedLyrics {
+  return parseCanonicalLyricsText(lyrics);
+}
+
+/** Backward-compatible plain-line projection for non-timed consumers. */
+export function plainLyricsToLines(lyrics: string | null): LyricLine[] {
+  return [...parseCanonicalLyricsText(lyrics).lines];
 }

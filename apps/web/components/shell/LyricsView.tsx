@@ -1,8 +1,17 @@
 'use client';
 
+import {
+  findActiveTimedTextCueIndex,
+  type LyricsTimingStatus,
+} from '@jovie/audio-contracts';
 import { Mic2, Sparkles } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import {
+  markInteractionStart,
+  measureInteractionNextPaint,
+} from '@/lib/monitoring/interaction-latency';
 import { cn } from '@/lib/utils';
 import { LyricRow } from './LyricRow';
 import { LyricsHeader } from './LyricsHeader';
@@ -10,6 +19,24 @@ import { LyricsTimeline } from './LyricsTimeline';
 import type { LyricLine, LyricsViewTrack } from './LyricsView.types';
 
 export type { LyricLine, LyricsViewTrack } from './LyricsView.types';
+
+function LyricsTimingFooter({
+  timingStatus,
+}: {
+  readonly timingStatus: LyricsTimingStatus;
+}) {
+  const label =
+    timingStatus === 'stale'
+      ? 'Lyrics timing needs review'
+      : timingStatus === 'untimed'
+        ? 'Unsynced lyrics'
+        : null;
+  return (
+    <div className='flex h-14 shrink-0 items-center justify-center border-t border-(--linear-app-shell-border)/50 px-4 text-xs text-tertiary-token'>
+      {label}
+    </div>
+  );
+}
 
 /**
  * LyricsView — full-screen lyrics with timed playhead, J/K nav, edit mode.
@@ -49,6 +76,9 @@ export function LyricsView({
   onPaste,
   editing = false,
   timed = true,
+  timingStatus = timed ? 'synced' : 'untimed',
+  seekEnabled = true,
+  syncEnabled = true,
   autoFocusView = false,
   className,
 }: {
@@ -63,29 +93,38 @@ export function LyricsView({
   readonly onPaste?: () => void;
   readonly editing?: boolean;
   readonly timed?: boolean;
+  readonly timingStatus?: LyricsTimingStatus;
+  readonly seekEnabled?: boolean;
+  readonly syncEnabled?: boolean;
   readonly autoFocusView?: boolean;
   readonly className?: string;
 }) {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const lyricsRootRef = useRef<HTMLElement | null>(null);
+  const prefersReducedMotion = useReducedMotion();
 
-  const activeIndex = useMemo(() => {
-    // Scan every line — caller may have edited a stamp out of order
-    // (LyricsView allows mid-list reordering via stampLine), so we cannot
-    // rely on ascending order to early-exit. Linear scan is O(n) but n is
-    // typically <40 lyric lines per track.
-    if (!timed) return -1;
-
-    let idx = -1;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].startSec <= currentTimeSec) idx = i;
-    }
-    return idx;
-  }, [lines, currentTimeSec, timed]);
+  const activeIndex = useMemo(
+    () =>
+      timed && syncEnabled
+        ? findActiveTimedTextCueIndex(lines, currentTimeSec)
+        : -1,
+    [lines, currentTimeSec, syncEnabled, timed]
+  );
 
   useEffect(() => {
     if (activeIndex >= 0) setFocusedIndex(activeIndex);
   }, [activeIndex]);
+
+  useEffect(() => {
+    if (activeIndex < 0 || editing) return;
+    const activeRow = lyricsRootRef.current?.querySelector<HTMLElement>(
+      `[data-lyric-index="${activeIndex}"]`
+    );
+    activeRow?.scrollIntoView?.({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'nearest',
+    });
+  }, [activeIndex, editing, prefersReducedMotion]);
 
   useEffect(() => {
     if (autoFocusView && lines.length > 0) {
@@ -105,6 +144,12 @@ export function LyricsView({
   function updateLineText(index: number, text: string) {
     if (!onLinesChange) return;
     onLinesChange(lines.map((l, i) => (i === index ? { ...l, text } : l)));
+  }
+
+  function seekTo(startSec: number) {
+    const latencyMark = markInteractionStart('lyrics-cue-seek');
+    onSeek(startSec);
+    void measureInteractionNextPaint(latencyMark);
   }
 
   function handleKey(e: KeyboardEvent) {
@@ -165,6 +210,7 @@ export function LyricsView({
             </div>
           </div>
         </div>
+        <LyricsTimingFooter timingStatus='empty' />
       </section>
     );
   }
@@ -194,9 +240,10 @@ export function LyricsView({
                 isActive={isActive}
                 isFocused={isFocused}
                 editing={editing && Boolean(onLinesChange)}
-                interactive={timed}
+                interactive={timed && seekEnabled}
+                currentTimeSec={isActive ? currentTimeSec : null}
                 onFocus={() => setFocusedIndex(i)}
-                onSeek={() => onSeek(line.startSec)}
+                onSeek={() => seekTo(line.startSec)}
                 onStamp={() => stampLine(i)}
                 onChangeText={text => updateLineText(i, text)}
               />
@@ -210,9 +257,11 @@ export function LyricsView({
           currentTimeSec={currentTimeSec}
           lines={lines}
           activeIndex={activeIndex}
-          onSeek={onSeek}
+          disabled={!seekEnabled}
+          onSeek={seekTo}
         />
       )}
+      {!timed && <LyricsTimingFooter timingStatus={timingStatus} />}
     </section>
   );
 }

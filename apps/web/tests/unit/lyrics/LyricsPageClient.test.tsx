@@ -32,17 +32,32 @@ vi.mock('@/components/shell/LyricsView', () => ({
   LyricsView: ({
     track,
     currentTimeSec,
+    durationSec,
     autoFocusView,
+    timed,
+    timingStatus,
+    seekEnabled,
+    syncEnabled,
   }: {
     track: { title: string; artist?: string };
     currentTimeSec: number;
+    durationSec: number;
     autoFocusView?: boolean;
+    timed?: boolean;
+    timingStatus?: string;
+    seekEnabled?: boolean;
+    syncEnabled?: boolean;
   }) => (
     <section aria-label='Lyrics view'>
       <h1>{track.title}</h1>
       <p>{track.artist}</p>
       <span data-testid='current-time'>{currentTimeSec}</span>
+      <span data-testid='duration'>{durationSec}</span>
       <span data-testid='auto-focus'>{String(Boolean(autoFocusView))}</span>
+      <span data-testid='timed'>{String(Boolean(timed))}</span>
+      <span data-testid='timing-status'>{timingStatus}</span>
+      <span data-testid='seek-enabled'>{String(Boolean(seekEnabled))}</span>
+      <span data-testid='sync-enabled'>{String(Boolean(syncEnabled))}</span>
     </section>
   ),
 }));
@@ -54,7 +69,11 @@ const { LyricsPageClient } = await import(
 type LyricsPageClientProps = ComponentProps<typeof LyricsPageClient>;
 
 const baseProps = {
-  initialLines: [],
+  initialLyrics: {
+    lines: [],
+    provenance: { format: 'plain', offsetMs: 0, timing: 'none' },
+    timed: false,
+  },
   initialTrack: {
     title: 'Server Track',
     artist: 'Server Artist',
@@ -84,6 +103,10 @@ describe('LyricsPageClient', () => {
     expect(screen.getByText('Server Artist')).toBeInTheDocument();
     expect(screen.getByTestId('current-time')).toHaveTextContent('0');
     expect(screen.getByTestId('auto-focus')).toHaveTextContent('true');
+    expect(screen.getByTestId('timed')).toHaveTextContent('false');
+    expect(screen.getByTestId('timing-status')).toHaveTextContent('empty');
+    expect(screen.getByTestId('seek-enabled')).toHaveTextContent('false');
+    expect(screen.getByTestId('sync-enabled')).toHaveTextContent('false');
   });
 
   it('closes direct lyrics entry to the return route on Escape', () => {
@@ -128,5 +151,95 @@ describe('LyricsPageClient', () => {
     fireEvent.keyDown(globalThis, { key: 'Escape' });
 
     expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('enables timed interaction only for server-validated timed lyrics', () => {
+    const initialLyrics = {
+      lines: [{ startSec: 1, text: 'Opening' }],
+      provenance: {
+        format: 'lrc' as const,
+        offsetMs: 0,
+        timing: 'line' as const,
+      },
+      timed: true,
+    };
+    const view = render(
+      <LyricsPageClient {...baseProps} initialLyrics={initialLyrics} />
+    );
+
+    expect(screen.getByTestId('timed')).toHaveTextContent('true');
+    expect(screen.getByTestId('seek-enabled')).toHaveTextContent('false');
+
+    mocks.playbackState.activeTrackId = 'track-1';
+    view.rerender(
+      <LyricsPageClient {...baseProps} initialLyrics={initialLyrics} />
+    );
+
+    expect(screen.getByTestId('timed')).toHaveTextContent('true');
+    expect(screen.getByTestId('seek-enabled')).toHaveTextContent('true');
+    expect(screen.getByTestId('sync-enabled')).toHaveTextContent('true');
+  });
+
+  it('reclassifies timing against live duration and disables stale seeking', () => {
+    mocks.playbackState.activeTrackId = 'track-1';
+    mocks.playbackState.duration = 30;
+    mocks.playbackState.currentTime = 12;
+
+    render(
+      <LyricsPageClient
+        {...baseProps}
+        initialDurationSec={0}
+        initialLyrics={{
+          lines: [
+            { startSec: 1, text: 'Opening' },
+            { startSec: 32, text: 'Past the live duration' },
+          ],
+          provenance: { format: 'lrc', offsetMs: 0, timing: 'line' },
+          timed: true,
+        }}
+      />
+    );
+
+    expect(screen.getByTestId('duration')).toHaveTextContent('30');
+    expect(screen.getByTestId('timing-status')).toHaveTextContent('stale');
+    expect(screen.getByTestId('timed')).toHaveTextContent('false');
+    expect(screen.getByTestId('seek-enabled')).toHaveTextContent('false');
+    expect(screen.getByTestId('sync-enabled')).toHaveTextContent('false');
+  });
+
+  it('clears synchronization when queue advance changes the active track', () => {
+    mocks.playbackState.activeTrackId = 'track-1';
+    mocks.playbackState.duration = 180;
+    mocks.playbackState.currentTime = 42;
+    const view = render(
+      <LyricsPageClient
+        {...baseProps}
+        initialLyrics={{
+          lines: [{ startSec: 1, text: 'Opening' }],
+          provenance: { format: 'lrc', offsetMs: 0, timing: 'line' },
+          timed: true,
+        }}
+      />
+    );
+
+    expect(screen.getByTestId('current-time')).toHaveTextContent('42');
+    expect(screen.getByTestId('sync-enabled')).toHaveTextContent('true');
+
+    mocks.playbackState.activeTrackId = 'track-2';
+    mocks.playbackState.currentTime = 9;
+    view.rerender(
+      <LyricsPageClient
+        {...baseProps}
+        initialLyrics={{
+          lines: [{ startSec: 1, text: 'Opening' }],
+          provenance: { format: 'lrc', offsetMs: 0, timing: 'line' },
+          timed: true,
+        }}
+      />
+    );
+
+    expect(screen.getByTestId('current-time')).toHaveTextContent('0');
+    expect(screen.getByTestId('seek-enabled')).toHaveTextContent('false');
+    expect(screen.getByTestId('sync-enabled')).toHaveTextContent('false');
   });
 });
