@@ -381,26 +381,27 @@ jobs:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           fetch-depth: 1
           persist-credentials: false
+      - uses: ./.github/actions/setup-doppler
 
       - name: Check for production auth credentials
         id: check-creds
         env:
-          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
-          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
-          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
-          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
         run: |
           set -euo pipefail
-          if { [ -n "$E2E_PROD_USER_EMAIL" ] &&
-              [ -n "$E2E_PROD_USER_PASSWORD" ]; } ||
-            { [ -n "$E2E_CLERK_USER_USERNAME" ] &&
-              [ -n "$E2E_CLERK_USER_PASSWORD" ]; }; then
+          # Expanded inside the Doppler child shell.
+          # shellcheck disable=SC2016
+          if [ -n "${DOPPLER_TOKEN:-}" ] &&
+            doppler run --project jovie-web --config prd \
+              --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
+              --no-fallback -- env -u DOPPLER_TOKEN bash -c \
+                '[ -n "${E2E_PROD_USER_EMAIL:-}" ] && [ -n "${DATABASE_URL:-}" ]'; then
             {
               echo "credentials_configured=true"
               echo "skip=false"
             } >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::Production auth credentials are not configured; authenticated smoke is explicitly skipped and is not release proof."
+            echo "::notice::Production Better Auth OTP proof is not configured; authenticated smoke is explicitly skipped and is not release proof."
             {
               echo "credentials_configured=false"
               echo "auth_smoke_status=not-configured"
@@ -434,24 +435,22 @@ jobs:
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           test -n "$PRODUCTION_BASE_URL"
-          CI=true \
-          BASE_URL="$PRODUCTION_BASE_URL" \
-          EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
-          EXPECTED_VERCEL_ENVIRONMENT=production \
-          PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-              pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
+          doppler run --project jovie-web --config prd \
+            --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
+            --no-fallback -- env -u DOPPLER_TOKEN \
+              CI=true \
+              BASE_URL="$PRODUCTION_BASE_URL" \
+              EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
+              EXPECTED_VERCEL_ENVIRONMENT=production \
+              PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
+                node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
           echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
-          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
-          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
-          E2E_PROD_USER_CODE: ${{ secrets.E2E_PROD_USER_CODE }}
-          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
-          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && steps.check-creds.outputs.skip != 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -651,22 +650,14 @@ jobs:
             fi
           done
           if [ "${{ needs.ci-post-deploy-auth-smoke.result }}" != "success" ]; then
-            echo "::error::Optional authenticated smoke lane did not resolve cleanly."
+            echo "::error::Authenticated smoke lane did not resolve cleanly."
             exit 1
           fi
           auth_smoke_status="${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}"
-          if [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" = "true" ] &&
+          if [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" != "true" ] ||
             [ "$auth_smoke_status" != "passed" ]; then
-            echo "::error::Configured authenticated smoke did not produce passing test evidence."
+            echo "::error::Authenticated Better Auth OTP smoke did not produce passing test evidence."
             exit 1
-          fi
-          if [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" != "true" ] &&
-            [ "$auth_smoke_status" != "not-configured" ]; then
-            echo "::error::Authenticated smoke emitted an invalid result state."
-            exit 1
-          fi
-          if [ "$auth_smoke_status" = "not-configured" ]; then
-            echo "::notice::Authenticated smoke was skipped because no complete credential pair is configured; OAuth and Better Auth public gates remain blocking."
           fi
 
           # Main can advance while setup runs. The workflow-level production

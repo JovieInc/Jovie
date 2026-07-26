@@ -7,13 +7,14 @@ import {
 } from '../helpers/vercel-preview';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
 import { resolveProductionAuthCredentials } from './utils/production-auth-credentials';
+import { waitForProductionAuthOtp } from './utils/production-auth-otp';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
  * Production Auth Smoke Tests
  *
  * Lightweight tests that run against the PRODUCTION deployment after deploy.
- * Uses seeded e2e production Clerk credentials (not +clerk_test emails).
+ * Uses a seeded Better Auth production identity and a fresh real sign-in OTP.
  *
  * These tests verify:
  * 1. Sign-in flow works with real credentials
@@ -34,23 +35,11 @@ function hasProdAuthCredentials(): boolean {
 function getProdCredentials() {
   const credentials = resolveProductionAuthCredentials();
   if (!credentials) {
-    throw new Error('Production auth smoke requires one complete named pair.');
+    throw new Error(
+      'Production auth smoke requires a configured Better Auth identity and OTP source.'
+    );
   }
   return credentials;
-}
-
-async function waitForClerk(page: Page): Promise<void> {
-  await page
-    .waitForFunction(
-      () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
-      undefined,
-      {
-        timeout: 30_000,
-      }
-    )
-    .catch(() => {
-      // Clerk may not be available in all environments.
-    });
 }
 
 async function getIdentifierInput(page: Page) {
@@ -144,6 +133,7 @@ async function signInViaRenderedFlow(
   }
 
   await identifierInput.fill(credentials.email);
+  const otpRequestedAtMs = Date.now();
   await (await getSubmitButton(page)).click();
 
   const nextStep = await detectNextStep(page, expectedOrigin);
@@ -168,17 +158,19 @@ async function signInViaRenderedFlow(
   }
 
   if (nextStep === 'email_code') {
-    if (!credentials.verificationCode) {
-      return 'verification-required';
-    }
-
     const codeInput = page
       .locator(
         'input[name="code"], input[autocomplete="one-time-code"], input[inputmode="numeric"]'
       )
       .first();
     await expect(codeInput).toBeVisible({ timeout: 10_000 });
-    await codeInput.fill(credentials.verificationCode);
+    const verificationCode =
+      credentials.verificationCode ||
+      (await waitForProductionAuthOtp({
+        email: credentials.email,
+        startedAtMs: otpRequestedAtMs,
+      }));
+    await codeInput.fill(verificationCode);
     await (await getSubmitButton(page)).click();
     await page.waitForURL(
       url => url.origin === expectedOrigin && url.pathname.startsWith('/app'),
@@ -216,7 +208,6 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
     assertExactNavigationUrl(page.url(), expectedOrigin, 'Sign-in navigation');
-    await waitForClerk(page);
 
     const result = await signInViaRenderedFlow(
       page,
@@ -226,11 +217,11 @@ test.describe('Production Auth Smoke @production-smoke', () => {
 
     if (result === 'verification-required') {
       throw new Error(
-        'Clerk rendered email-code verification and E2E_PROD_USER_CODE is not configured'
+        'Better Auth rendered email-code verification without a configured OTP source'
       );
     }
     if (result === 'signin-form-unavailable') {
-      throw new Error('Clerk sign-in form not available');
+      throw new Error('Better Auth sign-in form not available');
     }
 
     expect(result).toBe('authenticated');
@@ -284,8 +275,6 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       profileUrl.pathname.startsWith(APP_ROUTES.SIGNIN) ||
       profileUrl.pathname.startsWith('/sign-in')
     ) {
-      await waitForClerk(page);
-
       const result = await signInViaRenderedFlow(
         page,
         credentials,
@@ -294,7 +283,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
 
       if (result === 'verification-required') {
         throw new Error(
-          'Clerk rendered email-code verification and E2E_PROD_USER_CODE is not configured'
+          'Better Auth rendered email-code verification without a configured OTP source'
         );
       }
       if (result === 'signin-form-unavailable') {
