@@ -25,6 +25,7 @@ import { buildContactActions } from './contact-actions';
 interface ContactsTableProps {
   readonly contacts: EditableContact[];
   readonly artistName: string;
+  readonly isLoading?: boolean;
   readonly onUpdate: (id: string, updates: Partial<EditableContact>) => void;
   readonly onSave: (contact: EditableContact) => Promise<string | undefined>;
   readonly onDelete: (contact: EditableContact) => void;
@@ -34,6 +35,7 @@ interface ContactsTableProps {
 export const ContactsTable = memo(function ContactsTable({
   contacts,
   artistName,
+  isLoading = false,
   onUpdate,
   onSave,
   onDelete,
@@ -187,7 +189,7 @@ export const ContactsTable = memo(function ContactsTable({
     [selectedContactId]
   );
 
-  const isEmpty = contacts.length === 0;
+  const isEmpty = !isLoading && contacts.length === 0;
 
   return (
     <div className='flex h-full min-h-0 flex-row' data-testid='contacts-table'>
@@ -229,7 +231,7 @@ export const ContactsTable = memo(function ContactsTable({
             <UnifiedTable
               data={contacts}
               columns={columns}
-              isLoading={false}
+              isLoading={isLoading}
               getRowId={contact => contact.id}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
               className='text-app'

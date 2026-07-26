@@ -12,6 +12,7 @@ export interface ContactsManagerProps {
   readonly artistName: string;
   readonly artistHandle: string;
   readonly initialContacts: DashboardContact[];
+  readonly isLoading?: boolean;
 }
 
 export function ContactsManager({
@@ -19,6 +20,7 @@ export function ContactsManager({
   artistName,
   artistHandle,
   initialContacts,
+  isLoading = false,
 }: ContactsManagerProps) {
   const {
     contacts,
@@ -44,10 +46,11 @@ export function ContactsManager({
 
   return (
     <>
-      <NavigationDestinationReady destination='contacts' />
+      <NavigationDestinationReady destination='contacts' ready={!isLoading} />
       <ContactsTable
         contacts={contacts}
         artistName={artistName}
+        isLoading={isLoading}
         onUpdate={updateContact}
         onSave={handleSave}
         onDelete={handleDelete}
