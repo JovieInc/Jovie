@@ -10,8 +10,14 @@
  * Returns a numeric score between 0-100 and a breakdown.
  */
 export function scoreIssue(classification) {
-  const { category, mrrCategory, effort, mrrConfidence, relatedIssues } =
-    classification;
+  const {
+    category,
+    mrrCategory,
+    effort,
+    mrrConfidence,
+    valueScore,
+    relatedIssues,
+  } = classification;
 
   // Base score from category
   let base = 0;
@@ -88,7 +94,7 @@ export async function isProductionRed() {
     const resp = await fetch('https://jov.ie/api/health', {
       signal: AbortSignal.timeout(5000),
     });
-    const data = /** @type {any} */ (await resp.json());
+    const data = await resp.json();
     return data.status !== 'ok';
   } catch {
     // If we can't check, assume safe (fail open for local)

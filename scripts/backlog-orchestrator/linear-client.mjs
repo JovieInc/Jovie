@@ -25,7 +25,7 @@ export async function graphql(query, variables = {}) {
     },
     body: JSON.stringify({ query, variables }),
   });
-  const data = /** @type {any} */ (await resp.json());
+  const data = await resp.json();
   if (data.errors) {
     throw new Error(
       `Linear API error: ${data.errors.map(e => e.message).join('; ')}`

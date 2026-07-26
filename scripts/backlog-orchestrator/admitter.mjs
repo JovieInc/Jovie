@@ -6,7 +6,7 @@
 
 import { isProductionRed, scoreIssue } from './scorer.mjs';
 
-export const MAX_CONCURRENT_SHIPPING = 2; // v1: bumped to feed 4 workers
+export const MAX_CONCURRENT_SHIPPING = 1; // v0: one item at a time
 
 const FOUNDER_FAST_TRACK_LABEL = 'founder-fast-track';
 
@@ -16,7 +16,7 @@ const FOUNDER_FAST_TRACK_LABEL = 'founder-fast-track';
  * @param {object} classifications
  * @param {object} workstreams
  * @param {object} state - current shipping state
- * @returns {Promise<{ admit: Array, reason: string }>}
+ * @returns {{ admit: Array, reason: string }}
  */
 export async function selectNextToAdmit(
   classifications,
