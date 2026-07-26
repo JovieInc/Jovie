@@ -1031,11 +1031,7 @@ jobs:
             --route-id creator-contacts \
             --route-id creator-calendar \
             --route-id creator-tasks; then
-            # Performance is observational while the product stabilizes. Keep
-            # the exact-build/auth/deployment gates hard, but do not block a
-            # verified production release on latency or bundle budgets.
-            echo "::warning::Canonical six-route browser budgets exceeded on the exact staged build; continuing with a warning."
-            echo "performance_status=warn" >> "$GITHUB_OUTPUT"
+            fail_performance_gate "Canonical six-route browser budgets failed on the exact staged build."
           else
             echo "performance_status=passed" >> "$GITHUB_OUTPUT"
           fi
