@@ -13,8 +13,6 @@ export interface ProductionAuthEmailFormControls {
   readonly submitButton: Locator;
 }
 
-const DASHBOARD_MAIN_SELECTOR = 'main';
-
 /**
  * Wait for the production auth page to be interactive before mutating its
  * controlled email input. Filling at `domcontentloaded` can race React
@@ -51,29 +49,4 @@ export async function prepareProductionAuthEmailForm(
   );
 
   return { identifierInput, submitButton };
-}
-
-/**
- * Wait for the authenticated dashboard to render meaningful content.
- * The app shell can expose a visible, temporarily empty <main> while the
- * redirected React Server Component payload is still settling.
- */
-export async function waitForProductionDashboardContent(
-  page: Page,
-  timeoutMs = 15_000,
-  minLength = 30
-): Promise<string> {
-  const contentHandle = await page.waitForFunction(
-    ({ selector, minimumLength }) => {
-      const main = document.querySelector(selector);
-      if (!(main instanceof HTMLElement)) return false;
-
-      const text = (main.innerText || main.textContent || '').trim();
-      return text.length > minimumLength ? text : false;
-    },
-    { selector: DASHBOARD_MAIN_SELECTOR, minimumLength: minLength },
-    { timeout: timeoutMs }
-  );
-
-  return contentHandle.jsonValue() as Promise<string>;
 }
