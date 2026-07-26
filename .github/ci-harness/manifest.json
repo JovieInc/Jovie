@@ -48,7 +48,7 @@
     {
       "id": "post-deploy",
       "name": "Post-deploy Verification",
-      "purpose": "Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated smoke runs only when a complete credential pair exists, while public Better Auth/OAuth gates remain blocking. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease."
+      "purpose": "Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease."
     },
     {
       "id": "scheduled-cleanup",
@@ -297,7 +297,7 @@
       "tier": "post-deploy",
       "mergeGate": false,
       "nextLocalCommand": "gh run view --log-failed",
-      "remediation": "Repair immutable-URL public, homepage, or Lighthouse proof, public Better Auth/OAuth gates, or the leased final canonical ID/SHA check. Authenticated smoke is explicit optional evidence until a complete credential pair is configured."
+      "remediation": "Repair immutable-URL public, homepage, Lighthouse, Better Auth/OAuth, or leased final canonical ID/SHA proof. Authenticated smoke requires the dedicated production identity selector and protected verification-store access."
     },
     {
       "id": "postdeploy-probes",

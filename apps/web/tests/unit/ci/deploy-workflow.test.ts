@@ -27,6 +27,10 @@ const productionReleaseWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/production-release.yml'
 );
+const postdeployProbesWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/postdeploy-probes.yml'
+);
 const productionAliasVerifierPath = resolve(
   repoRoot,
   '.github/scripts/verify-production-alias.sh'
@@ -1056,6 +1060,15 @@ describe('deploy workflow Vercel env resolution', () => {
       'Authenticated performance credentials are required'
     );
     expect(performanceStep).toContain(
+      'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}'
+    );
+    expect(performanceStep).toContain(
+      '--only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL'
+    );
+    expect(performanceStep).toContain('env -u DOPPLER_TOKEN');
+    expect(performanceStep).not.toContain('E2E_PROD_USER_PASSWORD');
+    expect(performanceStep).not.toContain('E2E_CLERK_USER_USERNAME');
+    expect(performanceStep).toContain(
       'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs"'
     );
     expect(performanceStep).toContain(
@@ -1325,9 +1338,12 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'Check for production auth credentials'
     );
     expect(credentialCheck).toContain(
-      'E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}'
+      'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}'
     );
-    expect(credentialCheck).toContain('[ -n "$E2E_PROD_USER_EMAIL" ]');
+    expect(credentialCheck).toContain(
+      '--only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL'
+    );
+    expect(credentialCheck).toContain('[ -n "${E2E_PROD_USER_EMAIL:-}" ]');
     expect(credentialCheck).not.toContain(
       '[ -n "${{ secrets.E2E_PROD_USER_EMAIL }}" ]'
     );
@@ -1790,6 +1806,14 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL"'
     );
     expect(authSmoke).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
+    expect(authSmoke).toContain('uses: ./.github/actions/setup-doppler');
+    expect(authSmoke).toContain(
+      'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}'
+    );
+    expect(authSmoke).toContain(
+      '--only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL'
+    );
+    expect(authSmoke).not.toContain('E2E_PROD_USER_PASSWORD');
     expect(authSmoke).toContain('PLAYWRIGHT_DYNAMIC_SECRETS_FILE=');
     expect(authSmoke).toContain('echo "auth_smoke_status=passed"');
     expect(authSmoke).not.toMatch(/^\s+VERCEL_AUTOMATION_BYPASS_SECRET:/m);
@@ -1814,6 +1838,26 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verified).toContain('Notify exact verified production generation');
     expect(verified).toContain('steps.finalize.outputs.verified');
     expect(workflow).not.toContain('  deploy-notify:');
+  });
+
+  it('uses the same Better Auth OTP proof for landed production probes', () => {
+    const workflow = readFileSync(postdeployProbesWorkflowPath, 'utf8');
+    const authSmoke = getJobBlock(workflow, 'auth-smoke');
+
+    expect(authSmoke).toContain('uses: ./.github/actions/setup-doppler');
+    expect(authSmoke).toContain(
+      'DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}'
+    );
+    expect(authSmoke).toContain(
+      '--only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL'
+    );
+    expect(authSmoke).toContain('env -u DOPPLER_TOKEN');
+    expect(authSmoke).not.toContain('E2E_PROD_USER_PASSWORD');
+    expect(authSmoke).not.toContain('E2E_CLERK_USER_USERNAME');
+    expect(authSmoke).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
+    expect(authSmoke).toContain(
+      'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs"'
+    );
   });
 
   it('isolates OIDC in a no-checkout attestation job and strips Git credentials from sensitive jobs', () => {
@@ -4328,8 +4372,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(health).toContain('.head_repository.full_name == $repo');
     expect(markerState).toContain('actions/artifacts/${artifactId}/zip');
     expect(controller).toContain(
-      'Authenticated smoke was skipped because no complete credential pair is configured'
+      'Authenticated Better Auth OTP smoke did not produce passing test evidence'
     );
+    expect(controller).not.toContain('Optional authenticated smoke lane');
     expect(controller).toContain('credentials_configured=false');
   });
 
