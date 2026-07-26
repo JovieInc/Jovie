@@ -16,8 +16,14 @@ describe('production auth smoke session contract', () => {
     expect(source).not.toContain(
       "test('dashboard tab navigation works', async"
     );
-    expect(source).toContain(
-      'const tabs = [APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES];'
-    );
+    expect(source).toContain('navigationPath: APP_ROUTES.RELEASES');
+    expect(source).toContain('readyPath: APP_ROUTES.LIBRARY');
+    expect(source).toContain("readyTestId: 'library-surface'");
+    expect(source).toContain("readyView: 'releases'");
+    expect(source).toContain('await page.waitForURL(');
+    expect(source).toContain('await waitForProductionDashboardContent(');
+    const tabNavigation = source.split('const tabs = ')[1];
+    expect(tabNavigation).toBeDefined();
+    expect(tabNavigation).not.toContain('.isVisible({ timeout:');
   });
 });
