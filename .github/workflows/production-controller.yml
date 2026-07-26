@@ -22,9 +22,66 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Hold only the read-only controller preflight for one bounded release-wave
+  # window. A newer main SHA supersedes this generation before exact CI
+  # authorization, so no staging deploy, migration, canary, promotion, or
+  # rollback mutation can start for a stale SHA.
+  coalesce-production:
+    name: Coalesce release wave
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      is_current: ${{ steps.coalesce.outputs.is_current }}
+    steps:
+      - name: Wait for newer main to land
+        id: coalesce
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPOSITORY: ${{ github.repository }}
+          # One bounded 60-second release-wave window. The immediate check
+          # avoids sleeping when this run is already stale.
+          COALESCE_DELAY_SECONDS: '60'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "is_current=false" >> "$GITHUB_OUTPUT"
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Controller expected SHA must be a full commit."
+            exit 1
+          }
+
+          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact current main during release coalescing."
+            exit 1
+          }
+          if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
+            echo "::notice::Controller generation $EXPECTED_SHA was superseded by $current_main_sha before the coalescing window."
+            exit 0
+          fi
+
+          echo "Current main is $EXPECTED_SHA; waiting ${COALESCE_DELAY_SECONDS}s for the release wave to settle."
+          sleep "$COALESCE_DELAY_SECONDS"
+          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact current main at the end of release coalescing."
+            exit 1
+          }
+          if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
+            echo "::notice::Controller generation $EXPECTED_SHA was superseded by $current_main_sha during the coalescing window."
+            exit 0
+          fi
+
+          echo "is_current=true" >> "$GITHUB_OUTPUT"
+          echo "Release coalescing completed for current main $EXPECTED_SHA."
+
   authorize-production:
     name: Authorize exact main CI evidence
-    if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
+    needs: [coalesce-production]
+    if: ${{ needs.coalesce-production.result == 'success' && needs.coalesce-production.outputs.is_current == 'true' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
