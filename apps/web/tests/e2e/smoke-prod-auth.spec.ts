@@ -179,6 +179,10 @@ async function signInViaRenderedFlow(
 }
 
 test.describe('Production Auth Smoke @production-smoke', () => {
+  // Both checks use the same dedicated production identity. Requesting a new
+  // Better Auth OTP invalidates the prior code, so these flows must not race
+  // under the repository-wide fullyParallel Playwright configuration.
+  test.describe.configure({ mode: 'serial' });
   test.setTimeout(120_000);
 
   test.beforeEach(async ({ context }, testInfo) => {
