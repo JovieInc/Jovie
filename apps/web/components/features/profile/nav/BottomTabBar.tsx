@@ -90,7 +90,8 @@ export interface BottomTabBarProps {
  * Content rendered above this bar must reserve `--profile-bottom-nav-height`
  * — see `CONTENT_SAFE_AREA_BOTTOM_PADDING` in `lib/profile/nav-constants.ts`.
  *
- * Touch targets meet the 44×44pt minimum via `min-h-13` on each button.
+ * The visible treatment stays compact. The full grid cell is interactive, so
+ * touch geometry does not require a visible 44px button around every glyph.
  */
 export function BottomTabBar({
   activeTab,
@@ -105,14 +106,18 @@ export function BottomTabBar({
   return (
     <div
       className={cn(
-        '-mx-(--page-pad) shrink-0 border-t border-[color:var(--profile-dock-border)] bg-[color:var(--profile-dock-bg)] px-1.5 pb-[max(env(safe-area-inset-bottom),10px)] pt-1 backdrop-blur-2xl',
+        'shrink-0 pb-[max(env(safe-area-inset-bottom),10px)] pt-2',
         className
       )}
       data-testid='profile-tab-bar'
     >
-      <nav aria-label='Profile Navigation' data-testid='profile-bottom-nav'>
+      <nav
+        aria-label='Profile Navigation'
+        data-testid='profile-bottom-nav'
+        className='h-12 rounded-full border border-[color:var(--profile-dock-border)] bg-[color:var(--profile-dock-bg)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_14px_34px_rgba(0,0,0,0.32)] backdrop-blur-2xl'
+      >
         <div
-          className='grid items-center gap-1'
+          className='-my-0.5 grid h-11 items-center gap-1'
           style={{
             gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
           }}
@@ -127,9 +132,8 @@ export function BottomTabBar({
                 key={tab.mode}
                 type='button'
                 onClick={() => onTabSelect(tab.mode)}
-                // 44×44pt minimum touch target (spec §2 a11y requirement).
                 className={cn(
-                  'relative flex min-h-13 min-w-0 flex-col items-center justify-center gap-0.5 rounded-(--profile-action-radius) px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle',
+                  'relative flex h-full min-w-0 touch-manipulation items-center justify-center rounded-full text-center transition-[color,transform] duration-subtle ease-subtle active:scale-[0.94] motion-reduce:transform-none',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                   isActive
                     ? 'text-white dark:text-white'
@@ -141,9 +145,10 @@ export function BottomTabBar({
               >
                 <Icon
                   className={cn(
-                    'h-5 w-5 shrink-0',
+                    'h-5 w-5 shrink-0 transition-[color,stroke-width] duration-subtle',
                     isActive ? 'text-white dark:text-white' : 'text-white/52'
                   )}
+                  strokeWidth={isActive ? 2.35 : 1.8}
                   aria-hidden='true'
                 />
                 <span
