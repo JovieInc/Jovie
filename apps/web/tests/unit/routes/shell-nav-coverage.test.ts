@@ -17,6 +17,10 @@ import {
 import redirectBaseline from './shell-redirect-stubs.baseline.json';
 
 const SHELL_ROOT = path.resolve(__dirname, '../../../app/app/(shell)');
+const CONTACTS_CLIENT_PATH = path.join(
+  SHELL_ROOT,
+  'contacts/ContactsPageClient.tsx'
+);
 
 const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app': 'Shell root entry page',
@@ -157,11 +161,14 @@ describe('shell route coverage', () => {
 
   it('keeps the canonical Contacts destination as a real workspace', () => {
     const contactsPage = pageByRoute.get(APP_ROUTES.CONTACTS);
+    const contactsClient = fs.readFileSync(CONTACTS_CLIENT_PATH, 'utf8');
 
     expect(contactsPage).toBeDefined();
     expect(contactsPage?.source).not.toMatch(/\bredirect\(/);
-    expect(contactsPage?.source).toContain('ContactsManager');
-    expect(contactsPage?.source).toContain('getProfileContactsForOwner');
+    expect(contactsPage?.source).toContain('ContactsPageClient');
+    expect(contactsPage?.source).not.toContain('getProfileContactsForOwner');
+    expect(contactsClient).toContain('ContactsManager');
+    expect(contactsClient).toContain('useContactsQuery');
   });
 
   it('non-nav shell pages are intentional internals or baselined redirects', () => {

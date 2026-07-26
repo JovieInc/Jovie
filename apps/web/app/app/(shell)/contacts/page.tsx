@@ -1,10 +1,8 @@
 import type { Metadata } from 'next';
 import { APP_ROUTES } from '@/constants/routes';
-import { ContactsManager } from '@/features/dashboard/organisms/ContactsManager';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
-import { captureError } from '@/lib/error-tracking';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
-import { getProfileContactsForOwner } from '../dashboard/contacts/actions';
+import { ContactsPageClient } from './ContactsPageClient';
 
 export const runtime = 'nodejs';
 
@@ -30,25 +28,11 @@ export default async function ContactsPage() {
     );
   }
 
-  try {
-    const contacts = await getProfileContactsForOwner(profile.id);
-
-    return (
-      <ContactsManager
-        profileId={profile.id}
-        artistName={profile.displayName?.trim() || profile.username}
-        artistHandle={profile.usernameNormalized ?? profile.username}
-        initialContacts={contacts}
-      />
-    );
-  } catch (error) {
-    void captureError('Contacts load failed on contacts page', error, {
-      route: APP_ROUTES.CONTACTS,
-      profileId: profile.id,
-    });
-
-    return (
-      <PageErrorState message='Failed to load contacts. Please refresh the page.' />
-    );
-  }
+  return (
+    <ContactsPageClient
+      profileId={profile.id}
+      artistName={profile.displayName?.trim() || profile.username}
+      artistHandle={profile.usernameNormalized ?? profile.username}
+    />
+  );
 }
