@@ -179,9 +179,9 @@ async function signInViaRenderedFlow(
 }
 
 test.describe('Production Auth Smoke @production-smoke', () => {
-  // Both checks use the same dedicated production identity. Requesting a new
-  // Better Auth OTP invalidates the prior code, so these flows must not race
-  // under the repository-wide fullyParallel Playwright configuration.
+  // Keep sign-in and authenticated navigation in one browser session. Requesting
+  // another Better Auth OTP can invalidate the prior code, so future checks must
+  // extend this flow instead of creating a second authenticated test.
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(120_000);
 
@@ -248,56 +248,6 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     expect(lower).not.toContain('application error');
     expect(lower).not.toContain('something went wrong');
 
-    const performanceAuthStatePath =
-      process.env.PERFORMANCE_AUTH_STATE_PATH?.trim();
-    if (performanceAuthStatePath) {
-      await page.context().storageState({ path: performanceAuthStatePath });
-    }
-  });
-
-  test('dashboard tab navigation works', async ({ page }, testInfo) => {
-    const credentials = getProdCredentials();
-    const expectedOrigin = exactOriginForTest(testInfo);
-
-    await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-      waitUntil: 'domcontentloaded',
-      timeout: SMOKE_TIMEOUTS.NAVIGATION,
-    });
-    const profileUrl = assertExactNavigationUrl(
-      page.url(),
-      expectedOrigin,
-      'Dashboard profile navigation'
-    );
-
-    if (
-      profileUrl.pathname.startsWith(APP_ROUTES.SIGNIN) ||
-      profileUrl.pathname.startsWith('/sign-in')
-    ) {
-      const result = await signInViaRenderedFlow(
-        page,
-        credentials,
-        expectedOrigin
-      );
-
-      if (result === 'verification-required') {
-        throw new Error(
-          'Better Auth rendered email-code verification without a configured OTP source'
-        );
-      }
-      if (result === 'signin-form-unavailable') {
-        throw new Error('Sign-in form not available for tab navigation test');
-      }
-
-      expect(result).toBe('authenticated');
-    }
-
-    await waitForHydration(page);
-    assertExactNavigationUrl(
-      page.url(),
-      expectedOrigin,
-      'Hydrated dashboard profile navigation'
-    );
-
     const tabs = [APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES];
 
     for (const tabPath of tabs) {
@@ -321,13 +271,19 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       expect(currentUrl.pathname).not.toContain(APP_ROUTES.SIGNIN);
       expect(currentUrl.pathname).not.toContain('/sign-in');
 
-      const main = page.locator('main').first();
-      const mainVisible = await main
+      const tabMain = page.locator('main').first();
+      const mainVisible = await tabMain
         .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
         .catch(() => false);
       expect(mainVisible, `${tabPath}: main content should be visible`).toBe(
         true
       );
+    }
+
+    const performanceAuthStatePath =
+      process.env.PERFORMANCE_AUTH_STATE_PATH?.trim();
+    if (performanceAuthStatePath) {
+      await page.context().storageState({ path: performanceAuthStatePath });
     }
   });
 });
