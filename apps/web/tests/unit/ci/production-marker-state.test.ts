@@ -121,6 +121,32 @@ function recoveryLease() {
   };
 }
 
+function advisoryAuthFailureMarker() {
+  const marker = primaryMarker('completed', 'failure');
+  marker.payload.authSmoke = 'failed';
+  marker.payload.authSmokePolicy = {
+    gate: 'production-auth-smoke',
+    mode: 'advisory',
+    owner: 'Gem',
+    threshold: '10',
+    currentStreak: '0',
+    maximumStreak: '0',
+  };
+  marker.attemptJobs = [
+    job('Production Verified', 1, 'completed', 'success'),
+    job('Post-Deploy Auth Smoke (Production)', 1, 'completed', 'failure'),
+    job('Post-Deploy Smoke (Production)', 1, 'completed', 'success'),
+    job('Lighthouse CI (Production)', 1, 'completed', 'success'),
+    job(
+      'Production Release / Centralized production rollback',
+      1,
+      'completed',
+      'skipped'
+    ),
+  ];
+  return marker;
+}
+
 function evidence(overrides: Record<string, unknown> = {}) {
   return {
     sha,
@@ -209,6 +235,48 @@ describe('production marker attempt state', () => {
       state: 'verified',
       controllerAttempt: 1,
     });
+  });
+
+  it('accepts only the policy-qualified auth smoke failure as verified evidence', () => {
+    const marker = advisoryAuthFailureMarker();
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({
+          markers: [marker],
+          latestRun: run(1, 'completed', 'failure'),
+        })
+      )
+    ).toMatchObject({
+      state: 'verified',
+      reason: 'exact_attempt_verified',
+      controllerAttempt: 1,
+    });
+
+    marker.attemptJobs.push(
+      job('Unknown production failure', 1, 'completed', 'failure')
+    );
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({
+          markers: [marker],
+          latestRun: run(1, 'completed', 'failure'),
+        })
+      )
+    ).not.toMatchObject({ state: 'verified' });
+  });
+
+  it('rejects expired advisory mode after the ten-run graduation threshold', () => {
+    const marker = advisoryAuthFailureMarker();
+    marker.payload.authSmokePolicy.maximumStreak = '10';
+
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({
+          markers: [marker],
+          latestRun: run(1, 'completed', 'failure'),
+        })
+      )
+    ).not.toMatchObject({ state: 'verified' });
   });
 
   it('authorizes one full rerun only for one safe interrupted primary marker', () => {
