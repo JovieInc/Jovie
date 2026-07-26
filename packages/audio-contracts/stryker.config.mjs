@@ -14,6 +14,7 @@ const config = {
     'units.ts',
     'analysis.ts',
     'beat-grid.ts',
+    'lyrics.ts',
     'playback.ts',
     '!**/*.test.ts',
   ],
@@ -21,6 +22,7 @@ const config = {
     'index.test.ts',
     'analysis.test.ts',
     'beat-grid.test.ts',
+    'lyrics.test.ts',
     'playback.test.ts',
   ],
   vitest: {
