@@ -1,4 +1,4 @@
-import { LazyTasksPageClient } from '@/components/features/dashboard/tasks/LazyTasksPageClient';
+import { TasksPageClient } from '@/components/features/dashboard/tasks/TasksPageClient';
 import { TasksWorkspaceUpgradeInterstitial } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
@@ -46,7 +46,7 @@ export async function TasksRoute() {
 
   return (
     <HydrateClient state={getDehydratedState()}>
-      <LazyTasksPageClient />
+      <TasksPageClient />
     </HydrateClient>
   );
 }

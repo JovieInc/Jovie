@@ -2,7 +2,10 @@ import { redirect } from 'next/navigation';
 import { OpportunityInboxPageClient } from '@/components/features/opportunity-inbox/OpportunityInboxPageClient';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
-import { loadOpportunityInboxData } from '@/lib/connectors/opportunity-inbox-data';
+import {
+  loadOpportunityInboxData,
+  loadOpportunityInboxTourDateSections,
+} from '@/lib/connectors/opportunity-inbox-data';
 import type { AvailableDSP } from '@/lib/dsp';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { logger } from '@/lib/utils/logger';
@@ -18,35 +21,34 @@ import {
  * rail. Fail-soft: the inbox must still render suggested-action cards when
  * dashboard shell data is unavailable.
  */
-async function resolveProfileRailData(clerkUserId: string): Promise<{
-  readonly connectedDSPs: readonly AvailableDSP[];
-  readonly initialLinks: readonly ProfileSocialLink[];
+type SelectedProfile = NonNullable<
+  Awaited<ReturnType<typeof getDashboardShellData>>['selectedProfile']
+>;
+
+async function resolveProfileRailSeed(clerkUserId: string): Promise<{
   readonly profileId: string | null;
+  readonly selectedProfile: SelectedProfile | null;
 }> {
   try {
     const dashboardData = await getDashboardShellData(clerkUserId);
     if (dashboardData.dashboardLoadError) {
-      return { connectedDSPs: [], initialLinks: [], profileId: null };
+      return { profileId: null, selectedProfile: null };
     }
     const selectedProfile = dashboardData.selectedProfile;
     if (!selectedProfile) {
-      return { connectedDSPs: [], initialLinks: [], profileId: null };
+      return { profileId: null, selectedProfile: null };
     }
 
-    const initialLinks = await getProfileSocialLinks(selectedProfile.id).catch(
-      () => []
-    );
     return {
-      connectedDSPs: getCanonicalProfileDSPs(selectedProfile, initialLinks),
-      initialLinks,
       profileId: selectedProfile.id,
+      selectedProfile,
     };
   } catch (error) {
     logger.error(
       '[opportunity-inbox] profile rail data resolution failed; rendering inbox without profile data',
       error
     );
-    return { connectedDSPs: [], initialLinks: [], profileId: null };
+    return { profileId: null, selectedProfile: null };
   }
 }
 
@@ -54,20 +56,38 @@ export async function OpportunityInboxRoute() {
   const clerkUserId = await loadAuthenticatedAppShellUserId({
     route: APP_ROUTES.DASHBOARD,
   });
-  const profileRailData = await resolveProfileRailData(clerkUserId);
-  const inbox = await loadOpportunityInboxData(clerkUserId, {
-    profileId: profileRailData.profileId,
-  });
 
-  if (!inbox) {
+  const profileRailSeedPromise = resolveProfileRailSeed(clerkUserId);
+  const inboxPromise = loadOpportunityInboxData(clerkUserId);
+  const profileRailSeed = await profileRailSeedPromise;
+
+  const initialLinksPromise = profileRailSeed.profileId
+    ? getProfileSocialLinks(profileRailSeed.profileId).catch(() => [])
+    : Promise.resolve<ProfileSocialLink[]>([]);
+  const tourDatesPromise = profileRailSeed.profileId
+    ? loadOpportunityInboxTourDateSections(profileRailSeed.profileId)
+    : Promise.resolve(undefined);
+
+  const [baseInbox, initialLinks, tourDates] = await Promise.all([
+    inboxPromise,
+    initialLinksPromise,
+    tourDatesPromise,
+  ]);
+
+  if (!baseInbox) {
     redirect(buildAppShellSignInUrl(APP_ROUTES.DASHBOARD));
   }
+
+  const inbox = tourDates ? { ...baseInbox, tourDates } : baseInbox;
+  const connectedDSPs: readonly AvailableDSP[] = profileRailSeed.selectedProfile
+    ? getCanonicalProfileDSPs(profileRailSeed.selectedProfile, initialLinks)
+    : [];
 
   return (
     <OpportunityInboxPageClient
       inbox={inbox}
-      initialLinks={profileRailData.initialLinks}
-      connectedDSPs={profileRailData.connectedDSPs}
+      initialLinks={initialLinks}
+      connectedDSPs={connectedDSPs}
     />
   );
 }
