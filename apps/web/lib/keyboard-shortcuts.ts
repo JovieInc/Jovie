@@ -32,6 +32,8 @@ export const GLYPH_CMD = String.fromCodePoint(0x2318);
 export const GLYPH_OPT = String.fromCodePoint(0x2325);
 export const GLYPH_SHIFT = String.fromCodePoint(0x21e7);
 export const GLYPH_ARROW_RIGHT = String.fromCodePoint(0x2192);
+export const WORKSPACE_SWITCH_KEY = 'w';
+export const WORKSPACE_SWITCH_SHORTCUT_KEY = 'Alt+Shift+w';
 
 /**
  * Shipping gate — every shortcut must declare its status before merge.
@@ -281,6 +283,16 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     shortcutKey: 'Alt+Shift+Q',
     decision: { status: 'required', binding: 'useGlobalShortcutActions' },
   },
+  {
+    id: 'switch-workspace',
+    label: 'Switch workspace',
+    keys: `${GLYPH_OPT} ${GLYPH_SHIFT} W`,
+    description: 'Switch between Jovie and OV',
+    category: 'actions',
+    icon: Columns2,
+    shortcutKey: WORKSPACE_SWITCH_SHORTCUT_KEY,
+    decision: { status: 'required', binding: 'useGlobalShortcutActions' },
+  },
 
   // Player shortcuts — scope: 'player' means only fires when audio player has focus.
   // Bare single-key shortcuts here are intentional and safe in that scoped context.
@@ -372,6 +384,10 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     decision: { status: 'required', binding: 'ContextMenuOverlay' },
   },
 ];
+
+export const WORKSPACE_SWITCH_SHORTCUT = KEYBOARD_SHORTCUTS.find(
+  shortcut => shortcut.id === 'switch-workspace'
+)!;
 
 /**
  * Map from nav item ID to shortcut for quick lookup

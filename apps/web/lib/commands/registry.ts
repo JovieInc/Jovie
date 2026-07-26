@@ -122,6 +122,8 @@ export interface NavCommand {
   readonly iconName: string;
   readonly surfaces: readonly CommandSurface[];
   readonly href: string;
+  /** Optional shortcut hint rendered on the cmd+k row. */
+  readonly shortcutLabel?: string;
 }
 
 export type Command = SkillCommand | NavCommand;

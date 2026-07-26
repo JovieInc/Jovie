@@ -14,6 +14,7 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { toast } from '@/components/feedback';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
+import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
 import {
   Sidebar,
   SidebarContent,
@@ -42,6 +43,7 @@ import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
+import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { env } from '@/lib/env-client';
@@ -230,7 +232,8 @@ function SettingsNavigation({
 /** Logo (clean header) or back button for settings/library */
 function SidebarHeaderNav({
   isRouteSidebar,
-  isAdmin,
+  isOperatorSection,
+  canSwitchWorkspaces,
   hasMultipleProfiles,
   isDemoRoute,
   variant = 'jovie',
@@ -238,7 +241,8 @@ function SidebarHeaderNav({
   routeBackLabel = 'Back to App',
 }: Readonly<{
   isRouteSidebar: boolean;
-  isAdmin: boolean;
+  isOperatorSection: boolean;
+  canSwitchWorkspaces: boolean;
   hasMultipleProfiles: boolean;
   isDemoRoute: boolean;
   variant?: BrandVariant;
@@ -292,7 +296,15 @@ function SidebarHeaderNav({
             </div>
           );
         }
-        if (hasMultipleProfiles && !isAdmin) {
+        if (canSwitchWorkspaces) {
+          return (
+            <WorkspaceSelector
+              currentWorkspaceId={variant === 'ov' ? 'ov' : 'customer'}
+              workspaces={APP_SHELL_WORKSPACES}
+            />
+          );
+        }
+        if (hasMultipleProfiles && !isOperatorSection) {
           return <ProfileSwitcher />;
         }
         // Clean header: brand logo + wordmark for identity (matches Linear's
@@ -438,14 +450,14 @@ export function UnifiedSidebar({
   section,
   variant = 'jovie',
 }: UnifiedSidebarProps) {
-  const { creatorProfiles } = useDashboardData();
+  const { creatorProfiles, isAdmin: canSwitchWorkspaces } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
-  const isAdmin = section === 'admin' || section === 'ov';
+  const isOperatorSection = section === 'admin' || section === 'ov';
   const isRouteSidebar = isInSettings || sidebarOverride !== null;
-  const usesStandardAppNavigation = !isAdmin && !isRouteSidebar;
+  const usesStandardAppNavigation = !isOperatorSection && !isRouteSidebar;
   const hasMultipleProfiles = creatorProfiles.length >= 2;
 
   const { profileHref } = useProfileData(usesStandardAppNavigation);
@@ -472,7 +484,8 @@ export function UnifiedSidebar({
       >
         <SidebarHeaderNav
           isRouteSidebar={isRouteSidebar}
-          isAdmin={isAdmin}
+          isOperatorSection={isOperatorSection}
+          canSwitchWorkspaces={canSwitchWorkspaces}
           hasMultipleProfiles={hasMultipleProfiles}
           isDemoRoute={isDemoRoute}
           variant={variant}

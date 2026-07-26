@@ -193,6 +193,17 @@ describe('keyboard-shortcuts definitions', () => {
       expect(themeShortcut!.keys).toMatch(/T$/);
     });
 
+    it('includes the admin workspace switch shortcut', () => {
+      const workspaceShortcut = KEYBOARD_SHORTCUTS.find(
+        s => s.id === 'switch-workspace'
+      );
+      expect(workspaceShortcut?.shortcutKey).toBe('Alt+Shift+w');
+      expect(workspaceShortcut?.decision).toEqual({
+        status: 'required',
+        binding: 'useGlobalShortcutActions',
+      });
+    });
+
     it('includes sidebar toggle shortcut', () => {
       const sidebarShortcut = KEYBOARD_SHORTCUTS.find(
         s => s.id === 'toggle-sidebar'
