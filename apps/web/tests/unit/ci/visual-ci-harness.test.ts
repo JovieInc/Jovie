@@ -65,6 +65,17 @@ describe('visual CI harness', () => {
     expect(classifyUiPath('apps/web/components/example/NewCard.tsx')).toBe(
       'component'
     );
+
+    const workflow = readFileSync(
+      resolve(repositoryRoot, '.github/workflows/ui-story-coverage-audit.yml'),
+      'utf8'
+    );
+    expect(workflow).toContain(
+      'Initial UI coverage rollout must bootstrap in audit mode.'
+    );
+    expect(workflow).toContain(
+      'Base UI coverage policy is only partially installed.'
+    );
   });
 
   it('reports missing UI evidence without hiding harness defects', () => {

@@ -57,8 +57,29 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             git fetch --no-tags origin "${{ github.base_ref }}"
             base="origin/${{ github.base_ref }}"
-            git show "${base}:scripts/ui-story-coverage-policy.mjs" > "$TRUSTED_DIR/policy.mjs"
-            git show "${base}:.github/ui-story-coverage-policy.json" > "$TRUSTED_DIR/policy.json"
+            base_has_script=false
+            base_has_policy=false
+            git cat-file -e "${base}:scripts/ui-story-coverage-policy.mjs" &&
+              base_has_script=true
+            git cat-file -e "${base}:.github/ui-story-coverage-policy.json" &&
+              base_has_policy=true
+            if [ "$base_has_script" = "true" ] &&
+              [ "$base_has_policy" = "true" ]; then
+              git show "${base}:scripts/ui-story-coverage-policy.mjs" > "$TRUSTED_DIR/policy.mjs"
+              git show "${base}:.github/ui-story-coverage-policy.json" > "$TRUSTED_DIR/policy.json"
+            elif [ "$base_has_script" = "false" ] &&
+              [ "$base_has_policy" = "false" ]; then
+              cp scripts/ui-story-coverage-policy.mjs "$TRUSTED_DIR/policy.mjs"
+              cp .github/ui-story-coverage-policy.json "$TRUSTED_DIR/policy.json"
+              jq -e '.mode == "audit"' "$TRUSTED_DIR/policy.json" >/dev/null || {
+                echo "::error::Initial UI coverage rollout must bootstrap in audit mode."
+                exit 1
+              }
+              echo "::notice::Bootstrapping the trusted UI coverage policy in audit mode."
+            else
+              echo "::error::Base UI coverage policy is only partially installed."
+              exit 1
+            fi
           elif [ "${{ github.event_name }}" = "push" ]; then
             [[ "${{ github.event.before }}" =~ ^[0-9a-f]{40}$ ]] || {
               echo "::error::UI audit push has no exact before SHA."
