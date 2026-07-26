@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { prepareProductionAuthEmailForm } from '../../e2e/utils/production-auth-interaction';
+import {
+  prepareProductionAuthEmailForm,
+  waitForProductionDashboardContent,
+} from '../../e2e/utils/production-auth-interaction';
 
 describe('production auth interaction hydration gate', () => {
   it('waits for full load before refilling the controlled email and enabling submit', async () => {
@@ -62,5 +65,45 @@ describe('production auth interaction hydration gate', () => {
       'fill:smoke@example.com',
       'submit-enabled',
     ]);
+  });
+
+  it('waits for meaningful dashboard content instead of sampling an empty main', async () => {
+    document.body.innerHTML = '<main></main>';
+
+    const page = {
+      waitForFunction: vi.fn(
+        async (
+          predicate: (options: {
+            selector: string;
+            minimumLength: number;
+          }) => string | false,
+          options: { selector: string; minimumLength: number }
+        ) => {
+          expect(predicate(options)).toBe(false);
+
+          const main = document.querySelector('main');
+          expect(main).not.toBeNull();
+          if (main) {
+            main.textContent =
+              'Your dashboard is ready with real authenticated content.';
+          }
+
+          const content = predicate(options);
+          expect(content).toBe(
+            'Your dashboard is ready with real authenticated content.'
+          );
+          return { jsonValue: vi.fn(async () => content) };
+        }
+      ),
+    };
+
+    await expect(
+      waitForProductionDashboardContent(page as never, 20_000)
+    ).resolves.toBe('Your dashboard is ready with real authenticated content.');
+    expect(page.waitForFunction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { selector: 'main', minimumLength: 30 },
+      { timeout: 20_000 }
+    );
   });
 });

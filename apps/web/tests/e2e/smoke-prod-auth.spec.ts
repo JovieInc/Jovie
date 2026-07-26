@@ -7,7 +7,10 @@ import {
 } from '../helpers/vercel-preview';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
 import { resolveProductionAuthCredentials } from './utils/production-auth-credentials';
-import { prepareProductionAuthEmailForm } from './utils/production-auth-interaction';
+import {
+  prepareProductionAuthEmailForm,
+  waitForProductionDashboardContent,
+} from './utils/production-auth-interaction';
 import { waitForProductionAuthOtp } from './utils/production-auth-otp';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -232,11 +235,10 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       }
     );
 
-    const mainText = await main.innerText().catch(() => '');
-    expect(
-      mainText.length,
-      'Dashboard should have real content (not empty)'
-    ).toBeGreaterThan(30);
+    const mainText = await waitForProductionDashboardContent(
+      page,
+      SMOKE_TIMEOUTS.VISIBILITY
+    );
 
     const lower = mainText.toLowerCase();
     expect(lower).not.toContain('application error');
