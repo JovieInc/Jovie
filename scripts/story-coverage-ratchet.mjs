@@ -156,7 +156,11 @@ function changedAtomSources(diffBase) {
     ],
     { cwd: REPO_ROOT, encoding: 'utf8' }
   );
-  if (result.status !== 0) return [];
+  if (result.status !== 0) {
+    throw new Error(
+      `could not resolve changed atom sources from ${diffBase}: ${result.stderr.trim()}`
+    );
+  }
   return result.stdout
     .split('\n')
     .map(l => l.trim())
