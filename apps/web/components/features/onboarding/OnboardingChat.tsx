@@ -3,7 +3,14 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   consumeHomepageIntent,
   readHomepageIntent,
@@ -38,10 +45,8 @@ import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import { cn } from '@/lib/utils';
 import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
 import { ChatProposeNextStepCard } from './ChatProposeNextStepCard';
-import {
-  OnboardingChatEmptyIntro,
-  type OnboardingEntryMode,
-} from './OnboardingChatEmptyIntro';
+import { OnboardingChatEmptyIntro } from './OnboardingChatEmptyIntro';
+import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
 import type { OnboardingProfileBuilderState } from './OnboardingProfileRail';
 import { OnboardingProfileRail } from './OnboardingProfileRail';
 import {
@@ -76,9 +81,8 @@ import {
  * Anonymous onboarding chat client (JOV-2132 PR 3).
  *
  * Streams against `/api/chat` in `mode='onboarding'`. The first request also
- * carries the Cloudflare Turnstile token; subsequent requests in the same
- * session do not (the signed cookie + session-lifetime rate limit carry
- * trust forward).
+ * carries the Cloudflare Turnstile token; the signed cookie +
+ * session-lifetime rate limit carry trust forward after that request.
  */
 
 interface OnboardingChatProps {
@@ -104,6 +108,32 @@ interface OnboardingChatProps {
   ) => void;
   /** Validated URL-provided context for an automatic first message. */
   readonly starterHandoff?: StartEntryHandoff | null;
+}
+
+class OnboardingChatTransport extends DefaultChatTransport<UIMessage> {
+  private readonly turnstileState: { token: string | null };
+
+  constructor() {
+    const turnstileState = { token: null as string | null };
+    super({
+      api: '/api/chat',
+      prepareSendMessagesRequest: ({ messages, body }) => ({
+        body: {
+          ...body,
+          mode: 'onboarding' as const,
+          messages,
+          ...(turnstileState.token
+            ? { turnstileToken: turnstileState.token }
+            : {}),
+        },
+      }),
+    });
+    this.turnstileState = turnstileState;
+  }
+
+  setTurnstileToken(token: string | null): void {
+    this.turnstileState.token = token;
+  }
 }
 
 const BLOCKED_TURNSTILE_TOKEN_STATUSES: ReadonlySet<
@@ -443,76 +473,25 @@ function getDisplayMessages(
   ];
 }
 
-interface ChatErrorStatusBannerProps {
-  readonly chatError: ChatError | null;
-  readonly handleRetry: () => void;
-  readonly isBusy: boolean;
-  readonly isSubmitted: boolean;
-}
-
-function ChatErrorStatusBanner({
-  chatError,
-  handleRetry,
-  isBusy,
-  isSubmitted,
-}: ChatErrorStatusBannerProps) {
-  if (!chatError) return null;
-
-  const canRetry = Boolean(chatError.failedMessage) && !chatError.retryAfter;
-
-  return (
-    <div className='px-3 py-2.5 text-xs leading-5'>
-      <div role='alert' aria-live='assertive' aria-atomic='true'>
-        <p className='font-medium text-primary-token'>Message paused</p>
-        <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
-        {canRetry ? (
-          <button
-            type='button'
-            onClick={handleRetry}
-            disabled={isBusy || isSubmitted}
-            className='mt-2 inline-flex h-7 items-center rounded-lg border border-subtle px-2.5 text-2xs font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 disabled:opacity-50'
-          >
-            Retry message
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-interface ComposerStatusBannerProps extends ChatErrorStatusBannerProps {
+interface ComposerStatusBannerProps {
   readonly reserveTurnstileSpace?: boolean;
   readonly shouldShowTurnstileBanner: boolean;
   readonly turnstilePanel: ReactNode;
 }
 
 function ComposerStatusBanner({
-  chatError,
-  handleRetry,
-  isBusy,
-  isSubmitted,
   reserveTurnstileSpace = false,
   shouldShowTurnstileBanner,
   turnstilePanel,
 }: ComposerStatusBannerProps) {
-  if (!shouldShowTurnstileBanner && !chatError) return null;
+  if (!shouldShowTurnstileBanner) return null;
 
   return (
-    <div className='divide-y divide-white/[0.065]'>
-      {shouldShowTurnstileBanner ? (
-        <div
-          className={reserveTurnstileSpace ? 'min-h-[10rem]' : undefined}
-          data-testid='onboarding-turnstile-slot'
-        >
-          {turnstilePanel}
-        </div>
-      ) : null}
-      <ChatErrorStatusBanner
-        chatError={chatError}
-        handleRetry={handleRetry}
-        isBusy={isBusy}
-        isSubmitted={isSubmitted}
-      />
+    <div
+      className={reserveTurnstileSpace ? 'min-h-[10rem]' : undefined}
+      data-testid='onboarding-turnstile-slot'
+    >
+      {turnstilePanel}
     </div>
   );
 }
@@ -676,23 +655,12 @@ export function OnboardingChat({
     }
   }, [turnstileStatus, turnstileToken]);
 
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: '/api/chat',
-        // `prepareSendMessagesRequest` lets us mutate the body per-request so
-        // the first POST carries the Turnstile token; subsequent POSTs skip it.
-        prepareSendMessagesRequest: ({ messages, body }) => ({
-          body: {
-            ...body,
-            mode: 'onboarding' as const,
-            messages,
-            ...(turnstileToken ? { turnstileToken } : {}),
-          },
-        }),
-      }),
-    [turnstileToken]
-  );
+  // AI SDK's useChat captures its transport when the Chat instance is created.
+  // Keep it stable and update its request state before any passive send effect.
+  const transport = useMemo(() => new OnboardingChatTransport(), []);
+  useLayoutEffect(() => {
+    transport.setTurnstileToken(turnstileToken);
+  }, [transport, turnstileToken]);
 
   const { messages, sendMessage, setMessages, status, stop } = useChat({
     id: 'onboarding',
@@ -704,7 +672,7 @@ export function OnboardingChat({
       const failedMessage = lastAttemptedMessageRef.current ?? undefined;
       setChatError({
         type,
-        message: getOnboardingErrorMessage(message),
+        message: getOnboardingErrorMessage(message, metadata.errorCode, type),
         retryAfter: metadata.retryAfter,
         errorCode: metadata.errorCode,
         requestId: metadata.requestId,
@@ -985,14 +953,8 @@ export function OnboardingChat({
     (isAwaitingFirstToken ||
       shouldReserveStarterVerification ||
       verificationRequested);
-  const hasComposerStatusBanner =
-    shouldShowTurnstileBanner || chatError !== null;
-  const composerStatusBanner = hasComposerStatusBanner ? (
+  const composerStatusBanner = shouldShowTurnstileBanner ? (
     <ComposerStatusBanner
-      chatError={chatError}
-      handleRetry={handleRetry}
-      isBusy={isBusy}
-      isSubmitted={isSubmitted}
       reserveTurnstileSpace={shouldReserveStarterVerification}
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
       turnstilePanel={turnstilePanel}
@@ -1003,8 +965,9 @@ export function OnboardingChat({
     message => message.role === 'user'
   ).length;
   const hasConversationStarted = messages.length > 0 || hasSentFirst;
-  const shouldDockComposer =
-    chatError !== null || userTurnCount > 1 || selectedArtist !== null;
+  const shouldDockComposer = userTurnCount > 1 || selectedArtist !== null;
+  const showEmptyIntro = !intentId && !starterPrompt;
+
   useEffect(() => {
     if (shouldDockComposer) return;
     const scrollContainer = scrollContainerRef.current;
@@ -1040,6 +1003,14 @@ export function OnboardingChat({
   } as const;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
+      {chatError ? (
+        <OnboardingMessageRecoveryRow
+          chatError={chatError}
+          handleRetry={handleRetry}
+          isBusy={isBusy}
+          isSubmitted={isSubmitted}
+        />
+      ) : null}
       <ChatInput {...onboardingChatInputProps} />
     </div>
   );
