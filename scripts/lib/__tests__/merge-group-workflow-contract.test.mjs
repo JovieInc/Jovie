@@ -327,6 +327,9 @@ describe('merge_group workflow contract', () => {
     );
 
     expect(coalesce).toContain('timeout-minutes: 5');
+    expect(coalesce).toContain(
+      "github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'"
+    );
     expect(coalesce).toContain("COALESCE_DELAY_SECONDS: '60'");
     expect(coalesce).toContain('sleep "$COALESCE_DELAY_SECONDS"');
     expect(coalesce).toContain('echo "is_current=false" >> "$GITHUB_OUTPUT"');
