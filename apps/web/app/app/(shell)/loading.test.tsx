@@ -40,7 +40,7 @@ vi.mock('@/components/shell/LyricsRouteSkeleton', () => ({
 vi.mock('@/components/shell/TasksRouteSkeleton', () => ({
   TasksRouteSkeleton: () => null,
 }));
-vi.mock('./calendar/LazyCalendarPageClient', () => ({
+vi.mock('./calendar/CalendarRouteSkeleton', () => ({
   CalendarRouteSkeleton: () => null,
 }));
 vi.mock('./chat/loading', () => ({ default: () => null }));

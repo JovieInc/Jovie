@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { APP_ROUTES } from '@/constants/routes';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
-import { LazyCalendarPageClient } from './LazyCalendarPageClient';
+import { CalendarPageClient } from './CalendarPageClient';
 
 export const runtime = 'nodejs';
 
@@ -32,5 +32,5 @@ export default async function CalendarPage() {
     return routeContext.error;
   }
 
-  return <LazyCalendarPageClient />;
+  return <CalendarPageClient />;
 }
