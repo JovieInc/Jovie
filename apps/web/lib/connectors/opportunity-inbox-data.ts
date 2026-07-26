@@ -58,7 +58,7 @@ function pendingForUser(userId: string): SQL | undefined {
  * Fail-soft: any query error degrades to empty sections so the inbox feed
  * still renders (same posture as the suggested-actions migration-drift guard).
  */
-async function loadTourDateSections(
+export async function loadOpportunityInboxTourDateSections(
   profileId: string
 ): Promise<OpportunityInboxTourDates> {
   try {
@@ -127,7 +127,7 @@ export async function loadOpportunityInboxData(
 
   const profileId = options?.profileId ?? null;
   const tourDateSections = profileId
-    ? await loadTourDateSections(profileId)
+    ? await loadOpportunityInboxTourDateSections(profileId)
     : undefined;
 
   try {
