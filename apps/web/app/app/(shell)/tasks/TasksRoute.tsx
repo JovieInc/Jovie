@@ -8,7 +8,7 @@ import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import { DEFAULT_TASK_WORKSPACE_FILTERS } from '@/lib/tasks/query-defaults';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
-import { getTaskBoard, getTasks } from '../dashboard/tasks/task-actions';
+import { getTasks } from '../dashboard/tasks/task-actions';
 
 export async function TasksRoute() {
   const routeContext = await loadAppShellRouteContext({
@@ -30,22 +30,13 @@ export async function TasksRoute() {
   if (profileId) {
     const queryClient = getQueryClient();
     try {
-      await Promise.all([
-        queryClient.fetchQuery({
-          queryKey: queryKeys.tasks.list(
-            profileId,
-            DEFAULT_TASK_WORKSPACE_FILTERS
-          ),
-          queryFn: () => getTasks(DEFAULT_TASK_WORKSPACE_FILTERS),
-        }),
-        queryClient.fetchQuery({
-          queryKey: queryKeys.tasks.board(
-            profileId,
-            DEFAULT_TASK_WORKSPACE_FILTERS
-          ),
-          queryFn: () => getTaskBoard(DEFAULT_TASK_WORKSPACE_FILTERS),
-        }),
-      ]);
+      await queryClient.fetchQuery({
+        queryKey: queryKeys.tasks.list(
+          profileId,
+          DEFAULT_TASK_WORKSPACE_FILTERS
+        ),
+        queryFn: () => getTasks(DEFAULT_TASK_WORKSPACE_FILTERS),
+      });
     } catch (error) {
       void captureError('Tasks prefetch failed on tasks page', error, {
         route: APP_ROUTES.TASKS,

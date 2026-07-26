@@ -139,12 +139,12 @@ describe('tasks page routes', () => {
     expect(mockFetchQuery).not.toHaveBeenCalled();
   });
 
-  it('server-prefetches default task data before rendering the workspace', async () => {
+  it('prefetches only the default list before rendering the workspace', async () => {
     render(await TasksPage());
 
-    expect(mockFetchQuery).toHaveBeenCalledTimes(2);
+    expect(mockFetchQuery).toHaveBeenCalledTimes(1);
     expect(mockGetTasks).toHaveBeenCalledWith({ limit: 100 });
-    expect(mockGetTaskBoard).toHaveBeenCalledWith({ limit: 100 });
+    expect(mockGetTaskBoard).not.toHaveBeenCalled();
     expect(screen.getByTestId('hydrate-client')).toBeInTheDocument();
     expect(screen.getByTestId('tasks-page-client')).toBeInTheDocument();
     expect(
