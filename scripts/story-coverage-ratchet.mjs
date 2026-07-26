@@ -16,7 +16,7 @@
  *   node scripts/story-coverage-ratchet.mjs validate      # schema-only
  *
  * Baseline: scripts/story-coverage-baseline.json
- * Policy: docs/VISUAL_TESTING_POLICY.md (Story Coverage Ratchet)
+ * Rollout: docs/UI_STORY_COVERAGE_ROLLOUT.md
  */
 
 import { spawnSync } from 'node:child_process';

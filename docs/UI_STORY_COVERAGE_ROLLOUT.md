@@ -1,4 +1,4 @@
-# UI visual coverage rollout
+# UI story coverage rollout
 
 Jovie treats visual evidence as part of a UI change, not as optional follow-up.
 This policy applies to UI code and visual infrastructure only; backend-only
