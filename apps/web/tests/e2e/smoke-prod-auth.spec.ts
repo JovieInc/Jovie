@@ -7,6 +7,7 @@ import {
 } from '../helpers/vercel-preview';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
 import { resolveProductionAuthCredentials } from './utils/production-auth-credentials';
+import { prepareProductionAuthEmailForm } from './utils/production-auth-interaction';
 import { waitForProductionAuthOtp } from './utils/production-auth-otp';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -42,27 +43,6 @@ function getProdCredentials() {
   return credentials;
 }
 
-async function getIdentifierInput(page: Page) {
-  return page
-    .locator(
-      'input[name="identifier"], input[type="email"], input[autocomplete="email"]'
-    )
-    .first();
-}
-
-async function getSubmitButton(page: Page) {
-  return page
-    .locator(
-      [
-        'button[type="submit"]',
-        'button:has-text("Continue")',
-        'button:has-text("Sign in")',
-        'button:has-text("Verify")',
-      ].join(', ')
-    )
-    .first();
-}
-
 type SignInResult =
   | 'authenticated'
   | 'verification-required'
@@ -96,6 +76,7 @@ async function detectNextStep(
           return 'password';
         }
         if (
+          document.querySelector('[data-auth-email-code-step="code"]') ||
           document.querySelector(
             'input[name="code"], input[autocomplete="one-time-code"], input[inputmode="numeric"]'
           )
@@ -117,8 +98,10 @@ async function signInViaRenderedFlow(
   expectedOrigin: string
 ): Promise<SignInResult> {
   assertExactNavigationUrl(page.url(), expectedOrigin, 'Rendered sign-in flow');
-  const identifierInput = await getIdentifierInput(page);
-  const hasIdentifierInput = await identifierInput
+  const emailForm = page
+    .locator('form[data-auth-email-code-step="email"]')
+    .first();
+  const hasIdentifierInput = await emailForm
     .isVisible({ timeout: 15_000 })
     .catch(() => false);
 
@@ -132,9 +115,12 @@ async function signInViaRenderedFlow(
     return 'signin-form-unavailable';
   }
 
-  await identifierInput.fill(credentials.email);
+  const { submitButton } = await prepareProductionAuthEmailForm(
+    page,
+    credentials.email
+  );
   const otpRequestedAtMs = Date.now();
-  await (await getSubmitButton(page)).click();
+  await submitButton.click();
 
   const nextStep = await detectNextStep(page, expectedOrigin);
 
@@ -148,7 +134,10 @@ async function signInViaRenderedFlow(
       .first();
     await expect(passwordInput).toBeVisible({ timeout: 10_000 });
     await passwordInput.fill(credentials.password);
-    await (await getSubmitButton(page)).click();
+    await page
+      .locator('form:has(input[type="password"]) button[type="submit"]')
+      .first()
+      .click();
     await page.waitForURL(
       url => url.origin === expectedOrigin && url.pathname.startsWith('/app'),
       { timeout: 30_000 }
@@ -158,9 +147,12 @@ async function signInViaRenderedFlow(
   }
 
   if (nextStep === 'email_code') {
-    const codeInput = page
+    const codeForm = page
+      .locator('form[data-auth-email-code-step="code"]')
+      .first();
+    const codeInput = codeForm
       .locator(
-        'input[name="code"], input[autocomplete="one-time-code"], input[inputmode="numeric"]'
+        '[data-testid="otp-autofill-input"], input[name="code"], input[autocomplete="one-time-code"], input[inputmode="numeric"]'
       )
       .first();
     await expect(codeInput).toBeVisible({ timeout: 10_000 });
@@ -170,12 +162,12 @@ async function signInViaRenderedFlow(
         email: credentials.email,
         startedAtMs: otpRequestedAtMs,
       }));
-    await codeInput.fill(verificationCode);
-    await (await getSubmitButton(page)).click();
-    await page.waitForURL(
+    const authenticatedRedirect = page.waitForURL(
       url => url.origin === expectedOrigin && url.pathname.startsWith('/app'),
       { timeout: 30_000 }
     );
+    await codeInput.fill(verificationCode);
+    await authenticatedRedirect;
     assertExactNavigationUrl(page.url(), expectedOrigin, 'Email-code redirect');
     return 'authenticated';
   }
