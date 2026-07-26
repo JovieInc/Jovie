@@ -25,6 +25,12 @@ export { QRCodeCard } from './QRCodeCard';
 export { SocialLink } from './SocialLink';
 export type { StepCardProps } from './StepCard';
 export { cardBaseClasses, glowEffectClasses, StepCard } from './StepCard';
+export type {
+  SurfaceLoadingMode,
+  SurfaceStateProps,
+  SurfaceStateValue,
+} from './SurfaceState';
+export { SurfaceState } from './SurfaceState';
 // Migrated from atoms (has business logic - useState, useEffect, API calls)
 export {
   LegacySocialLink,

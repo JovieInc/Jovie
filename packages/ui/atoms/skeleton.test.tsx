@@ -1,7 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { LoadingSkeleton, Skeleton } from './skeleton';
+import {
+  LoadingSkeleton,
+  Skeleton,
+  SkeletonAvatar,
+  SkeletonBlock,
+  SkeletonMedia,
+  SkeletonText,
+} from './skeleton';
 
 describe('Skeleton', () => {
   describe('Basic Rendering', () => {
@@ -99,6 +106,36 @@ describe('Skeleton', () => {
       expect(skeleton).toHaveAttribute('id', 'custom-id');
       expect(skeleton).toHaveStyle({ width: '100px' });
     });
+  });
+});
+
+describe('semantic skeleton atoms', () => {
+  it('marks blocks with the canonical slot', () => {
+    render(<SkeletonBlock data-testid='block' className='h-10 w-32' />);
+    expect(screen.getByTestId('block')).toHaveAttribute(
+      'data-slot',
+      'skeleton-block'
+    );
+  });
+
+  it('renders text lines without announcing each placeholder', () => {
+    render(<SkeletonText data-testid='line' lines={3} />);
+    const text = document.querySelector('[data-slot="skeleton-text"]');
+    expect(text).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getAllByTestId('line')).toHaveLength(3);
+  });
+
+  it('uses canonical avatar sizes and circular geometry', () => {
+    render(<SkeletonAvatar data-testid='avatar' size='lg' />);
+    expect(screen.getByTestId('avatar')).toHaveClass('size-12', 'rounded-full');
+  });
+
+  it('reserves media aspect ratio', () => {
+    render(<SkeletonMedia data-testid='media' ratio='portrait' />);
+    expect(screen.getByTestId('media')).toHaveClass(
+      'aspect-[4/5]',
+      'rounded-lg'
+    );
   });
 });
 

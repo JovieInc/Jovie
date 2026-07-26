@@ -1,19 +1,19 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { Spinner } from './spinner';
+import { ProgressIndicator } from './spinner';
 
 const meta = {
-  title: 'UI/Atoms/Spinner',
-  component: Spinner,
+  title: 'UI/Atoms/ProgressIndicator',
+  component: ProgressIndicator,
   parameters: {
     docs: {
       description: {
         component:
-          'Inline spinner for buttons and in-flight actions. See packages/ui/docs/loading-states.md.',
+          'Compact indeterminate progress for the initiating control or a truly action-local status row. Reduced motion uses a static fallback.',
       },
     },
   },
-} satisfies Meta<typeof Spinner>;
+} satisfies Meta<typeof ProgressIndicator>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

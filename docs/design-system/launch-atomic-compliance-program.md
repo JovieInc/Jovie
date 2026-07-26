@@ -1,9 +1,7 @@
 # Launch Atomic Design Compliance Program
 
-Issue: JOV-4473  
-Baseline: `main@e336794c875a9f636e89770b4cbe8db8e489109c`  
-Design-read: Reading this as: a launch-readiness compliance system for artists and operators, with a calm, compact product language, leaning toward Jovie System B and its existing atomic architecture.  
-Dials: `DESIGN_VARIANCE=low`, `MOTION_INTENSITY=functional`, `VISUAL_DENSITY=high`
+Issue: JOV-4473; baseline: `main@e336794c875a9f636e89770b4cbe8db8e489109c`
+Design-read: Reading this as: a launch-readiness compliance system for artists and operators, with a calm, compact product language, leaning toward Jovie System B and its existing atomic architecture. Dials: `DESIGN_VARIANCE=low`, `MOTION_INTENSITY=functional`, `VISUAL_DENSITY=high`
 
 ## Outcome and success metric
 
@@ -73,13 +71,7 @@ system when reactivated:
 
 ## Launch surface compliance matrix
 
-Status meanings:
-
-- **Canonical**: shared primitive already owns the behavior.
-- **Mixed**: canonical primitives exist, with route-local equivalents remaining.
-- **Unknown geometry**: the loading frame cannot yet prove parity with the
-  loaded composition.
-- **Owner hold**: do not edit while coordinated work owns the surface.
+Statuses: **Canonical** means shared ownership; **Mixed** means equivalents remain; **Unknown geometry** means parity is unproved; **Owner hold** means do not edit while coordinated work owns the surface.
 
 | Surface | Canonical structure already present | Main gaps | Loading geometry | Status / next slice |
 | --- | --- | --- | --- | --- |
@@ -98,10 +90,7 @@ Status meanings:
 
 ## Atomic family inventory
 
-Static scans identify candidates, not automatic violations. A raw element can be
-the correct semantic implementation inside a canonical primitive. Migration
-requires behavioral equivalence, focus-path parity, and equal or better
-geometry.
+Static scans identify candidates, not automatic violations. Migration requires behavioral equivalence, focus-path parity, and equal or better geometry.
 
 | Family | Canonical owner | Launch-reachable duplicates or gaps | Decision |
 | --- | --- | --- | --- |
@@ -193,10 +182,7 @@ The scoped static scan found:
 - 30 production files referencing `LoadingSpinner`, `Spinner`, or `Loader2`.
 - 11 route/feature files implementing a launch loading state directly.
 
-These counts are an audit queue, not a deletion count. Existing canonical
-`Spinner` behavior is the compatibility implementation behind
-`ProgressIndicator`; valid action-local uses can migrate by import/name without
-changing appearance.
+These are audit candidates, not a deletion count. `Spinner` remains the compatibility implementation behind `ProgressIndicator`.
 
 | Surface / implementation | Canonical mode | Final geometry known? | Migration |
 | --- | --- | --- | --- |
