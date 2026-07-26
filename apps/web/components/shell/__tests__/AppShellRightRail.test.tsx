@@ -16,6 +16,8 @@ describe('AppShellRightRail', () => {
     expect(rail).toHaveClass(
       'sticky',
       'top-0',
+      'z-30',
+      'lg:z-10',
       'h-full',
       'min-h-0',
       'self-stretch',
@@ -24,6 +26,7 @@ describe('AppShellRightRail', () => {
       'ease-cinematic'
     );
     expect(rail).not.toHaveClass('self-start');
+    expect(rail).not.toHaveClass('z-10');
     expect(rail).toContainElement(screen.getByTestId('fixture-panel'));
   });
 

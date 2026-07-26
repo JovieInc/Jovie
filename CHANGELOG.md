@@ -123,6 +123,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- **Profile previews now fully cover the mobile app shell (JOV-4464):** opening the full-screen profile preview no longer leaves the shell header painted above the drawer, while desktop right-rail layering stays unchanged.
 - [internal] **Hermes/OpenClaw agent config health**: adds a launchd-backed sentinel for recurring Telegram-dispatched agent failures, catching stale Hermes fallback models, paid OpenRouter fallbacks, and schema-clobbered OpenClaw `memorySearch` blocks before gateway churn.
 - **Smoother dashboard interactions (JOV-3800)**: opening a release, contact, or tour-date panel from chat now shows the details instantly instead of a brief loading state; settings pages no longer nudge when a change is being saved; and the calendar keeps its layout steady while it first loads.
 - [internal] Pre-push Biome gate scopes to changed files (mirroring CI) instead of a repo-wide `biome check .`, so pre-existing Biome drift on `main` no longer blocks `git push` from every worktree and stops training agents toward the `JOVIE_SKIP_PRE_PUSH_GATE=1` escape hatch (GitHub #12475).
