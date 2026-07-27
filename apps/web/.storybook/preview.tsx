@@ -144,6 +144,20 @@ if (typeof window !== 'undefined') {
   };
 }
 
+// Deterministic rendering for Chromatic (docs/VISUAL_TESTING_POLICY.md):
+// collapse CSS animations/transitions so snapshots never catch a
+// mid-transition frame. Stories with time-dependent output should pass
+// fixed dates as props — Date is intentionally NOT frozen globally here,
+// because a frozen clock also breaks timers in code under test (retry
+// backoff, TanStack Query staleness, Clerk session expiry math).
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.setAttribute('data-storybook-deterministic', '');
+  style.textContent =
+    '*, *::before, *::after { animation-duration: 0s !important; animation-delay: 0s !important; transition-duration: 0s !important; transition-delay: 0s !important; }';
+  document.head.appendChild(style);
+}
+
 const preview: Preview = {
   parameters: {
     // Chromatic: pause animations (defense in depth vs CSS above)
