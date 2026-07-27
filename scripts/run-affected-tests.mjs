@@ -249,21 +249,6 @@ const VISUAL_QA_DIFF_ARTIFACTS_MANIFEST = new Set([
   VISUAL_QA_DIFF_ARTIFACTS_SOURCE,
   VISUAL_QA_DIFF_ARTIFACTS_TEST,
 ]);
-const GTMQ_SOURCE_GATE_REAPER_MANIFEST = new Set([
-  '.github/actions/setup-node-pnpm/action.yml',
-  '.github/workflows/gtmq-source-authorization.yml',
-  '.github/workflows/merge-queue-autoenroll.yml',
-  'apps/web/tests/unit/ci/runner-setup-action.test.ts',
-  'scripts/drain-pr-queue.sh',
-  'scripts/guard-gtmq-source-authorization.sh',
-  'scripts/tests/test_gh_retry.py',
-  'scripts/run-affected-tests.mjs',
-  'scripts/lib/__tests__/automation-verify.test.mjs',
-]);
-const GTMQ_SOURCE_GATE_REAPER_PYTHON_TESTS = ['scripts/tests/test_gh_retry.py'];
-const GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS = [
-  'scripts/lib/__tests__/automation-verify.test.mjs',
-];
 const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = new Set([
   'apps/web/tests/e2e/mobile-overflow.spec.ts',
   'apps/web/tests/e2e/utils/mobile-overflow.ts',
@@ -493,12 +478,6 @@ export function buildAffectedTestPlan(
     files.length ===
       AFFECTED_TEST_SELECTOR_MANIFEST.size +
         VISUAL_QA_DIFF_ARTIFACTS_MANIFEST.size;
-  const gtmqSourceGateReaperInputCount = files.filter(file =>
-    GTMQ_SOURCE_GATE_REAPER_MANIFEST.has(file)
-  ).length;
-  const isExactGtmqSourceGateReaper =
-    gtmqSourceGateReaperInputCount === GTMQ_SOURCE_GATE_REAPER_MANIFEST.size &&
-    files.length === GTMQ_SOURCE_GATE_REAPER_MANIFEST.size;
   const mobileOverflowNavigationRaceInputCount = files.filter(file =>
     MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.has(file)
   ).length;
@@ -681,9 +660,6 @@ export function buildAffectedTestPlan(
     ...(isExactVercelCongestionControl
       ? VERCEL_CONGESTION_CONTROL_PYTHON_TESTS
       : []),
-    ...(isExactGtmqSourceGateReaper
-      ? GTMQ_SOURCE_GATE_REAPER_PYTHON_TESTS
-      : []),
   ]);
   const scriptVitestTests = unique([
     ...(isExactPerformanceProfilerRepairPrimary ||
@@ -715,9 +691,6 @@ export function buildAffectedTestPlan(
       : []),
     ...(isExactPersistedAuthFixtureRepair
       ? PERSISTED_AUTH_FIXTURE_SCRIPT_TESTS
-      : []),
-    ...(isExactGtmqSourceGateReaper
-      ? GTMQ_SOURCE_GATE_REAPER_SCRIPT_TESTS
       : []),
     ...(isExactMobileOverflowNavigationRace
       ? MOBILE_OVERFLOW_NAVIGATION_RACE_SCRIPT_TESTS
@@ -823,7 +796,6 @@ export function buildAffectedTestPlan(
     !isExactPerformanceProfilerRepairWithSelector &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactVisualQaSelectorRepair &&
-    !isExactGtmqSourceGateReaper &&
     !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
@@ -855,23 +827,6 @@ export function buildAffectedTestPlan(
     !isExactPerformanceProfilerRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactVisualQaSelectorRepair &&
-    !isExactGtmqSourceGateReaper &&
-    !isExactMobileOverflowNavigationRace &&
-    !isExactRunnerIoPressure &&
-    !isExactRunnerPrerequisiteRepair &&
-    !isExactLayoutGuardContract &&
-    !isExactPrSizeGuardWithSelector;
-  const hasIncompleteGtmqSourceGateReaper =
-    hasManifestInputBeyondDirectTests(GTMQ_SOURCE_GATE_REAPER_MANIFEST) &&
-    !isExactGtmqSourceGateReaper &&
-    !isExactAuthenticatedA11yRepair &&
-    !isExactGoldenPathSmokeContractRepair &&
-    !isExactNeonAttemptArtifactRepair &&
-    !isExactPersistedAuthFixtureRepair &&
-    !isExactAffectedTestSelector &&
-    !isExactScannerLoadRepairPrimary &&
-    !isExactVisualQaSelectorRepair &&
-    !isExactPerformanceProfilerRepairWithSelector &&
     !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
@@ -889,7 +844,6 @@ export function buildAffectedTestPlan(
     !isExactPerformanceProfilerRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactVisualQaSelectorRepair &&
-    !isExactGtmqSourceGateReaper &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract &&
@@ -903,7 +857,6 @@ export function buildAffectedTestPlan(
     !isExactPersistedAuthFixtureRepair &&
     !isExactAffectedTestSelector &&
     !isExactVisualQaSelectorRepair &&
-    !isExactGtmqSourceGateReaper &&
     !isExactPerformanceProfilerRepair &&
     !isExactMobileOverflowNavigationRace &&
     !isExactRunnerPrerequisiteRepair &&
@@ -915,7 +868,6 @@ export function buildAffectedTestPlan(
     !isExactAuthenticatedA11yRepair &&
     !isExactAffectedTestSelector &&
     !isExactVisualQaSelectorRepair &&
-    !isExactGtmqSourceGateReaper &&
     !isExactPrerequisiteTrain &&
     !isExactGoldenPathSmokeContractRepair &&
     !isExactNeonAttemptArtifactRepair &&
@@ -934,7 +886,6 @@ export function buildAffectedTestPlan(
     !isExactGoldenPathSmokeContractRepair &&
     !isExactNeonAttemptArtifactRepair &&
     !isExactPersistedAuthFixtureRepair &&
-    !isExactGtmqSourceGateReaper &&
     !isExactVisualQaSelectorRepair &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactPerformanceProfilerRepair &&
@@ -952,7 +903,6 @@ export function buildAffectedTestPlan(
     !isExactPerformanceProfilerRepair &&
     !isExactPersistedAuthFixtureRepair &&
     !isExactVisualQaSelectorRepair &&
-    !isExactGtmqSourceGateReaper &&
     !isExactMobileOverflowNavigationRace &&
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
@@ -970,7 +920,6 @@ export function buildAffectedTestPlan(
     hasIncompletePrSizeGuard ||
     hasIncompletePerformanceProfilerRepair ||
     hasIncompleteScannerLoadRepair ||
-    hasIncompleteGtmqSourceGateReaper ||
     hasIncompleteMobileOverflowNavigationRace ||
     hasIncompleteRunnerIoPressure ||
     hasIncompleteRunnerPrerequisiteContract ||
@@ -998,7 +947,6 @@ export function buildAffectedTestPlan(
             isExactPerformanceProfilerRepair ||
             isExactPersistedAuthFixtureRepair ||
             isExactVisualQaSelectorRepair ||
-            isExactGtmqSourceGateReaper ||
             isExactMobileOverflowNavigationRace ||
             isExactRunnerIoPressure ||
             isExactRunnerPrerequisiteRepair ||

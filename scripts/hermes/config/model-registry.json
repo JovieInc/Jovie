@@ -136,13 +136,12 @@
     "mergeability-refresh",
     "focused-tests",
     "main-green",
-    "graphite-label-only"
+    "native-queue-only"
   ],
   "forbidden_actions": [
     "merge",
     "auto-merge",
     "admin",
-    "gtmq-drafts",
     "taste-gates",
     "codex-for-ordinary-remediation"
   ]

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Backend-routed PR queue drain. Graphite uses the merge-queue label as its
-# transport; GitHub native uses exact-head enrollment and authoritative queue
-# state without reading, writing, or requiring that legacy transport label.
+# GitHub-native PR queue drain. Native enrollment uses exact-head admission and
+# authoritative queue state without reading, writing, or requiring a transport
+# label. A label-backed fixture exists only for isolated shell tests.
 # Autonomous shipping (2026-07-06): taste gates are advisory — only hold/gated/needs-human block.
 #
 # It deliberately does NOT:
@@ -9,11 +9,6 @@
 #     queue still owns integration validation and the eventual merge)
 #   - retarget to integration/loop-* (agents ship straight to main now)
 #   - close ordinary PRs (surfaced for a human instead — see the SURFACE bucket)
-#
-# Graphite synthetic drafts are different: their generated `gtmq_*` branch can
-# still land after a source PR's queue authorization is withdrawn. The
-# synthetic-source guard below closes those generated drafts unless every open
-# source remains explicitly `merge-queue` enrolled and free of hard gates.
 #
 # Buckets that need code work (CONFLICT / BLOCKED) are printed for the
 # /drain command to fan out per-PR worktree agents (cheap model for mechanical
@@ -24,7 +19,7 @@
 #   DRAIN_MUTATION_AUTHORIZATION  required for every live mutation run
 #   DRAIN_EXPECT_GH  optional exact gh path assertion used by test fixtures
 #   DRAIN_MAX_SECONDS  hard wall-clock budget between GitHub calls (default 900)
-#   MERGE_QUEUE_BACKEND  native (default) or graphite rollback; unknown values fail closed
+#   MERGE_QUEUE_BACKEND  native (default); test-label-fixture is test-only
 set -euo pipefail
 
 DRY_RUN="${DRY_RUN:-0}"
@@ -51,7 +46,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 REPO="${REPO:-JovieInc/Jovie}"
 MERGE_QUEUE_BACKEND="${MERGE_QUEUE_BACKEND:-native}"
 case "$MERGE_QUEUE_BACKEND" in
-  graphite | native) ;;
+  native) ;;
+  test-label-fixture)
+    if [[ "${DRAIN_MUTATION_AUTHORIZATION:-}" != "test-fixture" ]]; then
+      echo "::error::test-label-fixture is restricted to isolated tests" >&2
+      exit 2
+    fi
+    ;;
   *)
     echo "::error::Unknown MERGE_QUEUE_BACKEND: $MERGE_QUEUE_BACKEND" >&2
     exit 2
@@ -103,14 +104,14 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
     and ([.labels[].name] | any(
       . == "needs-human" or . == "hold" or . == "gated"
       or . == "queue-deferred" or . == "needs-conflict-resolution"
-      or . == "fast" or ($backend == "graphite" and . == "merge-queue")
+      or . == "fast" or ($backend == "test-label-fixture" and . == "merge-queue")
     ) | not)
   ' <<<"$current" >/dev/null; then
     echo "    ⏸ eligibility changed; refusing enrollment for #$n"
     return 2
   fi
   if [[ "$DRY_RUN" == "1" ]]; then
-    if [[ "$MERGE_QUEUE_BACKEND" == "graphite" ]]; then
+    if [[ "$MERGE_QUEUE_BACKEND" == "test-label-fixture" ]]; then
       echo "    [dry-run] would +merge-queue on #$n"
     else
       echo "    [dry-run] would enroll #$n via native"
@@ -329,12 +330,6 @@ else
     map(. + {q: (((.L // []) | index("merge-queue")) != null)})
   ' <<<"$SNAP")"
 
-  # A source can be dequeued or gated after Graphite has already materialized
-  # a speculative gtmq branch. Removing the source label alone does not
-  # reliably cancel that generated branch, so fail closed before other work.
-  echo "=== GRAPHITE MQ source authorization ==="
-  printf '%s\n' "$SNAP" | GTMQ_MUTATION_AUTHORIZATION=drain-snapshot \
-    bash "$(dirname "${BASH_SOURCE[0]}")/guard-gtmq-source-authorization.sh" --snapshot
 fi
 
 ENRICHED="[]"
@@ -345,7 +340,6 @@ while IFS= read -r pr; do
   if jq -e '
     (.draft | not)
     and (.m == "MERGEABLE")
-    and ((.head | startswith("gtmq_")) | not)
     and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "fast")) | not)
   ' <<<"$pr" >/dev/null; then
     fail="$(check_failures_for_pr "$n")"
@@ -370,8 +364,7 @@ echo "$SNAP" | jq -r '
     "  UNSTABLE: " + ([.[] | select(queued and (.ms // "") == "UNSTABLE")] | length | tostring),
     "  BLOCKED: " + ([.[] | select(queued and (.ms // "") == "BLOCKED")] | length | tostring),
     "  DIRTY: " + ([.[] | select(queued and (.ms // "") == "DIRTY")] | length | tostring),
-    "  hard-gated: " + ([.[] | select(hard_gated)] | length | tostring),
-    "  gtmq: " + ([.[] | select((.head // "") | startswith("gtmq_"))] | length | tostring)
+    "  hard-gated: " + ([.[] | select(hard_gated)] | length | tostring)
   ] | .[]'
 
 # --- DEQUEUE: hard-gated PRs must not occupy queue slots ---
@@ -385,7 +378,6 @@ while read -r pr; do
     fi
   done < <(echo "$SNAP" | jq -c '.[]
   | select(.q == true)
-  | select((.head|startswith("gtmq_"))|not)
   | select(.draft or ([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred")))')
 
 # --- DEQUEUE: only GENUINELY un-mergeable PRs (conflict or real failing checks) ---
@@ -403,7 +395,6 @@ while read -r pr; do
 echo "=== DEQUEUE (conflict / failing → queue removal) ==="
 echo "$SNAP" | jq -c '.[]
   | select(.q == true)
-  | select((.head|startswith("gtmq_"))|not)
   | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred")) | not)
   | select(
       ([.L[]] | any(.=="needs-conflict-resolution"))
@@ -471,7 +462,6 @@ done < <(echo "$SNAP" | jq -c '.[]
   | select(.draft|not)
   | select(.m=="MERGEABLE")
   | select(.fail|length==0)
-  | select((.head|startswith("gtmq_"))|not)
   | select(.q | not)
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or .=="needs-conflict-resolution" or .=="fast") | not)')
 
@@ -479,13 +469,11 @@ done < <(echo "$SNAP" | jq -c '.[]
 echo "=== CONFLICT (needs rebase → fix agent) ==="
 echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
-  | select((.head|startswith("gtmq_"))|not)
   | select(.head|test($re))
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred") | not)
   | "  #\(.n)  \(.t)  [\(.head)]"'
 echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
-  | select((.head|startswith("gtmq_"))|not)
   | select(.head|test($re))
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred") | not) | .n' \
 | while read -r n; do [[ -n "$n" ]] && label "$n" needs-conflict-resolution; done
