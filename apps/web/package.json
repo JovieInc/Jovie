@@ -302,7 +302,7 @@
     "@chromatic-com/storybook": "^5.2.1",
     "@lhci/cli": "^0.15.1",
     "@next/bundle-analyzer": "^16.2.10",
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.62.0",
     "@sentry/node": "^10.63.0",
     "@storybook/addon-a11y": "10.4.6",
     "@storybook/addon-docs": "10.4.6",
