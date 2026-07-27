@@ -9,8 +9,8 @@ const config = {
   coverageAnalysis: 'off',
   disableTypeChecks: false,
   reporters: ['progress', 'clear-text', 'json'],
-  mutate: ['index.ts', '!**/*.test.ts'],
-  testFiles: ['index.test.ts'],
+  mutate: ['index.ts', 'playback.ts', '!**/*.test.ts'],
+  testFiles: ['index.test.ts', 'playback.test.ts'],
   vitest: {
     configFile: 'vitest.config.mts',
   },
