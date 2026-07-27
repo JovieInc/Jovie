@@ -130,6 +130,7 @@ describe('useTrackAudioPlayer', () => {
     expect(result.current.playbackState.isPlaying).toBe(true);
     expect(mockAudio.src).toBe('https://cdn.example.com/song.mp3');
     expect(mockAudio.play).toHaveBeenCalledTimes(1);
+    expect(audioInstances).toHaveLength(1);
   });
 
   it('toggles pause/resume when called with the same track ID', async () => {
@@ -330,6 +331,10 @@ describe('useTrackAudioPlayer', () => {
       mockAudio.duration = Number.NaN;
     });
     expect(result.current.jumpToCue('cue_drop')).toBeNull();
+    act(() => {
+      mockAudio.duration = 0;
+    });
+    expect(result.current.jumpToCue('cue_drop')).toBeNull();
 
     await act(async () => {
       await result.current.toggleTrack({
@@ -338,8 +343,319 @@ describe('useTrackAudioPlayer', () => {
         audioUrl: 'https://cdn.example.com/next.mp3',
       });
     });
+    act(() => {
+      mockAudio.duration = 10;
+    });
     expect(result.current.playbackState.timeline).toBeNull();
     expect(result.current.jumpToCue('cue_drop')).toBeNull();
+  });
+
+  it('edits timeline cues with monotonic undo and redo across hook consumers', async () => {
+    const measureSpy = vi.spyOn(performance, 'measure');
+    const useTrackAudioPlayer = await importFresh();
+    const first = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await first.result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        timeline: timeline(),
+      });
+    });
+    const second = renderHook(() => useTrackAudioPlayer());
+
+    act(() => {
+      first.result.current.editTimeline({
+        type: 'add',
+        cue: {
+          id: 'cue_verse',
+          kind: 'verse',
+          label: 'Verse',
+          sampleOffset: 48_000,
+        },
+      });
+      first.result.current.editTimeline({
+        type: 'rename',
+        cueId: 'cue_verse',
+        label: 'First Verse',
+      });
+      first.result.current.editTimeline({
+        type: 'move',
+        cueId: 'cue_verse',
+        sampleOffset: 96_000,
+      });
+    });
+
+    expect(second.result.current.playbackState.timeline).toMatchObject({
+      revision: 3,
+      cues: [
+        { id: 'cue_verse', label: 'First Verse', sampleOffset: 96_000 },
+        { id: 'cue_drop', sampleOffset: 240_000 },
+      ],
+    });
+    expect(second.result.current.playbackState.canUndoTimelineEdit).toBe(true);
+    expect(second.result.current.playbackState.canRedoTimelineEdit).toBe(false);
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-cue-edit:event-to-committed',
+      expect.any(String),
+      expect.any(String)
+    );
+
+    act(() => first.result.current.undoTimelineEdit());
+    expect(first.result.current.playbackState.timeline).toMatchObject({
+      revision: 4,
+      cues: [{ id: 'cue_verse', sampleOffset: 48_000 }, expect.any(Object)],
+    });
+    expect(first.result.current.playbackState.canRedoTimelineEdit).toBe(true);
+
+    act(() => first.result.current.redoTimelineEdit());
+    expect(first.result.current.playbackState.timeline).toMatchObject({
+      revision: 5,
+      cues: [{ id: 'cue_verse', sampleOffset: 96_000 }, expect.any(Object)],
+    });
+    expect(first.result.current.playbackState.canRedoTimelineEdit).toBe(false);
+  });
+
+  it('keeps empty history actions inert and rejects stale timeline ownership', async () => {
+    const markSpy = vi.spyOn(performance, 'mark');
+    const measureSpy = vi.spyOn(performance, 'measure');
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    const cueEditMarksBefore = markSpy.mock.calls.filter(([name]) =>
+      String(name).includes('audio-cue-edit')
+    ).length;
+    expect(result.current.undoTimelineEdit()).toBeNull();
+    expect(result.current.redoTimelineEdit()).toBeNull();
+    expect(
+      markSpy.mock.calls.filter(([name]) =>
+        String(name).includes('audio-cue-edit')
+      )
+    ).toHaveLength(cueEditMarksBefore);
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        timeline: timeline(),
+      });
+    });
+    act(() => {
+      result.current.undoTimelineEdit();
+    });
+    expect(measureSpy).toHaveBeenLastCalledWith(
+      'audio-cue-edit:event-to-unchanged',
+      expect.any(String),
+      expect.any(String)
+    );
+    measureSpy.mockClear();
+    act(() => result.current.redoTimelineEdit());
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-cue-edit:event-to-unchanged',
+      expect.any(String),
+      expect.any(String)
+    );
+
+    const activeTimeline = result.current.playbackState.timeline;
+    if (!activeTimeline) throw new Error('Expected active timeline');
+    (activeTimeline as { trackId: string }).trackId = 'stale-track';
+    act(() => {
+      mockAudio.duration = 10;
+    });
+    expect(result.current.jumpToCue('cue_drop')).toBeNull();
+    expect(
+      result.current.editTimeline({ type: 'delete', cueId: 'cue_drop' })
+    ).toBeNull();
+    expect(result.current.undoTimelineEdit()).toBeNull();
+    expect(result.current.redoTimelineEdit()).toBeNull();
+  });
+
+  it('returns undo availability to false after reverting the only edit', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        timeline: timeline(),
+      });
+    });
+
+    act(() => {
+      result.current.editTimeline({
+        type: 'rename',
+        cueId: 'cue_drop',
+        label: 'Final Drop',
+      });
+    });
+    expect(result.current.playbackState.canUndoTimelineEdit).toBe(true);
+    const measureSpy = vi.spyOn(performance, 'measure');
+    measureSpy.mockClear();
+    act(() => result.current.undoTimelineEdit());
+    expect(result.current.playbackState.canUndoTimelineEdit).toBe(false);
+    expect(result.current.playbackState.canRedoTimelineEdit).toBe(true);
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-cue-edit:event-to-committed',
+      expect.any(String),
+      expect.any(String)
+    );
+    measureSpy.mockClear();
+    act(() => result.current.redoTimelineEdit());
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-cue-edit:event-to-committed',
+      expect.any(String),
+      expect.any(String)
+    );
+  });
+
+  it('rejects invalid cue edits without mutating history and clears edits on source change', async () => {
+    const measureSpy = vi.spyOn(performance, 'measure');
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        timeline: timeline(),
+      });
+    });
+    const initial = result.current.playbackState.timeline;
+    let rejected: ReturnType<typeof result.current.editTimeline> = initial;
+    act(() => {
+      rejected = result.current.editTimeline({
+        type: 'add',
+        cue: {
+          id: 'cue_collision',
+          kind: 'custom',
+          label: 'Collision',
+          sampleOffset: 240_000,
+        },
+      });
+    });
+    expect(rejected).toBeNull();
+    expect(result.current.playbackState.timeline).toBe(initial);
+    expect(result.current.playbackState.canUndoTimelineEdit).toBe(false);
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-cue-edit:event-to-rejected',
+      expect.any(String),
+      expect.any(String)
+    );
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-2',
+        title: 'Next Song',
+        audioUrl: 'https://cdn.example.com/next.mp3',
+      });
+    });
+    expect(result.current.playbackState).toMatchObject({
+      timeline: null,
+      canUndoTimelineEdit: false,
+      canRedoTimelineEdit: false,
+    });
+    expect(
+      result.current.editTimeline({ type: 'delete', cueId: 'cue_drop' })
+    ).toBeNull();
+  });
+
+  it('retains edited timelines when queue navigation returns to the track', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+    const queue = [
+      {
+        id: 'track-1',
+        title: 'First Song',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+        timeline: timeline(),
+      },
+      {
+        id: 'track-2',
+        title: 'Second Song',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+      },
+    ];
+
+    await act(async () => {
+      await result.current.toggleTrack(queue[0], { queue });
+    });
+    act(() => {
+      result.current.editTimeline({
+        type: 'rename',
+        cueId: 'cue_drop',
+        label: 'Final Drop',
+      });
+    });
+    await act(async () => result.current.playNext());
+    expect(result.current.playbackState.timeline).toBeNull();
+
+    await act(async () => result.current.playPrevious());
+    expect(result.current.playbackState.timeline).toMatchObject({
+      revision: 1,
+      cues: [{ id: 'cue_drop', label: 'Final Drop' }],
+    });
+    expect(result.current.playbackState.canUndoTimelineEdit).toBe(false);
+  });
+
+  it('does not overwrite a queued source with the same track id but different provenance', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+    const queue = [
+      {
+        id: 'shared-id',
+        title: 'Uploaded Mix',
+        audioUrl: 'blob:https://jov.ie/uploaded',
+        sourceKind: 'chat-upload-preview' as const,
+        timeline: timeline('shared-id'),
+      },
+      {
+        id: 'shared-id',
+        title: 'Catalog Track',
+        audioUrl: 'https://cdn.example.com/catalog.mp3',
+        sourceKind: 'catalog' as const,
+      },
+    ];
+
+    await act(async () => {
+      await result.current.toggleTrack(queue[0], { queue });
+    });
+    act(() => {
+      result.current.editTimeline({
+        type: 'rename',
+        cueId: 'cue_drop',
+        label: 'Uploaded Drop',
+      });
+    });
+    await act(async () => result.current.playNext());
+    expect(result.current.playbackState).toMatchObject({
+      sourceKind: 'catalog',
+      timeline: null,
+    });
+    await act(async () => result.current.playPrevious());
+    expect(result.current.playbackState.timeline?.cues[0]?.label).toBe(
+      'Uploaded Drop'
+    );
+  });
+
+  it('fails a missing source closed before playback', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Missing Source',
+      });
+    });
+    expect(result.current.playbackState).toMatchObject({
+      activeTrackId: null,
+      lastErrorReason: 'missing_source',
+      playbackStatus: 'error',
+    });
+    expect(mockAudio.play).not.toHaveBeenCalled();
   });
 
   it('rejects mismatched or malformed timeline documents before playback', async () => {
@@ -377,6 +693,7 @@ describe('useTrackAudioPlayer', () => {
   });
 
   it('resets state and notifies error listeners on audio error', async () => {
+    const measureSpy = vi.spyOn(performance, 'measure');
     const useTrackAudioPlayer = await importFresh();
     const { result } = renderHook(() => useTrackAudioPlayer());
 
@@ -396,13 +713,18 @@ describe('useTrackAudioPlayer', () => {
         releaseTitle: 'Album',
         artistName: 'Artist',
         artworkUrl: 'https://cdn.example.com/art.jpg',
+        hasLyrics: true,
+        timeline: timeline(),
       });
     });
 
     expect(result.current.playbackState.activeTrackId).toBe('track-1');
 
-    // Fire error event
     act(() => {
+      mockAudio.duration = 10;
+      result.current.seek(2);
+      result.current.jumpToCue('cue_drop');
+      fireAudioEvent('waiting');
       fireAudioEvent('error');
     });
 
@@ -413,7 +735,16 @@ describe('useTrackAudioPlayer', () => {
     expect(result.current.playbackState.releaseTitle).toBeNull();
     expect(result.current.playbackState.artistName).toBeNull();
     expect(result.current.playbackState.artworkUrl).toBeNull();
+    expect(result.current.playbackState.hasLyrics).toBe(false);
+    expect(result.current.playbackState.timeline).toBeNull();
+    expect(result.current.playbackState.canUndoTimelineEdit).toBe(false);
+    expect(result.current.playbackState.canRedoTimelineEdit).toBe(false);
     expect(errorCb).toHaveBeenCalledTimes(1);
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-cue-jump:event-to-failed',
+      expect.any(String),
+      expect.any(String)
+    );
   });
 
   it('sets isPlaying to false and resets currentTime on ended event', async () => {
@@ -533,6 +864,7 @@ describe('useTrackAudioPlayer', () => {
   });
 
   it('clears playback state on stop and stays inactive after remount', async () => {
+    const measureSpy = vi.spyOn(performance, 'measure');
     const useTrackAudioPlayer = await importFresh();
     const firstMount = renderHook(() => useTrackAudioPlayer());
     const queue = [
@@ -544,6 +876,7 @@ describe('useTrackAudioPlayer', () => {
         artistName: 'Test Artist',
         artworkUrl: 'https://cdn.example.com/art.jpg',
         hasLyrics: true,
+        timeline: timeline(),
       },
       {
         id: 'track-2',
@@ -563,6 +896,7 @@ describe('useTrackAudioPlayer', () => {
       fireAudioEvent('playing');
       fireAudioEvent('loadedmetadata');
       fireAudioEvent('timeupdate');
+      firstMount.result.current.jumpToCue('cue_drop');
     });
 
     expect(firstMount.result.current.playbackState).toMatchObject({
@@ -589,6 +923,11 @@ describe('useTrackAudioPlayer', () => {
 
     expect(mockAudio.pause).toHaveBeenCalledTimes(pauseCallsBeforeStop + 1);
     expect(mockAudio.src).toBe('');
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-cue-jump:event-to-stopped',
+      expect.any(String),
+      expect.any(String)
+    );
     expect(firstMount.result.current.playbackState).toEqual({
       activeTrackId: null,
       sourceKind: null,
@@ -602,6 +941,9 @@ describe('useTrackAudioPlayer', () => {
       artistName: null,
       artworkUrl: null,
       hasLyrics: false,
+      timeline: null,
+      canUndoTimelineEdit: false,
+      canRedoTimelineEdit: false,
       queueLength: 0,
       queueIndex: -1,
       hasNext: false,
@@ -679,8 +1021,79 @@ describe('useTrackAudioPlayer', () => {
     expect(result.current.playbackState.activeTrackId).toBeNull();
     expect(result.current.playbackState.isPlaying).toBe(false);
     expect(result.current.playbackState.trackTitle).toBeNull();
+    expect(result.current.playbackState.lastErrorReason).toBe('play_rejected');
     expect(mockAudio.src).toBe('');
-    expect(errorCb).toHaveBeenCalledTimes(1);
+    expect(errorCb).toHaveBeenCalledWith('play_rejected');
+  });
+
+  it('ignores a rejected initial load after a newer track owns playback', async () => {
+    let rejectFirst: (reason: Error) => void = () => {};
+    nextPlayMock = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectFirst = reject;
+        })
+    );
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+    const firstLoad = result.current
+      .toggleTrack({
+        id: 'track-1',
+        title: 'First',
+        audioUrl: 'https://cdn.example.com/first.mp3',
+      })
+      .catch(() => {});
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-2',
+        title: 'Second',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+      });
+      rejectFirst(new Error('Late rejection'));
+      await firstLoad;
+    });
+
+    expect(result.current.playbackState).toMatchObject({
+      activeTrackId: 'track-2',
+      lastErrorReason: null,
+      playbackStatus: 'loading',
+    });
+    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
+  });
+
+  it('ignores a resolved initial load after a newer track owns playback', async () => {
+    let resolveFirst: () => void = () => {};
+    nextPlayMock = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>(resolve => {
+          resolveFirst = resolve;
+        })
+    );
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+    const firstLoad = result.current.toggleTrack({
+      id: 'track-1',
+      title: 'First',
+      audioUrl: 'https://cdn.example.com/first.mp3',
+    });
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-2',
+        title: 'Second',
+        audioUrl: 'https://cdn.example.com/second.mp3',
+      });
+      resolveFirst();
+      await firstLoad;
+    });
+
+    expect(result.current.playbackState).toMatchObject({
+      activeTrackId: 'track-2',
+      lastErrorReason: null,
+      playbackStatus: 'loading',
+    });
+    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
   });
 
   it('pauses for interruptions and stays paused by default', async () => {
