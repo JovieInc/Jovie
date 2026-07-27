@@ -254,21 +254,20 @@ describe('LibrarySurface', () => {
     // in library-system-b-compliance.test.ts and approval-status.test.ts.
     expect(source).toContain('releaseStatusClasses');
     expect(source).toContain('libraryApprovalStatusClasses');
-    expect(source).toContain('system-b-library-filter-pill-active');
+    expect(source).toContain('PageToolbarTabButton');
     expect(source).toContain("variant={active ? 'secondary' : 'tertiary'}");
     expect(source).toContain('system-b-library-card--selected');
     expect(source).toContain('system-b-library-table-row-selected');
     expect(source).toContain('ReleaseAudioAssetPanel');
     expect(source).toContain('function LibraryFilterPanel');
-    expect(source).toContain("data-testid='library-filter-count-slot'");
-    expect(source).toContain(
-      "className='inline-block w-8 shrink-0 text-right tabular-nums'"
-    );
+    expect(source).toContain("data-testid='library-filter-active-indicator'");
+    expect(source).toContain("surfaceMode='table'");
+    expect(source).not.toContain('Search library by title');
     expect(source).not.toContain('useRegisterShellSidebarOverride');
     expect(source).not.toContain('max-h-[45svh]');
   });
 
-  it('aligns library grid and list insets with the shell header padding contract', () => {
+  it('keeps the table on one workspace plane while preserving grid insets', () => {
     const source = readFileSync(
       resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),
       'utf8'
@@ -280,7 +279,8 @@ describe('LibrarySurface', () => {
     );
     expect(source).toContain('LIBRARY_GRID_DENSITY_LAYOUT');
     expect(source).toContain('useLibraryGridDensity');
-    expect(source).toContain('px-(--linear-app-header-padding-x) sm:flex');
+    expect(source).toContain("containerClassName='h-full'");
+    expect(source).toContain('h-(--app-shell-footer-row-height)');
     expect(source).not.toContain('px-2.5 pb-2.5 pt-1');
     expect(source).not.toMatch(/grid gap-2\.5/u);
   });
@@ -304,6 +304,7 @@ describe('LibrarySurface', () => {
     renderLibrary([buildAsset()]);
 
     expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.getByText('Apr 28, 2026')).toBeInTheDocument();
     expect(
       screen.getByTestId('library-release-row-release-1')
     ).toBeInTheDocument();
@@ -872,6 +873,9 @@ describe('LibrarySurface', () => {
       screen.getByRole('columnheader', { name: 'Title' })
     ).toBeInTheDocument();
     expect(
+      screen.getByRole('columnheader', { name: 'Release Date' })
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole('columnheader', { name: 'Artist' })
     ).toBeInTheDocument();
     expect(
@@ -1099,8 +1103,8 @@ describe('LibrarySurface', () => {
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
   });
 
-  it('filters library rows by title search', async () => {
-    renderLibrary([
+  it('keeps global header search as the only Library search surface', () => {
+    renderLibraryWithHeader([
       buildAsset(),
       buildAsset({
         id: 'release-2',
@@ -1109,18 +1113,12 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.change(screen.getByLabelText('Search library by title'), {
-      target: { value: 'never' },
-    });
-
-    await waitFor(() => {
-      expect(
-        screen.getByTestId('library-release-row-release-2')
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId('library-release-row-release-1')
-      ).not.toBeInTheDocument();
-    });
+    expect(screen.queryByLabelText('Search library by title')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+    expect(
+      screen.getAllByRole('combobox', { name: 'Search Jovie' })
+    ).toHaveLength(1);
   });
 
   it('labels the grid-card provider count badge', () => {
@@ -1247,16 +1245,15 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    const filterCountSlot = screen.getByTestId('library-filter-count-slot');
-    expect(filterCountSlot).toHaveClass(
-      'w-8',
-      'shrink-0',
-      'text-right',
-      'tabular-nums'
-    );
-    expect(filterCountSlot).toBeEmptyDOMElement();
+    const filterTrigger = screen.getByRole('button', {
+      name: 'Show filters',
+    });
+    expect(filterTrigger).toHaveClass('h-7', 'w-7');
+    expect(
+      screen.queryByTestId('library-filter-active-indicator')
+    ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Show filters' }));
+    await user.click(filterTrigger);
     const panel = screen.getByTestId('library-filter-panel');
     const savedViews = within(panel).getByTestId('library-saved-filter-views');
 
@@ -1304,11 +1301,10 @@ describe('LibrarySurface', () => {
     await user.click(
       within(panel).getByRole('button', { name: /Needs Review/u })
     );
-    expect(screen.getByTestId('library-filter-count-slot')).toBe(
-      filterCountSlot
-    );
-    expect(filterCountSlot).toHaveTextContent('(1)');
-    expect(filterCountSlot).toHaveClass('w-8');
+    expect(filterTrigger).toHaveAttribute('aria-label', 'Show filters (1)');
+    expect(
+      screen.getByTestId('library-filter-active-indicator')
+    ).toBeInTheDocument();
   });
 
   it('restores URL presets and persisted smart filters without changing their contracts', async () => {
@@ -1362,8 +1358,11 @@ describe('LibrarySurface', () => {
     const contentFrame = screen.getByTestId('library-content-frame');
     const before = contentFrame.getBoundingClientRect();
     const trigger = screen.getByRole('button', { name: 'Show filters' });
-    expect(trigger.className).toContain('min-h-11');
-    expect(trigger.className).toContain('min-w-11');
+    expect(trigger).toHaveClass('h-7', 'w-7');
+    expect(trigger.className).toContain('before:h-10');
+    expect(trigger.className).toContain('before:min-w-10');
+    expect(trigger.className).not.toContain('min-h-11');
+    expect(trigger.className).not.toContain('min-w-11');
 
     await user.click(trigger);
 

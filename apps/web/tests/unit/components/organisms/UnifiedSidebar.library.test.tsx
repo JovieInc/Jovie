@@ -167,6 +167,14 @@ describe('UnifiedSidebar library route', () => {
       screen.queryByRole('link', { name: 'Back to App' })
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('user-button')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('user-button').parentElement?.parentElement
+        ?.parentElement
+    ).toHaveClass(
+      'min-h-(--app-shell-footer-row-height)',
+      'border-t',
+      'border-(--app-shell-frame-seam)'
+    );
   });
 
   it('preserves the generic route-override contract for legitimate consumers', async () => {

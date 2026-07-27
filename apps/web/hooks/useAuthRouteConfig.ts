@@ -162,6 +162,8 @@ export function useAuthRouteConfig(
       pathname.includes('/people') ||
       pathname.includes('/growth') ||
       pathname.includes('/releases') ||
+      pathname === APP_ROUTES.LIBRARY ||
+      pathname.startsWith(`${APP_ROUTES.LIBRARY}/`) ||
       pathname === APP_ROUTES.TOUR_DATES,
     [isDemoRoute, pathname]
   );
