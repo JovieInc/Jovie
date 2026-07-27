@@ -49,8 +49,8 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
 
     for (const className of [
       'homepage-meet-jovie',
-      'homepage-meet-jovie__header',
-      'homepage-meet-jovie__copy',
+      'homepage-meet-jovie__inner',
+      'homepage-meet-jovie__eyebrow',
       'homepage-meet-jovie__heading',
       'homepage-meet-jovie__intro',
     ]) {
@@ -66,13 +66,13 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     }
 
     for (const className of [
-      'homepage-meet-jovie__carousel',
-      'homepage-meet-jovie__controls',
-      'homepage-meet-jovie__track',
-      'homepage-meet-jovie__card',
+      'homepage-artist-profiles__row',
+      'homepage-artist-profiles__track',
+      'homepage-artist-profiles__card',
       'homepage-artist-outcome',
+      'homepage-artist-outcome__copy',
       'homepage-artist-outcome__media',
-      'homepage-artist-outcome__caption',
+      'homepage-artist-outcome__device',
     ]) {
       expect(source).toContain(className);
     }
@@ -123,14 +123,14 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
 
     expect(css).toContain('var(--system-b-bg-page)');
     expect(css).toContain('var(--color-text-primary-token)');
-    expect(css).toContain('var(--color-text-secondary-token)');
+    expect(css).toContain('var(--color-text-tertiary-token)');
     expect(css).toContain('var(--ds-public-content-max)');
     expect(css).toContain('var(--homepage-page-gutter)');
-    expect(css).toContain('var(--homepage-chapter-space)');
+    expect(css).toContain('var(--homepage-section-title-size)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('var(--font-sans)');
-    expect(css).toContain('scroll-snap-type: x mandatory');
-    expect(css).toContain('@media (max-width: 767px)');
+    expect(css).toContain('font-size: var(--homepage-section-copy-size)');
+    expect(css).toContain('text-wrap: pretty');
   });
 
   it('keeps outcome card CSS tokenized', () => {
@@ -145,9 +145,9 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
 
     expect(css).toContain('var(--system-b-app-frame-seam)');
     expect(css).toContain('var(--color-text-primary-token)');
-    expect(css).toContain('var(--homepage-chapter-rule)');
+    expect(css).toContain('var(--system-b-primary-bg)');
     expect(css).toContain('var(--space-');
-    expect(css).toContain('var(--radius-lg)');
+    expect(css).toContain('var(--radius-2xl)');
     expect(css).toContain('@media (max-width: 767px)');
   });
 });

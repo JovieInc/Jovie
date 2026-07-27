@@ -52,9 +52,9 @@ describe('mounted homepage grid spine System B source contract', () => {
     // The hero guard slices page.tsx between these two anchors; they must
     // survive any page-spine edit verbatim.
     expect(pageSource).toContain('function HomepageHero()');
-    expect(pageSource).toContain('function HomepageOpportunity()');
+    expect(pageSource).toContain('function HomepageFaq()');
     expect(pageSource.indexOf('function HomepageHero()')).toBeLessThan(
-      pageSource.indexOf('function HomepageOpportunity()')
+      pageSource.indexOf('function HomepageFaq()')
     );
 
     // Page-level wrappers stay neutral: sections mount through named shells,
@@ -71,8 +71,7 @@ describe('mounted homepage grid spine System B source contract', () => {
       '<HomepagePosterHero',
       '<HomeTrustSection',
       '<HomepageMeetJovie',
-      '<HomepageOpportunitySection',
-      '<HomepageWorkspaceSectionLazy',
+      '<HomepageArtistProfiles',
       '<HomepageClosedLoop',
       '<HomepageV2FinalCta',
       '<FaqSection',
