@@ -1728,6 +1728,34 @@ function formatStreams(n: number) {
   return `${(n / 1_000_000).toFixed(1)}M`;
 }
 
+function useShellRouteSync({
+  initialView,
+  initialReleaseId,
+  initialThreadId,
+  setView,
+  setSelectedReleaseId,
+  setSelectedThreadId,
+  setThreadRailOpen,
+}: {
+  initialView: CanvasView;
+  initialReleaseId: string | null;
+  initialThreadId: string | null;
+  setView: (view: CanvasView) => void;
+  setSelectedReleaseId: (id: string | null) => void;
+  setSelectedThreadId: (id: string | null) => void;
+  setThreadRailOpen: (open: boolean) => void;
+}) {
+  useEffect(() => {
+    setView(initialView);
+    setSelectedReleaseId(initialReleaseId);
+  }, [initialView, initialReleaseId, setSelectedReleaseId, setView]);
+
+  useEffect(() => {
+    setSelectedThreadId(initialThreadId);
+    setThreadRailOpen(true);
+  }, [initialThreadId, setSelectedThreadId, setThreadRailOpen]);
+}
+
 function ShellV1ExperimentContent() {
   const searchParams = useSearchParams();
   const initialView = parseCanvasViewParam(searchParams.get('view'));
@@ -1782,10 +1810,6 @@ function ShellV1ExperimentContent() {
   const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(
     initialReleaseId
   );
-  useEffect(() => {
-    setView(initialView);
-    setSelectedReleaseId(initialReleaseId);
-  }, [initialView, initialReleaseId]);
   // Mock playback position in seconds for the currently playing track.
   // Click a row's waveform → updates this → bottom bar's scrub reflects it.
   const [currentTimeSec, setCurrentTimeSec] = useState(78);
@@ -1802,6 +1826,15 @@ function ShellV1ExperimentContent() {
     initialThreadId
   );
   const [threadRailOpen, setThreadRailOpen] = useState(true);
+  useShellRouteSync({
+    initialView,
+    initialReleaseId,
+    initialThreadId,
+    setView,
+    setSelectedReleaseId,
+    setSelectedThreadId,
+    setThreadRailOpen,
+  });
   // Threads the user has opened in this session — clears the per-thread
   // unread highlight in the sidebar.
   const [readThreadIds, setReadThreadIds] = useState<ReadonlySet<string>>(
@@ -1818,10 +1851,6 @@ function ShellV1ExperimentContent() {
       return next;
     });
   };
-  useEffect(() => {
-    setSelectedThreadId(initialThreadId);
-    setThreadRailOpen(true);
-  }, [initialThreadId]);
   const decoratedThreads = useMemo<Thread[]>(
     () =>
       THREADS.map(t =>
