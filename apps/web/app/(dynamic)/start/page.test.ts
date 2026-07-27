@@ -29,10 +29,12 @@ describe('StartPage', () => {
     });
   });
 
-  it('passes homepage intent and starter prompt params into the shell', async () => {
+  it('passes homepage intent and a validated starter handoff into the shell', async () => {
     const result = await StartPage({
       searchParams: Promise.resolve({
         intent_id: 'intent-1',
+        artist_name: 'David Guetta',
+        spotify_url: 'https://open.spotify.com/artist/1Cs0zKBU1kc0i8ypK3B9ai',
         starter_prompt: "hey, I'm David Guetta. show me my Spotify.",
       }),
     });
@@ -41,7 +43,28 @@ describe('StartPage', () => {
       props: {
         intentId: 'intent-1',
         sessionLabel: 'pending',
-        starterPrompt: "hey, I'm David Guetta. show me my Spotify.",
+        starterHandoff: {
+          artistName: 'David Guetta',
+          kind: 'spotify_artist',
+          prompt: "hey, I'm David Guetta. show me my Spotify.",
+          spotifyUrl: 'https://open.spotify.com/artist/1Cs0zKBU1kc0i8ypK3B9ai',
+        },
+      },
+    });
+  });
+
+  it('does not let bare URL params suppress the blank entry state', async () => {
+    const result = await StartPage({
+      searchParams: Promise.resolve({
+        spotify_url: 'https://open.spotify.com/artist/1Cs0zKBU1kc0i8ypK3B9ai',
+        url: 'https://example.com/artist',
+      }),
+    });
+
+    expect(result).toMatchObject({
+      props: {
+        sessionLabel: 'pending',
+        starterHandoff: null,
       },
     });
   });

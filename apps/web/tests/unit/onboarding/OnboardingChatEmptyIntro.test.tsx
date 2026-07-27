@@ -2,32 +2,27 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { OnboardingChatEmptyIntro } from '@/components/features/onboarding/OnboardingChatEmptyIntro';
 import {
+  ONBOARDING_ENTRY_SUPPORT,
+  ONBOARDING_ENTRY_TITLE,
   ONBOARDING_STARTER_SUGGESTIONS,
-  ONBOARDING_WELCOME_MESSAGE,
 } from '@/lib/onboarding/empty-state';
 
-vi.mock('@/components/jovie/components', () => ({
-  ChatMessage: ({
-    parts,
-  }: {
-    readonly parts: Array<{ type: 'text'; text: string }>;
-  }) => (
-    <div data-testid='chat-message'>
-      {parts.map(part => part.text).join('')}
-    </div>
-  ),
-}));
-
 describe('OnboardingChatEmptyIntro', () => {
-  it('renders welcome message, starter cards, and sign-in skip', () => {
+  it('renders concise entry copy, composer, starters, and sign-in', () => {
     const onSelectSuggestion = vi.fn();
 
     render(
-      <OnboardingChatEmptyIntro onSelectSuggestion={onSelectSuggestion} />
+      <OnboardingChatEmptyIntro
+        composer={<div data-testid='test-composer' />}
+        mode='blank'
+        onSelectSuggestion={onSelectSuggestion}
+      />
     );
 
     expect(screen.getByTestId('onboarding-empty-intro')).toBeTruthy();
-    expect(screen.getByText(ONBOARDING_WELCOME_MESSAGE)).toBeTruthy();
+    expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
+    expect(screen.getByText(ONBOARDING_ENTRY_SUPPORT)).toBeTruthy();
+    expect(screen.getByTestId('test-composer')).toBeTruthy();
     expect(screen.getByTestId('onboarding-starter-suggestions')).toBeTruthy();
     expect(screen.getByTestId('onboarding-sign-in-skip')).toHaveAttribute(
       'href',
@@ -46,7 +41,11 @@ describe('OnboardingChatEmptyIntro', () => {
     const [firstSuggestion] = ONBOARDING_STARTER_SUGGESTIONS;
 
     render(
-      <OnboardingChatEmptyIntro onSelectSuggestion={onSelectSuggestion} />
+      <OnboardingChatEmptyIntro
+        composer={<div />}
+        mode='blank'
+        onSelectSuggestion={onSelectSuggestion}
+      />
     );
 
     fireEvent.click(
@@ -58,7 +57,12 @@ describe('OnboardingChatEmptyIntro', () => {
 
   it('dims suggestions while the slash picker is open', () => {
     const { container } = render(
-      <OnboardingChatEmptyIntro onSelectSuggestion={vi.fn()} dimmed />
+      <OnboardingChatEmptyIntro
+        composer={<div />}
+        mode='blank'
+        onSelectSuggestion={vi.fn()}
+        dimmed
+      />
     );
 
     const suggestions = container.querySelector(
@@ -66,5 +70,22 @@ describe('OnboardingChatEmptyIntro', () => {
     );
     expect(suggestions?.className).toContain('opacity-0');
     expect(suggestions?.getAttribute('inert')).not.toBeNull();
+  });
+
+  it('replaces blank controls with one stable handoff status', () => {
+    render(
+      <OnboardingChatEmptyIntro
+        composer={<div data-testid='test-composer' />}
+        mode='spotify_handoff'
+        onSelectSuggestion={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Getting Your Artist Ready')).toBeTruthy();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Preparing your first message'
+    );
+    expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
+    expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { track } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import {
   getBrowserTurnstileHostname,
   resolveTurnstileSiteKey,
@@ -35,14 +36,14 @@ interface OnboardingShellProps {
   readonly sessionLabel: string;
   /** ID for a homepage-captured starter prompt stored in localStorage. */
   readonly intentId?: string;
-  /** Optional URL-provided starter prompt for deterministic demo runs. */
-  readonly starterPrompt?: string;
+  /** Validated URL-provided context for an automatic first message. */
+  readonly starterHandoff?: StartEntryHandoff | null;
 }
 
 export function OnboardingShell({
   intentId,
   sessionLabel,
-  starterPrompt,
+  starterHandoff,
 }: OnboardingShellProps) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [profileBuilderState, setProfileBuilderState] =
@@ -172,7 +173,7 @@ export function OnboardingShell({
               intentId={intentId}
               onConversationActivity={handleConversationActivity}
               onProfileBuilderChange={setProfileBuilderState}
-              starterPrompt={starterPrompt}
+              starterHandoff={starterHandoff}
               turnstileToken={turnstileToken}
               turnstileStatus={turnstileState.status}
               turnstilePanel={turnstilePanel}

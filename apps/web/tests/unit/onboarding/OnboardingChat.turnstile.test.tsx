@@ -199,7 +199,9 @@ function TurnstileHarness({
         setInstruction('Verify you are human to send');
       }}
       onConversationActivity={onConversationActivity}
-      starterPrompt={starterPrompt}
+      starterHandoff={
+        starterPrompt ? { kind: 'prompt', prompt: starterPrompt } : null
+      }
     />
   );
 }
@@ -218,7 +220,7 @@ function ControlledStarterHarness({
       turnstileToken={turnstileToken}
       turnstileStatus={turnstileToken ? 'verified' : 'interactive'}
       onTurnstileRequired={onTurnstileRequired}
-      starterPrompt={starterPrompt}
+      starterHandoff={{ kind: 'prompt', prompt: starterPrompt }}
     />
   );
 }
@@ -278,7 +280,10 @@ describe('OnboardingChat Turnstile gating', () => {
   it('renders a starter prompt and reserves verification space before effects run', () => {
     render(
       <OnboardingChat
-        starterPrompt='  Hey, I want to get access to Jovie.  '
+        starterHandoff={{
+          kind: 'prompt',
+          prompt: 'Hey, I want to get access to Jovie.',
+        }}
         turnstilePanel={<div data-testid='test-turnstile-panel' />}
         turnstilePanelVisible={false}
         turnstileStatus='interactive'

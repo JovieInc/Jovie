@@ -1,12 +1,8 @@
 import type { ChatSuggestion } from '@/components/jovie/types';
 
-/**
- * Static opener shown before the visitor sends their first message.
- * Mirrors the canonical onboarding system-prompt opener so the UI and
- * model stay aligned on memory disclosure + one intake question.
- */
-export const ONBOARDING_WELCOME_MESSAGE =
-  "Hey — I'm Jovie. Early access is limited right now, so some artists land on the waitlist. I'll remember this chat so we can pick up where we left off if you sign up. What are you working on?";
+export const ONBOARDING_ENTRY_TITLE = 'What Are You Working On?';
+export const ONBOARDING_ENTRY_SUPPORT =
+  'Start with your artist name, Spotify link, or next release.';
 
 /** Starter pills for the anonymous /start empty state. */
 export const ONBOARDING_STARTER_SUGGESTIONS: readonly ChatSuggestion[] = [
