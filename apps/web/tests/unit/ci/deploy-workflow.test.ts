@@ -1042,6 +1042,9 @@ describe('deploy workflow Vercel env resolution', () => {
       'PRODUCTION_DEPLOYMENT_URL_B64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}'
     );
     expect(performanceStep).toContain(
+      "PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'"
+    );
+    expect(performanceStep).toContain(
       'PERFORMANCE_AUTH_STATE_PATH="$auth_state"'
     );
     expect(performanceStep).toContain('--auth-path "$auth_state"');
@@ -1107,7 +1110,7 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(
       workflow.match(/PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'/g)
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(oauthStep).toContain(
       'pnpm exec playwright test tests/e2e/oauth-providers.spec.ts'
     );

@@ -955,6 +955,7 @@ jobs:
         env:
           EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
           PRODUCTION_DEPLOYMENT_URL_B64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
         run: |
