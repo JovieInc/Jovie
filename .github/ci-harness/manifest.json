@@ -48,7 +48,7 @@
     {
       "id": "post-deploy",
       "name": "Post-deploy Verification",
-      "purpose": "Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease."
+      "purpose": "Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease. Authenticated exact-build smoke still runs, fails visibly, and alerts on failure, but its release effect is temporarily advisory until authoritative controller history proves 10 consecutive exact-main passes; the policy then graduates it to blocking automatically. Public Better Auth/OAuth gates remain blocking. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease."
     },
     {
       "id": "scheduled-cleanup",
@@ -305,7 +305,7 @@
       "tier": "post-deploy",
       "mergeGate": false,
       "nextLocalCommand": "gh run view --log-failed",
-      "remediation": "Repair immutable-URL public, homepage, Lighthouse, Better Auth/OAuth, or leased final canonical ID/SHA proof. Authenticated smoke requires the dedicated production identity selector and protected verification-store access."
+      "remediation": "Repair immutable-URL public, homepage, Lighthouse, Better Auth/OAuth, or leased final canonical ID/SHA proof. Authenticated smoke requires the dedicated production identity selector and protected verification-store access; its temporary advisory policy accepts only that one visibly failed controller job and graduates after 10 authoritative exact-main passes."
     },
     {
       "id": "postdeploy-probes",

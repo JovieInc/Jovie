@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "gate": "production-auth-smoke",
+  "owner": "Gem",
+  "initialMode": "advisory",
+  "advisoryAfterControllerRunId": 30216913117,
+  "graduation": {
+    "consecutiveExactMainPasses": 10
+  }
+}

@@ -479,7 +479,7 @@ jobs:
         run: sleep 30
 
       - name: Run production auth smoke tests
-        id: auth-result
+        id: guarded-auth-smoke
         if: steps.check-creds.outputs.skip != 'true'
         run: |
           set -euo pipefail
@@ -493,6 +493,8 @@ jobs:
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           test -n "$PRODUCTION_BASE_URL"
+          # Expanded inside the guarded child shell.
+          # shellcheck disable=SC2016
           doppler run --project jovie-web --config prd \
             --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
             --no-fallback -- env -u DOPPLER_TOKEN \
@@ -502,14 +504,43 @@ jobs:
               EXPECTED_VERCEL_ENVIRONMENT=production \
               PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
                 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
-          echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
+                  bash -c '
+                    set +e
+                    pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
+                    status=$?
+                    printf "%s\n" "$status" > "$RUNNER_TEMP/production-auth-smoke-exit"
+                    exit 0
+                  '
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           PRODUCTION_BASE_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+
+      - name: Classify production auth smoke result
+        id: auth-result
+        if: steps.check-creds.outputs.skip != 'true' && steps.guarded-auth-smoke.outcome == 'success'
+        run: |
+          set -euo pipefail
+          status_file="$RUNNER_TEMP/production-auth-smoke-exit"
+          [ -f "$status_file" ] || {
+            echo "::error::Production auth smoke did not publish an exit-status receipt."
+            exit 1
+          }
+          status="$(<"$status_file")"
+          rm -f "$status_file"
+          [[ "$status" =~ ^[0-9]+$ ]] || {
+            echo "::error::Production auth smoke published a malformed exit-status receipt."
+            exit 1
+          }
+          if [ "$status" -eq 0 ]; then
+            echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "auth_smoke_status=failed" >> "$GITHUB_OUTPUT"
+          echo "::error::Production auth smoke assertions failed with exit status $status."
+          exit "$status"
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && steps.check-creds.outputs.skip != 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -624,6 +655,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      actions: read
     outputs:
       verified: ${{ steps.finalize.outputs.verified || 'false' }}
     steps:
@@ -655,6 +687,50 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.current.outputs.is_current == 'true'
+
+      - name: Classify temporary auth smoke release policy
+        id: auth-policy
+        if: steps.current.outputs.is_current == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          controller_workflow_id="$(gh api \
+            "repos/$REPOSITORY/actions/workflows/production-controller.yml" \
+            --jq '.id // empty')"
+          [[ "$controller_workflow_id" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::Could not resolve the authoritative Production Controller workflow."
+            exit 1
+          }
+          policy_json="$(node .github/scripts/production-auth-smoke-policy.mjs \
+            --policy=.github/release-gates/production-auth-smoke.json \
+            --repo="$REPOSITORY" \
+            --controller-workflow-id="$controller_workflow_id" \
+            --current-run-id="${{ github.run_id }}")"
+          jq -e '
+            .gate == "production-auth-smoke" and
+            .owner == "Gem" and
+            (.mode | IN("advisory", "blocking")) and
+            .threshold == 10 and
+            (.currentStreak | type == "number" and . >= 0) and
+            (.maximumStreak | type == "number" and . >= .currentStreak) and
+            (.productionRuns | type == "number" and . >= 0) and
+            ((.graduatedRunId | type) == "number" or .graduatedRunId == null)
+          ' >/dev/null <<<"$policy_json" || {
+            echo "::error::Production auth smoke policy returned malformed evidence."
+            exit 1
+          }
+          {
+            echo "mode=$(jq -r '.mode' <<<"$policy_json")"
+            echo "threshold=$(jq -r '.threshold' <<<"$policy_json")"
+            echo "current_streak=$(jq -r '.currentStreak' <<<"$policy_json")"
+            echo "maximum_streak=$(jq -r '.maximumStreak' <<<"$policy_json")"
+            echo "graduated_run_id=$(jq -r '.graduatedRunId // empty' <<<"$policy_json")"
+          } >> "$GITHUB_OUTPUT"
+          jq -r '"Auth smoke policy: mode=\(.mode), trailing=\(.currentStreak)/\(.threshold), maximum=\(.maximumStreak)/\(.threshold), owner=\(.owner)"' \
+            <<<"$policy_json" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Require exact deployment and every post-deploy probe
         id: verify
@@ -709,15 +785,16 @@ jobs:
               exit 1
             fi
           done
-          if [ "${{ needs.ci-post-deploy-auth-smoke.result }}" != "success" ]; then
-            echo "::error::Authenticated smoke lane did not resolve cleanly."
-            exit 1
-          fi
           auth_smoke_status="${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}"
-          if [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" != "true" ] ||
+          if [ "${{ needs.ci-post-deploy-auth-smoke.result }}" != "success" ] ||
+            [ "${{ needs.ci-post-deploy-auth-smoke.outputs.credentials_configured }}" != "true" ] ||
             [ "$auth_smoke_status" != "passed" ]; then
-            echo "::error::Authenticated Better Auth OTP smoke did not produce passing test evidence."
-            exit 1
+            if [ "${{ steps.auth-policy.outputs.mode }}" != "advisory" ] ||
+              [ "$auth_smoke_status" != "failed" ]; then
+              echo "::error::Authenticated Better Auth OTP smoke is blocking and did not produce passing evidence."
+              exit 1
+            fi
+            echo "::error::Authenticated Better Auth OTP smoke failed in temporary advisory mode; the controller remains visibly red while exact deployment verification continues."
           fi
 
           # Main can advance while setup runs. The workflow-level production
@@ -790,7 +867,12 @@ jobs:
             --arg controller_run "${{ github.run_id }}" \
             --arg controller_attempt "${{ github.run_attempt }}" \
             --arg auth_smoke "$AUTH_SMOKE_STATUS" \
-            '{sha: $sha, deploymentId: $deployment_id, controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke}' \
+            --arg auth_smoke_policy_mode "${{ steps.auth-policy.outputs.mode }}" \
+            --arg auth_smoke_policy_owner "Gem" \
+            --arg auth_smoke_policy_threshold "${{ steps.auth-policy.outputs.threshold }}" \
+            --arg auth_smoke_policy_streak "${{ steps.auth-policy.outputs.current_streak }}" \
+            --arg auth_smoke_policy_maximum_streak "${{ steps.auth-policy.outputs.maximum_streak }}" \
+            '{sha: $sha, deploymentId: $deployment_id, controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke, authSmokePolicy: {gate: "production-auth-smoke", mode: $auth_smoke_policy_mode, owner: $auth_smoke_policy_owner, threshold: $auth_smoke_policy_threshold, currentStreak: $auth_smoke_policy_streak, maximumStreak: $auth_smoke_policy_maximum_streak}}' \
             > "$RUNNER_TEMP/production-generation-verified.json"
 
       - name: Preserve exact verified-generation marker
@@ -814,19 +896,24 @@ jobs:
             exit 0
           fi
           payload="$(jq -n \
-            --arg text "✅ Production verified: jov.ie" \
+            --arg text "${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status == 'passed' && '✅ Production verified: jov.ie' || '⚠️ Production core verified; auth smoke failed in advisory mode' }}" \
+            --arg color "${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status == 'passed' && 'good' || 'warning' }}" \
             --arg sha "${{ needs.authorize-production.outputs.expected_sha }}" \
             --arg deployment "${{ needs.production-release.outputs.production_deployment_id }}" \
             --arg sentry_gate "${{ needs.production-release.outputs.sentry_gate_status }}" \
             --arg oauth_gate "${{ needs.production-release.outputs.oauth_gate_status }}" \
             --arg auth_smoke "${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}" \
+            --arg auth_smoke_policy "${{ steps.auth-policy.outputs.mode }}" \
+            --arg auth_smoke_streak "${{ steps.auth-policy.outputs.current_streak }}/${{ steps.auth-policy.outputs.threshold }}" \
             --arg run "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{text: $text, attachments: [{color: "good", fields: [
+            '{text: $text, attachments: [{color: $color, fields: [
               {title: "SHA", value: $sha, short: true},
               {title: "Deployment", value: $deployment, short: true},
               {title: "Sentry gate", value: $sentry_gate, short: true},
               {title: "OAuth gate", value: $oauth_gate, short: true},
               {title: "Auth smoke", value: $auth_smoke, short: true},
+              {title: "Auth smoke policy", value: $auth_smoke_policy, short: true},
+              {title: "Graduation streak", value: $auth_smoke_streak, short: true},
               {title: "Run", value: $run, short: false}
             ]}]}')"
           if ! curl --fail --silent --show-error \

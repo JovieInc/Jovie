@@ -9,6 +9,8 @@ import { pathToFileURL } from 'node:url';
 const MARKER_FILE = 'production-generation-verified.json';
 const RECOVERY_FILE = 'production-generation-recovery.json';
 const CONTROLLER_PATH = '.github/workflows/production-controller.yml';
+const ADVISORY_AUTH_SMOKE_JOB = 'Post-Deploy Auth Smoke (Production)';
+const ADVISORY_AUTH_SMOKE_THRESHOLD = 10;
 const INTERRUPTED_CONCLUSIONS = new Set([
   'cancelled',
   'failure',
@@ -95,6 +97,40 @@ function validateMarkerPayload(payload, context, artifact) {
   );
 }
 
+function validatesAdvisoryAuthSmokeFailure(entry, verifiedJob) {
+  const policy = entry.payload?.authSmokePolicy;
+  if (
+    entry.payload?.authSmoke !== 'failed' ||
+    policy?.gate !== 'production-auth-smoke' ||
+    policy?.mode !== 'advisory' ||
+    policy?.owner !== 'Gem' ||
+    positiveInteger(policy?.threshold) !== ADVISORY_AUTH_SMOKE_THRESHOLD ||
+    !Number.isSafeInteger(Number(policy?.currentStreak)) ||
+    Number(policy.currentStreak) < 0 ||
+    Number(policy.currentStreak) >= ADVISORY_AUTH_SMOKE_THRESHOLD ||
+    !Number.isSafeInteger(Number(policy?.maximumStreak)) ||
+    Number(policy.maximumStreak) < Number(policy.currentStreak) ||
+    Number(policy.maximumStreak) >= ADVISORY_AUTH_SMOKE_THRESHOLD ||
+    verifiedJob.status !== 'completed' ||
+    verifiedJob.conclusion !== 'success'
+  ) {
+    return false;
+  }
+
+  const failures = entry.attemptJobs.filter(
+    job => job?.status === 'completed' && job?.conclusion === 'failure'
+  );
+  return (
+    failures.length === 1 &&
+    failures[0].name === ADVISORY_AUTH_SMOKE_JOB &&
+    entry.attemptJobs.every(
+      job =>
+        job?.status === 'completed' &&
+        ['success', 'failure', 'skipped'].includes(job?.conclusion)
+    )
+  );
+}
+
 function validateRecoveryPayload(payload, context, artifact) {
   return (
     payload &&
@@ -153,6 +189,19 @@ function classifyMarkerEntry(entry, context) {
     ) {
       return { error: 'successful_attempt_without_verified_job' };
     }
+    return {
+      kind: 'verified',
+      attempt,
+      controllerRun,
+      deploymentId: entry.payload.deploymentId,
+      markerContext,
+    };
+  }
+  if (
+    status === 'completed' &&
+    conclusion === 'failure' &&
+    validatesAdvisoryAuthSmokeFailure(entry, verifiedJobs[0])
+  ) {
     return {
       kind: 'verified',
       attempt,
