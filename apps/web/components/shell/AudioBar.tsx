@@ -1,5 +1,9 @@
 'use client';
 
+import type {
+  AudioTimelineDocumentV1,
+  AudioTimelineEdit,
+} from '@jovie/audio-contracts';
 import {
   AudioLines,
   AudioWaveform,
@@ -14,6 +18,7 @@ import {
 } from 'lucide-react';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
+import { CueEditorPopover } from './CueEditorPopover';
 import { IconBtn } from './IconBtn';
 import { LoopBtn, type LoopMode } from './LoopBtn';
 import {
@@ -88,6 +93,12 @@ export function AudioBar({
   onToggleWaveform,
   lyricsActive,
   onOpenLyrics,
+  timeline,
+  canUndoTimelineEdit,
+  canRedoTimelineEdit,
+  onTimelineEdit,
+  onUndoTimelineEdit,
+  onRedoTimelineEdit,
   track,
   className,
 }: {
@@ -110,6 +121,12 @@ export function AudioBar({
   readonly onToggleWaveform?: () => void;
   readonly lyricsActive?: boolean;
   readonly onOpenLyrics?: () => void;
+  readonly timeline?: AudioTimelineDocumentV1 | null;
+  readonly canUndoTimelineEdit?: boolean;
+  readonly canRedoTimelineEdit?: boolean;
+  readonly onTimelineEdit?: (edit: AudioTimelineEdit) => boolean;
+  readonly onUndoTimelineEdit?: () => void;
+  readonly onRedoTimelineEdit?: () => void;
   readonly track: AudioBarTrack;
   readonly className?: string;
 }) {
@@ -178,6 +195,22 @@ export function AudioBar({
 
   const rightCluster = (
     <div className='flex items-center gap-1 justify-self-end'>
+      {timeline &&
+        onTimelineEdit &&
+        onUndoTimelineEdit &&
+        onRedoTimelineEdit &&
+        onCueJump && (
+          <CueEditorPopover
+            timeline={timeline}
+            currentTime={currentTime}
+            canUndo={Boolean(canUndoTimelineEdit)}
+            canRedo={Boolean(canRedoTimelineEdit)}
+            onEdit={onTimelineEdit}
+            onUndo={onUndoTimelineEdit}
+            onRedo={onRedoTimelineEdit}
+            onJump={onCueJump}
+          />
+        )}
       {track.hasLyrics && onOpenLyrics && (
         <IconBtn
           label={lyricsActive ? 'Close lyrics' : 'Lyrics'}
@@ -259,8 +292,8 @@ export function AudioBar({
             <ScrubGradient
               currentTime={currentTime}
               duration={duration}
-              onSeek={onSeek}
-              onCueJump={onCueJump}
+              onSeek={waveformOn ? onSeek : undefined}
+              onCueJump={waveformOn ? onCueJump : undefined}
               cues={cues}
               loopMode={loopMode}
               loopSection={loopSection}
