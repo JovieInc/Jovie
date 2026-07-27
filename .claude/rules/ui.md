@@ -211,7 +211,7 @@ This is the subtraction principle applied specifically to container boundaries. 
 
 - Hover states must not move layout or shift components without a product reason.
 - Do **NOT** use `translate`, `scale`, lift-on-hover, or floating-card motion on buttons, cards, screenshots, auth surfaces, or marketing panels as a default polish move.
-- Press/click feedback may use a subtle `scale(0.96)` when it is tactile and interruptible; provide a static opt-out when the motion would distract.
+- Press/click feedback uses the shared `--scale-press` token (`0.98`) when tactile feedback is useful. Shared controls must disable the transform under reduced motion and provide a static opt-out where motion would distract.
 - Menus, panels, drawers, and sidebars may use intentional `translate`/`scale` motion for open/close because the movement communicates spatial state.
 - Prefer background-color, border-color, text-color, opacity, or shadow changes for hover feedback.
 - If motion is necessary because the UI is directly manipulating something spatial, it must be intentional and clearly tied to that interaction.

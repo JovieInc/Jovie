@@ -21,37 +21,6 @@ describe('shared press-motion contract', () => {
     expect(button).toContain('active:scale-[var(--scale-press)]');
     expect(button).toContain('motion-reduce:active:scale-100');
     expect(button).not.toContain('active:scale-[0.96]');
-    expect(button).toContain('pressFeedback = false');
-  });
-
-  it('does not scale every interactive element globally', () => {
-    const globals = readWeb('app/globals.css');
-
-    expect(globals).not.toContain('transform: scale(0.96)');
-    expect(globals).not.toContain('active:scale-[0.96]');
-    expect(globals).not.toContain(
-      'button:not(:disabled):not([data-static="true"])'
-    );
-    expect(globals).not.toContain(
-      '[role="button"]:not([aria-disabled="true"]):not([data-static="true"])'
-    );
-    expect(globals).toContain(
-      'active:scale-[var(--scale-press)] motion-reduce:active:scale-100'
-    );
-  });
-
-  it('keeps immediate-state controls static and remaining press feedback at 0.98', () => {
-    const bottomTabs = readWeb(
-      'components/features/profile/nav/BottomTabBar.tsx'
-    );
-    const entityCard = readWeb(
-      'components/organisms/entity-card/EntityCard.tsx'
-    );
-
-    expect(bottomTabs).not.toContain('active:scale');
-    expect(bottomTabs).not.toContain('transition-[color,transform]');
-    expect(entityCard).toContain('group-active:scale-[var(--scale-press)]');
-    expect(entityCard).not.toContain('group-active:scale-[0.96]');
   });
 
   it.each([

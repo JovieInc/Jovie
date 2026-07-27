@@ -530,6 +530,17 @@ the app feeling consistent even as new components land.
 
 These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
 
+### Interaction feedback
+
+- Press feedback uses the shared `--scale-press` token. The canonical value is
+  `0.98`: enough tactile response to register without visible shrink or jump.
+- Shared interactive primitives, including Button, apply the token once.
+  Feature code must not add its own `whileTap` scale or hardcoded active scale.
+- Hover and focus feedback do not scale controls. Use semantic surface, text,
+  border, opacity, or shadow changes that preserve geometry.
+- `prefers-reduced-motion: reduce` disables press transforms. Components that
+  intentionally opt out use the shared Button `static` contract.
+
 **Rule of thumb:** if the user's eye has to track the move (panel sliding in,
 surface growing), it's cinematic. If the user notices it only as feedback
 (button color change, focus ring), it's subtle. Never invent a third tier
