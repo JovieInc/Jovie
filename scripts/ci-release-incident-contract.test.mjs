@@ -54,7 +54,6 @@ function fixture() {
       schemaVersion: 1,
       mergeQueueLabelPolicy: {
         nativeForbidsLegacyLabel: true,
-        graphiteExplicitlyAllowsLegacyLabel: true,
       },
       incidents,
     },
@@ -73,15 +72,14 @@ test('accepts every registered incident with existing prevention evidence', () =
   }
 });
 
-test('rejects legacy labels for native queue while permitting explicit Graphite backend', () => {
+test('rejects legacy labels and non-native queue backends', () => {
   assert.deepEqual(validateMergeQueueBackendLabels('native', ['merge-queue']), [
     'native merge queue must reject legacy merge-queue labels',
   ]);
   assert.deepEqual(validateMergeQueueBackendLabels('native', []), []);
-  assert.deepEqual(
-    validateMergeQueueBackendLabels('graphite', ['merge-queue']),
-    []
-  );
+  assert.deepEqual(validateMergeQueueBackendLabels('graphite', []), [
+    'merge queue backend must be native',
+  ]);
 });
 
 test('fails closed when an incident lacks propagation or a regression path', () => {
