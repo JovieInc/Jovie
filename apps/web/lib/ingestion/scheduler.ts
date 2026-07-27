@@ -85,6 +85,10 @@ export function determineJobFailure(error: unknown): {
  * Extract hostname from a job's payload URL.
  */
 function getJobHost(job: typeof ingestionJobs.$inferSelect): string | null {
+  if (job.jobType === 'audio_playback_derivative') {
+    return 'provider:audio-derivative';
+  }
+
   if (job.jobType === 'musicfetch_enrichment') {
     return 'provider:musicfetch';
   }

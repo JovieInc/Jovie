@@ -77,6 +77,7 @@ describe('library audio snippet API', () => {
       recordingId: 'recording_123',
       previewUrl: 'https://cdn.example.com/preview.mp3',
       audioUrl: 'https://cdn.example.com/preview.mp3',
+      audioFormat: 'audio/mpeg',
       durationMs: 180_000,
       metadata: {
         audioSnippet: { startMs: 10_000, endMs: 40_000 },
@@ -94,6 +95,7 @@ describe('library audio snippet API', () => {
     expect(response.status).toBe(200);
     expect(body.snippet).toEqual({ startMs: 10_000, endMs: 40_000 });
     expect(body.previewUrl).toBe('https://cdn.example.com/preview.mp3');
+    expect(body.playbackStatus).toBe('ready');
   });
 
   it('persists a normalized snippet trim window', async () => {
@@ -101,6 +103,7 @@ describe('library audio snippet API', () => {
       recordingId: 'recording_123',
       previewUrl: 'https://cdn.example.com/preview.mp3',
       audioUrl: 'https://cdn.example.com/preview.mp3',
+      audioFormat: 'audio/mpeg',
       durationMs: 180_000,
       metadata: {},
     });

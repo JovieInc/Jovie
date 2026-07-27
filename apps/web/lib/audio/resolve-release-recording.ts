@@ -11,6 +11,7 @@ export type ReleasePrimaryRecording = {
   readonly recordingId: string;
   readonly previewUrl: string | null;
   readonly audioUrl: string | null;
+  readonly audioFormat: string | null;
   readonly durationMs: number | null;
   readonly metadata: Record<string, unknown>;
 };
@@ -24,6 +25,7 @@ export async function resolvePrimaryRecordingForRelease(
       recordingId: discogRecordings.id,
       previewUrl: discogRecordings.previewUrl,
       audioUrl: discogRecordings.audioUrl,
+      audioFormat: discogRecordings.audioFormat,
       durationMs: discogRecordings.durationMs,
       metadata: discogRecordings.metadata,
     })
@@ -51,6 +53,7 @@ export async function resolvePrimaryRecordingForRelease(
     recordingId: row.recordingId,
     previewUrl: row.previewUrl,
     audioUrl: row.audioUrl,
+    audioFormat: row.audioFormat,
     durationMs: row.durationMs,
     metadata: row.metadata ?? {},
   };
