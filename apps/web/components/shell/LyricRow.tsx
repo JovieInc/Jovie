@@ -1,5 +1,6 @@
 'use client';
 
+import { findActiveTimedTextWordIndex } from '@jovie/audio-contracts';
 import { GripVertical } from 'lucide-react';
 import React from 'react';
 import { formatTime } from '@/lib/format-time';
@@ -45,6 +46,7 @@ export const LyricRow = React.memo(function LyricRow({
   onStamp,
   onChangeText,
   interactive = true,
+  currentTimeSec = null,
 }: {
   readonly line: LyricLine;
   readonly index: number;
@@ -56,11 +58,19 @@ export const LyricRow = React.memo(function LyricRow({
   readonly onStamp: () => void;
   readonly onChangeText: (text: string) => void;
   readonly interactive?: boolean;
+  readonly currentTimeSec?: number | null;
 }) {
+  const activeWordIndex = isActive
+    ? findActiveTimedTextWordIndex(line, currentTimeSec ?? Number.NaN)
+    : -1;
+
   if (!editing) {
     if (!interactive) {
       return (
-        <li className='text-center text-xl leading-[1.35] font-display text-secondary-token'>
+        <li
+          data-lyric-index={index}
+          className='text-center text-xl leading-[1.35] font-display text-secondary-token'
+        >
           {line.text}
         </li>
       );
@@ -69,11 +79,13 @@ export const LyricRow = React.memo(function LyricRow({
     // Display mode — the entire row is a seek button. Native <button>
     // gives proper keyboard + Enter/Space + focus ring for free.
     return (
-      <li>
+      <li data-lyric-index={index}>
         <button
           type='button'
           onClick={onSeek}
           data-focused={isFocused && !isActive ? '' : undefined}
+          aria-current={isActive ? 'true' : undefined}
+          aria-label={line.text}
           className={cn(
             'group/lyric block w-full text-center cursor-pointer select-none bg-transparent border-0 p-0',
             'transition-[color,opacity,transform] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
@@ -82,7 +94,36 @@ export const LyricRow = React.memo(function LyricRow({
               : 'text-tertiary-token text-xl leading-[1.35] font-display opacity-60 hover:opacity-90 hover:text-secondary-token'
           )}
         >
-          {line.text}
+          {isActive && line.words ? (
+            <span aria-hidden='true'>
+              {line.words.map((word, wordIndex) => {
+                return (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: enhanced-LRC words are immutable positional cues and can share timestamps and text
+                  <React.Fragment key={`${word.startSec}-${wordIndex}`}>
+                    {wordIndex > 0 ? ' ' : null}
+                    <span
+                      data-active-word={
+                        wordIndex === activeWordIndex ? '' : undefined
+                      }
+                      className={cn(
+                        'transition-colors duration-subtle ease-subtle',
+                        wordIndex === activeWordIndex &&
+                          'text-primary-token opacity-100',
+                        wordIndex < activeWordIndex &&
+                          'text-secondary-token opacity-90',
+                        wordIndex > activeWordIndex &&
+                          'text-tertiary-token opacity-55'
+                      )}
+                    >
+                      {word.text}
+                    </span>
+                  </React.Fragment>
+                );
+              })}
+            </span>
+          ) : (
+            line.text
+          )}
         </button>
       </li>
     );
@@ -92,6 +133,7 @@ export const LyricRow = React.memo(function LyricRow({
   // input naturally focuses it, which calls onFocus.
   return (
     <li
+      data-lyric-index={index}
       data-focused={isFocused && !isActive ? '' : undefined}
       data-selected={isActive ? '' : undefined}
       className={cn(

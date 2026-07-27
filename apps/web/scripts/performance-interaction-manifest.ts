@@ -510,6 +510,45 @@ export const INTERACTION_HOT_PATHS = [
     },
     firstSlice: false,
   },
+  {
+    id: 'lyrics-cue-seek',
+    title: 'Timed lyric cue seek settles and highlights',
+    tier: 'P1',
+    route: APP_ROUTES.LYRICS,
+    requiresAuth: true,
+    interactionClass: 'audio-transport-visual-response',
+    managerLoopProximity: 'medium',
+    expectedFrequency: 'medium',
+    trustRisk: 'medium',
+    budget: INTERACTION_CLASS_BUDGETS['audio-transport-visual-response'],
+    ia: {
+      trigger: 'Click a timed lyric, scrub its timeline, or use slider keys',
+      focusOrigin: 'Timed lyric row or lyric timeline slider',
+      firstVisibleFeedback: 'The active lyric highlight follows the playhead',
+      usableState: 'The lyric timeline remains focused and keyboard operable',
+      focusDestination: 'Invoked lyric row or lyric timeline slider',
+      escapePath: 'Continue playback or seek to another cue',
+      returnFocus: 'Invoked lyric row or lyric timeline slider',
+      contextPreservation: [
+        'active track',
+        'playback state',
+        'lyrics scroll position',
+        'app shell route',
+      ],
+      dataTrustClass: 'playback-only',
+      feedbackSemantics: ['active', 'pressed'],
+    },
+    likelyRootCauseBuckets: [
+      'audio-pipeline-delay',
+      'react-render-cascade',
+      'main-thread-blocking',
+    ],
+    selectors: {
+      firstFeedback: '[aria-label="Lyrics"] [aria-current="true"]',
+      usableState: '[role="slider"][aria-label="Lyric Timeline"]',
+    },
+    firstSlice: false,
+  },
 ] as const satisfies readonly InteractionScenarioDefinition[];
 
 export function getInteractionHotPathManifest() {
