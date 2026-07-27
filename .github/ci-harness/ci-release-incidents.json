@@ -77,7 +77,7 @@
     },
     {
       "id": "ci-release/legacy-merge-queue-label",
-      "failureMode": "Legacy merge-queue labels wake Graphite and rewrite exact heads after native enrollment.",
+      "failureMode": "Legacy merge-queue label transport can rewrite exact heads after native enrollment.",
       "regression": {
         "kind": "test",
         "command": "pnpm ci:merge-queue:check",
@@ -965,7 +965,6 @@
     }
   ],
   "mergeQueueLabelPolicy": {
-    "nativeForbidsLegacyLabel": true,
-    "graphiteExplicitlyAllowsLegacyLabel": true
+    "nativeForbidsLegacyLabel": true
   }
 }
