@@ -95,7 +95,7 @@ export const TrackRow = memo(function TrackRow({
     });
   }, [allProviders, providerMap]);
 
-  const previewUrl = track.previewUrl || track.audioUrl;
+  const previewUrl = track.previewUrl;
   const canPlay = Boolean(previewUrl);
   const isActiveTrack = playbackState.activeTrackId === track.id;
   const isPlaying = isActiveTrack && playbackState.isPlaying;
@@ -141,7 +141,7 @@ export const TrackRow = memo(function TrackRow({
     </button>
   ) : (
     <span className='system-b-track-row-preview-unavailable flex h-7 w-7 items-center justify-center rounded-full text-secondary-token/80'>
-      <VolumeX className='h-3.5 w-3.5' aria-label='No preview available' />
+      <VolumeX className='h-3.5 w-3.5' aria-label='No Preview Available' />
     </span>
   );
 
@@ -171,7 +171,7 @@ export const TrackRow = memo(function TrackRow({
             variant='secondary'
             className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-3xs text-tertiary-token'
             title='Explicit content'
-            aria-label='Explicit content'
+            aria-label='Explicit Content'
           >
             E
           </Badge>
@@ -299,7 +299,7 @@ export const TrackRow = memo(function TrackRow({
                     variant='secondary'
                     className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-3xs text-tertiary-token'
                     title='Explicit content'
-                    aria-label='Explicit content'
+                    aria-label='Explicit Content'
                   >
                     E
                   </Badge>

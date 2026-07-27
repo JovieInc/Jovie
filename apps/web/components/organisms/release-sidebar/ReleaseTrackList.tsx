@@ -82,7 +82,7 @@ function buildReleasePlaybackQueue(
   release: Release
 ): TrackControlSource[] {
   return tracks.flatMap(track => {
-    const audioUrl = track.audioUrl ?? track.previewUrl ?? undefined;
+    const audioUrl = track.previewUrl ?? undefined;
     if (!audioUrl) return [];
 
     return [
@@ -249,7 +249,7 @@ function TrackListRow({
   readonly isLastRow: boolean;
   readonly onSelect?: () => void;
 }) {
-  const playableUrl = track.audioUrl ?? track.previewUrl ?? undefined;
+  const playableUrl = track.previewUrl ?? undefined;
   const isActiveTrack = playbackState.activeTrackId === track.id;
   const isTrackPlaying = isActiveTrack && playbackState.isPlaying;
   const trackDuration =

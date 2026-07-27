@@ -1,3 +1,4 @@
+import { resolveRecordingPlayback } from '@/lib/audio/playback-derivative';
 import {
   derivePreviewState,
   getProviderConfidence,
@@ -76,9 +77,11 @@ function mapLegacyTrackToViewModel(
   profileHandle: string,
   releaseSlug: string
 ): TrackViewModel {
+  const playback = resolveRecordingPlayback(track);
+  const playbackUrl = playback.status === 'ready' ? playback.url : null;
   const previewState = derivePreviewState({
-    audioUrl: track.audioUrl,
-    previewUrl: track.previewUrl,
+    audioUrl: playbackUrl,
+    previewUrl: playbackUrl,
     metadata: track.metadata,
     providerLinks: track.providerLinks,
   });
@@ -99,8 +102,8 @@ function mapLegacyTrackToViewModel(
     durationMs: track.durationMs,
     isrc: track.isrc,
     isExplicit: track.isExplicit,
-    previewUrl: track.previewUrl,
-    audioUrl: track.audioUrl,
+    previewUrl: playbackUrl,
+    audioUrl: playbackUrl,
     audioFormat: track.audioFormat,
     lyrics: track.lyrics,
     previewSource: previewState.previewSource,
@@ -122,9 +125,11 @@ function mapReleaseTrackToViewModel(
   profileHandle: string,
   releaseSlug: string
 ): TrackViewModel {
+  const playback = resolveRecordingPlayback(track);
+  const playbackUrl = playback.status === 'ready' ? playback.url : null;
   const previewState = derivePreviewState({
-    audioUrl: track.audioUrl,
-    previewUrl: track.previewUrl,
+    audioUrl: playbackUrl,
+    previewUrl: playbackUrl,
     metadata: track.metadata,
     providerLinks: track.providerLinks,
   });
@@ -147,8 +152,8 @@ function mapReleaseTrackToViewModel(
     durationMs: track.durationMs,
     isrc: track.isrc,
     isExplicit: track.isExplicit,
-    previewUrl: track.previewUrl,
-    audioUrl: track.audioUrl,
+    previewUrl: playbackUrl,
+    audioUrl: playbackUrl,
     audioFormat: track.audioFormat,
     lyrics: track.lyrics,
     previewSource: previewState.previewSource,

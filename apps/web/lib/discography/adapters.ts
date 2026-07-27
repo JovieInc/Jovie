@@ -1,3 +1,4 @@
+import { resolveRecordingPlayback } from '@/lib/audio/playback-derivative';
 import { toISOStringOrFallback } from '@/lib/utils/date';
 import {
   derivePreviewState,
@@ -76,9 +77,11 @@ export function mapTrackToViewModel(params: {
   releaseSlug: string;
 }): TrackViewModel {
   const { track, providerLabels, profileHandle, releaseSlug } = params;
+  const playback = resolveRecordingPlayback(track);
+  const playbackUrl = playback.url;
   const previewState = derivePreviewState({
-    audioUrl: track.audioUrl,
-    previewUrl: track.previewUrl,
+    audioUrl: playbackUrl,
+    previewUrl: playbackUrl,
     metadata: track.metadata,
     providerLinks: track.providerLinks,
   });
@@ -101,8 +104,8 @@ export function mapTrackToViewModel(params: {
     durationMs: track.durationMs,
     isrc: track.isrc,
     isExplicit: track.isExplicit,
-    previewUrl: track.previewUrl,
-    audioUrl: track.audioUrl,
+    previewUrl: playbackUrl,
+    audioUrl: playbackUrl,
     audioFormat: track.audioFormat,
     previewSource: previewState.previewSource,
     previewVerification: previewState.previewVerification,
