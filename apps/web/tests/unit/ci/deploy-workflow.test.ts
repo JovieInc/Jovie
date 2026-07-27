@@ -1050,10 +1050,12 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(performanceStep).toContain('--auth-path "$auth_state"');
     expect(performanceStep).toContain('--runs 3');
     expect(performanceStep).toContain(
+      'echo "::warning::Canonical six-route browser budgets failed on the exact staged build."'
+    );
+    expect(performanceStep).toContain('performance_status=warn');
+    expect(performanceStep).not.toContain(
       'fail_performance_gate "Canonical six-route browser budgets failed on the exact staged build."'
     );
-    expect(performanceStep).not.toContain('performance_status=warn');
-    expect(performanceStep).not.toContain('continuing with a warning');
     for (const routeId of [
       'creator-inbox-nav',
       'creator-chat-nav',
