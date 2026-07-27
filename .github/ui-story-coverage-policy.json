@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "owner": "Gem",
+  "mode": "audit",
+  "cleanBaselineRunsRequired": 5,
+  "verifiedCleanRunIds": [],
+  "blockingAfter": null,
+  "minimumPullRequestNumber": null
+}

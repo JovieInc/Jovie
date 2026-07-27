@@ -219,7 +219,10 @@
     "gate-ladder:validate": "node scripts/gate-ladder/validate.mjs",
     "gate-ladder:list": "node scripts/gate-ladder/run.mjs --list",
     "gate-ladder:test": "node --test scripts/gate-ladder/gate-ladder.test.mjs",
-    "storybook:quality": "node scripts/storybook-story-quality-guard.mjs"
+    "storybook:quality": "node scripts/storybook-story-quality-guard.mjs",
+    "story-coverage:check": "node scripts/story-coverage-ratchet.mjs",
+    "story-coverage:measure": "node scripts/story-coverage-ratchet.mjs measure",
+    "story-coverage:audit": "node scripts/ui-story-coverage-policy.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

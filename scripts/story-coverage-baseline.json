@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "dimension": "packages-ui-atom-story-coverage-percent",
+  "direction": "lock_up",
+  "percent": 100,
+  "covered": 35,
+  "total": 35,
+  "updatedAt": "2026-07-26T21:45:00.000Z",
+  "note": "Coverage may only increase. Audit broader UI surfaces before graduating the forward-only gate."
+}

@@ -102,9 +102,10 @@ describe('ci-harness manifest', () => {
       expect(gate.remediation, gate.id).toMatch(/\S/);
       expect(gate.tier, gate.id).toMatch(/\S/);
     }
-    // Non-gate deploy/cleanup jobs must not pollute PR Ready documentation.
+    // Non-gate audit/deploy/cleanup jobs must not pollute PR Ready documentation.
     const nonGates = (manifest.jobs ?? []).filter(job => !job.mergeGate);
     expect(nonGates.map(job => job.name)).toEqual([
+      'UI Story Coverage Audit (shadow)',
       'Lighthouse (public routes manual)',
       'Lighthouse (dashboard manual)',
       'Lighthouse (onboarding manual)',

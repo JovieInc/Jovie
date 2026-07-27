@@ -1,0 +1,153 @@
+name: UI Story Coverage Audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'apps/web/app/**/*.tsx'
+      - 'apps/web/components/**'
+      - 'apps/web/.storybook/**'
+      - 'apps/web/styles/**'
+      - 'packages/ui/**'
+      - 'chromatic.config.json'
+      - '.github/ui-story-coverage-policy.json'
+      - '.github/workflows/ui-story-coverage-audit.yml'
+      - 'scripts/story-coverage-*'
+      - 'scripts/ui-story-coverage-policy.mjs'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/app/**/*.tsx'
+      - 'apps/web/components/**'
+      - 'apps/web/.storybook/**'
+      - 'apps/web/styles/**'
+      - 'packages/ui/**'
+      - 'chromatic.config.json'
+      - '.github/ui-story-coverage-policy.json'
+      - '.github/workflows/ui-story-coverage-audit.yml'
+      - 'scripts/story-coverage-*'
+      - 'scripts/ui-story-coverage-policy.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-story-coverage-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: UI Story Coverage Audit (shadow)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve exact audit range and trusted policy
+        id: range
+        shell: bash
+        env:
+          TRUSTED_DIR: ${{ runner.temp }}/ui-story-coverage-policy
+        run: |
+          set -euo pipefail
+          mkdir -p "$TRUSTED_DIR"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            base="origin/${{ github.base_ref }}"
+            base_has_script=false
+            base_has_policy=false
+            git cat-file -e "${base}:scripts/ui-story-coverage-policy.mjs" &&
+              base_has_script=true
+            git cat-file -e "${base}:.github/ui-story-coverage-policy.json" &&
+              base_has_policy=true
+            if [ "$base_has_script" = "true" ] &&
+              [ "$base_has_policy" = "true" ]; then
+              git show "${base}:scripts/ui-story-coverage-policy.mjs" > "$TRUSTED_DIR/policy.mjs"
+              git show "${base}:.github/ui-story-coverage-policy.json" > "$TRUSTED_DIR/policy.json"
+            elif [ "$base_has_script" = "false" ] &&
+              [ "$base_has_policy" = "false" ]; then
+              cp scripts/ui-story-coverage-policy.mjs "$TRUSTED_DIR/policy.mjs"
+              cp .github/ui-story-coverage-policy.json "$TRUSTED_DIR/policy.json"
+              jq -e '.mode == "audit"' "$TRUSTED_DIR/policy.json" >/dev/null || {
+                echo "::error::Initial UI coverage rollout must bootstrap in audit mode."
+                exit 1
+              }
+              echo "::notice::Bootstrapping the trusted UI coverage policy in audit mode."
+            else
+              echo "::error::Base UI coverage policy is only partially installed."
+              exit 1
+            fi
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            [[ "${{ github.event.before }}" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "::error::UI audit push has no exact before SHA."
+              exit 1
+            }
+            base="${{ github.event.before }}"
+            cp scripts/ui-story-coverage-policy.mjs "$TRUSTED_DIR/policy.mjs"
+            cp .github/ui-story-coverage-policy.json "$TRUSTED_DIR/policy.json"
+          else
+            git fetch --no-tags origin main
+            base="origin/main^"
+            cp scripts/ui-story-coverage-policy.mjs "$TRUSTED_DIR/policy.mjs"
+            cp .github/ui-story-coverage-policy.json "$TRUSTED_DIR/policy.json"
+          fi
+          {
+            echo "base=$base"
+            echo "script=$TRUSTED_DIR/policy.mjs"
+            echo "policy=$TRUSTED_DIR/policy.json"
+          } >> "$GITHUB_OUTPUT"
+      - name: Audit changed UI coverage
+        id: audit
+        shell: bash
+        env:
+          REPORT_PATH: ${{ runner.temp }}/ui-story-coverage-report.json
+        run: |
+          set +e
+          node "${{ steps.range.outputs.script }}" \
+            --root="$GITHUB_WORKSPACE" \
+            --policy="${{ steps.range.outputs.policy }}" \
+            --diff-base="${{ steps.range.outputs.base }}" \
+            --pr-number="${{ github.event.pull_request.number || '0' }}" \
+            --opened-at="${{ github.event.pull_request.created_at || '1970-01-01T00:00:00Z' }}" \
+            --report="$REPORT_PATH"
+          status=$?
+          set -e
+
+          if [ ! -f "$REPORT_PATH" ]; then
+            jq -n \
+              --arg owner "Gem" \
+              --arg mode "$(jq -r '.mode // "invalid"' "${{ steps.range.outputs.policy }}" 2>/dev/null || echo invalid)" \
+              --arg reason "audit harness failed before producing a report" \
+              '{schemaVersion: 1, owner: $owner, mode: $mode, applicable: true, changedUiPaths: [], clean: false, issues: [{path: ".github/ui-story-coverage-policy.json", reason: $reason}]}' \
+              > "$REPORT_PATH"
+          fi
+
+          jq -r '
+            "## UI Story Coverage Audit\n\n" +
+            "- Mode: `" + .mode + "`\n" +
+            "- Owner: `" + .owner + "`\n" +
+            "- Applicable UI paths: " + (.changedUiPaths | length | tostring) + "\n" +
+            "- Findings: " + (.issues | length | tostring)
+          ' "$REPORT_PATH" >> "$GITHUB_STEP_SUMMARY"
+
+          mode="$(jq -r '.mode' "$REPORT_PATH")"
+          if [ "$status" -ne 0 ]; then
+            echo "::error::UI story coverage did not produce clean evidence (status $status, mode $mode)."
+          fi
+          if [ "$mode" = "blocking" ] && [ "$status" -ne 0 ]; then
+            exit "$status"
+          fi
+          # Audit and grandfathered findings stay visible but do not participate
+          # in merge readiness or production authorization.
+          exit 0
+      - name: Upload authoritative audit report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-story-coverage-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ui-story-coverage-report.json
+          if-no-files-found: error
+          retention-days: 30
