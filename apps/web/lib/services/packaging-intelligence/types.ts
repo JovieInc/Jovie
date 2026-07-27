@@ -1,3 +1,7 @@
+import type {
+  AudioTranscriptionProvenance,
+  AudioTranscriptionSegment,
+} from '@jovie/audio-contracts';
 import { z } from 'zod';
 
 // -----------------------------------------------------------------------------
@@ -41,10 +45,12 @@ export type TitleLengthBias = z.infer<typeof titleLengthBiasSchema>;
 export const transcriptSegmentSchema = z.object({
   startSeconds: z.number().min(0),
   durationSeconds: z.number().min(0),
-  text: z.string(),
+  text: z.string().trim().min(1),
+  confidence: z.number().min(0).max(1).optional(),
+  isFinal: z.boolean().optional(),
 });
 
-export type TranscriptSegment = z.infer<typeof transcriptSegmentSchema>;
+export type TranscriptSegment = AudioTranscriptionSegment;
 
 export const packagingPromiseSchema = z.object({
   title: z.string(),
@@ -79,6 +85,7 @@ export interface PackagingIntelligence {
   readonly niche: PackagingLlmOutput['niche'];
   readonly priors: NichePriors;
   readonly transcriptSource: 'provided' | 'captions' | 'asr' | 'none';
+  readonly transcriptProvenance: AudioTranscriptionProvenance;
   readonly modelUsed: string;
   readonly analyzedAt: string;
 }
@@ -93,9 +100,14 @@ export interface AnalyzeVideoPackagingInput {
   readonly sessionId?: string | null;
 }
 
+export interface AsrTranscriptProviderResult {
+  readonly segments: readonly TranscriptSegment[];
+  readonly provenance: AudioTranscriptionProvenance;
+}
+
 export type AsrTranscriptProvider = (
   videoId: string
-) => Promise<readonly TranscriptSegment[] | null>;
+) => Promise<readonly TranscriptSegment[] | AsrTranscriptProviderResult | null>;
 
 export interface AnalyzeVideoPackagingOptions {
   readonly asrProvider?: AsrTranscriptProvider;

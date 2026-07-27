@@ -1,5 +1,9 @@
 import 'server-only';
 
+import {
+  type AudioTranscriptionProvenance,
+  createAudioTranscriptionProvenance,
+} from '@jovie/audio-contracts';
 import { serverFetch } from '@/lib/http/server-fetch';
 import { logger } from '@/lib/utils/logger';
 import { analyzePackagingWithLlm } from './analyze';
@@ -11,6 +15,7 @@ import {
 import {
   type AnalyzeVideoPackagingInput,
   type AnalyzeVideoPackagingOptions,
+  type AsrTranscriptProviderResult,
   getNichePriors,
   type PackagingIntelligence,
   type TranscriptSegment,
@@ -103,6 +108,12 @@ function segmentsToPlainText(segments: readonly TranscriptSegment[]): string {
     .trim();
 }
 
+function isStructuredAsrResult(
+  value: readonly TranscriptSegment[] | AsrTranscriptProviderResult | null
+): value is AsrTranscriptProviderResult {
+  return value !== null && !Array.isArray(value);
+}
+
 async function resolveTranscript(
   videoId: string,
   providedSegments: readonly TranscriptSegment[] | undefined,
@@ -110,24 +121,59 @@ async function resolveTranscript(
 ): Promise<{
   segments: readonly TranscriptSegment[];
   source: TranscriptSource;
+  provenance: AudioTranscriptionProvenance;
 }> {
   if (providedSegments?.length) {
-    return { segments: providedSegments, source: 'provided' };
+    return {
+      segments: providedSegments,
+      source: 'provided',
+      provenance: createAudioTranscriptionProvenance({
+        provider: 'user',
+        execution: 'provided',
+      }),
+    };
   }
 
   const captionSegments = await fetchVideoCaptions(videoId);
   if (captionSegments.length > 0) {
-    return { segments: captionSegments, source: 'captions' };
+    return {
+      segments: captionSegments,
+      source: 'captions',
+      provenance: createAudioTranscriptionProvenance({
+        provider: 'youtube-captions',
+        execution: 'network',
+      }),
+    };
   }
 
   if (asrProvider) {
-    const asrSegments = await asrProvider(videoId);
-    if (asrSegments?.length) {
-      return { segments: asrSegments, source: 'asr' };
+    const asrResult = await asrProvider(videoId);
+    const structuredResult = isStructuredAsrResult(asrResult);
+    const asrSegments: readonly TranscriptSegment[] = structuredResult
+      ? asrResult.segments
+      : (asrResult ?? []);
+    if (asrSegments.length) {
+      return {
+        segments: asrSegments,
+        source: 'asr',
+        provenance:
+          (structuredResult ? asrResult.provenance : null) ??
+          createAudioTranscriptionProvenance({
+            provider: 'server-asr',
+            execution: 'network',
+          }),
+      };
     }
   }
 
-  return { segments: [], source: 'none' };
+  return {
+    segments: [],
+    source: 'none',
+    provenance: createAudioTranscriptionProvenance({
+      provider: 'none',
+      execution: 'unavailable',
+    }),
+  };
 }
 
 export async function analyzeVideoPackaging(
@@ -138,7 +184,7 @@ export async function analyzeVideoPackaging(
   const title = input.title ?? videoContext?.title ?? 'Untitled video';
   const description = input.description ?? videoContext?.description ?? '';
   const thumbnailUrl = input.thumbnailUrl ?? videoContext?.thumbnailUrl;
-  const { segments, source } = await resolveTranscript(
+  const { segments, source, provenance } = await resolveTranscript(
     input.videoId,
     input.transcriptSegments,
     options.asrProvider
@@ -165,6 +211,7 @@ export async function analyzeVideoPackaging(
     niche: llmResult.output.niche,
     priors: getNichePriors(llmResult.output.niche.category),
     transcriptSource: source,
+    transcriptProvenance: provenance,
     modelUsed: llmResult.modelUsed,
     analyzedAt: new Date().toISOString(),
   };
