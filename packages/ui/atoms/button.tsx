@@ -240,7 +240,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         normalizedVariant.destructive &&
           DESTRUCTIVE_CLASSES[normalizedVariant.variant],
         className,
-        !isStatic && !isDisabled && 'active:scale-[0.96]',
+        !isStatic &&
+          !isDisabled &&
+          'active:scale-[var(--scale-press)] motion-reduce:active:scale-100',
         isDisabled && 'pointer-events-none'
       ),
       'aria-disabled': isDisabled || undefined,
