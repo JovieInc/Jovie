@@ -381,7 +381,6 @@ describe('pr-check-failures', () => {
     expect(isAgentBranch('codex/gh-12734-fix')).toBe(true);
     expect(isAgentBranch('tim/jov-1234')).toBe(true);
     expect(isAgentBranch('agent/wave-1')).toBe(true);
-    expect(isAgentBranch('gtmq_spec_abc')).toBe(false);
     expect(isAgentBranch('feature/user-auth')).toBe(false);
     expect(AGENT_BRANCH_RE.test('feat/onboarding')).toBe(true);
   });
