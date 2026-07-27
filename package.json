@@ -76,7 +76,7 @@
       "@tootallnate/once": "3.0.1",
       "smol-toml": "1.6.1",
       "srvx": "0.11.13",
-      "@playwright/test": "1.60.0",
+      "@playwright/test": "1.62.0",
       "playwright": "1.60.0",
       "playwright-core": "1.60.0"
     },
@@ -234,7 +234,7 @@
     "@biomejs/biome": "^2.5.1",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^21.2.0",
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.62.0",
     "commitizen": "^4.3.2",
     "csv-parse": "^7.0.1",
     "cz-conventional-changelog": "^3.3.0",
