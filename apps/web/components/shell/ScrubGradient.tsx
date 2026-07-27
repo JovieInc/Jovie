@@ -1,6 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useId } from 'react';
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
 
@@ -125,7 +127,10 @@ export function ScrubGradient({
   const safeCurrent = Number.isFinite(currentTime) ? currentTime : 0;
   const pct =
     safeDuration > 0
-      ? Math.max(0, Math.min(100, (safeCurrent / safeDuration) * 100))
+      ? Math.max(
+          0,
+          Math.min(100, computeRatePercent(safeCurrent, safeDuration, 6))
+        )
       : 0;
   const playedX = (pct / 100) * SCRUB_W;
   const sectionFromX = loopSection ? (loopSection.from / 100) * SCRUB_W : 0;
@@ -183,7 +188,13 @@ export function ScrubGradient({
           {cues.map(c => {
             const cuePercent =
               safeDuration > 0
-                ? Math.max(0, Math.min(100, (c.atSeconds / safeDuration) * 100))
+                ? Math.max(
+                    0,
+                    Math.min(
+                      100,
+                      computeRatePercent(c.atSeconds, safeDuration, 6)
+                    )
+                  )
                 : 0;
             const cx = (cuePercent / 100) * SCRUB_W;
             return (
@@ -244,13 +255,18 @@ export function ScrubGradient({
                 safeDuration > 0
                   ? Math.max(
                       0,
-                      Math.min(100, (cue.atSeconds / safeDuration) * 100)
+                      Math.min(
+                        100,
+                        computeRatePercent(cue.atSeconds, safeDuration, 6)
+                      )
                     )
                   : 0;
               return (
-                <button
+                <Button
                   key={cue.id}
                   type='button'
+                  variant='ghost'
+                  size='icon'
                   onClick={() => onCueJump(cue.id)}
                   aria-label={`Jump to ${cue.label} at ${formatTime(cue.atSeconds)}`}
                   disabled={safeDuration <= 0}

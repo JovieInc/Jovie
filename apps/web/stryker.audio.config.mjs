@@ -9,10 +9,10 @@ const config = {
   mutate: [
     // JOV-4391 authority boundary: replacement owns the new element and late
     // events from the prior source cannot mutate singleton state.
-    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:118-119',
-    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:559-567',
+    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:123-124',
+    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:577-583',
     // Equal ids only toggle when their typed source provenance also matches.
-    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:778-793',
+    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:832-844',
     // Ephemeral preview cleanup follows the latest authority state; selection
     // forwards the complete typed source into the singleton.
     'components/organisms/GlobalAudioPreviewAction.tsx:56-65',
@@ -32,13 +32,14 @@ const config = {
     'lib/chat/transcriber.ts',
     // JOV-4386 keeps cue jumps and edit history sample-indexed, revision-safe,
     // queue-persistent, and observable without recording cue values.
-    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:359-443',
-    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:462-463',
-    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:478-480',
-    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:493-499',
-    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:524-528',
-    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:644-647',
-    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:843-844',
+    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:358-463',
+    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:480-483',
+    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:498-500',
+    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:512-519',
+    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:544-547',
+    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:607-669',
+    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:690-705',
+    'components/organisms/release-sidebar/useTrackAudioPlayer.ts:893-897',
   ],
   testFiles: [
     'tests/components/organisms/release-sidebar/useTrackAudioPlayer.test.ts',
