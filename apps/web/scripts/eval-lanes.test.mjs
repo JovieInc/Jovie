@@ -164,8 +164,9 @@ test('fast Vitest config owns the eval-lane regression suite', () => {
     join(webRoot, 'vitest.config.mts'),
     'utf8'
   );
-  expect(defaultConfig).toContain(
-    "export { default } from './vitest.config.fast.mts';"
+  expect(defaultConfig).toContain("import('./vitest.config.fast.mts')");
+  expect(defaultConfig).toMatch(
+    /process\.env\.STORYBOOK_CONFIG_DIR\s*\?\s*\(await import\('\.\/vitest\.config\.storybook\.mts'\)\)\.default\s*:\s*\(await import\('\.\/vitest\.config\.fast\.mts'\)\)\.default/
   );
 
   const fastConfig = readFileSync(
