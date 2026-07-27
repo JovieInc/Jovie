@@ -18,6 +18,7 @@ const config = {
     'lyrics.ts',
     'performance.ts',
     'playback.ts',
+    'transcription.ts',
     '!**/*.test.ts',
   ],
   testFiles: [
@@ -28,6 +29,7 @@ const config = {
     'lyrics.test.ts',
     'performance.test.ts',
     'playback.test.ts',
+    'transcription.test.ts',
   ],
   vitest: {
     configFile: 'vitest.config.mts',

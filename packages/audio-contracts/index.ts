@@ -4,6 +4,7 @@ export * from './capabilities';
 export * from './lyrics';
 export * from './performance';
 export * from './playback';
+export * from './transcription';
 export * from './units';
 
 export const AUDIO_FORMAT_IDS = [
