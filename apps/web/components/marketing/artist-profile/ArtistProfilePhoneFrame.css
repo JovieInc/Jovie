@@ -3,39 +3,104 @@
    matching the original rgba(20,21,28) → rgba(10,11,15) stops. */
 
 .ap-phone-frame {
+  position: relative;
+  isolation: isolate;
   border: 1px solid
-    color-mix(in oklab, var(--color-text-primary-token) 12%, transparent);
+    color-mix(in oklab, var(--color-text-primary-token) 22%, transparent);
   border-radius: 2.4rem;
   background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--color-bg-surface-2) 98%, transparent),
-    color-mix(in oklab, var(--color-bg-surface-0) 98%, transparent)
+    105deg,
+    color-mix(
+        in oklab,
+        var(--color-text-primary-token) 18%,
+        var(--color-bg-surface-2)
+      )
+      0%,
+    var(--color-bg-surface-0) 12%,
+    var(--color-bg-surface-2) 48%,
+    color-mix(
+        in oklab,
+        var(--color-text-primary-token) 10%,
+        var(--color-bg-surface-0)
+      )
+      88%,
+    var(--color-bg-surface-0) 100%
   );
   box-shadow:
     0 34px 100px
     color-mix(in oklab, var(--system-b-cinematic-black) 48%, transparent),
     0 14px 36px
-    color-mix(in oklab, var(--system-b-cinematic-black) 28%, transparent);
+    color-mix(in oklab, var(--system-b-cinematic-black) 28%, transparent),
+    inset 0 1px 0
+    color-mix(in oklab, var(--color-text-primary-token) 22%, transparent),
+    inset 1px 0 0
+    color-mix(in oklab, var(--color-text-primary-token) 10%, transparent);
+}
+
+.ap-phone-frame::before,
+.ap-phone-frame::after {
+  position: absolute;
+  z-index: -1;
+  width: 0.18rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 18%,
+    var(--color-bg-surface-0)
+  );
+  content: "";
+}
+
+.ap-phone-frame::before {
+  top: 18%;
+  left: -0.24rem;
+  height: 11%;
+  box-shadow:
+    0 3.6rem 0
+    color-mix(
+      in oklab,
+      var(--color-text-primary-token) 18%,
+      var(--color-bg-surface-0)
+    ),
+    0 7rem 0
+    color-mix(
+      in oklab,
+      var(--color-text-primary-token) 18%,
+      var(--color-bg-surface-0)
+    );
+}
+
+.ap-phone-frame::after {
+  top: 24%;
+  right: -0.24rem;
+  height: 16%;
 }
 
 .ap-phone-frame__screen {
   border: 1px solid
-    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
+    color-mix(in oklab, var(--color-text-primary-token) 12%, transparent);
   border-radius: 1.85rem;
+  box-shadow: 0 0 0 0.12rem var(--system-b-cinematic-black);
 }
 
 .ap-phone-frame__notch {
-  background: color-mix(
-    in oklab,
-    var(--system-b-cinematic-black) 70%,
-    transparent
-  );
-  box-shadow: 0 0 0 1px
-    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
+  background: var(--system-b-cinematic-black);
+  box-shadow:
+    0 0 0 1px
+    color-mix(in oklab, var(--color-text-primary-token) 6%, transparent),
+    inset 0 1px 0
+    color-mix(in oklab, var(--color-text-primary-token) 5%, transparent);
 }
 
 .ap-phone-frame__overlay {
   background:
+    linear-gradient(
+      112deg,
+      color-mix(in oklab, var(--color-text-primary-token) 5%, transparent),
+      transparent 19%,
+      transparent 72%,
+      color-mix(in oklab, var(--color-text-primary-token) 2%, transparent)
+    ),
     radial-gradient(
       circle at top,
       color-mix(in oklab, var(--color-text-tertiary-token) 14%, transparent),

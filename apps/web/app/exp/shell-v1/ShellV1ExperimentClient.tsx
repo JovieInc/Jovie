@@ -349,6 +349,7 @@ type Thread = {
   id: string;
   title: string;
   status: ThreadStatus;
+  assistantResult?: string;
   entityKind?: 'release' | 'track' | 'task';
   entityId?: string;
   // ISO timestamp — most recent first when sorted descending.
@@ -359,6 +360,23 @@ type Thread = {
 };
 
 const THREADS: Thread[] = [
+  {
+    id: 'outcome-demo',
+    title: 'Prepared the release proof for The Deep End',
+    status: 'complete',
+    assistantResult: [
+      'The release proof is ready to review.',
+      '',
+      '- Organized the finished release artwork and audio in your library',
+      '- Prepared the **Spotify Canvas** variant for approval',
+      '- Updated the smart link preview for **The Deep End**',
+      '',
+      'Nothing has been published. Review the release details in the rail, then approve the assets you want to use.',
+    ].join('\n'),
+    entityKind: 'release',
+    entityId: 'the-deep-end',
+    updatedAt: '2026-04-26T10:12:00Z',
+  },
   {
     id: 'thr-1',
     title: 'Rendering 9:16 lyric video for The Deep End',
@@ -1713,6 +1731,12 @@ function formatStreams(n: number) {
 function ShellV1ExperimentContent() {
   const searchParams = useSearchParams();
   const initialView = parseCanvasViewParam(searchParams.get('view'));
+  const initialThreadParam = searchParams.get('thread');
+  const initialThreadId =
+    initialView === 'thread' &&
+    THREADS.some(thread => thread.id === initialThreadParam)
+      ? initialThreadParam
+      : null;
   const initialReleaseParam = searchParams.get('release');
   const hideInternalTools =
     searchParams.get('capture') === 'marketing' ||
@@ -1774,7 +1798,10 @@ function ShellV1ExperimentContent() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchPills, setSearchPills] = useState<FilterPill[]>([]);
   const [keyMode, setKeyMode] = useState<'normal' | 'camelot'>('normal');
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(
+    initialThreadId
+  );
+  const [threadRailOpen, setThreadRailOpen] = useState(true);
   // Threads the user has opened in this session — clears the per-thread
   // unread highlight in the sidebar.
   const [readThreadIds, setReadThreadIds] = useState<ReadonlySet<string>>(
@@ -1782,6 +1809,7 @@ function ShellV1ExperimentContent() {
   );
   const openThread = (id: string) => {
     setSelectedThreadId(id);
+    setThreadRailOpen(true);
     setView('thread');
     setReadThreadIds(prev => {
       if (prev.has(id)) return prev;
@@ -1790,6 +1818,10 @@ function ShellV1ExperimentContent() {
       return next;
     });
   };
+  useEffect(() => {
+    setSelectedThreadId(initialThreadId);
+    setThreadRailOpen(true);
+  }, [initialThreadId]);
   const decoratedThreads = useMemo<Thread[]>(
     () =>
       THREADS.map(t =>
@@ -2172,6 +2204,17 @@ function ShellV1ExperimentContent() {
   // bar hides, header chrome falls away. The chat IS the surface; the
   // shell reveals itself only after the user crosses the onboarding line.
   const onboardingActive = view === 'onboarding';
+  const selectedThread =
+    THREADS.find(thread => thread.id === selectedThreadId) ?? null;
+  const contextualThreadReleaseId =
+    view === 'thread' &&
+    threadRailOpen &&
+    selectedThread?.entityKind === 'release'
+      ? selectedThread.entityId
+      : null;
+  const releaseRailId =
+    view === 'releases' ? selectedReleaseId : contextualThreadReleaseId;
+  const releaseRailOpen = releaseRailId !== null;
   const cinematicStyle = cinematic
     ? {
         opacity: 0,
@@ -2217,7 +2260,7 @@ function ShellV1ExperimentContent() {
             transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), background-color var(--ds-motion-subtle-duration) ease-out`,
           } as React.CSSProperties
         }
-        className='shell-v1 flex h-dvh w-full overflow-hidden bg-(--linear-bg-page) lg:gap-2 lg:p-2'
+        className='shell-v1 system-b-product-shell dark flex h-dvh w-full overflow-hidden bg-(--linear-bg-page) lg:gap-2 lg:p-2'
       >
         {/* Theme focus-visible globally inside this experiment so we never get
           the browser's royal-blue ring on any tabbable element. Cyan-300 at
@@ -2672,27 +2715,29 @@ function ShellV1ExperimentContent() {
                 gate so the canvas is interactive while the drawer animates
                 away. */}
               <div
-                aria-hidden={
-                  !(view === 'releases' && selectedReleaseId !== null)
-                }
+                aria-hidden={!releaseRailOpen}
                 className='absolute inset-y-0 right-0 z-30 w-103 pointer-events-none'
                 style={{
-                  transform:
-                    view === 'releases' && selectedReleaseId !== null
-                      ? 'translateX(0)'
-                      : 'translateX(calc(100% + 16px))',
+                  transform: releaseRailOpen
+                    ? 'translateX(0)'
+                    : 'translateX(calc(100% + 16px))',
                   transition: `transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
                 }}
               >
                 <div className='h-full pointer-events-auto shadow-[0_24px_48px_-16px_rgba(0,0,0,0.55),-1px_0_0_0_rgba(255,255,255,0.04)]'>
                   <ReleaseDrawer
                     release={
-                      view === 'releases' && selectedReleaseId
-                        ? (RELEASES.find(r => r.id === selectedReleaseId) ??
-                          null)
+                      releaseRailId
+                        ? (RELEASES.find(r => r.id === releaseRailId) ?? null)
                         : null
                     }
-                    onClose={() => setSelectedReleaseId(null)}
+                    onClose={() => {
+                      if (view === 'thread') {
+                        setThreadRailOpen(false);
+                      } else {
+                        setSelectedReleaseId(null);
+                      }
+                    }}
                     onPlay={id => {
                       setPlayingReleaseId(id);
                       setIsPlaying(true);
@@ -4378,6 +4423,9 @@ function findRunningThreadFor(
 // Tiny pulsing affordance shown on entity rows when a thread is
 // running for that entity. Click → opens the thread in the canvas.
 function mockThreadMarkdown(thread: Thread): string {
+  if (thread.assistantResult) {
+    return thread.assistantResult;
+  }
   if (thread.status === 'errored') {
     return [
       'I hit a snag. The upstream renderer rejected the spatial job — master rate exceeds the 96 kHz upper bound.',
@@ -4407,54 +4455,58 @@ function mockThreadMarkdown(thread: Thread): string {
   ].join('\n');
 }
 
-// 16:10 placeholder used by the "complete" branch of the design demo.
-// Tiny dark-rect SVG keeps visual parity with the inline gradient
-// previously rendered when ThreadImageCard had no previewUrl.
-const THREAD_DEMO_PREVIEW =
-  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 10'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23292c33'/><stop offset='1' stop-color='%2310131a'/></linearGradient></defs><rect width='16' height='10' fill='url(%23g)'/></svg>";
+const THREAD_DEMO_PREVIEW = '/img/releases/the-deep-end.jpg';
 
 function ThreadView({ thread }: { thread: Thread }) {
   return (
-    <ShellThreadView thread={thread}>
-      <ThreadTurn speaker='jovie'>
-        <ChatMarkdown content={mockThreadMarkdown(thread)} />
-      </ThreadTurn>
-      {thread.status === 'complete' && (
-        <>
-          <ThreadImageCard
-            prompt='The Deep End · Spotify Canvas'
-            status='ready'
-            previewUrl={THREAD_DEMO_PREVIEW}
-          />
-          <ThreadAudioCard
-            title='The Deep End'
-            artist='Cosmic Gate & Tim White'
-            duration='3:33'
-          />
-          <ThreadVideoCard
-            title='The Deep End · lyric video'
-            durationSec={34}
-          />
-        </>
-      )}
-      {thread.status === 'running' && (
-        <>
-          <ThreadImageCard
-            prompt='The Deep End · Spotify Canvas'
-            status='generating'
-          />
-          <ThreadTurn speaker='jovie' subtle>
-            <span className='inline-flex items-center gap-1.5'>
-              <Loader2
-                className='h-3 w-3 animate-spin text-quaternary-token'
-                strokeWidth={2.25}
-              />
-              Generating…
-            </span>
-          </ThreadTurn>
-        </>
-      )}
-    </ShellThreadView>
+    <div
+      className='h-full'
+      data-testid={
+        thread.id === 'outcome-demo' ? 'shell-v1-outcome-demo' : undefined
+      }
+    >
+      <ShellThreadView thread={thread}>
+        <ThreadTurn speaker='jovie'>
+          <ChatMarkdown content={mockThreadMarkdown(thread)} />
+        </ThreadTurn>
+        {thread.status === 'complete' && (
+          <>
+            <ThreadImageCard
+              prompt='The Deep End · release artwork'
+              status='ready'
+              previewUrl={THREAD_DEMO_PREVIEW}
+              priority={thread.id === 'outcome-demo'}
+            />
+            <ThreadAudioCard
+              title='The Deep End'
+              artist='Cosmic Gate & Tim White'
+              duration='3:33'
+            />
+            <ThreadVideoCard
+              title='The Deep End · lyric video'
+              durationSec={34}
+            />
+          </>
+        )}
+        {thread.status === 'running' && (
+          <>
+            <ThreadImageCard
+              prompt='The Deep End · Spotify Canvas'
+              status='generating'
+            />
+            <ThreadTurn speaker='jovie' subtle>
+              <span className='inline-flex items-center gap-1.5'>
+                <Loader2
+                  className='h-3 w-3 animate-spin text-quaternary-token'
+                  strokeWidth={2.25}
+                />
+                Generating…
+              </span>
+            </ThreadTurn>
+          </>
+        )}
+      </ShellThreadView>
+    </div>
   );
 }
 

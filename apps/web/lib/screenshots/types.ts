@@ -49,6 +49,11 @@ export interface ScreenshotScenario {
   readonly fixedNow?: string;
   readonly reducedMotion?: boolean;
   /**
+   * Minimum number of annotated foreground/background pairs that must pass
+   * the capture-time WCAG contrast audit before this scenario is exported.
+   */
+  readonly minimumContrastChecks?: number;
+  /**
    * Visible audio player timestamp for this scenario (e.g. "2:14").
    *
    * Set this when the screenshot captures a visible music player so that the

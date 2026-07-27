@@ -143,7 +143,7 @@ test.describe('Homepage', () => {
     await expect(featuresFlyout).toHaveCount(0);
   });
 
-  test('hero exposes one centered artist dashboard at source quality', async ({
+  test('hero exposes one centered product outcome at source quality', async ({
     page,
   }) => {
     const commandCenter = page.getByTestId('homepage-hero-command-center');
@@ -151,7 +151,7 @@ test.describe('Homepage', () => {
     await expect(commandCenter).toBeVisible();
     await expect(
       commandCenter.getByAltText(
-        'Jovie artist dashboard showing an opportunity and the workspace used to act on it'
+        'Jovie chat showing a completed release outcome with The Deep End details open'
       )
     ).toBeVisible();
     await expect(commandCenter.locator('img')).toHaveCount(1);
@@ -205,7 +205,7 @@ test.describe('Homepage', () => {
     }
     await expect(commandCenter.locator('img')).toHaveAttribute(
       'src',
-      /shell-v1-dashboard/
+      /shell-v1-outcome-demo/
     );
   });
 

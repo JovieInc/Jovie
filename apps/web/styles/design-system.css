@@ -2068,6 +2068,7 @@ html[data-profile-initial-mode]
 
 .system-b-marketing.dark,
 .home-viewport.dark,
+.system-b-product-shell.dark,
 .system-b-root-not-found-page.dark {
   --linear-text-primary: #f7f8f8;
   --linear-text-secondary: #d0d6e0;

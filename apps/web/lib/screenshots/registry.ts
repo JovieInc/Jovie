@@ -408,6 +408,23 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       route: '/exp/shell-v1?capture=marketing',
       waitFor: '.shell-v1',
       publicExportPath: 'shell-v1-dashboard.png',
+      minimumContrastChecks: 1,
+    },
+    {
+      id: 'shell-v1-outcome-demo-desktop',
+      title: 'Shell v1 — Completed Outcome Demo',
+      route:
+        '/exp/shell-v1?view=thread&thread=outcome-demo&capture=marketing&player=off',
+      waitFor: '[data-testid="shell-v1-outcome-demo"]',
+      publicExportPath: 'shell-v1-outcome-demo.png',
+    },
+    {
+      id: 'shell-v1-outcome-demo-mobile',
+      title: 'Shell v1 — Completed Outcome Demo Mobile',
+      route:
+        '/exp/shell-v1?view=thread&thread=outcome-demo&capture=marketing&player=off',
+      waitFor: '[data-testid="shell-v1-outcome-demo"]',
+      viewport: 'mobile',
     },
     {
       id: 'shell-v1-library-desktop',
@@ -613,6 +630,7 @@ const PUBLIC_EXPORT_DIMENSIONS: Record<
   'releases-dashboard-sidebar.png': { width: 2880, height: 1800 },
   'shell-v1-dashboard.png': { width: 2880, height: 1800 },
   'shell-v1-library.png': { width: 2880, height: 1800 },
+  'shell-v1-outcome-demo.png': { width: 2880, height: 1800 },
   'shell-v1-releases.png': { width: 2880, height: 1800 },
   'tim-white-profile-contact-phone.png': { width: 780, height: 1688 },
   'tim-white-profile-listen-phone.png': { width: 780, height: 1688 },
