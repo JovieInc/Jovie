@@ -1,10 +1,13 @@
 'use client';
 
+import {
+  getLyricsTimingStatus,
+  type ParsedLyrics,
+} from '@jovie/audio-contracts';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
-  type LyricLine,
   LyricsView,
   type LyricsViewTrack,
 } from '@/components/shell/LyricsView';
@@ -19,12 +22,12 @@ import { isFormElement } from '@/lib/utils/keyboard';
  * the production empty state instead of demo lyric content.
  */
 export function LyricsPageClient({
-  initialLines,
+  initialLyrics,
   initialTrack,
   initialDurationSec,
   trackId,
 }: {
-  readonly initialLines: readonly LyricLine[];
+  readonly initialLyrics: ParsedLyrics;
   readonly initialTrack: LyricsViewTrack;
   readonly initialDurationSec: number;
   readonly trackId: string;
@@ -80,15 +83,20 @@ export function LyricsPageClient({
       ? playbackState.duration
       : initialDurationSec;
   const currentTimeSec = isActive ? playbackState.currentTime : 0;
+  const timingStatus = getLyricsTimingStatus(initialLyrics, durationSec);
+  const timed = timingStatus === 'synced';
 
   return (
     <LyricsView
       track={track}
       durationSec={durationSec}
       currentTimeSec={currentTimeSec}
-      lines={initialLines}
+      lines={initialLyrics.lines}
       onSeek={seek}
-      timed={false}
+      timed={timed}
+      timingStatus={timingStatus}
+      seekEnabled={isActive && timed}
+      syncEnabled={isActive && timed}
       autoFocusView
     />
   );
