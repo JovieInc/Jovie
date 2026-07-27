@@ -4289,8 +4289,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   width: 72%;
   max-width: 72%;
   height: auto;
-  aspect-ratio: 9 / 19.5;
-  padding: var(--space-2);
+  aspect-ratio: 675 / 1397;
 }
 
 .homepage-artist-outcome__screen {

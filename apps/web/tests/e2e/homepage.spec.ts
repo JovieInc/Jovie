@@ -479,7 +479,10 @@ test.describe('Homepage', () => {
     await expect(
       profiles.locator('.homepage-artist-outcome__device')
     ).toHaveCount(3);
-    await expect(profiles.locator('img')).toHaveCount(3);
+    await expect(
+      profiles.locator('.homepage-artist-outcome__screen')
+    ).toHaveCount(3);
+    await expect(profiles.locator('.ap-phone-frame__plate')).toHaveCount(3);
     await expect(
       page.getByTestId('homepage-closed-loop').getByRole('heading', {
         name: 'All your music working while you sleep',
