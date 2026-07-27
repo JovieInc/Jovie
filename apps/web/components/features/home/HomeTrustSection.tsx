@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import {
   ArmadaMusicLogo,
@@ -14,7 +15,8 @@ interface HomeTrustSectionProps {
   /** Label rendered above the logos. Artist-profile and release-notification
    * surfaces use the default ("Trusted by artists and teams releasing on");
    * the homepage hero historically used a shorter variant. */
-  readonly label?: string;
+  readonly label?: ReactNode;
+  readonly ariaLabel?: string;
 }
 
 function getInnerBoxClass(
@@ -60,8 +62,11 @@ export function HomeTrustSection({
   className,
   presentation = 'card',
   label = 'Trusted by artists and teams releasing on',
+  ariaLabel,
 }: Readonly<HomeTrustSectionProps>) {
   const isInlineStrip = presentation === 'inline-strip';
+  const accessibleLabel =
+    ariaLabel ?? (typeof label === 'string' ? label : 'Artist distribution');
   const logoTone = isInlineStrip ? '' : 'text-white/55';
   const innerBoxClass = getInnerBoxClass(isInlineStrip, variant);
   const labelMarginClass = getLabelMarginClass(isInlineStrip, variant);
@@ -76,7 +81,7 @@ export function HomeTrustSection({
           : 'relative z-[1] mx-auto w-full px-5 sm:px-6 lg:px-0',
         className
       )}
-      aria-label={`${label} major labels`}
+      aria-label={`${accessibleLabel} major labels`}
     >
       <div
         className={cn(
@@ -86,7 +91,7 @@ export function HomeTrustSection({
           innerBoxClass
         )}
       >
-        <p
+        <div
           className={cn(
             isInlineStrip
               ? 'system-b-mounted-home-trust-strip-label'
@@ -95,7 +100,7 @@ export function HomeTrustSection({
           )}
         >
           {label}
-        </p>
+        </div>
         <div
           className={cn(
             isInlineStrip
