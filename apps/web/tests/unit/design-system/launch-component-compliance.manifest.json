@@ -1,0 +1,285 @@
+{
+  "version": 1,
+  "issue": "JOV-4482",
+  "mode": "forward-only",
+  "scanTargets": [
+    {
+      "path": "packages/ui/atoms/button.tsx",
+      "owner": "design-system",
+      "allowedImports": [
+        "@jovie/ui/lib/utils",
+        "@radix-ui/react-slot",
+        "class-variance-authority",
+        "react",
+        "./spinner"
+      ]
+    },
+    {
+      "path": "packages/ui/atoms/card.tsx",
+      "owner": "design-system",
+      "allowedImports": [
+        "@jovie/ui/lib/utils",
+        "@radix-ui/react-slot",
+        "class-variance-authority",
+        "react"
+      ]
+    },
+    {
+      "path": "apps/web/components/molecules/EmptyState.tsx",
+      "owner": "design-system",
+      "allowedImports": ["@jovie/ui", "next/link", "react", "@/lib/utils"]
+    },
+    {
+      "path": "apps/web/components/shell/SidebarNavItem.tsx",
+      "owner": "app-shell",
+      "allowedImports": ["@/lib/utils", "./Tooltip"]
+    },
+    {
+      "path": "apps/web/components/organisms/table/molecules/PageToolbar.tsx",
+      "owner": "workspace-system",
+      "allowedImports": ["@jovie/ui", "react", "@/lib/utils", "./ActionBar"]
+    },
+    {
+      "path": "apps/web/components/organisms/table/atoms/TableEmptyState.tsx",
+      "owner": "workspace-system",
+      "allowedImports": [
+        "@/components/molecules/drawer",
+        "@/components/molecules/EmptyState",
+        "@/lib/utils"
+      ]
+    }
+  ],
+  "components": [
+    {
+      "id": "button",
+      "source": "packages/ui/atoms/button.tsx",
+      "owner": "design-system",
+      "semanticJob": "Render shared user actions with one canonical interaction contract.",
+      "variantSets": [
+        {
+          "variable": "buttonVariants",
+          "path": ["variants", "variant"],
+          "allowed": ["primary", "secondary", "tertiary", "ghost", "link"]
+        },
+        {
+          "variable": "buttonVariants",
+          "path": ["variants", "size"],
+          "allowed": ["sm", "md", "lg", "icon"]
+        }
+      ],
+      "typeUnions": [
+        {
+          "name": "DeprecatedButtonVariant",
+          "allowed": [
+            "accent",
+            "outline",
+            "destructive",
+            "frosted",
+            "frosted-ghost",
+            "frosted-outline",
+            "whitePill"
+          ]
+        },
+        {
+          "name": "DeprecatedButtonSize",
+          "allowed": ["default", "xl", "hero"]
+        }
+      ],
+      "states": [
+        { "id": "idle", "story": "Primary" },
+        { "id": "loading", "story": "Loading" },
+        { "id": "disabled", "story": "Disabled" },
+        { "id": "destructive", "story": "Destructive" },
+        { "id": "compact", "story": "Small" }
+      ],
+      "storybook": {
+        "file": "packages/ui/atoms/button.stories.tsx",
+        "requiredExports": [
+          "Primary",
+          "Secondary",
+          "Tertiary",
+          "Ghost",
+          "Destructive",
+          "Link",
+          "Small",
+          "Medium",
+          "Large",
+          "Icon",
+          "Loading",
+          "Disabled",
+          "AllVariants"
+        ]
+      },
+      "testFile": "packages/ui/atoms/button.test.tsx"
+    },
+    {
+      "id": "card",
+      "source": "packages/ui/atoms/card.tsx",
+      "owner": "design-system",
+      "semanticJob": "Render one semantic surface and its content hierarchy.",
+      "variantSets": [
+        {
+          "variable": "cardVariants",
+          "path": ["variants", "variant"],
+          "allowed": ["default", "hoverable"]
+        }
+      ],
+      "typeUnions": [
+        {
+          "name": "CardContentState",
+          "allowed": ["default", "partial", "offline"]
+        }
+      ],
+      "states": [
+        { "id": "default", "story": "Default" },
+        { "id": "interactive", "story": "HoverableInteractive" },
+        { "id": "partial", "story": "PartialData" },
+        { "id": "offline", "story": "InlineOffline" },
+        { "id": "long-content", "story": "LongContent" },
+        { "id": "dark", "story": "DarkTheme" },
+        {
+          "id": "reduced-motion",
+          "sourceMatch": "motion-reduce:transition-none"
+        }
+      ],
+      "storybook": {
+        "file": "packages/ui/atoms/card.stories.tsx",
+        "requiredExports": [
+          "Default",
+          "Hoverable",
+          "HoverableInteractive",
+          "PartialData",
+          "InlineOffline",
+          "LongContent",
+          "DarkTheme"
+        ]
+      },
+      "testFile": "packages/ui/atoms/card.test.tsx"
+    },
+    {
+      "id": "empty-state",
+      "source": "apps/web/components/molecules/EmptyState.tsx",
+      "owner": "design-system",
+      "semanticJob": "Explain one terminal surface state and expose one primary recovery action.",
+      "typeUnions": [
+        {
+          "name": "EmptyStateVariant",
+          "allowed": ["default", "search", "error", "permission"]
+        }
+      ],
+      "states": [
+        { "id": "default", "story": "Default" },
+        { "id": "search", "story": "SearchVariant" },
+        { "id": "error", "story": "ErrorState" },
+        { "id": "permission", "story": "PermissionState" },
+        {
+          "id": "compact",
+          "sourceMatch": "readonly size?: 'default' | 'sm';"
+        }
+      ],
+      "storybook": {
+        "file": "apps/web/components/organisms/EmptyState.stories.tsx",
+        "requiredExports": [
+          "Default",
+          "WithPrimaryAction",
+          "SearchVariant",
+          "ErrorState",
+          "PermissionState",
+          "Gallery"
+        ]
+      },
+      "testFile": "apps/web/tests/unit/EmptyState.test.tsx"
+    }
+  ],
+  "rules": [
+    {
+      "id": "raw-color",
+      "pattern": "(?:(?:[a-z0-9-]+:)*(?:bg|text|border|ring|fill|stroke|outline|divide|accent|caret|decoration|from|via|to|placeholder)-\\[(?:#|rgba?\\(|hsla?\\(|oklch\\(|lch\\(|color(?:-mix)?\\()[^\\]]*\\]|(?:[a-z0-9-]+:)*(?:bg|text|border|ring|fill|stroke|outline|divide|accent|caret|decoration|from|via|to|placeholder)-(?:black|white|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)(?:-\\d{2,3})?(?:\\/\\d+)?|(?:color|backgroundColor|borderColor|outlineColor|fill|stroke)\\s*:\\s*['\"`](?:#|rgba?\\(|hsla?\\(|oklch\\(|lch\\(|color(?:-mix)?\\()[^'\"`]*['\"`])",
+      "flags": "g",
+      "maxDebt": 4
+    },
+    {
+      "id": "arbitrary-shadow",
+      "pattern": "(?:shadow|drop-shadow)-\\[[^\\]]+\\]|boxShadow\\s*:\\s*['\"`][^'\"`]+['\"`]",
+      "flags": "g",
+      "maxDebt": 2
+    },
+    {
+      "id": "raw-button-clone",
+      "pattern": "<button(?=[\\s/>])",
+      "flags": "g",
+      "maxDebt": 1
+    },
+    {
+      "id": "local-loading-primitive",
+      "pattern": "\\banimate-(?:spin|pulse)\\b|\\b(?:Loader2|LoaderCircle)\\b",
+      "flags": "g",
+      "maxDebt": 0
+    }
+  ],
+  "exceptions": [
+    {
+      "rule": "raw-color",
+      "file": "apps/web/components/shell/SidebarNavItem.tsx",
+      "match": "bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)]",
+      "maxOccurrences": 1,
+      "owner": "app-shell",
+      "reason": "The primary sidebar row mixes an existing semantic surface token for reviewed idle contrast.",
+      "reviewTrigger": "Remove when a semantic sidebar-primary idle surface token reproduces this contrast."
+    },
+    {
+      "rule": "raw-color",
+      "file": "apps/web/components/shell/SidebarNavItem.tsx",
+      "match": "hover:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_86%,white_14%)]",
+      "maxOccurrences": 1,
+      "owner": "app-shell",
+      "reason": "The primary sidebar row mixes an existing semantic surface token for reviewed hover contrast.",
+      "reviewTrigger": "Remove when a semantic sidebar-primary hover surface token reproduces this contrast."
+    },
+    {
+      "rule": "raw-color",
+      "file": "apps/web/components/shell/SidebarNavItem.tsx",
+      "match": "before:bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_32%,transparent)]",
+      "maxOccurrences": 1,
+      "owner": "app-shell",
+      "reason": "The nested sidebar guide mixes an existing semantic seam token for the first compact guide.",
+      "reviewTrigger": "Remove when a semantic nested-guide color token reproduces this seam contrast."
+    },
+    {
+      "rule": "raw-color",
+      "file": "apps/web/components/shell/SidebarNavItem.tsx",
+      "match": "after:bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_32%,transparent)]",
+      "maxOccurrences": 1,
+      "owner": "app-shell",
+      "reason": "The nested sidebar guide mixes an existing semantic seam token for the second compact guide.",
+      "reviewTrigger": "Remove when a semantic nested-guide color token reproduces this seam contrast."
+    },
+    {
+      "rule": "arbitrary-shadow",
+      "file": "packages/ui/atoms/button.tsx",
+      "match": "shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_1px_rgba(0,0,0,0.08)]",
+      "maxOccurrences": 1,
+      "owner": "design-system",
+      "reason": "The canonical secondary button uses a reviewed inset elevation that has no semantic shadow alias yet.",
+      "reviewTrigger": "Remove when the button token set gains a secondary-control elevation alias."
+    },
+    {
+      "rule": "arbitrary-shadow",
+      "file": "apps/web/components/shell/SidebarNavItem.tsx",
+      "match": "shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
+      "maxOccurrences": 1,
+      "owner": "app-shell",
+      "reason": "The primary sidebar action uses the reviewed compact-shell inset highlight.",
+      "reviewTrigger": "Remove when the shell token set gains a matching primary-row elevation alias."
+    },
+    {
+      "rule": "raw-button-clone",
+      "file": "apps/web/components/shell/SidebarNavItem.tsx",
+      "match": "<button",
+      "maxOccurrences": 1,
+      "owner": "app-shell",
+      "reason": "This canonical primitive renders the native button consumed by shell navigation.",
+      "reviewTrigger": "Review if SidebarNavItem can compose the shared Button without changing compact row geometry."
+    }
+  ]
+}
