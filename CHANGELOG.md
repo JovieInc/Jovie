@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- **Homepage product proof is readable and true to the app:** the hero now shows a deterministic completed chat outcome with a populated right rail, Artist Profiles use real high-resolution screens inside consistent silver phone frames, and visual guards prevent low contrast, crop seams, and wrapped release titles.
 - [internal] **Merge-group visual CI harness repair:** the filtered web workspace can resolve the repository Chromatic config again, DB-free mobile overflow excludes only explicitly database-backed redirects, and a forward-only Storybook audit now requires five clean runs before newly opened UI PRs can be gated.
 - **Unified app shell migration:** the authenticated app now uses one canonical customer/OV navigation model, header search, route-shaped loading states, chat home, Library filters, release/tour-date/profile rails, audio controls, and privacy-safe navigation telemetry. Better Auth production-artifact tests, route-specific readiness contracts, optimistic profile edit concurrency, and a 21-route performance matrix cover the migration end to end.
 - [internal] **Next.js security update (JOV-2569):** upgraded every application to Next.js 16.2.11, patching middleware authorization bypass, SSRF, Server Action disclosure and denial-of-service, cache-confusion, and image-optimization vulnerabilities.

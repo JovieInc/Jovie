@@ -18,6 +18,7 @@ import { pruneFixedOwnedOutputFiles } from '../../scripts/owned-output-path';
 import { replaceWithAtomicSibling } from './atomic-output';
 import {
   assertNoDevOverlays,
+  assertScreenshotTextContrast,
   CATALOG_OUTPUT_DIR,
   hideTransientUI,
   PUBLIC_EXPORT_DIR,
@@ -142,11 +143,13 @@ async function captureCatalogImage(
     if (scenario.captureTarget === 'locator' && scenario.captureSelector) {
       await page.locator(scenario.captureSelector).first().screenshot({
         path: nextPath,
+        type: 'png',
       });
     } else {
       await page.screenshot({
         path: nextPath,
         fullPage: scenario.fullPage,
+        type: 'png',
       });
     }
 
@@ -311,6 +314,7 @@ async function prepareScenario(
   await waitForSettle(page);
   await hideTransientUI(page);
   await assertNoDevOverlays(page);
+  await assertScreenshotTextContrast(page, scenario.minimumContrastChecks ?? 0);
 
   return scenario;
 }

@@ -11,6 +11,7 @@ import {
 } from '@/components/atoms/StableHeaderSlots';
 import { cn } from '@/lib/utils';
 import { Tooltip } from './Tooltip';
+import './DrawerHero.css';
 
 type DrawerHeroMetaOverflow = 'wrap' | 'scroll';
 
@@ -268,7 +269,7 @@ export function DrawerHero({
             <h2
               title={title}
               className={cn(
-                'flex-1 min-w-0 text-base font-semibold text-primary-token leading-tight',
+                'drawer-hero__title flex-1 min-w-0 font-semibold text-primary-token leading-tight',
                 resolvedTitleLineClamp &&
                   STABLE_HEADER_LINE_CLAMP_CLASSNAME[resolvedTitleLineClamp],
                 stableLayout &&

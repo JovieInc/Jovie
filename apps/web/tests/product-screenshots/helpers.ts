@@ -3,7 +3,7 @@
  */
 
 import { join, resolve } from 'node:path';
-import { Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 export const TIMEOUTS = {
   NAVIGATION: 90_000,
@@ -12,7 +12,7 @@ export const TIMEOUTS = {
   SETTLE: 3_000,
 } as const;
 
-const WEB_ROOT = resolve(import.meta.dirname, '../..');
+const WEB_ROOT = resolve(__dirname, '../..');
 
 export const CATALOG_OUTPUT_DIR = join(
   WEB_ROOT,
@@ -131,6 +131,86 @@ export async function assertNoDevOverlays(page: Page) {
   if (results.length > 0) {
     throw new Error(
       `Dev overlay(s) still visible before screenshot: ${results.join(', ')}`
+    );
+  }
+}
+
+/**
+ * Fail a screenshot before export when an annotated text/surface pair is
+ * unreadable. The annotations live on the production components so the audit
+ * follows the rendered semantic tokens instead of sampling a stale PNG.
+ */
+export async function assertScreenshotTextContrast(
+  page: Page,
+  minimumChecks = 0
+) {
+  const results = await page.evaluate(() => {
+    const parseRgb = (value: string) => {
+      const channels = value
+        .match(/[\d.]+/g)
+        ?.slice(0, 3)
+        .map(Number);
+      return channels?.length === 3 ? channels : null;
+    };
+    const luminance = (channels: number[]) => {
+      const [r = 0, g = 0, b = 0] = channels.map(channel => {
+        const normalized = channel / 255;
+        return normalized <= 0.04045
+          ? normalized / 12.92
+          : ((normalized + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+
+    return Array.from(
+      document.querySelectorAll<HTMLElement>('[data-screenshot-contrast-text]')
+    ).map((textElement, index) => {
+      const surface = textElement.closest<HTMLElement>(
+        '[data-screenshot-contrast-surface]'
+      );
+      if (!surface) {
+        return {
+          index,
+          ratio: 0,
+          error: 'missing annotated contrast surface',
+        };
+      }
+
+      const foreground = parseRgb(getComputedStyle(textElement).color);
+      const background = parseRgb(getComputedStyle(surface).backgroundColor);
+      if (!foreground || !background) {
+        return {
+          index,
+          ratio: 0,
+          error: 'could not resolve computed RGB colors',
+        };
+      }
+
+      const foregroundLuminance = luminance(foreground);
+      const backgroundLuminance = luminance(background);
+      const ratio =
+        (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+        (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+
+      return {
+        index,
+        ratio,
+        foreground: getComputedStyle(textElement).color,
+        background: getComputedStyle(surface).backgroundColor,
+      };
+    });
+  });
+
+  if (results.length < minimumChecks) {
+    throw new Error(
+      `Screenshot contrast audit expected at least ${minimumChecks} annotated pair(s), found ${results.length}`
+    );
+  }
+
+  const failures = results.filter(result => result.ratio < 4.5);
+  if (failures.length > 0) {
+    throw new Error(
+      `Screenshot contrast audit failed: ${JSON.stringify(failures)}`
     );
   }
 }

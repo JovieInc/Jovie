@@ -43,7 +43,7 @@ const HomepageV2FinalCta = dynamic(
   { ssr: true }
 );
 const HERO_PRODUCT_IMAGES = {
-  product: getMarketingExportImage('shell-v1-dashboard-desktop'),
+  product: getMarketingExportImage('shell-v1-outcome-demo-desktop'),
 };
 const DISTRIBUTION_SUPPORT_COPY = {
   primary: 'Music does not stop at distribution.',

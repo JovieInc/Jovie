@@ -35,6 +35,7 @@ describe('experimental route admin gate', () => {
     expect(pages).not.toEqual([]);
     expect(layouts).toEqual(['layout.tsx']);
     expect(layoutSource).toContain('getCurrentAdminPageAccess');
+    expect(layoutSource).toContain('isTestAuthBypassEnabled');
     expect(layoutSource).toContain('notFound()');
     expect(layoutSource).not.toContain('redirect(');
   });

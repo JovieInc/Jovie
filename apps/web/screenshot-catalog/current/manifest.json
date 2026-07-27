@@ -106,8 +106,21 @@
     "publicExportPath": "artist-spec-press-assets-mobile.png"
   },
   {
+    "id": "artist-profile-hero-section-desktop",
+    "title": "Artist Profile Hero Section",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/artist-profiles",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-07-27T07:08:49.887Z",
+    "gitSha": null,
+    "imagePath": "artist-profile-hero-section-desktop.png"
+  },
+  {
     "id": "artist-profile-adaptive-section-desktop",
-    "title": "Artist Profile One Profile Section",
+    "title": "Artist Profile Adaptive Profile Section",
     "group": "marketing",
     "groupLabel": "Marketing",
     "route": "/artist-profiles",
@@ -119,17 +132,17 @@
     "imagePath": "artist-profile-adaptive-section-desktop.png"
   },
   {
-    "id": "artist-profile-built-for-artists-section-desktop",
-    "title": "Artist Profile Built for Artists Section",
+    "id": "artist-profile-outcomes-section-desktop",
+    "title": "Artist Profile Fan Outcomes Section",
     "group": "marketing",
     "groupLabel": "Marketing",
     "route": "/artist-profiles",
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-07-10T11:55:12.967Z",
-    "gitSha": "687065dc93af3b72a1dfbd71a7d2cd5c31a08d2b",
-    "imagePath": "artist-profile-built-for-artists-section-desktop.png"
+    "capturedAt": "2026-07-27T07:09:16.634Z",
+    "gitSha": null,
+    "imagePath": "artist-profile-outcomes-section-desktop.png"
   },
   {
     "id": "artist-profile-capture-section-desktop",
@@ -145,47 +158,34 @@
     "imagePath": "artist-profile-capture-section-desktop.png"
   },
   {
-    "id": "artist-profile-reactivation-section-desktop",
-    "title": "Artist Profile Notify Them Automatically Section",
+    "id": "artist-profile-opinionated-section-desktop",
+    "title": "Artist Profile Opinionated by Design Section",
     "group": "marketing",
     "groupLabel": "Marketing",
     "route": "/artist-profiles",
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-07-10T09:08:43.706Z",
-    "gitSha": "85249905c2a01c27a1c81e580555465281feeef4",
-    "imagePath": "artist-profile-reactivation-section-desktop.png"
+    "capturedAt": "2026-07-27T07:09:41.236Z",
+    "gitSha": null,
+    "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
   {
-    "id": "artist-profile-monetization-section-desktop",
-    "title": "Artist Profile Monetization Section",
+    "id": "artist-profile-spec-wall-section-desktop",
+    "title": "Artist Profile Product Truth Section",
     "group": "marketing",
     "groupLabel": "Marketing",
     "route": "/artist-profiles",
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-07-10T11:56:26.374Z",
-    "gitSha": "687065dc93af3b72a1dfbd71a7d2cd5c31a08d2b",
-    "imagePath": "artist-profile-monetization-section-desktop.png"
-  },
-  {
-    "id": "artist-profile-power-features-section-desktop",
-    "title": "Artist Profile Details That Matter Section",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/artist-profiles",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-07-10T11:56:51.162Z",
-    "gitSha": "687065dc93af3b72a1dfbd71a7d2cd5c31a08d2b",
-    "imagePath": "artist-profile-power-features-section-desktop.png"
+    "capturedAt": "2026-07-27T07:10:06.183Z",
+    "gitSha": null,
+    "imagePath": "artist-profile-spec-wall-section-desktop.png"
   },
   {
     "id": "artist-profile-how-it-works-section-desktop",
-    "title": "Artist Profile Live In 60 Seconds Section",
+    "title": "Artist Profile How It Works Section",
     "group": "marketing",
     "groupLabel": "Marketing",
     "route": "/artist-profiles",
@@ -195,6 +195,32 @@
     "capturedAt": "2026-07-09T23:30:17.839Z",
     "gitSha": "38be0e8534d8c73a4379aa2a85333ec3b6b9c325",
     "imagePath": "artist-profile-how-it-works-section-desktop.png"
+  },
+  {
+    "id": "artist-profile-faq-section-desktop",
+    "title": "Artist Profile FAQ Section",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/artist-profiles",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-07-27T07:10:30.729Z",
+    "gitSha": null,
+    "imagePath": "artist-profile-faq-section-desktop.png"
+  },
+  {
+    "id": "artist-profile-final-cta-section-desktop",
+    "title": "Artist Profile Final CTA Section",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/artist-profiles",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-07-27T07:10:55.295Z",
+    "gitSha": null,
+    "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
     "id": "tim-white-profile-mock-home-mobile",
@@ -580,10 +606,37 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-07-10T06:21:19.658Z",
-    "gitSha": "c305936ad8f8a2ee156a7a8c362c892009388923",
+    "capturedAt": "2026-07-27T05:00:30.651Z",
+    "gitSha": null,
     "imagePath": "shell-v1-dashboard-desktop.png",
     "publicExportPath": "shell-v1-dashboard.png"
+  },
+  {
+    "id": "shell-v1-outcome-demo-desktop",
+    "title": "Shell v1 — Completed Outcome Demo",
+    "group": "dashboard",
+    "groupLabel": "Dashboard",
+    "route": "/exp/shell-v1?view=thread&thread=outcome-demo&capture=marketing&player=off",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "marketing-export", "investor-ready"],
+    "capturedAt": "2026-07-27T05:00:37.844Z",
+    "gitSha": null,
+    "imagePath": "shell-v1-outcome-demo-desktop.png",
+    "publicExportPath": "shell-v1-outcome-demo.png"
+  },
+  {
+    "id": "shell-v1-outcome-demo-mobile",
+    "title": "Shell v1 — Completed Outcome Demo Mobile",
+    "group": "dashboard",
+    "groupLabel": "Dashboard",
+    "route": "/exp/shell-v1?view=thread&thread=outcome-demo&capture=marketing&player=off",
+    "viewport": "mobile",
+    "theme": "dark",
+    "consumers": ["admin", "marketing-export", "investor-ready"],
+    "capturedAt": "2026-07-27T04:45:29.000Z",
+    "gitSha": null,
+    "imagePath": "shell-v1-outcome-demo-mobile.png"
   },
   {
     "id": "shell-v1-library-desktop",

@@ -1,51 +1,34 @@
-/* ArtistProfilePhoneFrame — System B tokenized device chrome. Gradient stops
-   map to the dark surface tokens (surface-2 #161a20 / surface-0 #0a0b0e),
-   matching the original rgba(20,21,28) → rgba(10,11,15) stops. */
+/* ArtistProfilePhoneFrame — front-on silver Pro plate over a real product
+   screenshot. The plate owns the physical chrome and screen-edge highlights;
+   the aperture remains transparent so product pixels are never generated. */
 
 .ap-phone-frame {
-  border: 1px solid
-    color-mix(in oklab, var(--color-text-primary-token) 12%, transparent);
-  border-radius: 2.4rem;
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--color-bg-surface-2) 98%, transparent),
-    color-mix(in oklab, var(--color-bg-surface-0) 98%, transparent)
+  position: relative;
+  isolation: isolate;
+  aspect-ratio: 675 / 1397;
+  filter: drop-shadow(
+    0 var(--space-4) var(--space-2)
+      color-mix(in oklab, var(--system-b-cinematic-black) 18%, transparent)
   );
-  box-shadow:
-    0 34px 100px
-    color-mix(in oklab, var(--system-b-cinematic-black) 48%, transparent),
-    0 14px 36px
-    color-mix(in oklab, var(--system-b-cinematic-black) 28%, transparent);
 }
 
 .ap-phone-frame__screen {
-  border: 1px solid
-    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
-  border-radius: 1.85rem;
+  position: absolute;
+  z-index: 1;
+  inset: 2.8% 5.9% 2.75%;
+  overflow: hidden;
+  border-radius: 12% / 5.5%;
+  background: var(--color-bg-surface-0);
 }
 
-.ap-phone-frame__notch {
-  background: color-mix(
-    in oklab,
-    var(--system-b-cinematic-black) 70%,
-    transparent
-  );
-  box-shadow: 0 0 0 1px
-    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
-}
-
-.ap-phone-frame__overlay {
-  background:
-    radial-gradient(
-      circle at top,
-      color-mix(in oklab, var(--color-text-tertiary-token) 14%, transparent),
-      transparent 35%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--color-text-primary-token) 4%, transparent),
-      transparent 22%,
-      transparent 78%,
-      color-mix(in oklab, var(--system-b-cinematic-black) 22%, transparent)
-    );
+.ap-phone-frame__plate {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }

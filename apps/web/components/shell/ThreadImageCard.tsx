@@ -23,6 +23,7 @@ export type ThreadImageCardProps =
       readonly status: 'ready';
       readonly prompt: string;
       readonly previewUrl: string;
+      readonly priority?: boolean;
       readonly onDownload?: () => void;
       readonly onCopy?: () => void;
       readonly onRegenerate?: () => void;
@@ -58,6 +59,7 @@ export function ThreadImageCard(props: ThreadImageCardProps) {
             sizes='(min-width: 768px) 768px, 100vw'
             className='object-cover'
             unoptimized
+            priority={props.priority}
           />
         )}
       </div>

@@ -4278,7 +4278,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-artist-outcome__media {
   position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
   overflow: hidden;
   margin: 0;
@@ -4286,11 +4286,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-artist-outcome__device {
-  width: auto;
-  max-width: 78%;
-  height: calc(100% - var(--space-4));
-  aspect-ratio: 9 / 19.5;
-  padding: var(--space-2);
+  width: 72%;
+  max-width: 72%;
+  height: auto;
+  aspect-ratio: 675 / 1397;
 }
 
 .homepage-artist-outcome__screen {
