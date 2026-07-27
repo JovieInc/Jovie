@@ -166,7 +166,6 @@ import { SmartLinkRow } from '@/components/shell/SmartLinkRow';
 import type { SparklineTrend } from '@/components/shell/Sparkline';
 import { Stat } from '@/components/shell/Stat';
 import { StatusBadge } from '@/components/shell/StatusBadge';
-import { SuggestionCard } from '@/components/shell/SuggestionCard';
 import { TabletPlayerCard } from '@/components/shell/TabletPlayerCard';
 import { TaskStatusIcon } from '@/components/shell/TaskStatusIcon';
 import { ThreadAudioCard } from '@/components/shell/ThreadAudioCard';
@@ -211,7 +210,11 @@ import { relativeDate as formatRelativeDate } from '@/lib/format-relative-date';
 //      "keyboard shortcuts" sheet can ship later without hunting them down.
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
-import type { CanvasView } from './shell-v1-types';
+import {
+  ShellV1SharedChat,
+  ShellV1SharedChatCanvas,
+} from './ShellV1SharedChat';
+import { type CanvasView, parseCanvasViewParam } from './shell-v1-types';
 import { useShellHotkeys } from './useShellHotkeys';
 
 function isSelfActivationKey(event: React.KeyboardEvent<HTMLElement>): boolean {
@@ -219,23 +222,6 @@ function isSelfActivationKey(event: React.KeyboardEvent<HTMLElement>): boolean {
     event.currentTarget === event.target &&
     (event.key === 'Enter' || event.code === 'Space')
   );
-}
-
-function parseCanvasViewParam(value: string | null): CanvasView {
-  switch (value) {
-    case 'demo':
-    case 'releases':
-    case 'tracks':
-    case 'tasks':
-    case 'library':
-    case 'lyrics':
-    case 'settings':
-    case 'thread':
-    case 'onboarding':
-      return value;
-    default:
-      return 'demo';
-  }
 }
 
 type TrackInfo = {
@@ -2858,8 +2844,18 @@ function ShellV1ExperimentContent() {
 export default function ShellV1ExperimentClient() {
   return (
     <Suspense fallback={<div className='min-h-screen bg-(--color-bg-base)' />}>
-      <ShellV1ExperimentContent />
+      <ShellV1ExperimentRouteContent />
     </Suspense>
+  );
+}
+
+function ShellV1ExperimentRouteContent() {
+  const searchParams = useSearchParams();
+
+  return parseCanvasViewParam(searchParams.get('view')) === 'demo' ? (
+    <ShellV1SharedChat />
+  ) : (
+    <ShellV1ExperimentContent />
   );
 }
 
@@ -3955,113 +3951,8 @@ function UserMenu({
   );
 }
 
-// Dashboard / Home — calm, anti-anxiety HUD with a single-action
-// suggestion carousel at center and the chat composer docked at the
-// bottom of the canvas. No widgets. No HUD overload. Just the most
-// important thing Jovie thinks you should do today.
-type JovieSuggestion = {
-  id: string;
-  kind: 'dsp' | 'geo' | 'booking' | 'release' | 'pitch';
-  title: string;
-  body: string;
-  action: string;
-  // Lower = more urgent. Sorted by confidence × impact (mocked here).
-  rank: number;
-};
-
-const SUGGESTIONS: JovieSuggestion[] = [
-  {
-    id: 'sug-1',
-    kind: 'booking',
-    title: 'Detroit listeners up 340% — book a show',
-    body: 'A promoter at the Magic Stick reached out yesterday. I have a draft pitch ready that ties to your Spotify growth there.',
-    action: 'Review pitch',
-    rank: 1,
-  },
-  {
-    id: 'sug-2',
-    kind: 'dsp',
-    title: 'Spotify claim — possible match',
-    body: '“Jovie Tim” on Spotify (1.2k monthly) shares your bio language and three of your collaborator credits. Confirm if this is yours.',
-    action: 'Confirm match',
-    rank: 2,
-  },
-  {
-    id: 'sug-3',
-    kind: 'release',
-    title: 'The Deep End needs Spotify Canvas',
-    body: 'The release is live. I have three Canvas options ready — pick one, or I’ll ship the lead pick on Wednesday.',
-    action: 'Pick Canvas',
-    rank: 3,
-  },
-  {
-    id: 'sug-4',
-    kind: 'pitch',
-    title: 'Editorial pitch ready for Take Me Over',
-    body: 'I drafted the Spotify editorial pitch. It highlights the Erica Gibson feature and the release story. Send when you’re ready.',
-    action: 'Send pitch',
-    rank: 4,
-  },
-];
-
 function DashboardHome() {
-  const [index, setIndex] = useState(0);
-  const [composerValue, setComposerValue] = useState('');
-  const sorted = useMemo(
-    () => [...SUGGESTIONS].sort((a, b) => a.rank - b.rank),
-    []
-  );
-  const current = sorted[index] ?? sorted[0];
-  const greeting = 'Good morning, Tim';
-  const advance = () => setIndex(i => (i + 1) % sorted.length);
-
-  return (
-    <div className='h-full flex flex-col px-6 pb-4'>
-      {/* Suggestion focus zone — single hero card. No view-all, no
-          carousel chrome. The user can only advance by acting on the
-          card (Dismiss or its primary action), which forces a real
-          decision instead of letting them skim past. */}
-      <div className='flex-1 grid place-items-center min-h-0'>
-        <div className='w-full max-w-120 flex flex-col items-center'>
-          <div className='shrink-0 text-center pb-5'>
-            <h1
-              className='text-mid font-medium text-tertiary-token'
-              style={{ letterSpacing: '-0.012em' }}
-            >
-              {greeting}
-            </h1>
-          </div>
-
-          <SuggestionCard
-            title={current.title}
-            body={current.body}
-            actionLabel={current.action}
-            onDismiss={advance}
-            onAct={advance}
-          />
-        </div>
-      </div>
-
-      {/* Composer locked to the bottom of the canvas. Real production
-          ChatInput from apps/web/components/jovie/components/ChatInput.tsx
-          for the morphing pill surface, slash picker, and chip tray.
-          Backend wiring (useJovieChat / streaming / images) stays stubbed
-          for the design pass — those wires land at flip-time. */}
-      <div className='shrink-0 mt-4 max-w-[45rem] w-full mx-auto'>
-        <ChatInput
-          value={composerValue}
-          onChange={setComposerValue}
-          onSubmit={e => {
-            e?.preventDefault();
-            setComposerValue('');
-          }}
-          isLoading={false}
-          isSubmitting={false}
-          placeholder='Ask Jovie' // ui-casing-allow: brand placeholder
-        />
-      </div>
-    </div>
-  );
+  return <ShellV1SharedChatCanvas />;
 }
 
 // ---------------------------------------------------------------------------

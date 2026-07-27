@@ -12,6 +12,8 @@ import {
   starterActionToSuggestion,
 } from './starter-actions';
 
+export { MAX_MESSAGE_LENGTH } from './chat-constants';
+
 export interface ArtistContext {
   readonly displayName: string;
   readonly username: string;
@@ -101,9 +103,6 @@ export interface ChatError {
   /** Tool-only failures stay inline in the thread and should not pause the composer. */
   readonly suppressComposerPause?: boolean;
 }
-
-/** Maximum allowed message length */
-export const MAX_MESSAGE_LENGTH = 4000;
 
 export interface SocialLinkToolResult {
   readonly success: boolean;
