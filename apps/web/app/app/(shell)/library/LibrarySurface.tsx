@@ -511,7 +511,7 @@ const StatusCell = memo(function StatusCell({
     <span
       role='status'
       className={cn(
-        'system-b-library-status-pill inline-flex h-6 w-fit items-center whitespace-nowrap border px-2 leading-4',
+        'system-b-library-status-pill inline-flex h-6 w-fit items-center border px-2 leading-4',
         releaseStatusClasses(asset.status)
       )}
       data-testid={`library-release-status-${asset.id}`}
@@ -531,7 +531,7 @@ const ApprovalStatusCell = memo(function ApprovalStatusCell({
     <span
       role='status'
       className={cn(
-        'system-b-library-status-pill inline-flex h-6 w-fit items-center whitespace-nowrap border px-2 leading-4',
+        'system-b-library-status-pill inline-flex h-6 w-fit items-center border px-2 leading-4',
         libraryApprovalStatusClasses(asset.approvalStatus)
       )}
       data-testid={`library-approval-status-${asset.id}`}
@@ -1973,7 +1973,7 @@ function ApprovalStatusEditor({
           aria-label='Approval Status'
           data-testid={`library-approval-status-select-${asset.id}`}
           className={cn(
-            'system-b-library-status-pill inline-flex h-6 items-center gap-1 whitespace-nowrap border px-2',
+            'system-b-library-status-pill inline-flex h-6 items-center gap-1 border px-2',
             libraryApprovalStatusClasses(asset.approvalStatus),
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
@@ -2197,7 +2197,7 @@ function AssetDrawer({
                     <span
                       role='status'
                       className={cn(
-                        'system-b-library-status-pill inline-flex h-6 items-center whitespace-nowrap border px-2',
+                        'system-b-library-status-pill inline-flex h-6 items-center border px-2',
                         releaseStatusClasses(current.status)
                       )}
                       data-testid={`library-release-status-${current.id}`}

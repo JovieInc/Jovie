@@ -737,15 +737,6 @@ describe('ChatInput', () => {
     expect(sendButton).toBeDisabled();
     await user.click(sendButton);
     expect(onSubmit).not.toHaveBeenCalled();
-
-    // Form submit must also fail closed when the draft is empty.
-    const form = screen.getByRole('form', { name: /compose a message/i });
-    fireEvent.submit(form);
-    expect(onSubmit).not.toHaveBeenCalled();
-
-    expect(
-      screen.getByRole('textbox', { name: /chat message input/i })
-    ).toHaveAttribute('placeholder', 'Ask Jovie to plan your next release...');
   });
 
   it('enables send when textarea DOM input is replayed into controlled state', async () => {

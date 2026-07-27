@@ -48,7 +48,6 @@ import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
   ONBOARDING_WELCOME_REPLY_KEY,
 } from '@/lib/onboarding/session-keys';
-import { mergePreviewPanelHydration } from '@/lib/profile/preview-panel-optimistic';
 import {
   useDashboardSocialLinksQuery,
   useDeleteConversationMutation,
@@ -454,7 +453,7 @@ export function ChatPageClient({
       string,
       unknown
     > | null;
-    const incoming = {
+    setPreviewData({
       username: activeProfile.username,
       displayName: activeProfile.displayName ?? activeProfile.username,
       avatarUrl: activeProfile.avatarUrl ?? null,
@@ -481,8 +480,7 @@ export function ChatPageClient({
             (profileSettings?.appleMusicArtistName as string | null) ?? null,
         },
       },
-    };
-    setPreviewData(current => mergePreviewPanelHydration(current, incoming));
+    });
   }, [activeProfile, previewLinks, setPreviewData, shouldHydratePreviewData]);
 
   const { copy: copySessionId, isSuccess: sessionIdCopied } = useClipboard({

@@ -123,7 +123,7 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
     );
   });
 
-  it('renders a cardless no-music alert empty state without release leakage', () => {
+  it('renders a sparse no-music alert empty state', () => {
     render(
       <ProfilePrimaryTabPanel
         mode='listen'
@@ -139,16 +139,9 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
     );
 
     expect(screen.getByTestId('profile-primary-tab-music-empty')).toBeVisible();
-    const heading = screen.getByText('No Music');
-    expect(heading).toHaveClass('text-secondary-token');
-    expect(screen.getByTestId('profile-primary-tab-music-empty').tagName).toBe(
-      'OUTPUT'
-    );
+    expect(screen.getByText('No Music')).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Turn On Music Alerts' })
+      screen.getByRole('button', { name: 'Turn on alerts' })
     ).toHaveAttribute('data-source', 'music_empty_state');
-    expect(screen.queryByText('Latest release')).not.toBeInTheDocument();
-    expect(screen.queryByText('Releases')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('mock-releases-view')).not.toBeInTheDocument();
   });
 });

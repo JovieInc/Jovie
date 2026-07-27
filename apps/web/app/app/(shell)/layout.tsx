@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
-import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
+import { CinematicAppBoot } from '@/components/organisms/CinematicAppBoot';
 import { PersistentAudioBar } from '@/components/organisms/PersistentAudioBar';
 import { NuqsProvider } from '@/components/providers/NuqsProvider';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
@@ -28,7 +28,6 @@ import {
   isLyricsShellRoute,
   isReleasesShellRoute,
   isTasksShellRoute,
-  resolveAppShellLoadingPath,
   resolveAppShellRequestPath,
 } from './shell-route-matches';
 
@@ -77,11 +76,6 @@ export default async function AppShellLayout({
       headerStore.get('x-matched-path'),
       headerStore.get('x-invoke-path')
     );
-    const loadingPathname = resolveAppShellLoadingPath(
-      nextUrlHeader,
-      headerStore.get('x-matched-path'),
-      headerStore.get('x-invoke-path')
-    );
     const mode = parseTrustedAppShellMode(
       headerStore.get(APP_SHELL_MODE_HEADER)
     );
@@ -115,23 +109,25 @@ export default async function AppShellLayout({
 
     // Pick the route-specific skeleton main slot.
     let routeMain: React.ReactNode = undefined;
-    if (isChatShellRoute(loadingPathname)) {
+    if (isChatShellRoute(pathname)) {
       routeMain = <ChatLoading />;
-    } else if (isReleasesShellRoute(loadingPathname)) {
+    } else if (isReleasesShellRoute(pathname)) {
       routeMain = <ReleaseTableSkeleton showHeader={false} />;
-    } else if (isLibraryShellRoute(loadingPathname)) {
+    } else if (isLibraryShellRoute(pathname)) {
       routeMain = <LibraryLoadingState />;
-    } else if (isLyricsShellRoute(loadingPathname)) {
+    } else if (isLyricsShellRoute(pathname)) {
       routeMain = <LyricsRouteSkeleton />;
-    } else if (isTasksShellRoute(loadingPathname)) {
+    } else if (isTasksShellRoute(pathname)) {
       routeMain = <TasksRouteSkeleton />;
     }
 
-    // The authenticated shell must remain visible while route data streams.
-    // Route-specific main slots keep the final workspace geometry, avoiding a
-    // separate composer/logo composition or a route-dependent flash.
+    // CinematicAppBoot internally renders <AppShellSkeleton main={routeMain}
+    // /> unless this is the FIRST shell mount of the
+    // tab AND prefers-reduced-motion is off, in which case it plays a 2.4s
+    // cinematic timeline before the underlying tree resolves. Per-tab gate
+    // via sessionStorage flag `jovie:cinematic-boot-played`.
     const shellFallback = (
-      <AppShellSkeleton
+      <CinematicAppBoot
         main={routeMain}
         audioPlayer={audioPlayer}
         brandVariant={mode === 'ov' ? 'ov' : 'jovie'}

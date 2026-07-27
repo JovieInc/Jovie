@@ -19,7 +19,6 @@ describe('AmountSelector System B style guard', () => {
     );
     expect(source).toContain('duration-subtle');
     expect(source).toContain('ease-subtle');
-    expect(source).toContain('h-12 w-full');
-    expect(source).toContain('rounded-full');
+    expect(source).toContain('aspect-square');
   });
 });

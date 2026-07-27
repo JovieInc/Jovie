@@ -10,7 +10,6 @@ const {
   getCurrentAdminPageAccessMock,
   headersMock,
   redirectMock,
-  suspendShellContentMock,
 } = vi.hoisted(() => ({
   dashboardShellContentMock: vi.fn(),
   getAppFlagValueMock: vi.fn(),
@@ -20,7 +19,6 @@ const {
   redirectMock: vi.fn((href: string) => {
     throw new Error(`NEXT_REDIRECT:${href}`);
   }),
-  suspendShellContentMock: { value: false },
 }));
 
 vi.mock('server-only', () => ({}));
@@ -34,9 +32,9 @@ vi.mock('next/navigation', () => ({
   },
 }));
 
-vi.mock('@/components/organisms/AppShellSkeleton', () => ({
-  AppShellSkeleton: ({ main }: { readonly main?: ReactNode }) => (
-    <div data-testid='app-shell-skeleton'>{main}</div>
+vi.mock('@/components/organisms/CinematicAppBoot', () => ({
+  CinematicAppBoot: ({ brandVariant }: { brandVariant?: string }) => (
+    <div data-testid='shell-fallback' data-brand-variant={brandVariant} />
   ),
 }));
 vi.mock('@/components/organisms/PersistentAudioBar', () => ({
@@ -49,7 +47,7 @@ vi.mock('@/components/shell/LyricsRouteSkeleton', () => ({
   LyricsRouteSkeleton: () => null,
 }));
 vi.mock('@/components/shell/TasksRouteSkeleton', () => ({
-  TasksRouteSkeleton: () => <div data-testid='tasks-route-skeleton' />,
+  TasksRouteSkeleton: () => null,
 }));
 vi.mock('@/features/feedback/ErrorBanner', () => ({
   ErrorBanner: () => null,
@@ -72,9 +70,7 @@ vi.mock('@/lib/flags/server', () => ({
   getAppFlagValue: getAppFlagValueMock,
 }));
 
-vi.mock('./chat/loading', () => ({
-  default: () => <div data-testid='chat-route-skeleton' />,
-}));
+vi.mock('./chat/loading', () => ({ default: () => null }));
 vi.mock('./dashboard/releases/loading', () => ({
   ReleaseTableSkeleton: () => null,
 }));
@@ -87,9 +83,6 @@ vi.mock('./DashboardShellContent', () => ({
     readonly mode: string;
   }) => {
     dashboardShellContentMock(props);
-    if (suspendShellContentMock.value) {
-      throw new Promise(() => {});
-    }
     return <div data-shell-mode={props.mode}>{props.children}</div>;
   },
 }));
@@ -101,7 +94,6 @@ describe('AppShellLayout OV mode', () => {
     vi.clearAllMocks();
     getCachedAuthMock.mockResolvedValue({ userId: 'user_test' });
     getAppFlagValueMock.mockResolvedValue(true);
-    suspendShellContentMock.value = false;
   });
 
   it('terminates unauthorized OV requests before shell or flag data loads', async () => {
@@ -150,44 +142,5 @@ describe('AppShellLayout OV mode', () => {
     expect(
       screen.getByText('Customer content').closest('[data-shell-mode]')
     ).toHaveAttribute('data-shell-mode', 'customer');
-  });
-
-  it('keeps every app-shell route on the stable shell fallback while content streams', async () => {
-    headersMock.mockResolvedValue(
-      new Headers({
-        'next-url': APP_ROUTES.TASKS,
-        'x-jovie-app-shell-mode': 'customer',
-      })
-    );
-    suspendShellContentMock.value = true;
-
-    render(await AppShellLayout({ children: <div>Tasks content</div> }));
-
-    expect(screen.getByTestId('app-shell-skeleton')).toContainElement(
-      screen.getByTestId('tasks-route-skeleton')
-    );
-
-    headersMock.mockResolvedValue(
-      new Headers({
-        'next-url': APP_ROUTES.LIBRARY,
-        'x-jovie-app-shell-mode': 'customer',
-      })
-    );
-
-    render(await AppShellLayout({ children: <div>Library content</div> }));
-
-    expect(screen.getAllByTestId('app-shell-skeleton')).toHaveLength(2);
-  });
-
-  it('keeps unknown loading routes neutral instead of flashing chat', async () => {
-    headersMock.mockResolvedValue(
-      new Headers({ 'x-jovie-app-shell-mode': 'customer' })
-    );
-    suspendShellContentMock.value = true;
-
-    render(await AppShellLayout({ children: <div>Unknown content</div> }));
-
-    expect(screen.getByTestId('app-shell-skeleton')).toBeInTheDocument();
-    expect(screen.queryByTestId('chat-route-skeleton')).toBeNull();
   });
 });

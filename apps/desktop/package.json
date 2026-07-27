@@ -10,7 +10,7 @@
     "dev": "tsc && node scripts/launch-electron.mjs",
     "prepare:assets": "node scripts/prepare-icons.mjs && node scripts/generate-dmg-background.mjs",
     "prepare:dmg-background": "node scripts/generate-dmg-background.mjs",
-    "test": "node --test scripts/desktop-icon-contract.test.mjs && pnpm run test:desktop-url-disposition && pnpm run test:desktop-renderer-recovery && pnpm run test:desktop-remote-debugging-guard && pnpm run test:desktop-hud-build-reload && pnpm run test:desktop-csp-watchdog && pnpm run test:desktop-auth-security && pnpm run test:desktop-window-state && pnpm run test:desktop-tray-png && pnpm run test:system-b-tokens && node --test scripts/desktop-shell-contract.test.mjs && node --test scripts/desktop-tray-contract.test.mjs && node --test scripts/launch-electron.test.mjs && node --test scripts/capture-memory-baseline.test.mjs && node --test scripts/generate-dmg-background.test.mjs && node --test ../../scripts/desktop-release-guard.test.mjs && node --test ../../scripts/desktop-installed-apps-audit.test.mjs",
+    "test": "node --test scripts/desktop-icon-contract.test.mjs && pnpm run test:desktop-url-disposition && pnpm run test:desktop-renderer-recovery && pnpm run test:desktop-remote-debugging-guard && pnpm run test:desktop-hud-build-reload && pnpm run test:desktop-csp-watchdog && pnpm run test:desktop-auth-security && pnpm run test:desktop-window-state && pnpm run test:desktop-tray-png && pnpm run test:system-b-tokens && node --test scripts/desktop-shell-contract.test.mjs && node --test scripts/desktop-tray-contract.test.mjs && node --test scripts/launch-electron.test.mjs && node --test scripts/generate-dmg-background.test.mjs && node --test ../../scripts/desktop-release-guard.test.mjs && node --test ../../scripts/desktop-installed-apps-audit.test.mjs",
     "test:desktop-icon": "node --test scripts/desktop-icon-contract.test.mjs",
     "test:desktop-url-disposition": "vitest run --config vitest.config.mts scripts/desktop-url-disposition.test.ts",
     "test:desktop-renderer-recovery": "vitest run --config vitest.config.mts scripts/renderer-recovery.test.ts",
@@ -23,8 +23,6 @@
     "test:system-b-tokens": "vitest run --config vitest.config.mts scripts/system-b-tokens.test.ts",
     "test:desktop-shell": "node --test scripts/desktop-shell-contract.test.mjs",
     "test:launch-electron": "node --test scripts/launch-electron.test.mjs",
-    "test:memory": "node --test scripts/capture-memory-baseline.test.mjs",
-    "memory": "node scripts/capture-memory-baseline.mjs",
     "test:dmg-background": "node --test scripts/generate-dmg-background.test.mjs",
     "test:release-guard": "node --test ../../scripts/desktop-release-guard.test.mjs",
     "prebuild:staging": "node scripts/sync-version.mjs && cross-env ELECTRON_ENV=staging node scripts/write-env.mjs && pnpm run prepare:assets",
@@ -48,7 +46,7 @@
     "@types/node": "^22.0.0",
     "cross-env": "^7.0.3",
     "electron": "^42.0.0",
-    "electron-builder": "^26.15.3",
+    "electron-builder": "^25.0.0",
     "sharp": "^0.35.3",
     "typescript": "^5.7.0"
   }

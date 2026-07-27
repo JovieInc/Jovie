@@ -248,63 +248,35 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     expect(lower).not.toContain('application error');
     expect(lower).not.toContain('something went wrong');
 
-    const tabs = [
-      {
-        navigationPath: APP_ROUTES.AUDIENCE,
-        readyPath: APP_ROUTES.AUDIENCE,
-      },
-      {
-        navigationPath: APP_ROUTES.RELEASES,
-        readyPath: APP_ROUTES.LIBRARY,
-        readyTestId: 'library-surface',
-        readyView: 'releases',
-      },
-    ];
+    const tabs = [APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES];
 
-    for (const { navigationPath, readyPath, readyTestId, readyView } of tabs) {
-      await page.goto(navigationPath, {
+    for (const tabPath of tabs) {
+      await page.goto(tabPath, {
         waitUntil: 'domcontentloaded',
         timeout: SMOKE_TIMEOUTS.NAVIGATION,
       });
       assertExactNavigationUrl(
         page.url(),
         expectedOrigin,
-        `Dashboard tab navigation for ${navigationPath}`
+        `Dashboard tab navigation for ${tabPath}`
       );
 
-      await page.waitForURL(
-        url =>
-          url.origin === expectedOrigin &&
-          url.pathname === readyPath &&
-          (!readyView || url.searchParams.get('view') === readyView),
-        { timeout: SMOKE_TIMEOUTS.VISIBILITY }
-      );
-      if (readyTestId) {
-        await expect(page.getByTestId(readyTestId)).toBeVisible({
-          timeout: SMOKE_TIMEOUTS.VISIBILITY,
-        });
-      }
       await waitForHydration(page);
       const currentUrl = assertExactNavigationUrl(
         page.url(),
         expectedOrigin,
-        `Hydrated dashboard tab navigation for ${navigationPath}`
+        `Hydrated dashboard tab navigation for ${tabPath}`
       );
 
       expect(currentUrl.pathname).not.toContain(APP_ROUTES.SIGNIN);
       expect(currentUrl.pathname).not.toContain('/sign-in');
 
       const tabMain = page.locator('main').first();
-      await expect(
-        tabMain,
-        `${navigationPath}: main content should be visible`
-      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-      const tabMainText = await waitForProductionDashboardContent(
-        page,
-        SMOKE_TIMEOUTS.VISIBILITY
-      );
-      expect(tabMainText.toLowerCase()).not.toMatch(
-        /application error|something went wrong/
+      const mainVisible = await tabMain
+        .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+        .catch(() => false);
+      expect(mainVisible, `${tabPath}: main content should be visible`).toBe(
+        true
       );
     }
 

@@ -325,14 +325,10 @@ export function DevToolbar({
     };
   }, []);
 
-  // Restore state from localStorage and mark as mounted.
-  // Compact surfaces (e.g. /app/chat via defaultHidden) always start with the
-  // flag drawer collapsed — only the bottom bar + badge count may show — so a
-  // prior expanded session on another route cannot overwhelm the chat UI.
+  // Restore state from localStorage and mark as mounted
   useEffect(() => {
     setMounted(true);
-    const storedOpen = localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1';
-    setOpen(defaultHidden ? false : storedOpen);
+    setOpen(localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1');
     const storedHidden = localStorage.getItem(TOOLBAR_HIDDEN_KEY);
     setHidden(storedHidden === null ? defaultHidden : storedHidden === '1');
     setSwEnabled(localStorage.getItem(SW_ENABLED_KEY) === '1');
@@ -568,11 +564,6 @@ export function DevToolbar({
     });
   }
 
-  const collapseDrawer = useCallback(() => {
-    setOpen(false);
-    localStorage.setItem(TOOLBAR_STORAGE_KEY, '0');
-  }, []);
-
   const hide = useCallback(() => {
     setHidden(true);
     localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
@@ -602,8 +593,6 @@ export function DevToolbar({
    * no-op overrides don't accumulate. Read current state from the
    * `overrides` map directly (not from `useAppFlag` closure) so rapid
    * double-clicks don't race against a pending re-render.
-   * After selection, collapse the flag drawer so it cannot overwhelm chat
-   * (or other compact surfaces); the override badge keeps the count visible.
    */
   const setOrClearOverride = useCallback(
     (key: string, value: boolean) => {
@@ -616,23 +605,9 @@ export function DevToolbar({
         overridesCtx.setOverride(key, value);
       }
       flashFlag(key);
-      collapseDrawer();
     },
-    [collapseDrawer, flashFlag, overridesCtx]
+    [flashFlag, overridesCtx]
   );
-
-  const clearOverrideAndCollapse = useCallback(
-    (key: string) => {
-      overridesCtx.removeOverride(key);
-      collapseDrawer();
-    },
-    [collapseDrawer, overridesCtx]
-  );
-
-  const clearAllOverridesAndCollapse = useCallback(() => {
-    overridesCtx.clearOverrides();
-    collapseDrawer();
-  }, [collapseDrawer, overridesCtx]);
 
   // Unified flag list: filter by search, sort overrides to top
   const filteredFlags = useMemo(() => {
@@ -847,7 +822,7 @@ export function DevToolbar({
                     <Button
                       type='button'
                       variant='link'
-                      onClick={clearAllOverridesAndCollapse}
+                      onClick={overridesCtx.clearOverrides}
                       className='text-3xs text-(--color-text-tertiary) hover:text-(--color-text-primary) underline transition-colors'
                     >
                       Clear All
@@ -863,7 +838,7 @@ export function DevToolbar({
                         checked={overrides[flag.key]}
                         serverDefault={flag.serverDefault}
                         onCheckedChange={v => setOrClearOverride(flag.key, v)}
-                        onClear={() => clearOverrideAndCollapse(flag.key)}
+                        onClear={() => overridesCtx.removeOverride(flag.key)}
                         source={flag.source}
                       />
                     ))}
@@ -893,7 +868,7 @@ export function DevToolbar({
                         isOverridden={false}
                         checked={checked}
                         onCheckedChange={v => setOrClearOverride(flag.key, v)}
-                        onClear={() => clearOverrideAndCollapse(flag.key)}
+                        onClear={() => overridesCtx.removeOverride(flag.key)}
                         source={flag.source}
                       />
                     );

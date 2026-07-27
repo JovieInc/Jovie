@@ -267,22 +267,6 @@ describe('LibrarySurface', () => {
     expect(source).not.toContain('max-h-[45svh]');
   });
 
-  it('keeps every visible Library status pill on one line', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),
-      'utf8'
-    );
-
-    const statusPillClasses = source.match(
-      /system-b-library-status-pill inline-flex[^']*/gu
-    );
-
-    expect(statusPillClasses).toHaveLength(4);
-    for (const className of statusPillClasses ?? []) {
-      expect(className).toContain('whitespace-nowrap');
-    }
-  });
-
   it('keeps the table on one workspace plane while preserving grid insets', () => {
     const source = readFileSync(
       resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),

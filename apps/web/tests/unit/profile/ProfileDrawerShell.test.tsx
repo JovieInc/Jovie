@@ -128,25 +128,6 @@ describe('ProfileDrawerShell', () => {
     expect(back.className).toMatch(/\bw-11\b/);
   });
 
-  it('optically centers a terminal title between equal header controls', () => {
-    render(
-      <ProfileDrawerShell
-        open
-        onOpenChange={vi.fn()}
-        title='Pay'
-        onBack={vi.fn()}
-        navigationLevel='secondary'
-        centerTitle
-      >
-        <div>Drawer body</div>
-      </ProfileDrawerShell>
-    );
-
-    expect(screen.getByRole('heading', { name: 'Pay' })).toHaveClass(
-      'text-center'
-    );
-  });
-
   it('uses the simplified root header without nav chrome', () => {
     render(
       <ProfileDrawerShell open onOpenChange={vi.fn()} title='Menu'>

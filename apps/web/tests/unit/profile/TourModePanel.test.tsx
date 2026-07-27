@@ -145,22 +145,18 @@ describe('TourModePanel', () => {
     );
   });
 
-  it('renders a cardless full-plane events empty state without music leakage', () => {
+  it('renders the events empty state with the standard surface-1 card treatment', () => {
     render(<TourModePanel artist={artist} tourDates={[]} />);
 
     expect(
       screen.getByTestId('profile-primary-tab-events-empty')
     ).toBeInTheDocument();
-    expect(screen.getByTestId('profile-primary-tab-events-empty').tagName).toBe(
-      'OUTPUT'
-    );
     const heading = screen.getByText('No Events');
-    expect(heading).toHaveClass('text-secondary-token');
-    expect(
-      screen.getByText('Get alerted when shows are announced.')
-    ).toBeVisible();
-    expect(screen.queryByText('Latest release')).not.toBeInTheDocument();
-    expect(screen.queryByText('Releases')).not.toBeInTheDocument();
+    expect(heading).toHaveClass('dark:text-white');
+    expect(heading.className).not.toMatch(/text-\(--color-text-tooltip\)/);
+    const bentoCard = screen.getByTestId('profile-primary-tab-events-empty')
+      .firstChild as HTMLElement;
+    expect(bentoCard.style.background).toContain('var(--color-bg-surface-1)');
   });
 
   it('renders the styled all-shows list when no geolocation is available', () => {

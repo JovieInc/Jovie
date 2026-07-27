@@ -115,34 +115,4 @@ describe('VirtualizedTableRow', () => {
     expect(row.className).toContain('system-b-table-row-selected');
     expect(row.className).toContain('system-b-table-row-focus-within');
   });
-
-  it('keeps pointer activation separate from keyboard-visible row focus', () => {
-    const onRowClick = vi.fn();
-    const onFocusChange = vi.fn();
-
-    render(
-      <table>
-        <tbody>
-          <VirtualizedTableRow
-            {...baseProps}
-            shouldEnableKeyboardNav
-            onFocusChange={onFocusChange}
-            onRowClick={onRowClick}
-          />
-        </tbody>
-      </table>
-    );
-
-    const row = screen.getByRole('row');
-    fireEvent.click(row);
-    expect(onRowClick).toHaveBeenCalledWith({ id: '1', name: 'One' });
-    expect(onFocusChange).not.toHaveBeenCalled();
-
-    const matches = vi
-      .spyOn(row, 'matches')
-      .mockImplementation(selector => selector === ':focus-visible');
-    fireEvent.focus(row);
-    expect(onFocusChange).toHaveBeenCalledWith(0);
-    matches.mockRestore();
-  });
 });

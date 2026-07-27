@@ -37,10 +37,8 @@ interface SidebarNavChromeOptions {
 const SIDEBAR_PRIMARY_CHROME =
   'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_86%,white_14%)]';
 
-// Active state uses type and icon color only. Avoid a left rail so every shared
-// sidebar consumer keeps the same compact, decoration-free geometry.
 const SIDEBAR_ACTIVE_CHROME =
-  'bg-sidebar-accent-active text-white font-medium shadow-none';
+  'bg-sidebar-accent-active text-primary-token font-medium';
 
 const SIDEBAR_INACTIVE_CHROME =
   'text-sidebar-item-foreground hover:bg-sidebar-accent hover:text-sidebar-item-foreground';
@@ -80,9 +78,7 @@ export function getSidebarNavRowClassName({
     collapsed
       ? 'h-7 w-10 mx-auto grid-cols-1 place-items-center before:hidden after:hidden'
       : cn(
-          // Badge track: min 34px keeps empty rows aligned; auto grows so Pro /
-          // multi-digit count badges never overflow into the truncated label.
-          'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]',
+          'grid-cols-[22px_minmax(0,1fr)_34px]',
           nonCollapsedSize,
           'group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center'
         ),
@@ -104,9 +100,7 @@ export function getSidebarNavIconClassName({
   return cn(
     'shrink-0 justify-self-center',
     tight ? 'h-3 w-3' : 'h-3.5 w-3.5',
-    // The active row deliberately owns white label text. Make the icon's
-    // semantic accent explicit so it cannot inherit that foreground color.
-    active ? 'text-accent-blue!' : inactiveIconColor,
+    active ? 'text-primary-token' : inactiveIconColor,
     className
   );
 }

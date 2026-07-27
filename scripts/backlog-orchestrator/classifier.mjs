@@ -6,10 +6,6 @@
  */
 
 import { createHash } from 'node:crypto';
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Classification result for a single issue.
@@ -159,7 +155,7 @@ function classifyEffort(issue) {
 /**
  * Detect exact duplicates by matching identifiers in issue relations.
  */
-function findExactDuplicates(issue, allIssues) {
+function findExactDuplicates(issue) {
   const dupes = [];
   for (const rel of issue.relations?.nodes || []) {
     if (rel.type === 'duplicate' || rel.type === 'duplicate_of') {
@@ -267,7 +263,7 @@ export function classifyDeterministic(issue, allIssues) {
   c.evidence.push(effort.evidence);
 
   // Duplicates
-  const dupes = findExactDuplicates(issue, allIssues);
+  const dupes = findExactDuplicates(issue);
   if (dupes.length > 0) {
     c.category = 'duplicate';
     c.relatedIssues.push(...dupes);

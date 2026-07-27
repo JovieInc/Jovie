@@ -142,51 +142,6 @@ export async function fetchTeamActiveIssues(teamId, maxResults = 1000) {
 }
 
 /**
- * Fetch all unassigned-eligible candidates currently in In Progress, including
- * comments needed for terminal machine-agent evidence and recovery idempotency.
- */
-export async function fetchTeamInProgressIssues(teamId, maxResults = 1000) {
-  const issues = [];
-  let cursor = null;
-  while (issues.length < maxResults) {
-    const data = await graphql(
-      `
-      query($teamId: String!, $cursor: String) {
-        team(id: $teamId) {
-          issues(
-            first: 50,
-            after: $cursor,
-            filter: { state: { name: { eq: "In Progress" } } }
-          ) {
-            nodes {
-              id
-              identifier
-              title
-              description
-              url
-              createdAt
-              updatedAt
-              assignee { id name }
-              labels { nodes { id name } }
-              state { id name type }
-              comments { nodes { id body createdAt } }
-            }
-            pageInfo { hasNextPage endCursor }
-          }
-        }
-      }
-    `,
-      { teamId, cursor }
-    );
-    const edge = data.team.issues;
-    issues.push(...edge.nodes);
-    if (!edge.pageInfo.hasNextPage) break;
-    cursor = edge.pageInfo.endCursor;
-  }
-  return issues;
-}
-
-/**
  * Fetch a single issue by identifier (e.g. "JOV-1234").
  */
 export async function fetchIssue(identifier) {

@@ -2,7 +2,7 @@
 // Type guards + transforms, no JSX/hooks -- a testable logic module.
 
 import { type UIMessage } from 'ai';
-import type { ChatErrorType, MessagePart } from '@/components/jovie/types';
+import type { MessagePart } from '@/components/jovie/types';
 import { type CheckoutCardPayload } from './ChatProposeCheckoutCard';
 import { type NextStepCardPayload } from './ChatProposeNextStepCard';
 import type {
@@ -138,38 +138,11 @@ export function findLastAssistantMessageId(messages: readonly UIMessage[]) {
   return null;
 }
 
-export function getOnboardingErrorMessage(
-  message: string,
-  errorCode?: string,
-  type: ChatErrorType = 'unknown'
-): string {
-  switch (errorCode) {
-    case 'TURNSTILE_REQUIRED':
-      return 'Complete the security check to send your message.';
-    case 'RATE_LIMITED':
-      return 'Too many messages were sent. Try again in a moment.';
-    case 'INVALID_ONBOARDING_PAYLOAD':
-    case 'INVALID_MESSAGES':
-      return 'Jovie could not send that message. Try again.';
-    case 'SESSION_SECRET_NOT_CONFIGURED':
-    case 'TURNSTILE_NOT_CONFIGURED':
-    case 'ONBOARDING_CHAT_PERSISTENCE_FAILED':
-    case 'INTERNAL_ERROR':
-      return 'Chat is temporarily unavailable. Try again in a moment.';
-    default:
-      break;
-  }
-
+export function getOnboardingErrorMessage(message: string): string {
   if (/authentication service is initializing/i.test(message)) {
     return 'Jovie is still connecting. Try again in a moment.';
   }
-  if (type === 'network' || /failed to fetch/i.test(message)) {
-    return 'Jovie could not reach the chat service.';
-  }
-  if (type === 'rate_limit') {
-    return 'Too many messages were sent. Try again in a moment.';
-  }
-  return 'Jovie could not send your message. Try again.';
+  return message;
 }
 
 export function artistFromSelection(

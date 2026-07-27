@@ -55,16 +55,13 @@ describe('HomepagePosterHero', () => {
     const primaryLink = screen.getByRole('link', { name: 'Enter Jovie' });
     expect(primaryLink).toHaveAttribute('href', '/signup');
     expect(primaryLink).toHaveAttribute('data-size', 'md');
-    expect(primaryLink).toHaveAttribute('data-variant', 'primary');
     expect(primaryLink).toHaveClass('active:scale-[0.98]');
     expect(primaryLink).toHaveClass('motion-reduce:active:scale-100');
 
     const secondaryLink = screen.getByRole('link', { name: 'See proof' });
     expect(secondaryLink).toHaveAttribute('href', '/artist-profiles');
-    expect(secondaryLink).toHaveAttribute('data-variant', 'ghost');
+    expect(secondaryLink).toHaveAttribute('data-variant', 'tertiary');
     expect(secondaryLink).toHaveClass('active:scale-[0.98]');
-    // Secondary must stay quieter than the primary conversion control.
-    expect(secondaryLink.getAttribute('data-variant')).not.toBe('primary');
   });
 
   it('keeps the copy, media, and reserved seam slots present', () => {

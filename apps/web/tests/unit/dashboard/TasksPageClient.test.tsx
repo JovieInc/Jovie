@@ -205,7 +205,6 @@ let mockListQueryIsError = false;
 let mockBoardQueryIsLoading = false;
 let mockBoardQueryIsError = false;
 let mockViewMode: 'board' | 'list' = 'list';
-let mockViewModeHydrated = true;
 let mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
 const mockUnifiedTable = vi.fn();
 const mockSetViewMode = vi.fn((viewMode: 'board' | 'list') => {
@@ -292,7 +291,7 @@ vi.mock('@/components/organisms/table/utils/useViewMode', () => ({
     viewMode: mockViewMode,
     setViewMode: mockSetViewMode,
     availableModes: ['board', 'list'],
-    isHydrated: mockViewModeHydrated,
+    isHydrated: true,
   }),
 }));
 
@@ -662,7 +661,6 @@ describe('TasksPageClient', () => {
     mockBoardQueryIsLoading = false;
     mockBoardQueryIsError = false;
     mockViewMode = 'list';
-    mockViewModeHydrated = true;
     mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
   });
 
@@ -710,17 +708,10 @@ describe('TasksPageClient', () => {
     expect(screen.getByTestId('tasks-board')).toBeInTheDocument();
     expect(screen.queryByTestId('tasks-table')).not.toBeInTheDocument();
     expect(screen.getByTestId('task-document-pane')).toHaveClass('hidden');
-    expect(screen.getByTestId('task-list-pane').parentElement).toHaveClass(
-      'lg:grid-cols-1'
-    );
 
     fireEvent.click(screen.getByTestId('mock-board-card-task-2'));
 
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
-    expect(screen.getByTestId('task-document-pane')).toHaveClass('lg:flex');
-    expect(screen.getByTestId('task-list-pane').parentElement).toHaveClass(
-      'lg:grid-cols-[minmax(0,1fr)_minmax(18rem,20rem)]'
-    );
   });
 
   it('uses board data for subview counts when the list query is not loaded', () => {
@@ -815,28 +806,25 @@ describe('TasksPageClient', () => {
     });
 
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
-    expect(screen.getByTestId('task-list-pane').parentElement).toHaveClass(
-      'lg:grid-cols-[minmax(20rem,0.9fr)_minmax(0,1.1fr)]'
-    );
   });
 
-  it('leaves table shells unselected so the task row owns selection treatment', () => {
+  it('marks the opened canonical task with the shared selected row state', () => {
     renderPage();
 
     expect(
       getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)
     ).not.toContain('system-b-table-row-selected');
-    expect(getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)).toContain(
-      '!bg-transparent'
-    );
 
     act(() => {
       getLatestTableProps()?.onRowClick?.(mockTaskTwo);
     });
 
-    expect(
-      getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)
-    ).not.toContain('system-b-table-row-selected');
+    expect(getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)).toContain(
+      'system-b-table-row-selected'
+    );
+    expect(getLatestTableProps()?.getRowClassName?.(mockTask, 1)).not.toContain(
+      'system-b-table-row-selected'
+    );
   });
 
   it('resets the canonical detail selection when subview filters exclude the selected task', () => {
@@ -946,33 +934,18 @@ describe('TasksPageClient', () => {
     );
   });
 
-  it('keeps one shared loading canvas through the responsive-layout handoff', () => {
+  it('keeps the list pane in loading mode through the responsive-layout handoff', () => {
     mockListQueryData = undefined;
-    mockListQueryIsLoading = true;
 
     renderPage();
 
-    expect(
-      screen.getByTestId('task-workspace-loading-rows')
-    ).toBeInTheDocument();
-    expect(mockUnifiedTable).not.toHaveBeenCalled();
-  });
+    const firstTableProps = mockUnifiedTable.mock.calls[0]?.[0] as
+      | {
+          readonly isLoading?: boolean;
+        }
+      | undefined;
 
-  it('does not fetch or swap canvas composition before saved view mode resolves', () => {
-    mockViewMode = 'board';
-    mockViewModeHydrated = false;
-
-    renderPage();
-
-    expect(
-      screen.getByTestId('task-workspace-loading-rows')
-    ).toBeInTheDocument();
-    expect(mockUseTasksQuery.mock.calls.at(-1)?.[2]).toEqual({
-      enabled: false,
-    });
-    expect(mockUseTaskBoardQuery.mock.calls.at(-1)?.[2]).toEqual({
-      enabled: false,
-    });
+    expect(firstTableProps?.isLoading).toBe(true);
   });
 
   it('shows shell loading rows on mobile instead of flashing the empty state', () => {

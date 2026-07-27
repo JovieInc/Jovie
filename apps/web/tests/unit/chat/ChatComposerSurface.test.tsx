@@ -191,18 +191,6 @@ describe('ChatComposerSurface accessibility states', () => {
     expect(dictate).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('explains the disabled send control via tooltip when empty', async () => {
-    const user = userEvent.setup();
-    renderComposer();
-
-    const send = screen.getByRole('button', { name: 'Send message' });
-    expect(send).toBeDisabled();
-    await user.hover(send);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      'Type a message to send'
-    );
-  });
-
   it('enables keyboard send for typed input without changing control dimensions', () => {
     const onSubmit = vi.fn();
     renderComposer({ value: 'Plan my next release', onSubmit });

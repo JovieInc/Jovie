@@ -203,13 +203,6 @@ The example above says one thing three times. Jovie should say it once.
 - Hover feedback should stay visual, not positional. Prefer color, border, or shadow changes. Do not make the interface jump on hover unless the motion communicates direct manipulation.
 - Before shipping a UI, run this check: does it look like a generic AI-generated SaaS mockup? If yes, remove chrome until it feels native to Jovie
 
-### Icon and Text Alignment
-
-- **Geometric centering is the default** for icon-and-text pairs and icon controls. It is the stable choice for Lucide and other arbitrary web SVGs, whose CSS baseline is synthesized rather than a compatible typographic metric.
-- Use **baseline alignment only when both items expose meaningful, compatible baselines**. Apple SF Symbols are the model: they carry baseline information and are designed to align with adjacent text. Do not infer that guarantee for arbitrary SVG assets.
-- A component may apply a **1–2px optical correction** only after screenshot evidence at the affected sizes and in both light and dark themes. Put that correction in the shared primitive, helper, or token that owns the pairing, never in a call-site margin or translate utility.
-- Optical correction must preserve the control's box, hit target, and layout geometry. It is static, never a hover effect or other motion.
-
 ### Ovie Ops Cockpit Guardrail
 
 Ovie UI/UX work must use the make-interfaces-better path: load gstack `/design-review`, load `design-taste-frontend` where available, and run the checklist in `docs/ovie-design-guardrails.md`.
@@ -952,7 +945,6 @@ mark intentional marketing sentence-case headlines with
 | 2026-04-11 | Canonical 1200px width for all marketing | Fixed inconsistent widths (header 1200px, hero 1120px). **Superseded 2026-06-28** by DS_FOUNDATION_V1 1298px. |
 | 2026-06-28 | Canonical 1298px public/marketing width (DS_FOUNDATION_V1) | One width in code + docs. `--ds-public-content-max` is canonical; legacy 1200/1280 aliases resolve to 1298px. Linear.app container parity. |
 | 2026-07-02 | Canonical button variants shipped (DS_FOUNDATION_V1 Wave 1) | 5 variants (`primary`, `secondary`, `tertiary`, `ghost`, `link`) + `destructive` prop. 3 sizes (`sm`/`md`/`lg`) + `icon`. 19 surface-specific `system-b-*-button` classes migrated behind a shrink-only ratchet. |
-| 2026-07-28 | Icon/text alignment policy (JOV-4511) | Geometric centering is the web default; baseline alignment requires compatible baseline-bearing assets. Optical correction is component-scoped, measured, static, and geometry-preserving. |
 | 2026-04-11 | Ban emoji-on-colored-square icons | Replaced with accent color on card title text. Icon-on-square reads as AI slop and cheapens the brand. |
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |
 | 2026-06-18 | **Unify on one design system, two languages.** Retire System A; conform whole app to System B tokens. | Founder-directed (supersedes the 2026-04-22 "defer 3 months" note). Target = one token foundation, one palette, one core typeface (Inter), expressed as a compact product language + an editorial marketing language. Aligns with gbrain "design system review" canon ("not two design systems — one system, two languages"). Editorial layouts are preserved; surfaces are reskinned onto System B tokens, each with a `*-system-b-style-guard` test + a global shrink-only ratchet. |

@@ -98,8 +98,9 @@ function VirtualizedTableRowComponent<TData>({
       } else {
         onRowClick?.(rowData);
       }
+      onFocusChange(rowIndex);
     },
-    [onRowClick, onRowShiftClick, rowData, rowIndex]
+    [onRowClick, onRowShiftClick, rowData, onFocusChange, rowIndex]
   );
 
   const handleKeyDown = useCallback(
@@ -107,17 +108,11 @@ function VirtualizedTableRowComponent<TData>({
     [onKeyDown, rowIndex, rowData]
   );
 
-  const handleFocusChange = useCallback(
-    (event: React.FocusEvent<HTMLTableRowElement>) => {
-      if (
-        shouldEnableKeyboardNav &&
-        event.currentTarget.matches(':focus-visible')
-      ) {
-        onFocusChange(rowIndex);
-      }
-    },
-    [shouldEnableKeyboardNav, onFocusChange, rowIndex]
-  );
+  const handleFocusChange = useCallback(() => {
+    if (shouldEnableKeyboardNav) {
+      onFocusChange(rowIndex);
+    }
+  }, [shouldEnableKeyboardNav, onFocusChange, rowIndex]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent<HTMLTableRowElement>) => {

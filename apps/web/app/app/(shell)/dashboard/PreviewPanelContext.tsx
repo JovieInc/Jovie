@@ -2,8 +2,6 @@
 
 import {
   createContext,
-  type Dispatch,
-  type SetStateAction,
   useCallback,
   useContext,
   useEffect,
@@ -62,8 +60,7 @@ interface PreviewPanelStateContextValue {
 
 interface PreviewPanelDataContextValue {
   previewData: PreviewPanelData | null;
-  /** Supports functional updates so hydrators can merge without races. */
-  setPreviewData: Dispatch<SetStateAction<PreviewPanelData | null>>;
+  setPreviewData: (data: PreviewPanelData | null) => void;
 }
 
 // Combined type for backwards compatibility

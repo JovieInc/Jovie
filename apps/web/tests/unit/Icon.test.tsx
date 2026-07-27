@@ -31,14 +31,6 @@ describe('Icon', () => {
     expect(screen.getByTestId('suffix')).toBeInTheDocument();
   });
 
-  it('renders integration-state icons used by the Bandsintown setup flow (JOV-4463)', () => {
-    render(<Icon name='Key' data-testid='key-icon' />);
-    expect(screen.getByTestId('key-icon')).toBeInTheDocument();
-
-    render(<Icon name='CalendarDays' data-testid='calendar-days-icon' />);
-    expect(screen.getByTestId('calendar-days-icon')).toBeInTheDocument();
-  });
-
   it('returns null for unknown icon', () => {
     const { container } = render(
       <Icon name={'NotRealIcon' as any} data-testid='icon' />

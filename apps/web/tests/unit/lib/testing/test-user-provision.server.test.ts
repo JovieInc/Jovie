@@ -5,14 +5,6 @@ const { mockCreateUser, mockGetUserList } = vi.hoisted(() => ({
   mockGetUserList: vi.fn(),
 }));
 
-const { mockDb } = vi.hoisted(() => ({
-  mockDb: {
-    delete: vi.fn(),
-    insert: vi.fn(),
-    select: vi.fn(),
-  },
-}));
-
 const { mockInvalidateProxyUserStateCache, mockRedisDel, mockRevalidateTag } =
   vi.hoisted(() => ({
     mockInvalidateProxyUserStateCache: vi.fn(),
@@ -45,90 +37,11 @@ vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: mockInvalidateProxyUserStateCache,
 }));
 
-vi.mock('@/lib/db', () => ({ db: mockDb }));
-
 describe('test-user-provision.server', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
     vi.stubEnv('CLERK_SECRET_KEY', 'sk_test_123');
-  });
-
-  it('replaces a legacy allowlisted Better Auth fixture with its UUID actor', async () => {
-    const legacyId = 'ba_dev_browse_ready_clerk_test_jov_ie';
-    const insertWithoutReplacement = {
-      values: vi.fn(() => ({
-        onConflictDoNothing: vi.fn(() => ({
-          returning: vi.fn(async () => []),
-        })),
-      })),
-    };
-    const insertReplacement = {
-      values: vi.fn(() => ({
-        onConflictDoNothing: vi.fn(() => ({
-          returning: vi.fn(async () => [
-            { id: 'c2c206c9-6f48-872d-b1bd-a1b572e67060' },
-          ]),
-        })),
-      })),
-    };
-
-    mockDb.insert
-      .mockReturnValueOnce(insertWithoutReplacement)
-      .mockReturnValueOnce(insertReplacement);
-    mockDb.select.mockReturnValue({
-      from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: vi.fn(async () => [{ id: legacyId }]),
-        })),
-      })),
-    });
-    mockDb.delete.mockReturnValue({ where: vi.fn(async () => undefined) });
-
-    const { ensureBetterAuthTestUser, getDeterministicTestBetterAuthUserId } =
-      await import('@/lib/testing/test-user-provision.server');
-
-    await expect(
-      ensureBetterAuthTestUser({
-        email: 'browse-ready+clerk_test@jov.ie',
-        fullName: 'Browse Ready User',
-      })
-    ).resolves.toBe(
-      getDeterministicTestBetterAuthUserId('browse-ready+clerk_test@jov.ie')
-    );
-    expect(mockDb.delete).toHaveBeenCalledTimes(1);
-    expect(mockDb.insert).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not replace a non-legacy Better Auth identity', async () => {
-    const existingId = 'ba_live_non_fixture';
-    mockDb.insert.mockReturnValue({
-      values: vi.fn(() => ({
-        onConflictDoNothing: vi.fn(() => ({
-          returning: vi.fn(async () => []),
-        })),
-      })),
-    });
-    mockDb.select.mockReturnValue({
-      from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: vi.fn(async () => [{ id: existingId }]),
-        })),
-      })),
-    });
-
-    const { ensureBetterAuthTestUser } = await import(
-      '@/lib/testing/test-user-provision.server'
-    );
-
-    await expect(
-      ensureBetterAuthTestUser({
-        email: 'person@example.com',
-        fullName: 'A Real Person',
-      })
-    ).resolves.toBe(existingId);
-    expect(mockDb.delete).not.toHaveBeenCalled();
-    expect(mockDb.insert).toHaveBeenCalledTimes(1);
   });
 
   it('derives a stable schema-valid UUID for each Better Auth test persona', async () => {

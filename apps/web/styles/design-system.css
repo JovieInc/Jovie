@@ -2203,21 +2203,6 @@ html:not(.dark) .smart-link-powered-by {
     border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* A quiet disclosure needs a keyboard cue without the global focus halo.
-   This is deliberately declared after the fallback so it wins for pointer and
-   keyboard focus alike; the underline is limited to :focus-visible. */
-[data-focus-treatment="underline-only"]:focus {
-  outline: none;
-  box-shadow: none;
-}
-
-[data-focus-treatment="underline-only"]:focus-visible {
-  box-shadow: none;
-  text-decoration-line: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 4px;
-}
-
 :where(
   input,
   textarea,

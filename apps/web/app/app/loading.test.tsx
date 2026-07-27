@@ -8,21 +8,14 @@ vi.mock('next/headers', () => ({ headers: headersMock }));
 vi.mock('@/components/organisms/AppShellSkeleton', () => ({
   AppShellSkeleton: ({
     brandVariant,
-    main,
   }: {
     readonly brandVariant?: 'jovie' | 'ov';
-    readonly main?: React.ReactNode;
   }) => (
     <div
       data-testid='app-shell-skeleton'
       data-brand-variant={brandVariant ?? 'jovie'}
-    >
-      {main}
-    </div>
+    />
   ),
-}));
-vi.mock('@/components/shell/TasksRouteSkeleton', () => ({
-  TasksRouteSkeleton: () => <div data-testid='tasks-route-skeleton' />,
 }));
 
 import AppLoading from './loading';
@@ -59,20 +52,5 @@ describe('app/app/loading.tsx', () => {
     expect(
       getByTestId('app-shell-skeleton').getAttribute('data-brand-variant')
     ).toBe('jovie');
-  });
-
-  it('reserves the Tasks frame in the app-root loading boundary', async () => {
-    headersMock.mockResolvedValue(
-      new Headers({
-        'x-jovie-app-shell-mode': 'customer',
-        'next-url': '/app/tasks',
-      })
-    );
-
-    const { getByTestId } = render(await AppLoading());
-
-    expect(getByTestId('app-shell-skeleton')).toContainElement(
-      getByTestId('tasks-route-skeleton')
-    );
   });
 });

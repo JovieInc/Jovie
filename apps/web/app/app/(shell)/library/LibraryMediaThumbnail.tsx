@@ -59,9 +59,6 @@ function LibraryArtworkImage({
     >
       <ArtworkFallbackTile
         seed={asset.title}
-        size={
-          size === 'row' ? 'thumbnail' : size === 'drawer' ? 'hero' : 'default'
-        }
         iconClassName={size === 'row' ? 'h-4 w-4' : 'h-[36%] w-[36%]'}
       />
     </div>

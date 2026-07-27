@@ -2,7 +2,6 @@
 
 import type { Virtualizer } from '@tanstack/react-virtual';
 import type { ReactNode, RefCallback } from 'react';
-import { CHAT_COMPOSER_EMPTY_PLACEHOLDER } from './chat-composer-copy';
 import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
   CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
@@ -111,7 +110,7 @@ export function ChatComposerSurface({
 
       <ChatInput
         {...chatInputProps}
-        placeholder={CHAT_COMPOSER_EMPTY_PLACEHOLDER} // ui-casing-allow: brand placeholder
+        placeholder='Ask Jovie to plan your next release...' // ui-casing-allow: brand placeholder
         variant={showThreadView ? 'compact' : 'hero'}
       />
     </div>

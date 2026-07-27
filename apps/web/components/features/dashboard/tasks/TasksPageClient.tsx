@@ -62,8 +62,10 @@ import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
   type ContextMenuItemType,
   ShellListRowButton,
+  ShellListRowFrame,
   TableEmptyState,
 } from '@/components/organisms/table';
+import { rowState } from '@/components/organisms/table/table.styles';
 import {
   isFormElement,
   resolveTableNavAction,
@@ -123,14 +125,12 @@ import {
   TaskSubviewTabs,
   TaskWorkspaceHeaderBar,
 } from './TaskWorkspaceHeaderBar';
-import { TaskWorkspaceLoadingRows } from './TaskWorkspaceLoadingRows';
 import { distinctTaskTitles, taskSearchFromPills } from './task-header-search';
 import {
   getTaskAssigneeVisual,
   getTaskPriorityVisual,
   getTaskStageVisual,
   getTaskStatusVisual,
-  TASK_STATUS_LABEL_CLASSNAME,
 } from './task-presentation';
 
 const columnHelper = createColumnHelper<TaskView>();
@@ -191,6 +191,13 @@ const MOBILE_TASK_SCOPE_OPTIONS = [
   ['open', 'Open'],
   ['done', 'Closed'],
 ] as const satisfies ReadonlyArray<readonly [MobileTaskScope, string]>;
+
+const TASK_LOADING_ROWS = [
+  { key: 'task-loading-1', titleWidth: '72%', metaWidth: '40%' },
+  { key: 'task-loading-2', titleWidth: '56%', metaWidth: '30%' },
+  { key: 'task-loading-3', titleWidth: '84%', metaWidth: '48%' },
+  { key: 'task-loading-4', titleWidth: '64%', metaWidth: '34%' },
+] as const;
 
 function getTaskSubviewForAssigneeFilter(
   assigneeFilter: TaskAssigneeKind | 'all'
@@ -347,14 +354,7 @@ function TaskStageInline({
         className={cn('h-3.5 w-3.5', task.status === 'done' && 'fill-current')}
         style={{ color: accent.solid }}
       />
-      <span
-        className={cn(
-          'font-semibold text-secondary-token',
-          TASK_STATUS_LABEL_CLASSNAME
-        )}
-      >
-        {stage.label}
-      </span>
+      <span className='font-semibold text-secondary-token'>{stage.label}</span>
       {withChevron ? (
         <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
       ) : null}
@@ -390,12 +390,10 @@ function TaskAssigneeInline({
   assigneeKind,
   artistName,
   withChevron = false,
-  compact = false,
 }: Readonly<{
   assigneeKind: TaskAssigneeKind;
   artistName?: string | null;
   withChevron?: boolean;
-  compact?: boolean;
 }>) {
   const meta = getTaskAssigneeVisual(assigneeKind, artistName);
   const accent = getAccentCssVars(meta.accent);
@@ -414,11 +412,7 @@ function TaskAssigneeInline({
       >
         <UserAvatar name={meta.avatarName} size='xs' />
       </span>
-      {compact ? (
-        <span className='sr-only'>{meta.label}</span>
-      ) : (
-        <span className='font-semibold text-secondary-token'>{meta.label}</span>
-      )}
+      <span className='font-semibold text-secondary-token'>{meta.label}</span>
       {withChevron ? (
         <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
       ) : null}
@@ -609,7 +603,6 @@ function TaskDocumentPanel({
   onUpdateAssignee,
   artistName,
   isDesktopLayout,
-  compactMetadata = false,
 }: Readonly<{
   task: TaskView | null;
   title: string;
@@ -623,7 +616,6 @@ function TaskDocumentPanel({
   onUpdateAssignee: (taskId: string, assigneeKind: TaskAssigneeKind) => void;
   artistName?: string | null;
   isDesktopLayout: boolean;
-  compactMetadata?: boolean;
 }>) {
   const descriptionEditorRef = useRef<HTMLTextAreaElement>(null);
   const [descriptionHelperDismissed, setDescriptionHelperDismissed] =
@@ -702,14 +694,7 @@ function TaskDocumentPanel({
           <div className='mx-auto flex w-full max-w-[40rem] flex-col gap-3 px-4 pb-5 pt-4 sm:px-5 sm:pb-6 sm:pt-5'>
             <TaskTitleEditor value={title} onChange={onTitleChange} />
 
-            <div
-              className={cn(
-                'flex items-center border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] pb-2 text-3xs text-secondary-token',
-                compactMetadata
-                  ? 'flex-nowrap gap-1'
-                  : 'flex-wrap gap-x-2 gap-y-1'
-              )}
-            >
+            <div className='flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] pb-3 text-2xs text-secondary-token'>
               <TaskMetaMenuNumber
                 task={task}
                 onOpenRelease={onOpenRelease}
@@ -784,7 +769,6 @@ function TaskDocumentPanel({
                       assigneeKind={task.assigneeKind}
                       artistName={artistName}
                       withChevron
-                      compact={compactMetadata}
                     />
                   </TaskMetaTrigger>
                 </DropdownMenuTrigger>
@@ -974,6 +958,52 @@ function TaskEmptyState({
   );
 }
 
+function TaskLoadingState() {
+  return (
+    <div
+      role='status'
+      aria-busy='true'
+      className='flex min-h-0 flex-1 flex-col gap-1.5 px-3 pb-4 pt-2'
+    >
+      <span className='sr-only'>Loading tasks</span>
+      {TASK_LOADING_ROWS.map(row => (
+        <ShellListRowFrame
+          key={row.key}
+          interaction='none'
+          data-testid='task-loading-row'
+          className='group/row flex min-h-16 items-center gap-3 px-3 py-1.5'
+        >
+          <span className='flex shrink-0 items-center'>
+            <div className='skeleton h-5 w-5 rounded-full' aria-hidden='true' />
+          </span>
+
+          <div className='min-w-0 flex-1'>
+            <div
+              className='skeleton h-3.5 max-w-full rounded'
+              style={{ width: row.titleWidth }}
+              aria-hidden='true'
+            />
+            <div className='mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1'>
+              <div
+                className='skeleton h-3 rounded'
+                style={{ width: row.metaWidth }}
+                aria-hidden='true'
+              />
+            </div>
+          </div>
+
+          <div className='flex shrink-0 items-center justify-end'>
+            <div
+              className='skeleton h-5 w-14 rounded-full'
+              aria-hidden='true'
+            />
+          </div>
+        </ShellListRowFrame>
+      ))}
+    </div>
+  );
+}
+
 function TaskErrorState({
   onRetry,
 }: Readonly<{
@@ -1057,7 +1087,7 @@ function MobileTaskSection({
   }
 
   return (
-    <section className='px-4 pb-4'>
+    <section className='px-3 pb-4'>
       <div className='mb-2 flex items-center justify-between px-1'>
         <h2 className='text-2xs font-semibold text-tertiary-token'>{title}</h2>
         <span className='text-3xs text-tertiary-token'>{tasks.length}</span>
@@ -1125,9 +1155,7 @@ function MobileTaskListItem({
           {task.title}
         </span>
         <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-3xs text-secondary-token'>
-          <span className={cn('truncate', TASK_STATUS_LABEL_CLASSNAME)}>
-            {stage.label}
-          </span>
+          <span className='truncate'>{stage.label}</span>
           <span className='text-tertiary-token'>J-{task.taskNumber}</span>
           <span className='inline-flex items-center gap-1'>
             <PriorityBars
@@ -1372,11 +1400,7 @@ export function TasksPageClient() {
     () => taskSearchFromPills(deferredPills),
     [deferredPills]
   );
-  const {
-    viewMode,
-    setViewMode,
-    isHydrated: isViewModeHydrated,
-  } = useViewMode({
+  const { viewMode, setViewMode } = useViewMode({
     storageKey: 'jovie-dashboard-tasks-view-mode',
     defaultMode: 'list',
     availableModes: TASK_VIEW_MODES,
@@ -1424,11 +1448,10 @@ export function TasksPageClient() {
       }),
     [showCancelledColumn, statusFilter]
   );
-  const isTaskLayoutReady = hasResolvedResponsiveLayout && isViewModeHydrated;
   const shouldFetchBoard =
-    isTaskLayoutReady && isBoardMode && Boolean(profileId);
+    hasResolvedResponsiveLayout && isBoardMode && Boolean(profileId);
   const shouldFetchList =
-    isTaskLayoutReady && !isBoardMode && Boolean(profileId);
+    hasResolvedResponsiveLayout && !isBoardMode && Boolean(profileId);
 
   const { data, isLoading, isError, refetch } = useTasksQuery(
     profileId,
@@ -1539,7 +1562,7 @@ export function TasksPageClient() {
     statusFilter !== 'all' ||
     priorityFilter !== 'all' ||
     assigneeFilter !== 'human';
-  const isResolvingProfile = !profileId || !isTaskLayoutReady;
+  const isResolvingProfile = !profileId || !hasResolvedResponsiveLayout;
   const isActiveBoardLoading = isResolvingProfile || isBoardLoading;
   const isActiveListLoading = isResolvingProfile || isLoading;
   const showTaskListPane =
@@ -1986,7 +2009,8 @@ export function TasksPageClient() {
   useRegisterHeaderActions(headerActions);
 
   const showAssigneeInListRows = assigneeFilter === 'all';
-  const hideSelectedRowDue = showTaskDocumentPane && Boolean(selectedTask);
+  const suppressSelectedRowDetailDuplicates =
+    showTaskDocumentPane && Boolean(selectedTask);
 
   const renderTaskCell = useCallback(
     (info: { row: { original: TaskView } }) => {
@@ -1999,7 +2023,8 @@ export function TasksPageClient() {
           artistName={artistName}
           isSelected={isRowSelected}
           showAssignee={showAssigneeInListRows}
-          hideDue={hideSelectedRowDue && isRowSelected}
+          hideTitle={suppressSelectedRowDetailDuplicates && isRowSelected}
+          hideDue={suppressSelectedRowDetailDuplicates && isRowSelected}
           actionSlot={
             <TaskRowActionMenu
               items={getTaskContextMenuItems(info.row.original)}
@@ -2016,7 +2041,7 @@ export function TasksPageClient() {
       getTaskContextMenuItems,
       openReleaseSidebar,
       showAssigneeInListRows,
-      hideSelectedRowDue,
+      suppressSelectedRowDetailDuplicates,
     ]
   );
 
@@ -2033,6 +2058,12 @@ export function TasksPageClient() {
       ] as ColumnDef<TaskView, unknown>[],
     [renderTaskCell]
   );
+  const getTaskRowClassName = useCallback(
+    (task: TaskView) =>
+      task.id === effectiveSelectedTaskId ? rowState.selected : '',
+    [effectiveSelectedTaskId]
+  );
+
   const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -2053,12 +2084,7 @@ export function TasksPageClient() {
   };
 
   let desktopTaskPane: React.ReactNode;
-  if (
-    isResolvingProfile ||
-    (isBoardMode ? isActiveBoardLoading : isActiveListLoading)
-  ) {
-    desktopTaskPane = <TaskWorkspaceLoadingRows />;
-  } else if (showTaskWorkbenchEmptyState) {
+  if (showTaskWorkbenchEmptyState) {
     desktopTaskPane = (
       <div className='flex h-full items-center justify-center px-6 py-6'>
         <div className='w-full max-w-[26rem] px-6 py-8'>
@@ -2079,7 +2105,6 @@ export function TasksPageClient() {
         isLoading={isActiveBoardLoading}
         artistName={artistName}
         selectedTaskId={effectiveSelectedTaskId}
-        compactColumnLabels={Boolean(selectedTask)}
         showAssigneeChip={assigneeFilter === 'all'}
         onOpenTask={openTaskDocument}
         onCreateTask={() => setHeaderMode('create')}
@@ -2095,6 +2120,7 @@ export function TasksPageClient() {
         isLoading={isActiveListLoading}
         getRowId={row => row.id}
         onRowClick={row => openTaskDocument(row)}
+        getRowClassName={getTaskRowClassName}
         getContextMenuItems={getTaskContextMenuItems}
         emptyState={
           <TaskEmptyState
@@ -2111,8 +2137,8 @@ export function TasksPageClient() {
   }
 
   let mobileTaskContent: React.ReactNode;
-  if (isResolvingProfile || isActiveListLoading) {
-    mobileTaskContent = <TaskWorkspaceLoadingRows />;
+  if (isActiveListLoading) {
+    mobileTaskContent = <TaskLoadingState />;
   } else if (mobileScopedTasks.length === 0) {
     mobileTaskContent = (
       <div className='px-4 pt-6'>
@@ -2174,7 +2200,6 @@ export function TasksPageClient() {
       />
       <PageShell
         className='absolute inset-0 overflow-hidden'
-        surfaceClassName='p-0'
         data-testid='tasks-workspace'
         toolbar={
           isDesktopTaskLayout || headerMode !== 'default' ? (
@@ -2214,7 +2239,7 @@ export function TasksPageClient() {
       >
         <section
           className={cn(
-            'flex min-h-0 flex-1 flex-col gap-1 overflow-hidden pb-1'
+            'flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pb-2'
           )}
           data-testid='tasks-content-panel'
         >
@@ -2225,24 +2250,15 @@ export function TasksPageClient() {
               }}
             />
           ) : (
-            <div
-              className={cn(
-                'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
-                isBoardMode
-                  ? selectedTask
-                    ? 'lg:grid-cols-[minmax(0,1fr)_minmax(18rem,20rem)] xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]'
-                    : 'lg:grid-cols-1'
-                  : 'lg:grid-cols-[minmax(20rem,0.9fr)_minmax(0,1.1fr)]'
-              )}
-            >
+            <div className='flex min-h-0 flex-1 overflow-hidden'>
               <div
                 data-testid='task-list-pane'
                 className={cn(
                   'min-h-0 min-w-0',
                   TASK_WORKSPACE_PANE_CLASSNAME,
                   viewMode !== 'board'
-                    ? 'lg:border-r lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
-                    : !selectedTask && 'lg:col-span-1',
+                    ? 'lg:flex-none lg:basis-[32rem] lg:min-w-[28rem] lg:max-w-xl lg:border-r lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                    : 'flex-1',
                   showTaskListPane ? 'block' : 'hidden',
                   !selectedTask && 'lg:max-w-none'
                 )}
@@ -2261,7 +2277,7 @@ export function TasksPageClient() {
                       subviews={taskSubviewOptions}
                       activeSubview={activeTaskSubview}
                       onSubviewChange={setTaskSubview}
-                      className='px-4 pb-1 pt-2'
+                      className='px-3 pb-1 pt-2'
                     />
                     <MobileTaskScopeTabs
                       scope={mobileScope}
@@ -2278,8 +2294,8 @@ export function TasksPageClient() {
                 className={cn(
                   'min-h-0 min-w-0 overflow-hidden',
                   isBoardMode
-                    ? 'lg:border-l lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
-                    : '',
+                    ? 'lg:flex-none lg:w-[min(34rem,42vw)] lg:border-l lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                    : 'flex-1',
                   TASK_WORKSPACE_PANE_CLASSNAME,
                   showTaskDocumentPane
                     ? isDesktopTaskLayout
@@ -2309,7 +2325,6 @@ export function TasksPageClient() {
                     }
                     artistName={artistName}
                     isDesktopLayout={isDesktopTaskLayout}
-                    compactMetadata={isBoardMode}
                   />
                 ) : (
                   <TaskDocumentPanel
@@ -2325,7 +2340,6 @@ export function TasksPageClient() {
                     onUpdateAssignee={NOOP_TASK_ASSIGNEE_UPDATE}
                     artistName={artistName}
                     isDesktopLayout={isDesktopTaskLayout}
-                    compactMetadata={false}
                   />
                 )}
               </div>

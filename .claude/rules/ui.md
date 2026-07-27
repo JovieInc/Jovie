@@ -131,13 +131,6 @@ tertiary, ghost, or `PageToolbarActionButton` treatment.
 - For decorative indicators, use small SVG icon components (Lucide icons or inline SVGs).
 - Applies to marketing pages, dashboards, mockups, and all user-facing surfaces.
 
-### Icon and Text Alignment
-
-- **Geometric centering is the default** for icon-and-text pairs and icon controls. Lucide and arbitrary web SVGs do not provide a guaranteed typographic baseline.
-- Use **baseline alignment only when both paired assets expose compatible, meaningful baselines**. System symbols with baseline metadata are the exception, not a reason to baseline-align arbitrary SVGs.
-- A **1–2px optical correction** is allowed only after screenshot evidence across the affected sizes and both themes. It must live in the shared primitive, helper, or token that owns the pair.
-- Never add an optical correction as a call-site margin or translate utility. It must be static, preserve layout and hit-target geometry, and must not appear on hover.
-
 ### Text Casing Rules
 
 - All user-facing text must follow `DESIGN.md` casing rules.

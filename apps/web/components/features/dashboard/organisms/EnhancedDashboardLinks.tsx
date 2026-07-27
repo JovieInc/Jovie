@@ -8,7 +8,6 @@ import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { mergePreviewPanelHydration } from '@/lib/profile/preview-panel-optimistic';
 import { getProfileIdentity } from '@/lib/profile/profile-identity';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { getHometownFromSettings } from '@/types/db';
@@ -210,7 +209,7 @@ export function EnhancedDashboardLinks({
       ((selectedProfile?.settings as Record<string, unknown> | null)
         ?.spotifyArtistName as string | null) ?? null;
     const appleMusicConnected = !!selectedProfile?.appleMusicId;
-    const incoming = {
+    setPreviewData({
       username,
       displayName,
       avatarUrl: avatarUrl || null,
@@ -226,8 +225,7 @@ export function EnhancedDashboardLinks({
         spotify: { connected: spotifyConnected, artistName: spotifyArtistName },
         appleMusic: { connected: appleMusicConnected, artistName: null },
       },
-    };
-    setPreviewData(current => mergePreviewPanelHydration(current, incoming));
+    });
   }, [
     avatarUrl,
     dashboardLinks,

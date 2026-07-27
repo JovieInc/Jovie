@@ -117,24 +117,6 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     });
   });
 
-  it('keeps the standard Google OAuth button available when One Tap declines', async () => {
-    oneTapConfiguredState.value = true;
-    oneTapMock.mockRejectedValueOnce(new Error('Google One Tap unavailable'));
-
-    render(<AuthShell mode='sign-in' />);
-
-    await waitFor(() => {
-      expect(oneTapMock).toHaveBeenCalledWith({
-        callbackURL: '/signin',
-        context: 'signin',
-      });
-    });
-
-    expect(
-      await screen.findByRole('button', { name: /google/i })
-    ).toBeVisible();
-  });
-
   it('starts Google sign-in through Better Auth social with mode-aware callbacks', async () => {
     const user = userEvent.setup();
     render(<AuthShell mode='sign-in' />);

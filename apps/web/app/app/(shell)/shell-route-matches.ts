@@ -62,19 +62,6 @@ function matchesNestedRoute(
 export function resolveAppShellRequestPath(
   ...headerValues: readonly (string | null)[]
 ): string | null {
-  return resolveAppShellLoadingPath(...headerValues) ?? APP_ROUTES.DASHBOARD;
-}
-
-/**
- * Resolves only paths explicitly supplied by Next's request headers.
- *
- * Loading boundaries must not borrow the `/app` fallback used by the
- * authenticated dashboard flow: `/app` is a chat route and would flash a
- * composer while the actual destination is still unknown.
- */
-export function resolveAppShellLoadingPath(
-  ...headerValues: readonly (string | null)[]
-): string | null {
   for (const headerValue of headerValues) {
     const pathname = parseAppShellPath(headerValue);
     if (pathname) {
@@ -82,7 +69,11 @@ export function resolveAppShellLoadingPath(
     }
   }
 
-  return null;
+  // Next dev and some test/bypass flows do not always populate the route
+  // headers that the app shell normally relies on. Defaulting to `/app`
+  // preserves the onboarding redirect guard for fresh users instead of
+  // falling through to a broken null-profile shell.
+  return APP_ROUTES.DASHBOARD;
 }
 
 export function isChatShellRoute(pathname: string | null): boolean {

@@ -40,9 +40,6 @@ export interface TaskPriorityVisual {
   readonly bars: number;
 }
 
-/** Shared guardrail for task status copy across list, board, and detail surfaces. */
-export const TASK_STATUS_LABEL_CLASSNAME = 'whitespace-nowrap';
-
 const TASK_VISUAL_STAGE_META: Record<
   TaskStatus,
   (agentStatus: TaskAgentStatus) => TaskVisualStage
