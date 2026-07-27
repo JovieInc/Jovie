@@ -112,7 +112,7 @@ For each COMMENTS_TO_ADDRESS PR, follow this cycle:
 For every open sonar-fix PR (including ones just fixed):
 
 ```bash
-# Add to Graphite merge queue (enqueues by label; native auto-merge retired)
+# Request GitHub native merge-queue enrollment
 gh pr edit <NUMBER> --add-label merge-queue
 
 # Update branch with latest base
@@ -252,7 +252,7 @@ Fixes {N} SonarCloud issues ({severity} priority):
 EOF
 )"
 
-# Add the PR to the Graphite merge queue (enqueues by label)
+# Request GitHub native merge-queue enrollment
 gh pr edit --add-label merge-queue
 ```
 

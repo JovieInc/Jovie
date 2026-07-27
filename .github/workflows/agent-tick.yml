@@ -163,7 +163,7 @@ jobs:
               echo "Queue pressure threshold reached. Stopping."; break
             fi
 
-            echo "All gates passed for PR #$PR_NUMBER. Adding to Graphite merge queue..."
+            echo "All gates passed for PR #$PR_NUMBER. Requesting native merge-queue enrollment..."
             if gh pr edit "$PR_NUMBER" --add-label "merge-queue"; then
               echo "Added PR #$PR_NUMBER to merge queue."; LANDED=$((LANDED + 1))
             else
