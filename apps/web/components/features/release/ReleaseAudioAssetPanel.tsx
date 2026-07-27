@@ -1,5 +1,6 @@
 'use client';
 
+import type { AudioPlaybackDerivative } from '@jovie/audio-contracts';
 import { upload } from '@vercel/blob/client';
 import { FileAudio2, Loader2, Upload } from 'lucide-react';
 import {
@@ -54,7 +55,13 @@ export function ReleaseAudioAssetPanel({
   const readyTestId =
     testIdPrefix === 'library' ? 'library-audio-ready' : 'release-audio-ready';
   const inputRef = useRef<HTMLInputElement>(null);
+  const onUploadedRef = useRef(onUploaded);
   const [localPreviewUrl, setLocalPreviewUrl] = useState(previewUrl ?? null);
+  const [hasAudioMaster, setHasAudioMaster] = useState(Boolean(previewUrl));
+  const [playbackDerivative, setPlaybackDerivative] =
+    useState<AudioPlaybackDerivative | null>(null);
+  const [isCheckingAudioState, setIsCheckingAudioState] = useState(!previewUrl);
+  const [audioStateRevision, setAudioStateRevision] = useState(0);
   const [snippet, setSnippet] = useState<AudioSnippet | null>(
     initialSnippet ?? null
   );
@@ -73,28 +80,56 @@ export function ReleaseAudioAssetPanel({
   }, [initialSnippet]);
 
   useEffect(() => {
-    if (initialSnippet || !localPreviewUrl) return;
+    onUploadedRef.current = onUploaded;
+  }, [onUploaded]);
 
+  useEffect(() => {
+    if (initialSnippet && localPreviewUrl) return;
     let cancelled = false;
-    fetch(
-      `/api/library/audio/snippet?releaseId=${encodeURIComponent(releaseId)}`
-    )
-      .then(async response => {
-        if (!response.ok) return null;
-        return (await response.json()) as {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const loadAudioState = async () => {
+      try {
+        const response = await fetch(
+          `/api/library/audio/snippet?releaseId=${encodeURIComponent(releaseId)}`
+        );
+        if (!response.ok) return;
+        const body = (await response.json()) as {
           snippet?: AudioSnippet | null;
+          previewUrl?: string | null;
+          hasAudioMaster?: boolean;
+          playbackDerivative?: AudioPlaybackDerivative | null;
         };
-      })
-      .then(body => {
-        if (cancelled || !body?.snippet) return;
-        setSnippet(body.snippet);
-      })
-      .catch(() => {});
+        if (cancelled) return;
+
+        if (body.snippet) setSnippet(body.snippet);
+        if (body.previewUrl && !localPreviewUrl) {
+          onUploadedRef.current?.(body.previewUrl);
+        }
+        setLocalPreviewUrl(body.previewUrl ?? null);
+        setHasAudioMaster(Boolean(body.hasAudioMaster));
+        setPlaybackDerivative(body.playbackDerivative ?? null);
+
+        if (
+          body.playbackDerivative?.status === 'pending' ||
+          body.playbackDerivative?.status === 'retrying'
+        ) {
+          timeoutId = setTimeout(loadAudioState, 3_000);
+        }
+      } catch {
+        // Preserve the last known state; the next mount or retry will re-read it.
+      } finally {
+        if (!cancelled) setIsCheckingAudioState(false);
+      }
+    };
+
+    loadAudioState().catch(() => {});
 
     return () => {
       cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [initialSnippet, localPreviewUrl, releaseId]);
+  }, [audioStateRevision, initialSnippet, localPreviewUrl, releaseId]);
 
   const openFilePicker = useCallback(() => {
     inputRef.current?.click();
@@ -155,18 +190,27 @@ export function ReleaseAudioAssetPanel({
         });
 
         const body = (await response.json().catch(() => ({}))) as {
-          readonly previewUrl?: string;
+          readonly previewUrl?: string | null;
+          readonly hasAudioMaster?: boolean;
+          readonly playbackDerivative?: AudioPlaybackDerivative | null;
           readonly error?: string;
         };
 
-        if (!response.ok || !body.previewUrl) {
+        if (!response.ok || !body.hasAudioMaster) {
           throw new Error(body.error ?? 'Audio upload failed');
         }
 
-        setLocalPreviewUrl(body.previewUrl);
+        setLocalPreviewUrl(body.previewUrl ?? null);
+        setHasAudioMaster(true);
+        setPlaybackDerivative(body.playbackDerivative ?? null);
+        setAudioStateRevision(revision => revision + 1);
         setSnippet(null);
-        onUploaded?.(body.previewUrl);
-        toast.success('Audio attached to release');
+        if (body.previewUrl) onUploaded?.(body.previewUrl);
+        toast.success(
+          body.previewUrl
+            ? 'Audio attached to release'
+            : 'Audio uploaded — preparing preview'
+        );
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Audio upload failed';
@@ -226,6 +270,76 @@ export function ReleaseAudioAssetPanel({
     },
     [onSnippetSaved, releaseId]
   );
+
+  if (!localPreviewUrl && (isCheckingAudioState || hasAudioMaster)) {
+    const status = playbackDerivative?.status;
+    const isWorking =
+      isCheckingAudioState ||
+      isUploading ||
+      status === 'pending' ||
+      status === 'retrying';
+    const statusCopy = {
+      pending: 'Preparing a browser-ready preview and waveform.',
+      retrying: 'Preview preparation is retrying automatically.',
+      failed: 'We could not prepare this preview. Your original is preserved.',
+      unavailable:
+        'This format is preserved, but a browser preview is not available.',
+      superseded: 'A newer audio upload replaced this preview.',
+      ready: 'Preview metadata is ready, but its audio URL is unavailable.',
+    }[status ?? 'pending'];
+
+    return (
+      <div
+        className='flex min-h-30 w-full items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-3 py-4'
+        data-testid='release-audio-derivative-status'
+        aria-live='polite'
+        aria-busy={isWorking || undefined}
+      >
+        <span className='grid h-8 w-8 shrink-0 place-items-center rounded-md bg-surface-1 text-secondary-token'>
+          {isWorking ? (
+            <Loader2
+              className='h-4 w-4 animate-spin motion-reduce:animate-none'
+              aria-hidden='true'
+              strokeWidth={2.25}
+            />
+          ) : (
+            <FileAudio2
+              className='h-4 w-4'
+              aria-hidden='true'
+              strokeWidth={2.25}
+            />
+          )}
+        </span>
+        <div className='min-w-0 flex-1'>
+          <p className='text-xs font-medium text-primary-token'>
+            {isWorking ? 'Preparing preview' : 'Preview unavailable'}
+          </p>
+          <p className='mt-0.5 text-2xs leading-4 text-tertiary-token'>
+            {statusCopy}
+          </p>
+        </div>
+        {!isWorking && isEditable ? (
+          <button
+            type='button'
+            onClick={openFilePicker}
+            className='focus-ring-themed shrink-0 rounded-md border border-subtle bg-surface-1 px-2 py-1 text-2xs font-medium text-primary-token transition-colors duration-subtle hover:bg-surface-0'
+          >
+            Replace audio
+          </button>
+        ) : null}
+        <input
+          ref={inputRef}
+          type='file'
+          accept={AUDIO_ACCEPT}
+          onChange={handleInputChange}
+          disabled={!isEditable || isUploading}
+          tabIndex={disabledTabIndex}
+          className='sr-only'
+          aria-label={`Upload audio for ${releaseTitle}`}
+        />
+      </div>
+    );
+  }
 
   if (!localPreviewUrl) {
     const formats = SUPPORTED_AUDIO_FORMAT_LABELS.join(', ');
