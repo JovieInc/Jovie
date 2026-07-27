@@ -176,7 +176,7 @@ test.describe('canonical real audio corpus', () => {
   test('meets playback, scrub, cue, and shell-continuity budgets without long tasks', async ({
     page,
   }, testInfo) => {
-    await page.goto('/dev/audio-proof');
+    await page.goto('/audio-proof/source');
     await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Load Real Audio' })
@@ -244,6 +244,26 @@ test.describe('canonical real audio corpus', () => {
         () => status() === 'playing' && currentTime() > 0,
         'real production playback'
       );
+      const visiblePlaybackControls = [
+        ...document.querySelectorAll<HTMLButtonElement>('button'),
+      ].filter(element => {
+        const label = element.getAttribute('aria-label') ?? '';
+        const text = element.textContent?.trim() ?? '';
+        return (
+          !element.disabled &&
+          element.getClientRects().length > 0 &&
+          !element.closest('[aria-hidden="true"]') &&
+          (label.startsWith('Play') ||
+            label.startsWith('Pause') ||
+            text === 'Load Real Audio' ||
+            text === 'Stop Audio')
+        );
+      });
+      if (visiblePlaybackControls.length !== 1) {
+        throw new Error(
+          `Expected one visible playback authority, found ${visiblePlaybackControls.length}`
+        );
+      }
       button('Navigate Shell').click();
       await waitFor(() => view() === 'destination', 'destination shell');
       button('Navigate Shell').click();
@@ -273,7 +293,7 @@ test.describe('canonical real audio corpus', () => {
           const playToAudibleMs = performance.now() - playStart;
 
           const scrubStart = performance.now();
-          button('Scrub to 0:12').click();
+          button('Scrub 0:12').click();
           await waitFor(
             () =>
               status() !== 'seeking' && Math.abs(currentTime() - 12.5) <= 0.1,
@@ -282,7 +302,7 @@ test.describe('canonical real audio corpus', () => {
           const timelineScrubMs = performance.now() - scrubStart;
 
           const cueStart = performance.now();
-          button('Jump to Proof Cue').click();
+          button('Jump To Proof Cue').click();
           await waitFor(
             () => status() !== 'seeking' && Math.abs(currentTime() - 48) <= 0.1,
             'settled production cue jump'
@@ -320,7 +340,9 @@ test.describe('canonical real audio corpus', () => {
         }));
       } finally {
         observer.disconnect();
-        button('Stop Audio').click();
+        if (status() === 'playing') {
+          transport('Pause').click();
+        }
       }
     });
 

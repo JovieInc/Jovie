@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { isLocalDevelopmentAutomationHostname } from '@/lib/security/development-only';
+import { AudioProofClient } from './AudioProofClient';
 import { AudioProofShell } from './AudioProofShell';
 
 export default async function AudioProofLayout({
@@ -28,5 +31,17 @@ export default async function AudioProofLayout({
     notFound();
   }
 
-  return <AudioProofShell>{children}</AudioProofShell>;
+  const fixture = readFileSync(
+    resolve(process.cwd(), 'tests/fixtures/audio/long-vbr-tone.mp3')
+  );
+
+  return (
+    <AudioProofShell>
+      <AudioProofClient
+        audioSrc={`data:audio/mpeg;base64,${fixture.toString('base64')}`}
+      >
+        {children}
+      </AudioProofClient>
+    </AudioProofShell>
+  );
 }

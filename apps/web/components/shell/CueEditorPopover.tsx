@@ -6,7 +6,7 @@ import {
   type AudioTimelineDocumentV1,
   type AudioTimelineEdit,
 } from '@jovie/audio-contracts';
-import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import {
   CornerDownLeft,
   Flag,
@@ -16,6 +16,7 @@ import {
   Undo2,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
 import { Tooltip } from './Tooltip';
@@ -129,8 +130,10 @@ export function CueEditorPopover({
     >
       <Tooltip label='Edit Cues' side='top'>
         <PopoverTrigger asChild>
-          <button
+          <Button
             type='button'
+            variant='ghost'
+            size='icon'
             aria-label='Edit Cues'
             aria-pressed={open}
             className={cn(
@@ -141,7 +144,7 @@ export function CueEditorPopover({
             )}
           >
             <Flag className='h-3.5 w-3.5' strokeWidth={2.25} />
-          </button>
+          </Button>
         </PopoverTrigger>
       </Tooltip>
       <PopoverContent
@@ -153,24 +156,28 @@ export function CueEditorPopover({
         <div className='flex h-11 items-center justify-between border-b border-subtle px-3'>
           <span className='text-app font-caption text-primary-token'>Cues</span>
           <div className='flex items-center gap-2'>
-            <button
+            <Button
               type='button'
+              variant='ghost'
+              size='icon'
               aria-label='Undo Cue Change'
               disabled={!canUndo}
               onClick={onUndo}
               className={ICON_BUTTON_CLASS}
             >
               <Undo2 className='h-3.5 w-3.5' />
-            </button>
-            <button
+            </Button>
+            <Button
               type='button'
+              variant='ghost'
+              size='icon'
               aria-label='Redo Cue Change'
               disabled={!canRedo}
               onClick={onRedo}
               className={ICON_BUTTON_CLASS}
             >
               <Redo2 className='h-3.5 w-3.5' />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -189,14 +196,16 @@ export function CueEditorPopover({
               </option>
             ))}
           </select>
-          <button
+          <Button
             type='button'
+            variant='secondary'
+            size='sm'
             onClick={addCue}
             disabled={!canAddAtPlayhead}
             className='h-8 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-caption text-primary-token transition-colors duration-subtle ease-subtle hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-35'
           >
-            Add at {formatTime(currentTime)}
-          </button>
+            Add At {formatTime(currentTime)}
+          </Button>
         </div>
 
         <div className='relative h-1 bg-surface-0' aria-hidden='true'>
@@ -206,7 +215,14 @@ export function CueEditorPopover({
                   key={cue.id}
                   className='absolute inset-y-0 w-0.5 bg-primary-token'
                   style={{
-                    left: `${Math.min(100, (cue.sampleOffset / Math.max(1, durationSamples)) * 100)}%`,
+                    left: `${Math.min(
+                      100,
+                      computeRatePercent(
+                        cue.sampleOffset,
+                        Math.max(1, durationSamples),
+                        6
+                      )
+                    )}%`,
                   }}
                 />
               ))
@@ -255,18 +271,22 @@ export function CueEditorPopover({
                         }}
                         className='h-8 min-w-0 flex-1 rounded-md border border-subtle bg-surface-0 px-2 text-xs text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
                       />
-                      <button
+                      <Button
                         type='submit'
+                        variant='ghost'
+                        size='icon'
                         aria-label='Save Cue Name'
                         className={ICON_BUTTON_CLASS}
                       >
                         <CornerDownLeft className='h-3.5 w-3.5' />
-                      </button>
+                      </Button>
                     </form>
                   ) : (
                     <>
-                      <button
+                      <Button
                         type='button'
+                        variant='ghost'
+                        size='sm'
                         onClick={() => onJump(cue.id)}
                         className='min-w-0 flex-1 rounded-md px-2 py-1.5 text-left transition-colors duration-subtle ease-subtle hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
                         aria-label={`Jump to ${cue.label} at ${formatTime(time)}`}
@@ -279,17 +299,21 @@ export function CueEditorPopover({
                             {formatTime(time)}
                           </span>
                         </span>
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type='button'
+                        variant='ghost'
+                        size='icon'
                         aria-label={`Rename ${cue.label}`}
                         onClick={() => beginRename(cue.id, cue.label)}
                         className={ICON_BUTTON_CLASS}
                       >
                         <Pencil className='h-3.5 w-3.5' />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type='button'
+                        variant='ghost'
+                        size='icon'
                         aria-label={`Move ${cue.label} to ${formatTime(currentTime)}`}
                         disabled={
                           moveBlocked || cue.sampleOffset === targetSampleOffset
@@ -304,9 +328,11 @@ export function CueEditorPopover({
                         className={ICON_BUTTON_CLASS}
                       >
                         <Flag className='h-3.5 w-3.5' />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type='button'
+                        variant='ghost'
+                        size='icon'
                         aria-label={`Delete ${cue.label}`}
                         onClick={() =>
                           onEdit({ type: 'delete', cueId: cue.id })
@@ -314,7 +340,7 @@ export function CueEditorPopover({
                         className={ICON_BUTTON_CLASS}
                       >
                         <Trash2 className='h-3.5 w-3.5' />
-                      </button>
+                      </Button>
                     </>
                   )}
                 </li>

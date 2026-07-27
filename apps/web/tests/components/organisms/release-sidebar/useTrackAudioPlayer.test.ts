@@ -252,6 +252,42 @@ describe('useTrackAudioPlayer', () => {
     frameSpy.mockRestore();
   });
 
+  it('gives only the latest playing event ownership of playhead polling', async () => {
+    const frameCallbacks: FrameRequestCallback[] = [];
+    const frameSpy = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation(callback => {
+        frameCallbacks.push(callback);
+        return frameCallbacks.length;
+      });
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      mockAudio.duration = 60;
+      fireAudioEvent('playing');
+      fireAudioEvent('playing');
+      mockAudio.currentTime = 0.02;
+      frameCallbacks.shift()?.(performance.now());
+    });
+    expect(result.current.playbackState.currentTime).toBe(0);
+
+    act(() => {
+      frameCallbacks.shift()?.(performance.now());
+    });
+    expect(result.current.playbackState.currentTime).toBe(0.02);
+    expect(frameCallbacks).toHaveLength(0);
+    frameSpy.mockRestore();
+  });
+
   it('toggles pause/resume when called with the same track ID', async () => {
     const useTrackAudioPlayer = await importFresh();
     const { result } = renderHook(() => useTrackAudioPlayer());

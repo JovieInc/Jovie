@@ -49,7 +49,7 @@ describe('CueEditorPopover', () => {
 
     await user.click(screen.getByRole('button', { name: 'Edit Cues' }));
     await user.selectOptions(screen.getByRole('combobox'), 'verse');
-    await user.click(screen.getByRole('button', { name: 'Add at 0:02' }));
+    await user.click(screen.getByRole('button', { name: 'Add At 0:02' }));
 
     expect(props.onEdit).toHaveBeenCalledWith({
       type: 'add',
@@ -117,7 +117,7 @@ describe('CueEditorPopover', () => {
     renderEditor({ currentTime: 5 });
 
     await user.click(screen.getByRole('button', { name: 'Edit Cues' }));
-    expect(screen.getByRole('button', { name: 'Add at 0:05' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add At 0:05' })).toBeDisabled();
     expect(
       screen.getByRole('button', { name: 'Move Drop to 0:05' })
     ).toBeDisabled();
